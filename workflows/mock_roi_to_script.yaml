@@ -1,0 +1,15 @@
+name: mock_roi_to_script
+version: 1
+steps:
+  - id: analyze_hooks
+    type: analyze_hooks
+    inputs:
+      text_file: input_text_file
+    outputs:
+      hooks: hooks.json
+  - id: generate_scripts
+    type: generate_scripts
+    inputs:
+      hooks: hooks
+    outputs:
+      scripts: scripts.json

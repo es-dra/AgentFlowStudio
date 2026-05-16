@@ -11,6 +11,12 @@ from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.schemas import Hook
 from narratocut.utils import write_json
+from narratocut.workflow_engine import (
+    WorkflowContext,
+    WorkflowRunner,
+    default_node_registry,
+    load_workflow,
+)
 
 
 app = typer.Typer(
@@ -88,6 +94,50 @@ def generate_scripts_command(
     scripts = generate_scripts_from_hooks(hooks)
     write_json(output_path, scripts)
     typer.echo(f"Wrote {len(scripts)} scripts to {output_path}")
+
+
+@app.command(name="run-workflow")
+def run_workflow_command(
+    workflow_path: Path = typer.Option(
+        ...,
+        "--workflow",
+        "-w",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to workflow YAML.",
+    ),
+    input_path: Path = typer.Option(
+        ...,
+        "--input",
+        "-i",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="UTF-8 text file used as input_text_file.",
+    ),
+    output_dir: Path = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Directory for workflow artifacts.",
+    ),
+) -> None:
+    """Run a minimal sequential workflow with local mock nodes."""
+    workflow = load_workflow(workflow_path)
+    context = WorkflowContext(
+        run_id=output_dir.name,
+        workflow_name=workflow.name,
+        output_dir=output_dir,
+        inputs={"input_text_file": str(input_path)},
+    )
+    run = WorkflowRunner(default_node_registry()).run(workflow, context)
+    manifest_path = context.output_path("manifest.json")
+    typer.echo(f"Workflow {run.status}: {manifest_path}")
+    if run.status == "failed":
+        raise typer.Exit(code=1)
 
 
 def _load_hooks(hooks_path: Path) -> list[Hook]:
