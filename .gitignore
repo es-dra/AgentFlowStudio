@@ -1,0 +1,54 @@
+# env
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# local model configuration
+configs/models.yaml
+!configs/models.example.yaml
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# local data and generated artifacts
+data/raw/*
+data/processed/*
+data/outputs/*
+data/reports/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/outputs/.gitkeep
+!data/reports/.gitkeep
+
+# media
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wav
+*.mp3
+*.flac
+
+# generated
+/outputs/
+/artifacts/
+/runs/
+
+# node and tool caches
+node_modules/
+.claude-data/
+.codex/
+.cache/
+
+# secrets
+*.key
+*.pem
+*.p12

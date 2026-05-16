@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "narratocut"
+version = "0.1.0"
+description = "AI narrative-to-promo video workflow system for short drama and story-driven content."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2",
+    "typer",
+    "pyyaml",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+ncut = "apps.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*", "narratocut*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

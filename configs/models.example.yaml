@@ -1,0 +1,17 @@
+llm:
+  default: mock
+  providers:
+    mock:
+      type: mock
+      model: mock-llm
+      description: "Deterministic local provider used for tests and demos."
+    newapi:
+      type: openai_compatible
+      base_url: "${NEWAPI_BASE_URL}"
+      api_key_env: NEWAPI_API_KEY
+      model: deepseek-chat
+      enabled: false
+
+remote_calls:
+  allow_env: NARRATOCUT_ALLOW_REMOTE_LLM
+  default_allowed: false
