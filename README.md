@@ -1,18 +1,36 @@
 # NarratoCut
 
-NarratoCut is an AI narrative-to-promo video workflow system for short dramas, animated dramas, and novel-promo content.
+NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
 
-The first MVP focuses on one reproducible production chain:
+This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
+
+## Current Status
+
+NarratoCut is a CLI-first, schema-first, workflow-first prototype. The default pipeline is local and mock-driven:
 
 ```text
-subtitle/text -> hooks -> scripts -> clip_plans -> vertical videos -> metadata package
+text -> hooks -> scripts -> clip_plans -> mock clips
 ```
 
-This is a clean-room project. The previous AVP workspace is treated as reference material only, not as a codebase to migrate.
+Implemented capabilities:
 
-## Current Scope
+- ROI / hook analysis with a local mock provider
+- Mock short-video script generation
+- Deterministic ClipPlan generation
+- Mock slicing output with `slice_manifest.json` and `.txt` placeholder clips
+- Sequential YAML workflow execution
+- Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
+- FFmpeg availability probe
+- Real slicing command contract
 
-NarratoCut starts as a CLI-first, schema-first, workflow-first system. The early implementation avoids a full web app, database, SaaS features, multi-agent runtime, and async task queue.
+Not implemented yet:
+
+- real FFmpeg video slicing workflow
+- subtitle burn-in
+- vertical crop or aspect-ratio adaptation
+- BGM, cover generation, or multi-track timelines
+- web UI, API server, database, queue, or hosted SaaS runtime
 
 ## Project Layout
 
@@ -28,27 +46,73 @@ docs/                 Architecture and operating notes
 tests/                Automated tests and fixtures
 ```
 
-## Model Gateway Boundary
+## Requirements
 
-`narratocut.model_gateway` is the internal adapter layer. New API, LiteLLM, DeepSeek, Qwen, or other OpenAI-compatible services are external model gateways/endpoints. NarratoCut does not vendor or copy New API code.
-
-Remote LLM calls are disabled by default. Set `NARRATOCUT_ALLOW_REMOTE_LLM=true` only when real provider calls are intended.
+- Python 3.12 is recommended.
+- The project declares `>=3.11,<3.13`.
+- Python 3.13 is not recommended yet because ASR, video, and model-adjacent dependencies often lag the newest runtime.
+- FFmpeg is optional at this stage. `ffmpeg-check` only probes local availability.
 
 ## Quick Start
 
-Recommended Python version: 3.12. The project currently declares `>=3.11,<3.13`; Python 3.13 is not recommended yet because ASR, video, and model-adjacent dependencies often lag the newest runtime.
+PowerShell:
 
 ```powershell
 cd D:\Projects\NarratoCut
-python -m apps.cli.main --help
-python -m apps.cli.main version
+python -m venv .venv
+.venv\Scripts\pip install -e .[dev]
+.venv\Scripts\python -m pytest
+.venv\Scripts\ncut version
 ```
 
-After editable install:
+Run the full mock workflow:
 
 ```powershell
-pip install -e .[dev]
-ncut --help
-ncut version
-pytest
+.venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
+```
+
+Expected generated files:
+
+```text
+data/processed/runs/demo_full_mock/
++-- manifest.json
++-- hooks.json
++-- scripts.json
++-- clip_plans.json
++-- slice_manifest.json
++-- clips/
+    +-- clip_plan_script_mock_001.txt
+    +-- clip_plan_script_mock_002.txt
+    +-- clip_plan_script_mock_003.txt
+```
+
+Generated files under `data/processed/` are ignored by git.
+
+## Model Gateway Boundary
+
+The default provider is `mock`, so the standard CLI and workflow commands do not need an API key and do not access the network.
+
+Remote LLM calls are disabled by default. Set `NARRATOCUT_ALLOW_REMOTE_LLM=true` only when real provider calls are intended.
+
+Local model settings belong in `configs/models.yaml`, which is ignored by git. Commit only `configs/models.example.yaml`.
+
+## FFmpeg Boundary
+
+Check local FFmpeg availability:
+
+```powershell
+.venv\Scripts\ncut ffmpeg-check
+```
+
+If FFmpeg is not installed or not on `PATH`, this command reports an unavailable status. That is acceptable for the current MVP.
+
+Phase 7 only defines the real slicing command contract. It does not execute real FFmpeg slicing and does not generate `.mp4` outputs.
+
+## Development Checks
+
+```powershell
+.venv\Scripts\python -m pytest
+.venv\Scripts\python -m compileall -q apps narratocut tests
+.venv\Scripts\ncut --help
+.venv\Scripts\ncut version
 ```

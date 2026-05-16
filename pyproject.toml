@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "narratocut"
 version = "0.1.0"
-description = "AI narrative-to-promo video workflow system for short drama and story-driven content."
+description = "AI-assisted short video production workflow MVP for story-driven content."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
