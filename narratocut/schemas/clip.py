@@ -13,9 +13,11 @@ RenderMode = Literal["blurred_bg", "center_crop", "fit"]
 
 
 class ClipSegment(SchemaBase):
+    segment_id: str | None = None
     source_video: str
     start_sec: float = Field(ge=0)
     end_sec: float = Field(ge=0)
+    text: str | None = None
     speed: float = Field(default=1.0, gt=0)
     keep_original_audio: bool = True
     metadata: dict[str, Any] = Metadata
@@ -49,6 +51,7 @@ class ClipPlan(SchemaBase):
     project_id: str
     hook_id: str
     script_id: str | None = None
+    duration_sec: float | None = Field(default=None, ge=0)
     title: str
     cover_text: str
     segments: list[ClipSegment] = Field(default_factory=list)

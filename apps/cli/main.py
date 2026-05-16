@@ -9,7 +9,8 @@ from pydantic import ValidationError
 
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
-from narratocut.schemas import Hook
+from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
+from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
 from narratocut.utils import write_json
 from narratocut.workflow_engine import (
     WorkflowContext,
@@ -140,6 +141,55 @@ def run_workflow_command(
         raise typer.Exit(code=1)
 
 
+@app.command(name="generate-clip-plans")
+def generate_clip_plans_command(
+    scripts_path: Path = typer.Option(
+        ...,
+        "--scripts",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to scripts JSON.",
+    ),
+    output_path: Path = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Path to write clip plans JSON.",
+    ),
+) -> None:
+    """Generate deterministic mock clip plans from scripts JSON."""
+    scripts = _load_scripts(scripts_path)
+    clip_plans = generate_clip_plans_from_scripts(scripts)
+    write_json(output_path, clip_plans)
+    typer.echo(f"Wrote {len(clip_plans)} clip plans to {output_path}")
+
+
+@app.command(name="mock-slice")
+def mock_slice_command(
+    clip_plans_path: Path = typer.Option(
+        ...,
+        "--clip-plans",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to clip plans JSON.",
+    ),
+    output_dir: Path = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Directory for mock slice outputs.",
+    ),
+) -> None:
+    """Write mock slice outputs from clip plans JSON."""
+    clip_plans = _load_clip_plans(clip_plans_path)
+    manifest = mock_slice_clip_plans(clip_plans, output_dir)
+    typer.echo(f"Wrote {manifest['clip_count']} mock clips to {output_dir}")
+
+
 def _load_hooks(hooks_path: Path) -> list[Hook]:
     try:
         payload = json.loads(hooks_path.read_text(encoding="utf-8"))
@@ -151,6 +201,32 @@ def _load_hooks(hooks_path: Path) -> list[Hook]:
         return [Hook.model_validate(item) for item in payload]
     except ValidationError as exc:
         raise typer.BadParameter(f"Hooks file failed Hook schema validation: {exc}") from exc
+
+
+def _load_scripts(scripts_path: Path) -> list[ShortVideoScript]:
+    payload = _load_json_array(scripts_path, "Scripts")
+    try:
+        return [ShortVideoScript.model_validate(item) for item in payload]
+    except ValidationError as exc:
+        raise typer.BadParameter(f"Scripts file failed ShortVideoScript schema validation: {exc}") from exc
+
+
+def _load_clip_plans(clip_plans_path: Path) -> list[ClipPlan]:
+    payload = _load_json_array(clip_plans_path, "Clip plans")
+    try:
+        return [ClipPlan.model_validate(item) for item in payload]
+    except ValidationError as exc:
+        raise typer.BadParameter(f"Clip plans file failed ClipPlan schema validation: {exc}") from exc
+
+
+def _load_json_array(path: Path, label: str) -> list[object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise typer.BadParameter(f"{label} file is not valid JSON: {exc.msg}") from exc
+    if not isinstance(payload, list):
+        raise typer.BadParameter(f"{label} file must contain a JSON array.")
+    return payload
 
 
 if __name__ == "__main__":
