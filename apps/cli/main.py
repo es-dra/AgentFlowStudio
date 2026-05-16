@@ -10,7 +10,11 @@ from pydantic import ValidationError
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
-from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
+from narratocut.slicing_sop import (
+    check_ffmpeg_available,
+    generate_clip_plans_from_scripts,
+    mock_slice_clip_plans,
+)
 from narratocut.utils import write_json
 from narratocut.workflow_engine import (
     WorkflowContext,
@@ -188,6 +192,25 @@ def mock_slice_command(
     clip_plans = _load_clip_plans(clip_plans_path)
     manifest = mock_slice_clip_plans(clip_plans, output_dir)
     typer.echo(f"Wrote {manifest['clip_count']} mock clips to {output_dir}")
+
+
+@app.command(name="ffmpeg-check")
+def ffmpeg_check_command(
+    executable: str = typer.Option(
+        "ffmpeg",
+        "--executable",
+        "-e",
+        help="FFmpeg executable to probe.",
+    ),
+) -> None:
+    """Check whether FFmpeg is callable on this machine."""
+    info = check_ffmpeg_available(executable)
+    if info.available:
+        version = info.version or "unknown version"
+        typer.echo(f"FFmpeg available: {info.executable} ({version})")
+        return
+
+    typer.echo(f"FFmpeg unavailable: {info.error}")
 
 
 def _load_hooks(hooks_path: Path) -> list[Hook]:

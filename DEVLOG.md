@@ -21,3 +21,10 @@
 - Added `workflows/mock_text_to_slices.yaml` for the full mock chain: text -> hooks -> scripts -> clip_plans -> mock clips.
 - Updated workflow docs with the full mock run command and expected artifacts.
 - Verification: full mock workflow test passed and CLI run generated `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_manifest.json`, and 3 ignored `.txt` mock clip files.
+
+## 2026-05-16 - Phase 7 Real Slicing Design + FFmpeg Probe
+
+- Added `ffmpeg_probe` for structured FFmpeg availability checks without requiring FFmpeg during tests.
+- Added `real_slicer` command-contract helpers that build, but do not execute, minimal FFmpeg slice commands.
+- Added `ffmpeg-check` CLI as an informational local probe; it does not alter mock workflows or require real video assets.
+- Added real slicing design notes documenting the current mock boundary and future FFmpeg input/output contract.
