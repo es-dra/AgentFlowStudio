@@ -1,0 +1,27 @@
+name: mock_text_to_slices
+version: 1
+steps:
+  - id: analyze_hooks
+    type: analyze_hooks
+    inputs:
+      text_file: input_text_file
+    outputs:
+      hooks: hooks.json
+  - id: generate_scripts
+    type: generate_scripts
+    inputs:
+      hooks: hooks
+    outputs:
+      scripts: scripts.json
+  - id: generate_clip_plans
+    type: generate_clip_plans
+    inputs:
+      scripts: scripts
+    outputs:
+      clip_plans: clip_plans.json
+  - id: mock_slice
+    type: mock_slice
+    inputs:
+      clip_plans: clip_plans
+    outputs:
+      slice_manifest: slice_manifest.json
