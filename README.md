@@ -1,5 +1,7 @@
 # NarratoCut
 
+[中文 README](README.zh-CN.md)
+
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
 It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
 
