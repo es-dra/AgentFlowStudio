@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, FFmpeg readiness checks, and a standalone minimal real slicing PoC.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -29,10 +29,11 @@ Implemented capabilities:
 - Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
 - FFmpeg availability probe
 - Real slicing command contract
+- Standalone `ncut slice-real` PoC for local FFmpeg slicing from clip plans
 
 Not implemented yet:
 
-- real FFmpeg video slicing workflow
+- full real FFmpeg video slicing workflow
 - subtitle burn-in
 - vertical crop or aspect-ratio adaptation
 - BGM, cover generation, or multi-track timelines
@@ -137,7 +138,16 @@ Check local FFmpeg availability:
 
 If FFmpeg is not installed or not on `PATH`, this command reports an unavailable status. That is acceptable for the current MVP.
 
-Phase 7 only defines the real slicing command contract. It does not execute real FFmpeg slicing and does not generate `.mp4` outputs.
+Run the standalone minimal real slicing PoC:
+
+```powershell
+.venv\Scripts\ncut slice-real --video <local_input.mp4> --clip-plans <clip_plans.json> --output data/outputs/real_slicing_demo
+```
+
+This command is separate from the default mock workflow. It requires local
+FFmpeg and local video input, writes `real_slice_manifest.json`, and may generate
+`.mp4` outputs under the chosen output directory. It does not burn subtitles,
+crop video, add BGM, create covers, or run a full production timeline.
 
 ## Development Checks
 
@@ -147,6 +157,7 @@ Phase 7 only defines the real slicing command contract. It does not execute real
 .venv\Scripts\ncut --help
 .venv\Scripts\ncut version
 .venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+.venv\Scripts\ncut slice-real --help
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```

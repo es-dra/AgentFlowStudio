@@ -152,6 +152,39 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: slice_real
+    description: Execute minimal local FFmpeg slicing from clip plans.
+    category: real_slicing_poc
+    entrypoints:
+      cli: ncut slice-real
+      workflow_node: null
+      python: narratocut.slicing_sop.slice_clip_plans_real
+    input_artifacts:
+      - input_video_path
+      - clip_plans.json
+    output_artifacts:
+      - real_slice_manifest.json
+      - clips/*.mp4
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - input_video_missing
+      - clip_plans_missing
+      - clip_plans_schema_invalid
+      - ffmpeg_executable_not_found
+      - ffmpeg_execution_failed
+    quality_checks:
+      - real_slice_manifest_exists
+      - real_clips_written
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

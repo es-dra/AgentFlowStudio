@@ -51,3 +51,11 @@
 - Used `configs/tool_catalog.yaml` only to enrich plan step purpose text; workflow YAML remains the source of step order and outputs.
 - Kept planning separate from execution, FFmpeg, remote LLMs, Web/API, database, queue, and agent runtime.
 - Documented the planning contract in `docs/workflow_plan_contract.md`.
+
+## 2026-05-17 - Phase 8 Minimal Real Slicing PoC
+
+- Added standalone `slice_clip_plans_real(...)` execution for local FFmpeg slicing from validated clip plans.
+- Added `ncut slice-real --video ... --clip-plans ... --output ...` as a separate PoC command; it does not replace the default mock workflow.
+- Added `real_slice_manifest.json` output with passed/failed status, clip paths, durations, and errors.
+- Kept tests independent from installed FFmpeg by mocking `subprocess.run`; missing FFmpeg returns a clear failed manifest.
+- Updated tool contracts so `slice_real` requires FFmpeg, executes an external process, is not safe for automatic agent execution, and requires human review.

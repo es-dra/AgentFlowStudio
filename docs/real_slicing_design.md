@@ -1,32 +1,42 @@
 # Real Slicing Design
 
-Phase 7 prepares NarratoCut for future FFmpeg-based slicing without replacing the stable mock workflow.
+Phase 8 adds a standalone minimal FFmpeg slicing PoC without replacing the
+stable mock workflow.
 
 ## Current Boundary
 
-The current slicing path is mock-only:
+The default workflow path remains mock-only:
 
 ```text
 scripts.json -> clip_plans.json -> slice_manifest.json + clips/*.txt
 ```
 
-`mock_slice` writes text placeholders and never reads media, invokes FFmpeg, or emits `.mp4` files.
+`mock_slice` writes text placeholders and never reads media, invokes FFmpeg, or
+emits `.mp4` files.
 
-## Future Real Slicing Contract
+Real slicing is available only through the standalone PoC command:
 
-Real slicing should use a separate entry point and workflow, not a silent replacement for `mock_text_to_slices.yaml`.
+```powershell
+.venv\Scripts\ncut slice-real --video <local_input.mp4> --clip-plans <clip_plans.json> --output data/outputs/real_slicing_demo
+```
+
+## Minimal Real Slicing PoC
+
+Real slicing uses a separate entry point and is not a silent replacement for
+`mock_text_to_slices.yaml`.
 
 Expected input:
 
 - a source video path
-- a validated `ClipPlan`
+- validated `ClipPlan` objects loaded from `clip_plans.json`
 - one or more `ClipSegment` records with `start_sec` and `end_sec`
 - a configured FFmpeg executable
 
 Expected output:
 
 - clipped `.mp4` files
-- a slice manifest with status, clip paths, source plan IDs, durations, and any per-clip errors
+- `real_slice_manifest.json` with status, clip paths, source plan IDs,
+  durations, and any per-clip errors
 
 ## Time Mapping
 
@@ -43,7 +53,8 @@ The minimal FFmpeg command contract is:
 ffmpeg -y -ss <start_sec> -i <input_video> -t <duration_sec> <output_video>
 ```
 
-Phase 7 only builds this command. It does not execute FFmpeg.
+Phase 8 executes this command through `subprocess.run(...)` using a list of
+arguments, not a shell string.
 
 ## FFmpeg Probe
 
@@ -55,6 +66,9 @@ ffmpeg -version
 
 The probe returns structured availability information instead of requiring FFmpeg to be installed during tests.
 
+`slice-real` also reports a clear failed manifest when the configured FFmpeg
+executable is missing.
+
 ## Explicitly Out Of Scope
 
 - subtitle burn-in
@@ -64,3 +78,4 @@ The probe returns structured availability information instead of requiring FFmpe
 - encoding optimization
 - batch retry policy
 - replacing the mock workflow
+- generating or committing sample video assets
