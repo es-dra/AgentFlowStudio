@@ -1,0 +1,126 @@
+# Tool Contracts
+
+Phase 7.5B adds an agent-readable static catalog for NarratoCut's current
+capabilities. The catalog is descriptive only: no runtime registry, no skill
+runtime, no autonomous agent control, and no real FFmpeg execution are added.
+
+Catalog file:
+
+```text
+configs/tool_catalog.yaml
+```
+
+The catalog describes existing tools by name, entry point, input artifacts,
+output artifacts, dependencies, failure modes, quality checks, and agent usage
+constraints.
+
+## Boundary
+
+The Phase 7.5B catalog may describe tools that are already present in code or
+CLI form. It must not promise future systems as if they exist.
+
+Allowed:
+
+- local mock workflow tools
+- existing CLI commands
+- existing Python helper functions
+- the FFmpeg command builder contract that does not execute FFmpeg
+- harness inspection
+
+Not allowed:
+
+- runtime skill registry
+- `ncut list-skills`
+- autonomous agent execution
+- real FFmpeg slicing execution
+- Web/API, database, queue, or hosted runtime
+
+## Required Contract Fields
+
+Each tool in `configs/tool_catalog.yaml` includes:
+
+- `name`
+- `description`
+- `category`
+- `entrypoints`
+- `input_artifacts`
+- `output_artifacts`
+- `requires`
+- `failure_modes`
+- `quality_checks`
+- `agent_usage`
+
+`requires` states whether a tool needs FFmpeg, network access, a model provider,
+or an API key. In this phase, all cataloged tools are local and key-free.
+
+`agent_usage` states whether a future agent may safely call the tool, whether
+human review is required, whether it mutates workflow definitions, and whether it
+executes an external process.
+
+## Cataloged Tools
+
+### `analyze_hooks`
+
+Analyzes a UTF-8 text file and writes hook candidates to `hooks.json`.
+
+- Category: ROI analysis
+- Main entry points: `ncut analyze-hooks`, workflow node `analyze_hooks`
+- Inputs: `text_file`
+- Outputs: `hooks.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `hooks_file_exists`, `hooks_non_empty`
+
+### `generate_scripts`
+
+Generates mock short-video scripts from hook candidates.
+
+- Category: script generation
+- Main entry points: `ncut generate-scripts`, workflow node `generate_scripts`
+- Inputs: `hooks.json`
+- Outputs: `scripts.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `scripts_file_exists`, `scripts_non_empty`
+
+### `generate_clip_plans`
+
+Generates deterministic clip planning contracts from scripts.
+
+- Category: clip planning
+- Main entry points: `ncut generate-clip-plans`, workflow node `generate_clip_plans`
+- Inputs: `scripts.json`
+- Outputs: `clip_plans.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `clip_plans_file_exists`, `clip_plans_non_empty`
+
+### `mock_slice`
+
+Generates mock clip text files and a slice manifest from clip plans.
+
+- Category: mock slicing
+- Main entry points: `ncut mock-slice`, workflow node `mock_slice`
+- Inputs: `clip_plans.json`
+- Outputs: `slice_manifest.json`, `clips/`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `slice_manifest_exists`, `clips_dir_exists`, `mock_clips_count_matches_manifest`
+
+### `build_ffmpeg_command_contract`
+
+Builds a minimal FFmpeg slicing command list without executing FFmpeg.
+
+- Category: real slicing contract
+- Main entry point: `narratocut.slicing_sop.build_ffmpeg_slice_command`
+- Inputs: `input_video_path`, `start_sec`, `duration_sec`, `output_video_path`
+- Outputs: `ffmpeg_command`
+- Requires: no installed FFmpeg because this tool only builds the command
+- Main check: `ffmpeg_command_has_expected_args`
+
+### `inspect_run`
+
+Inspects a workflow run directory and writes `quality_report.json`.
+
+- Category: harness inspection
+- Main entry points: `ncut inspect-run`, `narratocut.harness.inspect_run`
+- Inputs: `run_dir`
+- Outputs: `quality_report.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `run_manifest_file_exists`, `trace_file_exists`, `mock_clips_count_matches_manifest`
