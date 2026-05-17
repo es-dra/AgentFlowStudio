@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -25,6 +25,7 @@ Implemented capabilities:
 - Run contract artifacts: `run_manifest.json`, `trace.json`, and `quality_report.json`
 - `ncut inspect-run` for local harness inspection of workflow run directories
 - `ncut review-run` for agent-readable `review_report.json` generation
+- `ncut draft-plan` for static `workflow_plan.json` draft generation
 - Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
 - FFmpeg availability probe
 - Real slicing command contract
@@ -108,8 +109,15 @@ Generate an agent-readable review report:
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
+Generate a static workflow plan draft:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+```
+
 Run contract details are documented in [`docs/run_contract.md`](docs/run_contract.md).
 The reviewer contract is documented in [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md).
+The workflow plan contract is documented in [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md).
 
 ## Model Gateway Boundary
 
@@ -138,6 +146,7 @@ Phase 7 only defines the real slicing command contract. It does not execute real
 .venv\Scripts\python -m compileall -q apps narratocut tests
 .venv\Scripts\ncut --help
 .venv\Scripts\ncut version
+.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```

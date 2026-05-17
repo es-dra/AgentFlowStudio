@@ -43,6 +43,12 @@ Example:
 
 This workflow writes `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_manifest.json`, `.txt` mock clips under `clips/`, and run contract artifacts.
 
+Draft a static workflow plan without executing the workflow:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+```
+
 Inspect the run:
 
 ```powershell
