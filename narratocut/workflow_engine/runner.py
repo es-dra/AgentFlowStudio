@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from narratocut.harness import write_run_manifest, write_trace
 from narratocut.schemas import StepResult, WorkflowRun
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
@@ -30,13 +31,13 @@ class WorkflowRunner:
                 run.status = "failed"
                 run.error = result.error
                 run.ended_at = datetime.now().astimezone()
-                self._write_manifest(run, context)
+                self._write_run_artifacts(definition, run, context)
                 return run
 
         run.status = "success"
         run.outputs = dict(context.artifacts)
         run.ended_at = datetime.now().astimezone()
-        self._write_manifest(run, context)
+        self._write_run_artifacts(definition, run, context)
         return run
 
     def _run_step(self, step: WorkflowStepDefinition, context: WorkflowContext) -> StepResult:
@@ -74,3 +75,13 @@ class WorkflowRunner:
             "error": run.error,
         }
         write_json(context.output_path("manifest.json"), manifest)
+
+    def _write_run_artifacts(
+        self,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        context: WorkflowContext,
+    ) -> None:
+        self._write_manifest(run, context)
+        write_run_manifest(run, context)
+        write_trace(definition, run, context)

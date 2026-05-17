@@ -19,6 +19,13 @@ Example:
 
 Generated files are written to the output directory. Runs under `data/processed/` are ignored by git.
 
+`run-workflow` also writes run contract artifacts:
+
+- `manifest.json`
+- `run_manifest.json`
+- `trace.json`
+- `quality_report.json`
+
 ### `mock_text_to_slices.yaml`
 
 Phase 6 full mock workflow:
@@ -34,4 +41,10 @@ Example:
 .venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
 ```
 
-This workflow writes `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_manifest.json`, and `.txt` mock clips under `clips/`.
+This workflow writes `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_manifest.json`, `.txt` mock clips under `clips/`, and run contract artifacts.
+
+Inspect the run:
+
+```powershell
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
+```
