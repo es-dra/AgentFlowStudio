@@ -13,13 +13,12 @@ EXPECTED_TOOLS = {
     "generate_clip_plans",
     "mock_slice",
     "build_ffmpeg_command_contract",
+    "slice_real",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {
     "autonomous_agent",
-    "execute_ffmpeg",
     "list_skills",
-    "real_slice",
     "skill_registry",
 }
 
@@ -64,7 +63,6 @@ def test_tool_catalog_keeps_phase_7_5b_safety_boundary() -> None:
     for tool in catalog["tools"]:
         assert tool["requires"]["network"] is False
         assert tool["requires"]["api_key"] is False
-        assert tool["agent_usage"]["safe_for_auto_execute"] is True
         assert tool["agent_usage"]["mutates_workflow"] is False
 
     ffmpeg_contract = next(
@@ -72,6 +70,12 @@ def test_tool_catalog_keeps_phase_7_5b_safety_boundary() -> None:
     )
     assert ffmpeg_contract["requires"]["ffmpeg"] is False
     assert ffmpeg_contract["agent_usage"]["executes_external_process"] is False
+
+    slice_real = next(tool for tool in catalog["tools"] if tool["name"] == "slice_real")
+    assert slice_real["requires"]["ffmpeg"] is True
+    assert slice_real["agent_usage"]["safe_for_auto_execute"] is False
+    assert slice_real["agent_usage"]["requires_human_review"] is True
+    assert slice_real["agent_usage"]["executes_external_process"] is True
 
 
 def test_tool_contract_docs_cover_catalog_tools() -> None:

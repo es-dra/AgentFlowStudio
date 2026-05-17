@@ -8,6 +8,7 @@ import typer
 from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
 from apps.cli.plan_commands import write_draft_plan_from_cli
 from apps.cli.report_commands import inspect_run_output, review_run_output
+from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.workflow_commands import run_workflow_from_cli
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
@@ -224,6 +225,9 @@ def mock_slice_command(
     clip_plans = load_clip_plans(clip_plans_path)
     manifest = mock_slice_clip_plans(clip_plans, output_dir)
     typer.echo(f"Wrote {manifest['clip_count']} mock clips to {output_dir}")
+
+
+app.command(name="slice-real")(slice_real_command)
 
 
 @app.command(name="ffmpeg-check")

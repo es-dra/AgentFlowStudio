@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+from narratocut.schemas import ClipPlan, ClipSegment
+from narratocut.utils import write_json
+
+
+REAL_SLICE_MANIFEST = "real_slice_manifest.json"
 
 @dataclass(frozen=True)
 class RealSlicingConfig:
@@ -46,5 +53,176 @@ def build_ffmpeg_slice_command(
     ]
 
 
+def slice_clip_plans_real(
+    input_video: str | Path,
+    clip_plans: list[ClipPlan],
+    output_dir: str | Path,
+    config: RealSlicingConfig | None = None,
+) -> dict[str, Any]:
+    """Execute minimal FFmpeg slicing for clip plans and write a manifest."""
+    resolved_config = config or RealSlicingConfig()
+    source = Path(input_video)
+    root = Path(output_dir)
+    clips_dir = root / "clips"
+    clips_dir.mkdir(parents=True, exist_ok=True)
+
+    if not source.is_file():
+        manifest = _manifest(
+            status="failed",
+            clips=[],
+            errors=[f"input_video_missing: {_display_ref(source)}"],
+        )
+        write_json(root / REAL_SLICE_MANIFEST, manifest)
+        return manifest
+
+    clips: list[dict[str, Any]] = []
+    errors: list[str] = []
+    clip_index = 1
+    for plan in clip_plans:
+        segments = plan.segments
+        if not segments:
+            error = f"clip_plan_has_no_segments: {plan.clip_plan_id}"
+            errors.append(error)
+            clips.append(_failed_clip(plan.clip_plan_id, "", error))
+            continue
+
+        for segment in segments:
+            clip_id = f"clip_{clip_index:03d}"
+            output_ref = Path("clips") / f"{clip_id}{resolved_config.output_ext}"
+            output_path = root / output_ref
+            try:
+                result = _slice_segment(
+                    source=source,
+                    segment=segment,
+                    output_path=output_path,
+                    config=resolved_config,
+                )
+            except FileNotFoundError:
+                error = f"ffmpeg_executable_not_found: {resolved_config.ffmpeg_executable}"
+                errors.append(error)
+                clips.append(
+                    _failed_clip(
+                        clip_id=clip_id,
+                        clip_plan_id=plan.clip_plan_id,
+                        path=_display_ref(output_ref),
+                        error=error,
+                    )
+                )
+                clip_index += 1
+                continue
+            except OSError as exc:
+                error = f"ffmpeg_execution_failed: {exc}"
+                errors.append(error)
+                clips.append(
+                    _failed_clip(
+                        clip_id=clip_id,
+                        clip_plan_id=plan.clip_plan_id,
+                        path=_display_ref(output_ref),
+                        error=error,
+                    )
+                )
+                clip_index += 1
+                continue
+            clip = _clip_record(
+                clip_id=clip_id,
+                clip_plan_id=plan.clip_plan_id,
+                segment=segment,
+                output_ref=output_ref,
+                status="passed" if result.returncode == 0 else "failed",
+            )
+            if result.returncode != 0:
+                error = _ffmpeg_error(clip_id, result)
+                clip["error"] = error
+                errors.append(error)
+            clips.append(clip)
+            clip_index += 1
+
+    status = "passed" if not errors else "failed"
+    manifest = _manifest(
+        status=status,
+        clips=clips,
+        errors=errors,
+    )
+    write_json(root / REAL_SLICE_MANIFEST, manifest)
+    return manifest
+
+
 def _format_seconds(value: float) -> str:
     return f"{value:g}"
+
+
+def _slice_segment(
+    source: Path,
+    segment: ClipSegment,
+    output_path: Path,
+    config: RealSlicingConfig,
+) -> subprocess.CompletedProcess[str]:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    command = build_ffmpeg_slice_command(
+        input_video=source,
+        start_sec=segment.start_sec,
+        duration_sec=segment.end_sec - segment.start_sec,
+        output_video=output_path,
+        config=config,
+    )
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _clip_record(
+    clip_id: str,
+    clip_plan_id: str,
+    segment: ClipSegment,
+    output_ref: Path,
+    status: str,
+) -> dict[str, Any]:
+    return {
+        "clip_id": clip_id,
+        "clip_plan_id": clip_plan_id,
+        "segment_id": segment.segment_id,
+        "path": _display_ref(output_ref),
+        "status": status,
+        "start_sec": segment.start_sec,
+        "end_sec": segment.end_sec,
+        "duration_sec": segment.end_sec - segment.start_sec,
+    }
+
+
+def _failed_clip(clip_plan_id: str, path: str, error: str, clip_id: str = "") -> dict[str, Any]:
+    return {
+        "clip_id": clip_id,
+        "clip_plan_id": clip_plan_id,
+        "path": path,
+        "status": "failed",
+        "error": error,
+    }
+
+
+def _manifest(
+    status: str,
+    clips: list[dict[str, Any]],
+    errors: list[str],
+) -> dict[str, Any]:
+    passed_clips = [clip for clip in clips if clip.get("status") == "passed"]
+    return {
+        "status": status,
+        "clip_count": len(passed_clips),
+        "clips": clips,
+        "errors": errors,
+        "manifest_path": REAL_SLICE_MANIFEST,
+    }
+
+
+def _ffmpeg_error(clip_id: str, result: subprocess.CompletedProcess[str]) -> str:
+    detail = (result.stderr or result.stdout or "").strip()
+    if detail:
+        return f"{clip_id}: ffmpeg_failed_exit_{result.returncode}: {detail}"
+    return f"{clip_id}: ffmpeg_failed_exit_{result.returncode}"
+
+
+def _display_ref(path: str | Path) -> str:
+    return str(path).replace("\\", "/")

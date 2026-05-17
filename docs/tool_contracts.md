@@ -2,7 +2,7 @@
 
 Phase 7.5B adds an agent-readable static catalog for NarratoCut's current
 capabilities. The catalog is descriptive only: no runtime registry, no skill
-runtime, no autonomous agent control, and no real FFmpeg execution are added.
+runtime, and no autonomous agent control are added.
 
 Catalog file:
 
@@ -25,6 +25,7 @@ Allowed:
 - existing CLI commands
 - existing Python helper functions
 - the FFmpeg command builder contract that does not execute FFmpeg
+- the standalone minimal real slicing PoC, marked as external-process execution
 - harness inspection
 
 Not allowed:
@@ -32,7 +33,6 @@ Not allowed:
 - runtime skill registry
 - `ncut list-skills`
 - autonomous agent execution
-- real FFmpeg slicing execution
 - Web/API, database, queue, or hosted runtime
 
 ## Required Contract Fields
@@ -56,6 +56,9 @@ or an API key. In this phase, all cataloged tools are local and key-free.
 `agent_usage` states whether a future agent may safely call the tool, whether
 human review is required, whether it mutates workflow definitions, and whether it
 executes an external process.
+
+Tools that execute local FFmpeg are explicitly marked as not safe for automatic
+agent execution and requiring human review.
 
 ## Cataloged Tools
 
@@ -113,6 +116,18 @@ Builds a minimal FFmpeg slicing command list without executing FFmpeg.
 - Outputs: `ffmpeg_command`
 - Requires: no installed FFmpeg because this tool only builds the command
 - Main check: `ffmpeg_command_has_expected_args`
+
+### `slice_real`
+
+Executes minimal local FFmpeg slicing from clip plans.
+
+- Category: real slicing PoC
+- Main entry points: `ncut slice-real`, `narratocut.slicing_sop.slice_clip_plans_real`
+- Inputs: `input_video_path`, `clip_plans.json`
+- Outputs: `real_slice_manifest.json`, `clips/*.mp4`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `real_slice_manifest_exists`, `real_clips_written`
+- Agent usage: not safe for automatic execution, requires human review, executes an external process
 
 ### `inspect_run`
 
