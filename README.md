@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -22,6 +22,8 @@ Implemented capabilities:
 - Deterministic ClipPlan generation
 - Mock slicing output with `slice_manifest.json` and `.txt` placeholder clips
 - Sequential YAML workflow execution
+- Run contract artifacts: `run_manifest.json`, `trace.json`, and `quality_report.json`
+- `ncut inspect-run` for local harness inspection of workflow run directories
 - Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
 - FFmpeg availability probe
 - Real slicing command contract
@@ -78,6 +80,9 @@ Expected generated files:
 ```text
 data/processed/runs/demo_full_mock/
 +-- manifest.json
++-- run_manifest.json
++-- trace.json
++-- quality_report.json
 +-- hooks.json
 +-- scripts.json
 +-- clip_plans.json
@@ -89,6 +94,14 @@ data/processed/runs/demo_full_mock/
 ```
 
 Generated files under `data/processed/` are ignored by git.
+
+Inspect the generated run:
+
+```powershell
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
+```
+
+Run contract details are documented in [`docs/run_contract.md`](docs/run_contract.md).
 
 ## Model Gateway Boundary
 
@@ -117,4 +130,5 @@ Phase 7 only defines the real slicing command contract. It does not execute real
 .venv\Scripts\python -m compileall -q apps narratocut tests
 .venv\Scripts\ncut --help
 .venv\Scripts\ncut version
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
 ```

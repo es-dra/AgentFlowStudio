@@ -12,6 +12,10 @@ class WorkflowContext:
     run_id: str
     workflow_name: str
     output_dir: Path
+    workflow_path: str | None = None
+    mode: str = "mock"
+    ffmpeg_required: bool = False
+    network_required: bool = False
     inputs: dict[str, Any] = field(default_factory=dict)
     artifacts: dict[str, str] = field(default_factory=dict)
     step_results: list[StepResult] = field(default_factory=list)

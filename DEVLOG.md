@@ -28,3 +28,11 @@
 - Added `real_slicer` command-contract helpers that build, but do not execute, minimal FFmpeg slice commands.
 - Added `ffmpeg-check` CLI as an informational local probe; it does not alter mock workflows or require real video assets.
 - Added real slicing design notes documenting the current mock boundary and future FFmpeg input/output contract.
+
+## 2026-05-17 - Phase 7.5 Run Contract + Harness Inspection Baseline
+
+- Added standardized run contract artifacts for workflow runs: `run_manifest.json` and `trace.json`.
+- Added harness quality checks and run inspection that write `quality_report.json` without moving quality decisions into workflow nodes.
+- Added `ncut inspect-run --run-dir ...` to inspect generated workflow run directories and return a non-zero exit code when quality checks fail.
+- Documented the run contract boundary in `docs/run_contract.md` and updated workflow/README guidance.
+- Verification: `pytest` passed with 57 tests, `compileall` passed, `ncut version` returned `0.1.0`, the full mock workflow generated the run contract artifacts, `inspect-run` reported `12 passed / 0 failed / 0 warnings`, and `git diff --check` passed with line-ending warnings only.

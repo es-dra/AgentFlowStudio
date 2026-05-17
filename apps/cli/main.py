@@ -8,6 +8,7 @@ import typer
 from pydantic import ValidationError
 
 from narratocut import __version__
+from narratocut.harness import inspect_run
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
 from narratocut.slicing_sop import (
@@ -135,10 +136,12 @@ def run_workflow_command(
     context = WorkflowContext(
         run_id=output_dir.name,
         workflow_name=workflow.name,
+        workflow_path=str(workflow_path),
         output_dir=output_dir,
         inputs={"input_text_file": str(input_path)},
     )
     run = WorkflowRunner(default_node_registry()).run(workflow, context)
+    inspect_run(output_dir)
     manifest_path = context.output_path("manifest.json")
     typer.echo(f"Workflow {run.status}: {manifest_path}")
     if run.status == "failed":
@@ -211,6 +214,41 @@ def ffmpeg_check_command(
         return
 
     typer.echo(f"FFmpeg unavailable: {info.error}")
+
+
+@app.command(name="inspect-run")
+def inspect_run_command(
+    run_dir: Path = typer.Option(
+        ...,
+        "--run-dir",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        help="Workflow run directory to inspect.",
+    ),
+) -> None:
+    """Inspect a workflow run directory and write quality_report.json."""
+    inspection = inspect_run(run_dir)
+    quality = inspection["quality_report"]
+    passed = sum(1 for check in quality["checks"] if check["status"] == "pass")
+    failed = sum(1 for check in quality["checks"] if check["status"] == "fail")
+    warnings = len(quality["warnings"])
+
+    typer.echo(f"Run: {inspection['run_id']}")
+    typer.echo(f"Workflow: {inspection['workflow']}")
+    typer.echo(f"Status: {inspection['status']}")
+    typer.echo("")
+    typer.echo("Artifacts:")
+    for artifact in inspection["artifacts"]:
+        typer.echo(f"  {artifact['path']:<24} {artifact['status']}")
+    typer.echo("")
+    typer.echo("Quality:")
+    typer.echo(f"  {passed} passed")
+    typer.echo(f"  {failed} failed")
+    typer.echo(f"  {warnings} warnings")
+    if inspection["status"] != "pass":
+        raise typer.Exit(code=1)
 
 
 def _load_hooks(hooks_path: Path) -> list[Hook]:
