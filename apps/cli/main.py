@@ -8,7 +8,7 @@ import typer
 from pydantic import ValidationError
 
 from narratocut import __version__
-from narratocut.harness import inspect_run
+from narratocut.harness import inspect_run, review_run, write_review_report
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
 from narratocut.slicing_sop import (
@@ -251,6 +251,35 @@ def inspect_run_command(
         raise typer.Exit(code=1)
 
 
+@app.command(name="review-run")
+def review_run_command(
+    run_dir: Path = typer.Option(
+        ...,
+        "--run-dir",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        help="Workflow run directory to review.",
+    ),
+) -> None:
+    """Write an agent-readable review_report.json for a workflow run."""
+    report = review_run(run_dir)
+    report_path = write_review_report(run_dir, report)
+    summary = report["summary"]
+
+    typer.echo(f"Review report: {_display_ref(report_path)}")
+    typer.echo(f"Status: {report['status']}")
+    typer.echo(
+        "Checks: "
+        f"{summary['passed']} passed / "
+        f"{summary['failed']} failed / "
+        f"{summary['warnings']} warnings"
+    )
+    if report["status"] == "failed":
+        raise typer.Exit(code=1)
+
+
 def _load_hooks(hooks_path: Path) -> list[Hook]:
     try:
         payload = json.loads(hooks_path.read_text(encoding="utf-8"))
@@ -288,6 +317,10 @@ def _load_json_array(path: Path, label: str) -> list[object]:
     if not isinstance(payload, list):
         raise typer.BadParameter(f"{label} file must contain a JSON array.")
     return payload
+
+
+def _display_ref(path: Path) -> str:
+    return str(path).replace("\\", "/")
 
 
 if __name__ == "__main__":
