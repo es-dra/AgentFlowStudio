@@ -48,3 +48,9 @@ Inspect the run:
 ```powershell
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
 ```
+
+Generate an agent-readable review report:
+
+```powershell
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+```

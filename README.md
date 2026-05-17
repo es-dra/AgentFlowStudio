@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, a lightweight model gateway, and FFmpeg readiness checks for future real slicing.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -24,6 +24,7 @@ Implemented capabilities:
 - Sequential YAML workflow execution
 - Run contract artifacts: `run_manifest.json`, `trace.json`, and `quality_report.json`
 - `ncut inspect-run` for local harness inspection of workflow run directories
+- `ncut review-run` for agent-readable `review_report.json` generation
 - Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
 - FFmpeg availability probe
 - Real slicing command contract
@@ -101,7 +102,14 @@ Inspect the generated run:
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
 ```
 
+Generate an agent-readable review report:
+
+```powershell
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+```
+
 Run contract details are documented in [`docs/run_contract.md`](docs/run_contract.md).
+The reviewer contract is documented in [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md).
 
 ## Model Gateway Boundary
 
@@ -131,4 +139,5 @@ Phase 7 only defines the real slicing command contract. It does not execute real
 .venv\Scripts\ncut --help
 .venv\Scripts\ncut version
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```

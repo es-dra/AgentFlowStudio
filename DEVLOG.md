@@ -36,3 +36,10 @@
 - Added `ncut inspect-run --run-dir ...` to inspect generated workflow run directories and return a non-zero exit code when quality checks fail.
 - Documented the run contract boundary in `docs/run_contract.md` and updated workflow/README guidance.
 - Verification: `pytest` passed with 57 tests, `compileall` passed, `ncut version` returned `0.1.0`, the full mock workflow generated the run contract artifacts, `inspect-run` reported `12 passed / 0 failed / 0 warnings`, and `git diff --check` passed with line-ending warnings only.
+
+## 2026-05-17 - Phase 7.6 Agent Reviewer Contract
+
+- Added a read-only harness reviewer that reads an existing workflow run and writes `review_report.json`.
+- Added `ncut review-run --run-dir ...` for agent-readable review report generation with `passed`, `warning`, and `failed` status aggregation.
+- Kept the reviewer outside workflow execution: it does not rerun workflows, call FFmpeg, call remote LLMs, or modify source run artifacts.
+- Documented the reviewer contract in `docs/agent_reviewer_contract.md`.
