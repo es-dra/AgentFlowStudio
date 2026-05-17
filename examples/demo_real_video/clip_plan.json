@@ -1,0 +1,38 @@
+{
+  "clip_plan_id": "clip_plan_demo_real_001",
+  "project_id": "demo_real_video",
+  "hook_id": "hook_demo_real_001",
+  "script_id": null,
+  "duration_sec": 10,
+  "title": "Demo real video clip",
+  "cover_text": "Real clip demo",
+  "segments": [
+    {
+      "segment_id": "seg_demo_real_001",
+      "source_video": "data/raw/demo_real_video/input.mp4",
+      "start_sec": 0,
+      "end_sec": 10,
+      "text": "Demo segment for validating the real video workflow.",
+      "speed": 1.0,
+      "keep_original_audio": true
+    }
+  ],
+  "render_spec": {
+    "aspect_ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "render_mode": "fit",
+    "subtitle_style": {
+      "font": "default",
+      "font_size": 42,
+      "color": "#FFFFFF",
+      "stroke_color": "#000000",
+      "position": "bottom"
+    }
+  },
+  "bgm_path": null,
+  "voiceover_text": null,
+  "cta_text": null,
+  "output_name": "clip_demo_real_001.mp4"
+}

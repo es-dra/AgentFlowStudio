@@ -16,12 +16,16 @@ class RealSlicingConfig:
     ffmpeg_executable: str = "ffmpeg"
     output_ext: str = ".mp4"
     overwrite: bool = True
+    clips_dir: str = "clips"
 
     def __post_init__(self) -> None:
         if not self.ffmpeg_executable.strip():
             raise ValueError("ffmpeg_executable must not be empty.")
         if not self.output_ext.startswith("."):
             raise ValueError("output_ext must start with a dot.")
+        clips_path = Path(self.clips_dir)
+        if not self.clips_dir.strip() or clips_path.is_absolute() or ".." in clips_path.parts:
+            raise ValueError("clips_dir must be a safe relative path.")
 
 
 def build_ffmpeg_slice_command(
@@ -63,7 +67,8 @@ def slice_clip_plans_real(
     resolved_config = config or RealSlicingConfig()
     source = Path(input_video)
     root = Path(output_dir)
-    clips_dir = root / "clips"
+    clips_dir_ref = Path(resolved_config.clips_dir)
+    clips_dir = root / clips_dir_ref
     clips_dir.mkdir(parents=True, exist_ok=True)
 
     if not source.is_file():
@@ -88,7 +93,7 @@ def slice_clip_plans_real(
 
         for segment in segments:
             clip_id = f"clip_{clip_index:03d}"
-            output_ref = Path("clips") / f"{clip_id}{resolved_config.output_ext}"
+            output_ref = clips_dir_ref / f"{clip_id}{resolved_config.output_ext}"
             output_path = root / output_ref
             try:
                 result = _slice_segment(
@@ -128,7 +133,7 @@ def slice_clip_plans_real(
                 clip_plan_id=plan.clip_plan_id,
                 segment=segment,
                 output_ref=output_ref,
-                status="passed" if result.returncode == 0 else "failed",
+                status="succeeded" if result.returncode == 0 else "failed",
             )
             if result.returncode != 0:
                 error = _ffmpeg_error(clip_id, result)
@@ -137,7 +142,7 @@ def slice_clip_plans_real(
             clips.append(clip)
             clip_index += 1
 
-    status = "passed" if not errors else "failed"
+    status = _manifest_status(clips, errors)
     manifest = _manifest(
         status=status,
         clips=clips,
@@ -207,7 +212,7 @@ def _manifest(
     clips: list[dict[str, Any]],
     errors: list[str],
 ) -> dict[str, Any]:
-    passed_clips = [clip for clip in clips if clip.get("status") == "passed"]
+    passed_clips = [clip for clip in clips if clip.get("status") in {"succeeded", "passed"}]
     return {
         "status": status,
         "clip_count": len(passed_clips),
@@ -215,6 +220,14 @@ def _manifest(
         "errors": errors,
         "manifest_path": REAL_SLICE_MANIFEST,
     }
+
+
+def _manifest_status(clips: list[dict[str, Any]], errors: list[str]) -> str:
+    if not errors:
+        return "succeeded"
+    if any(clip.get("status") in {"succeeded", "passed"} for clip in clips):
+        return "partial_failed"
+    return "failed"
 
 
 def _ffmpeg_error(clip_id: str, result: subprocess.CompletedProcess[str]) -> str:

@@ -29,7 +29,7 @@ def test_slice_clip_plans_real_runs_ffmpeg_for_each_clip_plan(tmp_path, monkeypa
         config=RealSlicingConfig(ffmpeg_executable="ffmpeg-test", overwrite=False),
     )
 
-    assert manifest["status"] == "passed"
+    assert manifest["status"] == "succeeded"
     assert manifest["clip_count"] == 2
     assert manifest["errors"] == []
     assert [clip["path"] for clip in manifest["clips"]] == [
@@ -85,6 +85,28 @@ def test_slice_clip_plans_real_writes_manifest(tmp_path, monkeypatch) -> None:
     manifest_path = tmp_path / "real_slices" / "real_slice_manifest.json"
     assert manifest_path.is_file()
     assert manifest["manifest_path"] == "real_slice_manifest.json"
+
+
+def test_slice_clip_plans_real_honors_configured_clips_dir(tmp_path, monkeypatch) -> None:
+    input_video = tmp_path / "input.mp4"
+    input_video.write_bytes(b"not a real video")
+
+    def fake_run(command, capture_output, text, check):
+        output_path = Path(command[-1])
+        output_path.write_bytes(b"fake mp4")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+
+    manifest = slice_clip_plans_real(
+        input_video=input_video,
+        clip_plans=[_clip_plan("clip_plan_a", 0, 1)],
+        output_dir=tmp_path / "real_slices",
+        config=RealSlicingConfig(clips_dir="custom_clips"),
+    )
+
+    assert manifest["clips"][0]["path"] == "custom_clips/clip_001.mp4"
+    assert (tmp_path / "real_slices" / "custom_clips" / "clip_001.mp4").is_file()
 
 
 def test_slice_clip_plans_real_reports_ffmpeg_failure(tmp_path, monkeypatch) -> None:

@@ -7,3 +7,4 @@ Architecture notes, SOP decisions, and implementation records live here.
 - [Agent reviewer contract](agent_reviewer_contract.md)
 - [Workflow plan contract](workflow_plan_contract.md)
 - [Real slicing design](real_slicing_design.md)
+- [Real video workflow demo](real_video_workflow_demo.md)

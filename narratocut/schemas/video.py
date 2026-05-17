@@ -1,11 +1,28 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
 from narratocut.schemas.base import Metadata, SchemaBase, utc_now
+
+
+ProbeStatus = Literal["succeeded", "failed", "missing"]
+
+
+class VideoMetadata(SchemaBase):
+    file_path: str
+    duration_sec: float | None = Field(default=None, ge=0)
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+    codec: str | None = None
+    fps: float | None = Field(default=None, ge=0)
+    bitrate: int | None = Field(default=None, ge=0)
+    probe_status: ProbeStatus
+    errors: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Metadata
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class GeneratedVideo(SchemaBase):

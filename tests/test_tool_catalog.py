@@ -14,6 +14,9 @@ EXPECTED_TOOLS = {
     "mock_slice",
     "build_ffmpeg_command_contract",
     "slice_real",
+    "probe_video_metadata",
+    "validate_clip_plan",
+    "real_slice_video",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

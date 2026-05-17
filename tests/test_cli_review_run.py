@@ -24,6 +24,9 @@ def test_review_run_command_writes_review_report(tmp_path) -> None:
     )
     assert run_result.exit_code == 0, run_result.output
 
+    inspect_result = runner.invoke(app, ["inspect-run", "--run-dir", str(output_dir)])
+    assert inspect_result.exit_code == 0, inspect_result.output
+
     review_result = runner.invoke(app, ["review-run", "--run-dir", str(output_dir)])
 
     assert review_result.exit_code == 0, review_result.output

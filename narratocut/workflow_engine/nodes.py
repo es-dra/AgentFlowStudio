@@ -6,8 +6,25 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
-from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
-from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
+from narratocut.schemas import (
+    ClipPlan,
+    ClipPlanValidationReport,
+    Hook,
+    ROISettings,
+    ShortVideoScript,
+    VideoMetadata,
+)
+from narratocut.slicing_sop import (
+    RealSlicingConfig,
+    check_ffmpeg_available,
+    generate_clip_plans_from_scripts,
+    mock_slice_clip_plans,
+    probe_video_metadata,
+    resolve_media_tool_paths,
+    slice_clip_plans_real,
+    validate_clip_plan,
+)
+from narratocut.slicing_sop.real_slicer import REAL_SLICE_MANIFEST
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
@@ -62,12 +79,112 @@ def mock_slice_node(step: WorkflowStepDefinition, context: WorkflowContext) -> l
     return [output_ref, "clips"]
 
 
+def load_roi_config_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    roi_ref = _require_input(step, "roi_config")
+    roi_path = Path(str(context.resolve_input(str(roi_ref))))
+    roi_settings = _load_roi_settings(roi_path)
+
+    output_ref = _require_output(step, "roi_settings")
+    write_json(context.output_path(output_ref), roi_settings)
+    context.artifacts["roi_settings"] = output_ref
+    context.state["roi_settings"] = roi_settings
+    return [output_ref]
+
+
+def load_clip_plan_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    clip_plan_ref = _require_input(step, "clip_plan")
+    clip_plan_path = Path(str(context.resolve_input(str(clip_plan_ref))))
+    clip_plan = _load_clip_plan(clip_plan_path)
+
+    output_ref = _require_output(step, "clip_plan")
+    write_json(context.output_path(output_ref), clip_plan)
+    context.artifacts["clip_plan"] = output_ref
+    context.state["clip_plan"] = clip_plan
+    return [output_ref]
+
+
+def probe_video_metadata_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    video_ref = _require_input(step, "video")
+    video_path = Path(str(context.resolve_input(str(video_ref))))
+    paths = resolve_media_tool_paths()
+    metadata = probe_video_metadata(video_path, ffprobe_executable=paths.ffprobe)
+
+    output_ref = _require_output(step, "video_metadata")
+    write_json(context.output_path(output_ref), metadata)
+    context.artifacts["video_metadata"] = output_ref
+    context.state["video_metadata"] = metadata
+    return [output_ref]
+
+
+def validate_clip_plan_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    clip_plan = _state_or_load_clip_plan(context, "clip_plan")
+    roi_settings = _state_or_load_roi_settings(context, "roi_settings")
+    metadata = _state_or_load_video_metadata(context, "video_metadata")
+    paths = resolve_media_tool_paths()
+    ffmpeg_info = check_ffmpeg_available(paths.ffmpeg)
+    report = validate_clip_plan(
+        clip_plan,
+        roi_settings,
+        metadata,
+        ffmpeg_available=ffmpeg_info.available,
+    )
+
+    output_ref = _require_output(step, "validation")
+    write_json(context.output_path(output_ref), report)
+    context.artifacts["clip_plan_validation"] = output_ref
+    context.state["clip_plan_validation"] = report
+    if report.status == "failed":
+        skipped = _skipped_real_slice_manifest("clip_plan_validation_failed", report)
+        write_json(context.output_path(REAL_SLICE_MANIFEST), skipped)
+        context.artifacts["real_slice_manifest"] = REAL_SLICE_MANIFEST
+        context.artifacts["clips"] = _clips_dir(context)
+        raise ValueError("clip_plan_validation_failed")
+    return [output_ref]
+
+
+def real_slice_video_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    clip_plan = _state_or_load_clip_plan(context, "clip_plan")
+    paths = resolve_media_tool_paths()
+    ffmpeg_info = check_ffmpeg_available(paths.ffmpeg)
+    if not ffmpeg_info.available:
+        failed = {
+            "status": "failed",
+            "reason": "ffmpeg_unavailable",
+            "clips": [],
+            "errors": [ffmpeg_info.error or "ffmpeg_unavailable"],
+            "manifest_path": REAL_SLICE_MANIFEST,
+        }
+        write_json(context.output_path(REAL_SLICE_MANIFEST), failed)
+        context.artifacts["real_slice_manifest"] = REAL_SLICE_MANIFEST
+        context.artifacts["clips"] = _clips_dir(context)
+        raise ValueError("ffmpeg_unavailable")
+
+    video_ref = _require_input(step, "video")
+    video_path = Path(str(context.resolve_input(str(video_ref))))
+    manifest = slice_clip_plans_real(
+        input_video=video_path,
+        clip_plans=[clip_plan],
+        output_dir=context.output_dir,
+        config=RealSlicingConfig(ffmpeg_executable=paths.ffmpeg, clips_dir=_clips_dir(context)),
+    )
+    context.artifacts["real_slice_manifest"] = REAL_SLICE_MANIFEST
+    context.artifacts["clips"] = _clips_dir(context)
+    if manifest.get("status") not in {"succeeded", "passed"}:
+        raise ValueError(str(manifest.get("reason") or manifest.get("errors") or "real_slice_failed"))
+    return [REAL_SLICE_MANIFEST, _clips_dir(context)]
+
+
 def default_node_registry() -> NodeRegistry:
     registry = NodeRegistry()
     registry.register("analyze_hooks", analyze_hooks_node)
     registry.register("generate_scripts", generate_scripts_node)
     registry.register("generate_clip_plans", generate_clip_plans_node)
     registry.register("mock_slice", mock_slice_node)
+    registry.register("load_roi_config", load_roi_config_node)
+    registry.register("load_clip_plan", load_clip_plan_node)
+    registry.register("probe_video_metadata", probe_video_metadata_node)
+    registry.register("validate_clip_plan", validate_clip_plan_node)
+    registry.register("real_slice_video", real_slice_video_node)
     return registry
 
 
@@ -110,6 +227,89 @@ def _load_clip_plans(path: Path) -> list[ClipPlan]:
         return [ClipPlan.model_validate(item) for item in payload]
     except ValidationError as exc:
         raise ValueError(f"Clip plans artifact failed ClipPlan schema validation: {path}") from exc
+
+
+def _load_clip_plan(path: Path) -> ClipPlan:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Clip plan artifact is not valid JSON: {path}") from exc
+    try:
+        return ClipPlan.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"Clip plan artifact failed ClipPlan schema validation: {path}") from exc
+
+
+def _load_roi_settings(path: Path) -> ROISettings:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"ROI config is not valid JSON: {path}") from exc
+    try:
+        return ROISettings.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"ROI config failed ROISettings schema validation: {path}") from exc
+
+
+def _load_video_metadata(path: Path) -> VideoMetadata:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Video metadata is not valid JSON: {path}") from exc
+    try:
+        return VideoMetadata.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"Video metadata failed VideoMetadata schema validation: {path}") from exc
+
+
+def _load_validation_report(path: Path) -> ClipPlanValidationReport:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Validation report is not valid JSON: {path}") from exc
+    try:
+        return ClipPlanValidationReport.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"Validation report failed schema validation: {path}") from exc
+
+
+def _state_or_load_clip_plan(context: WorkflowContext, key: str) -> ClipPlan:
+    value = context.state.get(key)
+    if isinstance(value, ClipPlan):
+        return value
+    return _load_clip_plan(context.output_path(context.artifacts[key]))
+
+
+def _state_or_load_roi_settings(context: WorkflowContext, key: str) -> ROISettings:
+    value = context.state.get(key)
+    if isinstance(value, ROISettings):
+        return value
+    return _load_roi_settings(context.output_path(context.artifacts[key]))
+
+
+def _state_or_load_video_metadata(context: WorkflowContext, key: str) -> VideoMetadata:
+    value = context.state.get(key)
+    if isinstance(value, VideoMetadata):
+        return value
+    return _load_video_metadata(context.output_path(context.artifacts[key]))
+
+
+def _skipped_real_slice_manifest(
+    reason: str,
+    report: ClipPlanValidationReport,
+) -> dict[str, object]:
+    return {
+        "status": "skipped",
+        "reason": reason,
+        "clips": [],
+        "errors": [issue.code for issue in report.hard_errors],
+        "manifest_path": REAL_SLICE_MANIFEST,
+    }
+
+
+def _clips_dir(context: WorkflowContext) -> str:
+    value = context.inputs.get("output_clips_dir") or "clips"
+    return str(value).strip().replace("\\", "/") or "clips"
 
 
 def _load_json_array(path: Path, label: str) -> list[object]:

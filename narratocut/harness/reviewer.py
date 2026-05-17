@@ -23,6 +23,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         _run_contract_section(root, run_manifest, trace, quality_report),
         _workflow_outputs_section(root, run_manifest),
     ]
+    if run_manifest and run_manifest.get("quality_profile") == "real_video":
+        sections.append(_real_video_section(root))
     summary = _summarize_sections(sections)
 
     return {
@@ -37,7 +39,7 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
             "quality_report": "quality_report.json",
         },
         "sections": sections,
-        "recommendations": [],
+        "recommendations": _recommendations(root, run_manifest, quality_report),
     }
 
 
@@ -103,6 +105,15 @@ def _workflow_outputs_section(
     return _section("workflow_outputs", checks)
 
 
+def _real_video_section(root: Path) -> dict[str, Any]:
+    checks = [
+        _artifact_check(root, "video_metadata", "video_metadata.json"),
+        _artifact_check(root, "clip_plan_validation", "clip_plan_validation.json"),
+        _artifact_check(root, "real_slice_manifest", "real_slice_manifest.json"),
+    ]
+    return _section("real_video_outputs", checks)
+
+
 def _file_check(path: Path, check_id: str, message: str) -> dict[str, Any]:
     return _check(check_id, PASSED if path.is_file() else FAILED, message)
 
@@ -120,16 +131,26 @@ def _trace_steps_check(trace: dict[str, Any] | None) -> dict[str, Any]:
 
 def _quality_report_check(quality_report: dict[str, Any] | None) -> dict[str, Any]:
     failed_count = 0
+    warning_count = 0
     if quality_report:
         checks = quality_report.get("checks")
         if isinstance(checks, list):
             failed_count = sum(1 for check in checks if check.get("status") == "fail")
-    status = PASSED if quality_report and quality_report.get("status") == "pass" and failed_count == 0 else FAILED
+            warning_count = sum(1 for check in checks if check.get("status") == "warning")
+        report_warnings = quality_report.get("warnings")
+        if isinstance(report_warnings, list):
+            warning_count += len(report_warnings)
+    if not quality_report or quality_report.get("status") != "pass" or failed_count > 0:
+        status = FAILED
+    elif warning_count > 0:
+        status = WARNING
+    else:
+        status = PASSED
     return _check(
         "quality_report_passed",
         status,
         "quality_report.json has no failed checks",
-        {"failed_checks": failed_count},
+        {"failed_checks": failed_count, "warnings": warning_count},
     )
 
 
@@ -207,6 +228,43 @@ def _load_json_object(path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _recommendations(
+    root: Path,
+    run_manifest: dict[str, Any] | None,
+    quality_report: dict[str, Any] | None,
+) -> list[str]:
+    if not run_manifest or run_manifest.get("quality_profile") != "real_video":
+        return []
+
+    recommendation_set: list[str] = []
+    real_manifest = _load_json_object(root / "real_slice_manifest.json")
+    validation = _load_json_object(root / "clip_plan_validation.json")
+    metadata = _load_json_object(root / "video_metadata.json")
+    all_errors = " ".join(
+        str(item)
+        for source in [
+            quality_report.get("errors", []) if quality_report else [],
+            real_manifest.get("errors", []) if real_manifest else [],
+            validation.get("hard_errors", []) if validation else [],
+            metadata.get("errors", []) if metadata else [],
+        ]
+        for item in source
+    )
+    reason = str(real_manifest.get("reason") if real_manifest else "")
+
+    if "ffmpeg_unavailable" in all_errors or "ffmpeg_unavailable" in reason:
+        recommendation_set.append("Install FFmpeg or set NCUT_FFMPEG_PATH to a valid ffmpeg executable.")
+    if "ffprobe" in all_errors or "video_duration_unavailable" in all_errors:
+        recommendation_set.append("Install FFprobe or set NCUT_FFPROBE_PATH so video duration can be validated.")
+    if "segment_exceeds_video_duration" in all_errors:
+        recommendation_set.append("Adjust the ClipPlan segment end times so they stay within video duration.")
+    if "unsafe_output_name" in all_errors:
+        recommendation_set.append("Use a plain output file name without directories or path traversal.")
+    if "clip_plan_validation_failed" in reason:
+        recommendation_set.append("Review clip_plan_validation.json before rerunning real slicing.")
+    return recommendation_set
 
 
 def _display_ref(value: str | Path) -> str:

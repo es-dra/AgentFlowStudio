@@ -1,0 +1,17 @@
+{
+  "target_platform": "douyin",
+  "target_audience": "college students interested in AI creative tools",
+  "content_goal": "increase_completion_rate",
+  "min_clip_duration": 8,
+  "max_clip_duration": 30,
+  "target_clip_count": 1,
+  "min_clip_count": 1,
+  "max_clip_count": 3,
+  "risk_tolerance": "low",
+  "priority": [
+    "hook_strength",
+    "clarity",
+    "watch_completion"
+  ],
+  "validation_policy": "advisory"
+}

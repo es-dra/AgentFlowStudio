@@ -17,6 +17,8 @@ class WorkflowStepDefinition(SchemaBase):
 class WorkflowDefinition(SchemaBase):
     name: str
     version: int = Field(default=1, ge=1)
+    mode: str = "mock"
+    quality_profile: str = "mock"
     steps: list[WorkflowStepDefinition] = Field(min_length=1)
 
     @model_validator(mode="after")

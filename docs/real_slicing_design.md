@@ -79,3 +79,23 @@ executable is missing.
 - batch retry policy
 - replacing the mock workflow
 - generating or committing sample video assets
+
+## Phase 9 Real Workflow Boundary
+
+Phase 9 connects real slicing to the workflow engine as a separate
+`real_video` workflow:
+
+```text
+ROI settings + input video + ClipPlan
+  -> video_metadata.json
+  -> clip_plan_validation.json
+  -> real_slice_manifest.json
+  -> clips/*.mp4, when FFmpeg is available and validation passes
+```
+
+The workflow still does not perform ASR, highlight detection, subtitles, BGM,
+cover generation, multi-track timelines, or final-video assembly.
+
+Validation hard failures, such as missing FFmpeg, missing duration, unsafe
+output names, or segments outside video duration, write reviewable artifacts
+before the workflow fails. ROI mismatches are advisory by default.

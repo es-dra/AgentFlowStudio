@@ -4,6 +4,10 @@ Phase 7.5B adds an agent-readable static catalog for NarratoCut's current
 capabilities. The catalog is descriptive only: no runtime registry, no skill
 runtime, and no autonomous agent control are added.
 
+Phase 9 extends the same static catalog with real-video workflow nodes that now
+exist in code. These entries remain descriptive contracts; they do not add an
+agent runtime or automatic tool execution.
+
 Catalog file:
 
 ```text
@@ -27,6 +31,7 @@ Allowed:
 - the FFmpeg command builder contract that does not execute FFmpeg
 - the standalone minimal real slicing PoC, marked as external-process execution
 - harness inspection
+- Phase 9 real-video workflow nodes that already exist in code
 
 Not allowed:
 
@@ -128,6 +133,47 @@ Executes minimal local FFmpeg slicing from clip plans.
 - Requires: installed FFmpeg; no network, no model provider, no API key
 - Main checks: `real_slice_manifest_exists`, `real_clips_written`
 - Agent usage: not safe for automatic execution, requires human review, executes an external process
+
+### `probe_video_metadata`
+
+Reads local video metadata through FFprobe and writes `video_metadata.json`.
+
+- Category: real video metadata
+- Main entry points: workflow node `probe_video_metadata`,
+  `narratocut.slicing_sop.probe_video_metadata`
+- Inputs: `input_video_path`, `ffprobe_executable`
+- Outputs: `video_metadata.json`
+- Requires: installed FFprobe; no network, no model provider, no API key
+- Main checks: `video_metadata_exists`, `video_metadata_status`
+
+### `validate_clip_plan`
+
+Validates one `ClipPlan` against `ROISettings`, video metadata, and local
+FFmpeg availability.
+
+- Category: real video validation
+- Main entry points: workflow node `validate_clip_plan`,
+  `narratocut.slicing_sop.validate_clip_plan`
+- Inputs: `clip_plan.json`, `roi_config.json`, `video_metadata.json`
+- Outputs: `clip_plan_validation.json`
+- Requires: no network, no model provider, no API key
+- Main checks: segment time range, video duration, ROI advisory constraints,
+  output filename safety, FFmpeg availability
+
+### `real_slice_video`
+
+Executes the real-video workflow slicing node after validation succeeds.
+
+- Category: real video workflow node
+- Main entry points: workflow node `real_slice_video`,
+  `narratocut.slicing_sop.slice_clip_plans_real`
+- Inputs: `input_video_path`, `clip_plan.json`, `clip_plan_validation.json`
+- Outputs: `real_slice_manifest.json`, `clips/*.mp4`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `real_slice_manifest_exists`, `real_slice_manifest_status`,
+  `real_clips_written`
+- Agent usage: not safe for automatic execution, requires human review,
+  executes an external process
 
 ### `inspect_run`
 

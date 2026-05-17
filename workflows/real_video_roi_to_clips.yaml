@@ -1,0 +1,40 @@
+name: real_video_roi_to_clips
+version: 1
+mode: real_video
+quality_profile: real_video
+steps:
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config
+    outputs:
+      roi_settings: roi_config.json
+  - id: load_clip_plan
+    type: load_clip_plan
+    inputs:
+      clip_plan: clip_plan
+    outputs:
+      clip_plan: clip_plan.json
+  - id: probe_video_metadata
+    type: probe_video_metadata
+    inputs:
+      video: input_video_file
+    outputs:
+      video_metadata: video_metadata.json
+  - id: validate_clip_plan
+    type: validate_clip_plan
+    inputs:
+      roi_settings: roi_settings
+      clip_plan: clip_plan
+      video_metadata: video_metadata
+    outputs:
+      validation: clip_plan_validation.json
+  - id: real_slice_video
+    type: real_slice_video
+    inputs:
+      video: input_video_file
+      clip_plan: clip_plan
+      validation: clip_plan_validation
+    outputs:
+      real_slice_manifest: real_slice_manifest.json
+      clips: clips

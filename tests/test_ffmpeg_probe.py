@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import subprocess
 
-from narratocut.slicing_sop.ffmpeg_probe import check_ffmpeg_available
+from narratocut.slicing_sop.ffmpeg_probe import (
+    check_ffmpeg_available,
+    check_media_tools,
+    resolve_media_tool_paths,
+)
 
 
 class _CompletedProcess:
@@ -57,3 +61,39 @@ def test_check_ffmpeg_available_handles_timeout(monkeypatch) -> None:
     assert info.available is False
     assert info.version is None
     assert "timed out" in str(info.error)
+
+
+def test_resolve_media_tool_paths_prefers_explicit_then_env_then_config(tmp_path, monkeypatch) -> None:
+    config_path = tmp_path / "ffmpeg.yaml"
+    config_path.write_text(
+        "ffmpeg_path: config-ffmpeg\nffprobe_path: config-ffprobe\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("NCUT_FFMPEG_PATH", "env-ffmpeg")
+
+    paths = resolve_media_tool_paths(
+        ffprobe="explicit-ffprobe",
+        config_path=config_path,
+    )
+
+    assert paths.ffmpeg == "env-ffmpeg"
+    assert paths.ffprobe == "explicit-ffprobe"
+
+
+def test_check_media_tools_reports_ready_when_both_tools_work(monkeypatch) -> None:
+    def fake_run(args, **kwargs):
+        executable = args[0]
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=f"{executable} version 6.1\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    info = check_media_tools(ffmpeg="ffmpeg-ok", ffprobe="ffprobe-ok")
+
+    assert info.status == "ready"
+    assert info.ffmpeg.available is True
+    assert info.ffprobe.available is True

@@ -2,9 +2,9 @@
 
 [English README](README.md)
 
-NarratoCut 是一个面向短视频生产流程的 Python MVP 项目，用来探索从文本分析、脚本生成、切片计划到视频切片准备的自动化工作流。
+NarratoCut 是一个面向短视频生产流程的 Python MVP 项目，用来探索从文本分析、脚本生成、切片计划到真实视频切片与质量审查的自动化工作流。
 
-当前版本支持文本到 hooks 分析、mock 脚本生成、ClipPlan 生成、mock slicing、本地 workflow 编排、轻量 Model Gateway，以及为后续真实切片准备的 FFmpeg 可用性检测。
+当前版本支持文本到 hooks 分析、mock 脚本生成、ClipPlan 生成、mock slicing、本地 workflow 编排、轻量 Model Gateway、FFmpeg/FFprobe 可用性检测，以及基于本地视频、ROI settings 和已提供 `ClipPlan` 的真实视频切片 workflow。
 
 这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移来源。
 
@@ -26,10 +26,18 @@ text -> hooks -> scripts -> clip_plans -> mock clips
 - Model Gateway Lite，默认 mock，可选 OpenAI-compatible provider 代码路径
 - FFmpeg availability probe
 - real slicing command contract
+- standalone `ncut slice-real` PoC
+- ROI-aware real video slicing workflow：
+  `本地视频 + ROI settings + ClipPlan -> 元数据读取 -> 计划校验 -> FFmpeg clips -> inspect/review`
+
+当前真实视频能力是“手工提供 ClipPlan 后的可信执行层”。系统可以校验并执行一个已有切片计划，生成真实 `.mp4` clips 和可审查 artifacts，但当前还不是自动爆点识别、自动剪辑或自动成片工具。
 
 尚未实现：
 
-- 真实 FFmpeg 视频切片 workflow
+- 自动高光 / 爆点识别
+- ASR 或带时间戳 transcript 生成
+- 剧本 / transcript 自动生成可执行 ClipPlan
+- clips 拼接为 final video
 - 字幕烧录
 - 竖屏裁剪或画幅适配
 - BGM、封面生成、多轨 timeline
@@ -54,7 +62,7 @@ tests/                自动化测试和 fixtures
 - 推荐 Python 3.12。
 - 项目声明支持 `>=3.11,<3.13`。
 - 暂不建议使用 Python 3.13，因为 ASR、视频处理和模型相关依赖通常会滞后于最新 runtime。
-- 当前阶段不强制安装 FFmpeg；`ffmpeg-check` 只是检测本机可用性。
+- 默认 mock pipeline 不强制安装 FFmpeg；`slice-real` 和 `workflows/real_video_roi_to_clips.yaml` 需要本机可用的 FFmpeg / FFprobe。
 
 ## 快速开始
 
@@ -105,15 +113,23 @@ $env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
 
 ## FFmpeg 边界
 
-检查本机 FFmpeg 可用性：
+检查本机 FFmpeg / FFprobe 可用性：
 
 ```powershell
-.venv\Scripts\ncut ffmpeg-check
+.venv\Scripts\ncut ffmpeg-check --json
 ```
 
-如果本机没有安装 FFmpeg 或 FFmpeg 不在 `PATH` 中，该命令会输出 unavailable 状态。这在当前 MVP 阶段是可接受的。
+如果本机没有安装 FFmpeg 或 FFmpeg 不在 `PATH` 中，该命令会输出 unavailable 状态。这对默认 mock pipeline 是可接受的，但真实视频切片 workflow 需要 FFmpeg 和 FFprobe。
 
-Phase 7 只定义真实切片的命令契约，不执行真实 FFmpeg slicing，也不生成 `.mp4` 文件。
+运行 Phase 9 真实视频切片 workflow：
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
+```
+
+该 workflow 需要 input bundle 中声明的本地视频文件。真实媒体文件和运行产物默认被 git 忽略。
 
 ## 开发检查
 
