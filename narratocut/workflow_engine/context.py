@@ -14,10 +14,12 @@ class WorkflowContext:
     output_dir: Path
     workflow_path: str | None = None
     mode: str = "mock"
+    quality_profile: str = "mock"
     ffmpeg_required: bool = False
     network_required: bool = False
     inputs: dict[str, Any] = field(default_factory=dict)
     artifacts: dict[str, str] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
     step_results: list[StepResult] = field(default_factory=list)
 
     def __post_init__(self) -> None:

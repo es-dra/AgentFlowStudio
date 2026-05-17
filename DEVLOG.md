@@ -1,5 +1,37 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
+
+- Phase 9 establishes the real video execution foundation: it runs a provided
+  `ClipPlan` against a local video and produces inspectable/reviewable
+  artifacts. It intentionally does not include automatic highlight detection,
+  ASR, clip assembly, subtitles, BGM, Web UI, or agent runtime.
+- Added a real-video workflow mode with explicit `workflow_mode` and
+  `quality_profile` fields in `run_manifest.json`.
+- Added `ROISettings`, `VideoMetadata`, and `ClipPlanValidationReport`
+  contracts for one local video, one ROI config, one `ClipPlan`, and many
+  segments.
+- Added FFmpeg/FFprobe path resolution through CLI/env/config and structured
+  `ncut ffmpeg-check --json` output.
+- Added `workflows/real_video_roi_to_clips.yaml` plus example input JSON files
+  under `examples/demo_real_video/` without committing real media.
+- Kept `run-workflow`, `inspect-run`, and `review-run` separated:
+  `run-workflow` writes execution artifacts, `inspect-run` writes
+  `quality_report.json`, and `review-run` writes `review_report.json`.
+- Added real-video inspection and review recommendations for FFmpeg/FFprobe,
+  validation, and slicing failures.
+- Extended the static tool catalog with implemented Phase 9 real-video nodes
+  and added optional FFprobe-based clip duration tolerance checks.
+- Honored the structured input bundle's relative `output.clips_dir` while
+  keeping `clips` as the default output folder.
+- Validated the real-video success path with a local ignored demo mp4:
+  FFmpeg/FFprobe were ready, `real_slice_manifest.json` reported one succeeded
+  10-second clip, `inspect-run` reported `11 passed / 0 failed / 0 warnings`,
+  and `review-run` reported `16 passed / 0 failed / 0 warnings`.
+- Follow-up direction: Phase 10 should address script/timestamped transcript
+  highlight detection, Phase 11 should add video ASR to timestamped transcript,
+  and Phase 12 should assemble clips into a final video.
+
 ## 2026-05-16 - Phase 4 Model Gateway Lite
 
 - Added a lightweight model gateway layer with config loading, provider errors, `ModelGateway`, and a minimal OpenAI-compatible provider.

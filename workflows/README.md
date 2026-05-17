@@ -60,3 +60,25 @@ Generate an agent-readable review report:
 ```powershell
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```
+
+### `real_video_roi_to_clips.yaml`
+
+Phase 9 real-video workflow:
+
+1. `load_roi_config`
+2. `load_clip_plan`
+3. `probe_video_metadata`
+4. `validate_clip_plan`
+5. `real_slice_video`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
+```
+
+This workflow requires a local video at `data/raw/demo_real_video/input.mp4`
+and local FFmpeg/FFprobe for a successful real slicing run. Missing tools still
+produce structured failure artifacts.

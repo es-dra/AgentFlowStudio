@@ -7,6 +7,8 @@
 # local model configuration
 configs/models.yaml
 !configs/models.example.yaml
+configs/ffmpeg.yaml
+!configs/ffmpeg.example.yaml
 
 # python
 __pycache__/

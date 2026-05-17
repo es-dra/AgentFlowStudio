@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.harness import inspect_run
 from narratocut.workflow_engine import (
     WorkflowContext,
     WorkflowRunner,
     default_node_registry,
     load_workflow,
 )
+from narratocut.workflow_engine.input_bundle import load_workflow_inputs
 
 
 def run_workflow_from_cli(
@@ -21,9 +21,10 @@ def run_workflow_from_cli(
         run_id=output_dir.name,
         workflow_name=workflow.name,
         workflow_path=str(workflow_path),
+        mode=workflow.mode,
+        quality_profile=workflow.quality_profile,
         output_dir=output_dir,
-        inputs={"input_text_file": str(input_path)},
+        inputs=load_workflow_inputs(input_path),
     )
     run = WorkflowRunner(default_node_registry()).run(workflow, context)
-    inspect_run(output_dir)
     return run.status, context.output_path("manifest.json")

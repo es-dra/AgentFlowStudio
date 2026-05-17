@@ -185,6 +185,104 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: probe_video_metadata
+    description: Read local video metadata through FFprobe and write video_metadata.json.
+    category: real_video_metadata
+    entrypoints:
+      cli: null
+      workflow_node: probe_video_metadata
+      python: narratocut.slicing_sop.probe_video_metadata
+    input_artifacts:
+      - input_video_path
+      - ffprobe_executable
+    output_artifacts:
+      - video_metadata.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - input_video_missing
+      - ffprobe_unavailable
+      - ffprobe_execution_failed
+      - video_metadata_parse_failed
+    quality_checks:
+      - video_metadata_exists
+      - video_metadata_status
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
+  - name: validate_clip_plan
+    description: Validate one ClipPlan against ROISettings, video metadata, and FFmpeg availability.
+    category: real_video_validation
+    entrypoints:
+      cli: null
+      workflow_node: validate_clip_plan
+      python: narratocut.slicing_sop.validate_clip_plan
+    input_artifacts:
+      - clip_plan.json
+      - roi_config.json
+      - video_metadata.json
+    output_artifacts:
+      - clip_plan_validation.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - empty_clip_plan
+      - invalid_segment_time_range
+      - segment_outside_video_duration
+      - unsafe_output_filename
+      - ffmpeg_unavailable
+    quality_checks:
+      - clip_plan_validation_exists
+      - clip_plan_validation_status
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
+  - name: real_slice_video
+    description: Execute the real-video workflow slicing node after validation succeeds.
+    category: real_video_workflow_node
+    entrypoints:
+      cli: null
+      workflow_node: real_slice_video
+      python: narratocut.slicing_sop.slice_clip_plans_real
+    input_artifacts:
+      - input_video_path
+      - clip_plan.json
+      - clip_plan_validation.json
+    output_artifacts:
+      - real_slice_manifest.json
+      - clips/*.mp4
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - clip_plan_validation_failed
+      - ffmpeg_unavailable
+      - ffmpeg_execution_failed
+      - real_clip_write_failed
+    quality_checks:
+      - real_slice_manifest_exists
+      - real_slice_manifest_status
+      - real_clips_written
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

@@ -19,6 +19,15 @@ ARTIFACTS_TO_INSPECT = [
     "clips/",
 ]
 
+REAL_VIDEO_ARTIFACTS_TO_INSPECT = [
+    "video_metadata.json",
+    "clip_plan_validation.json",
+    "real_slice_manifest.json",
+    "run_manifest.json",
+    "trace.json",
+    "clips/",
+]
+
 
 def inspect_run(run_dir: str | Path) -> dict[str, Any]:
     root = Path(run_dir)
@@ -31,7 +40,7 @@ def inspect_run(run_dir: str | Path) -> dict[str, Any]:
         "run_id": _run_id(root, run_manifest, legacy_manifest),
         "workflow": _workflow(run_manifest, legacy_manifest),
         "status": quality_report["status"],
-        "artifacts": _artifact_statuses(root),
+        "artifacts": _artifact_statuses(root, run_manifest),
         "quality_report": quality_report,
     }
 
@@ -59,9 +68,14 @@ def _workflow(
     return "unknown"
 
 
-def _artifact_statuses(root: Path) -> list[dict[str, str]]:
+def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[dict[str, str]]:
     statuses: list[dict[str, str]] = []
-    for artifact in ARTIFACTS_TO_INSPECT:
+    artifacts = (
+        REAL_VIDEO_ARTIFACTS_TO_INSPECT
+        if run_manifest and run_manifest.get("quality_profile") == "real_video"
+        else ARTIFACTS_TO_INSPECT
+    )
+    for artifact in artifacts:
         path = root / artifact.rstrip("/")
         exists = path.is_dir() if artifact.endswith("/") else path.is_file()
         statuses.append({"path": artifact, "status": "found" if exists else "missing"})

@@ -8,7 +8,13 @@ from narratocut.schemas.harness import EvidenceCard, GateResult, TaskPacket
 from narratocut.schemas.project import Project
 from narratocut.schemas.roi import Hook, TimeRange
 from narratocut.schemas.script import ScriptSegment, ShortVideoScript
-from narratocut.schemas.video import ExportPackage, GeneratedVideo
+from narratocut.schemas.roi import ROISettings
+from narratocut.schemas.validation import (
+    ClipPlanValidationReport,
+    ValidationCheck,
+    ValidationIssue,
+)
+from narratocut.schemas.video import ExportPackage, GeneratedVideo, VideoMetadata
 from narratocut.schemas.workflow import StepResult, WorkflowRun
 
 __all__ = [
@@ -16,6 +22,7 @@ __all__ = [
     "ClipPlan",
     "ClipSegment",
     "ComplianceResult",
+    "ClipPlanValidationReport",
     "CostRecord",
     "EvidenceCard",
     "ExportPackage",
@@ -24,11 +31,15 @@ __all__ = [
     "Hook",
     "Project",
     "RenderSpec",
+    "ROISettings",
     "ScriptSegment",
     "ShortVideoScript",
     "StepResult",
     "SubtitleStyle",
     "TaskPacket",
     "TimeRange",
+    "ValidationCheck",
+    "ValidationIssue",
+    "VideoMetadata",
     "WorkflowRun",
 ]

@@ -1,0 +1,18 @@
+{
+  "project": {
+    "project_id": "demo_real_video",
+    "name": "Demo Real Video Workflow"
+  },
+  "video": {
+    "path": "data/raw/demo_real_video/input.mp4"
+  },
+  "roi": {
+    "path": "examples/demo_real_video/roi_config.json"
+  },
+  "clip_plan": {
+    "path": "examples/demo_real_video/clip_plan.json"
+  },
+  "output": {
+    "clips_dir": "clips"
+  }
+}

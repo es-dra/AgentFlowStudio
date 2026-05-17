@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, FFmpeg readiness checks, and a standalone minimal real slicing PoC.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, FFmpeg readiness checks, a standalone minimal real slicing PoC, and an ROI-aware real video slicing workflow from a provided `ClipPlan`.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -30,10 +30,19 @@ Implemented capabilities:
 - FFmpeg availability probe
 - Real slicing command contract
 - Standalone `ncut slice-real` PoC for local FFmpeg slicing from clip plans
+- ROI-aware real video slicing workflow:
+  `local video + ROI settings + ClipPlan -> metadata -> validation -> FFmpeg clips -> inspect/review`
+
+Current real-video capability is manual `ClipPlan` execution. NarratoCut can
+validate and execute a provided cut plan against a local video, then produce
+reviewable run artifacts. It is not yet an automatic highlight editing product.
 
 Not implemented yet:
 
-- full real FFmpeg video slicing workflow
+- automatic highlight or viral-moment detection
+- ASR or timestamped transcript generation
+- script/transcript-to-ClipPlan generation
+- clip assembly into a final video
 - subtitle burn-in
 - vertical crop or aspect-ratio adaptation
 - BGM, cover generation, or multi-track timelines
@@ -58,7 +67,7 @@ tests/                Automated tests and fixtures
 - Python 3.12 is recommended.
 - The project declares `>=3.11,<3.13`.
 - Python 3.13 is not recommended yet because ASR, video, and model-adjacent dependencies often lag the newest runtime.
-- FFmpeg is optional at this stage. `ffmpeg-check` only probes local availability.
+- FFmpeg is optional for the default mock pipeline, but required for `slice-real` and `workflows/real_video_roi_to_clips.yaml`.
 
 ## Quick Start
 
@@ -130,13 +139,13 @@ Local model settings belong in `configs/models.yaml`, which is ignored by git. C
 
 ## FFmpeg Boundary
 
-Check local FFmpeg availability:
+Check local FFmpeg and FFprobe availability:
 
 ```powershell
-.venv\Scripts\ncut ffmpeg-check
+.venv\Scripts\ncut ffmpeg-check --json
 ```
 
-If FFmpeg is not installed or not on `PATH`, this command reports an unavailable status. That is acceptable for the current MVP.
+If FFmpeg is not installed or not on `PATH`, this command reports an unavailable status. That is acceptable for the default mock pipeline, but real video slicing requires FFmpeg and FFprobe.
 
 Run the standalone minimal real slicing PoC:
 
@@ -148,6 +157,17 @@ This command is separate from the default mock workflow. It requires local
 FFmpeg and local video input, writes `real_slice_manifest.json`, and may generate
 `.mp4` outputs under the chosen output directory. It does not burn subtitles,
 crop video, add BGM, create covers, or run a full production timeline.
+
+Run the Phase 9 real video slicing workflow from a provided `ClipPlan`:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
+```
+
+This workflow expects a local video at the path declared in the input bundle.
+Real media files and generated run artifacts are ignored by git.
 
 ## Development Checks
 

@@ -13,6 +13,11 @@ text -> hooks -> scripts -> clip_plans -> mock clips
 No run contract artifact requires FFmpeg, network access, API keys, a database,
 a queue, or an agent runtime.
 
+Phase 9 adds a separate `real_video` workflow mode. It does not change the
+default mock pipeline. Real-video runs write `workflow_mode` and
+`quality_profile` explicitly in `run_manifest.json` so inspection does not infer
+behavior from incomplete artifacts.
+
 ## Run Directory
 
 A full mock workflow run writes:
@@ -45,6 +50,8 @@ Key fields:
 - `run_id`: run directory identity
 - `workflow`: workflow YAML path or workflow name
 - `mode`: currently `mock`
+- `workflow_mode`: execution semantics such as `mock` or `real_video`
+- `quality_profile`: inspection profile such as `mock` or `real_video`
 - `created_at`: ISO timestamp from the workflow run
 - `status`: `success` or `failed`
 - `inputs`: normalized input references, such as `text`
@@ -159,3 +166,28 @@ Quality:
 ```
 
 `inspect-run` exits with code 1 when the quality report status is not `pass`.
+
+## Real Video Run Directory
+
+A Phase 9 real-video workflow writes:
+
+```text
+data/processed/runs/demo_real_video/
++-- clips/
++-- roi_config.json
++-- clip_plan.json
++-- video_metadata.json
++-- clip_plan_validation.json
++-- real_slice_manifest.json
++-- manifest.json
++-- run_manifest.json
++-- trace.json
+```
+
+Inspection and review remain separate:
+
+```text
+run-workflow -> inspect-run -> review-run
+```
+
+`run-workflow` does not write `quality_report.json`.
