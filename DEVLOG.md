@@ -43,3 +43,11 @@
 - Added `ncut review-run --run-dir ...` for agent-readable review report generation with `passed`, `warning`, and `failed` status aggregation.
 - Kept the reviewer outside workflow execution: it does not rerun workflows, call FFmpeg, call remote LLMs, or modify source run artifacts.
 - Documented the reviewer contract in `docs/agent_reviewer_contract.md`.
+
+## 2026-05-17 - Phase 7.7 Workflow Plan Draft
+
+- Added a static workflow planner that converts workflow YAML and a planned input file into `workflow_plan.json`.
+- Added `ncut draft-plan --workflow ... --input ... --output ...` without executing workflow nodes or creating run artifacts.
+- Used `configs/tool_catalog.yaml` only to enrich plan step purpose text; workflow YAML remains the source of step order and outputs.
+- Kept planning separate from execution, FFmpeg, remote LLMs, Web/API, database, queue, and agent runtime.
+- Documented the planning contract in `docs/workflow_plan_contract.md`.
