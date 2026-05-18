@@ -101,11 +101,20 @@ review_report
 
 ## Decision
 
-Product smoke status: passed.
+Engineering smoke status: passed.
+
+Product-quality smoke status: not validated by the original Phase 13 report.
 
 The Phase 13 complete Golden Path produced a real final video, subtitle file,
 subtitle-burned video, cover image, BGM-mixed video, package manifest, quality
 reports, and review reports with zero failed checks and zero warnings.
+
+After product-quality review, this result should not be read as "the generated
+video is good." The run used a single `0s..10s` ClipPlan segment, a generic
+subtitle transcript that is not tied to the source video, and a local BGM file
+whose content fit was not assessed. Phase 14.0B adds package-level evidence
+checks so this type of run can be reported as engineering-pass but
+product-quality-warning.
 
 ## Boundaries
 

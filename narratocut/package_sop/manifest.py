@@ -13,6 +13,7 @@ def build_finished_package_manifest(
     package_id: str,
     final_video_path: str | Path,
     optional_assets: dict[str, str | Path | None] | None = None,
+    evidence: dict[str, str | Path | None] | None = None,
 ) -> FinishedPackageManifest:
     assets: list[FinishedPackageAsset] = []
     errors: list[str] = []
@@ -31,6 +32,7 @@ def build_finished_package_manifest(
         package_id=package_id,
         primary_video=primary,
         assets=assets,
+        evidence={key: _display_ref(path) for key, path in (evidence or {}).items() if path},
         errors=errors,
         warnings=[],
         manifest_path=FINISHED_PACKAGE_MANIFEST,

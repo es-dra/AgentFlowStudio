@@ -22,6 +22,13 @@ def write_finished_package_node(step: WorkflowStepDefinition, context: WorkflowC
             "cover_image": context.inputs.get("cover_path"),
             "review_report": context.inputs.get("review_report_path"),
         },
+        evidence={
+            "final_video_manifest": context.inputs.get("final_video_manifest_path"),
+            "real_slice_manifest": context.inputs.get("real_slice_manifest_path"),
+            "clip_plan": context.inputs.get("clip_plan_path"),
+            "subtitle_manifest": context.inputs.get("subtitle_manifest_path"),
+            "audio_mix_manifest": context.inputs.get("audio_mix_manifest_path"),
+        },
     )
     write_json(context.output_path(manifest_ref), manifest)
     context.state["finished_package_manifest"] = manifest
