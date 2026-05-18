@@ -6,11 +6,13 @@ from narratocut.subtitle_sop.exporter import (
     build_subtitle_export,
     transcript_to_srt,
 )
+from narratocut.subtitle_sop.timeline import build_clip_timeline_subtitle_export
 
 __all__ = [
     "SUBTITLE_MANIFEST",
     "SUBTITLES_SRT",
     "SubtitleExport",
+    "build_clip_timeline_subtitle_export",
     "build_failed_subtitle_manifest",
     "build_subtitle_export",
     "transcript_to_srt",

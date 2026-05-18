@@ -35,6 +35,7 @@ from narratocut.workflow_engine.assembly_nodes import (
     probe_final_video_node,
 )
 from narratocut.workflow_engine.highlight_nodes import (
+    align_script_highlights_to_transcript_node,
     detect_highlights_node,
     generate_highlight_clip_plan_node,
     load_script_node,
@@ -50,7 +51,7 @@ from narratocut.workflow_engine.transcription_nodes import (
     transcribe_audio_mock_node,
     write_transcript_node,
 )
-from narratocut.workflow_engine.subtitle_nodes import write_subtitles_node
+from narratocut.workflow_engine.subtitle_nodes import write_clip_timeline_subtitles_node, write_subtitles_node
 from narratocut.workflow_engine.subtitle_burn_nodes import burn_subtitles_node, probe_subtitle_burn_node
 from narratocut.workflow_engine.cover_nodes import export_cover_node
 from narratocut.workflow_engine.bgm_nodes import mix_bgm_node, probe_bgm_mix_node
@@ -226,6 +227,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("rank_highlights_by_roi", rank_highlights_by_roi_node)
     registry.register("generate_highlight_clip_plan", generate_highlight_clip_plan_node)
     registry.register("generate_clip_plan_from_highlights", generate_highlight_clip_plan_node)
+    registry.register("align_script_highlights_to_transcript", align_script_highlights_to_transcript_node)
     registry.register("write_highlight_plan", write_highlight_plan_node)
     registry.register("write_clip_plan", write_clip_plan_node)
     registry.register("load_video", load_video_node)
@@ -238,6 +240,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("concat_clips", concat_clips_node)
     registry.register("probe_final_video", probe_final_video_node)
     registry.register("write_subtitles", write_subtitles_node)
+    registry.register("write_clip_timeline_subtitles", write_clip_timeline_subtitles_node)
     registry.register("burn_subtitles", burn_subtitles_node)
     registry.register("probe_subtitle_burn", probe_subtitle_burn_node)
     registry.register("export_cover", export_cover_node)

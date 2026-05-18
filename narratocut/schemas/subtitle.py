@@ -27,6 +27,7 @@ class SubtitleCue(SchemaBase):
 class SubtitleManifest(SchemaBase):
     status: Literal["succeeded", "failed"]
     format: Literal["srt"] = "srt"
+    timeline: Literal["source_video", "final_video"] = "source_video"
     subtitle_path: str
     source_transcript_id: str | None = None
     source_video: str | None = None

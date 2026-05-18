@@ -19,6 +19,7 @@ from narratocut.workflow_engine.definitions import WorkflowStepDefinition
 def mix_bgm_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     video_path = Path(str(context.resolve_input(str(_require_input(step, "video")))))
     bgm_path = Path(str(context.resolve_input(str(_require_input(step, "bgm")))))
+    bgm_metadata = _optional_bgm_metadata(step, context)
     output_ref = str(context.inputs.get("output_name") or step.outputs.get("final_video") or BGM_VIDEO)
     manifest_ref = step.outputs.get("audio_mix_manifest") or AUDIO_MIX_MANIFEST
     paths = resolve_media_tool_paths()
@@ -48,8 +49,8 @@ def mix_bgm_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list
         _record_bgm_artifacts(context, output_ref, manifest_ref)
         raise
 
-    if manifest_ref != AUDIO_MIX_MANIFEST:
-        write_json(context.output_path(manifest_ref), manifest)
+    manifest = _with_bgm_metadata(manifest, bgm_metadata)
+    write_json(context.output_path(manifest_ref), manifest)
     context.state["audio_mix_manifest"] = manifest
     _record_bgm_artifacts(context, str(manifest.get("output_video") or output_ref), manifest_ref)
     if manifest.get("status") != "succeeded":
@@ -117,6 +118,28 @@ def _float_input(context: WorkflowContext, name: str, default: float) -> float:
         return float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be a number.") from exc
+
+
+def _optional_bgm_metadata(step: WorkflowStepDefinition, context: WorkflowContext) -> dict[str, Any] | None:
+    if "bgm_metadata" not in step.inputs:
+        return None
+    value = step.inputs["bgm_metadata"]
+    if isinstance(value, str) and value not in context.inputs and value not in context.state and value not in context.artifacts:
+        return None
+    metadata_path = Path(str(context.resolve_input(str(value))))
+    metadata = _load_json_object(metadata_path, "BGM metadata")
+    if not isinstance(metadata.get("quality_verified"), bool):
+        raise ValueError("BGM metadata must include boolean quality_verified.")
+    return metadata
+
+
+def _with_bgm_metadata(manifest: dict[str, Any], metadata: dict[str, Any] | None) -> dict[str, Any]:
+    if metadata is None:
+        return manifest
+    enriched = dict(manifest)
+    enriched["quality_verified"] = bool(metadata.get("quality_verified"))
+    enriched["bgm_metadata"] = metadata
+    return enriched
 
 
 def _load_json_object(path: Path, label: str) -> dict[str, Any]:

@@ -317,6 +317,67 @@ repository does not include real media. This workflow indexes artifacts only. It
 does not copy files, upload files, regenerate videos, burn subtitles, mix BGM,
 export covers, call remote providers, or provide a Web UI.
 
+### `video_to_finished_package_real_asr.yaml`
+
+Phase 14.1 ASR-first product Golden Path for the source-video-only case:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_openai_compatible`
+4. `write_transcript`
+5. `load_roi_config`
+6. `detect_highlights`
+7. `rank_highlights_by_roi`
+8. `generate_clip_plan_from_highlights`
+9. `write_highlight_plan`
+10. `write_clip_plan`
+11. `probe_video_metadata`
+12. `validate_clip_plan`
+13. `real_slice_video`
+14. `generate_assembly_plan`
+15. `concat_clips`
+16. `probe_final_video`
+17. `write_clip_timeline_subtitles`
+18. `mix_bgm`
+19. `probe_bgm_mix`
+20. `write_finished_package`
+
+Example:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_finished_package_real_asr.yaml --input examples/demo_asr/video_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_real_asr
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
+```
+
+This workflow uses ASR transcript text as the highlight signal. It does not
+inspect video frames or run multimodal highlight detection. The BGM path must be
+local, ignored media, and `bgm_metadata_path` should point to local metadata
+with `quality_verified: true` when the music has actually been reviewed.
+
+### `video_script_to_finished_package_real_asr.yaml`
+
+Phase 14.1 ASR-first product Golden Path for the source-video-plus-script case.
+It first detects script highlights, then aligns those script highlights to ASR
+transcript segments and writes `script_highlight_alignment.json` before slicing
+and packaging.
+
+Example:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\ncut run-workflow --workflow workflows/video_script_to_finished_package_real_asr.yaml --input examples/demo_asr/video_script_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_real_asr
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
+```
+
+Low-confidence script-to-transcript alignments are skipped and reported in the
+alignment manifest. This workflow does not do visual semantic search; the ASR
+transcript is the source of video timestamps.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

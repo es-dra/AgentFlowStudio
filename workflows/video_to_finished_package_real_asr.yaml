@@ -1,0 +1,145 @@
+name: video_to_finished_package_real_asr
+version: 1
+mode: video_to_finished_package_real_asr
+quality_profile: finished_package
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: extract_audio
+    type: extract_audio
+    inputs:
+      video: video_path
+      audio_extraction_mode: audio_extraction_mode
+    outputs:
+      audio_manifest: audio_manifest.json
+  - id: transcribe_audio_openai_compatible
+    type: transcribe_audio_openai_compatible
+    inputs:
+      base_url: asr_base_url
+      model: asr_model
+      api_key: asr_api_key
+      api_key_env: asr_api_key_env
+      timeout_sec: asr_timeout_sec
+      language: language
+  - id: write_transcript
+    type: write_transcript
+    inputs:
+      transcript: transcript
+    outputs:
+      transcript: transcript.json
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config_path
+    outputs:
+      roi_settings: roi_config.json
+  - id: detect_highlights
+    type: detect_highlights
+    inputs:
+      input_mode: timestamped_transcript
+      transcript: transcript
+      max_highlights: max_highlights
+  - id: rank_highlights_by_roi
+    type: rank_highlights_by_roi
+    inputs:
+      highlight_plan: highlight_plan
+      roi_settings: roi_settings
+  - id: generate_clip_plan_from_highlights
+    type: generate_clip_plan_from_highlights
+    inputs:
+      highlight_plan: highlight_plan
+      source_video: source_video
+      max_clips: max_clips
+  - id: write_highlight_plan
+    type: write_highlight_plan
+    inputs:
+      highlight_plan: highlight_plan
+    outputs:
+      highlight_plan: highlight_plan.json
+  - id: write_clip_plan
+    type: write_clip_plan
+    inputs:
+      clip_plan: clip_plan
+    outputs:
+      clip_plan: clip_plan.json
+  - id: probe_video_metadata
+    type: probe_video_metadata
+    inputs:
+      video: video_path
+    outputs:
+      video_metadata: video_metadata.json
+  - id: validate_clip_plan
+    type: validate_clip_plan
+    inputs:
+      roi_settings: roi_settings
+      clip_plan: clip_plan
+      video_metadata: video_metadata
+    outputs:
+      validation: clip_plan_validation.json
+  - id: real_slice_video
+    type: real_slice_video
+    inputs:
+      video: video_path
+      clip_plan: clip_plan
+      validation: clip_plan_validation
+    outputs:
+      real_slice_manifest: real_slice_manifest.json
+      clips: clips
+  - id: generate_assembly_plan
+    type: generate_assembly_plan
+    inputs:
+      real_slice_manifest: real_slice_manifest
+    outputs:
+      assembly_plan: assembly_plan.json
+  - id: concat_clips
+    type: concat_clips
+    inputs:
+      assembly_plan: assembly_plan
+    outputs:
+      final_video_manifest: final_video_manifest.json
+      final_video: final_video.mp4
+      concat_list: concat_list.txt
+  - id: probe_final_video
+    type: probe_final_video
+    inputs:
+      final_video_manifest: final_video_manifest
+    outputs:
+      final_video_manifest: final_video_manifest.json
+  - id: write_clip_timeline_subtitles
+    type: write_clip_timeline_subtitles
+    inputs:
+      transcript: transcript
+      real_slice_manifest: real_slice_manifest
+      final_video_manifest: final_video_manifest
+    outputs:
+      subtitles: subtitles.srt
+      subtitle_manifest: subtitle_manifest.json
+  - id: mix_bgm
+    type: mix_bgm
+    inputs:
+      video: final_video
+      bgm: bgm_path
+      bgm_metadata: bgm_metadata_path
+    outputs:
+      audio_mix_manifest: audio_mix_manifest.json
+      final_video: final_video_with_bgm.mp4
+  - id: probe_bgm_mix
+    type: probe_bgm_mix
+    inputs:
+      audio_mix_manifest: audio_mix_manifest
+    outputs:
+      audio_mix_manifest: audio_mix_manifest.json
+  - id: write_finished_package
+    type: write_finished_package
+    inputs:
+      final_video: bgm_video
+      bgm_video: bgm_video
+      final_video_manifest: final_video_manifest
+      real_slice_manifest: real_slice_manifest
+      clip_plan: clip_plan
+      subtitle_manifest: subtitle_manifest
+      audio_mix_manifest: audio_mix_manifest
+    outputs:
+      finished_package_manifest: finished_package_manifest.json
