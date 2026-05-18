@@ -1,0 +1,19 @@
+{
+  "video_path": "data/raw/demo_real_video/input.mp4",
+  "source_video": "data/raw/demo_real_video/input.mp4",
+  "script_path": "examples/demo_highlight/script.txt",
+  "audio_extraction_mode": "ffmpeg",
+  "asr_base_url": "https://api.example.com/v1",
+  "asr_model": "whisper-1",
+  "asr_api_key_env": "NARRATOCUT_OPENAI_API_KEY",
+  "asr_timeout_sec": 60,
+  "roi_config_path": "examples/demo_highlight/roi_config.json",
+  "language": "zh-CN",
+  "max_highlights": 4,
+  "max_clips": 4,
+  "alignment_min_confidence": 0.25,
+  "bgm_path": "data/raw/demo_bgm/bgm.mp3",
+  "bgm_metadata_path": "data/raw/demo_bgm/bgm.metadata.json",
+  "output_clips_dir": "clips",
+  "output_dir": "data/processed/runs/demo_video_script_to_finished_package_real_asr"
+}

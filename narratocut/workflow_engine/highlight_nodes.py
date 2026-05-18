@@ -7,6 +7,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from narratocut.highlight_sop import (
+    ALIGNMENT_MANIFEST,
+    align_script_highlights_to_transcript,
     detect_highlights_from_script,
     detect_highlights_from_transcript,
     generate_clip_plan_from_highlights,
@@ -91,6 +93,26 @@ def generate_highlight_clip_plan_node(step: WorkflowStepDefinition, context: Wor
     return []
 
 
+def align_script_highlights_to_transcript_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    script_plan = _state_highlight_plan(context, str(_optional_raw_input(step, "script_highlight_plan") or "highlight_plan"))
+    transcript = _state_transcript(context, str(_optional_raw_input(step, "transcript") or "transcript"))
+    min_confidence = _optional_float(step, context, "min_confidence")
+    result = align_script_highlights_to_transcript(
+        script_plan,
+        transcript,
+        min_confidence=min_confidence if min_confidence is not None else 0.25,
+    )
+    output_ref = str(step.outputs.get("script_highlight_alignment") or ALIGNMENT_MANIFEST)
+    write_json(context.output_path(output_ref), result.manifest)
+    context.artifacts["script_highlight_alignment"] = output_ref
+    context.state["script_highlight_alignment"] = result.manifest
+    if result.highlight_plan is None:
+        raise ValueError("script_highlight_alignment_empty")
+    context.state["aligned_highlight_plan"] = result.highlight_plan
+    context.state["highlight_plan"] = result.highlight_plan
+    return [output_ref]
+
+
 def write_highlight_plan_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     plan = _state_highlight_plan(context, str(_optional_raw_input(step, "highlight_plan") or "highlight_plan"))
     output_ref = _require_output(step, "highlight_plan")
@@ -161,6 +183,13 @@ def _state_highlight_plan(context: WorkflowContext, key: str) -> HighlightPlan:
     raise ValueError("highlight_plan must be detected before this node")
 
 
+def _state_transcript(context: WorkflowContext, key: str) -> Transcript:
+    value = context.state.get(key)
+    if isinstance(value, Transcript):
+        return value
+    raise ValueError("transcript must be loaded before this node")
+
+
 def _state_roi_settings(context: WorkflowContext) -> ROISettings | None:
     value = context.state.get("roi_settings")
     if value is None:
@@ -188,6 +217,23 @@ def _optional_int(
         raise ValueError(f"{name} must be an integer") from exc
     if value <= 0:
         raise ValueError(f"{name} must be greater than 0")
+    return value
+
+
+def _optional_float(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> float | None:
+    raw = _optional_resolved_input(step, context, name)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
+    if value < 0 or value > 1:
+        raise ValueError(f"{name} must be between 0 and 1")
     return value
 
 

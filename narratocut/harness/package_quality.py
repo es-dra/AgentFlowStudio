@@ -131,6 +131,13 @@ def _add_subtitle_quality_checks(
         return
     if not subtitle_manifest.get("source_video"):
         _add_warning(checks, warnings, "product_quality_subtitle_source_video_missing", {})
+    if subtitle_manifest.get("timeline") != "final_video":
+        _add_warning(
+            checks,
+            warnings,
+            "product_quality_subtitle_timeline_not_final_video",
+            {"timeline": subtitle_manifest.get("timeline")},
+        )
     subtitle_duration = _optional_float(subtitle_manifest.get("duration_sec"))
     if primary_duration is not None and subtitle_duration is not None and subtitle_duration > primary_duration + 0.5:
         _add_warning(

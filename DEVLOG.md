@@ -525,3 +525,18 @@
 - Added `real_slice_manifest.json` output with passed/failed status, clip paths, durations, and errors.
 - Kept tests independent from installed FFmpeg by mocking `subprocess.run`; missing FFmpeg returns a clear failed manifest.
 - Updated tool contracts so `slice_real` requires FFmpeg, executes an external process, is not safe for automatic agent execution, and requires human review.
+
+## 2026-05-19 - Phase 14.1 ASR-First Product Golden Path
+
+- Started `feature/phase-14-1-asr-highlight-product-golden-path` from the merged Phase 14.0B `master`.
+- Added deterministic script-highlight-to-ASR-transcript alignment via `script_highlight_alignment.json`, producing timestamped highlights from script-only highlights without visual semantic retrieval.
+- Added clip-timeline subtitle export so subtitles are remapped from original-video transcript timestamps onto the assembled final-video timeline instead of reusing the source-video timeline directly.
+- Extended `SubtitleManifest` with `timeline`, and package quality review now warns when subtitle evidence is not explicitly `final_video` timeline.
+- Added optional local BGM metadata ingestion to `mix_bgm`; `quality_verified=true` is now carried into `audio_mix_manifest.json` so package review can distinguish verified music from arbitrary noise.
+- Added two ASR-first product workflows:
+  - `workflows/video_to_finished_package_real_asr.yaml`
+  - `workflows/video_script_to_finished_package_real_asr.yaml`
+- Added examples for the two workflows and a local BGM metadata example. Examples reference ignored local media only and do not commit videos or music.
+- Added focused tests for script alignment, clip-timeline subtitles, BGM verified metadata, product package warning clearance, and both product Golden Path workflows with mocked ASR/FFmpeg.
+- Product-quality intent: the old Phase 13 demo warning set remains a useful negative smoke, while the Phase 14.1 workflows can clear the six known product warnings when they receive multi-segment highlights, final-timeline subtitles, and verified BGM metadata.
+- Boundaries kept: no visual/multimodal highlight detection, no Web UI, no publishing/upload, no automatic music recommendation, no real ASR in tests, and no default remote ASR without `NARRATOCUT_ALLOW_REMOTE_ASR=true`.

@@ -40,6 +40,15 @@ product_quality_warning: subtitle_duration_exceeds_primary_video
 product_quality_warning: bgm_quality_unverified
 ```
 
+Phase 14.1 also adds a stricter subtitle timeline check:
+
+```text
+product_quality_warning: subtitle_timeline_not_final_video
+```
+
+This warning is expected when subtitle evidence still uses the source-video
+timeline instead of the assembled final-video timeline.
+
 These warnings mean:
 
 - `single_clip_only`: the package contains a one-clip edit, not a multi-moment
@@ -52,6 +61,8 @@ These warnings mean:
   video.
 - `subtitle_duration_exceeds_primary_video`: subtitle timing is longer than the
   assembled primary video.
+- `subtitle_timeline_not_final_video`: subtitle timing has not been remapped to
+  the assembled final-video timeline.
 - `bgm_quality_unverified`: BGM was technically mixed but not judged for music
   or content fit.
 
@@ -110,3 +121,52 @@ Until then, the correct product verdict is:
 engineering path: pass
 product quality: warning / not ready
 ```
+
+## Phase 14.1 Product Golden Path Target
+
+Phase 14.1 introduces ASR-first product workflows that are intended to clear the
+six known warnings when the input evidence is good enough:
+
+```text
+video_to_finished_package_real_asr:
+  source video
+    -> real ASR transcript
+    -> transcript highlights
+    -> multi-segment ClipPlan
+    -> real clips
+    -> final_video.mp4
+    -> clip-timeline subtitles
+    -> verified BGM mix
+    -> finished_package_manifest.json
+
+video_script_to_finished_package_real_asr:
+  source video + script
+    -> real ASR transcript
+    -> script highlights
+    -> script_highlight_alignment.json
+    -> timestamped highlights
+    -> multi-segment ClipPlan
+    -> real clips
+    -> final video package
+```
+
+This is still ASR/text-first. It does not perform visual or multimodal video
+highlight detection. The package can be considered product-quality acceptable
+only when:
+
+- at least two clips are selected
+- selected clips do not all start at `0s`
+- `clip_plan.json` carries highlight/ranking evidence
+- `subtitle_manifest.json` has `timeline: "final_video"` and a source video
+- subtitle duration stays within the primary video duration
+- `audio_mix_manifest.json` has `quality_verified: true` from local BGM metadata
+
+Real ASR remains explicit opt-in:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+```
+
+Tests for these workflows continue to mock ASR and FFmpeg, so CI does not call
+the network or require real media.
