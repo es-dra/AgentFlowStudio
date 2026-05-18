@@ -18,6 +18,7 @@ class BGMMixConfig:
     output_name: str = BGM_VIDEO
     bgm_volume: float = 0.2
     original_audio_volume: float = 1.0
+    mix_strategy: str = "mix_with_original"
     overwrite: bool = True
 
     def __post_init__(self) -> None:
@@ -28,10 +29,12 @@ class BGMMixConfig:
             raise ValueError("output_name must be a safe relative file name.")
         if output_path.name != self.output_name:
             raise ValueError("output_name must not include directories.")
-        if self.bgm_volume < 0:
-            raise ValueError("bgm_volume must be greater than or equal to 0.")
-        if self.original_audio_volume < 0:
-            raise ValueError("original_audio_volume must be greater than or equal to 0.")
+        if not 0 <= self.bgm_volume <= 1:
+            raise ValueError("bgm_volume must be between 0 and 1.")
+        if not 0 <= self.original_audio_volume <= 1:
+            raise ValueError("original_audio_volume must be between 0 and 1.")
+        if self.mix_strategy not in {"mix_with_original", "bgm_only"}:
+            raise ValueError("mix_strategy must be mix_with_original or bgm_only.")
 
 
 def mix_bgm_into_video(
@@ -142,9 +145,13 @@ def build_ffmpeg_bgm_mix_command(
     resolved_config = config or BGMMixConfig()
     overwrite_flag = "-y" if resolved_config.overwrite else "-n"
     filter_complex = (
-        f"[0:a]volume={resolved_config.original_audio_volume:g}[a0];"
-        f"[1:a]volume={resolved_config.bgm_volume:g}[a1];"
-        "[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+        f"[1:a]volume={resolved_config.bgm_volume:g}[aout]"
+        if resolved_config.mix_strategy == "bgm_only"
+        else (
+            f"[0:a]volume={resolved_config.original_audio_volume:g}[a0];"
+            f"[1:a]volume={resolved_config.bgm_volume:g}[a1];"
+            "[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+        )
     )
     return [
         resolved_config.ffmpeg_executable,
@@ -188,6 +195,7 @@ def _manifest(
         "output_video": _display_ref(output_video),
         "bgm_volume": config.bgm_volume,
         "original_audio_volume": config.original_audio_volume,
+        "mix_strategy": config.mix_strategy,
         "duration_sec": None,
         "width": None,
         "height": None,

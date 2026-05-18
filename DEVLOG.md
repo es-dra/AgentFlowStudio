@@ -1,5 +1,21 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.6 BGM Mix Hardening
+
+- Started `feature/phase-13-6-bgm-hardening` from the merged Phase 13.5
+  `master`.
+- Hardened `BGMMixConfig` so `bgm_volume` and `original_audio_volume` must stay
+  between `0` and `1`.
+- Added a `mix_strategy` option. The default remains `mix_with_original`, while
+  `bgm_only` builds a BGM-only audio filter path for silent final videos.
+- Added BGM inspect/review warnings for known FFmpeg stderr patterns such as
+  `Non-monotonic DTS` and for output duration drift beyond the BGM tolerance.
+- Split BGM review tests into a separate focused test file so the main workflow
+  test file stays under the 300-line project preference.
+- Kept this increment free of music libraries, licensing management, beat
+  detection, fades, transitions, final-video assembly changes, subtitles,
+  covers, remote providers, and Web UI.
+
 ## 2026-05-19 - Phase 13.5 Local BGM Mix
 
 - Started `feature/phase-13-5-bgm-mix` from the merged Phase 13.4 `master`.

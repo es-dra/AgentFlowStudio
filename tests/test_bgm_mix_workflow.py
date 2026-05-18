@@ -138,6 +138,16 @@ def test_bgm_mix_config_rejects_unsafe_output_name() -> None:
         BGMMixConfig(output_name="../outside.mp4")
 
 
+def test_bgm_mix_config_rejects_volume_above_one() -> None:
+    from narratocut.bgm_sop import BGMMixConfig
+
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        BGMMixConfig(bgm_volume=1.5)
+
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        BGMMixConfig(original_audio_volume=1.5)
+
+
 def test_bgm_mix_command_loops_bgm_and_maps_video() -> None:
     from narratocut.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
 
@@ -154,52 +164,19 @@ def test_bgm_mix_command_loops_bgm_and_maps_video() -> None:
     assert "-shortest" in command
 
 
-def test_bgm_mix_review_fails_when_manifest_succeeds_but_output_missing(tmp_path) -> None:
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-    write_json(
-        run_dir / "run_manifest.json",
-        {
-            "run_id": "run",
-            "workflow": "workflows/final_video_with_bgm.yaml",
-            "workflow_mode": "final_video_with_bgm",
-            "quality_profile": "bgm_mix",
-            "artifacts": {
-                "audio_mix_manifest": "audio_mix_manifest.json",
-                "bgm_video": "final_video_with_bgm.mp4",
-            },
-        },
-    )
-    write_json(run_dir / "manifest.json", {"run_id": "run", "status": "success"})
-    write_json(run_dir / "trace.json", {"steps": [{"step_id": "mix_bgm", "status": "success"}]})
-    write_json(
-        run_dir / "audio_mix_manifest.json",
-        {
-            "status": "succeeded",
-            "source_video": "final_video.mp4",
-            "bgm_path": "bgm.mp3",
-            "output_video": "final_video_with_bgm.mp4",
-            "bgm_volume": 0.2,
-            "original_audio_volume": 1.0,
-            "duration_sec": 8.0,
-            "ffmpeg_command": ["ffmpeg", "-y"],
-            "returncode": 0,
-            "stdout": "",
-            "stderr": "",
-            "errors": [],
-            "warnings": [],
-            "manifest_path": "audio_mix_manifest.json",
-        },
+def test_bgm_mix_command_supports_bgm_only_strategy_for_silent_video() -> None:
+    from narratocut.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
+
+    command = build_ffmpeg_bgm_mix_command(
+        source_video="silent_final_video.mp4",
+        bgm_audio="bgm.mp3",
+        output_video="final_video_with_bgm.mp4",
+        config=BGMMixConfig(mix_strategy="bgm_only"),
     )
 
-    inspection = inspect_run(run_dir)
-    review = review_run(run_dir)
-
-    assert inspection["status"] == "fail"
-    assert review["status"] == "failed"
-    bgm_section = next(section for section in review["sections"] if section["name"] == "bgm_mix_outputs")
-    failed_ids = {check["id"] for check in bgm_section["checks"] if check["status"] == "failed"}
-    assert "bgm_mix_output_file_exists" in failed_ids
+    assert "0:a" not in " ".join(command)
+    assert command[command.index("-map") + 1] == "0:v:0"
+    assert "[aout]" in command
 
 
 def test_draft_workflow_plan_lists_bgm_mix_outputs() -> None:

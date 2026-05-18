@@ -39,6 +39,7 @@ def mix_bgm_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list
                 output_name=output_ref,
                 bgm_volume=_float_input(context, "bgm_volume", 0.2),
                 original_audio_volume=_float_input(context, "original_audio_volume", 1.0),
+                mix_strategy=str(context.inputs.get("mix_strategy") or "mix_with_original"),
             ),
         )
     except ValueError as exc:
@@ -95,6 +96,7 @@ def _failed_manifest(source_video: Path, bgm_path: Path, output_video: str, erro
         "output_video": _display_ref(output_video),
         "bgm_volume": None,
         "original_audio_volume": None,
+        "mix_strategy": None,
         "duration_sec": None,
         "width": None,
         "height": None,

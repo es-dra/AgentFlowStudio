@@ -8,6 +8,14 @@ from narratocut.harness.quality_profiles import BGM_MIX_PROFILE
 from narratocut.slicing_sop import probe_video_metadata, resolve_media_tool_paths
 
 
+BGM_DURATION_TOLERANCE_SEC = 1.0
+KNOWN_FFMPEG_WARNING_PATTERNS = [
+    ("non_monotonic_dts", "Non-monotonic DTS"),
+    ("dts_out_of_order", "DTS out of order"),
+    ("invalid_non_monotonic_dts", "non monotonically increasing dts"),
+]
+
+
 def bgm_artifacts_to_inspect() -> list[str]:
     return [
         "audio_mix_manifest.json",
@@ -82,6 +90,11 @@ def _add_ffmpeg_checks(
     _add_check(checks, "bgm_mix_ffmpeg_returncode", "pass" if returncode == 0 else "fail", {"returncode": returncode})
     if returncode not in (0, None):
         errors.append(f"bgm_mix_ffmpeg_failed: {returncode}")
+    classified = _classify_ffmpeg_warnings(str(mix_manifest.get("stderr") or ""))
+    if not classified:
+        _add_check(checks, "bgm_mix_ffmpeg_warnings", "pass", {"warnings": []})
+        return
+    _add_check(checks, "bgm_mix_ffmpeg_warnings", "warning", {"warnings": classified})
 
 
 def _add_output_video_checks(
@@ -112,12 +125,45 @@ def _add_output_video_checks(
     metadata = probe_video_metadata(path, ffprobe_executable=paths.ffprobe)
     if metadata.probe_status == "succeeded":
         _add_check(checks, "bgm_mix_video_stream_present", "pass", {"path": ref})
+        _add_duration_check(mix_manifest, metadata.duration_sec, ref, checks)
         return
     if "video_stream_missing" in metadata.errors:
         _add_check(checks, "bgm_mix_video_stream_present", "fail", {"path": ref, "errors": metadata.errors})
         errors.append(f"bgm_mix_video_stream_missing: {ref}")
     else:
         _add_check(checks, "bgm_mix_video_probe", "warning", {"path": ref, "errors": metadata.errors})
+
+
+def _add_duration_check(
+    mix_manifest: dict[str, Any],
+    actual_duration: float | None,
+    ref: str,
+    checks: list[dict[str, Any]],
+) -> None:
+    expected = _optional_float(mix_manifest.get("duration_sec"))
+    if expected is None or actual_duration is None:
+        _add_check(checks, "bgm_mix_duration_probe", "warning", {"path": ref})
+        return
+    delta = abs(actual_duration - expected)
+    if delta <= BGM_DURATION_TOLERANCE_SEC:
+        _add_check(
+            checks,
+            "bgm_mix_duration_tolerance",
+            "pass",
+            {"path": ref, "expected_sec": expected, "actual_sec": actual_duration},
+        )
+        return
+    _add_check(
+        checks,
+        "bgm_mix_duration_tolerance",
+        "warning",
+        {
+            "path": ref,
+            "expected_sec": expected,
+            "actual_sec": actual_duration,
+            "tolerance_sec": BGM_DURATION_TOLERANCE_SEC,
+        },
+    )
 
 
 def _check_json_object(
@@ -161,6 +207,29 @@ def _add_check(
 def _is_safe_file_ref(ref: str) -> bool:
     path = Path(ref)
     return bool(ref) and not path.is_absolute() and ".." not in path.parts and path.name == ref
+
+
+def _classify_ffmpeg_warnings(stderr: str) -> list[dict[str, str]]:
+    classified: list[dict[str, str]] = []
+    lowered = stderr.lower()
+    for code, pattern in KNOWN_FFMPEG_WARNING_PATTERNS:
+        if pattern.lower() in lowered:
+            classified.append(
+                {
+                    "code": code,
+                    "severity": "warning",
+                    "source": "ffmpeg_stderr",
+                    "message": pattern,
+                }
+            )
+    return classified
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _review_check(check: dict[str, Any]) -> dict[str, Any]:
