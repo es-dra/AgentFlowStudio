@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.7 Video Artifact Review Hardening
+
+- Started `feature/phase-11-7-video-artifact-review` from the merged Phase
+  11.6 `master` after syncing the branch and deleting the completed Phase 11.6
+  branch locally and on `origin`.
+- Added Phase 11 video artifact harness profiles for `mock_asr_transcript`,
+  `real_asr_transcript`, `video_highlight_clip_plan`, and
+  `real_asr_highlight_clip_plan`.
+- `inspect-run` now recognizes Phase 11 audio/transcript artifacts and writes
+  summaries for audio extraction status, transcript provider, segment count,
+  timestamp validity, monotonic segment order, and text presence.
+- `review-run` now adds a `video_artifacts` section for Phase 11 profiles,
+  including audio manifest checks, Transcript schema checks, ASR provider
+  metadata checks, source-segment alignment checks for video-to-highlight runs,
+  and obvious API secret value leakage checks for explicit real-ASR runs.
+- Video-to-highlight runs still include the existing `highlight_artifacts`
+  section, so HighlightPlan and ClipPlan review remains shared with Phase 10.
+- Kept this increment free of new workflows, new product CLI commands, real
+  slicing, final assembly, subtitles, BGM, Web UI, video-frame highlight
+  detection, and default remote ASR calls.
+
 ## 2026-05-18 - Phase 11.6 Real-ASR Video-to-ClipPlan Workflow
 
 - Synced local `master` to the merged Phase 11.5 PR and deleted the completed

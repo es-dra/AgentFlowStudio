@@ -225,3 +225,22 @@ This workflow composes explicit remote ASR with the Phase 10 highlight
 pipeline. It writes `transcript.json`, `highlight_plan.json`, and
 `clip_plan.json`. It does not inspect video frames, run FFmpeg slicing, stitch
 clips, add subtitles, add BGM, or export a final video.
+
+## Phase 11 artifact inspection
+
+Phase 11 video workflows can be inspected and reviewed with the same commands:
+
+```powershell
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_transcript
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_transcript
+```
+
+For video transcript profiles, inspection covers `audio_manifest.json`,
+`audio/audio.wav`, `transcript.json`, `manifest.json`, `run_manifest.json`, and
+`trace.json`. For video-to-highlight profiles, it also covers
+`highlight_plan.json` and `clip_plan.json`.
+
+The review layer checks transcript timestamps and provider metadata, audio
+manifest execution status, highlight/clip source segment references, and
+obvious secret leakage in explicit real-ASR runs. It does not call ASR, execute
+FFmpeg slicing, or generate clips.

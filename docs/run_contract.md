@@ -18,6 +18,12 @@ default mock pipeline. Real-video runs write `workflow_mode` and
 `quality_profile` explicitly in `run_manifest.json` so inspection does not infer
 behavior from incomplete artifacts.
 
+Phase 11 adds video transcription and video-to-clip-plan quality profiles. These
+profiles keep the same run contract, but `inspect-run` now recognizes video
+artifacts such as `audio_manifest.json`, `audio/audio.wav`, `transcript.json`,
+`highlight_plan.json`, and `clip_plan.json` when the run declares a video
+quality profile.
+
 ## Run Directory
 
 A full mock workflow run writes:
@@ -124,6 +130,15 @@ Current checks include:
 - `slice_manifest.json` exists
 - `clips/` exists
 - mock clip count matches the slice manifest
+
+For Phase 11 video profiles, `quality_report.json` also summarizes:
+
+- audio extraction status, mode, execution flag, and audio artifact presence
+- transcript provider, segment count, timestamp validity, monotonic order, and
+  non-empty text
+- highlight and clip-plan summaries when the workflow produces them
+- transcript source-segment references from highlight and clip metadata
+- obvious remote-ASR secret value leakage for explicit real-ASR profiles
 
 The harness owns this artifact because quality checks are gates over completed
 artifacts, not workflow execution order.

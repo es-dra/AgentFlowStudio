@@ -116,6 +116,25 @@ Workflow output checks:
 
 - artifact references declared in `run_manifest.json` exist in the run directory
 
+Video artifact checks are added when `run_manifest.json` declares a Phase 11
+video quality profile such as `mock_asr_transcript`, `real_asr_transcript`,
+`video_highlight_clip_plan`, or `real_asr_highlight_clip_plan`.
+
+The `video_artifacts` section checks:
+
+- `audio_manifest.json` exists and its mock/FFmpeg execution status is explicit
+- `audio/audio.wav` exists when declared by the audio manifest
+- `transcript.json` validates against the `Transcript` schema
+- transcript segments are non-empty, timestamped, monotonic, and text-bearing
+- transcript metadata identifies the ASR provider
+- explicit real-ASR runs do not record obvious API secret values in run artifacts
+- video-to-highlight runs keep highlight and clip source segment IDs aligned
+  with transcript segment IDs
+
+Video-to-highlight runs still include the existing `highlight_artifacts` section
+for HighlightPlan and ClipPlan checks. The reviewer does not call ASR, FFmpeg,
+remote LLMs, slicing, or assembly.
+
 ## CLI
 
 Generate a review report:

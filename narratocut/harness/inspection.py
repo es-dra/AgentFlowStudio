@@ -9,6 +9,10 @@ from narratocut.harness.highlight_artifacts import (
     is_highlight_quality_profile,
 )
 from narratocut.harness.quality_checks import build_quality_report
+from narratocut.harness.video_artifacts import (
+    is_video_quality_profile,
+    video_artifacts_to_inspect,
+)
 from narratocut.utils import write_json
 
 
@@ -75,7 +79,9 @@ def _workflow(
 def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[dict[str, str]]:
     statuses: list[dict[str, str]] = []
     quality_profile = run_manifest.get("quality_profile") if run_manifest else None
-    if is_highlight_quality_profile(quality_profile):
+    if is_video_quality_profile(quality_profile):
+        artifacts = video_artifacts_to_inspect(quality_profile)
+    elif is_highlight_quality_profile(quality_profile):
         artifacts = highlight_artifacts_to_inspect(quality_profile)
     elif quality_profile == "real_video":
         artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT

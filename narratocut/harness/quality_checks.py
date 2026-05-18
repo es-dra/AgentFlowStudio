@@ -4,10 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from narratocut.harness.highlight_artifacts import (
-    build_highlight_quality_report,
-    is_highlight_quality_profile,
-)
+from narratocut.harness.highlight_artifacts import build_highlight_quality_report, is_highlight_quality_profile
+from narratocut.harness.video_artifacts import build_video_quality_report, is_video_quality_profile
 from narratocut.slicing_sop import probe_video_metadata, resolve_media_tool_paths
 
 
@@ -21,6 +19,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
         quality_profile = run_manifest.get("quality_profile")
         if quality_profile == "real_video":
             return _build_real_video_quality_report(root)
+        if is_video_quality_profile(quality_profile):
+            return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):
             return build_highlight_quality_report(root, quality_profile)
 
