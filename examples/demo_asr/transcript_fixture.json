@@ -1,0 +1,38 @@
+{
+  "transcript_id": "demo_video_transcript_001",
+  "source_video": null,
+  "language": "zh-CN",
+  "duration": 12.0,
+  "segments": [
+    {
+      "segment_id": "seg_001",
+      "start_time": 0.0,
+      "end_time": 4.0,
+      "text": "很多团队一开始就想自动剪出爆款，但真正可靠的第一步是把视频转成可检查的时间轴文本。",
+      "speaker": "speaker_1",
+      "confidence": 0.98,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_002",
+      "start_time": 4.0,
+      "end_time": 8.0,
+      "text": "只要转写稿稳定，高光识别、排序和切片计划就可以复用前面的工作流。",
+      "speaker": "speaker_1",
+      "confidence": 0.97,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_003",
+      "start_time": 8.0,
+      "end_time": 12.0,
+      "text": "所以 Phase 11 先解决视频到转写稿，不急着做画面理解或自动成片。",
+      "speaker": "speaker_1",
+      "confidence": 0.96,
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "fixture_note": "Deterministic mock ASR fixture for Phase 11.1."
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "video_path": "data/raw/demo_real_video/input.mp4",
+  "asr_fixture_path": "examples/demo_asr/transcript_fixture.json",
+  "audio_extraction_mode": "mock",
+  "language": "zh-CN",
+  "output_dir": "data/processed/runs/demo_video_to_transcript"
+}

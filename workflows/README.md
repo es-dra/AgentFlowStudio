@@ -123,3 +123,23 @@ Example:
 This workflow writes a ranked `highlight_plan.json` and an executable
 `clip_plan.json`. It does not run FFmpeg, stitch clips, add subtitles, add BGM,
 or export a final video.
+
+### `video_to_transcript.yaml`
+
+Phase 11.1 video-to-transcript workflow:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_mock`
+4. `write_transcript`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_transcript.yaml --input examples/demo_asr/video_to_transcript_input.example.json --output data/processed/runs/demo_video_to_transcript
+```
+
+The example uses `audio_extraction_mode: mock` and a fixture-backed mock ASR
+provider, so it writes `audio_manifest.json`, `audio/audio.wav`, and
+`transcript.json` without requiring real ASR. It does not detect highlights,
+generate `clip_plan.json`, run FFmpeg slicing, or inspect video frames.

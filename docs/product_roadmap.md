@@ -73,6 +73,18 @@ Purpose:
 
 - turn a local video into a timestamped transcript that can be clipped
 
+Phase 11.1 starts with the narrow video-to-transcript foundation:
+
+```text
+local video
+  -> audio artifact
+  -> mock/local ASR adapter
+  -> transcript.json
+```
+
+This first step is intentionally deterministic and does not inspect video
+frames for highlights.
+
 Target flow:
 
 ```text
