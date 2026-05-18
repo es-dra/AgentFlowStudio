@@ -704,12 +704,16 @@ tools:
       - ffmpeg_unavailable
       - ffmpeg_bgm_mix_failed
       - bgm_mix_output_missing
+      - volume_out_of_range
+      - unsupported_mix_strategy
     quality_checks:
       - audio_mix_manifest_exists
       - bgm_mix_manifest_status
       - bgm_mix_output_file_exists
       - bgm_mix_output_file_size_positive
       - bgm_mix_ffmpeg_returncode
+      - bgm_mix_ffmpeg_warnings
+      - bgm_mix_duration_tolerance
     agent_usage:
       safe_for_auto_execute: false
       requires_human_review: true
@@ -739,6 +743,7 @@ tools:
     quality_checks:
       - bgm_mix_video_stream_present
       - bgm_mix_output_file_size_positive
+      - bgm_mix_duration_tolerance
     agent_usage:
       safe_for_auto_execute: false
       requires_human_review: true

@@ -38,6 +38,10 @@ existing final video and a local BGM audio file, then writes
 music libraries, handle licensing, detect beats, add fades, add transitions, or
 change final assembly.
 
+Phase 13.6 hardens the BGM mix path without changing its product scope. It adds
+bounded volume validation, a `bgm_only` mix strategy for silent final videos,
+known FFmpeg warning classification, and duration drift warnings.
+
 Catalog file:
 
 ```text
@@ -410,9 +414,13 @@ Mixes a local BGM audio file into an existing final video with FFmpeg.
 - Requires: installed FFmpeg; no network, no model provider, no API key
 - Main checks: `audio_mix_manifest_exists`, `bgm_mix_manifest_status`,
   `bgm_mix_output_file_exists`, `bgm_mix_output_file_size_positive`,
-  `bgm_mix_ffmpeg_returncode`
+  `bgm_mix_ffmpeg_returncode`, `bgm_mix_ffmpeg_warnings`,
+  `bgm_mix_duration_tolerance`
 - Agent usage: not safe for automatic execution, requires human review,
   executes an external process
+- Options: `bgm_volume` and `original_audio_volume` must be between 0 and 1.
+  `mix_strategy` defaults to `mix_with_original`; `bgm_only` can be used for a
+  final video without an original audio stream.
 - Boundary: this node consumes existing local artifacts only. It does not choose
   music, manage licensing, detect beats, add fades, add transitions, regenerate
   final assembly, call remote providers, or provide a Web UI.
@@ -428,7 +436,7 @@ Probes the BGM-mixed output video and enriches `audio_mix_manifest.json`.
 - Outputs: `audio_mix_manifest.json`
 - Requires: installed FFprobe; no network, no model provider, no API key
 - Main checks: `bgm_mix_video_stream_present`,
-  `bgm_mix_output_file_size_positive`
+  `bgm_mix_output_file_size_positive`, `bgm_mix_duration_tolerance`
 
 ### `inspect_run`
 

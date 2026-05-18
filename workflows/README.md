@@ -278,7 +278,12 @@ This workflow consumes an existing `final_video.mp4` and a local BGM audio file,
 then writes `final_video_with_bgm.mp4` plus `audio_mix_manifest.json`.
 `inspect-run` and `review-run` check manifest status, FFmpeg command/return
 code, safe relative output path, output video presence, non-empty output size,
-and video stream presence when FFprobe is available.
+video stream presence when FFprobe is available, known FFmpeg warnings, and
+duration drift.
+
+`bgm_volume` and `original_audio_volume` are bounded to `0..1`. The default
+`mix_strategy` is `mix_with_original`; use `bgm_only` only when the input final
+video has no original audio stream.
 
 The example references generated or local ignored media under `data/processed/`
 and `data/raw/`; the repository does not include real video or music assets. It
