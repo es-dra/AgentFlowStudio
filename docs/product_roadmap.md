@@ -99,6 +99,11 @@ local video
 This composition still does not add real ASR, video-frame highlight detection,
 FFmpeg slicing, or final video assembly.
 
+Phase 11.3 adds auditable real FFmpeg audio extraction metadata while preserving
+the mock extraction path for deterministic tests. Phase 11.4 adds an optional
+OpenAI-compatible ASR adapter behind an explicit `NARRATOCUT_ALLOW_REMOTE_ASR`
+gate. The default demo workflows still use mock ASR fixtures.
+
 Target flow:
 
 ```text

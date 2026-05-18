@@ -144,6 +144,10 @@ provider, so it writes `audio_manifest.json`, `audio/audio.wav`, and
 `transcript.json` without requiring real ASR. It does not detect highlights,
 generate `clip_plan.json`, run FFmpeg slicing, or inspect video frames.
 
+Use `audio_extraction_mode: ffmpeg` only when local FFmpeg is available and a
+real audio artifact is needed. Remote ASR providers are not used by this
+workflow unless a future workflow explicitly selects one.
+
 ### `video_to_highlight_clip_plan.yaml`
 
 Phase 11.2 mock-ASR video-to-clip-plan workflow:

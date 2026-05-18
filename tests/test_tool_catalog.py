@@ -20,6 +20,7 @@ EXPECTED_TOOLS = {
     "load_video",
     "extract_audio",
     "transcribe_audio_mock",
+    "transcribe_audio_openai_compatible",
     "write_transcript",
     "inspect_run",
 }
@@ -68,6 +69,8 @@ def test_tool_catalog_keeps_phase_7_5b_safety_boundary() -> None:
 
     assert names.isdisjoint(FORBIDDEN_TOOLS)
     for tool in catalog["tools"]:
+        if tool["name"] == "transcribe_audio_openai_compatible":
+            continue
         assert tool["requires"]["network"] is False
         assert tool["requires"]["api_key"] is False
         assert tool["agent_usage"]["mutates_workflow"] is False
