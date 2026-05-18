@@ -172,6 +172,61 @@ For `script_only`, generated highlights are untimed. For
 the exact `start_time` / `end_time` values from the transcript. Phase 10.3 still
 does not perform ROI ranking or generate executable `ClipPlan` artifacts.
 
+## Phase 10.4 ROI-aware Ranking
+
+Phase 10.4 adds transparent local ranking rules that reorder a `HighlightPlan`
+with optional `ROISettings`.
+
+Public API:
+
+- `ROIHighlightRanker.rank(...)`
+- `rank_highlights_by_roi(...)`
+
+The ranker returns a new `HighlightPlan` instead of mutating the detector output.
+This lets later workflows keep both raw and ranked plans, for example:
+
+```text
+highlight_plan.raw.json
+highlight_plan.ranked.json
+```
+
+The detector score remains in `highlight.score`. The ROI-aware score is stored
+under:
+
+```text
+highlight.metadata.ranking_factors.final_score
+```
+
+Ranking factors include:
+
+- `base_score`
+- `confidence`
+- `content_goal`
+- `target_platform`
+- `priority`
+- `content_goal_boost`
+- `target_platform_boost`
+- `priority_boost`
+- `final_score`
+- `matched_rules`
+
+The current formula is intentionally simple and explainable:
+
+```text
+final_score =
+  base_score * 0.70
+  + confidence * 0.15
+  + content_goal_boost
+  + target_platform_boost
+  + priority_boost
+```
+
+`final_score` is clamped to `0.0-1.0`. This is a ranking heuristic, not a
+prediction of views, virality, conversion, or revenue.
+
+The ranker may add user-facing tags such as `goal:*`, `platform:*`, and
+`priority:*`, while preserving detector-provided `roi_tags`.
+
 ## Acceptance Criteria
 
 Phase 10 is complete when:

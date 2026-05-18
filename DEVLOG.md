@@ -33,6 +33,24 @@
   real slicing integration out of Phase 10.3. Those remain later Phase 10
   increments.
 
+## 2026-05-18 - Phase 10.4 ROI-aware Highlight Ranking
+
+- Added `ROIHighlightRanker` and `rank_highlights_by_roi(...)` under
+  `narratocut.highlight_sop`.
+- Ranking returns a new `HighlightPlan` instead of mutating detector output,
+  so later workflows can keep raw and ranked plans separate.
+- Added transparent local ranking factors under
+  `highlight.metadata.ranking_factors`, including base score, confidence,
+  content goal, target platform, priority boosts, matched rules, and
+  `final_score`.
+- Kept `highlight.score` as the detector score. ROI ranking uses
+  `metadata.ranking_factors.final_score` for ordering.
+- Added user-facing ROI tags such as `goal:*`, `platform:*`, and
+  `priority:*` without discarding detector-provided tags.
+- Kept this increment free of performance prediction, virality prediction,
+  ClipPlan generation, workflow nodes, CLI commands, remote LLM calls, ASR, and
+  final-video assembly.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided
