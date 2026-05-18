@@ -197,3 +197,31 @@ and an API key is available through the configured environment variable. It
 writes `audio_manifest.json`, `audio/audio.wav`, and `transcript.json`. It does
 not detect highlights, generate `clip_plan.json`, run FFmpeg slicing, stitch
 clips, add subtitles, add BGM, or export a final video.
+
+### `video_to_highlight_clip_plan_real_asr.yaml`
+
+Phase 11.6 explicit real-ASR video-to-highlight-clip-plan workflow:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_openai_compatible`
+4. `write_transcript`
+5. `load_roi_config`
+6. `detect_highlights`
+7. `rank_highlights_by_roi`
+8. `generate_clip_plan_from_highlights`
+9. `write_highlight_plan`
+10. `write_clip_plan`
+
+Example:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_highlight_clip_plan_real_asr.yaml --input examples/demo_asr/video_to_highlight_clip_plan_real_asr_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan_real_asr
+```
+
+This workflow composes explicit remote ASR with the Phase 10 highlight
+pipeline. It writes `transcript.json`, `highlight_plan.json`, and
+`clip_plan.json`. It does not inspect video frames, run FFmpeg slicing, stitch
+clips, add subtitles, add BGM, or export a final video.
