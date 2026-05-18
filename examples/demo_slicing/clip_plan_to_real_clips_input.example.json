@@ -1,0 +1,5 @@
+{
+  "video_path": "data/raw/demo_slicing/input.mp4",
+  "clip_plan_path": "examples/demo_slicing/clip_plan.example.json",
+  "output_clips_dir": "clips"
+}

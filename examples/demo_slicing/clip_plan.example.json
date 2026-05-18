@@ -1,0 +1,16 @@
+{
+  "clip_plan_id": "clip_plan_demo_slicing",
+  "project_id": "demo_slicing",
+  "hook_id": "hook_demo",
+  "title": "Demo real clip slicing",
+  "cover_text": "Demo",
+  "segments": [
+    {
+      "segment_id": "seg_001",
+      "source_video": "data/raw/demo_slicing/input.mp4",
+      "start_sec": 0,
+      "end_sec": 5
+    }
+  ],
+  "output_name": "clip_demo.mp4"
+}

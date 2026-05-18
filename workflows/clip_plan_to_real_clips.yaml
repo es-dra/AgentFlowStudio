@@ -1,0 +1,37 @@
+name: clip_plan_to_real_clips
+version: 1
+mode: clip_plan_to_real_clips
+quality_profile: real_clips
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: load_clip_plan
+    type: load_clip_plan
+    inputs:
+      clip_plan: clip_plan_path
+    outputs:
+      clip_plan: clip_plan.json
+  - id: probe_video_metadata
+    type: probe_video_metadata
+    inputs:
+      video: video_path
+    outputs:
+      video_metadata: video_metadata.json
+  - id: validate_clip_plan
+    type: validate_clip_plan
+    inputs:
+      clip_plan: clip_plan
+      video_metadata: video_metadata
+    outputs:
+      validation: clip_plan_validation.json
+  - id: real_slice_video
+    type: real_slice_video
+    inputs:
+      video: video_path
+      clip_plan: clip_plan
+      validation: clip_plan_validation
+    outputs:
+      real_slice_manifest: real_slice_manifest.json
+      clips: clips

@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 12.1 ClipPlan To Real Clips
+
+- Added `workflows/clip_plan_to_real_clips.yaml` as the Phase 12.1 primary
+  execution workflow: source video plus existing `clip_plan.json` -> metadata
+  probe -> validation -> real slicing -> `real_slice_manifest.json` and
+  `clips/`.
+- Kept this phase scoped to ClipPlan execution. It does not run ASR, detect
+  highlights, regenerate clip plans, concatenate clips, add subtitles, add BGM,
+  create covers, call remote providers, or export `final_video.mp4`.
+- Added `examples/demo_slicing/clip_plan_to_real_clips_input.example.json` and
+  a small `clip_plan.example.json`; the example references an ignored local
+  video path and does not commit real media.
+- Extended the real clip inspection/review path with a `real_clips` profile
+  that reuses the existing real-video artifact checks without requiring
+  transcript, highlight, or audio artifacts.
+- Enriched `real_slice_manifest.json` with source video, clip plan path, clips
+  directory, FFmpeg command, return code, stdout, and stderr so later assembly
+  phases can inspect the execution result.
+- Deferred `video_to_real_clips.yaml` to Phase 12.1B unless a follow-up needs a
+  separate composition smoke workflow.
+
 ## 2026-05-18 - Phase 11.7 Video Artifact Review Hardening
 
 - Started `feature/phase-11-7-video-artifact-review` from the merged Phase

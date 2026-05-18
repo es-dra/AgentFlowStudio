@@ -20,6 +20,7 @@ SCHEMA_VERSION = "0.1"
 PASSED = "passed"
 WARNING = "warning"
 FAILED = "failed"
+REAL_CLIP_QUALITY_PROFILES = {"real_video", "real_clips"}
 
 
 def review_run(run_dir: str | Path) -> dict[str, Any]:
@@ -32,7 +33,7 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         _run_contract_section(root, run_manifest, trace, quality_report),
         _workflow_outputs_section(root, run_manifest),
     ]
-    if run_manifest and run_manifest.get("quality_profile") == "real_video":
+    if run_manifest and run_manifest.get("quality_profile") in REAL_CLIP_QUALITY_PROFILES:
         sections.append(_real_video_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
@@ -252,7 +253,7 @@ def _recommendations(
     run_manifest: dict[str, Any] | None,
     quality_report: dict[str, Any] | None,
 ) -> list[str]:
-    if not run_manifest or run_manifest.get("quality_profile") != "real_video":
+    if not run_manifest or run_manifest.get("quality_profile") not in REAL_CLIP_QUALITY_PROFILES:
         return []
 
     recommendation_set: list[str] = []

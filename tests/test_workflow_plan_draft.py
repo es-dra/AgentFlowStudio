@@ -120,3 +120,24 @@ def test_write_workflow_plan_accepts_prebuilt_invalid_plan(tmp_path) -> None:
 
     saved = json.loads(output_path.read_text(encoding="utf-8"))
     assert saved["status"] == "invalid"
+
+
+def test_draft_workflow_plan_lists_real_clip_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/clip_plan_to_real_clips.yaml",
+        input_path="examples/demo_slicing/clip_plan_to_real_clips_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_video",
+        "load_clip_plan",
+        "probe_video_metadata",
+        "validate_clip_plan",
+        "real_slice_video",
+    ]
+    expected = plan["artifacts"]["expected"]
+    assert "video_metadata.json" in expected
+    assert "clip_plan_validation.json" in expected
+    assert "real_slice_manifest.json" in expected
+    assert "clips" in expected

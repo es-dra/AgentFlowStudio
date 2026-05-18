@@ -116,6 +116,7 @@ def load_clip_plan_node(step: WorkflowStepDefinition, context: WorkflowContext) 
     write_json(context.output_path(output_ref), clip_plan)
     context.artifacts["clip_plan"] = output_ref
     context.state["clip_plan"] = clip_plan
+    context.state["clip_plan_path"] = str(clip_plan_path)
     return [output_ref]
 
 
@@ -134,7 +135,7 @@ def probe_video_metadata_node(step: WorkflowStepDefinition, context: WorkflowCon
 
 def validate_clip_plan_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     clip_plan = _state_or_load_clip_plan(context, "clip_plan")
-    roi_settings = _state_or_load_roi_settings(context, "roi_settings")
+    roi_settings = _state_or_default_roi_settings(context)
     metadata = _state_or_load_video_metadata(context, "video_metadata")
     paths = resolve_media_tool_paths()
     ffmpeg_info = check_ffmpeg_available(paths.ffmpeg)
@@ -183,6 +184,13 @@ def real_slice_video_node(step: WorkflowStepDefinition, context: WorkflowContext
         output_dir=context.output_dir,
         config=RealSlicingConfig(ffmpeg_executable=paths.ffmpeg, clips_dir=_clips_dir(context)),
     )
+    manifest = _add_real_slice_provenance(
+        manifest,
+        source_video=video_path,
+        clip_plan_path=context.state.get("clip_plan_path"),
+        clips_dir=_clips_dir(context),
+    )
+    write_json(context.output_path(REAL_SLICE_MANIFEST), manifest)
     context.artifacts["real_slice_manifest"] = REAL_SLICE_MANIFEST
     context.artifacts["clips"] = _clips_dir(context)
     if manifest.get("status") not in {"succeeded", "passed"}:
@@ -316,6 +324,20 @@ def _state_or_load_roi_settings(context: WorkflowContext, key: str) -> ROISettin
     return _load_roi_settings(context.output_path(context.artifacts[key]))
 
 
+def _state_or_default_roi_settings(context: WorkflowContext) -> ROISettings:
+    value = context.state.get("roi_settings")
+    if isinstance(value, ROISettings):
+        return value
+    if "roi_settings" in context.artifacts:
+        return _load_roi_settings(context.output_path(context.artifacts["roi_settings"]))
+    return ROISettings(
+        target_platform=str(context.inputs.get("target_platform") or "generic"),
+        target_audience=str(context.inputs.get("target_audience") or "unspecified"),
+        content_goal=str(context.inputs.get("content_goal") or "execute_clip_plan"),
+        validation_policy="advisory",
+    )
+
+
 def _state_or_load_video_metadata(context: WorkflowContext, key: str) -> VideoMetadata:
     value = context.state.get(key)
     if isinstance(value, VideoMetadata):
@@ -334,6 +356,21 @@ def _skipped_real_slice_manifest(
         "errors": [issue.code for issue in report.hard_errors],
         "manifest_path": REAL_SLICE_MANIFEST,
     }
+
+
+def _add_real_slice_provenance(
+    manifest: dict[str, object],
+    *,
+    source_video: Path,
+    clip_plan_path: object,
+    clips_dir: str,
+) -> dict[str, object]:
+    enriched = dict(manifest)
+    enriched["source_video"] = str(source_video)
+    if clip_plan_path:
+        enriched["clip_plan_path"] = str(clip_plan_path)
+    enriched["clips_dir"] = clips_dir
+    return enriched
 
 
 def _clips_dir(context: WorkflowContext) -> str:
