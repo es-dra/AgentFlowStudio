@@ -2,55 +2,62 @@
 
 [中文 README](README.zh-CN.md)
 
-NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, deterministic script/transcript highlight workflows, FFmpeg readiness checks, a standalone minimal real slicing PoC, and an ROI-aware real video slicing workflow from a provided `ClipPlan`.
+NarratoCut is a Python-based, CLI-first technical MVP for AI-assisted short
+video production workflows. It is currently an artifact-driven workflow system:
+each major step writes readable JSON or media artifacts, and those artifacts can
+be inspected and reviewed after a run.
 
-This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
+The project is clean-room. The previous AVP workspace is reference material
+only and is not used as a source-code base.
 
 ## Current Status
 
-NarratoCut is a CLI-first, schema-first, workflow-first prototype. The default pipeline is local and mock-driven:
+NarratoCut is now a CLI-first technical MVP for developer-facing short-video
+generation workflows. It is not yet a consumer product, SaaS app, desktop app,
+or Web UI product.
+
+The current product path is:
 
 ```text
-text -> hooks -> scripts -> clip_plans -> mock clips
+video / transcript / clip_plan
+  -> highlight_plan
+  -> clip_plan.json
+  -> real clips
+  -> final_video.mp4
+  -> subtitles.srt
+  -> final_video_with_subtitles.mp4
+  -> cover.jpg
+  -> final_video_with_bgm.mp4
+  -> finished_package_manifest.json
+  -> inspect/review
 ```
 
-Implemented capabilities:
+Supported today:
 
-- ROI / hook analysis with a local mock provider
-- Mock short-video script generation
-- Deterministic ClipPlan generation
-- Mock slicing output with `slice_manifest.json` and `.txt` placeholder clips
-- Sequential YAML workflow execution
-- Run contract artifacts: `run_manifest.json`, `trace.json`, and `quality_report.json`
-- `ncut inspect-run` for local harness inspection of workflow run directories
-- `ncut review-run` for agent-readable `review_report.json` generation
-- `ncut draft-plan` for static `workflow_plan.json` draft generation
-- Model Gateway Lite with mock default and optional OpenAI-compatible provider code path
-- FFmpeg availability probe
-- Real slicing command contract
-- Standalone `ncut slice-real` PoC for local FFmpeg slicing from clip plans
-- ROI-aware real video slicing workflow:
-  `local video + ROI settings + ClipPlan -> metadata -> validation -> FFmpeg clips -> inspect/review`
-- Deterministic Phase 10 highlight workflows:
-  `script + ROI -> ranked HighlightPlan`
-- Timestamped transcript workflow:
-  `timestamped transcript + ROI -> ranked HighlightPlan -> ClipPlan`
+- deterministic script/transcript highlight workflows
+- mock and explicit opt-in OpenAI-compatible ASR paths
+- ClipPlan validation against probed video metadata
+- real FFmpeg slicing from existing ClipPlans
+- simple final-video assembly from real clips
+- final video quality hardening with FFmpeg warning classification
+- subtitle export to SRT
+- subtitle burn-in for existing videos and SRT files
+- cover image export from an existing final video
+- local BGM mixing with bounded volume settings
+- finished package manifest indexing
+- `inspect-run` and `review-run` reports for generated run artifacts
+- `draft-plan` for static workflow plans
 
-Current real-video capability is manual `ClipPlan` execution. NarratoCut can
-validate and execute a provided cut plan against a local video, then produce
-reviewable run artifacts. It is not yet an automatic highlight editing product.
+Not included yet:
 
-Not implemented yet:
-
-- automatic video highlight or viral-moment detection from raw video
-- ASR or timestamped transcript generation
-- executable ClipPlan generation from untimed scripts
-- clip assembly into a final video
-- subtitle burn-in
-- vertical crop or aspect-ratio adaptation
-- BGM, cover generation, or multi-track timelines
-- web UI, API server, database, queue, or hosted SaaS runtime
+- one-command end-to-end product workflow
+- Web UI or desktop UI
+- automatic music selection or licensing management
+- transition templates or multi-track timeline editing
+- visual highlight detection from video frames
+- publishing/upload integrations
+- physical package directory or zip export
+- hosted API, database, queue, or SaaS runtime
 
 ## Project Layout
 
@@ -59,10 +66,10 @@ apps/                 CLI, API, and future web entrypoints
 narratocut/           Core Python package
 workflows/            YAML workflow definitions
 prompts/              Auditable prompt templates
-configs/              Example configuration files
+configs/              Example configuration and tool catalog files
 examples/             User-facing demo inputs
 data/                 Local runtime data; generated files are ignored
-docs/                 Architecture and operating notes
+docs/                 Architecture, contracts, roadmap, and smoke docs
 tests/                Automated tests and fixtures
 ```
 
@@ -70,8 +77,11 @@ tests/                Automated tests and fixtures
 
 - Python 3.12 is recommended.
 - The project declares `>=3.11,<3.13`.
-- Python 3.13 is not recommended yet because ASR, video, and model-adjacent dependencies often lag the newest runtime.
-- FFmpeg is optional for the default mock pipeline, but required for `slice-real` and `workflows/real_video_roi_to_clips.yaml`.
+- Python 3.13 is not recommended yet because media, ASR, and model-adjacent
+  dependencies may lag the newest runtime.
+- FFmpeg and FFprobe are required for real slicing, final video assembly,
+  subtitle burn-in, cover export, and BGM mix workflows.
+- Remote LLM and ASR calls are disabled by default.
 
 ## Quick Start
 
@@ -85,79 +95,124 @@ python -m venv .venv
 .venv\Scripts\ncut version
 ```
 
-Run the full mock workflow:
+Run the default mock workflow:
 
 ```powershell
 .venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
-```
-
-Expected generated files:
-
-```text
-data/processed/runs/demo_full_mock/
-+-- manifest.json
-+-- run_manifest.json
-+-- trace.json
-+-- quality_report.json
-+-- hooks.json
-+-- scripts.json
-+-- clip_plans.json
-+-- slice_manifest.json
-+-- clips/
-    +-- clip_plan_script_mock_001.txt
-    +-- clip_plan_script_mock_002.txt
-    +-- clip_plan_script_mock_003.txt
-```
-
-Generated files under `data/processed/` are ignored by git.
-
-Inspect the generated run:
-
-```powershell
 .venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
-```
-
-Generate an agent-readable review report:
-
-```powershell
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
-Generate a static workflow plan draft:
+Expected generated files include:
 
-```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+```text
+manifest.json
+run_manifest.json
+trace.json
+quality_report.json
+review_report.json
+hooks.json
+scripts.json
+clip_plans.json
+slice_manifest.json
+clips/
 ```
 
-Run contract details are documented in [`docs/run_contract.md`](docs/run_contract.md).
-The reviewer contract is documented in [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md).
-The workflow plan contract is documented in [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md).
+Generated files under `data/processed/`, `data/reports/`, and local media under
+`data/raw/` are ignored by git.
 
-Run the Phase 10 script highlight workflow:
+## Product Golden Path
 
-```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
+For a product-level local smoke after Phase 13, use the Golden Path:
+
+```text
+source video + clip_plan
+  -> real clips
+  -> final_video.mp4
+  -> subtitles.srt
+  -> final_video_with_subtitles.mp4
+  -> cover.jpg
+  -> final_video_with_bgm.mp4
+  -> finished_package_manifest.json
+  -> inspect/review
 ```
 
-This writes `highlight_plan.json` only. It does not generate `clip_plan.json`
-because ordinary scripts do not carry reliable timestamps.
+See [`docs/golden_path.md`](docs/golden_path.md) for the required local files,
+commands, expected artifacts, and acceptance criteria.
 
-Run the Phase 10 timestamped transcript workflow:
+## Main Workflows
 
-```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
+Planning and transcript workflows:
+
+- `workflows/script_to_highlight_plan.yaml`
+- `workflows/transcript_to_highlight_clip_plan.yaml`
+- `workflows/video_to_transcript.yaml`
+- `workflows/video_to_transcript_real_asr.yaml`
+- `workflows/video_to_highlight_clip_plan.yaml`
+- `workflows/video_to_highlight_clip_plan_real_asr.yaml`
+
+Execution and product artifact workflows:
+
+- `workflows/clip_plan_to_real_clips.yaml`
+- `workflows/video_to_real_clips.yaml`
+- `workflows/clips_to_final_video.yaml`
+- `workflows/transcript_to_subtitles.yaml`
+- `workflows/final_video_with_subtitles.yaml`
+- `workflows/final_video_to_cover.yaml`
+- `workflows/final_video_with_bgm.yaml`
+- `workflows/final_video_package.yaml`
+
+Workflow details are documented in [`workflows/README.md`](workflows/README.md).
+
+## Artifact and Review Model
+
+NarratoCut treats generated files as first-class contracts. Important artifacts
+include:
+
+```text
+run_manifest.json
+trace.json
+quality_report.json
+review_report.json
+real_slice_manifest.json
+final_video_manifest.json
+subtitle_manifest.json
+subtitle_burn_manifest.json
+cover_manifest.json
+audio_mix_manifest.json
+finished_package_manifest.json
 ```
 
-This writes `highlight_plan.json` and `clip_plan.json`. It does not run FFmpeg
-or create a final video.
+`inspect-run` writes `quality_report.json`.
+`review-run` reads the run artifacts and writes `review_report.json`.
 
-## Model Gateway Boundary
+Contract references:
 
-The default provider is `mock`, so the standard CLI and workflow commands do not need an API key and do not access the network.
+- [`docs/run_contract.md`](docs/run_contract.md)
+- [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md)
+- [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
+- [`docs/tool_contracts.md`](docs/tool_contracts.md)
+- [`docs/current_architecture.md`](docs/current_architecture.md)
 
-Remote LLM calls are disabled by default. Set `NARRATOCUT_ALLOW_REMOTE_LLM=true` only when real provider calls are intended.
+## Remote Provider Boundary
 
-Local model settings belong in `configs/models.yaml`, which is ignored by git. Commit only `configs/models.example.yaml`.
+The default model and ASR paths are local/mock. Standard CLI and workflow
+commands do not need API keys and do not access the network.
+
+Remote LLM calls require:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
+```
+
+Remote ASR calls require:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+```
+
+Local model settings belong in `configs/models.yaml`, which is ignored by git.
+Commit only example configuration files such as `configs/models.example.yaml`.
 
 ## FFmpeg Boundary
 
@@ -167,39 +222,19 @@ Check local FFmpeg and FFprobe availability:
 .venv\Scripts\ncut ffmpeg-check --json
 ```
 
-If FFmpeg is not installed or not on `PATH`, this command reports an unavailable status. That is acceptable for the default mock pipeline, but real video slicing requires FFmpeg and FFprobe.
-
-Run the standalone minimal real slicing PoC:
-
-```powershell
-.venv\Scripts\ncut slice-real --video <local_input.mp4> --clip-plans <clip_plans.json> --output data/outputs/real_slicing_demo
-```
-
-This command is separate from the default mock workflow. It requires local
-FFmpeg and local video input, writes `real_slice_manifest.json`, and may generate
-`.mp4` outputs under the chosen output directory. It does not burn subtitles,
-crop video, add BGM, create covers, or run a full production timeline.
-
-Run the Phase 9 real video slicing workflow from a provided `ClipPlan`:
-
-```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
-```
-
-This workflow expects a local video at the path declared in the input bundle.
-Real media files and generated run artifacts are ignored by git.
+If FFmpeg is missing, mock workflows can still run. Real media workflows need
+FFmpeg/FFprobe.
 
 ## Development Checks
 
 ```powershell
 .venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall -q apps narratocut tests
-.venv\Scripts\ncut --help
-.venv\Scripts\ncut version
-.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
-.venv\Scripts\ncut slice-real --help
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\python -m compileall apps narratocut tests
+git diff --check
+.venv\Scripts\python -m apps.cli.main --help
+.venv\Scripts\python -m apps.cli.main version
 ```
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
