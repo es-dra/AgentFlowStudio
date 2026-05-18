@@ -230,3 +230,16 @@ def test_draft_workflow_plan_lists_cover_outputs() -> None:
     expected = plan["artifacts"]["expected"]
     assert "cover_manifest.json" in expected
     assert "cover.jpg" in expected
+
+
+def test_draft_workflow_plan_lists_bgm_mix_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/final_video_with_bgm.yaml",
+        input_path="examples/demo_bgm/final_video_with_bgm_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == ["mix_bgm", "probe_bgm_mix"]
+    expected = plan["artifacts"]["expected"]
+    assert "audio_mix_manifest.json" in expected
+    assert "final_video_with_bgm.mp4" in expected

@@ -32,6 +32,12 @@ existing final video, extracts one frame with FFmpeg, and writes `cover.jpg`
 plus `cover_manifest.json`. It does not create cover templates, inspect video
 frames for the best moment, add BGM, add transitions, or change final assembly.
 
+Phase 13.5 extends the catalog with a narrow BGM mix node that consumes an
+existing final video and a local BGM audio file, then writes
+`final_video_with_bgm.mp4` plus `audio_mix_manifest.json`. It does not manage
+music libraries, handle licensing, detect beats, add fades, add transitions, or
+change final assembly.
+
 Catalog file:
 
 ```text
@@ -62,6 +68,7 @@ Allowed:
 - Phase 13.2 subtitle export nodes that write text subtitle artifacts
 - Phase 13.3 subtitle burn-in nodes that consume existing final video and SRT artifacts
 - Phase 13.4 cover export nodes that consume an existing final video
+- Phase 13.5 BGM mix nodes that consume an existing final video and local audio
 
 Not allowed:
 
@@ -390,6 +397,38 @@ Exports a single `cover.jpg` image from an existing final video with FFmpeg.
 - Boundary: this node consumes an existing final video only. It does not select
   an optimal highlight frame, generate templates, add text overlays, add BGM,
   add transitions, call remote providers, or provide a Web UI.
+
+### `mix_bgm`
+
+Mixes a local BGM audio file into an existing final video with FFmpeg.
+
+- Category: BGM mix execution
+- Main entry points: workflow node `mix_bgm`,
+  `narratocut.bgm_sop.mix_bgm_into_video`
+- Inputs: `final_video.mp4`, local BGM audio such as `bgm.mp3`
+- Outputs: `final_video_with_bgm.mp4`, `audio_mix_manifest.json`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `audio_mix_manifest_exists`, `bgm_mix_manifest_status`,
+  `bgm_mix_output_file_exists`, `bgm_mix_output_file_size_positive`,
+  `bgm_mix_ffmpeg_returncode`
+- Agent usage: not safe for automatic execution, requires human review,
+  executes an external process
+- Boundary: this node consumes existing local artifacts only. It does not choose
+  music, manage licensing, detect beats, add fades, add transitions, regenerate
+  final assembly, call remote providers, or provide a Web UI.
+
+### `probe_bgm_mix`
+
+Probes the BGM-mixed output video and enriches `audio_mix_manifest.json`.
+
+- Category: BGM mix metadata
+- Main entry points: workflow node `probe_bgm_mix`,
+  `narratocut.slicing_sop.probe_video_metadata`
+- Inputs: `final_video_with_bgm.mp4`, `audio_mix_manifest.json`
+- Outputs: `audio_mix_manifest.json`
+- Requires: installed FFprobe; no network, no model provider, no API key
+- Main checks: `bgm_mix_video_stream_present`,
+  `bgm_mix_output_file_size_positive`
 
 ### `inspect_run`
 
