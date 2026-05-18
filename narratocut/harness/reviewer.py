@@ -8,6 +8,11 @@ from narratocut.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
 )
+from narratocut.harness.video_artifacts import (
+    build_video_review_section,
+    is_video_highlight_quality_profile,
+    is_video_quality_profile,
+)
 from narratocut.utils import write_json
 
 
@@ -29,6 +34,12 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
     ]
     if run_manifest and run_manifest.get("quality_profile") == "real_video":
         sections.append(_real_video_section(root))
+    if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
+        sections.append(build_video_review_section(root, run_manifest))
+    if run_manifest and is_video_highlight_quality_profile(run_manifest.get("quality_profile")):
+        highlight_manifest = dict(run_manifest)
+        highlight_manifest["quality_profile"] = "highlight_clip_plan"
+        sections.append(build_highlight_review_section(root, highlight_manifest))
     if run_manifest and is_highlight_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_highlight_review_section(root, run_manifest))
     summary = _summarize_sections(sections)

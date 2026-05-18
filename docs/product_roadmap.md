@@ -112,6 +112,13 @@ Phase 11.6 composes the explicit real-ASR transcript path with the Phase 10
 highlight pipeline. It produces `transcript.json`, `highlight_plan.json`, and
 `clip_plan.json`, but still does not run real slicing or final assembly.
 
+Phase 11.7 hardens reviewability for Phase 11 artifacts. `inspect-run` and
+`review-run` now understand video transcript and video-to-highlight quality
+profiles, including audio manifests, transcript schema/timestamp checks,
+provider metadata, highlight/clip source-segment alignment, and explicit
+real-ASR secret-leak checks. It does not add workflows, providers, slicing, or
+assembly.
+
 Target flow:
 
 ```text
