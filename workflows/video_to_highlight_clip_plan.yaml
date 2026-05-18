@@ -1,0 +1,61 @@
+name: video_to_highlight_clip_plan
+version: 1
+mode: video_to_highlight_clip_plan
+quality_profile: video_highlight_clip_plan
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: extract_audio
+    type: extract_audio
+    inputs:
+      video: video_path
+      audio_extraction_mode: audio_extraction_mode
+    outputs:
+      audio_manifest: audio_manifest.json
+  - id: transcribe_audio_mock
+    type: transcribe_audio_mock
+    inputs:
+      asr_fixture: asr_fixture_path
+      language: language
+  - id: write_transcript
+    type: write_transcript
+    inputs:
+      transcript: transcript
+    outputs:
+      transcript: transcript.json
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config_path
+    outputs:
+      roi_settings: roi_config.json
+  - id: detect_highlights
+    type: detect_highlights
+    inputs:
+      input_mode: timestamped_transcript
+      transcript: transcript
+      max_highlights: max_highlights
+  - id: rank_highlights_by_roi
+    type: rank_highlights_by_roi
+    inputs:
+      highlight_plan: highlight_plan
+      roi_settings: roi_settings
+  - id: generate_clip_plan_from_highlights
+    type: generate_clip_plan_from_highlights
+    inputs:
+      highlight_plan: highlight_plan
+      source_video: source_video
+  - id: write_highlight_plan
+    type: write_highlight_plan
+    inputs:
+      highlight_plan: highlight_plan
+    outputs:
+      highlight_plan: highlight_plan.json
+  - id: write_clip_plan
+    type: write_clip_plan
+    inputs:
+      clip_plan: clip_plan
+    outputs:
+      clip_plan: clip_plan.json

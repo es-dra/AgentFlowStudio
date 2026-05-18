@@ -85,6 +85,20 @@ local video
 This first step is intentionally deterministic and does not inspect video
 frames for highlights.
 
+Phase 11.2 composes that transcript foundation with the existing Phase 10
+highlight pipeline:
+
+```text
+local video
+  -> audio artifact
+  -> mock ASR transcript
+  -> highlight_plan.json
+  -> clip_plan.json
+```
+
+This composition still does not add real ASR, video-frame highlight detection,
+FFmpeg slicing, or final video assembly.
+
 Target flow:
 
 ```text
