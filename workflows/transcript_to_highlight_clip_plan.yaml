@@ -1,0 +1,43 @@
+name: transcript_to_highlight_clip_plan
+version: 1
+mode: highlight_to_clip_plan
+quality_profile: highlight_clip_plan
+steps:
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config_path
+    outputs:
+      roi_settings: roi_config.json
+  - id: load_transcript
+    type: load_transcript
+    inputs:
+      transcript: transcript_path
+  - id: detect_highlights
+    type: detect_highlights
+    inputs:
+      input_mode: input_mode
+      transcript: transcript
+      max_highlights: max_highlights
+  - id: rank_highlights_by_roi
+    type: rank_highlights_by_roi
+    inputs:
+      highlight_plan: highlight_plan
+      roi_settings: roi_settings
+  - id: generate_clip_plan_from_highlights
+    type: generate_clip_plan_from_highlights
+    inputs:
+      highlight_plan: highlight_plan
+      source_video: source_video
+  - id: write_highlight_plan
+    type: write_highlight_plan
+    inputs:
+      highlight_plan: highlight_plan
+    outputs:
+      highlight_plan: highlight_plan.json
+  - id: write_clip_plan
+    type: write_clip_plan
+    inputs:
+      clip_plan: clip_plan
+    outputs:
+      clip_plan: clip_plan.json

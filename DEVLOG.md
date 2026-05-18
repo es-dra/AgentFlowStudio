@@ -1,5 +1,89 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 10.1/10.2 Highlight Contracts
+
+- Started Phase 10 on `feature/phase-10-highlight-detection` after Phase 9
+  was merged into `master`.
+- Added `HighlightSegment` and `HighlightPlan` contracts for `script_only`
+  and `timestamped_transcript` highlight planning.
+- Added `TranscriptSegment` and `Transcript` contracts for externally
+  supplied timestamped transcript input. Phase 10 consumes transcripts; it does
+  not generate them through ASR.
+- Enforced the key Phase 10 boundary: `script_only` highlight plans must not
+  carry timestamps, while `timestamped_transcript` plans require timestamps on
+  every highlight.
+- Added `examples/demo_highlight/` input examples for script-only and
+  timestamped-transcript workflows, plus a reusable ROI config.
+- Kept this increment free of detector logic, ROI ranking, ClipPlan generation,
+  workflow nodes, CLI commands, remote LLM calls, ASR, Web UI, subtitles, BGM,
+  and final-video assembly.
+
+## 2026-05-18 - Phase 10.3 Deterministic Highlight Detector
+
+- Added `narratocut.highlight_sop` as the local highlight-detection module.
+- Added `DeterministicHighlightDetector` plus convenience functions for
+  script-only and timestamped-transcript inputs.
+- The detector is a stable, offline baseline. It uses simple rules for hook,
+  conflict, insight, and CTA candidates; it does not call the model gateway,
+  remote LLMs, ASR, OCR, FFmpeg, or any network service.
+- Script-only detection writes untimed `HighlightPlan` objects. Timestamped
+  transcript detection preserves `TranscriptSegment` time ranges and source
+  segment IDs.
+- Kept ROI ranking, ClipPlan generation, workflow nodes, CLI commands, and
+  real slicing integration out of Phase 10.3. Those remain later Phase 10
+  increments.
+
+## 2026-05-18 - Phase 10.4 ROI-aware Highlight Ranking
+
+- Added `ROIHighlightRanker` and `rank_highlights_by_roi(...)` under
+  `narratocut.highlight_sop`.
+- Ranking returns a new `HighlightPlan` instead of mutating detector output,
+  so later workflows can keep raw and ranked plans separate.
+- Added transparent local ranking factors under
+  `highlight.metadata.ranking_factors`, including base score, confidence,
+  content goal, target platform, priority boosts, matched rules, and
+  `final_score`.
+- Kept `highlight.score` as the detector score. ROI ranking uses
+  `metadata.ranking_factors.final_score` for ordering.
+- Added user-facing ROI tags such as `goal:*`, `platform:*`, and
+  `priority:*` without discarding detector-provided tags.
+- Kept this increment free of performance prediction, virality prediction,
+  ClipPlan generation, workflow nodes, CLI commands, remote LLM calls, ASR, and
+  final-video assembly.
+
+## 2026-05-18 - Phase 10.5 Highlight-to-ClipPlan Generation
+
+- Added `HighlightClipPlanGenerator` and
+  `generate_clip_plan_from_highlights(...)` under `narratocut.highlight_sop`.
+- The generator accepts only `timestamped_transcript` `HighlightPlan` objects
+  and rejects `script_only` plans instead of inventing timestamps.
+- Generated one executable `ClipPlan` with one `ClipSegment` per selected
+  highlight, preserving the incoming ranked order.
+- Required caller-provided `source_video` for generated segments so the output
+  can enter Phase 9 validation and real slicing when the caller supplies a real
+  video path.
+- Preserved highlight evidence in segment metadata, including highlight ID,
+  type, score, confidence, ROI tags, source transcript segment IDs, and ranking
+  factors.
+- Kept this increment free of FFmpeg execution, workflow nodes, CLI commands,
+  ASR, remote LLM calls, clip assembly, subtitles, BGM, and final-video export.
+
+## 2026-05-18 - Phase 10.6 Highlight Workflow Integration
+
+- Added highlight workflow nodes for loading scripts/transcripts, detecting
+  highlights, ROI ranking, generating ClipPlan from timestamped highlights, and
+  writing highlight/clip plan artifacts.
+- Added `workflows/script_to_highlight_plan.yaml`, which writes a ranked
+  `highlight_plan.json` and intentionally does not write `clip_plan.json`.
+- Added `workflows/transcript_to_highlight_clip_plan.yaml`, which writes a
+  ranked `highlight_plan.json` plus executable `clip_plan.json`.
+- Kept Phase 10.6 on the existing `ncut run-workflow` path instead of adding a
+  product-specific CLI command.
+- Updated highlight examples with `max_highlights` and an optional
+  `source_video` placeholder for transcript-driven clip plan generation.
+- Kept this increment free of ASR, raw-video highlight detection, FFmpeg
+  execution, clip assembly, subtitles, BGM, Web UI, and final-video export.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided

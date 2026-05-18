@@ -1,0 +1,32 @@
+name: script_to_highlight_plan
+version: 1
+mode: highlight_detection
+quality_profile: highlight_plan
+steps:
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config_path
+    outputs:
+      roi_settings: roi_config.json
+  - id: load_script
+    type: load_script
+    inputs:
+      script: script_path
+  - id: detect_highlights
+    type: detect_highlights
+    inputs:
+      input_mode: input_mode
+      script_text: script_text
+      max_highlights: max_highlights
+  - id: rank_highlights_by_roi
+    type: rank_highlights_by_roi
+    inputs:
+      highlight_plan: highlight_plan
+      roi_settings: roi_settings
+  - id: write_highlight_plan
+    type: write_highlight_plan
+    inputs:
+      highlight_plan: highlight_plan
+    outputs:
+      highlight_plan: highlight_plan.json

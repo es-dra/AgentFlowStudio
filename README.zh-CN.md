@@ -4,7 +4,7 @@
 
 NarratoCut 是一个面向短视频生产流程的 Python MVP 项目，用来探索从文本分析、脚本生成、切片计划到真实视频切片与质量审查的自动化工作流。
 
-当前版本支持文本到 hooks 分析、mock 脚本生成、ClipPlan 生成、mock slicing、本地 workflow 编排、轻量 Model Gateway、FFmpeg/FFprobe 可用性检测，以及基于本地视频、ROI settings 和已提供 `ClipPlan` 的真实视频切片 workflow。
+当前版本支持文本到 hooks 分析、mock 脚本生成、ClipPlan 生成、mock slicing、本地 workflow 编排、轻量 Model Gateway、本地 deterministic 的剧本 / 转写稿高光 workflow、FFmpeg/FFprobe 可用性检测，以及基于本地视频、ROI settings 和已提供 `ClipPlan` 的真实视频切片 workflow。
 
 这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移来源。
 
@@ -29,14 +29,18 @@ text -> hooks -> scripts -> clip_plans -> mock clips
 - standalone `ncut slice-real` PoC
 - ROI-aware real video slicing workflow：
   `本地视频 + ROI settings + ClipPlan -> 元数据读取 -> 计划校验 -> FFmpeg clips -> inspect/review`
+- Phase 10 deterministic highlight workflows：
+  `script + ROI -> ranked HighlightPlan`
+- timestamped transcript workflow：
+  `timestamped transcript + ROI -> ranked HighlightPlan -> ClipPlan`
 
 当前真实视频能力是“手工提供 ClipPlan 后的可信执行层”。系统可以校验并执行一个已有切片计划，生成真实 `.mp4` clips 和可审查 artifacts，但当前还不是自动爆点识别、自动剪辑或自动成片工具。
 
 尚未实现：
 
-- 自动高光 / 爆点识别
+- 从原始视频中自动识别高光 / 爆点
 - ASR 或带时间戳 transcript 生成
-- 剧本 / transcript 自动生成可执行 ClipPlan
+- 从无时间戳普通剧本直接生成可执行 ClipPlan
 - clips 拼接为 final video
 - 字幕烧录
 - 竖屏裁剪或画幅适配
@@ -130,6 +134,22 @@ $env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
 ```
 
 该 workflow 需要 input bundle 中声明的本地视频文件。真实媒体文件和运行产物默认被 git 忽略。
+
+运行 Phase 10 普通剧本高光 workflow：
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
+```
+
+该 workflow 只生成 `highlight_plan.json`。普通剧本没有可靠时间轴，因此不会生成 `clip_plan.json`。
+
+运行 Phase 10 带时间戳转写稿 workflow：
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
+```
+
+该 workflow 生成 `highlight_plan.json` 和 `clip_plan.json`，但不会调用 FFmpeg，也不会生成最终成片。
 
 ## 开发检查
 

@@ -1,0 +1,54 @@
+{
+  "transcript_id": "demo_transcript_001",
+  "source_video": null,
+  "language": "zh-CN",
+  "duration": 23.6,
+  "segments": [
+    {
+      "segment_id": "seg_001",
+      "start_time": 0.0,
+      "end_time": 4.2,
+      "text": "很多人以为努力就一定会成功，但真相可能完全相反。",
+      "speaker": "speaker_1",
+      "confidence": 0.98,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_002",
+      "start_time": 4.2,
+      "end_time": 8.6,
+      "text": "真正决定结果的，往往不是你做了多少，而是你有没有选对方向。",
+      "speaker": "speaker_1",
+      "confidence": 0.97,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_003",
+      "start_time": 8.6,
+      "end_time": 13.8,
+      "text": "我曾经连续三个月每天工作到凌晨，但项目还是失败了。",
+      "speaker": "speaker_1",
+      "confidence": 0.96,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_004",
+      "start_time": 13.8,
+      "end_time": 18.4,
+      "text": "直到后来我发现，用户根本不需要我们做的那个功能。",
+      "speaker": "speaker_1",
+      "confidence": 0.97,
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_005",
+      "start_time": 18.4,
+      "end_time": 23.6,
+      "text": "所以，如果你正在做一个产品，请先验证需求，再投入全部资源。",
+      "speaker": "speaker_1",
+      "confidence": 0.98,
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
