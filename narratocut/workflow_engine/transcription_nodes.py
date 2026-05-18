@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.asr_sop import MockASRProvider
+from narratocut.asr_sop import MockASRProvider, OpenAICompatibleASRProvider
 from narratocut.audio_sop import AUDIO_MANIFEST, AudioArtifact, AudioExtractionConfig, extract_audio_from_video
 from narratocut.schemas import Transcript
 from narratocut.utils import write_json
@@ -47,6 +47,30 @@ def transcribe_audio_mock_node(step: WorkflowStepDefinition, context: WorkflowCo
     return []
 
 
+def transcribe_audio_openai_compatible_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    audio_artifact = _state_audio_artifact(context)
+    base_url = str(_required_resolved_input(step, context, "base_url"))
+    model = str(_required_resolved_input(step, context, "model"))
+    api_key = _optional_parameter_input(step, context, "api_key")
+    api_key_env = _optional_parameter_input(step, context, "api_key_env")
+    timeout_sec = _optional_parameter_input(step, context, "timeout_sec")
+    language = _optional_parameter_input(step, context, "language")
+
+    provider = OpenAICompatibleASRProvider(
+        base_url=base_url,
+        model=model,
+        api_key=str(api_key) if api_key is not None else None,
+        api_key_env=str(api_key_env) if api_key_env is not None else None,
+        timeout_sec=float(timeout_sec) if timeout_sec is not None else 60.0,
+    )
+    transcript = provider.transcribe(
+        audio_artifact,
+        language=str(language) if language is not None else None,
+    )
+    context.state["transcript"] = transcript
+    return []
+
+
 def write_transcript_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     transcript = _state_transcript(context)
     output_ref = _require_output(step, "transcript")
@@ -83,6 +107,30 @@ def _optional_resolved_input(
         return None
     if isinstance(value, str) and value not in context.inputs and value not in context.state:
         return value
+    return context.resolve_input(str(value))
+
+
+def _required_resolved_input(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> object:
+    value = _optional_resolved_input(step, context, name)
+    if value is None or (isinstance(value, str) and not value.strip()):
+        raise ValueError(f"Step {step.id} missing required input: {name}")
+    return value
+
+
+def _optional_parameter_input(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> object | None:
+    if name not in step.inputs:
+        return None
+    value = step.inputs[name]
+    if isinstance(value, str) and value not in context.inputs and value not in context.state and value not in context.artifacts:
+        return None
     return context.resolve_input(str(value))
 
 

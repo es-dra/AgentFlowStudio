@@ -173,3 +173,27 @@ This workflow composes Phase 11.1 transcript generation with the Phase 10
 highlight pipeline. It writes `transcript.json`, `highlight_plan.json`, and
 `clip_plan.json`. It does not use real ASR, inspect video frames, run FFmpeg
 slicing, stitch clips, add subtitles, add BGM, or export a final video.
+
+### `video_to_transcript_real_asr.yaml`
+
+Phase 11.5 explicit remote-ASR video-to-transcript workflow:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_openai_compatible`
+4. `write_transcript`
+
+Example:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_transcript_real_asr.yaml --input examples/demo_asr/video_to_transcript_real_asr_input.example.json --output data/processed/runs/demo_video_to_transcript_real_asr
+```
+
+This workflow is intentionally separate from the mock ASR workflows. It may
+call a remote ASR provider only when `NARRATOCUT_ALLOW_REMOTE_ASR=true` is set
+and an API key is available through the configured environment variable. It
+writes `audio_manifest.json`, `audio/audio.wav`, and `transcript.json`. It does
+not detect highlights, generate `clip_plan.json`, run FFmpeg slicing, stitch
+clips, add subtitles, add BGM, or export a final video.

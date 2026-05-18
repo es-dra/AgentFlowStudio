@@ -1,0 +1,31 @@
+name: video_to_transcript_real_asr
+version: 1
+mode: video_to_transcript_real_asr
+quality_profile: real_asr_transcript
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: extract_audio
+    type: extract_audio
+    inputs:
+      video: video_path
+      audio_extraction_mode: audio_extraction_mode
+    outputs:
+      audio_manifest: audio_manifest.json
+  - id: transcribe_audio_openai_compatible
+    type: transcribe_audio_openai_compatible
+    inputs:
+      base_url: asr_base_url
+      model: asr_model
+      api_key: asr_api_key
+      api_key_env: asr_api_key_env
+      timeout_sec: asr_timeout_sec
+      language: language
+  - id: write_transcript
+    type: write_transcript
+    inputs:
+      transcript: transcript
+    outputs:
+      transcript: transcript.json

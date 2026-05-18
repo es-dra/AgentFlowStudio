@@ -104,6 +104,10 @@ the mock extraction path for deterministic tests. Phase 11.4 adds an optional
 OpenAI-compatible ASR adapter behind an explicit `NARRATOCUT_ALLOW_REMOTE_ASR`
 gate. The default demo workflows still use mock ASR fixtures.
 
+Phase 11.5 exposes that adapter through a separate
+`video_to_transcript_real_asr.yaml` workflow. This is an explicit opt-in remote
+ASR path and still stops at `transcript.json`.
+
 Target flow:
 
 ```text

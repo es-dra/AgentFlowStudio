@@ -378,7 +378,7 @@ tools:
     category: video_transcription_asr
     entrypoints:
       cli: null
-      workflow_node: null
+      workflow_node: transcribe_audio_openai_compatible
       python: narratocut.asr_sop.OpenAICompatibleASRProvider
     input_artifacts:
       - audio_manifest.json
