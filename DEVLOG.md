@@ -1,5 +1,20 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.2 Mock ASR Video-to-ClipPlan Workflow
+
+- Synced local `master` to the merged Phase 11.1 PR and deleted the completed
+  `feature/phase-11-video-to-transcript` branch locally and on `origin`.
+- Started `feature/phase-11-2-video-to-highlight-clip-plan` from the latest
+  `master`.
+- Added `workflows/video_to_highlight_clip_plan.yaml`, which composes the
+  Phase 11.1 mock-ASR transcript workflow with the Phase 10 deterministic
+  highlight detection, ROI ranking, and highlight-to-ClipPlan generation path.
+- Added a demo input bundle under `examples/demo_asr/` for the composed
+  video-to-highlight-clip-plan workflow.
+- Kept this increment free of real ASR providers, video-frame highlight
+  detection, FFmpeg slicing, real clip generation, final-video assembly,
+  subtitles, BGM, Web UI, and new product CLI commands.
+
 ## 2026-05-18 - Phase 11.1 Video-to-Transcript Foundation
 
 - Synced local `master` to the merged Phase 10.7 PR and deleted the completed

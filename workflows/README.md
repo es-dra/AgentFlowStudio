@@ -143,3 +143,29 @@ The example uses `audio_extraction_mode: mock` and a fixture-backed mock ASR
 provider, so it writes `audio_manifest.json`, `audio/audio.wav`, and
 `transcript.json` without requiring real ASR. It does not detect highlights,
 generate `clip_plan.json`, run FFmpeg slicing, or inspect video frames.
+
+### `video_to_highlight_clip_plan.yaml`
+
+Phase 11.2 mock-ASR video-to-clip-plan workflow:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_mock`
+4. `write_transcript`
+5. `load_roi_config`
+6. `detect_highlights`
+7. `rank_highlights_by_roi`
+8. `generate_clip_plan_from_highlights`
+9. `write_highlight_plan`
+10. `write_clip_plan`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_highlight_clip_plan.yaml --input examples/demo_asr/video_to_highlight_clip_plan_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan
+```
+
+This workflow composes Phase 11.1 transcript generation with the Phase 10
+highlight pipeline. It writes `transcript.json`, `highlight_plan.json`, and
+`clip_plan.json`. It does not use real ASR, inspect video frames, run FFmpeg
+slicing, stitch clips, add subtitles, add BGM, or export a final video.
