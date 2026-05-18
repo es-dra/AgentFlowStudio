@@ -18,6 +18,21 @@
   workflow nodes, CLI commands, remote LLM calls, ASR, Web UI, subtitles, BGM,
   and final-video assembly.
 
+## 2026-05-18 - Phase 10.3 Deterministic Highlight Detector
+
+- Added `narratocut.highlight_sop` as the local highlight-detection module.
+- Added `DeterministicHighlightDetector` plus convenience functions for
+  script-only and timestamped-transcript inputs.
+- The detector is a stable, offline baseline. It uses simple rules for hook,
+  conflict, insight, and CTA candidates; it does not call the model gateway,
+  remote LLMs, ASR, OCR, FFmpeg, or any network service.
+- Script-only detection writes untimed `HighlightPlan` objects. Timestamped
+  transcript detection preserves `TranscriptSegment` time ranges and source
+  segment IDs.
+- Kept ROI ranking, ClipPlan generation, workflow nodes, CLI commands, and
+  real slicing integration out of Phase 10.3. Those remain later Phase 10
+  increments.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided

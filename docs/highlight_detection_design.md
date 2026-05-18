@@ -145,6 +145,33 @@ Not required in Phase 10:
 - final-video assembly
 - BGM, subtitles, or Web UI
 
+## Phase 10.3 Deterministic Baseline
+
+Phase 10.3 adds `narratocut.highlight_sop` as an offline baseline detector.
+This module is intentionally not a fake-data generator and not an LLM wrapper.
+It is a deterministic rule-based detector used to make Phase 10 testable before
+provider-backed detection is introduced.
+
+Public API:
+
+- `DeterministicHighlightDetector.detect_script(...)`
+- `DeterministicHighlightDetector.detect_transcript(...)`
+- `detect_highlights_from_script(...)`
+- `detect_highlights_from_transcript(...)`
+
+The baseline detects a small set of candidate types:
+
+- `hook`
+- `conflict`
+- `insight`
+- `cta`
+- `other`, as a fallback candidate
+
+For `script_only`, generated highlights are untimed. For
+`timestamped_transcript`, generated highlights preserve source segment IDs and
+the exact `start_time` / `end_time` values from the transcript. Phase 10.3 still
+does not perform ROI ranking or generate executable `ClipPlan` artifacts.
+
 ## Acceptance Criteria
 
 Phase 10 is complete when:
