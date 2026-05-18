@@ -82,6 +82,7 @@ def extract_audio_from_video(
                 channels=resolved_config.channels,
                 codec=resolved_config.codec,
                 error=f"input_video_missing: {source}",
+                metadata=_execution_metadata(executed=False),
             ),
         )
 
@@ -109,6 +110,7 @@ def extract_audio_from_video(
                 sample_rate=resolved_config.sample_rate,
                 channels=resolved_config.channels,
                 codec=resolved_config.codec,
+                metadata=_execution_metadata(executed=False, audio_path=audio_path),
             ),
         )
 
@@ -123,12 +125,24 @@ def extract_audio_from_video(
     except FileNotFoundError:
         return _write_artifact(
             root,
-            _failed_artifact(source, audio_ref, resolved_config, f"ffmpeg_executable_not_found: {resolved_config.ffmpeg_executable}"),
+            _failed_artifact(
+                source,
+                audio_ref,
+                resolved_config,
+                f"ffmpeg_executable_not_found: {resolved_config.ffmpeg_executable}",
+                metadata=_execution_metadata(executed=False, command=command, audio_path=audio_path),
+            ),
         )
     except OSError as exc:
         return _write_artifact(
             root,
-            _failed_artifact(source, audio_ref, resolved_config, f"ffmpeg_execution_failed: {exc}"),
+            _failed_artifact(
+                source,
+                audio_ref,
+                resolved_config,
+                f"ffmpeg_execution_failed: {exc}",
+                metadata=_execution_metadata(executed=True, command=command, audio_path=audio_path, error=str(exc)),
+            ),
         )
 
     if result.returncode != 0:
@@ -136,7 +150,23 @@ def extract_audio_from_video(
         error = f"ffmpeg_audio_extract_failed_exit_{result.returncode}"
         if detail:
             error = f"{error}: {detail}"
-        return _write_artifact(root, _failed_artifact(source, audio_ref, resolved_config, error))
+        return _write_artifact(
+            root,
+            _failed_artifact(
+                source,
+                audio_ref,
+                resolved_config,
+                error,
+                metadata=_execution_metadata(
+                    executed=True,
+                    command=command,
+                    audio_path=audio_path,
+                    returncode=result.returncode,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                ),
+            ),
+        )
 
     return _write_artifact(
         root,
@@ -148,6 +178,14 @@ def extract_audio_from_video(
             sample_rate=resolved_config.sample_rate,
             channels=resolved_config.channels,
             codec=resolved_config.codec,
+            metadata=_execution_metadata(
+                executed=True,
+                command=command,
+                audio_path=audio_path,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+            ),
         ),
     )
 
@@ -157,6 +195,7 @@ def _failed_artifact(
     audio_ref: Path,
     config: AudioExtractionConfig,
     error: str,
+    metadata: dict[str, object] | None = None,
 ) -> AudioArtifact:
     return AudioArtifact(
         source_video=str(source),
@@ -167,6 +206,7 @@ def _failed_artifact(
         channels=config.channels,
         codec=config.codec,
         error=error,
+        metadata=metadata or _execution_metadata(executed=False),
     )
 
 
@@ -189,3 +229,30 @@ def _validate_output_filename(value: str) -> None:
 
 def _display_ref(path: str | Path) -> str:
     return str(path).replace("\\", "/")
+
+
+def _execution_metadata(
+    *,
+    executed: bool,
+    command: list[str] | None = None,
+    audio_path: Path | None = None,
+    returncode: int | None = None,
+    stdout: str | None = None,
+    stderr: str | None = None,
+    error: str | None = None,
+) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "executed": executed,
+        "ffmpeg_command": command or [],
+    }
+    if audio_path is not None:
+        metadata["absolute_audio_path"] = str(audio_path)
+    if returncode is not None:
+        metadata["returncode"] = returncode
+    if stdout is not None:
+        metadata["stdout"] = stdout
+    if stderr is not None:
+        metadata["stderr"] = stderr
+    if error is not None:
+        metadata["error"] = error
+    return metadata

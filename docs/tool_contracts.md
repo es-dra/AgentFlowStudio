@@ -13,6 +13,10 @@ nodes. These entries cover local video loading, audio artifact creation,
 fixture-backed mock ASR, and `transcript.json` writing. They do not add visual
 highlight detection, real ASR providers, or new autonomous tool execution.
 
+Phase 11.3/11.4 extends the same contracts with real FFmpeg audio extraction
+metadata and an optional OpenAI-compatible ASR adapter. The default workflows
+still use mock ASR fixtures unless explicitly changed.
+
 Catalog file:
 
 ```text
@@ -38,6 +42,7 @@ Allowed:
 - harness inspection
 - Phase 9 real-video workflow nodes that already exist in code
 - Phase 11.1 video-to-transcript workflow nodes that already exist in code
+- optional Phase 11.4 ASR provider adapters, marked as network/API-key gated
 
 Not allowed:
 
@@ -62,7 +67,8 @@ Each tool in `configs/tool_catalog.yaml` includes:
 - `agent_usage`
 
 `requires` states whether a tool needs FFmpeg, network access, a model provider,
-or an API key. In this phase, all cataloged tools are local and key-free.
+or an API key. Optional remote ASR adapters must be marked as network,
+model-provider, and API-key gated.
 
 `agent_usage` states whether a future agent may safely call the tool, whether
 human review is required, whether it mutates workflow definitions, and whether it
@@ -201,8 +207,9 @@ Extracts or mocks a local audio artifact from a video for ASR.
   `narratocut.audio_sop.extract_audio_from_video`
 - Inputs: `input_video_path`
 - Outputs: `audio_manifest.json`, `audio/audio.wav`
-- Requires: no network, no model provider, no API key. The Phase 11.1 mock mode
-  does not require installed FFmpeg.
+- Requires: installed FFmpeg for real extraction mode. The Phase 11.1 examples
+  still use `audio_extraction_mode: mock`, which does not require installed
+  FFmpeg.
 - Main checks: `audio_manifest_exists`, `audio_artifact_exists`,
   `audio_manifest_status`
 
@@ -217,6 +224,19 @@ fixture-backed mock ASR provider.
 - Inputs: `audio_manifest.json`, `asr_fixture.json`
 - Outputs: workflow state `transcript`
 - Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
+
+### `transcribe_audio_openai_compatible`
+
+Converts an audio artifact into a timestamped `Transcript` using an explicitly
+enabled OpenAI-compatible ASR provider.
+
+- Category: video transcription ASR
+- Main entry point: `narratocut.asr_sop.OpenAICompatibleASRProvider`
+- Inputs: `audio_manifest.json`, `audio/audio.wav`
+- Outputs: workflow state `transcript`
+- Requires: network, model provider, and API key. Calls are blocked unless
+  `NARRATOCUT_ALLOW_REMOTE_ASR=true` is set.
 - Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
 
 ### `write_transcript`

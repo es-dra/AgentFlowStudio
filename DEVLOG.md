@@ -1,5 +1,19 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.3/11.4 Audio Extraction and ASR Provider Contracts
+
+- Started `feature/phase-11-3-4-audio-asr-providers` from the merged Phase 11.2
+  `master`.
+- Strengthened real FFmpeg audio extraction artifacts so `audio_manifest.json`
+  records execution status, command arguments, return code, stdout, and stderr.
+- Kept mock extraction available and explicitly marked as not executing FFmpeg.
+- Added an optional `OpenAICompatibleASRProvider` adapter behind
+  `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
+- Kept default workflows on fixture-backed mock ASR; no workflow now calls a
+  remote ASR provider by default.
+- Kept this increment free of video-frame highlight detection, real slicing,
+  final assembly, subtitles, BGM, Web UI, and new product CLI commands.
+
 ## 2026-05-18 - Phase 11.2 Mock ASR Video-to-ClipPlan Workflow
 
 - Synced local `master` to the merged Phase 11.1 PR and deleted the completed

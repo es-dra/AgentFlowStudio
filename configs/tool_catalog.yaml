@@ -323,7 +323,7 @@ tools:
       - audio_manifest.json
       - audio/audio.wav
     requires:
-      ffmpeg: false
+      ffmpeg: true
       network: false
       model_provider: false
       api_key: false
@@ -337,10 +337,10 @@ tools:
       - audio_artifact_exists
       - audio_manifest_status
     agent_usage:
-      safe_for_auto_execute: true
-      requires_human_review: false
+      safe_for_auto_execute: false
+      requires_human_review: true
       mutates_workflow: false
-      executes_external_process: false
+      executes_external_process: true
 
   - name: transcribe_audio_mock
     description: Convert an audio artifact into a timestamped Transcript using a local fixture-backed mock ASR provider.
@@ -370,6 +370,38 @@ tools:
     agent_usage:
       safe_for_auto_execute: true
       requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
+  - name: transcribe_audio_openai_compatible
+    description: Convert an audio artifact into a timestamped Transcript using an explicitly enabled OpenAI-compatible ASR provider.
+    category: video_transcription_asr
+    entrypoints:
+      cli: null
+      workflow_node: null
+      python: narratocut.asr_sop.OpenAICompatibleASRProvider
+    input_artifacts:
+      - audio_manifest.json
+      - audio/audio.wav
+    output_artifacts:
+      - workflow_state.transcript
+    requires:
+      ffmpeg: false
+      network: true
+      model_provider: true
+      api_key: true
+    failure_modes:
+      - remote_asr_not_enabled
+      - api_key_missing
+      - audio_artifact_missing
+      - asr_request_failed
+      - transcript_schema_invalid
+    quality_checks:
+      - transcript_segments_non_empty
+      - transcript_timestamps_valid
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
       mutates_workflow: false
       executes_external_process: false
 
