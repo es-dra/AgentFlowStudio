@@ -13,8 +13,10 @@ from narratocut.harness.quality_checks import build_quality_report
 from narratocut.harness.quality_profiles import (
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
+    SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
 )
+from narratocut.harness.subtitle_burn_quality import subtitle_burn_artifacts_to_inspect
 from narratocut.harness.subtitle_quality import subtitle_artifacts_to_inspect
 from narratocut.harness.video_artifacts import (
     is_video_quality_profile,
@@ -96,6 +98,12 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = final_video_artifacts_to_inspect()
     elif quality_profile == SUBTITLE_EXPORT_PROFILE:
         artifacts = subtitle_artifacts_to_inspect()
+    elif quality_profile == SUBTITLE_BURN_PROFILE:
+        artifacts = subtitle_burn_artifacts_to_inspect()
+        if run_manifest:
+            output_ref = _run_artifact_ref(run_manifest, "subtitled_video")
+            if output_ref and output_ref not in artifacts:
+                artifacts.append(output_ref)
     else:
         artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:
@@ -113,3 +121,11 @@ def _load_json_object(path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _run_artifact_ref(run_manifest: dict[str, Any], key: str) -> str | None:
+    artifacts = run_manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return None
+    value = artifacts.get(key)
+    return value if isinstance(value, str) and value else None

@@ -11,7 +11,7 @@ def load_workflow_inputs(input_path: str | Path) -> dict[str, Any]:
         return {"input_text_file": str(path)}
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError:
         return {"input_text_file": str(path)}
 

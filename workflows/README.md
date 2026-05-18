@@ -203,6 +203,35 @@ It intentionally exports subtitle text only. It does not burn subtitles into
 video, run FFmpeg, re-encode media, add BGM, add transitions, create covers,
 call remote providers, or export a new final video.
 
+### `final_video_with_subtitles.yaml`
+
+Phase 13.3 subtitle burn-in workflow:
+
+1. `burn_subtitles`
+2. `probe_subtitle_burn`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/reports/final_video_with_subtitles_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/processed/runs/demo_final_video_with_subtitles
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_with_subtitles
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_with_subtitles
+```
+
+This workflow consumes an existing `final_video.mp4` and an existing
+`subtitles.srt`, then writes `final_video_with_subtitles.mp4` plus
+`subtitle_burn_manifest.json`. `inspect-run` and `review-run` check manifest
+status, FFmpeg return code, output video existence, non-empty output file size,
+video stream presence when FFprobe is available, and known FFmpeg warning
+classification.
+
+The example references a generated ignored final video under `data/processed/`;
+the repository does not include real media. It intentionally does not generate
+subtitles, regenerate final assembly, slice videos, add BGM, add transitions,
+create covers, call remote providers, inspect video frames, or provide a Web
+UI.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

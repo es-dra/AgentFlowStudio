@@ -34,3 +34,16 @@ def test_load_workflow_inputs_flattens_real_video_bundle(tmp_path) -> None:
     assert inputs["roi_config"] == "examples/demo_real_video/roi_config.json"
     assert inputs["clip_plan"] == "examples/demo_real_video/clip_plan.json"
     assert inputs["output_clips_dir"] == "clips"
+
+
+def test_load_workflow_inputs_accepts_utf8_bom_json_bundle(tmp_path) -> None:
+    bundle_path = tmp_path / "input.json"
+    bundle_path.write_text(
+        '{"final_video_path":"data/processed/runs/demo/final_video.mp4","subtitles_path":"examples/demo_subtitles/subtitles.srt"}',
+        encoding="utf-8-sig",
+    )
+
+    inputs = load_workflow_inputs(bundle_path)
+
+    assert inputs["final_video_path"] == "data/processed/runs/demo/final_video.mp4"
+    assert inputs["subtitles_path"] == "examples/demo_subtitles/subtitles.srt"
