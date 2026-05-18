@@ -28,6 +28,15 @@ from narratocut.slicing_sop.real_slicer import REAL_SLICE_MANIFEST
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.highlight_nodes import (
+    detect_highlights_node,
+    generate_highlight_clip_plan_node,
+    load_script_node,
+    load_transcript_node,
+    rank_highlights_by_roi_node,
+    write_clip_plan_node,
+    write_highlight_plan_node,
+)
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -185,6 +194,14 @@ def default_node_registry() -> NodeRegistry:
     registry.register("probe_video_metadata", probe_video_metadata_node)
     registry.register("validate_clip_plan", validate_clip_plan_node)
     registry.register("real_slice_video", real_slice_video_node)
+    registry.register("load_script", load_script_node)
+    registry.register("load_transcript", load_transcript_node)
+    registry.register("detect_highlights", detect_highlights_node)
+    registry.register("rank_highlights_by_roi", rank_highlights_by_roi_node)
+    registry.register("generate_highlight_clip_plan", generate_highlight_clip_plan_node)
+    registry.register("generate_clip_plan_from_highlights", generate_highlight_clip_plan_node)
+    registry.register("write_highlight_plan", write_highlight_plan_node)
+    registry.register("write_clip_plan", write_clip_plan_node)
     return registry
 
 
