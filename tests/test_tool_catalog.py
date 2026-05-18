@@ -17,6 +17,10 @@ EXPECTED_TOOLS = {
     "probe_video_metadata",
     "validate_clip_plan",
     "real_slice_video",
+    "load_video",
+    "extract_audio",
+    "transcribe_audio_mock",
+    "write_transcript",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

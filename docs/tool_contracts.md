@@ -8,6 +8,11 @@ Phase 9 extends the same static catalog with real-video workflow nodes that now
 exist in code. These entries remain descriptive contracts; they do not add an
 agent runtime or automatic tool execution.
 
+Phase 11.1 extends the catalog with the narrow video-to-transcript workflow
+nodes. These entries cover local video loading, audio artifact creation,
+fixture-backed mock ASR, and `transcript.json` writing. They do not add visual
+highlight detection, real ASR providers, or new autonomous tool execution.
+
 Catalog file:
 
 ```text
@@ -32,6 +37,7 @@ Allowed:
 - the standalone minimal real slicing PoC, marked as external-process execution
 - harness inspection
 - Phase 9 real-video workflow nodes that already exist in code
+- Phase 11.1 video-to-transcript workflow nodes that already exist in code
 
 Not allowed:
 
@@ -174,6 +180,55 @@ Executes the real-video workflow slicing node after validation succeeds.
   `real_clips_written`
 - Agent usage: not safe for automatic execution, requires human review,
   executes an external process
+
+### `load_video`
+
+Loads and validates a local video path for the video-to-transcript workflow.
+
+- Category: video transcription input
+- Main entry point: workflow node `load_video`
+- Inputs: `input_video_path`
+- Outputs: workflow state `video_path`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main check: `input_video_file_exists`
+
+### `extract_audio`
+
+Extracts or mocks a local audio artifact from a video for ASR.
+
+- Category: video transcription audio
+- Main entry points: workflow node `extract_audio`,
+  `narratocut.audio_sop.extract_audio_from_video`
+- Inputs: `input_video_path`
+- Outputs: `audio_manifest.json`, `audio/audio.wav`
+- Requires: no network, no model provider, no API key. The Phase 11.1 mock mode
+  does not require installed FFmpeg.
+- Main checks: `audio_manifest_exists`, `audio_artifact_exists`,
+  `audio_manifest_status`
+
+### `transcribe_audio_mock`
+
+Converts an audio artifact into a timestamped `Transcript` using a local
+fixture-backed mock ASR provider.
+
+- Category: video transcription ASR
+- Main entry points: workflow node `transcribe_audio_mock`,
+  `narratocut.asr_sop.MockASRProvider`
+- Inputs: `audio_manifest.json`, `asr_fixture.json`
+- Outputs: workflow state `transcript`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
+
+### `write_transcript`
+
+Writes the current timestamped `Transcript` state to `transcript.json`.
+
+- Category: video transcription output
+- Main entry point: workflow node `write_transcript`
+- Inputs: workflow state `transcript`
+- Outputs: `transcript.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `transcript_file_exists`, `transcript_schema_valid`
 
 ### `inspect_run`
 

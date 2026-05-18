@@ -283,6 +283,124 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: load_video
+    description: Load and validate a local video path for the video-to-transcript workflow.
+    category: video_transcription_input
+    entrypoints:
+      cli: null
+      workflow_node: load_video
+      python: narratocut.workflow_engine.transcription_nodes.load_video_node
+    input_artifacts:
+      - input_video_path
+    output_artifacts:
+      - workflow_state.video_path
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - video_path_missing
+      - video_file_missing
+    quality_checks:
+      - input_video_file_exists
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
+  - name: extract_audio
+    description: Extract or mock a local audio artifact from a video for ASR.
+    category: video_transcription_audio
+    entrypoints:
+      cli: null
+      workflow_node: extract_audio
+      python: narratocut.audio_sop.extract_audio_from_video
+    input_artifacts:
+      - input_video_path
+    output_artifacts:
+      - audio_manifest.json
+      - audio/audio.wav
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - input_video_missing
+      - ffmpeg_executable_not_found
+      - ffmpeg_audio_extract_failed
+      - audio_artifact_write_failed
+    quality_checks:
+      - audio_manifest_exists
+      - audio_artifact_exists
+      - audio_manifest_status
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
+  - name: transcribe_audio_mock
+    description: Convert an audio artifact into a timestamped Transcript using a local fixture-backed mock ASR provider.
+    category: video_transcription_asr
+    entrypoints:
+      cli: null
+      workflow_node: transcribe_audio_mock
+      python: narratocut.asr_sop.MockASRProvider
+    input_artifacts:
+      - audio_manifest.json
+      - asr_fixture.json
+    output_artifacts:
+      - workflow_state.transcript
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - audio_artifact_failed
+      - asr_fixture_missing
+      - asr_fixture_invalid_json
+      - transcript_schema_invalid
+    quality_checks:
+      - transcript_segments_non_empty
+      - transcript_timestamps_valid
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
+  - name: write_transcript
+    description: Write the current timestamped Transcript state to transcript.json.
+    category: video_transcription_output
+    entrypoints:
+      cli: null
+      workflow_node: write_transcript
+      python: narratocut.workflow_engine.transcription_nodes.write_transcript_node
+    input_artifacts:
+      - workflow_state.transcript
+    output_artifacts:
+      - transcript.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - transcript_missing
+      - transcript_write_failed
+    quality_checks:
+      - transcript_file_exists
+      - transcript_schema_valid
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

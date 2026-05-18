@@ -37,6 +37,12 @@ from narratocut.workflow_engine.highlight_nodes import (
     write_clip_plan_node,
     write_highlight_plan_node,
 )
+from narratocut.workflow_engine.transcription_nodes import (
+    extract_audio_node,
+    load_video_node,
+    transcribe_audio_mock_node,
+    write_transcript_node,
+)
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -202,6 +208,10 @@ def default_node_registry() -> NodeRegistry:
     registry.register("generate_clip_plan_from_highlights", generate_highlight_clip_plan_node)
     registry.register("write_highlight_plan", write_highlight_plan_node)
     registry.register("write_clip_plan", write_clip_plan_node)
+    registry.register("load_video", load_video_node)
+    registry.register("extract_audio", extract_audio_node)
+    registry.register("transcribe_audio_mock", transcribe_audio_mock_node)
+    registry.register("write_transcript", write_transcript_node)
     return registry
 
 

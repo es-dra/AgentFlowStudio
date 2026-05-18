@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.1 Video-to-Transcript Foundation
+
+- Synced local `master` to the merged Phase 10.7 PR and deleted the completed
+  `feature/phase-10-7-highlight-artifact-review` branch locally and on
+  `origin`.
+- Started `feature/phase-11-video-to-transcript` from the latest `master`.
+- Added `narratocut.audio_sop` for the video-to-audio artifact contract,
+  including FFmpeg command construction and deterministic mock extraction for
+  tests and offline workflow smoke runs.
+- Added `narratocut.asr_sop` with an adapter protocol, fixture-backed
+  `MockASRProvider`, and transcript normalization into the existing
+  `Transcript` schema.
+- Added `workflows/video_to_transcript.yaml`, which runs
+  `load_video -> extract_audio -> transcribe_audio_mock -> write_transcript`.
+- Added `examples/demo_asr/` with a mock ASR transcript fixture and workflow
+  input bundle.
+- Kept this increment free of video-frame highlight detection, Phase 10
+  highlight workflows, ClipPlan generation, FFmpeg slicing, real ASR providers,
+  remote LLM calls, clip assembly, subtitles, BGM, Web UI, and new product CLI
+  commands.
+
 ## 2026-05-18 - Phase 10.7 Highlight Artifact Review
 
 - Synced local `master` to the merged Phase 10 PR and deleted the completed

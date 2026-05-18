@@ -1,0 +1,27 @@
+name: video_to_transcript
+version: 1
+mode: video_to_transcript
+quality_profile: mock_asr_transcript
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: extract_audio
+    type: extract_audio
+    inputs:
+      video: video_path
+      audio_extraction_mode: audio_extraction_mode
+    outputs:
+      audio_manifest: audio_manifest.json
+  - id: transcribe_audio_mock
+    type: transcribe_audio_mock
+    inputs:
+      asr_fixture: asr_fixture_path
+      language: language
+  - id: write_transcript
+    type: write_transcript
+    inputs:
+      transcript: transcript
+    outputs:
+      transcript: transcript.json
