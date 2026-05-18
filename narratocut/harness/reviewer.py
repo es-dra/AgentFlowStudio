@@ -8,7 +8,7 @@ from narratocut.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
 )
-from narratocut.harness.quality_profiles import REAL_CLIP_QUALITY_PROFILES, VIDEO_REAL_CLIPS_PROFILE
+from narratocut.harness.quality_profiles import FINAL_VIDEO_PROFILE, REAL_CLIP_QUALITY_PROFILES, VIDEO_REAL_CLIPS_PROFILE
 from narratocut.harness.video_artifacts import (
     build_video_review_section,
     is_video_highlight_quality_profile,
@@ -35,6 +35,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
     ]
     if run_manifest and run_manifest.get("quality_profile") in REAL_CLIP_QUALITY_PROFILES | {VIDEO_REAL_CLIPS_PROFILE}:
         sections.append(_real_video_section(root))
+    if run_manifest and run_manifest.get("quality_profile") == FINAL_VIDEO_PROFILE:
+        sections.append(_final_video_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
     if run_manifest and is_video_highlight_quality_profile(run_manifest.get("quality_profile")):
@@ -130,6 +132,20 @@ def _real_video_section(root: Path) -> dict[str, Any]:
         _artifact_check(root, "real_slice_manifest", "real_slice_manifest.json"),
     ]
     return _section("real_video_outputs", checks)
+
+
+def _final_video_section(root: Path) -> dict[str, Any]:
+    final_manifest = _load_json_object(root / "final_video_manifest.json")
+    final_video = "final_video.mp4"
+    if final_manifest and isinstance(final_manifest.get("final_video"), str) and final_manifest["final_video"]:
+        final_video = str(final_manifest["final_video"])
+    checks = [
+        _artifact_check(root, "assembly_plan", "assembly_plan.json"),
+        _artifact_check(root, "concat_list", "concat_list.txt"),
+        _artifact_check(root, "final_video_manifest", "final_video_manifest.json"),
+        _artifact_check(root, "final_video", final_video),
+    ]
+    return _section("final_video_outputs", checks)
 
 
 def _file_check(path: Path, check_id: str, message: str) -> dict[str, Any]:

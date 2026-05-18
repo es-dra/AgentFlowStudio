@@ -150,6 +150,32 @@ It is intentionally a composition smoke path. It does not use real ASR, inspect
 video frames, concatenate clips, add subtitles, add BGM, create covers, call
 remote providers, or export `final_video.mp4`.
 
+### `clips_to_final_video.yaml`
+
+Phase 12.2 simple assembly workflow:
+
+1. `load_real_slice_manifest`
+2. `generate_assembly_plan`
+3. `concat_clips`
+4. `probe_final_video`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/reports/clips_to_final_video_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/processed/runs/demo_clips_to_final_video
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_clips_to_final_video
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_clips_to_final_video
+```
+
+This workflow consumes an existing `real_slice_manifest.json` and its `clips/`
+directory from a prior real slicing run. It writes `assembly_plan.json`,
+`concat_list.txt`, `final_video_manifest.json`, and `final_video.mp4`.
+
+It is intentionally a simple FFmpeg concat path. It does not run ASR, detect
+highlights, slice source videos, burn subtitles, add BGM, add transitions,
+create covers, call remote providers, or provide a Web UI.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

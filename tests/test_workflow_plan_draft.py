@@ -177,3 +177,27 @@ def test_draft_workflow_plan_lists_video_to_real_clip_outputs() -> None:
         "clips",
     ]:
         assert artifact in expected
+
+
+def test_draft_workflow_plan_lists_final_video_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/clips_to_final_video.yaml",
+        input_path="examples/demo_assembly/clips_to_final_video_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_real_slice_manifest",
+        "generate_assembly_plan",
+        "concat_clips",
+        "probe_final_video",
+    ]
+    expected = plan["artifacts"]["expected"]
+    for artifact in [
+        "real_slice_manifest.json",
+        "assembly_plan.json",
+        "concat_list.txt",
+        "final_video_manifest.json",
+        "final_video.mp4",
+    ]:
+        assert artifact in expected

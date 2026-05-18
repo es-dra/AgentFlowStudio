@@ -43,6 +43,7 @@ Allowed:
 - Phase 9 real-video workflow nodes that already exist in code
 - Phase 11.1 video-to-transcript workflow nodes that already exist in code
 - optional Phase 11.4 ASR provider adapters, marked as network/API-key gated
+- Phase 12.2 simple assembly nodes that consume existing real clips
 
 Not allowed:
 
@@ -186,6 +187,57 @@ Executes the real-video workflow slicing node after validation succeeds.
   `real_clips_written`
 - Agent usage: not safe for automatic execution, requires human review,
   executes an external process
+
+### `load_real_slice_manifest`
+
+Loads a `real_slice_manifest.json` from a prior slicing run.
+
+- Category: video assembly input
+- Main entry point: workflow node `load_real_slice_manifest`
+- Inputs: `real_slice_manifest.json`
+- Outputs: `real_slice_manifest.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `real_slice_manifest_exists`
+
+### `generate_assembly_plan`
+
+Generates a simple ordered assembly plan from successful real clip records.
+
+- Category: video assembly planning
+- Main entry points: workflow node `generate_assembly_plan`,
+  `narratocut.assembly_sop.build_assembly_plan`
+- Inputs: `real_slice_manifest.json`
+- Outputs: `assembly_plan.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `assembly_plan_exists`
+
+### `concat_clips`
+
+Concatenates ordered clip files into `final_video.mp4` with FFmpeg.
+
+- Category: video assembly execution
+- Main entry points: workflow node `concat_clips`,
+  `narratocut.assembly_sop.concat_clips`
+- Inputs: `assembly_plan.json`, `clips/*.mp4`
+- Outputs: `concat_list.txt`, `final_video.mp4`,
+  `final_video_manifest.json`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `final_video_manifest_exists`,
+  `final_video_manifest_status`, `final_video_file_exists`
+- Agent usage: not safe for automatic execution, requires human review,
+  executes an external process
+
+### `probe_final_video`
+
+Probes the assembled final video and enriches `final_video_manifest.json`.
+
+- Category: video assembly metadata
+- Main entry points: workflow node `probe_final_video`,
+  `narratocut.slicing_sop.probe_video_metadata`
+- Inputs: `final_video.mp4`, `final_video_manifest.json`
+- Outputs: `final_video_manifest.json`
+- Requires: installed FFprobe; no network, no model provider, no API key
+- Main checks: `final_video_duration_tolerance`
 
 ### `load_video`
 

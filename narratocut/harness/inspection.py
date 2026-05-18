@@ -8,8 +8,9 @@ from narratocut.harness.highlight_artifacts import (
     highlight_artifacts_to_inspect,
     is_highlight_quality_profile,
 )
+from narratocut.harness.final_video_quality import final_video_artifacts_to_inspect
 from narratocut.harness.quality_checks import build_quality_report
-from narratocut.harness.quality_profiles import REAL_CLIP_QUALITY_PROFILES
+from narratocut.harness.quality_profiles import FINAL_VIDEO_PROFILE, REAL_CLIP_QUALITY_PROFILES
 from narratocut.harness.video_artifacts import (
     is_video_quality_profile,
     video_artifacts_to_inspect,
@@ -84,6 +85,8 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = highlight_artifacts_to_inspect(quality_profile)
     elif quality_profile in REAL_CLIP_QUALITY_PROFILES:
         artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT
+    elif quality_profile == FINAL_VIDEO_PROFILE:
+        artifacts = final_video_artifacts_to_inspect()
     else:
         artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:

@@ -1,5 +1,20 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 12.2 Simple Video Assembly
+
+- Added `workflows/clips_to_final_video.yaml` as the Phase 12 simple assembly
+  workflow: existing `real_slice_manifest.json` plus `clips/` -> assembly plan
+  -> FFmpeg concat -> `final_video.mp4` and `final_video_manifest.json`.
+- Added `narratocut/assembly_sop/` for assembly-specific plan and concat logic
+  so slicing remains separate from final-video assembly.
+- Added `final_video` harness quality/review support for assembly artifacts,
+  including final manifest status, final video existence, non-empty file size,
+  and duration tolerance when FFprobe is available.
+- Added an example input under `examples/demo_assembly/` that references an
+  ignored generated run path rather than committing media.
+- Kept this increment free of subtitles, BGM, transitions, covers, Web UI,
+  remote providers, video-frame understanding, and new ASR behavior.
+
 ## 2026-05-19 - Phase 12.1B Video To Real Clips Composition
 
 - Synced `master` to the merged Phase 12.1A PR and started

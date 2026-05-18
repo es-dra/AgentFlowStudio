@@ -28,6 +28,12 @@ from narratocut.slicing_sop.real_slicer import REAL_SLICE_MANIFEST
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.assembly_nodes import (
+    concat_clips_node,
+    generate_assembly_plan_node,
+    load_real_slice_manifest_node,
+    probe_final_video_node,
+)
 from narratocut.workflow_engine.highlight_nodes import (
     detect_highlights_node,
     generate_highlight_clip_plan_node,
@@ -222,6 +228,10 @@ def default_node_registry() -> NodeRegistry:
     registry.register("transcribe_audio_mock", transcribe_audio_mock_node)
     registry.register("transcribe_audio_openai_compatible", transcribe_audio_openai_compatible_node)
     registry.register("write_transcript", write_transcript_node)
+    registry.register("load_real_slice_manifest", load_real_slice_manifest_node)
+    registry.register("generate_assembly_plan", generate_assembly_plan_node)
+    registry.register("concat_clips", concat_clips_node)
+    registry.register("probe_final_video", probe_final_video_node)
     return registry
 
 

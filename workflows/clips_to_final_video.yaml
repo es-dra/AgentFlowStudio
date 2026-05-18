@@ -1,0 +1,31 @@
+name: clips_to_final_video
+version: 1
+mode: clips_to_final_video
+quality_profile: final_video
+steps:
+  - id: load_real_slice_manifest
+    type: load_real_slice_manifest
+    inputs:
+      real_slice_manifest: real_slice_manifest_path
+    outputs:
+      real_slice_manifest: real_slice_manifest.json
+  - id: generate_assembly_plan
+    type: generate_assembly_plan
+    inputs:
+      real_slice_manifest: real_slice_manifest
+    outputs:
+      assembly_plan: assembly_plan.json
+  - id: concat_clips
+    type: concat_clips
+    inputs:
+      assembly_plan: assembly_plan
+    outputs:
+      final_video_manifest: final_video_manifest.json
+      final_video: final_video.mp4
+      concat_list: concat_list.txt
+  - id: probe_final_video
+    type: probe_final_video
+    inputs:
+      final_video_manifest: final_video_manifest
+    outputs:
+      final_video_manifest: final_video_manifest.json
