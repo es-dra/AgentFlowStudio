@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 12.1B Video To Real Clips Composition
+
+- Synced `master` to the merged Phase 12.1A PR and started
+  `feature/phase-12-1b-video-to-real-clips`.
+- Added `workflows/video_to_real_clips.yaml` as a composition smoke workflow
+  that reuses the Phase 11 mock-ASR planning path and then executes the
+  generated `clip_plan.json` through Phase 12.1 real slicing.
+- Added the `video_real_clips` harness profile so `inspect-run` and
+  `review-run` cover video/transcript artifacts, highlight/clip-plan artifacts,
+  and real clip slicing artifacts in one run.
+- Split real-clip quality checks into `narratocut/harness/real_clip_quality.py`
+  and shared profile constants into `quality_profiles.py` so the generic
+  quality entrypoint stays thin as Phase 12 adds execution-layer checks.
+- Added `examples/demo_asr/video_to_real_clips_input.example.json` using mock
+  ASR and the existing ignored local demo video path.
+- Kept this increment free of real ASR, video-frame highlight detection, clip
+  concatenation, subtitles, BGM, covers, Web UI, remote providers, and
+  `final_video.mp4` export.
+
 ## 2026-05-19 - Phase 12.1 ClipPlan To Real Clips
 
 - Added `workflows/clip_plan_to_real_clips.yaml` as the Phase 12.1 primary

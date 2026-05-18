@@ -9,6 +9,7 @@ from narratocut.harness.highlight_artifacts import (
     is_highlight_quality_profile,
 )
 from narratocut.harness.quality_checks import build_quality_report
+from narratocut.harness.quality_profiles import REAL_CLIP_QUALITY_PROFILES
 from narratocut.harness.video_artifacts import (
     is_video_quality_profile,
     video_artifacts_to_inspect,
@@ -35,9 +36,6 @@ REAL_VIDEO_ARTIFACTS_TO_INSPECT = [
     "trace.json",
     "clips/",
 ]
-REAL_CLIP_QUALITY_PROFILES = {"real_video", "real_clips"}
-
-
 def inspect_run(run_dir: str | Path) -> dict[str, Any]:
     root = Path(run_dir)
     run_manifest = _load_json_object(root / "run_manifest.json")

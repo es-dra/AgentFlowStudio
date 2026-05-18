@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from narratocut.harness import quality_checks
+from narratocut.harness import real_clip_quality
 from narratocut.harness.quality_checks import build_quality_report
 from narratocut.schemas import VideoMetadata
 from narratocut.utils import write_json
@@ -94,7 +94,7 @@ def test_real_video_quality_profile_checks_clip_duration_when_ffprobe_available(
             probe_status="succeeded",
         )
 
-    monkeypatch.setattr(quality_checks, "probe_video_metadata", fake_probe)
+    monkeypatch.setattr(real_clip_quality, "probe_video_metadata", fake_probe)
 
     report = build_quality_report(run_dir)
 

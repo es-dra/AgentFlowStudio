@@ -141,3 +141,39 @@ def test_draft_workflow_plan_lists_real_clip_outputs() -> None:
     assert "clip_plan_validation.json" in expected
     assert "real_slice_manifest.json" in expected
     assert "clips" in expected
+
+
+def test_draft_workflow_plan_lists_video_to_real_clip_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/video_to_real_clips.yaml",
+        input_path="examples/demo_asr/video_to_real_clips_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_video",
+        "extract_audio",
+        "transcribe_audio_mock",
+        "write_transcript",
+        "load_roi_config",
+        "detect_highlights",
+        "rank_highlights_by_roi",
+        "generate_clip_plan_from_highlights",
+        "write_highlight_plan",
+        "write_clip_plan",
+        "probe_video_metadata",
+        "validate_clip_plan",
+        "real_slice_video",
+    ]
+    expected = plan["artifacts"]["expected"]
+    for artifact in [
+        "audio_manifest.json",
+        "transcript.json",
+        "highlight_plan.json",
+        "clip_plan.json",
+        "video_metadata.json",
+        "clip_plan_validation.json",
+        "real_slice_manifest.json",
+        "clips",
+    ]:
+        assert artifact in expected

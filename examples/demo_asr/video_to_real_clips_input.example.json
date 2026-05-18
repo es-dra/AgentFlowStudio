@@ -1,0 +1,10 @@
+{
+  "video_path": "data/raw/demo_real_video/input.mp4",
+  "asr_fixture_path": "examples/demo_asr/transcript_fixture.json",
+  "roi_config_path": "examples/demo_asr/video_to_real_clips_roi_config.json",
+  "audio_extraction_mode": "mock",
+  "input_mode": "timestamped_transcript",
+  "language": "zh-CN",
+  "max_highlights": 3,
+  "output_clips_dir": "clips"
+}

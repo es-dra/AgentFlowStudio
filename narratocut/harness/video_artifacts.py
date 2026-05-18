@@ -9,6 +9,7 @@ from narratocut.harness.highlight_artifacts import (
     HIGHLIGHT_CLIP_PLAN_PROFILE,
     build_highlight_quality_report,
 )
+from narratocut.harness.quality_profiles import VIDEO_REAL_CLIPS_PROFILE
 from narratocut.harness.video_artifact_checks import (
     all_clip_source_ids_known,
     all_source_ids_known,
@@ -33,7 +34,11 @@ REAL_ASR_TRANSCRIPT_PROFILE = "real_asr_transcript"
 VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE = "video_highlight_clip_plan"
 REAL_ASR_HIGHLIGHT_CLIP_PLAN_PROFILE = "real_asr_highlight_clip_plan"
 VIDEO_TRANSCRIPT_PROFILES = {MOCK_ASR_TRANSCRIPT_PROFILE, REAL_ASR_TRANSCRIPT_PROFILE}
-VIDEO_HIGHLIGHT_PROFILES = {VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE, REAL_ASR_HIGHLIGHT_CLIP_PLAN_PROFILE}
+VIDEO_HIGHLIGHT_PROFILES = {
+    VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE,
+    REAL_ASR_HIGHLIGHT_CLIP_PLAN_PROFILE,
+    VIDEO_REAL_CLIPS_PROFILE,
+}
 VIDEO_QUALITY_PROFILES = VIDEO_TRANSCRIPT_PROFILES | VIDEO_HIGHLIGHT_PROFILES
 REAL_ASR_PROFILES = {REAL_ASR_TRANSCRIPT_PROFILE, REAL_ASR_HIGHLIGHT_CLIP_PLAN_PROFILE}
 SECRET_SCAN_FILES = ["manifest.json", "run_manifest.json", "trace.json", "quality_report.json", "transcript.json", "audio_manifest.json"]
@@ -60,6 +65,8 @@ def video_artifacts_to_inspect(quality_profile: object) -> list[str]:
     if is_video_highlight_quality_profile(quality_profile):
         artifacts.insert(3, "highlight_plan.json")
         artifacts.insert(4, "clip_plan.json")
+    if str(quality_profile or "") == VIDEO_REAL_CLIPS_PROFILE:
+        artifacts.extend(["video_metadata.json", "clip_plan_validation.json", "real_slice_manifest.json", "clips/"])
     return artifacts
 
 
@@ -191,7 +198,7 @@ def _add_transcript_checks(
         "pass" if text_non_empty(provider) else "fail",
         {"provider": provider},
     )
-    if profile == MOCK_ASR_TRANSCRIPT_PROFILE or profile == VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE:
+    if profile in {MOCK_ASR_TRANSCRIPT_PROFILE, VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE, VIDEO_REAL_CLIPS_PROFILE}:
         _add_check(checks, "mock_asr_provider_marked", "pass" if provider == "mock" else "fail", {"provider": provider})
     if profile in REAL_ASR_PROFILES:
         _add_check(
@@ -255,7 +262,7 @@ def _video_review_check_names(profile: str) -> set[str]:
         "transcript_segment_text_non_empty",
         "transcript_provider_metadata_present",
     }
-    if profile in {MOCK_ASR_TRANSCRIPT_PROFILE, VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE}:
+    if profile in {MOCK_ASR_TRANSCRIPT_PROFILE, VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE, VIDEO_REAL_CLIPS_PROFILE}:
         names.add("mock_asr_provider_marked")
     if profile in REAL_ASR_PROFILES:
         names.update({"real_asr_provider_marked", "api_secret_values_not_recorded"})
@@ -273,7 +280,7 @@ def _transcript_dependent_checks(profile: str) -> list[str]:
         "transcript_segment_text_non_empty",
         "transcript_provider_metadata_present",
     ]
-    if profile in {MOCK_ASR_TRANSCRIPT_PROFILE, VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE}:
+    if profile in {MOCK_ASR_TRANSCRIPT_PROFILE, VIDEO_HIGHLIGHT_CLIP_PLAN_PROFILE, VIDEO_REAL_CLIPS_PROFILE}:
         names.append("mock_asr_provider_marked")
     if profile in REAL_ASR_PROFILES:
         names.append("real_asr_provider_marked")

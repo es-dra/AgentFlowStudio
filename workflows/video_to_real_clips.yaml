@@ -1,0 +1,84 @@
+name: video_to_real_clips
+version: 1
+mode: video_to_real_clips
+quality_profile: video_real_clips
+steps:
+  - id: load_video
+    type: load_video
+    inputs:
+      video: video_path
+  - id: extract_audio
+    type: extract_audio
+    inputs:
+      video: video_path
+      audio_extraction_mode: audio_extraction_mode
+    outputs:
+      audio_manifest: audio_manifest.json
+  - id: transcribe_audio_mock
+    type: transcribe_audio_mock
+    inputs:
+      asr_fixture: asr_fixture_path
+      language: language
+  - id: write_transcript
+    type: write_transcript
+    inputs:
+      transcript: transcript
+    outputs:
+      transcript: transcript.json
+  - id: load_roi_config
+    type: load_roi_config
+    inputs:
+      roi_config: roi_config_path
+    outputs:
+      roi_settings: roi_config.json
+  - id: detect_highlights
+    type: detect_highlights
+    inputs:
+      input_mode: timestamped_transcript
+      transcript: transcript
+      max_highlights: max_highlights
+  - id: rank_highlights_by_roi
+    type: rank_highlights_by_roi
+    inputs:
+      highlight_plan: highlight_plan
+      roi_settings: roi_settings
+  - id: generate_clip_plan_from_highlights
+    type: generate_clip_plan_from_highlights
+    inputs:
+      highlight_plan: highlight_plan
+      source_video: source_video
+  - id: write_highlight_plan
+    type: write_highlight_plan
+    inputs:
+      highlight_plan: highlight_plan
+    outputs:
+      highlight_plan: highlight_plan.json
+  - id: write_clip_plan
+    type: write_clip_plan
+    inputs:
+      clip_plan: clip_plan
+    outputs:
+      clip_plan: clip_plan.json
+  - id: probe_video_metadata
+    type: probe_video_metadata
+    inputs:
+      video: video_path
+    outputs:
+      video_metadata: video_metadata.json
+  - id: validate_clip_plan
+    type: validate_clip_plan
+    inputs:
+      roi_settings: roi_settings
+      clip_plan: clip_plan
+      video_metadata: video_metadata
+    outputs:
+      validation: clip_plan_validation.json
+  - id: real_slice_video
+    type: real_slice_video
+    inputs:
+      video: video_path
+      clip_plan: clip_plan
+      validation: clip_plan_validation
+    outputs:
+      real_slice_manifest: real_slice_manifest.json
+      clips: clips

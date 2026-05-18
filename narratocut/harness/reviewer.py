@@ -8,6 +8,7 @@ from narratocut.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
 )
+from narratocut.harness.quality_profiles import REAL_CLIP_QUALITY_PROFILES, VIDEO_REAL_CLIPS_PROFILE
 from narratocut.harness.video_artifacts import (
     build_video_review_section,
     is_video_highlight_quality_profile,
@@ -20,7 +21,6 @@ SCHEMA_VERSION = "0.1"
 PASSED = "passed"
 WARNING = "warning"
 FAILED = "failed"
-REAL_CLIP_QUALITY_PROFILES = {"real_video", "real_clips"}
 
 
 def review_run(run_dir: str | Path) -> dict[str, Any]:
@@ -33,7 +33,7 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         _run_contract_section(root, run_manifest, trace, quality_report),
         _workflow_outputs_section(root, run_manifest),
     ]
-    if run_manifest and run_manifest.get("quality_profile") in REAL_CLIP_QUALITY_PROFILES:
+    if run_manifest and run_manifest.get("quality_profile") in REAL_CLIP_QUALITY_PROFILES | {VIDEO_REAL_CLIPS_PROFILE}:
         sections.append(_real_video_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
@@ -253,7 +253,7 @@ def _recommendations(
     run_manifest: dict[str, Any] | None,
     quality_report: dict[str, Any] | None,
 ) -> list[str]:
-    if not run_manifest or run_manifest.get("quality_profile") not in REAL_CLIP_QUALITY_PROFILES:
+    if not run_manifest or run_manifest.get("quality_profile") not in REAL_CLIP_QUALITY_PROFILES | {VIDEO_REAL_CLIPS_PROFILE}:
         return []
 
     recommendation_set: list[str] = []

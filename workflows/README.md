@@ -113,6 +113,43 @@ This workflow is the Phase 12.1 execution boundary: it runs an existing
 highlights, generate a new clip plan, concatenate clips, add subtitles, add
 BGM, create covers, call remote providers, or export `final_video.mp4`.
 
+### `video_to_real_clips.yaml`
+
+Phase 12.1B composition smoke workflow:
+
+1. `load_video`
+2. `extract_audio`
+3. `transcribe_audio_mock`
+4. `write_transcript`
+5. `load_roi_config`
+6. `detect_highlights`
+7. `rank_highlights_by_roi`
+8. `generate_clip_plan_from_highlights`
+9. `write_highlight_plan`
+10. `write_clip_plan`
+11. `probe_video_metadata`
+12. `validate_clip_plan`
+13. `real_slice_video`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/reports/video_to_real_clips_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/processed/runs/demo_video_to_real_clips
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_real_clips
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_real_clips
+```
+
+This workflow composes the Phase 11 mock-ASR planning chain with the Phase
+12.1 ClipPlan execution workflow. It writes `audio_manifest.json`,
+`transcript.json`, `highlight_plan.json`, `clip_plan.json`,
+`video_metadata.json`, `clip_plan_validation.json`,
+`real_slice_manifest.json`, and real `.mp4` clips under `clips/`.
+
+It is intentionally a composition smoke path. It does not use real ASR, inspect
+video frames, concatenate clips, add subtitles, add BGM, create covers, call
+remote providers, or export `final_video.mp4`.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:
