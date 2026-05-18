@@ -4,6 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from narratocut.harness.highlight_artifacts import (
+    highlight_artifacts_to_inspect,
+    is_highlight_quality_profile,
+)
 from narratocut.harness.quality_checks import build_quality_report
 from narratocut.utils import write_json
 
@@ -70,11 +74,13 @@ def _workflow(
 
 def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[dict[str, str]]:
     statuses: list[dict[str, str]] = []
-    artifacts = (
-        REAL_VIDEO_ARTIFACTS_TO_INSPECT
-        if run_manifest and run_manifest.get("quality_profile") == "real_video"
-        else ARTIFACTS_TO_INSPECT
-    )
+    quality_profile = run_manifest.get("quality_profile") if run_manifest else None
+    if is_highlight_quality_profile(quality_profile):
+        artifacts = highlight_artifacts_to_inspect(quality_profile)
+    elif quality_profile == "real_video":
+        artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT
+    else:
+        artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:
         path = root / artifact.rstrip("/")
         exists = path.is_dir() if artifact.endswith("/") else path.is_file()

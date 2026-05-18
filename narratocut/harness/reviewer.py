@@ -4,6 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from narratocut.harness.highlight_artifacts import (
+    build_highlight_review_section,
+    is_highlight_quality_profile,
+)
 from narratocut.utils import write_json
 
 
@@ -25,6 +29,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
     ]
     if run_manifest and run_manifest.get("quality_profile") == "real_video":
         sections.append(_real_video_section(root))
+    if run_manifest and is_highlight_quality_profile(run_manifest.get("quality_profile")):
+        sections.append(build_highlight_review_section(root, run_manifest))
     summary = _summarize_sections(sections)
 
     return {
