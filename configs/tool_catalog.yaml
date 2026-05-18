@@ -679,6 +679,72 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: mix_bgm
+    description: Mix a local BGM audio file into an existing final video with FFmpeg.
+    category: bgm_mix_execution
+    entrypoints:
+      cli: null
+      workflow_node: mix_bgm
+      python: narratocut.bgm_sop.mix_bgm_into_video
+    input_artifacts:
+      - final_video.mp4
+      - bgm.mp3
+    output_artifacts:
+      - final_video_with_bgm.mp4
+      - audio_mix_manifest.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - source_video_missing
+      - bgm_missing
+      - unsafe_output_name
+      - ffmpeg_unavailable
+      - ffmpeg_bgm_mix_failed
+      - bgm_mix_output_missing
+    quality_checks:
+      - audio_mix_manifest_exists
+      - bgm_mix_manifest_status
+      - bgm_mix_output_file_exists
+      - bgm_mix_output_file_size_positive
+      - bgm_mix_ffmpeg_returncode
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
+  - name: probe_bgm_mix
+    description: Probe the BGM-mixed output video and enrich audio_mix_manifest.json.
+    category: bgm_mix_metadata
+    entrypoints:
+      cli: null
+      workflow_node: probe_bgm_mix
+      python: narratocut.slicing_sop.probe_video_metadata
+    input_artifacts:
+      - final_video_with_bgm.mp4
+      - audio_mix_manifest.json
+    output_artifacts:
+      - audio_mix_manifest.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - ffprobe_unavailable
+      - bgm_mix_video_probe_failed
+    quality_checks:
+      - bgm_mix_video_stream_present
+      - bgm_mix_output_file_size_positive
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

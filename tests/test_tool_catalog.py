@@ -30,6 +30,8 @@ EXPECTED_TOOLS = {
     "burn_subtitles",
     "probe_subtitle_burn",
     "export_cover",
+    "mix_bgm",
+    "probe_bgm_mix",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

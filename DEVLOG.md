@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.5 Local BGM Mix
+
+- Started `feature/phase-13-5-bgm-mix` from the merged Phase 13.4 `master`.
+- Added `workflows/final_video_with_bgm.yaml` as a narrow local BGM mix
+  workflow: existing `final_video.mp4` plus local `bgm.mp3` ->
+  `final_video_with_bgm.mp4` and `audio_mix_manifest.json`.
+- Added `narratocut/bgm_sop/` for FFmpeg BGM mix command construction,
+  execution, failed-manifest writing, volume configuration, and output-name
+  safety.
+- Added `bgm_mix` inspect/review support so BGM runs are checked for manifest
+  status, FFmpeg command/return code, safe relative output paths, output video
+  presence, non-empty output size, and video stream presence when FFprobe is
+  available.
+- Added example input under `examples/demo_bgm/` that references ignored local
+  media paths and does not commit real video or music assets.
+- Kept this increment free of music libraries, licensing management, beat
+  detection, fades, transitions, final-video assembly changes, subtitles,
+  covers, remote providers, and Web UI.
+
 ## 2026-05-19 - Phase 13.4 Cover Export
 
 - Started `feature/phase-13-4-cover-export` from the merged Phase 13.3

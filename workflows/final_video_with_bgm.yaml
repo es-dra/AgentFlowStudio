@@ -1,0 +1,19 @@
+name: final_video_with_bgm
+version: 1
+mode: final_video_with_bgm
+quality_profile: bgm_mix
+steps:
+  - id: mix_bgm
+    type: mix_bgm
+    inputs:
+      video: final_video_path
+      bgm: bgm_path
+    outputs:
+      audio_mix_manifest: audio_mix_manifest.json
+      final_video: final_video_with_bgm.mp4
+  - id: probe_bgm_mix
+    type: probe_bgm_mix
+    inputs:
+      audio_mix_manifest: audio_mix_manifest
+    outputs:
+      audio_mix_manifest: audio_mix_manifest.json

@@ -258,6 +258,34 @@ optimal highlight frame, generate cover templates, add title overlays, add BGM,
 add transitions, regenerate final assembly, call remote providers, inspect video
 frames for quality, or provide a Web UI.
 
+### `final_video_with_bgm.yaml`
+
+Phase 13.5 local BGM mix workflow:
+
+1. `mix_bgm`
+2. `probe_bgm_mix`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/reports/final_video_with_bgm_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/processed/runs/demo_final_video_with_bgm
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_with_bgm
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_with_bgm
+```
+
+This workflow consumes an existing `final_video.mp4` and a local BGM audio file,
+then writes `final_video_with_bgm.mp4` plus `audio_mix_manifest.json`.
+`inspect-run` and `review-run` check manifest status, FFmpeg command/return
+code, safe relative output path, output video presence, non-empty output size,
+and video stream presence when FFprobe is available.
+
+The example references generated or local ignored media under `data/processed/`
+and `data/raw/`; the repository does not include real video or music assets. It
+intentionally does not select music, manage licensing, detect beats, add fades,
+add transitions, regenerate final assembly, call remote providers, or provide a
+Web UI.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

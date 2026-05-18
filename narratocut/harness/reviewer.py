@@ -8,9 +8,11 @@ from narratocut.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
 )
+from narratocut.harness.bgm_quality import build_bgm_review_section
 from narratocut.harness.cover_quality import build_cover_review_section
 from narratocut.harness.quality_profiles import (
     COVER_EXPORT_PROFILE,
+    BGM_MIX_PROFILE,
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
@@ -54,6 +56,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         sections.append(build_subtitle_burn_review_section(root))
     if run_manifest and run_manifest.get("quality_profile") == COVER_EXPORT_PROFILE:
         sections.append(build_cover_review_section(root))
+    if run_manifest and run_manifest.get("quality_profile") == BGM_MIX_PROFILE:
+        sections.append(build_bgm_review_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
     if run_manifest and is_video_highlight_quality_profile(run_manifest.get("quality_profile")):
