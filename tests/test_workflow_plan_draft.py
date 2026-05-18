@@ -201,3 +201,19 @@ def test_draft_workflow_plan_lists_final_video_outputs() -> None:
         "final_video.mp4",
     ]:
         assert artifact in expected
+
+
+def test_draft_workflow_plan_lists_subtitle_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/transcript_to_subtitles.yaml",
+        input_path="examples/demo_subtitles/transcript_to_subtitles_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_transcript",
+        "write_subtitles",
+    ]
+    expected = plan["artifacts"]["expected"]
+    assert "subtitles.srt" in expected
+    assert "subtitle_manifest.json" in expected

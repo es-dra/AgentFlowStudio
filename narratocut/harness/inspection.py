@@ -10,7 +10,12 @@ from narratocut.harness.highlight_artifacts import (
 )
 from narratocut.harness.final_video_quality import final_video_artifacts_to_inspect
 from narratocut.harness.quality_checks import build_quality_report
-from narratocut.harness.quality_profiles import FINAL_VIDEO_PROFILE, REAL_CLIP_QUALITY_PROFILES
+from narratocut.harness.quality_profiles import (
+    FINAL_VIDEO_PROFILE,
+    REAL_CLIP_QUALITY_PROFILES,
+    SUBTITLE_EXPORT_PROFILE,
+)
+from narratocut.harness.subtitle_quality import subtitle_artifacts_to_inspect
 from narratocut.harness.video_artifacts import (
     is_video_quality_profile,
     video_artifacts_to_inspect,
@@ -37,6 +42,8 @@ REAL_VIDEO_ARTIFACTS_TO_INSPECT = [
     "trace.json",
     "clips/",
 ]
+
+
 def inspect_run(run_dir: str | Path) -> dict[str, Any]:
     root = Path(run_dir)
     run_manifest = _load_json_object(root / "run_manifest.json")
@@ -87,6 +94,8 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT
     elif quality_profile == FINAL_VIDEO_PROFILE:
         artifacts = final_video_artifacts_to_inspect()
+    elif quality_profile == SUBTITLE_EXPORT_PROFILE:
+        artifacts = subtitle_artifacts_to_inspect()
     else:
         artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:

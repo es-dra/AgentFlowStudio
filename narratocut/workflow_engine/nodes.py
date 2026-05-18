@@ -50,6 +50,7 @@ from narratocut.workflow_engine.transcription_nodes import (
     transcribe_audio_mock_node,
     write_transcript_node,
 )
+from narratocut.workflow_engine.subtitle_nodes import write_subtitles_node
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -232,6 +233,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("generate_assembly_plan", generate_assembly_plan_node)
     registry.register("concat_clips", concat_clips_node)
     registry.register("probe_final_video", probe_final_video_node)
+    registry.register("write_subtitles", write_subtitles_node)
     return registry
 
 

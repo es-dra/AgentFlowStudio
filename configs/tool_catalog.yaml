@@ -547,6 +547,39 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: write_subtitles
+    description: Export a timestamped Transcript to subtitles.srt and subtitle_manifest.json.
+    category: subtitle_export
+    entrypoints:
+      cli: null
+      workflow_node: write_subtitles
+      python: narratocut.subtitle_sop.build_subtitle_export
+    input_artifacts:
+      - workflow_state.transcript
+    output_artifacts:
+      - subtitles.srt
+      - subtitle_manifest.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - transcript_missing
+      - subtitle_segments_not_monotonic
+      - subtitle_text_empty
+      - subtitle_write_failed
+    quality_checks:
+      - subtitle_manifest_exists
+      - subtitle_manifest_status
+      - subtitle_file_exists
+      - subtitle_cue_count_matches_manifest
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection
