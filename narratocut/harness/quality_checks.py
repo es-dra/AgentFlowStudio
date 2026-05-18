@@ -4,6 +4,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from narratocut.harness.highlight_artifacts import (
+    build_highlight_quality_report,
+    is_highlight_quality_profile,
+)
 from narratocut.slicing_sop import probe_video_metadata, resolve_media_tool_paths
 
 
@@ -13,8 +17,12 @@ CLIP_DURATION_TOLERANCE_SEC = 0.75
 def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
     root = Path(run_dir)
     run_manifest = _read_json(root / "run_manifest.json")
-    if isinstance(run_manifest, dict) and run_manifest.get("quality_profile") == "real_video":
-        return _build_real_video_quality_report(root)
+    if isinstance(run_manifest, dict):
+        quality_profile = run_manifest.get("quality_profile")
+        if quality_profile == "real_video":
+            return _build_real_video_quality_report(root)
+        if is_highlight_quality_profile(quality_profile):
+            return build_highlight_quality_report(root, quality_profile)
 
     checks: list[dict[str, Any]] = []
 

@@ -322,6 +322,43 @@ The workflow run manifest records Phase 10-specific modes:
 Phase 10.6 still does not generate ASR, inspect raw video for highlights, run
 FFmpeg, assemble clips, burn subtitles, mix BGM, or export a final video.
 
+## Phase 10.7 Artifact Inspect/Review
+
+Phase 10.7 makes Phase 10 artifacts observable and reviewable through the
+existing harness. It does not add new workflow nodes or CLI commands.
+
+`inspect-run` summarizes `highlight_plan.json`:
+
+- `input_mode`
+- highlight count
+- highlight type distribution
+- timestamp presence
+- ranking factor presence
+- detector score range
+- ROI ranking `final_score` range
+
+For `highlight_clip_plan` runs, `inspect-run` also summarizes `clip_plan.json`
+segment count and whether segments preserve highlight metadata.
+
+`review-run` adds a `highlight_artifacts` section. It checks:
+
+- highlight count is positive
+- input mode is valid
+- `script_only` highlights do not carry timestamps
+- `timestamped_transcript` highlights carry valid `start_time` / `end_time`
+- highlight IDs are unique
+- detector scores, confidence values, and ranking `final_score` values are in
+  `0-1`
+- ranking factors are present
+- transcript highlights keep `source_segment_ids`
+- highlight-derived clip segments preserve `highlight_id` and ranking metadata
+- clip segment order matches the ranked highlight order
+
+This profile is a quality gate for Phase 10 artifacts before Phase 11 adds
+video-to-transcript work. It still does not perform ASR, raw-video highlight
+detection, FFmpeg slicing, clip assembly, subtitles, BGM, Web UI, or remote LLM
+calls.
+
 ## Acceptance Criteria
 
 Phase 10 is complete when:
