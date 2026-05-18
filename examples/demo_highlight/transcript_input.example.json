@@ -1,0 +1,6 @@
+{
+  "input_mode": "timestamped_transcript",
+  "transcript_path": "examples/demo_highlight/transcript.json",
+  "roi_config_path": "examples/demo_highlight/roi_config.json",
+  "output_dir": "data/processed/runs/demo_highlight_transcript"
+}

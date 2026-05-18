@@ -1,0 +1,6 @@
+{
+  "input_mode": "script_only",
+  "script_path": "examples/demo_highlight/script.txt",
+  "roi_config_path": "examples/demo_highlight/roi_config.json",
+  "output_dir": "data/processed/runs/demo_highlight_script"
+}

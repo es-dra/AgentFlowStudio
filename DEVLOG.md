@@ -1,5 +1,23 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 10.1/10.2 Highlight Contracts
+
+- Started Phase 10 on `feature/phase-10-highlight-detection` after Phase 9
+  was merged into `master`.
+- Added `HighlightSegment` and `HighlightPlan` contracts for `script_only`
+  and `timestamped_transcript` highlight planning.
+- Added `TranscriptSegment` and `Transcript` contracts for externally
+  supplied timestamped transcript input. Phase 10 consumes transcripts; it does
+  not generate them through ASR.
+- Enforced the key Phase 10 boundary: `script_only` highlight plans must not
+  carry timestamps, while `timestamped_transcript` plans require timestamps on
+  every highlight.
+- Added `examples/demo_highlight/` input examples for script-only and
+  timestamped-transcript workflows, plus a reusable ROI config.
+- Kept this increment free of detector logic, ROI ranking, ClipPlan generation,
+  workflow nodes, CLI commands, remote LLM calls, ASR, Web UI, subtitles, BGM,
+  and final-video assembly.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided

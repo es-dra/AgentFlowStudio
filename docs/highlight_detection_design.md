@@ -58,28 +58,51 @@ The first version should introduce a highlight schema under
 Recommended `HighlightSegment` fields:
 
 - `highlight_id`
-- `type`
+- `source_type`
+- `highlight_type`
 - `title`
-- `source_text`
+- `text`
 - `reason`
 - `score`
+- `confidence`
 - `suggested_duration`
-- `start_sec`
-- `end_sec`
+- `start_time`
+- `end_time`
 - `roi_tags`
-- `risk_flags`
+- `source_segment_ids`
+- `metadata`
 
 Recommended `HighlightPlan` fields:
 
-- `project_id`
-- `source_type`
-- `content_goal`
-- `target_platform`
+- `plan_id`
+- `input_mode`
+- `source_id`
+- `roi_profile`
 - `highlights`
+- `summary`
+- `warnings`
+- `metadata`
 - `created_at`
 
-`start_sec` and `end_sec` are optional for `script_only` and required before
-generating an executable `ClipPlan`.
+`start_time` and `end_time` are optional at the `HighlightSegment` level, but
+the `HighlightPlan` input mode decides whether they may appear.
+
+The Phase 10.1 schema uses `start_time` and `end_time` for transcript-aligned
+time ranges. `script_only` highlight plans must not include these fields;
+`timestamped_transcript` highlight plans require them for every highlight.
+
+## Input Examples
+
+Phase 10.2 adds example contracts under `examples/demo_highlight/`:
+
+- `script.txt`
+- `transcript.json`
+- `roi_config.json`
+- `script_input.example.json`
+- `transcript_input.example.json`
+
+The script-only input produces only `highlight_plan.json`. The timestamped
+transcript input can later produce both `highlight_plan.json` and `clip_plan.json`.
 
 ## Workflow Direction
 
