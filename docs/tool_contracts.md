@@ -21,6 +21,12 @@ Phase 13.2 extends the catalog with a basic subtitle export node that turns an
 existing timestamped `Transcript` into `subtitles.srt` and
 `subtitle_manifest.json`. It does not burn subtitles into video or call FFmpeg.
 
+Phase 13.3 extends the catalog with a narrow subtitle burn-in node that consumes
+an existing final video and an existing `subtitles.srt`, then writes
+`final_video_with_subtitles.mp4` plus `subtitle_burn_manifest.json`. It does
+not generate subtitles, regenerate clip assembly, add BGM, create covers, or add
+transitions.
+
 Catalog file:
 
 ```text
@@ -49,6 +55,7 @@ Allowed:
 - optional Phase 11.4 ASR provider adapters, marked as network/API-key gated
 - Phase 12.2 simple assembly nodes that consume existing real clips
 - Phase 13.2 subtitle export nodes that write text subtitle artifacts
+- Phase 13.3 subtitle burn-in nodes that consume existing final video and SRT artifacts
 
 Not allowed:
 
@@ -323,6 +330,41 @@ Exports the current timestamped `Transcript` state to `subtitles.srt` and
   `subtitle_file_exists`, `subtitle_cue_count_matches_manifest`
 - Boundary: this node only writes subtitle text artifacts. It does not burn
   subtitles into video, re-encode media, add BGM, or create a final video.
+
+### `burn_subtitles`
+
+Burns an existing `subtitles.srt` file into an existing final video with
+FFmpeg.
+
+- Category: subtitle burn execution
+- Main entry points: workflow node `burn_subtitles`,
+  `narratocut.subtitle_burn_sop.burn_subtitles_into_video`
+- Inputs: `final_video.mp4`, `subtitles.srt`
+- Outputs: `final_video_with_subtitles.mp4`,
+  `subtitle_burn_manifest.json`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `subtitle_burn_manifest_exists`,
+  `subtitle_burn_manifest_status`, `subtitle_burn_output_file_exists`,
+  `subtitle_burn_ffmpeg_returncode`
+- Agent usage: not safe for automatic execution, requires human review,
+  executes an external process
+- Boundary: this node consumes existing artifacts only. It does not generate
+  subtitles, regenerate final assembly, add BGM, add transitions, create covers,
+  call remote providers, or provide a Web UI.
+
+### `probe_subtitle_burn`
+
+Probes the subtitle-burned output video and enriches
+`subtitle_burn_manifest.json`.
+
+- Category: subtitle burn metadata
+- Main entry points: workflow node `probe_subtitle_burn`,
+  `narratocut.slicing_sop.probe_video_metadata`
+- Inputs: `final_video_with_subtitles.mp4`, `subtitle_burn_manifest.json`
+- Outputs: `subtitle_burn_manifest.json`
+- Requires: installed FFprobe; no network, no model provider, no API key
+- Main checks: `subtitle_burn_video_stream_present`,
+  `subtitle_burn_output_file_size_positive`
 
 ### `inspect_run`
 

@@ -1,0 +1,5 @@
+{
+  "final_video_path": "data/processed/runs/demo_clips_to_final_video/final_video.mp4",
+  "subtitles_path": "examples/demo_subtitles/subtitles.srt",
+  "output_name": "final_video_with_subtitles.mp4"
+}

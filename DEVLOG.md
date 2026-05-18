@@ -1,5 +1,27 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.3 Subtitle Burn-In
+
+- Started `feature/phase-13-3-subtitle-burn-in` from the merged Phase 13.2
+  `master`.
+- Added `workflows/final_video_with_subtitles.yaml` as a narrow execution
+  workflow: existing `final_video.mp4` plus existing `subtitles.srt` ->
+  `final_video_with_subtitles.mp4` and `subtitle_burn_manifest.json`.
+- Added `narratocut/subtitle_burn_sop/` for FFmpeg subtitle burn-in command
+  construction, execution, failed-manifest writing, and output-name safety.
+- Added `subtitle_burn` inspect/review support so subtitle-burn runs are
+  checked for manifest status, FFmpeg command/return code, output video
+  presence, non-empty output size, FFmpeg warning classification, and video
+  stream presence when FFprobe is available.
+- Added example input under `examples/demo_subtitles/` with a committed small
+  `.srt` fixture and an ignored generated final-video path.
+- Fixed workflow input bundle loading for UTF-8 BOM JSON files so PowerShell
+  generated input bundles are parsed as structured workflow inputs instead of
+  falling back to legacy `input_text_file` mode.
+- Kept this increment free of subtitle generation, final-video assembly
+  regeneration, slicing, BGM, covers, transitions, Web UI, remote providers,
+  ASR behavior, and video-frame understanding.
+
 ## 2026-05-19 - Phase 13.2 Basic Subtitle Export
 
 - Started `feature/phase-13-2-basic-subtitle-export` from the merged Phase

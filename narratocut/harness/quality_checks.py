@@ -9,6 +9,7 @@ from narratocut.harness.final_video_quality import build_final_video_quality_rep
 from narratocut.harness.quality_profiles import (
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
+    SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
     VIDEO_REAL_CLIPS_PROFILE,
 )
@@ -17,6 +18,7 @@ from narratocut.harness.real_clip_quality import (
     build_video_real_clips_quality_report,
 )
 from narratocut.harness.subtitle_quality import build_subtitle_quality_report
+from narratocut.harness.subtitle_burn_quality import build_subtitle_burn_quality_report
 from narratocut.harness.video_artifacts import build_video_quality_report, is_video_quality_profile
 
 
@@ -33,6 +35,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return build_final_video_quality_report(root)
         if quality_profile == SUBTITLE_EXPORT_PROFILE:
             return build_subtitle_quality_report(root)
+        if quality_profile == SUBTITLE_BURN_PROFILE:
+            return build_subtitle_burn_quality_report(root)
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):

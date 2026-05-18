@@ -27,6 +27,8 @@ EXPECTED_TOOLS = {
     "transcribe_audio_openai_compatible",
     "write_transcript",
     "write_subtitles",
+    "burn_subtitles",
+    "probe_subtitle_burn",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

@@ -580,6 +580,70 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: burn_subtitles
+    description: Burn an existing subtitles.srt file into an existing final video with FFmpeg.
+    category: subtitle_burn_execution
+    entrypoints:
+      cli: null
+      workflow_node: burn_subtitles
+      python: narratocut.subtitle_burn_sop.burn_subtitles_into_video
+    input_artifacts:
+      - final_video.mp4
+      - subtitles.srt
+    output_artifacts:
+      - final_video_with_subtitles.mp4
+      - subtitle_burn_manifest.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - source_video_missing
+      - subtitles_missing
+      - unsafe_output_name
+      - ffmpeg_unavailable
+      - ffmpeg_subtitle_burn_failed
+    quality_checks:
+      - subtitle_burn_manifest_exists
+      - subtitle_burn_manifest_status
+      - subtitle_burn_output_file_exists
+      - subtitle_burn_ffmpeg_returncode
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
+  - name: probe_subtitle_burn
+    description: Probe the subtitle-burned output video and enrich subtitle_burn_manifest.json.
+    category: subtitle_burn_metadata
+    entrypoints:
+      cli: null
+      workflow_node: probe_subtitle_burn
+      python: narratocut.slicing_sop.probe_video_metadata
+    input_artifacts:
+      - final_video_with_subtitles.mp4
+      - subtitle_burn_manifest.json
+    output_artifacts:
+      - subtitle_burn_manifest.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - ffprobe_unavailable
+      - subtitle_burn_video_probe_failed
+    quality_checks:
+      - subtitle_burn_video_stream_present
+      - subtitle_burn_output_file_size_positive
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection
