@@ -644,6 +644,41 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: export_cover
+    description: Export a single cover image from an existing final video with FFmpeg.
+    category: cover_export_execution
+    entrypoints:
+      cli: null
+      workflow_node: export_cover
+      python: narratocut.cover_sop.export_cover_from_video
+    input_artifacts:
+      - final_video.mp4
+    output_artifacts:
+      - cover.jpg
+      - cover_manifest.json
+    requires:
+      ffmpeg: true
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - source_video_missing
+      - unsafe_output_name
+      - ffmpeg_unavailable
+      - ffmpeg_cover_export_failed
+      - cover_output_missing
+    quality_checks:
+      - cover_manifest_exists
+      - cover_manifest_status
+      - cover_image_file_exists
+      - cover_image_file_size_positive
+      - cover_ffmpeg_returncode
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

@@ -232,6 +232,32 @@ subtitles, regenerate final assembly, slice videos, add BGM, add transitions,
 create covers, call remote providers, inspect video frames, or provide a Web
 UI.
 
+### `final_video_to_cover.yaml`
+
+Phase 13.4 cover export workflow:
+
+1. `export_cover`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/reports/final_video_to_cover_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/processed/runs/demo_final_video_to_cover
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_to_cover
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_to_cover
+```
+
+This workflow consumes an existing `final_video.mp4`, extracts one frame with
+FFmpeg, and writes `cover.jpg` plus `cover_manifest.json`. `inspect-run` and
+`review-run` check manifest status, FFmpeg command/return code, cover file
+presence, non-empty cover file size, and safe relative output paths.
+
+The example references a generated ignored final video under `data/processed/`;
+the repository does not include real media. It intentionally does not select an
+optimal highlight frame, generate cover templates, add title overlays, add BGM,
+add transitions, regenerate final assembly, call remote providers, inspect video
+frames for quality, or provide a Web UI.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

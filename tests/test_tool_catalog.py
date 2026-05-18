@@ -29,6 +29,7 @@ EXPECTED_TOOLS = {
     "write_subtitles",
     "burn_subtitles",
     "probe_subtitle_burn",
+    "export_cover",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

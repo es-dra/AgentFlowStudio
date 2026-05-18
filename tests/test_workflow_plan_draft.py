@@ -217,3 +217,16 @@ def test_draft_workflow_plan_lists_subtitle_outputs() -> None:
     expected = plan["artifacts"]["expected"]
     assert "subtitles.srt" in expected
     assert "subtitle_manifest.json" in expected
+
+
+def test_draft_workflow_plan_lists_cover_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/final_video_to_cover.yaml",
+        input_path="examples/demo_cover/final_video_to_cover_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == ["export_cover"]
+    expected = plan["artifacts"]["expected"]
+    assert "cover_manifest.json" in expected
+    assert "cover.jpg" in expected
