@@ -232,7 +232,8 @@ Converts an audio artifact into a timestamped `Transcript` using an explicitly
 enabled OpenAI-compatible ASR provider.
 
 - Category: video transcription ASR
-- Main entry point: `narratocut.asr_sop.OpenAICompatibleASRProvider`
+- Main entry points: workflow node `transcribe_audio_openai_compatible`,
+  `narratocut.asr_sop.OpenAICompatibleASRProvider`
 - Inputs: `audio_manifest.json`, `audio/audio.wav`
 - Outputs: workflow state `transcript`
 - Requires: network, model provider, and API key. Calls are blocked unless

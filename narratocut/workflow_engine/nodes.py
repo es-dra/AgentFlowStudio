@@ -40,6 +40,7 @@ from narratocut.workflow_engine.highlight_nodes import (
 from narratocut.workflow_engine.transcription_nodes import (
     extract_audio_node,
     load_video_node,
+    transcribe_audio_openai_compatible_node,
     transcribe_audio_mock_node,
     write_transcript_node,
 )
@@ -211,6 +212,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("load_video", load_video_node)
     registry.register("extract_audio", extract_audio_node)
     registry.register("transcribe_audio_mock", transcribe_audio_mock_node)
+    registry.register("transcribe_audio_openai_compatible", transcribe_audio_openai_compatible_node)
     registry.register("write_transcript", write_transcript_node)
     return registry
 

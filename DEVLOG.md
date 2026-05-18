@@ -1,5 +1,21 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.5 Explicit Real-ASR Workflow
+
+- Synced local `master` to the merged Phase 11.3/11.4 PR and deleted the
+  completed `feature/phase-11-3-4-audio-asr-providers` branch locally and on
+  `origin`.
+- Started `feature/phase-11-5-real-asr-workflow` from the latest `master`.
+- Added workflow node `transcribe_audio_openai_compatible`, which wires the
+  optional OpenAI-compatible ASR provider into the workflow engine.
+- Added `workflows/video_to_transcript_real_asr.yaml` as an explicit remote-ASR
+  path that stops at `transcript.json`.
+- Added an example input bundle that uses an API-key environment variable name
+  rather than committing any secret.
+- Kept default demo workflows on mock ASR and kept this increment free of
+  highlight detection, ClipPlan generation, real slicing, final assembly,
+  subtitles, BGM, Web UI, and new product CLI commands.
+
 ## 2026-05-18 - Phase 11.3/11.4 Audio Extraction and ASR Provider Contracts
 
 - Started `feature/phase-11-3-4-audio-asr-providers` from the merged Phase 11.2
