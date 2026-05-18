@@ -102,15 +102,15 @@ Phase 10.2 adds example contracts under `examples/demo_highlight/`:
 - `transcript_input.example.json`
 
 The script-only input produces only `highlight_plan.json`. The timestamped
-transcript input can later produce both `highlight_plan.json` and `clip_plan.json`.
+transcript input can produce both `highlight_plan.json` and `clip_plan.json`.
 
 ## Workflow Direction
 
-Phase 10 should add a text-first workflow:
+Phase 10 adds text-first workflows:
 
 ```text
 load_roi_config
-  -> load_script_or_transcript
+  -> load_script / load_transcript
   -> detect_highlights
   -> rank_highlights_by_roi
   -> generate_clip_plan, only when timestamps exist
@@ -271,6 +271,57 @@ This increment still does not run FFmpeg, validate against a real video, add
 workflow nodes, add CLI commands, generate ASR, stitch clips, burn subtitles, or
 mix BGM. Those remain later phases or later Phase 10 workflow integration.
 
+## Phase 10.6 Workflow Integration
+
+Phase 10.6 exposes the Phase 10 pipeline through `run-workflow` without adding
+new product CLI commands.
+
+Workflows:
+
+- `workflows/script_to_highlight_plan.yaml`
+- `workflows/transcript_to_highlight_clip_plan.yaml`
+
+Script workflow:
+
+```text
+load_roi_config
+  -> load_script
+  -> detect_highlights
+  -> rank_highlights_by_roi
+  -> write_highlight_plan
+```
+
+Output:
+
+- `highlight_plan.json`
+
+It does not write `clip_plan.json`.
+
+Timestamped transcript workflow:
+
+```text
+load_roi_config
+  -> load_transcript
+  -> detect_highlights
+  -> rank_highlights_by_roi
+  -> generate_clip_plan_from_highlights
+  -> write_highlight_plan
+  -> write_clip_plan
+```
+
+Outputs:
+
+- `highlight_plan.json`
+- `clip_plan.json`
+
+The workflow run manifest records Phase 10-specific modes:
+
+- `workflow_mode: highlight_detection` for script-only runs
+- `workflow_mode: highlight_to_clip_plan` for timestamped transcript runs
+
+Phase 10.6 still does not generate ASR, inspect raw video for highlights, run
+FFmpeg, assemble clips, burn subtitles, mix BGM, or export a final video.
+
 ## Acceptance Criteria
 
 Phase 10 is complete when:
@@ -281,4 +332,5 @@ Phase 10 is complete when:
 - generated clip plans can pass Phase 9 validation when their timestamps are
   within video duration
 - ROI settings influence ranking metadata or ordering
-- tests cover both input modes and provider failure handling
+- tests cover both input modes, workflow execution, and generated artifact
+  schema validation

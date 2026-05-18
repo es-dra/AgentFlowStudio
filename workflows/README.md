@@ -82,3 +82,44 @@ Example:
 This workflow requires a local video at `data/raw/demo_real_video/input.mp4`
 and local FFmpeg/FFprobe for a successful real slicing run. Missing tools still
 produce structured failure artifacts.
+
+### `script_to_highlight_plan.yaml`
+
+Phase 10 script highlight workflow:
+
+1. `load_roi_config`
+2. `load_script`
+3. `detect_highlights`
+4. `rank_highlights_by_roi`
+5. `write_highlight_plan`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
+```
+
+This workflow writes a ranked `highlight_plan.json`. It intentionally does not
+write `clip_plan.json` because script-only input has no reliable timeline.
+
+### `transcript_to_highlight_clip_plan.yaml`
+
+Phase 10 timestamped transcript workflow:
+
+1. `load_roi_config`
+2. `load_transcript`
+3. `detect_highlights`
+4. `rank_highlights_by_roi`
+5. `generate_clip_plan_from_highlights`
+6. `write_highlight_plan`
+7. `write_clip_plan`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
+```
+
+This workflow writes a ranked `highlight_plan.json` and an executable
+`clip_plan.json`. It does not run FFmpeg, stitch clips, add subtitles, add BGM,
+or export a final video.

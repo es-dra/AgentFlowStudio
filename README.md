@@ -3,7 +3,7 @@
 [中文 README](README.zh-CN.md)
 
 NarratoCut is a Python-based MVP for AI-assisted short video production workflows.
-It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, FFmpeg readiness checks, a standalone minimal real slicing PoC, and an ROI-aware real video slicing workflow from a provided `ClipPlan`.
+It currently supports text-to-hook analysis, mock script generation, clip planning, mock slicing, workflow run contracts, run inspection, agent-readable run review reports, static workflow plan drafts, a lightweight model gateway, deterministic script/transcript highlight workflows, FFmpeg readiness checks, a standalone minimal real slicing PoC, and an ROI-aware real video slicing workflow from a provided `ClipPlan`.
 
 This is a clean-room project. The previous AVP workspace is reference material only and is not used as a source code base.
 
@@ -32,6 +32,10 @@ Implemented capabilities:
 - Standalone `ncut slice-real` PoC for local FFmpeg slicing from clip plans
 - ROI-aware real video slicing workflow:
   `local video + ROI settings + ClipPlan -> metadata -> validation -> FFmpeg clips -> inspect/review`
+- Deterministic Phase 10 highlight workflows:
+  `script + ROI -> ranked HighlightPlan`
+- Timestamped transcript workflow:
+  `timestamped transcript + ROI -> ranked HighlightPlan -> ClipPlan`
 
 Current real-video capability is manual `ClipPlan` execution. NarratoCut can
 validate and execute a provided cut plan against a local video, then produce
@@ -39,9 +43,9 @@ reviewable run artifacts. It is not yet an automatic highlight editing product.
 
 Not implemented yet:
 
-- automatic highlight or viral-moment detection
+- automatic video highlight or viral-moment detection from raw video
 - ASR or timestamped transcript generation
-- script/transcript-to-ClipPlan generation
+- executable ClipPlan generation from untimed scripts
 - clip assembly into a final video
 - subtitle burn-in
 - vertical crop or aspect-ratio adaptation
@@ -128,6 +132,24 @@ Generate a static workflow plan draft:
 Run contract details are documented in [`docs/run_contract.md`](docs/run_contract.md).
 The reviewer contract is documented in [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md).
 The workflow plan contract is documented in [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md).
+
+Run the Phase 10 script highlight workflow:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
+```
+
+This writes `highlight_plan.json` only. It does not generate `clip_plan.json`
+because ordinary scripts do not carry reliable timestamps.
+
+Run the Phase 10 timestamped transcript workflow:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
+```
+
+This writes `highlight_plan.json` and `clip_plan.json`. It does not run FFmpeg
+or create a final video.
 
 ## Model Gateway Boundary
 

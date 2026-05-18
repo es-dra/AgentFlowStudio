@@ -68,6 +68,22 @@
 - Kept this increment free of FFmpeg execution, workflow nodes, CLI commands,
   ASR, remote LLM calls, clip assembly, subtitles, BGM, and final-video export.
 
+## 2026-05-18 - Phase 10.6 Highlight Workflow Integration
+
+- Added highlight workflow nodes for loading scripts/transcripts, detecting
+  highlights, ROI ranking, generating ClipPlan from timestamped highlights, and
+  writing highlight/clip plan artifacts.
+- Added `workflows/script_to_highlight_plan.yaml`, which writes a ranked
+  `highlight_plan.json` and intentionally does not write `clip_plan.json`.
+- Added `workflows/transcript_to_highlight_clip_plan.yaml`, which writes a
+  ranked `highlight_plan.json` plus executable `clip_plan.json`.
+- Kept Phase 10.6 on the existing `ncut run-workflow` path instead of adding a
+  product-specific CLI command.
+- Updated highlight examples with `max_highlights` and an optional
+  `source_video` placeholder for transcript-driven clip plan generation.
+- Kept this increment free of ASR, raw-video highlight detection, FFmpeg
+  execution, clip assembly, subtitles, BGM, Web UI, and final-video export.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided
