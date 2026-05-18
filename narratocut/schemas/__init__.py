@@ -10,6 +10,7 @@ from narratocut.schemas.project import Project
 from narratocut.schemas.roi import Hook, TimeRange
 from narratocut.schemas.script import ScriptSegment, ShortVideoScript
 from narratocut.schemas.roi import ROISettings
+from narratocut.schemas.subtitle import SubtitleCue, SubtitleManifest
 from narratocut.schemas.transcript import Transcript, TranscriptSegment
 from narratocut.schemas.validation import (
     ClipPlanValidationReport,
@@ -40,6 +41,8 @@ __all__ = [
     "ShortVideoScript",
     "StepResult",
     "SubtitleStyle",
+    "SubtitleCue",
+    "SubtitleManifest",
     "TaskPacket",
     "TimeRange",
     "Transcript",

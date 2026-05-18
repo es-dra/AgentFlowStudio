@@ -178,6 +178,31 @@ It is intentionally a simple FFmpeg concat path. It does not run ASR, detect
 highlights, slice source videos, burn subtitles, add BGM, add transitions,
 create covers, call remote providers, or provide a Web UI.
 
+### `transcript_to_subtitles.yaml`
+
+Phase 13.2 basic subtitle export workflow:
+
+1. `load_transcript`
+2. `write_subtitles`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/reports/transcript_to_subtitles_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/processed/runs/demo_transcript_to_subtitles
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_transcript_to_subtitles
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_transcript_to_subtitles
+```
+
+This workflow consumes an existing timestamped `transcript.json` and writes
+`subtitles.srt` plus `subtitle_manifest.json`. `inspect-run` and `review-run`
+check subtitle file presence, manifest status, cue count alignment, cue time
+ranges, monotonic ordering, and non-empty cue text.
+
+It intentionally exports subtitle text only. It does not burn subtitles into
+video, run FFmpeg, re-encode media, add BGM, add transitions, create covers,
+call remote providers, or export a new final video.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

@@ -17,6 +17,10 @@ Phase 11.3/11.4 extends the same contracts with real FFmpeg audio extraction
 metadata and an optional OpenAI-compatible ASR adapter. The default workflows
 still use mock ASR fixtures unless explicitly changed.
 
+Phase 13.2 extends the catalog with a basic subtitle export node that turns an
+existing timestamped `Transcript` into `subtitles.srt` and
+`subtitle_manifest.json`. It does not burn subtitles into video or call FFmpeg.
+
 Catalog file:
 
 ```text
@@ -44,6 +48,7 @@ Allowed:
 - Phase 11.1 video-to-transcript workflow nodes that already exist in code
 - optional Phase 11.4 ASR provider adapters, marked as network/API-key gated
 - Phase 12.2 simple assembly nodes that consume existing real clips
+- Phase 13.2 subtitle export nodes that write text subtitle artifacts
 
 Not allowed:
 
@@ -302,6 +307,22 @@ Writes the current timestamped `Transcript` state to `transcript.json`.
 - Outputs: `transcript.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
 - Main checks: `transcript_file_exists`, `transcript_schema_valid`
+
+### `write_subtitles`
+
+Exports the current timestamped `Transcript` state to `subtitles.srt` and
+`subtitle_manifest.json`.
+
+- Category: subtitle export
+- Main entry points: workflow node `write_subtitles`,
+  `narratocut.subtitle_sop.build_subtitle_export`
+- Inputs: workflow state `transcript`
+- Outputs: `subtitles.srt`, `subtitle_manifest.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `subtitle_manifest_exists`, `subtitle_manifest_status`,
+  `subtitle_file_exists`, `subtitle_cue_count_matches_manifest`
+- Boundary: this node only writes subtitle text artifacts. It does not burn
+  subtitles into video, re-encode media, add BGM, or create a final video.
 
 ### `inspect_run`
 

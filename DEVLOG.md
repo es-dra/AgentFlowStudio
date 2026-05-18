@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.2 Basic Subtitle Export
+
+- Started `feature/phase-13-2-basic-subtitle-export` from the merged Phase
+  13.1 `master`.
+- Added `workflows/transcript_to_subtitles.yaml` as a narrow subtitle export
+  workflow: timestamped `transcript.json` -> `subtitles.srt` plus
+  `subtitle_manifest.json`.
+- Added `narratocut/subtitle_sop/` for deterministic SRT formatting and
+  subtitle manifest generation without FFmpeg, media re-encoding, or remote
+  providers.
+- Added the `subtitle_export` inspect/review profile so subtitle runs are
+  checked for manifest status, subtitle file existence, cue count alignment,
+  valid cue ranges, monotonic cue ordering, and non-empty text.
+- Added example input under `examples/demo_subtitles/` with a committed text
+  transcript fixture and no media dependency.
+- Kept this increment free of subtitle burn-in, final-video regeneration, BGM,
+  covers, transitions, Web UI, real ASR behavior, visual understanding, and
+  remote provider calls.
+
 ## 2026-05-19 - Phase 13.1 Final Video Quality Hardening
 
 - Started `feature/phase-13-1-final-video-quality-hardening` from the Phase
