@@ -35,6 +35,7 @@ REAL_VIDEO_ARTIFACTS_TO_INSPECT = [
     "trace.json",
     "clips/",
 ]
+REAL_CLIP_QUALITY_PROFILES = {"real_video", "real_clips"}
 
 
 def inspect_run(run_dir: str | Path) -> dict[str, Any]:
@@ -83,7 +84,7 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = video_artifacts_to_inspect(quality_profile)
     elif is_highlight_quality_profile(quality_profile):
         artifacts = highlight_artifacts_to_inspect(quality_profile)
-    elif quality_profile == "real_video":
+    elif quality_profile in REAL_CLIP_QUALITY_PROFILES:
         artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT
     else:
         artifacts = ARTIFACTS_TO_INSPECT

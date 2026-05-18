@@ -134,6 +134,7 @@ def slice_clip_plans_real(
                 segment=segment,
                 output_ref=output_ref,
                 status="succeeded" if result.returncode == 0 else "failed",
+                result=result,
             )
             if result.returncode != 0:
                 error = _ffmpeg_error(clip_id, result)
@@ -184,6 +185,7 @@ def _clip_record(
     segment: ClipSegment,
     output_ref: Path,
     status: str,
+    result: subprocess.CompletedProcess[str],
 ) -> dict[str, Any]:
     return {
         "clip_id": clip_id,
@@ -194,6 +196,10 @@ def _clip_record(
         "start_sec": segment.start_sec,
         "end_sec": segment.end_sec,
         "duration_sec": segment.end_sec - segment.start_sec,
+        "ffmpeg_command": [str(item) for item in result.args],
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
     }
 
 

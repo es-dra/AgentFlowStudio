@@ -83,6 +83,36 @@ This workflow requires a local video at `data/raw/demo_real_video/input.mp4`
 and local FFmpeg/FFprobe for a successful real slicing run. Missing tools still
 produce structured failure artifacts.
 
+### `clip_plan_to_real_clips.yaml`
+
+Phase 12.1 primary execution workflow:
+
+1. `load_video`
+2. `load_clip_plan`
+3. `probe_video_metadata`
+4. `validate_clip_plan`
+5. `real_slice_video`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/reports/phase_12_1_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/processed/runs/demo_clip_plan_to_real_clips
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
+```
+
+The example expects a local ignored video at
+`data/raw/demo_slicing/input.mp4`; the repository does not include real media.
+The workflow writes `clip_plan.json`, `video_metadata.json`,
+`clip_plan_validation.json`, `real_slice_manifest.json`, real `.mp4` clips
+under `clips/`, and run contract artifacts.
+
+This workflow is the Phase 12.1 execution boundary: it runs an existing
+`clip_plan.json` against a source video. It does not run ASR, detect
+highlights, generate a new clip plan, concatenate clips, add subtitles, add
+BGM, create covers, call remote providers, or export `final_video.mp4`.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:

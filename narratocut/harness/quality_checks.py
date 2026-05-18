@@ -10,6 +10,7 @@ from narratocut.slicing_sop import probe_video_metadata, resolve_media_tool_path
 
 
 CLIP_DURATION_TOLERANCE_SEC = 0.75
+REAL_CLIP_QUALITY_PROFILES = {"real_video", "real_clips"}
 
 
 def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
@@ -17,8 +18,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
     run_manifest = _read_json(root / "run_manifest.json")
     if isinstance(run_manifest, dict):
         quality_profile = run_manifest.get("quality_profile")
-        if quality_profile == "real_video":
-            return _build_real_video_quality_report(root)
+        if quality_profile in REAL_CLIP_QUALITY_PROFILES:
+            return _build_real_video_quality_report(root, str(quality_profile))
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):
@@ -62,7 +63,7 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
     }
 
 
-def _build_real_video_quality_report(root: Path) -> dict[str, Any]:
+def _build_real_video_quality_report(root: Path, quality_profile: str = "real_video") -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     warnings: list[str] = []
     errors: list[str] = []
@@ -97,7 +98,7 @@ def _build_real_video_quality_report(root: Path) -> dict[str, Any]:
         "warnings": warnings,
         "errors": errors + [_check_error(check) for check in failed if _check_error(check) not in errors],
         "summary": {
-            "quality_profile": "real_video",
+            "quality_profile": quality_profile,
             "clips": _real_clip_count(real_manifest),
         },
     }
