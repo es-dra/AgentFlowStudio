@@ -108,6 +108,10 @@ Phase 11.5 exposes that adapter through a separate
 `video_to_transcript_real_asr.yaml` workflow. This is an explicit opt-in remote
 ASR path and still stops at `transcript.json`.
 
+Phase 11.6 composes the explicit real-ASR transcript path with the Phase 10
+highlight pipeline. It produces `transcript.json`, `highlight_plan.json`, and
+`clip_plan.json`, but still does not run real slicing or final assembly.
+
 Target flow:
 
 ```text

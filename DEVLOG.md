@@ -1,5 +1,20 @@
 # DEVLOG
 
+## 2026-05-18 - Phase 11.6 Real-ASR Video-to-ClipPlan Workflow
+
+- Synced local `master` to the merged Phase 11.5 PR and deleted the completed
+  `feature/phase-11-5-real-asr-workflow` branch locally and on `origin`.
+- Started `feature/phase-11-6-real-asr-highlight-clip-plan` from the latest
+  `master`.
+- Added `workflows/video_to_highlight_clip_plan_real_asr.yaml`, which composes
+  explicit OpenAI-compatible ASR with the Phase 10 deterministic highlight
+  detection, ROI ranking, and ClipPlan generation path.
+- Added an example input bundle under `examples/demo_asr/` that references an
+  API-key environment variable name without committing secrets.
+- Kept this increment free of video-frame highlight detection, real slicing,
+  clip generation, final assembly, subtitles, BGM, Web UI, and new product CLI
+  commands.
+
 ## 2026-05-18 - Phase 11.5 Explicit Real-ASR Workflow
 
 - Synced local `master` to the merged Phase 11.3/11.4 PR and deleted the
