@@ -6,6 +6,7 @@ from narratocut.schemas.compliance import ComplianceResult
 from narratocut.schemas.cost import CostRecord
 from narratocut.schemas.harness import EvidenceCard, GateResult, TaskPacket
 from narratocut.schemas.highlight import HighlightPlan, HighlightSegment
+from narratocut.schemas.package import FinishedPackageAsset, FinishedPackageManifest
 from narratocut.schemas.project import Project
 from narratocut.schemas.roi import Hook, TimeRange
 from narratocut.schemas.script import ScriptSegment, ShortVideoScript
@@ -29,6 +30,8 @@ __all__ = [
     "CostRecord",
     "EvidenceCard",
     "ExportPackage",
+    "FinishedPackageAsset",
+    "FinishedPackageManifest",
     "GateResult",
     "GeneratedVideo",
     "Hook",

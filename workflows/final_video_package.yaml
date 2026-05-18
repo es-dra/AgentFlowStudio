@@ -1,0 +1,11 @@
+name: final_video_package
+version: 1
+mode: final_video_package
+quality_profile: finished_package
+steps:
+  - id: write_finished_package
+    type: write_finished_package
+    inputs:
+      final_video: final_video_path
+    outputs:
+      finished_package_manifest: finished_package_manifest.json

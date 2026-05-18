@@ -32,6 +32,7 @@ EXPECTED_TOOLS = {
     "export_cover",
     "mix_bgm",
     "probe_bgm_mix",
+    "write_finished_package",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

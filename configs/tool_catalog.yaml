@@ -750,6 +750,41 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: write_finished_package
+    description: Write a finished package manifest that indexes existing final video artifacts.
+    category: finished_package_manifest
+    entrypoints:
+      cli: null
+      workflow_node: write_finished_package
+      python: narratocut.package_sop.build_finished_package_manifest
+    input_artifacts:
+      - final_video.mp4
+      - final_video_with_subtitles.mp4
+      - final_video_with_bgm.mp4
+      - cover.jpg
+      - review_report.json
+    output_artifacts:
+      - finished_package_manifest.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - final_video_missing
+      - package_manifest_write_failed
+      - declared_asset_missing
+    quality_checks:
+      - finished_package_manifest_exists
+      - finished_package_manifest_status
+      - finished_package_assets_non_empty
+      - finished_package_asset_final_video_exists
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

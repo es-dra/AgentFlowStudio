@@ -1,5 +1,21 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.7 Finished Video Package Manifest
+
+- Started `feature/phase-13-7-finished-video-package` from the merged Phase
+  13.6 `master`.
+- Added `workflows/final_video_package.yaml` as a narrow manifest-only
+  workflow: existing final video artifacts -> `finished_package_manifest.json`.
+- Added `narratocut/package_sop/` and `write_finished_package` workflow node to
+  index the required final video plus optional subtitle-burned video,
+  BGM-mixed video, cover image, and review report paths.
+- Added `finished_package` inspect/review support so declared package assets
+  are checked for manifest status and file existence.
+- Added example input under `examples/demo_package/` that references ignored
+  generated artifacts and does not commit real media.
+- Kept this increment free of file copying, uploads, final assembly changes,
+  subtitle burn-in, BGM mixing, cover export, remote providers, and Web UI.
+
 ## 2026-05-19 - Phase 13.6 BGM Mix Hardening
 
 - Started `feature/phase-13-6-bgm-hardening` from the merged Phase 13.5
