@@ -27,6 +27,11 @@ an existing final video and an existing `subtitles.srt`, then writes
 not generate subtitles, regenerate clip assembly, add BGM, create covers, or add
 transitions.
 
+Phase 13.4 extends the catalog with a narrow cover export node that consumes an
+existing final video, extracts one frame with FFmpeg, and writes `cover.jpg`
+plus `cover_manifest.json`. It does not create cover templates, inspect video
+frames for the best moment, add BGM, add transitions, or change final assembly.
+
 Catalog file:
 
 ```text
@@ -56,6 +61,7 @@ Allowed:
 - Phase 12.2 simple assembly nodes that consume existing real clips
 - Phase 13.2 subtitle export nodes that write text subtitle artifacts
 - Phase 13.3 subtitle burn-in nodes that consume existing final video and SRT artifacts
+- Phase 13.4 cover export nodes that consume an existing final video
 
 Not allowed:
 
@@ -365,6 +371,25 @@ Probes the subtitle-burned output video and enriches
 - Requires: installed FFprobe; no network, no model provider, no API key
 - Main checks: `subtitle_burn_video_stream_present`,
   `subtitle_burn_output_file_size_positive`
+
+### `export_cover`
+
+Exports a single `cover.jpg` image from an existing final video with FFmpeg.
+
+- Category: cover export execution
+- Main entry points: workflow node `export_cover`,
+  `narratocut.cover_sop.export_cover_from_video`
+- Inputs: `final_video.mp4`
+- Outputs: `cover.jpg`, `cover_manifest.json`
+- Requires: installed FFmpeg; no network, no model provider, no API key
+- Main checks: `cover_manifest_exists`, `cover_manifest_status`,
+  `cover_image_file_exists`, `cover_image_file_size_positive`,
+  `cover_ffmpeg_returncode`
+- Agent usage: not safe for automatic execution, requires human review,
+  executes an external process
+- Boundary: this node consumes an existing final video only. It does not select
+  an optimal highlight frame, generate templates, add text overlays, add BGM,
+  add transitions, call remote providers, or provide a Web UI.
 
 ### `inspect_run`
 

@@ -52,6 +52,7 @@ from narratocut.workflow_engine.transcription_nodes import (
 )
 from narratocut.workflow_engine.subtitle_nodes import write_subtitles_node
 from narratocut.workflow_engine.subtitle_burn_nodes import burn_subtitles_node, probe_subtitle_burn_node
+from narratocut.workflow_engine.cover_nodes import export_cover_node
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -237,6 +238,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("write_subtitles", write_subtitles_node)
     registry.register("burn_subtitles", burn_subtitles_node)
     registry.register("probe_subtitle_burn", probe_subtitle_burn_node)
+    registry.register("export_cover", export_cover_node)
     return registry
 
 

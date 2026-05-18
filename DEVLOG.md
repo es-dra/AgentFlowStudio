@@ -1,5 +1,24 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.4 Cover Export
+
+- Started `feature/phase-13-4-cover-export` from the merged Phase 13.3
+  `master`.
+- Added `workflows/final_video_to_cover.yaml` as a narrow cover export
+  workflow: existing `final_video.mp4` -> `cover.jpg` plus
+  `cover_manifest.json`.
+- Added `narratocut/cover_sop/` for FFmpeg single-frame command construction,
+  execution, failed-manifest writing, cover timestamp selection, and output-name
+  safety.
+- Added `cover_export` inspect/review support so cover runs are checked for
+  manifest status, FFmpeg command/return code, safe relative output paths,
+  cover image presence, and non-empty output size.
+- Added example input under `examples/demo_cover/` that references an ignored
+  generated final-video path and does not commit real media.
+- Kept this increment free of BGM, transitions, subtitle changes, final-video
+  assembly changes, cover templates, text overlays, remote providers, video
+  frame highlight selection, and Web UI.
+
 ## 2026-05-19 - Phase 13.3 Subtitle Burn-In
 
 - Started `feature/phase-13-3-subtitle-burn-in` from the merged Phase 13.2

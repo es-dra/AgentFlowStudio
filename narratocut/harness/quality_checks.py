@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from narratocut.harness.highlight_artifacts import build_highlight_quality_report, is_highlight_quality_profile
+from narratocut.harness.cover_quality import build_cover_quality_report
 from narratocut.harness.final_video_quality import build_final_video_quality_report
 from narratocut.harness.quality_profiles import (
+    COVER_EXPORT_PROFILE,
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
@@ -37,6 +39,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return build_subtitle_quality_report(root)
         if quality_profile == SUBTITLE_BURN_PROFILE:
             return build_subtitle_burn_quality_report(root)
+        if quality_profile == COVER_EXPORT_PROFILE:
+            return build_cover_quality_report(root)
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):
