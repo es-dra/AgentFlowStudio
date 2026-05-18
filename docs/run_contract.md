@@ -140,6 +140,16 @@ For Phase 11 video profiles, `quality_report.json` also summarizes:
 - transcript source-segment references from highlight and clip metadata
 - obvious remote-ASR secret value leakage for explicit real-ASR profiles
 
+For final-video profiles, `quality_report.json` treats
+`final_video_manifest.json` as the source of truth for generated output paths
+and checks:
+
+- final manifest status
+- final video file existence and non-empty size
+- final video stream presence
+- final duration tolerance against the assembly plan
+- known FFmpeg stderr warnings such as `Non-monotonic DTS`
+
 The harness owns this artifact because quality checks are gates over completed
 artifacts, not workflow execution order.
 

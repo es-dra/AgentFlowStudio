@@ -171,6 +171,8 @@ Example:
 This workflow consumes an existing `real_slice_manifest.json` and its `clips/`
 directory from a prior real slicing run. It writes `assembly_plan.json`,
 `concat_list.txt`, `final_video_manifest.json`, and `final_video.mp4`.
+For inspect/review, `final_video_manifest.json` is the source of truth for the
+generated video path.
 
 It is intentionally a simple FFmpeg concat path. It does not run ASR, detect
 highlights, slice source videos, burn subtitles, add BGM, add transitions,

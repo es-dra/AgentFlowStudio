@@ -32,8 +32,10 @@ P0 quality checks:
 - final video exists
 - file size is greater than 0
 - FFprobe can read the file when available
+- final video stream is present
 - final duration approximately matches the sum of clip durations
 - expected resolution and codec are recorded when available
+- known FFmpeg stderr warnings are classified without changing assembly output
 
 ## P1 Scope
 
@@ -78,6 +80,9 @@ P1 should not include:
 - `errors`
 - `warnings`
 
+`final_video_manifest.json` is the source of truth for generated output paths.
+Inspection and review should read it instead of guessing artifact names.
+
 ## Workflow Direction
 
 Target P0 workflow:
@@ -104,6 +109,7 @@ Examples:
 - missing clip file -> failed `final_video_manifest.json`
 - FFmpeg unavailable -> failed `final_video_manifest.json` with actionable error
 - concat failure -> failed manifest with FFmpeg stderr summary
+- successful concat with known FFmpeg stderr warnings -> quality warning
 - duration mismatch -> inspect warning or failure depending on tolerance
 
 ## Acceptance Criteria
