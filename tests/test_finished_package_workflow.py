@@ -83,6 +83,44 @@ def test_final_video_package_workflow_writes_package_manifest(tmp_path) -> None:
     assert "finished_package_outputs" in {section["name"] for section in review["sections"]}
 
 
+def test_finished_package_records_quality_evidence_paths(tmp_path) -> None:
+    real_slice = tmp_path / "real_slice_manifest.json"
+    clip_plan = tmp_path / "clip_plan.json"
+    subtitle_manifest = tmp_path / "subtitle_manifest.json"
+    audio_mix_manifest = tmp_path / "audio_mix_manifest.json"
+    final_video_manifest = tmp_path / "final_video_manifest.json"
+    for path in [real_slice, clip_plan, subtitle_manifest, audio_mix_manifest, final_video_manifest]:
+        write_json(path, {"status": "succeeded"})
+    input_path = _write_input_bundle(
+        tmp_path,
+        include_optional=True,
+        evidence={
+            "real_slice_manifest_path": real_slice,
+            "clip_plan_path": clip_plan,
+            "subtitle_manifest_path": subtitle_manifest,
+            "audio_mix_manifest_path": audio_mix_manifest,
+            "final_video_manifest_path": final_video_manifest,
+        },
+    )
+    output_dir = tmp_path / "package_run"
+
+    status, _ = run_workflow_from_cli(
+        workflow_path=WORKFLOW,
+        input_path=input_path,
+        output_dir=output_dir,
+    )
+
+    assert status == "success"
+    package = json.loads((output_dir / "finished_package_manifest.json").read_text(encoding="utf-8"))
+    assert package["evidence"] == {
+        "real_slice_manifest": str(real_slice).replace("\\", "/"),
+        "clip_plan": str(clip_plan).replace("\\", "/"),
+        "subtitle_manifest": str(subtitle_manifest).replace("\\", "/"),
+        "audio_mix_manifest": str(audio_mix_manifest).replace("\\", "/"),
+        "final_video_manifest": str(final_video_manifest).replace("\\", "/"),
+    }
+
+
 def test_final_video_package_fails_when_primary_final_video_missing(tmp_path) -> None:
     input_path = _write_input_bundle(tmp_path, missing_final_video=True)
     output_dir = tmp_path / "package_run"
@@ -150,6 +188,7 @@ def _write_input_bundle(
     *,
     include_optional: bool = False,
     missing_final_video: bool = False,
+    evidence: dict[str, Path] | None = None,
 ) -> Path:
     final_video = tmp_path / "final_video.mp4"
     if not missing_final_video:
@@ -175,6 +214,8 @@ def _write_input_bundle(
                 "review_report_path": str(review),
             }
         )
+    for key, path in (evidence or {}).items():
+        payload[key] = str(path)
     input_path = tmp_path / "final_video_package_input.json"
     write_json(input_path, payload)
     return input_path

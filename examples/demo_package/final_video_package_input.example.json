@@ -4,5 +4,10 @@
   "subtitled_video_path": "data/processed/runs/demo_final_video_with_subtitles/final_video_with_subtitles.mp4",
   "bgm_video_path": "data/processed/runs/demo_final_video_with_bgm/final_video_with_bgm.mp4",
   "cover_path": "data/processed/runs/demo_final_video_to_cover/cover.jpg",
-  "review_report_path": "data/processed/runs/demo_clips_to_final_video/review_report.json"
+  "review_report_path": "data/processed/runs/demo_clips_to_final_video/review_report.json",
+  "final_video_manifest_path": "data/processed/runs/demo_clips_to_final_video/final_video_manifest.json",
+  "real_slice_manifest_path": "data/processed/runs/demo_clip_plan_to_real_clips/real_slice_manifest.json",
+  "clip_plan_path": "data/processed/runs/demo_clip_plan_to_real_clips/clip_plan.json",
+  "subtitle_manifest_path": "data/processed/runs/demo_transcript_to_subtitles/subtitle_manifest.json",
+  "audio_mix_manifest_path": "data/processed/runs/demo_final_video_with_bgm/audio_mix_manifest.json"
 }

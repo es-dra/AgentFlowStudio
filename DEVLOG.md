@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 14.0B Product Quality Smoke Reclassification
+
+- Started `feature/phase-14-0b-product-quality-smoke` from the merged Phase
+  14.0 documentation `master`.
+- Reclassified the Phase 13 Golden Path as an engineering smoke, not a
+  product-quality acceptance run.
+- Added optional `evidence` paths to `finished_package_manifest.json` so package
+  review can inspect upstream artifacts such as `final_video_manifest.json`,
+  `real_slice_manifest.json`, `clip_plan.json`, `subtitle_manifest.json`, and
+  `audio_mix_manifest.json`.
+- Added finished-package product-quality warnings for single-clip demo cuts,
+  `0s`-only starts, missing highlight evidence, missing subtitle source-video
+  binding, subtitle duration exceeding the primary video, and unverified BGM
+  content fit.
+- Updated the Golden Path docs and package example so the next product test can
+  surface engineering success separately from product-quality warnings.
+- Added `docs/product_quality_smoke.md` with the current expected warning set
+  and the local Phase 14.0B baseline:
+  `inspect-run` reports `11 passed / 0 failed / 6 warnings`, while
+  `review-run` reports `17 passed / 0 failed / 7 warnings`.
+
 ## 2026-05-19 - Phase 14.0 Documentation and Golden Path Prep
 
 - Started `feature/phase-14-0-docs-golden-path` from the Phase 13 complete

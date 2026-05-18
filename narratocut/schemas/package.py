@@ -31,6 +31,7 @@ class FinishedPackageManifest(SchemaBase):
     package_id: str
     primary_video: FinishedPackageAsset
     assets: list[FinishedPackageAsset] = Field(default_factory=list)
+    evidence: dict[str, str] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     manifest_path: str = "finished_package_manifest.json"

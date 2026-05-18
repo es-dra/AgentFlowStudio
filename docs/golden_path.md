@@ -7,6 +7,9 @@ finished package manifest from local ignored media.
 The Golden Path is not a consumer one-click workflow yet. It is a developer
 acceptance path for the current artifact-driven product surface.
 
+For the Phase 14.0B quality-warning baseline, see
+[`docs/product_quality_smoke.md`](product_quality_smoke.md).
+
 ## Goal
 
 Run this path:
@@ -240,7 +243,12 @@ Create a local input bundle:
   "subtitled_video_path": "data/processed/runs/golden_path_phase13_subtitled_video/final_video_with_subtitles.mp4",
   "bgm_video_path": "data/processed/runs/golden_path_phase13_bgm/final_video_with_bgm.mp4",
   "cover_path": "data/processed/runs/golden_path_phase13_cover/cover.jpg",
-  "review_report_path": "data/processed/runs/golden_path_phase13_final_video/review_report.json"
+  "review_report_path": "data/processed/runs/golden_path_phase13_final_video/review_report.json",
+  "final_video_manifest_path": "data/processed/runs/golden_path_phase13_final_video/final_video_manifest.json",
+  "real_slice_manifest_path": "data/processed/runs/golden_path_phase13_real_clips/real_slice_manifest.json",
+  "clip_plan_path": "data/processed/runs/golden_path_phase13_real_clips/clip_plan.json",
+  "subtitle_manifest_path": "data/processed/runs/golden_path_phase13_subtitles/subtitle_manifest.json",
+  "audio_mix_manifest_path": "data/processed/runs/golden_path_phase13_bgm/audio_mix_manifest.json"
 }
 ```
 
@@ -267,9 +275,36 @@ A Golden Path smoke passes when:
 - each workflow returns `success`
 - each `inspect-run` has `0 failed`
 - each `review-run` has `0 failed`
+- `final_video_package` review may return `warning` when product-quality
+  evidence is present but the current demo is not product-ready
 - warnings are allowed only when they are explicit and non-blocking, such as
-  known FFmpeg DTS warnings or duration drift warnings
+  known FFmpeg DTS warnings, duration drift warnings, or product-quality smoke
+  warnings
 - no generated media or run artifacts are committed to git
+
+## Product-Quality Smoke Warnings
+
+The Golden Path is an engineering smoke first. When the package input declares
+quality evidence paths, `review-run` also reports product-quality warnings for
+known demo limitations.
+
+Current demo limitations that should be surfaced as warnings:
+
+- `single_clip_only`: the demo ClipPlan produces one clip, not a multi-moment
+  edit
+- `clip_starts_at_zero_only`: the demo cut starts at `0s`, so it should not be
+  mistaken for automatic highlight selection
+- `no_highlight_evidence`: the package cannot prove that clip choices came from
+  ranked highlights
+- `subtitle_source_video_missing`: the demo subtitle transcript is not tied to
+  the source video
+- `subtitle_duration_exceeds_primary_video`: subtitle timing may exceed the
+  assembled video duration
+- `bgm_quality_unverified`: local BGM was mixed successfully but not judged for
+  musical/content fit
+
+For product-quality acceptance, the goal is not `0 warnings`; the goal is that
+engineering failures are zero and quality limitations are explicit.
 
 ## Known Boundaries
 
