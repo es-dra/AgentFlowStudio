@@ -1,5 +1,20 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 13.1 Final Video Quality Hardening
+
+- Started `feature/phase-13-1-final-video-quality-hardening` from the Phase
+  12 completion point at `8347e30`.
+- Hardened final-video inspection without changing assembly behavior:
+  `final_video_manifest.json` remains the source of truth for generated output
+  paths, and FFmpeg concat output is not regenerated differently.
+- Added known FFmpeg stderr warning classification for final-video runs.
+  `Non-monotonic DTS` is reported as a quality warning rather than a hard
+  failure when FFmpeg exits successfully and FFprobe can read the output.
+- Added final-video stream presence checking so a missing video stream is
+  surfaced as a failed quality check.
+- Made `review-run` clearer when `quality_report.json` is missing by telling
+  users to run `inspect-run` before `review-run`.
+
 ## 2026-05-19 - Phase 12.2 Simple Video Assembly
 
 - Added `workflows/clips_to_final_video.yaml` as the Phase 12 simple assembly

@@ -9,6 +9,7 @@ from narratocut.harness.highlight_artifacts import (
     is_highlight_quality_profile,
 )
 from narratocut.harness.quality_profiles import FINAL_VIDEO_PROFILE, REAL_CLIP_QUALITY_PROFILES, VIDEO_REAL_CLIPS_PROFILE
+from narratocut.harness.review_checks import build_quality_report_check
 from narratocut.harness.video_artifacts import (
     build_video_review_section,
     is_video_highlight_quality_profile,
@@ -87,7 +88,7 @@ def _run_contract_section(
             "quality_report.json exists",
         ),
         _trace_steps_check(trace),
-        _quality_report_check(quality_report),
+        build_quality_report_check(quality_report),
     ]
     return _section("run_contract", checks)
 
@@ -160,31 +161,6 @@ def _trace_steps_check(trace: dict[str, Any] | None) -> dict[str, Any]:
         status,
         "trace.json contains at least one workflow step",
         {"count": len(steps) if isinstance(steps, list) else 0},
-    )
-
-
-def _quality_report_check(quality_report: dict[str, Any] | None) -> dict[str, Any]:
-    failed_count = 0
-    warning_count = 0
-    if quality_report:
-        checks = quality_report.get("checks")
-        if isinstance(checks, list):
-            failed_count = sum(1 for check in checks if check.get("status") == "fail")
-            warning_count = sum(1 for check in checks if check.get("status") == "warning")
-        report_warnings = quality_report.get("warnings")
-        if isinstance(report_warnings, list):
-            warning_count += len(report_warnings)
-    if not quality_report or quality_report.get("status") != "pass" or failed_count > 0:
-        status = FAILED
-    elif warning_count > 0:
-        status = WARNING
-    else:
-        status = PASSED
-    return _check(
-        "quality_report_passed",
-        status,
-        "quality_report.json has no failed checks",
-        {"failed_checks": failed_count, "warnings": warning_count},
     )
 
 

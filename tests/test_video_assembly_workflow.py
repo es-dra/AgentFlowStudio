@@ -162,6 +162,62 @@ def test_clips_to_final_video_review_uses_manifest_final_video_name(tmp_path, mo
     assert final_video_check["details"]["path"] == "assembled.mp4"
 
 
+def test_final_video_quality_classifies_known_ffmpeg_stderr_warnings(tmp_path, monkeypatch) -> None:
+    input_path = _write_input_bundle(tmp_path)
+    output_dir = tmp_path / "assembly_run"
+
+    def warning_ffmpeg(command, capture_output, text, check):  # noqa: ANN001, ANN202
+        output_path = Path(command[-1])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"fake final video")
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="",
+            stderr="Non-monotonic DTS; previous: 177145, current: 176400",
+        )
+
+    _patch_assembly_tools(monkeypatch, duration_sec=8.0, ffmpeg_run=warning_ffmpeg)
+
+    status, _ = run_workflow_from_cli(
+        workflow_path=WORKFLOW,
+        input_path=input_path,
+        output_dir=output_dir,
+    )
+
+    assert status == "success"
+    inspection = inspect_run(output_dir)
+    assert inspection["status"] == "pass"
+    quality_report = inspection["quality_report"]
+    warning_check = next(check for check in quality_report["checks"] if check["name"] == "final_video_ffmpeg_warnings")
+    assert warning_check["status"] == "warning"
+    assert warning_check["details"]["warnings"][0]["code"] == "non_monotonic_dts"
+    assert "final_video_ffmpeg_warning: non_monotonic_dts" in quality_report["warnings"]
+
+    review = review_run(output_dir)
+    assert review["status"] == "warning"
+
+
+def test_final_video_quality_fails_when_video_stream_missing(tmp_path, monkeypatch) -> None:
+    input_path = _write_input_bundle(tmp_path)
+    output_dir = tmp_path / "assembly_run"
+    _patch_assembly_tools(monkeypatch, duration_sec=8.0, probe_status="failed", probe_errors=["video_stream_missing"])
+
+    status, _ = run_workflow_from_cli(
+        workflow_path=WORKFLOW,
+        input_path=input_path,
+        output_dir=output_dir,
+    )
+
+    assert status == "success"
+    inspection = inspect_run(output_dir)
+    assert inspection["status"] == "fail"
+    quality_report = inspection["quality_report"]
+    failed_checks = {check["name"] for check in quality_report["checks"] if check["status"] == "fail"}
+    assert "final_video_stream_present" in failed_checks
+    assert "final_video_stream_missing: final_video.mp4" in quality_report["errors"]
+
+
 def _write_input_bundle(
     tmp_path: Path,
     *,
@@ -218,6 +274,8 @@ def _patch_assembly_tools(
     monkeypatch,
     *,
     duration_sec: float,
+    probe_status: str = "succeeded",
+    probe_errors: list[str] | None = None,
     ffmpeg_calls: list[list[str]] | None = None,
     ffmpeg_run=None,
 ) -> None:
@@ -230,7 +288,8 @@ def _patch_assembly_tools(
             codec="h264",
             fps=30,
             bitrate=1000,
-            probe_status="succeeded",
+            probe_status=probe_status,
+            errors=probe_errors or [],
         )
 
     def fake_tool_check(executable="ffmpeg"):  # noqa: ANN001, ANN202

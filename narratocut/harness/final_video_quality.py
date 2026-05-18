@@ -9,6 +9,11 @@ from narratocut.slicing_sop import probe_video_metadata, resolve_media_tool_path
 
 FINAL_VIDEO_QUALITY_PROFILE = "final_video"
 FINAL_DURATION_TOLERANCE_SEC = 1.0
+KNOWN_FFMPEG_WARNING_PATTERNS = [
+    ("non_monotonic_dts", "Non-monotonic DTS"),
+    ("dts_out_of_order", "DTS out of order"),
+    ("invalid_non_monotonic_dts", "non monotonically increasing dts"),
+]
 
 
 def build_final_video_quality_report(root: Path) -> dict[str, Any]:
@@ -23,6 +28,8 @@ def build_final_video_quality_report(root: Path) -> dict[str, Any]:
     final_manifest = _check_json_object(root, "final_video_manifest_exists", "final_video_manifest.json", checks)
     _add_final_manifest_status_check(final_manifest, checks, errors)
     _add_final_video_file_checks(root, final_manifest, checks, warnings, errors)
+    _add_ffmpeg_warning_checks(final_manifest, checks, warnings)
+    _add_final_stream_check(root, final_manifest, checks, errors)
     _add_final_duration_check(root, assembly_plan, final_manifest, checks, warnings, errors)
 
     failed = [check for check in checks if check["status"] == "fail"]
@@ -85,6 +92,48 @@ def _add_final_video_file_checks(
     _add_check(checks, "final_video_file_exists", "pass", {"path": ref})
 
 
+def _add_ffmpeg_warning_checks(
+    final_manifest: dict[str, Any] | None,
+    checks: list[dict[str, Any]],
+    warnings: list[str],
+) -> None:
+    if final_manifest is None:
+        return
+    classified = _classify_ffmpeg_warnings(str(final_manifest.get("stderr") or ""))
+    if not classified:
+        _add_check(checks, "final_video_ffmpeg_warnings", "pass", {"warnings": []})
+        return
+    for item in classified:
+        warnings.append(f"final_video_ffmpeg_warning: {item['code']}")
+    _add_check(checks, "final_video_ffmpeg_warnings", "warning", {"warnings": classified})
+
+
+def _add_final_stream_check(
+    root: Path,
+    final_manifest: dict[str, Any] | None,
+    checks: list[dict[str, Any]],
+    errors: list[str],
+) -> None:
+    if final_manifest is None:
+        return
+    ref = str(final_manifest.get("final_video") or "")
+    if not ref or not (root / ref).is_file():
+        return
+    manifest_warnings = [str(item) for item in final_manifest.get("warnings", []) if item]
+    if "video_stream_missing" in manifest_warnings:
+        _add_check(checks, "final_video_stream_present", "fail", {"path": ref, "errors": manifest_warnings})
+        errors.append(f"final_video_stream_missing: {ref}")
+        return
+    paths = resolve_media_tool_paths()
+    metadata = probe_video_metadata(root / ref, ffprobe_executable=paths.ffprobe)
+    if metadata.probe_status == "succeeded":
+        _add_check(checks, "final_video_stream_present", "pass", {"path": ref})
+        return
+    if "video_stream_missing" in metadata.errors:
+        _add_check(checks, "final_video_stream_present", "fail", {"path": ref, "errors": metadata.errors})
+        errors.append(f"final_video_stream_missing: {ref}")
+
+
 def _add_final_duration_check(
     root: Path,
     assembly_plan: dict[str, Any] | None,
@@ -127,6 +176,22 @@ def _add_final_duration_check(
     )
     if status == "fail":
         errors.append(f"final_video_duration_out_of_tolerance: {ref}")
+
+
+def _classify_ffmpeg_warnings(stderr: str) -> list[dict[str, str]]:
+    classified: list[dict[str, str]] = []
+    lowered = stderr.lower()
+    for code, pattern in KNOWN_FFMPEG_WARNING_PATTERNS:
+        if pattern.lower() in lowered:
+            classified.append(
+                {
+                    "code": code,
+                    "severity": "warning",
+                    "source": "ffmpeg_stderr",
+                    "message": pattern,
+                }
+            )
+    return classified
 
 
 def _check_json_object(

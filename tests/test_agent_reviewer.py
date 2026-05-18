@@ -53,6 +53,24 @@ def test_review_run_fails_when_required_contract_files_are_missing(tmp_path) -> 
     assert "quality_report_exists" in failed_ids
 
 
+def test_review_run_explains_missing_quality_report_requires_inspect_run(tmp_path) -> None:
+    run_dir = _write_complete_run(tmp_path / "demo_run")
+    (run_dir / "quality_report.json").unlink()
+
+    report = review_run(run_dir)
+
+    quality_check = next(
+        check
+        for section in report["sections"]
+        for check in section["checks"]
+        if check["id"] == "quality_report_passed"
+    )
+    assert report["status"] == "failed"
+    assert quality_check["status"] == "failed"
+    assert "inspect-run" in quality_check["message"]
+    assert quality_check["details"]["missing_quality_report"] is True
+
+
 def test_review_run_fails_when_quality_report_has_failed_checks(tmp_path) -> None:
     run_dir = _write_complete_run(tmp_path / "demo_run")
     quality_report = json.loads((run_dir / "quality_report.json").read_text(encoding="utf-8"))

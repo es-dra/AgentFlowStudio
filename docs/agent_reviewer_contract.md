@@ -159,6 +159,10 @@ artifacts, performs harness quality checks, and writes `quality_report.json`.
 `review-run` is the agent-readable reporting command. It reads the run contract
 and quality artifacts, then writes `review_report.json`.
 
+`review-run` does not generate `quality_report.json`. If that file is missing,
+the run contract section fails with an explicit instruction to run
+`inspect-run` first.
+
 In normal usage:
 
 ```text
