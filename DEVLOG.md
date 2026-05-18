@@ -1,5 +1,32 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 14.0 Documentation and Golden Path Prep
+
+- Started `feature/phase-14-0-docs-golden-path` from the Phase 13 complete
+  `master`.
+- Refreshed `README.md` and `README.zh-CN.md` to position NarratoCut as a
+  CLI-first technical MVP with real final-video, subtitle, cover, BGM, package,
+  inspect, and review capabilities.
+- Replaced the stale Phase 13 Web UI roadmap with a Phase 14 Productization
+  roadmap.
+- Added `docs/current_architecture.md` to summarize the post-Phase-13
+  architecture and artifact model.
+- Added `docs/golden_path.md` to define the local Phase 13 complete product
+  smoke from source video and ClipPlan to `finished_package_manifest.json`.
+- Ran the Phase 13 complete Golden Path with local ignored media:
+  `clip_plan_to_real_clips`, `clips_to_final_video`, `transcript_to_subtitles`,
+  `final_video_with_subtitles`, `final_video_to_cover`,
+  `final_video_with_bgm`, and `final_video_package`.
+- Recorded the smoke result in `docs/product_smoke_phase13.md`: all seven
+  workflows succeeded, and every inspect/review report showed `0 failed` and
+  `0 warnings`.
+- Generated real product artifacts under ignored
+  `data/processed/runs/golden_path_phase13_*` directories, including
+  `final_video.mp4`, `subtitles.srt`, `final_video_with_subtitles.mp4`,
+  `cover.jpg`, `final_video_with_bgm.mp4`, and
+  `finished_package_manifest.json`.
+- Kept generated media and smoke outputs under ignored `data/` paths.
+
 ## 2026-05-19 - Phase 13.7 Finished Video Package Manifest
 
 - Started `feature/phase-13-7-finished-video-package` from the merged Phase
