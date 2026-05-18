@@ -51,6 +51,23 @@
   ClipPlan generation, workflow nodes, CLI commands, remote LLM calls, ASR, and
   final-video assembly.
 
+## 2026-05-18 - Phase 10.5 Highlight-to-ClipPlan Generation
+
+- Added `HighlightClipPlanGenerator` and
+  `generate_clip_plan_from_highlights(...)` under `narratocut.highlight_sop`.
+- The generator accepts only `timestamped_transcript` `HighlightPlan` objects
+  and rejects `script_only` plans instead of inventing timestamps.
+- Generated one executable `ClipPlan` with one `ClipSegment` per selected
+  highlight, preserving the incoming ranked order.
+- Required caller-provided `source_video` for generated segments so the output
+  can enter Phase 9 validation and real slicing when the caller supplies a real
+  video path.
+- Preserved highlight evidence in segment metadata, including highlight ID,
+  type, score, confidence, ROI tags, source transcript segment IDs, and ranking
+  factors.
+- Kept this increment free of FFmpeg execution, workflow nodes, CLI commands,
+  ASR, remote LLM calls, clip assembly, subtitles, BGM, and final-video export.
+
 ## 2026-05-18 - Phase 9 ROI-aware Real Video Workflow Closure
 
 - Phase 9 establishes the real video execution foundation: it runs a provided

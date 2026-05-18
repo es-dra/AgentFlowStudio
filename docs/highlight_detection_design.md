@@ -227,6 +227,50 @@ prediction of views, virality, conversion, or revenue.
 The ranker may add user-facing tags such as `goal:*`, `platform:*`, and
 `priority:*`, while preserving detector-provided `roi_tags`.
 
+## Phase 10.5 Highlight-to-ClipPlan Generation
+
+Phase 10.5 converts a ranked `timestamped_transcript` `HighlightPlan` into one
+executable `ClipPlan`.
+
+Public API:
+
+- `HighlightClipPlanGenerator.generate(...)`
+- `generate_clip_plan_from_highlights(...)`
+
+Input requirements:
+
+- `HighlightPlan.input_mode` must be `timestamped_transcript`
+- each highlight must already contain `start_time` and `end_time`
+- `source_video` must be provided by the caller
+
+The generator intentionally rejects `script_only` plans. Plain scripts can
+produce a `HighlightPlan`, but they cannot produce a trustworthy executable
+`ClipPlan` without a timeline.
+
+The generated `ClipPlan` preserves the incoming highlight order. This means the
+usual Phase 10 path is:
+
+```text
+transcript
+  -> detect_highlights
+  -> rank_highlights_by_roi
+  -> generate_clip_plan_from_highlights
+```
+
+Each highlight becomes one `ClipSegment`. Segment metadata preserves:
+
+- `highlight_id`
+- `highlight_type`
+- `highlight_score`
+- `highlight_confidence`
+- `roi_tags`
+- `source_segment_ids`
+- `ranking_factors`, when available
+
+This increment still does not run FFmpeg, validate against a real video, add
+workflow nodes, add CLI commands, generate ASR, stitch clips, burn subtitles, or
+mix BGM. Those remain later phases or later Phase 10 workflow integration.
+
 ## Acceptance Criteria
 
 Phase 10 is complete when:
