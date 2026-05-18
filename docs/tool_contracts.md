@@ -438,6 +438,26 @@ Probes the BGM-mixed output video and enriches `audio_mix_manifest.json`.
 - Main checks: `bgm_mix_video_stream_present`,
   `bgm_mix_output_file_size_positive`, `bgm_mix_duration_tolerance`
 
+### `write_finished_package`
+
+Writes a finished-package manifest that indexes existing final video outputs.
+
+- Category: finished package manifest
+- Main entry points: workflow node `write_finished_package`,
+  `narratocut.package_sop.build_finished_package_manifest`
+- Inputs: required `final_video.mp4`; optional subtitle-burned video,
+  BGM-mixed video, cover image, and review report paths
+- Outputs: `finished_package_manifest.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `finished_package_manifest_exists`,
+  `finished_package_manifest_status`, `finished_package_assets_non_empty`,
+  `finished_package_asset_final_video_exists`
+- Agent usage: safe for automatic execution, does not execute external
+  processes
+- Boundary: this node indexes existing artifacts only. It does not copy files,
+  upload files, regenerate videos, burn subtitles, mix BGM, export covers, call
+  remote providers, or provide a Web UI.
+
 ### `inspect_run`
 
 Inspects a workflow run directory and writes `quality_report.json`.

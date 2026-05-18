@@ -8,9 +8,11 @@ from narratocut.harness.bgm_quality import build_bgm_quality_report
 from narratocut.harness.highlight_artifacts import build_highlight_quality_report, is_highlight_quality_profile
 from narratocut.harness.cover_quality import build_cover_quality_report
 from narratocut.harness.final_video_quality import build_final_video_quality_report
+from narratocut.harness.package_quality import build_package_quality_report
 from narratocut.harness.quality_profiles import (
     COVER_EXPORT_PROFILE,
     BGM_MIX_PROFILE,
+    FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
@@ -45,6 +47,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return build_cover_quality_report(root)
         if quality_profile == BGM_MIX_PROFILE:
             return build_bgm_quality_report(root)
+        if quality_profile == FINISHED_PACKAGE_PROFILE:
+            return build_package_quality_report(root)
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):

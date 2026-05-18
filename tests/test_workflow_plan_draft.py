@@ -243,3 +243,15 @@ def test_draft_workflow_plan_lists_bgm_mix_outputs() -> None:
     expected = plan["artifacts"]["expected"]
     assert "audio_mix_manifest.json" in expected
     assert "final_video_with_bgm.mp4" in expected
+
+
+def test_draft_workflow_plan_lists_finished_package_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/final_video_package.yaml",
+        input_path="examples/demo_package/final_video_package_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == ["write_finished_package"]
+    expected = plan["artifacts"]["expected"]
+    assert "finished_package_manifest.json" in expected

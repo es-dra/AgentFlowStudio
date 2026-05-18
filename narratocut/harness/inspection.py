@@ -11,10 +11,12 @@ from narratocut.harness.highlight_artifacts import (
 from narratocut.harness.bgm_quality import bgm_artifacts_to_inspect
 from narratocut.harness.cover_quality import cover_artifacts_to_inspect
 from narratocut.harness.final_video_quality import final_video_artifacts_to_inspect
+from narratocut.harness.package_quality import package_artifacts_to_inspect
 from narratocut.harness.quality_checks import build_quality_report
 from narratocut.harness.quality_profiles import (
     COVER_EXPORT_PROFILE,
     BGM_MIX_PROFILE,
+    FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
@@ -120,6 +122,8 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
             output_ref = _run_artifact_ref(run_manifest, "bgm_video")
             if output_ref and output_ref not in artifacts:
                 artifacts.append(output_ref)
+    elif quality_profile == FINISHED_PACKAGE_PROFILE:
+        artifacts = package_artifacts_to_inspect()
     else:
         artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:

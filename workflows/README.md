@@ -291,6 +291,32 @@ intentionally does not select music, manage licensing, detect beats, add fades,
 add transitions, regenerate final assembly, call remote providers, or provide a
 Web UI.
 
+### `final_video_package.yaml`
+
+Phase 13.7 finished package manifest workflow:
+
+1. `write_finished_package`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/reports/final_video_package_workflow_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/processed/runs/demo_final_video_package
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_package
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_package
+```
+
+This workflow consumes paths to existing final video artifacts and writes
+`finished_package_manifest.json`. The final video is required; subtitle-burned
+video, BGM-mixed video, cover image, and review report paths are optional.
+`inspect-run` and `review-run` check package manifest status and declared asset
+existence.
+
+The example references generated ignored artifacts under `data/processed/`; the
+repository does not include real media. This workflow indexes artifacts only. It
+does not copy files, upload files, regenerate videos, burn subtitles, mix BGM,
+export covers, call remote providers, or provide a Web UI.
+
 ### `script_to_highlight_plan.yaml`
 
 Phase 10 script highlight workflow:
