@@ -28,10 +28,11 @@ def test_video_to_finished_package_real_asr_workflow_definition() -> None:
         "transcribe_audio_openai_compatible",
         "write_transcript",
         "load_roi_config",
-        "detect_highlights",
-        "rank_highlights_by_roi",
-        "generate_clip_plan_from_highlights",
+        "generate_candidate_windows",
+        "score_candidate_windows",
+        "write_highlight_score_report",
         "write_highlight_plan",
+        "generate_clip_plan_from_highlights",
         "write_clip_plan",
         "probe_video_metadata",
         "validate_clip_plan",
@@ -63,9 +64,13 @@ def test_video_to_finished_package_real_asr_workflow_runs_product_path(tmp_path,
     package = json.loads((output_dir / "finished_package_manifest.json").read_text(encoding="utf-8"))
 
     assert len(highlight_plan["highlights"]) >= 2
+    assert highlight_plan["metadata"]["source"] == "candidate_scoring"
     assert len(clip_plan["segments"]) >= 2
+    assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
+    assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
+    assert all(segment["metadata"].get("scorer") == "deterministic_viral_scorer_v0" for segment in clip_plan["segments"])
     assert subtitle_manifest["timeline"] == "final_video"
-    assert subtitle_manifest["duration_sec"] <= 8.0
+    assert subtitle_manifest["duration_sec"] <= 30.0
     assert package["evidence"]["real_slice_manifest"].endswith("real_slice_manifest.json")
     assert package["evidence"]["subtitle_manifest"].endswith("subtitle_manifest.json")
 
@@ -93,8 +98,11 @@ def test_video_script_to_finished_package_real_asr_workflow_runs_alignment_path(
     assert alignment["aligned_count"] >= 2
     assert alignment["skipped_count"] == 0
     assert highlight_plan["input_mode"] == "timestamped_transcript"
-    assert all(highlight["metadata"].get("alignment") for highlight in highlight_plan["highlights"])
+    assert highlight_plan["metadata"]["source"] == "candidate_scoring"
+    assert (output_dir / "highlight_score_report.json").is_file()
+    assert any(highlight["metadata"].get("script_alignment") for highlight in highlight_plan["highlights"])
     assert all(segment["metadata"].get("highlight_id") for segment in clip_plan["segments"])
+    assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
 
     inspection = inspect_run(output_dir)
     review = review_run(output_dir)
@@ -107,6 +115,8 @@ def _assert_product_outputs(output_dir: Path) -> None:
     for artifact in [
         "audio_manifest.json",
         "transcript.json",
+        "candidate_windows.json",
+        "highlight_score_report.json",
         "highlight_plan.json",
         "clip_plan.json",
         "clip_plan_validation.json",

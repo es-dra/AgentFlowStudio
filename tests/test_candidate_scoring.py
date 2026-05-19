@@ -91,3 +91,122 @@ def test_score_candidate_windows_rejects_overlapping_candidates() -> None:
     assert len(plan.highlights) == 2
     rejected = [item for item in report["candidates"] if item["decision"] == "rejected"]
     assert any("overlap" in item["rejection_reasons"] for item in rejected)
+
+
+def test_score_candidate_windows_rejects_repeated_split_source_window() -> None:
+    candidates = {
+        "schema_version": "0.1",
+        "status": "succeeded",
+        "source_transcript_id": "demo_transcript",
+        "source_video": "input.mp4",
+        "content_channel": "local_asr",
+        "candidates": [
+            _candidate(
+                "cand_001",
+                0.0,
+                5.0,
+                "The first short beat explains the setup.",
+                source_window_start_sec=0.0,
+                source_window_end_sec=20.0,
+            ),
+            _candidate(
+                "cand_002",
+                5.0,
+                10.0,
+                "The second short beat repeats the same setup.",
+                source_window_start_sec=0.0,
+                source_window_end_sec=20.0,
+            ),
+            _candidate(
+                "cand_003",
+                30.0,
+                35.0,
+                "A separate payoff gives the edit a different beat.",
+                source_window_start_sec=30.0,
+                source_window_end_sec=40.0,
+            ),
+        ],
+    }
+
+    report, plan = score_candidate_windows(candidates, max_selected=3)
+
+    selected_ids = [candidate["candidate_id"] for candidate in report["candidates"] if candidate["decision"] == "selected"]
+    assert selected_ids == ["cand_001", "cand_003"]
+    assert len(plan.highlights) == 2
+    assert any(
+        candidate["candidate_id"] == "cand_002"
+        and candidate["decision"] == "rejected"
+        and "duplicate_source_window" in candidate["rejection_reasons"]
+        for candidate in report["candidates"]
+    )
+
+
+def test_score_candidate_windows_prefers_short_clip_duration() -> None:
+    candidates = {
+        "schema_version": "0.1",
+        "status": "succeeded",
+        "source_transcript_id": "demo",
+        "source_video": "input.mp4",
+        "content_channel": "asr_transcript",
+        "candidates": [
+            {
+                "candidate_id": "long",
+                "source": "transcript_window",
+                "start_sec": 0.0,
+                "end_sec": 20.0,
+                "duration_sec": 20.0,
+                "segment_ids": ["seg_001"],
+                "text": "90% of creators cut the wrong part but the real problem is direction",
+                "asr_confidence": 0.9,
+                "script_alignment": None,
+                "evidence": {"content_channel": "asr_transcript"},
+            },
+            {
+                "candidate_id": "short",
+                "source": "transcript_subwindow",
+                "start_sec": 4.0,
+                "end_sec": 9.0,
+                "duration_sec": 5.0,
+                "segment_ids": ["seg_001"],
+                "text": "90% of creators cut the wrong part",
+                "asr_confidence": 0.9,
+                "script_alignment": None,
+                "evidence": {"content_channel": "asr_transcript"},
+            },
+        ],
+    }
+
+    report, plan = score_candidate_windows(candidates, max_selected=1)
+
+    assert report["candidates"][0]["candidate_id"] == "short"
+    assert plan.highlights[0].start_time == 4.0
+    assert plan.highlights[0].end_time == 9.0
+
+
+def _candidate(
+    candidate_id: str,
+    start_sec: float,
+    end_sec: float,
+    text: str,
+    *,
+    source_window_start_sec: float,
+    source_window_end_sec: float,
+) -> dict[str, object]:
+    return {
+        "candidate_id": candidate_id,
+        "source": "transcript_subwindow",
+        "start_sec": start_sec,
+        "end_sec": end_sec,
+        "duration_sec": round(end_sec - start_sec, 6),
+        "segment_ids": [candidate_id.replace("cand", "seg")],
+        "text": text,
+        "asr_confidence": 0.8,
+        "script_alignment": None,
+        "evidence": {
+            "window_size": 2,
+            "content_channel": "local_asr",
+            "boundary_strategy": "fixed_duration_split",
+            "source_window_start_sec": source_window_start_sec,
+            "source_window_end_sec": source_window_end_sec,
+        },
+    }

@@ -97,6 +97,7 @@ def _segment_from_highlight(
 
 
 def _segment_metadata(highlight: HighlightSegment) -> dict[str, Any]:
+    metadata = dict(highlight.metadata)
     return {
         "source": GENERATOR_NAME,
         "highlight_id": highlight.highlight_id,
@@ -105,7 +106,12 @@ def _segment_metadata(highlight: HighlightSegment) -> dict[str, Any]:
         "highlight_confidence": highlight.confidence,
         "roi_tags": list(highlight.roi_tags),
         "source_segment_ids": list(highlight.source_segment_ids),
-        "ranking_factors": highlight.metadata.get("ranking_factors"),
+        "ranking_factors": metadata.get("ranking_factors"),
+        "candidate_id": metadata.get("candidate_id"),
+        "content_channel": metadata.get("content_channel"),
+        "scorer": metadata.get("scorer"),
+        "score_breakdown": metadata.get("score_breakdown"),
+        "script_alignment": metadata.get("script_alignment"),
     }
 
 

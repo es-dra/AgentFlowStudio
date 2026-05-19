@@ -74,6 +74,56 @@ def test_finished_package_quality_warns_for_demo_smoke_quality_gaps(tmp_path: Pa
     assert "product_quality_subtitle_source_video_missing" in warning_ids
 
 
+def test_finished_package_quality_warns_for_non_product_short_clip_shape(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    final_video = tmp_path / "final_video.mp4"
+    bgm_video = tmp_path / "final_video_with_bgm.mp4"
+    final_video.write_bytes(b"fake media")
+    bgm_video.write_bytes(b"fake media")
+    real_slice = _write_long_duplicate_real_slice_manifest(tmp_path)
+    clip_plan = _write_long_duplicate_clip_plan(tmp_path)
+    subtitle_manifest = _write_final_timeline_subtitle_manifest(tmp_path)
+    audio_mix_manifest = _write_verified_audio_mix_manifest(tmp_path)
+    final_video_manifest = _write_final_video_manifest(tmp_path, final_video, duration_sec=42.0)
+    _write_package_run_manifest(run_dir)
+    write_json(run_dir / "manifest.json", {"run_id": "run", "status": "success"})
+    write_json(run_dir / "trace.json", {"steps": [{"step_id": "write_finished_package", "status": "success"}]})
+    write_json(
+        run_dir / "finished_package_manifest.json",
+        {
+            "schema_version": "0.1",
+            "status": "succeeded",
+            "package_id": "pkg",
+            "primary_video": {"role": "final_video", "path": str(final_video), "required": True, "exists": True},
+            "assets": [
+                {"role": "final_video", "path": str(final_video), "required": True, "exists": True},
+                {"role": "bgm_video", "path": str(bgm_video), "required": False, "exists": True},
+            ],
+            "evidence": {
+                "real_slice_manifest": str(real_slice),
+                "clip_plan": str(clip_plan),
+                "subtitle_manifest": str(subtitle_manifest),
+                "audio_mix_manifest": str(audio_mix_manifest),
+                "final_video_manifest": str(final_video_manifest),
+            },
+            "errors": [],
+            "warnings": [],
+            "manifest_path": "finished_package_manifest.json",
+        },
+    )
+
+    inspection = inspect_run(run_dir)
+
+    warnings = set(inspection["quality_report"]["warnings"])
+    assert {
+        "product_quality_warning: clip_too_long",
+        "product_quality_warning: final_video_too_long",
+        "product_quality_warning: duplicate_clip_window",
+        "product_quality_warning: candidate_scoring_not_used",
+    } <= warnings
+
+
 def test_finished_package_quality_passes_when_product_evidence_is_aligned(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -195,6 +245,8 @@ def _write_clip_plan_with_highlight_evidence(tmp_path: Path) -> Path:
                     "end_sec": 10.0,
                     "metadata": {
                         "highlight_id": "hl_001",
+                        "candidate_id": "cand_001",
+                        "scorer": "deterministic_viral_scorer_v0",
                         "source_segment_ids": ["seg_002"],
                         "ranking_factors": {"final_score": 0.92},
                     },
@@ -205,8 +257,58 @@ def _write_clip_plan_with_highlight_evidence(tmp_path: Path) -> Path:
                     "end_sec": 24.0,
                     "metadata": {
                         "highlight_id": "hl_002",
+                        "candidate_id": "cand_002",
+                        "scorer": "deterministic_viral_scorer_v0",
                         "source_segment_ids": ["seg_004"],
                         "ranking_factors": {"final_score": 0.88},
+                    },
+                },
+            ]
+        },
+    )
+    return path
+
+
+def _write_long_duplicate_real_slice_manifest(tmp_path: Path) -> Path:
+    path = tmp_path / "real_slice_manifest.json"
+    write_json(
+        path,
+        {
+            "status": "succeeded",
+            "clip_count": 2,
+            "clips": [
+                {"clip_id": "clip_001", "start_sec": 1.0, "end_sec": 21.0, "duration_sec": 20.0},
+                {"clip_id": "clip_002", "start_sec": 1.5, "end_sec": 20.5, "duration_sec": 19.0},
+            ],
+        },
+    )
+    return path
+
+
+def _write_long_duplicate_clip_plan(tmp_path: Path) -> Path:
+    path = tmp_path / "clip_plan.json"
+    write_json(
+        path,
+        {
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_sec": 1.0,
+                    "end_sec": 21.0,
+                    "metadata": {
+                        "highlight_id": "hl_001",
+                        "source_segment_ids": ["seg_001"],
+                        "ranking_factors": {"final_score": 0.92},
+                    },
+                },
+                {
+                    "segment_id": "seg_002",
+                    "start_sec": 1.5,
+                    "end_sec": 20.5,
+                    "metadata": {
+                        "highlight_id": "hl_002",
+                        "source_segment_ids": ["seg_001"],
+                        "ranking_factors": {"final_score": 0.9},
                     },
                 },
             ]
@@ -263,9 +365,9 @@ def _write_verified_audio_mix_manifest(tmp_path: Path) -> Path:
     return path
 
 
-def _write_final_video_manifest(tmp_path: Path, final_video: Path) -> Path:
+def _write_final_video_manifest(tmp_path: Path, final_video: Path, *, duration_sec: float = 10.0) -> Path:
     path = tmp_path / "final_video_manifest.json"
-    write_json(path, {"status": "succeeded", "final_video": str(final_video), "duration_sec": 10.0})
+    write_json(path, {"status": "succeeded", "final_video": str(final_video), "duration_sec": duration_sec})
     return path
 
 

@@ -48,6 +48,52 @@ No API key is required. No remote ASR opt-in is required.
 
 ## Acceptance Runs
 
+### Phase 14.2D Short Highlight Product Path
+
+Latest run directories:
+
+```text
+data/processed/runs/product_acceptance_video_only_phase14_2d
+data/processed/runs/product_acceptance_video_script_phase14_2d
+```
+
+These runs use the Phase 14.2D scoring-first product path:
+
+```text
+local ASR transcript
+  -> candidate_windows.json
+  -> highlight_score_report.json
+  -> highlight_plan.json
+  -> clip_plan.json
+  -> real clips
+  -> final package
+```
+
+Source video only result:
+
+- Clips: 4
+- Clip durations: 4.2s, 4.6s, 5.0s, 5.0s
+- Final video duration: 18.82322s
+- Duplicate source-window rejections: 1
+- `inspect-run`: pass, 8 passed / 0 failed / 0 warnings
+- `review-run`: passed, 36 passed / 0 failed / 0 warnings
+
+Source video plus script result:
+
+- Clips: 4
+- Clip durations: 5.0s, 5.0s, 4.98s, 5.0s
+- Final video duration: 20.00322s
+- Script highlights aligned: 4
+- Script highlights skipped: 0
+- Duplicate source-window rejections: 7
+- `inspect-run`: pass, 8 passed / 0 failed / 0 warnings
+- `review-run`: passed, 37 passed / 0 failed / 0 warnings
+
+Product acceptance judgment: Phase 14.2D fixes the earlier overlong clip/final
+video failure. The current local product outputs are now shaped like short promo
+cuts. Editorial selection quality is still deterministic and text-first; OCR,
+visual, and audio evidence remain future improvements.
+
 ### Source Video Only
 
 Run directory:

@@ -594,3 +594,19 @@
 - Added `candidate_scoring` inspect/review quality checks for OCR transcript presence, candidate count, selected score breakdowns, and candidate IDs in selected highlights.
 - Updated tool catalog, tool contract docs, workflow docs, and README workflow/artifact lists.
 - Boundary kept: no real OCR provider dependency, no frame extraction, no FFmpeg execution, no remote calls, no media slicing, no Web UI.
+
+## 2026-05-19 - Phase 14.2D Short Highlight Product Path
+
+- Switched the ASR-first finished-package workflows from direct highlight detection to the candidate scoring path:
+  - `video_to_finished_package_real_asr.yaml`
+  - `video_script_to_finished_package_real_asr.yaml`
+  - `video_to_finished_package_local_asr.yaml`
+  - `video_script_to_finished_package_local_asr.yaml`
+- Added product defaults for short promo clips in `generate_candidate_windows`: target windows default to about 5 seconds with 4-6 second preferred candidates when explicit candidate settings are not supplied.
+- Added script-alignment evidence propagation into candidate windows, scored highlights, and final clip-plan segment metadata.
+- Added duplicate-source-window rejection so the scorer does not fill the final edit with adjacent fixed splits from the same long ASR/alignment window.
+- Added finished-package product-quality warnings for clips over the hard short-clip limit, final videos over the hard short-form limit, duplicate clip windows, and clip plans that bypass candidate scoring.
+- Real local product acceptance after this change:
+  - video-only: 4 clips, clip durations 4.2s / 4.6s / 5.0s / 5.0s, final duration 18.82322s, `inspect-run` pass with 0 warnings, `review-run` passed with 0 warnings.
+  - video+script: 4 clips, clip durations 5.0s / 5.0s / 4.98s / 5.0s, final duration 20.00322s, 4 aligned / 0 skipped script highlights, `inspect-run` pass with 0 warnings, `review-run` passed with 0 warnings.
+- Product judgment: this fixes the previous 30s/90s overlong-cut failure and makes the current local acceptance suitable for short promo validation. Remaining quality risk is editorial selection depth: scoring is still deterministic and text-first, with OCR/visual/audio fusion planned as later evidence channels.

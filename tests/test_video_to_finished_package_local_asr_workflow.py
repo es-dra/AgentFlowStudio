@@ -61,7 +61,12 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     assert status == "success"
     _assert_product_outputs(output_dir)
     transcript = json.loads((output_dir / "transcript.json").read_text(encoding="utf-8"))
+    highlight_plan = json.loads((output_dir / "highlight_plan.json").read_text(encoding="utf-8"))
+    clip_plan = json.loads((output_dir / "clip_plan.json").read_text(encoding="utf-8"))
     assert transcript["metadata"]["asr_provider"] == "faster_whisper"
+    assert highlight_plan["metadata"]["source"] == "candidate_scoring"
+    assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
+    assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
     inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
     review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"

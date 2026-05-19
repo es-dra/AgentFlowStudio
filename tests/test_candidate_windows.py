@@ -82,6 +82,90 @@ def test_generate_candidate_windows_respects_duration_bounds() -> None:
     assert manifest["candidate_count"] == 2
 
 
+def test_generate_candidate_windows_splits_long_segments_into_short_product_windows() -> None:
+    transcript = Transcript.model_validate(
+        {
+            "transcript_id": "demo_transcript",
+            "duration": 18.0,
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_time": 0.0,
+                    "end_time": 14.0,
+                    "text": "The long aligned segment contains multiple possible promo moments.",
+                    "confidence": 0.9,
+                },
+            ],
+        }
+    )
+
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=2,
+        min_duration_sec=4.0,
+        max_duration_sec=6.0,
+        target_window_sec=5.0,
+    )
+
+    assert manifest["candidate_count"] == 3
+    assert [candidate["duration_sec"] for candidate in manifest["candidates"]] == [5.0, 5.0, 4.0]
+    assert all(candidate["source"] == "transcript_subwindow" for candidate in manifest["candidates"])
+    assert all(candidate["evidence"]["boundary_strategy"] == "fixed_duration_split" for candidate in manifest["candidates"])
+
+
+def test_generate_candidate_windows_attaches_script_alignment_evidence() -> None:
+    transcript = Transcript.model_validate(
+        {
+            "transcript_id": "demo_transcript",
+            "source_video": "input.mp4",
+            "duration": 12.0,
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_time": 0.0,
+                    "end_time": 5.0,
+                    "text": "Opening context.",
+                },
+                {
+                    "segment_id": "seg_002",
+                    "start_time": 6.0,
+                    "end_time": 11.0,
+                    "text": "The real bottleneck is choosing what to cut.",
+                },
+            ],
+        }
+    )
+    alignment = {
+        "alignments": [
+            {
+                "highlight_id": "hl_script_001",
+                "status": "aligned",
+                "confidence": 0.76,
+                "matched_segment_ids": ["seg_002"],
+                "start_time": 6.0,
+                "end_time": 11.0,
+            }
+        ]
+    }
+
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=1,
+        min_duration_sec=4.0,
+        max_duration_sec=6.0,
+        script_highlight_alignment=alignment,
+    )
+
+    aligned = [candidate for candidate in manifest["candidates"] if candidate["segment_ids"] == ["seg_002"]][0]
+    assert aligned["script_alignment"] == {
+        "highlight_id": "hl_script_001",
+        "confidence": 0.76,
+        "matched_segment_ids": ["seg_002"],
+        "overlap_ratio": 1.0,
+    }
+    assert aligned["evidence"]["script_highlight_id"] == "hl_script_001"
+
+
 def test_generate_candidate_windows_rejects_invalid_window_size() -> None:
     transcript = Transcript.model_validate(
         {

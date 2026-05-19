@@ -60,17 +60,24 @@ def score_candidate_windows(
     scored = [_score_candidate(candidate, candidate_manifest) for candidate in candidates if isinstance(candidate, dict)]
     scored.sort(key=lambda item: (-item["selection_score"], item["start_sec"], item["candidate_id"]))
     selected: list[dict[str, Any]] = []
+    selected_source_windows: set[tuple[float, float]] = set()
     for item in scored:
         overlap = max((_overlap_ratio(item, picked) for picked in selected), default=0.0)
+        source_window = _source_window_key(item)
         if len(selected) >= max_selected:
             item["decision"] = "rejected"
             item["rejection_reasons"].append("selection_limit")
         elif overlap > max_overlap_ratio:
             item["decision"] = "rejected"
             item["rejection_reasons"].append("overlap")
+        elif source_window is not None and source_window in selected_source_windows:
+            item["decision"] = "rejected"
+            item["rejection_reasons"].append("duplicate_source_window")
         else:
             item["decision"] = "selected"
             selected.append(item)
+            if source_window is not None:
+                selected_source_windows.add(source_window)
 
     ordered = selected + [item for item in scored if item["decision"] != "selected"]
     report = {
@@ -138,6 +145,7 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
         "selection_score": round(total - _coverage_penalty(duration), 6),
         "score_breakdown": breakdown,
         "reasons": _reasons(breakdown, content_channel),
+        "script_alignment": candidate.get("script_alignment") if isinstance(candidate.get("script_alignment"), dict) else None,
         "source_candidate": candidate,
     }
 
@@ -167,6 +175,7 @@ def _highlight_plan_from_selected(report: dict[str, Any], selected: list[dict[st
                     "content_channel": item["content_channel"],
                     "scorer": SCORER_NAME,
                     "score_breakdown": item["score_breakdown"],
+                    "script_alignment": item.get("script_alignment"),
                     "ranking_factors": {
                         "ranker": SCORER_NAME,
                         "final_score": item["total_score"],
@@ -224,23 +233,29 @@ def _clarity_score(text: str) -> float:
 
 
 def _duration_fit(duration: float) -> float:
-    if 8 <= duration <= 35:
+    if 4 <= duration <= 6:
         return 1.0
-    if 4 <= duration < 8 or 35 < duration <= 60:
+    if 3 <= duration < 4 or 6 < duration <= 8:
         return 0.65
-    return 0.35
+    if 8 < duration <= 12:
+        return 0.25
+    return 0.05
 
 
 def _platform_fit(duration: float) -> float:
-    return 0.9 if 6 <= duration <= 45 else 0.5
+    return 0.9 if 4 <= duration <= 8 else 0.35
 
 
 def _coverage_penalty(duration: float) -> float:
-    if duration <= 6:
+    if 4 <= duration <= 6:
         return 0.0
-    if duration <= 12:
+    if duration < 4:
+        return 0.06
+    if duration <= 8:
         return 0.08
-    return 0.14
+    if duration <= 12:
+        return 0.24
+    return 0.36
 
 
 def _script_alignment_confidence(candidate: dict[str, Any]) -> float:
@@ -282,3 +297,24 @@ def _overlap_ratio(left: dict[str, Any], right: dict[str, Any]) -> float:
     overlap = max(0.0, end - start)
     shortest = max(min(left["duration_sec"], right["duration_sec"]), 0.000001)
     return overlap / shortest
+
+
+def _source_window_key(item: dict[str, Any]) -> tuple[float, float] | None:
+    source_candidate = item.get("source_candidate")
+    if not isinstance(source_candidate, dict):
+        return None
+    evidence = source_candidate.get("evidence")
+    if not isinstance(evidence, dict) or evidence.get("boundary_strategy") != "fixed_duration_split":
+        return None
+    start = _optional_float(evidence.get("source_window_start_sec"))
+    end = _optional_float(evidence.get("source_window_end_sec"))
+    if start is None or end is None or end <= start:
+        return None
+    return (round(start, 3), round(end, 3))
+
+
+def _optional_float(value: Any) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
