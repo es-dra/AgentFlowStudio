@@ -610,7 +610,7 @@ tools:
       executes_external_process: false
 
   - name: generate_candidate_windows
-    description: Generate adjacent transcript-window candidates with optional script and media boundary evidence for later highlight scoring and selection.
+    description: Generate adjacent transcript-window candidates with optional script/media evidence and safe audio boundary cut-point refinement for later highlight scoring and selection.
     category: candidate_generation
     entrypoints:
       cli: null

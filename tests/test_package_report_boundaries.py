@@ -98,6 +98,43 @@ def test_package_report_documents_audio_boundary_evidence(tmp_path: Path) -> Non
     ) in report_text
 
 
+def test_package_report_documents_audio_boundary_refinement(tmp_path: Path) -> None:
+    run_dir = _write_base_package_run(tmp_path, final_duration=4.1)
+    _write_clip_plan(run_dir, start_sec=2.0, end_sec=6.1, candidate_id="cand_001")
+    _write_score_report(
+        run_dir,
+        {
+            "candidate_id": "cand_001",
+            "decision": "selected",
+            "total_score": 0.79,
+            "reasons": ["duration_fit"],
+            "source_candidate": {
+                "evidence": {
+                    "boundary_strategy": "audio_boundary_refined",
+                    "base_boundary_strategy": "elastic_duration_split",
+                    "audio_boundary_refinement": {
+                        "strategy": "audio_boundary_refined",
+                        "original_start_sec": 1.8,
+                        "original_end_sec": 6.3,
+                        "refined_start_sec": 2.0,
+                        "refined_end_sec": 6.1,
+                        "applied": ["start", "end"],
+                        "max_adjustment_sec": 0.4,
+                        "min_confidence": 0.5,
+                    },
+                }
+            },
+        },
+    )
+
+    write_package_report(run_dir)
+
+    report_text = (run_dir / "package_report.md").read_text(encoding="utf-8")
+    assert "- Boundary: audio_boundary_refined" in report_text
+    assert "- Base boundary: elastic_duration_split" in report_text
+    assert "- Audio refinement: 1.80s - 6.30s -> 2.00s - 6.10s (start, end)" in report_text
+
+
 def _write_base_package_run(tmp_path: Path, *, final_duration: float) -> Path:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

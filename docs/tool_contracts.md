@@ -380,7 +380,9 @@ Writes the current timestamped `Transcript` state to `transcript.json`.
 
 Generates adjacent transcript-window candidates for later highlight scoring and
 selection. When script alignment or audio boundary evidence exists in workflow
-state, the candidate manifest records that evidence for downstream review.
+state, the candidate manifest records that evidence for downstream review. A
+nearby high-confidence audio boundary may refine `start_sec` and/or `end_sec`
+when the change is small and the candidate still satisfies duration bounds.
 
 - Category: candidate generation
 - Main entry points: workflow node `generate_candidate_windows`,
@@ -392,9 +394,10 @@ state, the candidate manifest records that evidence for downstream review.
 - Main checks: `candidate_windows_manifest_exists`,
   `candidate_count_positive`, `candidate_timestamps_valid`,
   `candidate_duration_bounds`
-- Boundary: this node only expands transcript segments into candidate windows.
-  It does not score candidates, select final highlights, call an LLM, inspect
-  video frames, slice media, or build a final package.
+- Boundary: this node only expands transcript segments into candidate windows
+  and applies local deterministic boundary refinement. It does not score
+  candidates, select final highlights, call an LLM, inspect video frames,
+  slice media, or build a final package.
 - Content source: the manifest records `content_channel` from transcript
   metadata when present. This keeps the candidate layer reusable for ASR
   transcripts, future OCR subtitle transcripts, or later fused transcripts.

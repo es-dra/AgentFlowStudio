@@ -360,11 +360,21 @@ Phase 14.4C adds the first local media signal:
 - Keep the evidence advisory so mock audio, unsupported audio, or weak boundary
   results do not block ASR, scoring, slicing, or packaging.
 
+Phase 14.4D uses that signal to refine candidate cut points:
+
+- Move candidate `start_sec` and/or `end_sec` to nearby high-confidence audio
+  boundaries when the adjustment is small.
+- Keep the 4-6 second product window constraints intact; a refinement is
+  rejected if it would make the candidate too short, too long, or outside the
+  source transcript window.
+- Preserve both `audio_boundary_refinement` and the original split strategy
+  (`base_boundary_strategy`) so reports can explain what changed.
+- Keep duplicate-source-window rejection active for audio-refined split
+  candidates.
+
 Do:
 
 - Scene boundary detection via FFmpeg.
-- Stronger silence/loudness checks that can refine actual cut points, not only
-  explain nearby boundaries.
 - Optional contact sheets.
 - Optional keyframe OCR evidence.
 
