@@ -70,6 +70,7 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     clip_plan = json.loads((output_dir / "clip_plan.json").read_text(encoding="utf-8"))
     assert transcript["metadata"]["asr_provider"] == "faster_whisper"
     assert highlight_plan["metadata"]["source"] == "candidate_scoring"
+    assert (output_dir / "selection_diagnostics.json").is_file()
     assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
     assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
     inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
@@ -93,6 +94,7 @@ def test_video_script_to_finished_package_local_asr_workflow_runs_product_path(t
     candidates = json.loads((output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
     assert candidates["boundary_signal_source"] == "boundary_signal_manifest.json"
     assert (output_dir / "script_highlight_alignment.json").is_file()
+    assert (output_dir / "selection_diagnostics.json").is_file()
     assert any(candidate["script_alignment"] for candidate in candidates["candidates"])
     inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
     review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)

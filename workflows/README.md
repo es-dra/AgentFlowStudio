@@ -9,8 +9,8 @@ component workflow:
 
 | Workflow | Kind | Use when | Main outputs |
 | --- | --- | --- | --- |
-| `video_to_finished_package_local_asr.yaml` | product / recommended | The user has only a source video. | `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
-| `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_to_finished_package_local_asr.yaml` | product / recommended | The user has only a source video. | `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `selection_diagnostics.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `selection_diagnostics.json`, `finished_package_manifest.json`, `package_report.md` |
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
 
@@ -369,19 +369,20 @@ rather than direct raw-transcript highlights.
 6. `generate_candidate_windows`
 7. `score_candidate_windows`
 8. `write_highlight_score_report`
-9. `write_highlight_plan`
-10. `generate_clip_plan_from_highlights`
-11. `write_clip_plan`
-12. `probe_video_metadata`
-13. `validate_clip_plan`
-14. `real_slice_video`
-15. `generate_assembly_plan`
-16. `concat_clips`
-17. `probe_final_video`
-18. `write_clip_timeline_subtitles`
-19. `mix_bgm`
-20. `probe_bgm_mix`
-21. `write_finished_package`
+9. `write_selection_diagnostics`
+10. `write_highlight_plan`
+11. `generate_clip_plan_from_highlights`
+12. `write_clip_plan`
+13. `probe_video_metadata`
+14. `validate_clip_plan`
+15. `real_slice_video`
+16. `generate_assembly_plan`
+17. `concat_clips`
+18. `probe_final_video`
+19. `write_clip_timeline_subtitles`
+20. `mix_bgm`
+21. `probe_bgm_mix`
+22. `write_finished_package`
 
 Example:
 
@@ -394,8 +395,9 @@ $env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
 ```
 
 This workflow uses ASR transcript text as the highlight signal and writes
-`candidate_windows.json`, `highlight_score_report.json`, `highlight_plan.json`,
-and `clip_plan.json` before slicing. Candidate settings can be overridden with
+`candidate_windows.json`, `highlight_score_report.json`,
+`selection_diagnostics.json`, `highlight_plan.json`, and `clip_plan.json`
+before slicing. Candidate settings can be overridden with
 `candidate_max_window_size`, `candidate_min_duration_sec`,
 `candidate_max_duration_sec`, `candidate_target_window_sec`, and
 `candidate_max_overlap_ratio`; when omitted, the product defaults target about
@@ -521,7 +523,8 @@ Phase 14.2B/C OCR-subtitle timeline and candidate scoring workflow:
 4. `generate_candidate_windows`
 5. `score_candidate_windows`
 6. `write_highlight_score_report`
-7. `write_highlight_plan`
+7. `write_selection_diagnostics`
+8. `write_highlight_plan`
 
 Example:
 
@@ -536,8 +539,8 @@ The committed example expects a local ignored video at
 `data/raw/demo_ocr/source.mp4` and consumes the committed frame-level OCR
 fixture at `examples/demo_ocr/ocr_frames_fixture.json`. The workflow writes
 `ocr_transcript.json`, `ocr_transcript_manifest.json`,
-`candidate_windows.json`, `highlight_score_report.json`, and
-`highlight_plan.json`.
+`candidate_windows.json`, `highlight_score_report.json`,
+`selection_diagnostics.json`, and `highlight_plan.json`.
 
 This is an offline product skeleton for OCR evidence and explainable highlight
 selection. It does not extract frames, run a real OCR engine, call remote

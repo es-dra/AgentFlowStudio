@@ -33,6 +33,7 @@ EXPECTED_TOOLS = {
     "generate_candidate_windows",
     "score_candidate_windows",
     "write_highlight_score_report",
+    "write_selection_diagnostics",
     "write_subtitles",
     "burn_subtitles",
     "probe_subtitle_burn",

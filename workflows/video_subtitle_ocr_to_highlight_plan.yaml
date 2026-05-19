@@ -45,6 +45,12 @@ steps:
       highlight_score_report: highlight_score_report
     outputs:
       highlight_score_report: highlight_score_report.json
+  - id: write_selection_diagnostics
+    type: write_selection_diagnostics
+    inputs:
+      highlight_score_report: highlight_score_report
+    outputs:
+      selection_diagnostics: selection_diagnostics.json
   - id: write_highlight_plan
     type: write_highlight_plan
     inputs:

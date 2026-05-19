@@ -26,6 +26,7 @@ output_artifacts:
   - boundary_signal_manifest.json
   - candidate_windows.json
   - highlight_score_report.json
+  - selection_diagnostics.json
 quality_gates:
   - inspect-run
   - review-run
@@ -45,5 +46,5 @@ when_not_to_use:
 failure_recovery:
   missing_asr_model: Install or configure local faster-whisper model settings.
   low_candidate_count: Try the video-script skill if a script is available.
-  weak_highlight_quality: Review candidate_windows.json and highlight_score_report.json before rerunning.
+  weak_highlight_quality: Review candidate_windows.json, highlight_score_report.json, and selection_diagnostics.json before rerunning.
   weak_boundary_evidence: Treat boundary_signal_manifest.json as advisory and review clip starts/ends manually.

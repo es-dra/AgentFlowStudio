@@ -13,6 +13,7 @@ def build_candidate_scoring_quality_report(root: str | Path) -> dict[str, Any]:
     ocr_manifest = _read_json_object(run_dir / "ocr_transcript_manifest.json")
     candidates = _read_json_object(run_dir / "candidate_windows.json")
     score_report = _read_json_object(run_dir / "highlight_score_report.json")
+    diagnostics = _read_json_object(run_dir / "selection_diagnostics.json")
     highlight_plan = _read_json_object(run_dir / "highlight_plan.json")
 
     checks: list[dict[str, Any]] = []
@@ -24,6 +25,7 @@ def build_candidate_scoring_quality_report(root: str | Path) -> dict[str, Any]:
         "ocr_transcript_manifest.json",
         "candidate_windows.json",
         "highlight_score_report.json",
+        "selection_diagnostics.json",
         "highlight_plan.json",
     ]:
         _add_file_check(run_dir / filename, f"{Path(filename).stem}_exists", checks)
@@ -34,6 +36,8 @@ def build_candidate_scoring_quality_report(root: str | Path) -> dict[str, Any]:
     _add_check(checks, "score_report_succeeded", "pass" if _status(score_report) == "succeeded" else "fail")
     _add_check(checks, "score_report_selected_positive", "pass" if _selected_count(score_report) > 0 else "fail")
     _add_check(checks, "selected_candidates_have_scores", "pass" if _selected_have_scores(score_report) else "fail")
+    _add_check(checks, "selection_diagnostics_succeeded", "pass" if _status(diagnostics) == "succeeded" else "fail")
+    _add_check(checks, "selection_diagnostics_counts_match", "pass" if _diagnostic_counts_match(score_report, diagnostics) else "fail")
     _add_check(checks, "highlight_plan_has_candidate_ids", "pass" if _highlights_have_candidate_ids(highlight_plan) else "fail")
 
     failed = [check for check in checks if check["status"] == "fail"]
@@ -47,6 +51,7 @@ def build_candidate_scoring_quality_report(root: str | Path) -> dict[str, Any]:
             "ocr_segments": _count(ocr_transcript, "segments"),
             "candidate_count": _count(candidates, "candidates"),
             "selected_count": _selected_count(score_report),
+            "selection_warnings": _count(diagnostics, "warnings"),
         },
     }
 
@@ -109,6 +114,15 @@ def _highlights_have_candidate_ids(payload: dict[str, Any] | None) -> bool:
         if not isinstance(metadata, dict) or not metadata.get("candidate_id"):
             return False
     return True
+
+
+def _diagnostic_counts_match(score_report: dict[str, Any] | None, diagnostics: dict[str, Any] | None) -> bool:
+    if not score_report or not diagnostics:
+        return False
+    return (
+        diagnostics.get("candidate_count") == score_report.get("candidate_count")
+        and diagnostics.get("selected_count") == score_report.get("selected_count")
+    )
 
 
 def _review_check(check: dict[str, Any]) -> dict[str, Any]:

@@ -1,5 +1,31 @@
 # DEVLOG
 
+## 2026-05-20 - Phase 14.5 Selection Diagnostics
+
+- Started `feature/phase-14-5-selection-diagnostics` from the merged Phase
+  14.4E `master` after syncing `origin/master` and deleting the merged
+  Phase 14.4E branch locally and remotely.
+- Added `selection_diagnostics.json` generation from the existing
+  `highlight_score_report.json` state. The diagnostic artifact summarizes
+  selected score range, top rejected candidates, near misses, rejection reason
+  counts, source-time distribution, boundary strategy distribution, and warning
+  signals such as clustered selection, duplicate-source-window pressure, weak
+  hook evidence, and near-miss rejected candidates.
+- Added workflow node `write_selection_diagnostics` and inserted it after
+  `write_highlight_score_report` in ASR-first finished-package workflows and
+  the OCR-subtitle candidate scoring workflow.
+- Updated `package_report.md` so finished-package reports include a compact
+  Selection Diagnostics section alongside selected clips and rejected
+  candidates.
+- Extended the candidate scoring harness to require and validate
+  `selection_diagnostics.json` for candidate-scoring runs.
+- Updated workflow docs, workspace/tool contracts, tool catalog, and agent
+  skill output contracts so agents can read diagnostics before deciding whether
+  to rerun, review manually, or tune candidate settings.
+- Boundary kept: diagnostics are read-only over existing scores. This phase
+  does not change scoring weights, selected highlights, clip boundaries, media
+  execution, ASR/OCR providers, or Web UI behavior.
+
 ## 2026-05-19 - Phase 14.2A Candidate Windows
 
 - Started `feature/phase-14-2a-candidate-windows` from the merged local-ASR

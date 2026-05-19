@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from narratocut.package_sop.report_selection import selection_diagnostic_lines
+
 
 PACKAGE_REPORT = "package_report.md"
 NEARBY_AUDIO_BOUNDARY_SEC = 1.0
@@ -17,6 +19,7 @@ def build_package_report(run_dir: str | Path) -> str:
     review = _load_json(root / "review_report.json")
     clip_plan = _load_json(root / "clip_plan.json")
     score_report = _load_json(root / "highlight_score_report.json")
+    diagnostics = _load_json(root / "selection_diagnostics.json")
     final_video = _load_json(root / "final_video_manifest.json")
 
     lines: list[str] = [
@@ -36,6 +39,8 @@ def build_package_report(run_dir: str | Path) -> str:
     lines.extend(_asset_lines(package))
     lines.extend(["", "## Selected Clips"])
     lines.extend(_clip_lines(clip_plan, score_report))
+    lines.extend(["", "## Selection Diagnostics"])
+    lines.extend(selection_diagnostic_lines(diagnostics))
     lines.extend(["", "## Rejected Candidates"])
     lines.extend(_rejected_candidate_lines(score_report))
     lines.extend(["", "## Quality Gates"])

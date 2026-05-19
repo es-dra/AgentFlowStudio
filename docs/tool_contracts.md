@@ -55,6 +55,12 @@ candidate windows carry nearest silence/low-energy boundary evidence. It does
 not add a new model dependency, call remote services, or make audio evidence a
 hard gate.
 
+Phase 14.5 adds a selection diagnostics node. It consumes the existing
+`highlight_score_report.json` state, writes `selection_diagnostics.json`, and
+summarizes near-miss candidates, rejection pressure, score gaps, source-time
+distribution, and boundary strategy distribution. It does not change scoring,
+selection, clip timing, or media execution.
+
 Catalog file:
 
 ```text
@@ -88,6 +94,7 @@ Allowed:
 - Phase 13.5 BGM mix nodes that consume an existing final video and local audio
 - Phase 14.2B/C OCR timeline and candidate scoring nodes that already exist in code
 - Phase 14.4C local audio boundary signal nodes that already exist in code
+- Phase 14.5 selection diagnostics nodes that already exist in code
 
 Not allowed:
 
@@ -452,6 +459,20 @@ Writes the candidate scoring report to `highlight_score_report.json`.
 - Outputs: `highlight_score_report.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
 
+### `write_selection_diagnostics`
+
+Writes `selection_diagnostics.json` from the existing candidate scoring report.
+
+- Category: candidate scoring
+- Main entry point: workflow node `write_selection_diagnostics`
+- Inputs: workflow state `highlight_score_report`
+- Outputs: `selection_diagnostics.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: diagnostics status, near-miss candidates, rejection reason
+  counts, source-time distribution, and boundary strategy distribution
+- Boundary: this node is diagnostic only. It does not change candidate scores,
+  selected highlights, clip boundaries, package contents, or media outputs.
+
 ### `write_subtitles`
 
 Exports the current timestamped `Transcript` state to `subtitles.srt` and
@@ -586,8 +607,8 @@ Writes a human- and agent-readable Markdown report for a finished package run.
 - Main entry points: workflow node `write_package_report`,
   `ncut package-report`, `narratocut.package_sop.write_package_report`
 - Inputs: `finished_package_manifest.json`, `run_manifest.json`, optional
-  `quality_report.json`, `review_report.json`, `clip_plan.json`, and
-  `highlight_score_report.json`
+  `quality_report.json`, `review_report.json`, `clip_plan.json`,
+  `highlight_score_report.json`, and `selection_diagnostics.json`
 - Outputs: `package_report.md`
 - Requires: no FFmpeg, no network, no model provider, no API key
 - Main checks: `package_report_exists`, selected clips documented, quality
