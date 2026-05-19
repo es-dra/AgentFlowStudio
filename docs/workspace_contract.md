@@ -97,6 +97,7 @@ run_dir/
   trace.json
   manifest.json
   transcript.json
+  boundary_signal_manifest.json
   candidate_windows.json
   highlight_score_report.json
   highlight_plan.json
@@ -142,6 +143,9 @@ from the scoring report when it exists:
   generation.
 - `Source window`: the original transcript/alignment window from which the
   selected clip was split or trimmed.
+- `Audio boundary`: nearest low-energy boundary evidence when
+  `boundary_signal_manifest.json` was available and could be attached to the
+  selected candidate.
 
 Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown

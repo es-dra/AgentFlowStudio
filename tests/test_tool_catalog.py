@@ -23,6 +23,7 @@ EXPECTED_TOOLS = {
     "probe_final_video",
     "load_video",
     "extract_audio",
+    "analyze_audio_boundary_signals",
     "transcribe_audio_mock",
     "transcribe_audio_openai_compatible",
     "transcribe_audio_faster_whisper",

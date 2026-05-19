@@ -21,6 +21,15 @@ steps:
       audio_extraction_mode: audio_extraction_mode
     outputs:
       audio_manifest: audio_manifest.json
+  - id: analyze_audio_boundary_signals
+    type: analyze_audio_boundary_signals
+    inputs:
+      audio: audio
+      boundary_window_sec: boundary_window_sec
+      boundary_low_energy_ratio: boundary_low_energy_ratio
+      boundary_peak_energy_ratio: boundary_peak_energy_ratio
+    outputs:
+      boundary_signal_manifest: boundary_signal_manifest.json
   - id: transcribe_audio_openai_compatible
     type: transcribe_audio_openai_compatible
     inputs:
@@ -50,6 +59,7 @@ steps:
       min_duration_sec: candidate_min_duration_sec
       max_duration_sec: candidate_max_duration_sec
       target_window_sec: candidate_target_window_sec
+      boundary_signal_manifest: boundary_signal_manifest
       product_short_defaults: true
     outputs:
       candidate_windows: candidate_windows.json

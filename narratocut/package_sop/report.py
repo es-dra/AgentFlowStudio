@@ -92,6 +92,7 @@ def _clip_lines(clip_plan: dict[str, Any] | None, score_report: dict[str, Any] |
                 f"- Boundary: {_boundary_strategy(scored)}",
                 f"- Target duration: {_target_duration(scored)}",
                 f"- Source window: {_source_window(scored, start, end)}",
+                f"- Audio boundary: {_audio_boundary(scored)}",
                 f"- Text: {segment.get('text') or '(empty)'}",
                 "",
             ]
@@ -238,6 +239,32 @@ def _source_window(candidate: dict[str, Any] | None, fallback_start: float | Non
     if _source_candidate(candidate) is not None:
         return _time_range(fallback_start, fallback_end)
     return "unknown"
+
+
+def _audio_boundary(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    audio_boundary = evidence.get("audio_boundary") if evidence else None
+    if not isinstance(audio_boundary, dict):
+        return "not available"
+    parts: list[str] = []
+    for key in ("start", "end"):
+        value = audio_boundary.get(key)
+        if isinstance(value, dict):
+            parts.append(f"{key} {_audio_boundary_point(value)}")
+    return "; ".join(parts) if parts else "not available"
+
+
+def _audio_boundary_point(point: dict[str, Any]) -> str:
+    time_sec = _float(point.get("time_sec"))
+    kind = str(point.get("kind") or "boundary")
+    confidence = _float(point.get("confidence"))
+    distance = _float(point.get("distance_sec"))
+    return (
+        f"{_seconds(time_sec)} {kind} "
+        f"({_seconds(distance)} away, conf {confidence:.2f})"
+        if confidence is not None
+        else f"{_seconds(time_sec)} {kind} ({_seconds(distance)} away)"
+    )
 
 
 def _source_evidence(candidate: dict[str, Any] | None) -> dict[str, Any] | None:

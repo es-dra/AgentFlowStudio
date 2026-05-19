@@ -49,6 +49,12 @@ candidate windows, scores them with explainable local heuristics, and writes
 not add a real OCR provider dependency, call a remote model, run FFmpeg, slice
 media, or provide a Web UI.
 
+Phase 14.4C adds a local audio boundary signal node. It consumes the already
+extracted WAV artifact, writes `boundary_signal_manifest.json`, and lets
+candidate windows carry nearest silence/low-energy boundary evidence. It does
+not add a new model dependency, call remote services, or make audio evidence a
+hard gate.
+
 Catalog file:
 
 ```text
@@ -81,6 +87,7 @@ Allowed:
 - Phase 13.4 cover export nodes that consume an existing final video
 - Phase 13.5 BGM mix nodes that consume an existing final video and local audio
 - Phase 14.2B/C OCR timeline and candidate scoring nodes that already exist in code
+- Phase 14.4C local audio boundary signal nodes that already exist in code
 
 Not allowed:
 
@@ -302,6 +309,20 @@ Extracts or mocks a local audio artifact from a video for ASR.
 - Main checks: `audio_manifest_exists`, `audio_artifact_exists`,
   `audio_manifest_status`
 
+### `analyze_audio_boundary_signals`
+
+Analyzes the extracted local WAV file for low-energy boundary points and energy
+peaks, then writes `boundary_signal_manifest.json`.
+
+- Category: media boundary signal
+- Main entry points: workflow node `analyze_audio_boundary_signals`,
+  `narratocut.audio_sop.analyze_audio_boundary_signals`
+- Inputs: `audio/audio.wav` or workflow state `audio`
+- Outputs: `boundary_signal_manifest.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `boundary_signal_manifest_exists`,
+  `boundary_signal_status_recorded`, boundary points optional
+
 ### `transcribe_audio_mock`
 
 Converts an audio artifact into a timestamped `Transcript` using a local
@@ -358,12 +379,14 @@ Writes the current timestamped `Transcript` state to `transcript.json`.
 ### `generate_candidate_windows`
 
 Generates adjacent transcript-window candidates for later highlight scoring and
-selection.
+selection. When script alignment or audio boundary evidence exists in workflow
+state, the candidate manifest records that evidence for downstream review.
 
 - Category: candidate generation
 - Main entry points: workflow node `generate_candidate_windows`,
   `narratocut.candidate_sop.generate_candidate_windows`
-- Inputs: `transcript.json` or workflow state `transcript`
+- Inputs: `transcript.json` or workflow state `transcript`, optional
+  `boundary_signal_manifest`
 - Outputs: `candidate_windows.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
 - Main checks: `candidate_windows_manifest_exists`,

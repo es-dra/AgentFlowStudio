@@ -3,7 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from narratocut.asr_sop import FasterWhisperASRProvider, MockASRProvider, OpenAICompatibleASRProvider
-from narratocut.audio_sop import AUDIO_MANIFEST, AudioArtifact, AudioExtractionConfig, extract_audio_from_video
+from narratocut.audio_sop import (
+    AUDIO_MANIFEST,
+    BOUNDARY_SIGNAL_MANIFEST,
+    AudioArtifact,
+    AudioBoundarySignalConfig,
+    AudioExtractionConfig,
+    analyze_audio_boundary_signals,
+    extract_audio_from_video,
+)
 from narratocut.schemas import Transcript
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
@@ -32,6 +40,22 @@ def extract_audio_node(step: WorkflowStepDefinition, context: WorkflowContext) -
     if artifact.status == "failed":
         raise ValueError(artifact.error or "audio_extraction_failed")
     return [context.artifacts["audio_manifest"], artifact.audio_path]
+
+
+def analyze_audio_boundary_signals_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    audio_path = Path(str(_required_artifact_or_input(step, context, "audio")))
+    manifest_ref = _output_ref(step, "boundary_signal_manifest", BOUNDARY_SIGNAL_MANIFEST)
+    config = AudioBoundarySignalConfig(
+        window_sec=_float_parameter_or_default(step, context, "boundary_window_sec", 0.5),
+        low_energy_ratio=_float_parameter_or_default(step, context, "boundary_low_energy_ratio", 0.18),
+        peak_energy_ratio=_float_parameter_or_default(step, context, "boundary_peak_energy_ratio", 0.75),
+    )
+    manifest = analyze_audio_boundary_signals(audio_path, context.output_dir, config=config)
+    if manifest_ref != BOUNDARY_SIGNAL_MANIFEST:
+        write_json(context.output_path(manifest_ref), manifest)
+    context.state["boundary_signal_manifest"] = manifest
+    context.artifacts["boundary_signal_manifest"] = manifest_ref
+    return [manifest_ref]
 
 
 def transcribe_audio_mock_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -129,9 +153,9 @@ def _optional_resolved_input(
     if name not in step.inputs:
         return None
     value = step.inputs[name]
-    if value == name and name not in context.inputs and name not in context.state:
+    if value == name and name not in context.inputs and name not in context.state and name not in context.artifacts:
         return None
-    if isinstance(value, str) and value not in context.inputs and value not in context.state:
+    if isinstance(value, str) and value not in context.inputs and value not in context.state and value not in context.artifacts:
         return value
     return context.resolve_input(str(value))
 
@@ -147,6 +171,17 @@ def _required_resolved_input(
     return value
 
 
+def _required_artifact_or_input(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> object:
+    value = _required_resolved_input(step, context, name)
+    if isinstance(value, str) and value in context.artifacts:
+        return context.resolve_input(value)
+    return value
+
+
 def _optional_parameter_input(
     step: WorkflowStepDefinition,
     context: WorkflowContext,
@@ -158,6 +193,30 @@ def _optional_parameter_input(
     if isinstance(value, str) and value not in context.inputs and value not in context.state and value not in context.artifacts:
         return None
     return context.resolve_input(str(value))
+
+
+def _optional_float_parameter(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> float | None:
+    value = _optional_parameter_input(step, context, name)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
+
+
+def _float_parameter_or_default(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+    default: float,
+) -> float:
+    value = _optional_float_parameter(step, context, name)
+    return default if value is None else value
 
 
 def _state_video_path(context: WorkflowContext) -> Path:

@@ -18,12 +18,13 @@ contracts obvious without reading every historical phase note.
 - `workflows/video_to_finished_package_local_asr.yaml`
   - Use when the user has only a source video.
   - Local-first; no remote ASR by default.
-  - Writes `finished_package_manifest.json` and `package_report.md`.
+  - Writes `boundary_signal_manifest.json`, `finished_package_manifest.json`,
+    and `package_report.md`.
 - `workflows/video_script_to_finished_package_local_asr.yaml`
   - Use when the user has a source video plus script.
   - Aligns script highlights to ASR transcript timestamps.
-  - Writes `script_highlight_alignment.json`, `finished_package_manifest.json`,
-    and `package_report.md`.
+  - Writes `script_highlight_alignment.json`, `boundary_signal_manifest.json`,
+    `finished_package_manifest.json`, and `package_report.md`.
 
 For final acceptance, run `inspect-run` and `review-run`, then refresh
 `package_report.md` with `ncut package-report --run-dir <run_dir>` so the

@@ -57,6 +57,47 @@ def test_package_report_documents_native_clip_boundary_when_no_split_evidence(tm
     assert "- Source window: 3.00s - 7.80s" in report_text
 
 
+def test_package_report_documents_audio_boundary_evidence(tmp_path: Path) -> None:
+    run_dir = _write_base_package_run(tmp_path, final_duration=4.8)
+    _write_clip_plan(run_dir, start_sec=2.2, end_sec=5.9, candidate_id="cand_001")
+    _write_score_report(
+        run_dir,
+        {
+            "candidate_id": "cand_001",
+            "decision": "selected",
+            "total_score": 0.77,
+            "reasons": ["duration_fit"],
+            "source_candidate": {
+                "evidence": {
+                    "audio_boundary": {
+                        "source": "boundary_signal_manifest.json",
+                        "start": {
+                            "time_sec": 2.0,
+                            "kind": "silence_end",
+                            "confidence": 0.93,
+                            "distance_sec": 0.2,
+                        },
+                        "end": {
+                            "time_sec": 6.0,
+                            "kind": "silence_start",
+                            "confidence": 0.88,
+                            "distance_sec": 0.1,
+                        },
+                    }
+                }
+            },
+        },
+    )
+
+    write_package_report(run_dir)
+
+    report_text = (run_dir / "package_report.md").read_text(encoding="utf-8")
+    assert (
+        "- Audio boundary: start 2.00s silence_end (0.20s away, conf 0.93); "
+        "end 6.00s silence_start (0.10s away, conf 0.88)"
+    ) in report_text
+
+
 def _write_base_package_run(tmp_path: Path, *, final_duration: float) -> Path:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

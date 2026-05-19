@@ -338,7 +338,7 @@ Goal:
 Use local non-LLM media signals to improve clip boundaries.
 ```
 
-Phase 14.4A starts with transcript-only boundary hardening before adding new
+Phase 14.4A started with transcript-only boundary hardening before adding new
 media detectors:
 
 - Replace fixed five-second splits for long transcript windows with elastic
@@ -351,10 +351,20 @@ media detectors:
   evidence so `package_report.md` can explain why the selected clip starts and
   ends where it does.
 
+Phase 14.4C adds the first local media signal:
+
+- Analyze the extracted WAV artifact for low-energy windows and energy peaks.
+- Write `boundary_signal_manifest.json`.
+- Attach nearest audio boundary evidence to candidate windows when analysis
+  succeeds.
+- Keep the evidence advisory so mock audio, unsupported audio, or weak boundary
+  results do not block ASR, scoring, slicing, or packaging.
+
 Do:
 
 - Scene boundary detection via FFmpeg.
-- Silence/loudness checks.
+- Stronger silence/loudness checks that can refine actual cut points, not only
+  explain nearby boundaries.
 - Optional contact sheets.
 - Optional keyframe OCR evidence.
 

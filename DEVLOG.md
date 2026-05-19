@@ -645,3 +645,12 @@
 - Refined `package_report.md` boundary display so native short transcript windows are labeled `native_transcript_window` instead of `unknown`.
 - Added `docs/product_acceptance_phase14_4b_elastic_boundaries.md` as the acceptance record.
 - Boundary kept: this is an execution and boundary-evidence acceptance pass, not a claim that deterministic viral selection is editorially mature.
+
+## 2026-05-20 - Phase 14.4C Local Audio Boundary Signals
+
+- Added `boundary_signal_manifest.json` generation from the already extracted local WAV artifact.
+- Added workflow node `analyze_audio_boundary_signals` and inserted it into ASR-first finished-package workflows before transcription/scoring.
+- Candidate windows now attach nearest low-energy audio boundary evidence when a successful boundary signal manifest is available.
+- `package_report.md` now displays selected-clip audio boundary evidence alongside transcript boundary strategy and source-window evidence.
+- Updated workflow docs, workspace contract, tool catalog/contracts, and agent skill outputs so agents can treat audio boundary evidence as a first-class advisory artifact.
+- Boundary kept: audio signals are advisory and local-only. They do not replace transcript/scoring logic, do not call remote models, do not add visual/multimodal analysis, and do not fail the product workflow when mock audio or unsupported audio cannot be analyzed.

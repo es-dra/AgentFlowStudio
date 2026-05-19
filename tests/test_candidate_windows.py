@@ -237,6 +237,46 @@ def test_generate_candidate_windows_attaches_script_alignment_evidence() -> None
     assert aligned["evidence"]["script_highlight_id"] == "hl_script_001"
 
 
+def test_generate_candidate_windows_attaches_nearest_audio_boundary_evidence() -> None:
+    transcript = Transcript.model_validate(
+        {
+            "transcript_id": "demo_transcript",
+            "duration": 12.0,
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_time": 1.8,
+                    "end_time": 6.0,
+                    "text": "The hook starts near a silence boundary.",
+                },
+            ],
+        }
+    )
+    boundary_manifest = {
+        "status": "succeeded",
+        "manifest_path": "boundary_signal_manifest.json",
+        "boundary_points": [
+            {"time_sec": 2.0, "kind": "silence_end", "confidence": 0.93},
+            {"time_sec": 5.7, "kind": "silence_start", "confidence": 0.88},
+        ],
+    }
+
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=1,
+        min_duration_sec=4.0,
+        max_duration_sec=6.0,
+        boundary_signal_manifest=boundary_manifest,
+    )
+
+    evidence = manifest["candidates"][0]["evidence"]
+    assert evidence["audio_boundary"] == {
+        "source": "boundary_signal_manifest.json",
+        "start": {"time_sec": 2.0, "kind": "silence_end", "confidence": 0.93, "distance_sec": 0.2},
+        "end": {"time_sec": 5.7, "kind": "silence_start", "confidence": 0.88, "distance_sec": 0.3},
+    }
+
+
 def test_generate_candidate_windows_rejects_invalid_window_size() -> None:
     transcript = Transcript.model_validate(
         {
