@@ -3,7 +3,7 @@ from __future__ import annotations
 from narratocut.candidate_sop import build_selection_diagnostics
 
 
-def test_selection_diagnostics_flags_near_miss_and_rejection_pressure() -> None:
+def test_selection_diagnostics_flags_actionable_near_miss() -> None:
     score_report = {
         "schema_version": "0.1",
         "status": "succeeded",
@@ -15,7 +15,7 @@ def test_selection_diagnostics_flags_near_miss_and_rejection_pressure() -> None:
             _candidate("cand_002", "selected", 0.40, 0.40, 20.0, 25.0, ["duration_fit"], []),
             _candidate("cand_003", "rejected", 0.42, 0.42, 40.0, 45.0, ["strong_hook"], ["selection_limit"]),
             _candidate("cand_004", "rejected", 0.39, 0.39, 20.5, 25.5, [], ["overlap"]),
-            _candidate("cand_005", "rejected", 0.18, 0.18, 21.0, 26.0, [], ["duplicate_source_window"]),
+            _candidate("cand_005", "rejected", 0.37, 0.37, 21.0, 26.0, [], ["duplicate_source_window"]),
         ],
     }
 
@@ -31,9 +31,38 @@ def test_selection_diagnostics_flags_near_miss_and_rejection_pressure() -> None:
     }
     assert diagnostics["selected_score_range"] == {"min": 0.4, "max": 0.44}
     assert diagnostics["score_gaps"]["best_rejected_gap_to_selected_floor"] == -0.02
-    assert [item["candidate_id"] for item in diagnostics["near_misses"]] == ["cand_003", "cand_004"]
+    assert [item["candidate_id"] for item in diagnostics["near_misses"]] == ["cand_003", "cand_004", "cand_005"]
     assert "near_miss_rejected" in _warning_codes(diagnostics)
-    assert "duplicate_source_window_pressure" in _warning_codes(diagnostics)
+    assert "duplicate_source_window_pressure" not in _warning_codes(diagnostics)
+
+
+def test_selection_diagnostics_does_not_warn_for_expected_pruning_near_misses() -> None:
+    score_report = {
+        "schema_version": "0.1",
+        "status": "succeeded",
+        "candidate_count": 4,
+        "selected_count": 2,
+        "candidates": [
+            _candidate("cand_001", "selected", 0.62, 0.62, 0.0, 5.0, ["strong_hook"], []),
+            _candidate("cand_002", "selected", 0.58, 0.58, 20.0, 25.0, ["strong_hook"], []),
+            _candidate("cand_003", "rejected", 0.59, 0.59, 1.0, 6.0, ["strong_hook"], ["overlap"]),
+            _candidate(
+                "cand_004",
+                "rejected",
+                0.57,
+                0.57,
+                25.0,
+                30.0,
+                ["strong_hook"],
+                ["duplicate_source_window"],
+            ),
+        ],
+    }
+
+    diagnostics = build_selection_diagnostics(score_report)
+
+    assert [item["candidate_id"] for item in diagnostics["near_misses"]] == ["cand_003", "cand_004"]
+    assert "near_miss_rejected" not in _warning_codes(diagnostics)
 
 
 def test_selection_diagnostics_summarizes_boundary_and_position_distribution() -> None:
@@ -60,6 +89,30 @@ def test_selection_diagnostics_summarizes_boundary_and_position_distribution() -
     assert diagnostics["selected_position_counts"] == {"early": 3}
     assert "selection_clustered" in _warning_codes(diagnostics)
     assert "few_strong_hooks" in _warning_codes(diagnostics)
+
+
+def test_selection_diagnostics_ignores_low_score_selection_limit_tail() -> None:
+    score_report = {
+        "schema_version": "0.1",
+        "status": "succeeded",
+        "candidate_count": 7,
+        "selected_count": 2,
+        "candidates": [
+            _candidate("cand_001", "selected", 0.62, 0.62, 0.0, 5.0, ["strong_hook"], []),
+            _candidate("cand_002", "selected", 0.58, 0.58, 20.0, 25.0, ["strong_hook"], []),
+            _candidate("cand_003", "rejected", 0.25, 0.25, 40.0, 45.0, [], ["selection_limit"]),
+            _candidate("cand_004", "rejected", 0.24, 0.24, 45.0, 50.0, [], ["selection_limit"]),
+            _candidate("cand_005", "rejected", 0.23, 0.23, 50.0, 55.0, [], ["selection_limit"]),
+            _candidate("cand_006", "rejected", 0.22, 0.22, 55.0, 60.0, [], ["selection_limit"]),
+            _candidate("cand_007", "rejected", 0.21, 0.21, 60.0, 65.0, [], ["selection_limit"]),
+        ],
+    }
+
+    diagnostics = build_selection_diagnostics(score_report)
+
+    assert diagnostics["near_misses"] == []
+    assert "near_miss_rejected" not in _warning_codes(diagnostics)
+    assert "too_many_selection_limit_rejections" not in _warning_codes(diagnostics)
 
 
 def _candidate(

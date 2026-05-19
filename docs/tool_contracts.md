@@ -61,6 +61,12 @@ summarizes near-miss candidates, rejection pressure, score gaps, source-time
 distribution, and boundary strategy distribution. It does not change scoring,
 selection, clip timing, or media execution.
 
+Phase 14.6 adds a delivery readiness report. It consumes existing product run
+artifacts after `inspect-run`, `review-run`, and `package-report`, then writes
+`delivery_readiness.json` and `delivery_readiness.md`. It does not rerun media
+workflows, change scoring, validate editorial taste, call remote services, or
+replace human review.
+
 Catalog file:
 
 ```text
@@ -95,6 +101,7 @@ Allowed:
 - Phase 14.2B/C OCR timeline and candidate scoring nodes that already exist in code
 - Phase 14.4C local audio boundary signal nodes that already exist in code
 - Phase 14.5 selection diagnostics nodes that already exist in code
+- Phase 14.6 delivery readiness reporting that already exists in code
 
 Not allowed:
 
@@ -618,6 +625,29 @@ Writes a human- and agent-readable Markdown report for a finished package run.
 - Boundary: this report summarizes existing run artifacts only. Run
   `inspect-run` and `review-run` first, then refresh with `package-report` when
   the report must include final quality and review status.
+
+### `delivery_readiness`
+
+Summarizes one or more formal product runs into a delivery readiness report.
+
+- Category: delivery readiness
+- Main entry points: `ncut delivery-readiness`,
+  `narratocut.package_sop.write_delivery_readiness`
+- Inputs: one or more run directories after `inspect-run`, `review-run`, and
+  `package-report`; expected run artifacts include
+  `finished_package_manifest.json`, `quality_report.json`,
+  `review_report.json`, `package_report.md`, `highlight_score_report.json`,
+  and `selection_diagnostics.json`
+- Outputs: `delivery_readiness.json`, `delivery_readiness.md`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: required product artifacts exist, package status succeeded,
+  quality gate passed, review gate passed, selected candidates exist, selection
+  diagnostics warnings are surfaced
+- Agent usage: safe for automatic execution, does not execute external
+  processes
+- Boundary: this is a delivery gate over existing reports. It does not rerun
+  ASR/OCR/slicing/assembly, does not decide editorial quality by itself, and
+  does not replace human review of the final video.
 
 ### `inspect_run`
 

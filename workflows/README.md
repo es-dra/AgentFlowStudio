@@ -34,6 +34,20 @@ After a formal product run, use:
 The workflow writes an initial `package_report.md`; the final command refreshes
 it with the latest quality and review status.
 
+For a formal delivery checkpoint that compares multiple accepted product runs,
+for example video-only plus video+script, write a separate readiness summary:
+
+```powershell
+.venv\Scripts\ncut delivery-readiness `
+  --run-dir <video_only_run_dir> `
+  --run-dir <video_script_run_dir> `
+  --output <delivery_report_dir>
+```
+
+This command writes `delivery_readiness.json` and `delivery_readiness.md`. It is
+a report gate over existing artifacts; it does not rerun the workflow or replace
+manual review of the final videos.
+
 Product video workflows also write `boundary_signal_manifest.json` from the
 extracted audio. This local evidence is advisory: it helps selected clips report
 nearby low-energy boundaries, but it does not block ASR, scoring, slicing, or

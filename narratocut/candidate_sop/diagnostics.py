@@ -8,6 +8,7 @@ SELECTION_DIAGNOSTICS = "selection_diagnostics.json"
 DIAGNOSTICS_SOURCE = "phase14_5_selection_diagnostics"
 NEAR_MISS_SCORE_MARGIN = 0.05
 LOW_SELECTED_SCORE = 0.25
+EXPECTED_PRUNING_REASONS = {"overlap", "duplicate_source_window"}
 
 
 def build_selection_diagnostics(score_report: dict[str, Any]) -> dict[str, Any]:
@@ -19,13 +20,14 @@ def build_selection_diagnostics(score_report: dict[str, Any]) -> dict[str, Any]:
     selected_floor = min(selected_scores) if selected_scores else None
     best_rejected = _best_rejected_score(rejected)
     near_misses = _near_misses(rejected, selected_floor)
+    actionable_near_misses = _actionable_near_misses(near_misses)
     rejection_reason_counts = _rejection_reason_counts(rejected)
     selected_position_counts = _position_counts(selected, candidates)
     warnings = _warnings(
         selected=selected,
         selected_scores=selected_scores,
         selected_position_counts=selected_position_counts,
-        near_misses=near_misses,
+        near_misses=actionable_near_misses,
         rejection_reason_counts=rejection_reason_counts,
     )
 
@@ -68,6 +70,15 @@ def _near_misses(rejected: list[dict[str, Any]], selected_floor: float | None) -
     return [_candidate_summary(item) for item in sorted(near, key=_sort_key)[:5]]
 
 
+def _actionable_near_misses(near_misses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [item for item in near_misses if not _is_expected_pruning(item)]
+
+
+def _is_expected_pruning(candidate: dict[str, Any]) -> bool:
+    reasons = set(_list_text(candidate.get("rejection_reasons")))
+    return bool(reasons) and reasons <= EXPECTED_PRUNING_REASONS
+
+
 def _warnings(
     *,
     selected: list[dict[str, Any]],
@@ -93,20 +104,18 @@ def _warnings(
                 "details": {"near_miss_count": len(near_misses)},
             }
         )
-    if rejection_reason_counts.get("selection_limit", 0) > max(len(selected), 1):
+    selection_limit_near_misses = [
+        item for item in near_misses if "selection_limit" in _list_text(item.get("rejection_reasons"))
+    ]
+    if selection_limit_near_misses and rejection_reason_counts.get("selection_limit", 0) > max(len(selected), 1):
         warnings.append(
             {
                 "code": "too_many_selection_limit_rejections",
                 "message": "Many candidates were rejected only because the selection limit was reached.",
-                "details": {"selection_limit_rejections": rejection_reason_counts["selection_limit"]},
-            }
-        )
-    if rejection_reason_counts.get("duplicate_source_window", 0) > 0:
-        warnings.append(
-            {
-                "code": "duplicate_source_window_pressure",
-                "message": "Duplicate source windows are competing for the final selection.",
-                "details": {"duplicate_source_window_rejections": rejection_reason_counts["duplicate_source_window"]},
+                "details": {
+                    "selection_limit_rejections": rejection_reason_counts["selection_limit"],
+                    "near_miss_selection_limit_rejections": len(selection_limit_near_misses),
+                },
             }
         )
     if selected and selected_position_counts and max(selected_position_counts.values()) == len(selected):

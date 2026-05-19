@@ -26,6 +26,8 @@ Formal product outputs:
 - `package_report.md`
 - `quality_report.json`
 - `review_report.json`
+- `delivery_readiness.json`
+- `delivery_readiness.md`
 
 ## Directory Semantics
 
@@ -171,6 +173,21 @@ Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown
 summary with `ncut package-report --run-dir <run_dir>` so the report captures
 the final quality and review status.
+
+When comparing the video-only and video+script product paths for a release or
+handoff, write a delivery summary after both runs are refreshed:
+
+```powershell
+.venv\Scripts\ncut delivery-readiness `
+  --run-dir data/processed/runs/acceptance/<video_only_run> `
+  --run-dir data/processed/runs/acceptance/<video_script_run> `
+  --output data/reports/acceptance/<acceptance_id>
+```
+
+`delivery_readiness.json` is the machine-readable release gate. The Markdown
+file is the human handoff summary. This gate summarizes existing artifacts only;
+it does not rerun media workflows or claim that selection quality is
+editorially final.
 
 ## Cleanup Rules
 

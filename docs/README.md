@@ -13,6 +13,7 @@ contracts obvious without reading every historical phase note.
 - [Phase 14 local ASR product acceptance](product_acceptance_phase14_local_asr.md)
 - [Phase 14.4B elastic boundary acceptance](product_acceptance_phase14_4b_elastic_boundaries.md)
 - [Phase 14.4E audio boundary refinement acceptance](product_acceptance_phase14_4e_audio_boundary_refinement.md)
+- [Phase 14.6 delivery readiness acceptance](product_acceptance_phase14_6_delivery_readiness.md)
 
 ## Recommended Product Workflows
 
@@ -31,6 +32,15 @@ contracts obvious without reading every historical phase note.
 For final acceptance, run `inspect-run` and `review-run`, then refresh
 `package_report.md` with `ncut package-report --run-dir <run_dir>` so the
 Markdown report includes the final quality and review status.
+
+For release or handoff readiness across the current video-only and video+script
+paths, summarize refreshed product runs with:
+
+```powershell
+.venv\Scripts\ncut delivery-readiness --run-dir <video_only_run> --run-dir <video_script_run> --output <report_dir>
+```
+
+This writes `delivery_readiness.json` and `delivery_readiness.md`.
 
 Agent-facing task contracts live in [`../skills`](../skills/README.md).
 

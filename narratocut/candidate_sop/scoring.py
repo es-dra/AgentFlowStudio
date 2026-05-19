@@ -3,44 +3,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from narratocut.candidate_sop.signals import (
+    CONFLICT_TERMS,
+    HOOK_TERMS,
+    PAYOFF_TERMS,
+    keyword_score,
+    specificity_score,
+)
 from narratocut.schemas import HighlightPlan
 
 
 HIGHLIGHT_SCORE_REPORT = "highlight_score_report.json"
 SCORER_NAME = "deterministic_viral_scorer_v0"
-
-HOOK_TERMS = (
-    "90%",
-    "do not",
-    "mistake",
-    "wrong",
-    "truth",
-    "key",
-    "secret",
-    "must know",
-    "why",
-    "how",
-)
-CONFLICT_TERMS = (
-    "not",
-    "but",
-    "however",
-    "instead",
-    "problem",
-    "conflict",
-    "failure",
-    "reversal",
-)
-PAYOFF_TERMS = (
-    "therefore",
-    "solution",
-    "method",
-    "answer",
-    "conclusion",
-    "recommend",
-    "choose",
-    "finally",
-)
 
 
 def score_candidate_windows(
@@ -64,15 +38,15 @@ def score_candidate_windows(
     for item in scored:
         overlap = max((_overlap_ratio(item, picked) for picked in selected), default=0.0)
         source_window = _source_window_key(item)
-        if len(selected) >= max_selected:
-            item["decision"] = "rejected"
-            item["rejection_reasons"].append("selection_limit")
-        elif overlap > max_overlap_ratio:
+        if overlap > max_overlap_ratio:
             item["decision"] = "rejected"
             item["rejection_reasons"].append("overlap")
         elif source_window is not None and source_window in selected_source_windows:
             item["decision"] = "rejected"
             item["rejection_reasons"].append("duplicate_source_window")
+        elif len(selected) >= max_selected:
+            item["decision"] = "rejected"
+            item["rejection_reasons"].append("selection_limit")
         else:
             item["decision"] = "selected"
             selected.append(item)
@@ -107,30 +81,33 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
     duration = float(candidate.get("duration_sec") or 0.0)
     transcript_confidence = _transcript_confidence(candidate.get("asr_confidence"))
     breakdown = {
-        "hook_strength": _keyword_score(text, HOOK_TERMS),
-        "conflict_intensity": _keyword_score(text, CONFLICT_TERMS),
+        "hook_strength": keyword_score(text, HOOK_TERMS),
+        "conflict_intensity": keyword_score(text, CONFLICT_TERMS),
         "clarity_without_context": _clarity_score(text),
-        "payoff_or_reversal": _keyword_score(text, PAYOFF_TERMS),
+        "payoff_or_reversal": keyword_score(text, PAYOFF_TERMS),
         "duration_fit": _duration_fit(duration),
         "transcript_confidence": transcript_confidence,
-        "on_screen_hook_strength": _keyword_score(text, HOOK_TERMS) if content_channel == "ocr_subtitle" else 0.0,
+        "on_screen_hook_strength": keyword_score(text, HOOK_TERMS) if content_channel == "ocr_subtitle" else 0.0,
         "asr_ocr_consistency": 0.5,
         "script_alignment_confidence": _script_alignment_confidence(candidate),
         "platform_fit": _platform_fit(duration),
+        "specificity_or_novelty": specificity_score(text),
     }
     total = round(
-        0.16 * breakdown["hook_strength"]
-        + 0.14 * breakdown["conflict_intensity"]
-        + 0.13 * breakdown["clarity_without_context"]
-        + 0.13 * breakdown["payoff_or_reversal"]
+        0.18 * breakdown["hook_strength"]
+        + 0.15 * breakdown["conflict_intensity"]
+        + 0.10 * breakdown["clarity_without_context"]
+        + 0.14 * breakdown["payoff_or_reversal"]
         + 0.10 * breakdown["duration_fit"]
-        + 0.08 * breakdown["transcript_confidence"]
+        + 0.07 * breakdown["transcript_confidence"]
         + 0.12 * breakdown["on_screen_hook_strength"]
-        + 0.04 * breakdown["asr_ocr_consistency"]
+        + 0.03 * breakdown["asr_ocr_consistency"]
         + 0.05 * breakdown["script_alignment_confidence"]
-        + 0.05 * breakdown["platform_fit"],
+        + 0.04 * breakdown["platform_fit"]
+        + 0.02 * breakdown["specificity_or_novelty"],
         6,
     )
+    source_position_penalty = _source_window_position_penalty(candidate)
     return {
         "candidate_id": str(candidate.get("candidate_id") or ""),
         "decision": "pending",
@@ -142,7 +119,7 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
         "text": text,
         "content_channel": content_channel,
         "total_score": total,
-        "selection_score": round(total - _coverage_penalty(duration), 6),
+        "selection_score": round(total - _coverage_penalty(duration) - source_position_penalty, 6),
         "score_breakdown": breakdown,
         "reasons": _reasons(breakdown, content_channel),
         "script_alignment": candidate.get("script_alignment") if isinstance(candidate.get("script_alignment"), dict) else None,
@@ -154,7 +131,8 @@ def _highlight_plan_from_selected(report: dict[str, Any], selected: list[dict[st
     if not selected:
         raise ValueError("no_candidate_selected")
     highlights = []
-    for index, item in enumerate(selected, start=1):
+    timeline_selected = sorted(selected, key=lambda item: (item["start_sec"], item["end_sec"], item["candidate_id"]))
+    for index, item in enumerate(timeline_selected, start=1):
         highlights.append(
             {
                 "highlight_id": f"hl_candidate_{index:03d}",
@@ -215,12 +193,6 @@ def _transcript_confidence(value: Any) -> float:
     return 0.7
 
 
-def _keyword_score(text: str, terms: tuple[str, ...]) -> float:
-    lower = text.lower()
-    hits = sum(1 for term in terms if term.lower() in lower)
-    return round(min(hits / 2.0, 1.0), 6)
-
-
 def _clarity_score(text: str) -> float:
     length = len(text.strip())
     if length <= 0:
@@ -258,6 +230,21 @@ def _coverage_penalty(duration: float) -> float:
     return 0.36
 
 
+def _source_window_position_penalty(candidate: dict[str, Any]) -> float:
+    evidence = candidate.get("evidence")
+    if not isinstance(evidence, dict):
+        return 0.0
+    source_start = _optional_float(evidence.get("source_window_start_sec"))
+    source_end = _optional_float(evidence.get("source_window_end_sec"))
+    start_sec = _optional_float(candidate.get("start_sec"))
+    if source_start is None or source_end is None or start_sec is None or source_end <= source_start:
+        return 0.0
+    ratio = max(0.0, min((start_sec - source_start) / (source_end - source_start), 1.0))
+    if ratio < 0.05:
+        return 0.0
+    return round(0.03 * ratio, 6)
+
+
 def _script_alignment_confidence(candidate: dict[str, Any]) -> float:
     alignment = candidate.get("script_alignment")
     if isinstance(alignment, dict) and isinstance(alignment.get("confidence"), int | float):
@@ -275,6 +262,8 @@ def _reasons(breakdown: dict[str, float], content_channel: str) -> list[str]:
         reasons.append("payoff_or_reversal")
     if breakdown["on_screen_hook_strength"] >= 0.5 and content_channel == "ocr_subtitle":
         reasons.append("ocr_hook")
+    if breakdown.get("specificity_or_novelty", 0.0) >= 0.5:
+        reasons.append("specificity")
     if breakdown["duration_fit"] >= 0.8:
         reasons.append("duration_fit")
     return reasons

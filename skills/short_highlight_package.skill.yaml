@@ -23,6 +23,8 @@ output_artifacts:
   - package_report.md
   - review_report.json
   - quality_report.json
+  - delivery_readiness.json
+  - delivery_readiness.md
   - boundary_signal_manifest.json
   - candidate_windows.json
   - highlight_score_report.json
@@ -30,6 +32,7 @@ output_artifacts:
 quality_gates:
   - inspect-run
   - review-run
+  - delivery-readiness
   - short_clip_quality
 dependencies:
   local:

@@ -1069,6 +1069,45 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: delivery_readiness
+    description: Summarize one or more product runs into a final delivery readiness report.
+    category: delivery_readiness
+    entrypoints:
+      cli: ncut delivery-readiness
+      workflow_node: null
+      python: narratocut.package_sop.write_delivery_readiness
+    input_artifacts:
+      - run_dir
+      - finished_package_manifest.json
+      - quality_report.json
+      - review_report.json
+      - package_report.md
+      - highlight_score_report.json
+      - selection_diagnostics.json
+    output_artifacts:
+      - delivery_readiness.json
+      - delivery_readiness.md
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - run_dir_missing
+      - required_product_artifact_missing
+      - quality_gate_failed
+      - review_gate_failed
+      - no_selected_candidates
+    quality_checks:
+      - delivery_readiness_report_exists
+      - product_runs_summarized
+      - quality_and_review_status_recorded
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection
