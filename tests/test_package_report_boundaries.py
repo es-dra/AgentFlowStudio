@@ -98,6 +98,45 @@ def test_package_report_documents_audio_boundary_evidence(tmp_path: Path) -> Non
     ) in report_text
 
 
+def test_package_report_marks_distant_audio_boundary_as_not_nearby(tmp_path: Path) -> None:
+    run_dir = _write_base_package_run(tmp_path, final_duration=4.8)
+    _write_clip_plan(run_dir, start_sec=2.2, end_sec=5.9, candidate_id="cand_001")
+    _write_score_report(
+        run_dir,
+        {
+            "candidate_id": "cand_001",
+            "decision": "selected",
+            "total_score": 0.77,
+            "reasons": ["duration_fit"],
+            "source_candidate": {
+                "evidence": {
+                    "audio_boundary": {
+                        "source": "boundary_signal_manifest.json",
+                        "start": {
+                            "time_sec": 31.0,
+                            "kind": "silence_start",
+                            "confidence": 0.99,
+                            "distance_sec": 28.8,
+                        },
+                        "end": {
+                            "time_sec": 31.0,
+                            "kind": "silence_start",
+                            "confidence": 0.99,
+                            "distance_sec": 25.1,
+                        },
+                    }
+                }
+            },
+        },
+    )
+
+    write_package_report(run_dir)
+
+    report_text = (run_dir / "package_report.md").read_text(encoding="utf-8")
+    assert "- Audio boundary: not nearby" in report_text
+    assert "28.80s away" not in report_text
+
+
 def test_package_report_documents_audio_boundary_refinement(tmp_path: Path) -> None:
     run_dir = _write_base_package_run(tmp_path, final_duration=4.1)
     _write_clip_plan(run_dir, start_sec=2.0, end_sec=6.1, candidate_id="cand_001")

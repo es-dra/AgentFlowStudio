@@ -663,3 +663,21 @@
 - Updated scoring duplicate-source-window rejection so audio-refined split candidates still dedupe against the original transcript/alignment window.
 - `package_report.md` now shows base boundary strategy and audio refinement before/after time ranges for selected clips.
 - Kept the boundary narrow: no Web UI, no remote LLM, no new dependencies, no visual model, and no claim that deterministic viral selection is editorially mature.
+
+## 2026-05-20 - Phase 14.4E Audio Boundary Refinement Acceptance
+
+- Synced `master` to PR #35 and cleaned the merged Phase 14.4D branch locally and remotely after confirming the remote branch tree matched `master`.
+- Re-ran the local video-only product workflow on `data/raw/demo_real_video/input.mp4`.
+  - Result: 4 clips, durations 4.2s / 4.6s / 4.79s / 4.56s, final duration 18.189323s.
+  - Audio refinement applied to selected candidate `cand_008`: 32.47s - 37.06s -> 32.50s - 37.06s.
+  - `inspect-run`: pass, 8 passed / 0 failed / 0 warnings.
+  - `review-run`: passed, 38 passed / 0 failed / 0 warnings.
+- Re-ran the local video+script product workflow on `data/raw/demo_zombie/input.mp4` and `script.txt`.
+  - Result: 4 clips, durations 4.9225s / 4.98s / 5.346667s / 4.785s, final duration 20.082292s.
+  - Script alignment: 4 aligned / 0 skipped.
+  - No selected candidate required audio-boundary refinement in this run.
+  - `inspect-run`: pass, 8 passed / 0 failed / 0 warnings.
+  - `review-run`: passed, 39 passed / 0 failed / 0 warnings.
+- Refined `package_report.md` audio-boundary display so distant nearest boundaries are summarized as `not nearby` instead of cluttering acceptance reports with misleading far-away evidence.
+- Added `docs/product_acceptance_phase14_4e_audio_boundary_refinement.md` as the acceptance record.
+- Boundary kept: this is local product acceptance plus report readability hardening, not a broader scoring rewrite or Web UI step.

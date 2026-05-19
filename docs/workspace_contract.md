@@ -150,7 +150,9 @@ from the scoring report when it exists:
   moved to nearby high-confidence audio boundary points.
 - `Audio boundary`: nearest low-energy boundary evidence when
   `boundary_signal_manifest.json` was available and could be attached to the
-  selected candidate.
+  selected candidate. The Markdown report only displays this as nearby evidence
+  when the boundary is within 1.0 second of the clip boundary; distant nearest
+  boundaries are summarized as `not nearby`.
 
 Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown
