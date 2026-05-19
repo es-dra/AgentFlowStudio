@@ -46,6 +46,7 @@ from narratocut.workflow_engine.highlight_nodes import (
     write_highlight_plan_node,
 )
 from narratocut.workflow_engine.transcription_nodes import (
+    analyze_audio_boundary_signals_node,
     extract_audio_node,
     load_video_node,
     transcribe_audio_openai_compatible_node,
@@ -245,6 +246,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("write_clip_plan", write_clip_plan_node)
     registry.register("load_video", load_video_node)
     registry.register("extract_audio", extract_audio_node)
+    registry.register("analyze_audio_boundary_signals", analyze_audio_boundary_signals_node)
     registry.register("transcribe_audio_mock", transcribe_audio_mock_node)
     registry.register("transcribe_audio_openai_compatible", transcribe_audio_openai_compatible_node)
     registry.register("transcribe_audio_faster_whisper", transcribe_audio_faster_whisper_node)

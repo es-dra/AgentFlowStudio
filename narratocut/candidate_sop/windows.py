@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from narratocut.candidate_sop.audio_boundaries import build_boundary_index, nearest_audio_boundary_evidence
 from narratocut.candidate_sop.boundaries import elastic_time_windows
 from narratocut.schemas import Transcript, TranscriptSegment
 
@@ -17,6 +18,7 @@ def generate_candidate_windows(
     max_duration_sec: float | None = None,
     target_window_sec: float | None = None,
     script_highlight_alignment: dict[str, Any] | None = None,
+    boundary_signal_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if max_window_size <= 0:
         raise ValueError("max_window_size must be greater than 0")
@@ -36,6 +38,7 @@ def generate_candidate_windows(
     candidates: list[dict[str, Any]] = []
     content_channel = _content_channel(transcript)
     alignment_index = _alignment_index(script_highlight_alignment)
+    boundary_index = build_boundary_index(boundary_signal_manifest)
     for window in _segment_windows(transcript.segments, max_window_size=max_window_size):
         duration = round(window[-1].end_time - window[0].start_time, 6)
         if max_duration_sec is not None and duration > max_duration_sec and target_window_sec is not None:
@@ -46,6 +49,7 @@ def generate_candidate_windows(
                     transcript_duration=transcript.duration,
                     content_channel=content_channel,
                     alignment_index=alignment_index,
+                    boundary_index=boundary_index,
                     min_duration_sec=min_duration_sec,
                     max_duration_sec=max_duration_sec,
                     target_window_sec=target_window_sec,
@@ -63,6 +67,7 @@ def generate_candidate_windows(
                 transcript_duration=transcript.duration,
                 content_channel=content_channel,
                 alignment_index=alignment_index,
+                boundary_index=boundary_index,
             )
         )
 
@@ -78,6 +83,7 @@ def generate_candidate_windows(
         "max_duration_sec": max_duration_sec,
         "target_window_sec": target_window_sec,
         "script_alignment_source": script_highlight_alignment.get("manifest_path") if script_highlight_alignment else None,
+        "boundary_signal_source": boundary_signal_manifest.get("manifest_path") if boundary_signal_manifest else None,
         "candidate_count": len(candidates),
         "candidates": candidates,
         "warnings": [],
@@ -109,6 +115,7 @@ def _candidate_payload(
     transcript_duration: float | None,
     content_channel: str,
     alignment_index: list[dict[str, Any]] | None = None,
+    boundary_index: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     start_sec = window[0].start_time
     end_sec = window[-1].end_time
@@ -126,6 +133,13 @@ def _candidate_payload(
     }
     if script_alignment is not None:
         evidence["script_highlight_id"] = script_alignment["highlight_id"]
+    audio_boundary = nearest_audio_boundary_evidence(
+        start_sec=start_sec,
+        end_sec=end_sec,
+        boundary_index=boundary_index or [],
+    )
+    if audio_boundary is not None:
+        evidence["audio_boundary"] = audio_boundary
     return {
         "candidate_id": f"cand_{index:03d}",
         "source": "transcript_window",
@@ -147,6 +161,7 @@ def _subwindow_candidates(
     transcript_duration: float | None,
     content_channel: str,
     alignment_index: list[dict[str, Any]],
+    boundary_index: list[dict[str, Any]],
     min_duration_sec: float | None,
     max_duration_sec: float,
     target_window_sec: float | None,
@@ -171,6 +186,7 @@ def _subwindow_candidates(
                 transcript_duration=transcript_duration,
                 content_channel=content_channel,
                 alignment_index=alignment_index,
+                boundary_index=boundary_index,
                 target_window_sec=target_window_sec,
                 boundary_strategy=boundary_strategy,
             )
@@ -187,6 +203,7 @@ def _subwindow_payload(
     transcript_duration: float | None,
     content_channel: str,
     alignment_index: list[dict[str, Any]],
+    boundary_index: list[dict[str, Any]],
     target_window_sec: float | None,
     boundary_strategy: str,
 ) -> dict[str, Any]:
@@ -196,6 +213,7 @@ def _subwindow_payload(
         transcript_duration=transcript_duration,
         content_channel=content_channel,
         alignment_index=alignment_index,
+        boundary_index=boundary_index,
     )
     payload["source"] = "transcript_subwindow"
     payload["start_sec"] = start_sec

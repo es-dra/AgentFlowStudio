@@ -456,6 +456,37 @@ tools:
       mutates_workflow: false
       executes_external_process: true
 
+  - name: analyze_audio_boundary_signals
+    description: Analyze a local WAV audio artifact for low-energy boundary points and energy peaks.
+    category: media_boundary_signal
+    entrypoints:
+      cli: null
+      workflow_node: analyze_audio_boundary_signals
+      python: narratocut.audio_sop.analyze_audio_boundary_signals
+    input_artifacts:
+      - audio/audio.wav
+      - workflow_state.audio
+    output_artifacts:
+      - boundary_signal_manifest.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - audio_path_missing
+      - unsupported_audio_format
+      - audio_boundary_analysis_failed
+    quality_checks:
+      - boundary_signal_manifest_exists
+      - boundary_signal_status_recorded
+      - boundary_points_optional
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: transcribe_audio_mock
     description: Convert an audio artifact into a timestamped Transcript using a local fixture-backed mock ASR provider.
     category: video_transcription_asr
@@ -579,7 +610,7 @@ tools:
       executes_external_process: false
 
   - name: generate_candidate_windows
-    description: Generate adjacent transcript-window candidates for later highlight scoring and selection.
+    description: Generate adjacent transcript-window candidates with optional script and media boundary evidence for later highlight scoring and selection.
     category: candidate_generation
     entrypoints:
       cli: null
@@ -588,6 +619,7 @@ tools:
     input_artifacts:
       - transcript.json
       - workflow_state.transcript
+      - workflow_state.boundary_signal_manifest
     output_artifacts:
       - candidate_windows.json
     requires:

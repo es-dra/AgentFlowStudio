@@ -29,9 +29,10 @@ def test_video_to_finished_package_local_asr_workflow_definition() -> None:
     assert step_types[:4] == [
         "load_video",
         "extract_audio",
+        "analyze_audio_boundary_signals",
         "transcribe_audio_faster_whisper",
-        "write_transcript",
     ]
+    assert step_types[4] == "write_transcript"
     assert "transcribe_audio_openai_compatible" not in step_types
 
 
@@ -43,9 +44,10 @@ def test_video_script_to_finished_package_local_asr_workflow_definition() -> Non
     assert step_types[:4] == [
         "load_video",
         "extract_audio",
+        "analyze_audio_boundary_signals",
         "transcribe_audio_faster_whisper",
-        "write_transcript",
     ]
+    assert step_types[4] == "write_transcript"
     assert "align_script_highlights_to_transcript" in step_types
     assert "transcribe_audio_openai_compatible" not in step_types
 
@@ -60,6 +62,9 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
 
     assert status == "success"
     _assert_product_outputs(output_dir)
+    assert (output_dir / "boundary_signal_manifest.json").is_file()
+    candidates = json.loads((output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
+    assert candidates["boundary_signal_source"] == "boundary_signal_manifest.json"
     transcript = json.loads((output_dir / "transcript.json").read_text(encoding="utf-8"))
     highlight_plan = json.loads((output_dir / "highlight_plan.json").read_text(encoding="utf-8"))
     clip_plan = json.loads((output_dir / "clip_plan.json").read_text(encoding="utf-8"))
@@ -67,6 +72,28 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     assert highlight_plan["metadata"]["source"] == "candidate_scoring"
     assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
     assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
+    inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
+    review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
+    assert inspection["status"] == "pass"
+    assert review["status"] == "passed"
+    assert _product_warnings(inspection).isdisjoint(_six_quality_warnings())
+
+
+def test_video_script_to_finished_package_local_asr_workflow_runs_product_path(tmp_path, monkeypatch) -> None:
+    input_path = _write_local_input_bundle(tmp_path, with_script=True)
+    output_dir = tmp_path / "script_run"
+    _patch_real_tools(monkeypatch)
+    _patch_local_asr(monkeypatch, source_video=str(tmp_path / "input.mp4"))
+
+    status, _ = run_workflow_from_cli(SCRIPT_LOCAL_WORKFLOW, input_path, output_dir)
+
+    assert status == "success"
+    _assert_product_outputs(output_dir)
+    assert (output_dir / "boundary_signal_manifest.json").is_file()
+    candidates = json.loads((output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
+    assert candidates["boundary_signal_source"] == "boundary_signal_manifest.json"
+    assert (output_dir / "script_highlight_alignment.json").is_file()
+    assert any(candidate["script_alignment"] for candidate in candidates["candidates"])
     inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
     review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"

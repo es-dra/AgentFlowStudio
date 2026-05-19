@@ -102,6 +102,7 @@ def generate_candidate_windows_node(step: WorkflowStepDefinition, context: Workf
     max_duration_sec = _optional_float_unbounded(step, context, "max_duration_sec")
     target_window_sec = _optional_float_unbounded(step, context, "target_window_sec")
     script_highlight_alignment = _optional_dict_state(step, context, "script_highlight_alignment")
+    boundary_signal_manifest = _optional_dict_state(step, context, "boundary_signal_manifest")
     manifest = generate_candidate_windows(
         transcript,
         max_window_size=max_window_size or (2 if product_short_defaults else 4),
@@ -109,6 +110,7 @@ def generate_candidate_windows_node(step: WorkflowStepDefinition, context: Workf
         max_duration_sec=6.0 if product_short_defaults and max_duration_sec is None else max_duration_sec,
         target_window_sec=5.0 if product_short_defaults and target_window_sec is None else target_window_sec,
         script_highlight_alignment=script_highlight_alignment,
+        boundary_signal_manifest=boundary_signal_manifest,
     )
 
     output_ref = str(step.outputs.get("candidate_windows") or CANDIDATE_WINDOWS_MANIFEST)

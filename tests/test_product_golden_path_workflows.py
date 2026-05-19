@@ -27,6 +27,7 @@ def test_video_to_finished_package_real_asr_workflow_definition() -> None:
     assert step_types == [
         "load_video",
         "extract_audio",
+        "analyze_audio_boundary_signals",
         "transcribe_audio_openai_compatible",
         "write_transcript",
         "load_roi_config",
@@ -120,6 +121,7 @@ def test_video_script_to_finished_package_real_asr_workflow_runs_alignment_path(
 def _assert_product_outputs(output_dir: Path) -> None:
     for artifact in [
         "audio_manifest.json",
+        "boundary_signal_manifest.json",
         "transcript.json",
         "candidate_windows.json",
         "highlight_score_report.json",

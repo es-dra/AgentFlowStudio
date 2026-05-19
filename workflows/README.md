@@ -9,8 +9,8 @@ component workflow:
 
 | Workflow | Kind | Use when | Main outputs |
 | --- | --- | --- | --- |
-| `video_to_finished_package_local_asr.yaml` | product / recommended | The user has only a source video. | `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
-| `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_to_finished_package_local_asr.yaml` | product / recommended | The user has only a source video. | `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
 
@@ -33,6 +33,11 @@ After a formal product run, use:
 
 The workflow writes an initial `package_report.md`; the final command refreshes
 it with the latest quality and review status.
+
+Product video workflows also write `boundary_signal_manifest.json` from the
+extracted audio. This local evidence is advisory: it helps selected clips report
+nearby low-energy boundaries, but it does not block ASR, scoring, slicing, or
+package generation when the audio artifact is mocked or cannot be analyzed.
 
 ## Available workflows
 
