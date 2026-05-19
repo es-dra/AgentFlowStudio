@@ -23,10 +23,12 @@ venv/
 # local data and generated artifacts
 data/raw/*
 data/processed/*
+data/models/*
 data/outputs/*
 data/reports/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/models/.gitkeep
 !data/outputs/.gitkeep
 !data/reports/.gitkeep
 

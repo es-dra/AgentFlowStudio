@@ -321,6 +321,21 @@ enabled OpenAI-compatible ASR provider.
   `NARRATOCUT_ALLOW_REMOTE_ASR=true` is set.
 - Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
 
+### `transcribe_audio_faster_whisper`
+
+Converts an audio artifact into a timestamped `Transcript` using a local
+`faster-whisper` model.
+
+- Category: video transcription ASR
+- Main entry points: workflow node `transcribe_audio_faster_whisper`,
+  `narratocut.asr_sop.FasterWhisperASRProvider`
+- Inputs: `audio_manifest.json`, `audio/audio.wav`
+- Outputs: workflow state `transcript`
+- Requires: local optional dependency `faster-whisper`; no API key and no
+  explicit remote ASR opt-in. The first model use may download model files into
+  the configured local cache.
+- Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
+
 ### `write_transcript`
 
 Writes the current timestamped `Transcript` state to `transcript.json`.

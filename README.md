@@ -36,6 +36,7 @@ Supported today:
 
 - deterministic script/transcript highlight workflows
 - mock and explicit opt-in OpenAI-compatible ASR paths
+- local faster-whisper ASR path for offline product smokes
 - ClipPlan validation against probed video metadata
 - real FFmpeg slicing from existing ClipPlans
 - simple final-video assembly from real clips
@@ -150,6 +151,8 @@ Planning and transcript workflows:
 - `workflows/video_to_transcript_real_asr.yaml`
 - `workflows/video_to_highlight_clip_plan.yaml`
 - `workflows/video_to_highlight_clip_plan_real_asr.yaml`
+- `workflows/video_to_finished_package_local_asr.yaml`
+- `workflows/video_script_to_finished_package_local_asr.yaml`
 
 Execution and product artifact workflows:
 

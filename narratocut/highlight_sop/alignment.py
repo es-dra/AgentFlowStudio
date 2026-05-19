@@ -89,16 +89,20 @@ def _best_segment_match(
 ) -> dict[str, Any]:
     best: dict[str, Any] | None = None
     highlight_tokens = _tokens(highlight.text)
-    for segment in segments:
-        confidence = _similarity(highlight_tokens, _tokens(segment.text))
+    for candidate_segments in _candidate_segment_windows(segments):
+        matched_text = " ".join(segment.text for segment in candidate_segments)
+        confidence = _similarity(highlight_tokens, _tokens(matched_text))
         candidate = {
             "confidence": confidence,
-            "matched_segment_ids": [segment.segment_id],
-            "start_time": segment.start_time,
-            "end_time": segment.end_time,
-            "matched_text": segment.text,
+            "matched_segment_ids": [segment.segment_id for segment in candidate_segments],
+            "start_time": candidate_segments[0].start_time,
+            "end_time": candidate_segments[-1].end_time,
+            "matched_text": matched_text,
         }
-        if best is None or confidence > best["confidence"]:
+        if best is None or confidence > best["confidence"] or (
+            confidence == best["confidence"]
+            and len(candidate["matched_segment_ids"]) > len(best["matched_segment_ids"])
+        ):
             best = candidate
     if best is None:
         return {
@@ -109,6 +113,18 @@ def _best_segment_match(
             "matched_text": "",
         }
     return best
+
+
+def _candidate_segment_windows(segments: list[TranscriptSegment]) -> list[list[TranscriptSegment]]:
+    windows: list[list[TranscriptSegment]] = []
+    max_window_size = min(4, len(segments))
+    for start_index in range(len(segments)):
+        for window_size in range(1, max_window_size + 1):
+            end_index = start_index + window_size
+            if end_index > len(segments):
+                break
+            windows.append(segments[start_index:end_index])
+    return windows
 
 
 def _aligned_highlight(highlight: HighlightSegment, match: dict[str, Any]) -> HighlightSegment:
@@ -151,11 +167,16 @@ def _similarity(left: set[str], right: set[str]) -> float:
 
 
 def _tokens(text: str) -> set[str]:
-    return {
+    normalized = text.lower()
+    tokens = {
         token
-        for token in re.findall(r"[A-Za-z0-9]+", text.lower())
+        for token in re.findall(r"[A-Za-z0-9]+", normalized)
         if len(token) > 1 and token not in _STOPWORDS
     }
+    chinese_chars = re.findall(r"[\u4e00-\u9fff]", normalized)
+    tokens.update(chinese_chars)
+    tokens.update("".join(pair) for pair in zip(chinese_chars, chinese_chars[1:]))
+    return tokens
 
 
 _STOPWORDS = {
