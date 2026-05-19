@@ -3,6 +3,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from apps.cli import main as cli_main
+from apps.cli import media_commands
 from narratocut.slicing_sop import FFmpegInfo
 
 
@@ -16,7 +17,7 @@ def test_ffmpeg_check_command_reports_available(monkeypatch) -> None:
             error=None,
         )
 
-    monkeypatch.setattr(cli_main, "check_ffmpeg_available", fake_check)
+    monkeypatch.setattr(media_commands, "check_ffmpeg_available", fake_check)
 
     result = CliRunner().invoke(cli_main.app, ["ffmpeg-check", "--executable", "ffmpeg-test"])
 
@@ -34,7 +35,7 @@ def test_ffmpeg_check_command_reports_unavailable(monkeypatch) -> None:
             error="not found",
         )
 
-    monkeypatch.setattr(cli_main, "check_ffmpeg_available", fake_check)
+    monkeypatch.setattr(media_commands, "check_ffmpeg_available", fake_check)
 
     result = CliRunner().invoke(cli_main.app, ["ffmpeg-check"])
 

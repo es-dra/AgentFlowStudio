@@ -1,0 +1,47 @@
+id: narratocut.short_highlight_package
+name: Short Highlight Package
+version: 1
+status: product_mvp
+description: Generate a local-first short promotional package from a source video.
+primary_workflow: workflows/video_to_finished_package_local_asr.yaml
+input_contract:
+  required:
+    - video_path
+    - source_video
+    - roi_config_path
+    - bgm_path
+    - bgm_metadata_path
+  optional:
+    - language
+    - asr_model
+    - asr_device
+    - asr_compute_type
+    - candidate_target_window_sec
+    - max_clips
+output_artifacts:
+  - finished_package_manifest.json
+  - package_report.md
+  - review_report.json
+  - quality_report.json
+  - candidate_windows.json
+  - highlight_score_report.json
+quality_gates:
+  - inspect-run
+  - review-run
+  - short_clip_quality
+dependencies:
+  local:
+    - ffmpeg
+    - ffprobe
+    - faster-whisper
+  network: false
+when_to_use:
+  - The user has a video and wants a short promotional highlight package.
+  - The run should stay local-first and avoid remote ASR by default.
+when_not_to_use:
+  - The user requires visual multimodal understanding as the primary signal.
+  - The source video has no speech, no readable subtitles, and no script.
+failure_recovery:
+  missing_asr_model: Install or configure local faster-whisper model settings.
+  low_candidate_count: Try the video-script skill if a script is available.
+  weak_highlight_quality: Review candidate_windows.json and highlight_score_report.json before rerunning.

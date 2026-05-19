@@ -21,6 +21,8 @@ def test_video_to_finished_package_real_asr_workflow_definition() -> None:
 
     assert workflow.mode == "video_to_finished_package_real_asr"
     assert workflow.quality_profile == "finished_package"
+    assert workflow.metadata["kind"] == "product"
+    assert workflow.metadata["status"] == "optional"
     step_types = [step.type for step in workflow.steps]
     assert step_types == [
         "load_video",
@@ -44,6 +46,7 @@ def test_video_to_finished_package_real_asr_workflow_definition() -> None:
         "mix_bgm",
         "probe_bgm_mix",
         "write_finished_package",
+        "write_package_report",
     ]
     assert "multimodal" not in " ".join(step_types)
 
@@ -62,6 +65,7 @@ def test_video_to_finished_package_real_asr_workflow_runs_product_path(tmp_path,
     clip_plan = json.loads((output_dir / "clip_plan.json").read_text(encoding="utf-8"))
     subtitle_manifest = json.loads((output_dir / "subtitle_manifest.json").read_text(encoding="utf-8"))
     package = json.loads((output_dir / "finished_package_manifest.json").read_text(encoding="utf-8"))
+    package_report = (output_dir / "package_report.md").read_text(encoding="utf-8")
 
     assert len(highlight_plan["highlights"]) >= 2
     assert highlight_plan["metadata"]["source"] == "candidate_scoring"
@@ -73,6 +77,8 @@ def test_video_to_finished_package_real_asr_workflow_runs_product_path(tmp_path,
     assert subtitle_manifest["duration_sec"] <= 30.0
     assert package["evidence"]["real_slice_manifest"].endswith("real_slice_manifest.json")
     assert package["evidence"]["subtitle_manifest"].endswith("subtitle_manifest.json")
+    assert "## Selected Clips" in package_report
+    assert "Candidate ID" in package_report
 
     inspection = inspect_run(output_dir)
     review = review_run(output_dir)
@@ -129,6 +135,7 @@ def _assert_product_outputs(output_dir: Path) -> None:
         "final_video_with_bgm.mp4",
         "audio_mix_manifest.json",
         "finished_package_manifest.json",
+        "package_report.md",
         "manifest.json",
         "run_manifest.json",
         "trace.json",

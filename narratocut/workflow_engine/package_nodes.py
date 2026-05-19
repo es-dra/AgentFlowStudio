@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.package_sop import FINISHED_PACKAGE_MANIFEST, build_finished_package_manifest
+from narratocut.package_sop import (
+    FINISHED_PACKAGE_MANIFEST,
+    PACKAGE_REPORT,
+    build_finished_package_manifest,
+    write_package_report,
+)
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
@@ -36,6 +41,13 @@ def write_finished_package_node(step: WorkflowStepDefinition, context: WorkflowC
     if manifest.status != "succeeded":
         raise ValueError(str(manifest.errors or "finished_package_failed"))
     return [manifest_ref]
+
+
+def write_package_report_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    report_ref = step.outputs.get("package_report") or PACKAGE_REPORT
+    write_package_report(context.output_dir, report_ref)
+    context.artifacts["package_report"] = report_ref
+    return [report_ref]
 
 
 def _require_input(step: WorkflowStepDefinition, name: str) -> object:

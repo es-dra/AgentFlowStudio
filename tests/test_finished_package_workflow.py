@@ -5,7 +5,8 @@ from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
 from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
+from narratocut.harness.reviewer import review_run, write_review_report
+from narratocut.package_sop import write_package_report
 from narratocut.utils import write_json
 from narratocut.workflow_engine import load_workflow
 from narratocut.workflow_engine.planner import draft_workflow_plan
@@ -19,8 +20,9 @@ def test_final_video_package_workflow_definition_is_manifest_only() -> None:
 
     assert workflow.mode == "final_video_package"
     assert workflow.quality_profile == "finished_package"
+    assert workflow.metadata["kind"] == "component"
     step_types = [step.type for step in workflow.steps]
-    assert step_types == ["write_finished_package"]
+    assert step_types == ["write_finished_package", "write_package_report"]
     forbidden_fragments = [
         "ffmpeg",
         "probe",
@@ -51,6 +53,7 @@ def test_final_video_package_workflow_writes_package_manifest(tmp_path) -> None:
     assert status == "success"
     for artifact in [
         "finished_package_manifest.json",
+        "package_report.md",
         "manifest.json",
         "run_manifest.json",
         "trace.json",
@@ -75,11 +78,22 @@ def test_final_video_package_workflow_writes_package_manifest(tmp_path) -> None:
     assert run_manifest["workflow_mode"] == "final_video_package"
     assert run_manifest["quality_profile"] == "finished_package"
     assert run_manifest["artifacts"]["finished_package_manifest"] == "finished_package_manifest.json"
+    assert run_manifest["artifacts"]["package_report"] == "package_report.md"
+    report_text = (output_dir / "package_report.md").read_text(encoding="utf-8")
+    assert "# NarratoCut Package Report" in report_text
+    assert "demo_package" in report_text
+    assert "- Workflow: workflows/final_video_package.yaml" in report_text
+    assert "final_video" in report_text
 
     inspection = inspect_run(output_dir)
     review = review_run(output_dir)
+    write_review_report(output_dir, review)
+    write_package_report(output_dir)
+    refreshed_report = (output_dir / "package_report.md").read_text(encoding="utf-8")
     assert inspection["status"] == "pass"
     assert review["status"] == "passed"
+    assert "- Quality status: pass" in refreshed_report
+    assert "- Review status: passed" in refreshed_report
     assert "finished_package_outputs" in {section["name"] for section in review["sections"]}
 
 
@@ -178,9 +192,10 @@ def test_draft_workflow_plan_lists_finished_package_outputs() -> None:
     )
 
     assert plan["status"] == "draft"
-    assert [step["tool"] for step in plan["steps"]] == ["write_finished_package"]
+    assert [step["tool"] for step in plan["steps"]] == ["write_finished_package", "write_package_report"]
     expected = plan["artifacts"]["expected"]
     assert "finished_package_manifest.json" in expected
+    assert "package_report.md" in expected
 
 
 def _write_input_bundle(

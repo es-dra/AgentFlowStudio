@@ -63,7 +63,7 @@ from narratocut.workflow_engine.ocr_nodes import (
     write_highlight_score_report_node,
     write_ocr_transcript_node,
 )
-from narratocut.workflow_engine.package_nodes import write_finished_package_node
+from narratocut.workflow_engine.package_nodes import write_finished_package_node, write_package_report_node
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -261,6 +261,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("mix_bgm", mix_bgm_node)
     registry.register("probe_bgm_mix", probe_bgm_mix_node)
     registry.register("write_finished_package", write_finished_package_node)
+    registry.register("write_package_report", write_package_report_node)
     return registry
 
 

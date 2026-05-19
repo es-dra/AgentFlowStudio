@@ -293,6 +293,7 @@ def test_draft_workflow_plan_lists_finished_package_outputs() -> None:
     )
 
     assert plan["status"] == "draft"
-    assert [step["tool"] for step in plan["steps"]] == ["write_finished_package"]
+    assert [step["tool"] for step in plan["steps"]] == ["write_finished_package", "write_package_report"]
     expected = plan["artifacts"]["expected"]
     assert "finished_package_manifest.json" in expected
+    assert "package_report.md" in expected

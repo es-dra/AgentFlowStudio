@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from narratocut.harness import write_run_manifest, write_trace
+from narratocut.package_sop import write_package_report
 from narratocut.schemas import StepResult, WorkflowRun
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
@@ -85,3 +86,6 @@ class WorkflowRunner:
         self._write_manifest(run, context)
         write_run_manifest(run, context)
         write_trace(definition, run, context)
+        report_ref = context.artifacts.get("package_report")
+        if report_ref:
+            write_package_report(context.output_dir, report_ref)
