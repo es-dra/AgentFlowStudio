@@ -6,6 +6,7 @@ from typing import Any
 
 
 PACKAGE_REPORT = "package_report.md"
+NEARBY_AUDIO_BOUNDARY_SEC = 1.0
 
 
 def build_package_report(run_dir: str | Path) -> str:
@@ -269,9 +270,9 @@ def _audio_boundary(candidate: dict[str, Any] | None) -> str:
     parts: list[str] = []
     for key in ("start", "end"):
         value = audio_boundary.get(key)
-        if isinstance(value, dict):
+        if isinstance(value, dict) and _audio_boundary_is_nearby(value):
             parts.append(f"{key} {_audio_boundary_point(value)}")
-    return "; ".join(parts) if parts else "not available"
+    return "; ".join(parts) if parts else "not nearby"
 
 
 def _audio_boundary_point(point: dict[str, Any]) -> str:
@@ -285,6 +286,11 @@ def _audio_boundary_point(point: dict[str, Any]) -> str:
         if confidence is not None
         else f"{_seconds(time_sec)} {kind} ({_seconds(distance)} away)"
     )
+
+
+def _audio_boundary_is_nearby(point: dict[str, Any]) -> bool:
+    distance = _float(point.get("distance_sec"))
+    return distance is not None and distance <= NEARBY_AUDIO_BOUNDARY_SEC
 
 
 def _source_evidence(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
