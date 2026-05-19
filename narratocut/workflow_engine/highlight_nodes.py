@@ -96,14 +96,19 @@ def generate_highlight_clip_plan_node(step: WorkflowStepDefinition, context: Wor
 
 def generate_candidate_windows_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     transcript = _state_transcript(context, str(_optional_raw_input(step, "transcript") or "transcript"))
-    max_window_size = _optional_int(step, context, "max_window_size") or 4
-    min_duration_sec = _optional_float(step, context, "min_duration_sec")
+    product_short_defaults = _optional_bool(step, context, "product_short_defaults")
+    max_window_size = _optional_int(step, context, "max_window_size")
+    min_duration_sec = _optional_float_unbounded(step, context, "min_duration_sec")
     max_duration_sec = _optional_float_unbounded(step, context, "max_duration_sec")
+    target_window_sec = _optional_float_unbounded(step, context, "target_window_sec")
+    script_highlight_alignment = _optional_dict_state(step, context, "script_highlight_alignment")
     manifest = generate_candidate_windows(
         transcript,
-        max_window_size=max_window_size,
-        min_duration_sec=min_duration_sec,
-        max_duration_sec=max_duration_sec,
+        max_window_size=max_window_size or (2 if product_short_defaults else 4),
+        min_duration_sec=4.0 if product_short_defaults and min_duration_sec is None else min_duration_sec,
+        max_duration_sec=6.0 if product_short_defaults and max_duration_sec is None else max_duration_sec,
+        target_window_sec=5.0 if product_short_defaults and target_window_sec is None else target_window_sec,
+        script_highlight_alignment=script_highlight_alignment,
     )
 
     output_ref = str(step.outputs.get("candidate_windows") or CANDIDATE_WINDOWS_MANIFEST)
@@ -219,6 +224,21 @@ def _state_roi_settings(context: WorkflowContext) -> ROISettings | None:
     raise ValueError("roi_settings state is not a ROISettings object")
 
 
+def _optional_dict_state(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> dict[str, Any] | None:
+    raw = _optional_raw_input(step, name)
+    key = str(raw or name)
+    value = context.state.get(key)
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    raise ValueError(f"{name} state must be a JSON object")
+
+
 def _max_highlights(step: WorkflowStepDefinition, context: WorkflowContext) -> int:
     return _optional_int(step, context, "max_highlights") or DEFAULT_MAX_HIGHLIGHTS
 
@@ -231,9 +251,13 @@ def _optional_int(
     raw = _optional_resolved_input(step, context, name)
     if raw is None:
         return None
+    if isinstance(raw, str) and raw == name and raw not in context.inputs and raw not in context.state:
+        return None
     try:
         value = int(raw)
     except (TypeError, ValueError) as exc:
+        if isinstance(raw, str) and raw not in context.inputs and raw not in context.state:
+            return None
         raise ValueError(f"{name} must be an integer") from exc
     if value <= 0:
         raise ValueError(f"{name} must be greater than 0")
@@ -248,9 +272,13 @@ def _optional_float(
     raw = _optional_resolved_input(step, context, name)
     if raw is None:
         return None
+    if isinstance(raw, str) and raw == name and raw not in context.inputs and raw not in context.state:
+        return None
     try:
         value = float(raw)
     except (TypeError, ValueError) as exc:
+        if isinstance(raw, str) and raw not in context.inputs and raw not in context.state:
+            return None
         raise ValueError(f"{name} must be a number") from exc
     if value < 0 or value > 1:
         raise ValueError(f"{name} must be between 0 and 1")
@@ -265,10 +293,32 @@ def _optional_float_unbounded(
     raw = _optional_resolved_input(step, context, name)
     if raw is None:
         return None
+    if isinstance(raw, str) and raw == name and raw not in context.inputs and raw not in context.state:
+        return None
     try:
         return float(raw)
     except (TypeError, ValueError) as exc:
+        if isinstance(raw, str) and raw not in context.inputs and raw not in context.state:
+            return None
         raise ValueError(f"{name} must be a number") from exc
+
+
+def _optional_bool(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> bool:
+    raw = _optional_resolved_input(step, context, name)
+    if raw is None:
+        return False
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off"} or (isinstance(raw, str) and raw not in context.inputs and raw not in context.state):
+        return False
+    raise ValueError(f"{name} must be a boolean")
 
 
 def _source_video(step: WorkflowStepDefinition, context: WorkflowContext) -> str:

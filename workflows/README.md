@@ -319,28 +319,32 @@ export covers, call remote providers, or provide a Web UI.
 
 ### `video_to_finished_package_real_asr.yaml`
 
-Phase 14.1 ASR-first product Golden Path for the source-video-only case:
+Phase 14 ASR-first product Golden Path for the source-video-only case. The
+current product path uses candidate windows and deterministic candidate scoring
+before generating a clip plan, so selected clips are short promo candidates
+rather than direct raw-transcript highlights.
 
 1. `load_video`
 2. `extract_audio`
 3. `transcribe_audio_openai_compatible`
 4. `write_transcript`
 5. `load_roi_config`
-6. `detect_highlights`
-7. `rank_highlights_by_roi`
-8. `generate_clip_plan_from_highlights`
+6. `generate_candidate_windows`
+7. `score_candidate_windows`
+8. `write_highlight_score_report`
 9. `write_highlight_plan`
-10. `write_clip_plan`
-11. `probe_video_metadata`
-12. `validate_clip_plan`
-13. `real_slice_video`
-14. `generate_assembly_plan`
-15. `concat_clips`
-16. `probe_final_video`
-17. `write_clip_timeline_subtitles`
-18. `mix_bgm`
-19. `probe_bgm_mix`
-20. `write_finished_package`
+10. `generate_clip_plan_from_highlights`
+11. `write_clip_plan`
+12. `probe_video_metadata`
+13. `validate_clip_plan`
+14. `real_slice_video`
+15. `generate_assembly_plan`
+16. `concat_clips`
+17. `probe_final_video`
+18. `write_clip_timeline_subtitles`
+19. `mix_bgm`
+20. `probe_bgm_mix`
+21. `write_finished_package`
 
 Example:
 
@@ -352,14 +356,20 @@ $env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
 .venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
 ```
 
-This workflow uses ASR transcript text as the highlight signal. It does not
-inspect video frames or run multimodal highlight detection. The BGM path must be
-local, ignored media, and `bgm_metadata_path` should point to local metadata
-with `quality_verified: true` when the music has actually been reviewed.
+This workflow uses ASR transcript text as the highlight signal and writes
+`candidate_windows.json`, `highlight_score_report.json`, `highlight_plan.json`,
+and `clip_plan.json` before slicing. Candidate settings can be overridden with
+`candidate_max_window_size`, `candidate_min_duration_sec`,
+`candidate_max_duration_sec`, `candidate_target_window_sec`, and
+`candidate_max_overlap_ratio`; when omitted, the product defaults target about
+4-6 seconds per selected clip. It does not inspect video frames or run
+multimodal highlight detection. The BGM path must be local, ignored media, and
+`bgm_metadata_path` should point to local metadata with `quality_verified: true`
+when the music has actually been reviewed.
 
 ### `video_to_finished_package_local_asr.yaml`
 
-Local-ASR variant of the Phase 14.1 source-video-only Golden Path. It has the
+Local-ASR variant of the Phase 14 source-video-only Golden Path. It has the
 same product chain as `video_to_finished_package_real_asr.yaml`, but step 3 is
 `transcribe_audio_faster_whisper` instead of a remote OpenAI-compatible ASR
 call.
@@ -381,10 +391,10 @@ download model files into the configured local cache.
 
 ### `video_script_to_finished_package_real_asr.yaml`
 
-Phase 14.1 ASR-first product Golden Path for the source-video-plus-script case.
-It first detects script highlights, then aligns those script highlights to ASR
-transcript segments and writes `script_highlight_alignment.json` before slicing
-and packaging.
+Phase 14 ASR-first product Golden Path for the source-video-plus-script case.
+It first detects script highlights, aligns those script highlights to ASR
+transcript segments, injects that alignment evidence into candidate windows,
+then scores short candidates before slicing and packaging.
 
 Example:
 
@@ -397,14 +407,16 @@ $env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
 ```
 
 Low-confidence script-to-transcript alignments are skipped and reported in the
-alignment manifest. This workflow does not do visual semantic search; the ASR
-transcript is the source of video timestamps.
+alignment manifest. Selected clip metadata records `candidate_id`, scorer
+details, source segment ids, and any attached `script_alignment`. This workflow
+does not do visual semantic search; the ASR transcript is the source of video
+timestamps.
 
 ### `video_script_to_finished_package_local_asr.yaml`
 
-Local-ASR variant of the Phase 14.1 source-video-plus-script Golden Path. It
+Local-ASR variant of the Phase 14 source-video-plus-script Golden Path. It
 uses `transcribe_audio_faster_whisper`, then aligns script highlights to local
-ASR transcript segments before slicing and packaging.
+ASR transcript segments before candidate scoring, slicing, and packaging.
 
 Example:
 

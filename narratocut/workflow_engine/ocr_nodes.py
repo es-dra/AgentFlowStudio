@@ -102,6 +102,8 @@ def _optional_int(step: WorkflowStepDefinition, context: WorkflowContext, name: 
     try:
         value = int(raw)
     except (TypeError, ValueError) as exc:
+        if isinstance(raw, str) and raw not in context.inputs and raw not in context.state:
+            return None
         raise ValueError(f"{name} must be an integer") from exc
     if value <= 0:
         raise ValueError(f"{name} must be greater than 0")
@@ -115,6 +117,8 @@ def _optional_float(step: WorkflowStepDefinition, context: WorkflowContext, name
     try:
         return float(raw)
     except (TypeError, ValueError) as exc:
+        if isinstance(raw, str) and raw not in context.inputs and raw not in context.state:
+            return None
         raise ValueError(f"{name} must be a number") from exc
 
 

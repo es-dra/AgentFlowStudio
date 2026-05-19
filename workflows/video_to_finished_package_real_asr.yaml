@@ -35,29 +35,41 @@ steps:
       roi_config: roi_config_path
     outputs:
       roi_settings: roi_config.json
-  - id: detect_highlights
-    type: detect_highlights
+  - id: generate_candidate_windows
+    type: generate_candidate_windows
     inputs:
-      input_mode: timestamped_transcript
       transcript: transcript
-      max_highlights: max_highlights
-  - id: rank_highlights_by_roi
-    type: rank_highlights_by_roi
+      max_window_size: candidate_max_window_size
+      min_duration_sec: candidate_min_duration_sec
+      max_duration_sec: candidate_max_duration_sec
+      target_window_sec: candidate_target_window_sec
+      product_short_defaults: true
+    outputs:
+      candidate_windows: candidate_windows.json
+  - id: score_candidate_windows
+    type: score_candidate_windows
     inputs:
-      highlight_plan: highlight_plan
-      roi_settings: roi_settings
-  - id: generate_clip_plan_from_highlights
-    type: generate_clip_plan_from_highlights
+      candidate_windows: candidate_windows
+      max_selected: max_clips
+      max_overlap_ratio: candidate_max_overlap_ratio
+  - id: write_highlight_score_report
+    type: write_highlight_score_report
     inputs:
-      highlight_plan: highlight_plan
-      source_video: source_video
-      max_clips: max_clips
+      highlight_score_report: highlight_score_report
+    outputs:
+      highlight_score_report: highlight_score_report.json
   - id: write_highlight_plan
     type: write_highlight_plan
     inputs:
       highlight_plan: highlight_plan
     outputs:
       highlight_plan: highlight_plan.json
+  - id: generate_clip_plan_from_highlights
+    type: generate_clip_plan_from_highlights
+    inputs:
+      source_video: source_video
+      max_clips: max_clips
+      highlight_plan: highlight_plan
   - id: write_clip_plan
     type: write_clip_plan
     inputs:

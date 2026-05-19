@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from narratocut.harness.quality_profiles import FINISHED_PACKAGE_PROFILE
+from narratocut.harness.short_clip_quality import add_short_clip_product_checks
 
 
 def package_artifacts_to_inspect() -> list[str]:
@@ -89,6 +90,13 @@ def _add_product_quality_checks(
         return
     primary_duration = _primary_video_duration(root, package, evidence)
     _add_slice_quality_checks(root, evidence, checks, warnings)
+    add_short_clip_product_checks(
+        primary_duration=primary_duration,
+        clip_plan=_load_evidence_json(root, evidence, "clip_plan"),
+        checks=checks,
+        warnings=warnings,
+        add_warning=_add_warning,
+    )
     _add_subtitle_quality_checks(root, evidence, primary_duration, checks, warnings)
     _add_bgm_quality_checks(root, evidence, checks, warnings)
 

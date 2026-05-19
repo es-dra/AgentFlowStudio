@@ -38,6 +38,8 @@ def test_generate_clip_plan_from_ranked_timestamped_highlights_preserves_order()
     assert clip_plan.segments[0].source_video == "data/raw/demo_real_video/input.mp4"
     assert clip_plan.segments[0].metadata["highlight_id"] == "hl_hook"
     assert clip_plan.segments[0].metadata["ranking_factors"]["final_score"] == 0.94
+    assert clip_plan.segments[0].metadata["candidate_id"] == "cand_hl_hook"
+    assert clip_plan.segments[0].metadata["scorer"] == "deterministic_viral_scorer_v0"
     assert clip_plan.metadata["source"] == "phase10_highlight_clip_plan_generator"
     assert clip_plan.metadata["highlight_plan_id"] == "highlight_plan_test"
     assert clip_plan.metadata["clip_plan_status"] == "generated"
@@ -145,7 +147,11 @@ def _highlight(
     final_score: float = 0.8,
     source_type: str = "transcript",
 ) -> HighlightSegment:
-    metadata = {"ranking_factors": {"final_score": final_score}}
+    metadata = {
+        "candidate_id": f"cand_{highlight_id}",
+        "scorer": "deterministic_viral_scorer_v0",
+        "ranking_factors": {"final_score": final_score},
+    }
     return HighlightSegment(
         highlight_id=highlight_id,
         source_type=source_type,
