@@ -37,6 +37,7 @@ from narratocut.workflow_engine.assembly_nodes import (
 from narratocut.workflow_engine.highlight_nodes import (
     align_script_highlights_to_transcript_node,
     detect_highlights_node,
+    generate_candidate_windows_node,
     generate_highlight_clip_plan_node,
     load_script_node,
     load_transcript_node,
@@ -225,6 +226,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("load_script", load_script_node)
     registry.register("load_transcript", load_transcript_node)
     registry.register("detect_highlights", detect_highlights_node)
+    registry.register("generate_candidate_windows", generate_candidate_windows_node)
     registry.register("rank_highlights_by_roi", rank_highlights_by_roi_node)
     registry.register("generate_highlight_clip_plan", generate_highlight_clip_plan_node)
     registry.register("generate_clip_plan_from_highlights", generate_highlight_clip_plan_node)

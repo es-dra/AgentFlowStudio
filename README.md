@@ -146,6 +146,7 @@ commands, expected artifacts, and acceptance criteria.
 Planning and transcript workflows:
 
 - `workflows/script_to_highlight_plan.yaml`
+- `workflows/transcript_to_candidate_windows.yaml`
 - `workflows/transcript_to_highlight_clip_plan.yaml`
 - `workflows/video_to_transcript.yaml`
 - `workflows/video_to_transcript_real_asr.yaml`
@@ -177,6 +178,7 @@ run_manifest.json
 trace.json
 quality_report.json
 review_report.json
+candidate_windows.json
 real_slice_manifest.json
 final_video_manifest.json
 subtitle_manifest.json

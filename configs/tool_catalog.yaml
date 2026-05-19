@@ -578,6 +578,39 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: generate_candidate_windows
+    description: Generate adjacent transcript-window candidates for later highlight scoring and selection.
+    category: candidate_generation
+    entrypoints:
+      cli: null
+      workflow_node: generate_candidate_windows
+      python: narratocut.candidate_sop.generate_candidate_windows
+    input_artifacts:
+      - transcript.json
+      - workflow_state.transcript
+    output_artifacts:
+      - candidate_windows.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - transcript_missing
+      - invalid_window_size
+      - invalid_duration_bounds
+      - candidate_manifest_write_failed
+    quality_checks:
+      - candidate_windows_manifest_exists
+      - candidate_count_positive
+      - candidate_timestamps_valid
+      - candidate_duration_bounds
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: write_subtitles
     description: Export a timestamped Transcript to subtitles.srt and subtitle_manifest.json.
     category: subtitle_export

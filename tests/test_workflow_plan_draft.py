@@ -219,6 +219,20 @@ def test_draft_workflow_plan_lists_subtitle_outputs() -> None:
     assert "subtitle_manifest.json" in expected
 
 
+def test_draft_workflow_plan_lists_candidate_window_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/transcript_to_candidate_windows.yaml",
+        input_path="examples/demo_highlight/transcript_candidate_windows_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_transcript",
+        "generate_candidate_windows",
+    ]
+    assert "candidate_windows.json" in plan["artifacts"]["expected"]
+
+
 def test_draft_workflow_plan_lists_cover_outputs() -> None:
     plan = draft_workflow_plan(
         workflow_path="workflows/final_video_to_cover.yaml",

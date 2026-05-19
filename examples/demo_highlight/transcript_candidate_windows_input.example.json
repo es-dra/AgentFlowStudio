@@ -1,0 +1,7 @@
+{
+  "transcript_path": "examples/demo_highlight/transcript.json",
+  "max_window_size": 4,
+  "min_duration_sec": 1,
+  "max_duration_sec": 30,
+  "output_dir": "data/processed/runs/demo_transcript_candidate_windows"
+}

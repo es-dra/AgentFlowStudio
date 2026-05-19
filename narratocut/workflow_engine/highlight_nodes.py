@@ -14,6 +14,7 @@ from narratocut.highlight_sop import (
     generate_clip_plan_from_highlights,
     rank_highlights_by_roi,
 )
+from narratocut.candidate_sop import CANDIDATE_WINDOWS_MANIFEST, generate_candidate_windows
 from narratocut.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
@@ -91,6 +92,25 @@ def generate_highlight_clip_plan_node(step: WorkflowStepDefinition, context: Wor
     )
     context.state["clip_plan"] = clip_plan
     return []
+
+
+def generate_candidate_windows_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    transcript = _state_transcript(context, str(_optional_raw_input(step, "transcript") or "transcript"))
+    max_window_size = _optional_int(step, context, "max_window_size") or 4
+    min_duration_sec = _optional_float(step, context, "min_duration_sec")
+    max_duration_sec = _optional_float_unbounded(step, context, "max_duration_sec")
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=max_window_size,
+        min_duration_sec=min_duration_sec,
+        max_duration_sec=max_duration_sec,
+    )
+
+    output_ref = str(step.outputs.get("candidate_windows") or CANDIDATE_WINDOWS_MANIFEST)
+    write_json(context.output_path(output_ref), manifest)
+    context.artifacts["candidate_windows"] = output_ref
+    context.state["candidate_windows"] = manifest
+    return [output_ref]
 
 
 def align_script_highlights_to_transcript_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -235,6 +255,20 @@ def _optional_float(
     if value < 0 or value > 1:
         raise ValueError(f"{name} must be between 0 and 1")
     return value
+
+
+def _optional_float_unbounded(
+    step: WorkflowStepDefinition,
+    context: WorkflowContext,
+    name: str,
+) -> float | None:
+    raw = _optional_resolved_input(step, context, name)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
 
 
 def _source_video(step: WorkflowStepDefinition, context: WorkflowContext) -> str:

@@ -27,6 +27,7 @@ EXPECTED_TOOLS = {
     "transcribe_audio_openai_compatible",
     "transcribe_audio_faster_whisper",
     "write_transcript",
+    "generate_candidate_windows",
     "write_subtitles",
     "burn_subtitles",
     "probe_subtitle_burn",
