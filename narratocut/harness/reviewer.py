@@ -79,11 +79,14 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
     if run_manifest and is_highlight_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_highlight_review_section(root, run_manifest))
     summary = _summarize_sections(sections)
+    status = _status_from_summary(summary)
 
     return {
         "schema_version": SCHEMA_VERSION,
         "run_id": _run_id(root, run_manifest),
-        "status": _status_from_summary(summary),
+        "status": status,
+        "quality_level": _quality_level(status, run_manifest),
+        "delivery_status": _delivery_status(status),
         "summary": summary,
         "inputs": {
             "run_dir": _display_ref(root),
@@ -142,6 +145,10 @@ def _workflow_outputs_section(
             ],
         )
 
+    artifact_index = run_manifest.get("artifact_index") if run_manifest else None
+    if not isinstance(artifact_index, dict):
+        artifact_index = {}
+
     checks: list[dict[str, Any]] = []
     seen_paths: set[str] = set()
     for name, ref in artifacts.items():
@@ -153,7 +160,11 @@ def _workflow_outputs_section(
         if normalized_ref in seen_paths:
             continue
         seen_paths.add(normalized_ref)
-        checks.append(_artifact_check(root, name, ref))
+        index_entry = artifact_index.get(name)
+        required = True
+        if isinstance(index_entry, dict):
+            required = bool(index_entry.get("required", True))
+        checks.append(_artifact_check(root, name, ref, required=required))
 
     return _section("workflow_outputs", checks)
 
@@ -196,14 +207,16 @@ def _trace_steps_check(trace: dict[str, Any] | None) -> dict[str, Any]:
     )
 
 
-def _artifact_check(root: Path, name: str, ref: str) -> dict[str, Any]:
+def _artifact_check(root: Path, name: str, ref: str, *, required: bool = True) -> dict[str, Any]:
     artifact_path = root / ref.rstrip("/")
     exists = artifact_path.is_dir() if ref.endswith("/") else artifact_path.exists()
+    status = PASSED if exists or not required else FAILED
+    message = f"{_display_ref(ref)} exists" if required else f"{_display_ref(ref)} optional artifact"
     return _check(
         f"artifact_{name}_exists",
-        PASSED if exists else FAILED,
-        f"{_display_ref(ref)} exists",
-        {"path": _display_ref(ref)},
+        status,
+        message,
+        {"path": _display_ref(ref), "required": required, "exists": exists},
     )
 
 
@@ -254,6 +267,25 @@ def _status_from_checks(checks: list[dict[str, Any]]) -> str:
     if any(check["status"] == WARNING for check in checks):
         return WARNING
     return PASSED
+
+
+def _quality_level(status: str, run_manifest: dict[str, Any] | None) -> str:
+    if status == FAILED:
+        return "needs_review"
+    if status == WARNING:
+        return "needs_review"
+    profile = str(run_manifest.get("quality_profile") if run_manifest else "")
+    if profile == FINISHED_PACKAGE_PROFILE:
+        return "product_mvp"
+    return "engineering_pass"
+
+
+def _delivery_status(status: str) -> str:
+    if status == PASSED:
+        return "pass"
+    if status == WARNING:
+        return "warning"
+    return "failed"
 
 
 def _run_id(root: Path, run_manifest: dict[str, Any] | None) -> str:

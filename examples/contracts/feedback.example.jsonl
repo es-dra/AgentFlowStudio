@@ -1,0 +1,2 @@
+{"schema_version":"0.1","feedback_id":"fb_clip_001","target_type":"clip","target_id":"clip_001","decision":"accepted","rating":4,"reason_tags":["strong_hook","clear_payoff"],"user_note":"This opening is suitable for a short promo.","created_at":"2026-05-20T10:00:00+08:00"}
+{"schema_version":"0.1","feedback_id":"fb_candidate_001","target_type":"candidate","target_id":"candidate_007","decision":"rejected","rating":2,"reason_tags":["weak_hook","too_much_context"],"user_note":"The idea is clear but the start is too slow.","created_at":"2026-05-20T10:05:00+08:00"}

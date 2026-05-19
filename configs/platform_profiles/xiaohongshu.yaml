@@ -1,0 +1,20 @@
+schema_version: "0.1"
+platform_id: xiaohongshu
+display_name: Xiaohongshu
+aspect_ratio: "9:16"
+recommended_duration_sec:
+  min: 15
+  target: 20
+  max: 45
+opening_style:
+  target_hook_sec: 4
+  prefer:
+    - practical_value
+    - personal_experience
+    - clear_before_after
+subtitle_density:
+  style: readable
+  max_chars_per_line: 16
+packaging:
+  cover_required: true
+  bgm_optional: true

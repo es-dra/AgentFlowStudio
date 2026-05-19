@@ -29,6 +29,12 @@ Formal product outputs:
 - `delivery_readiness.json`
 - `delivery_readiness.md`
 
+Contract examples:
+
+- `examples/contracts/project_manifest.example.json`
+- `examples/contracts/feedback.example.jsonl`
+- `configs/platform_profiles/*.yaml`
+
 ## Directory Semantics
 
 Committed directories:
@@ -136,6 +142,15 @@ review_report.json
 `finished_package_manifest.json` is the machine index. `package_report.md` is
 the human and agent summary. `quality_report.json` and `review_report.json` are
 the trust layer.
+
+`run_manifest.json` is the run-level artifact index. Agents and Web UI code
+should read both:
+
+- `artifacts`: backward-compatible simple string map.
+- `artifact_index`: expanded entries with `path`, `required`, and `exists`.
+
+`review_report.json` includes `quality_level` and `delivery_status` for callers
+that need a compact handoff state before reading detailed checks.
 
 For selected short clips, `package_report.md` should expose boundary evidence
 from the scoring report when it exists:

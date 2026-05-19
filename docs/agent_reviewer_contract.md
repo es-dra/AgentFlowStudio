@@ -50,6 +50,8 @@ Example shape:
   "schema_version": "0.1",
   "run_id": "demo_full_mock",
   "status": "passed",
+  "quality_level": "engineering_pass",
+  "delivery_status": "pass",
   "summary": {
     "total_checks": 12,
     "passed": 12,
@@ -93,6 +95,18 @@ any failed check -> failed
 no failed checks but at least one warning -> warning
 all checks passed -> passed
 ```
+
+`quality_level` values:
+
+- `engineering_pass`: checks passed for an engineering workflow run.
+- `product_mvp`: checks passed for a finished-package product run.
+- `needs_review`: failed or warning state requires human or agent review.
+
+`delivery_status` values:
+
+- `pass`
+- `warning`
+- `failed`
 
 CLI exit behavior:
 

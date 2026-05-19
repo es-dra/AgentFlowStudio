@@ -1,0 +1,20 @@
+schema_version: "0.1"
+platform_id: youtube_shorts
+display_name: YouTube Shorts
+aspect_ratio: "9:16"
+recommended_duration_sec:
+  min: 15
+  target: 25
+  max: 60
+opening_style:
+  target_hook_sec: 5
+  prefer:
+    - clear_topic
+    - payoff_preview
+    - curiosity_gap
+subtitle_density:
+  style: readable
+  max_chars_per_line: 18
+packaging:
+  cover_required: false
+  bgm_optional: true

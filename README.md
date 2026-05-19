@@ -2,19 +2,19 @@
 
 [中文 README](README.zh-CN.md)
 
-NarratoCut is a Python-based, CLI-first technical MVP for AI-assisted short
-video production workflows. It is currently an artifact-driven workflow system:
-each major step writes readable JSON or media artifacts, and those artifacts can
-be inspected and reviewed after a run.
+NarratoCut is the distribution-side short video highlight workflow module of
+AgentFlow Studio. It is a Python-based, local-first CLI/Agent MVP for
+AI-assisted short video packaging: each major step writes readable JSON or
+media artifacts, and those artifacts can be inspected and reviewed after a run.
 
 The project is clean-room. The previous AVP workspace is reference material
 only and is not used as a source-code base.
 
 ## Current Status
 
-NarratoCut is now a CLI-first technical MVP for developer-facing short-video
-generation workflows. It is not yet a consumer product, SaaS app, desktop app,
-or Web UI product.
+NarratoCut is now a CLI-first technical MVP for developer- and agent-facing
+short-video distribution workflows. It is not yet the full AgentFlow Studio
+platform, a consumer SaaS app, desktop app, or Web UI product.
 
 The current product path is:
 
@@ -49,11 +49,11 @@ Supported today:
 - local BGM mixing with bounded volume settings
 - finished package manifest indexing
 - `inspect-run` and `review-run` reports for generated run artifacts
+- `package_report.md` and delivery-readiness reports for handoff
 - `draft-plan` for static workflow plans
 
 Not included yet:
 
-- one-command end-to-end product workflow
 - Web UI or desktop UI
 - automatic music selection or licensing management
 - transition templates or multi-track timeline editing
@@ -203,6 +203,8 @@ Contract references:
 - [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md)
 - [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
 - [`docs/tool_contracts.md`](docs/tool_contracts.md)
+- [`docs/agent_usage_guide.md`](docs/agent_usage_guide.md)
+- [`docs/narratocut_delivery_checklist.md`](docs/narratocut_delivery_checklist.md)
 - [`docs/current_architecture.md`](docs/current_architecture.md)
 
 ## Remote Provider Boundary

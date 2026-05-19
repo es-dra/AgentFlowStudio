@@ -1,15 +1,18 @@
 # NarratoCut Docs
 
-Use this page as the current navigation surface. NarratoCut is now a
-local-first CLI product MVP with an agent-readable artifact chain. The main
-documentation goal is to make the product path, quality gates, and agent
-contracts obvious without reading every historical phase note.
+Use this page as the current navigation surface. NarratoCut is the
+distribution-side short video highlight workflow module of AgentFlow Studio. It
+is now a local-first CLI/Agent product MVP with an agent-readable artifact
+chain. The main documentation goal is to make the product path, quality gates,
+and agent contracts obvious without reading every historical phase note.
 
 ## Current Product State
 
 - [Current architecture](current_architecture.md)
 - [Product roadmap](product_roadmap.md)
+- [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
 - [Golden Path](golden_path.md)
+- [Golden Sample v0.1.0](golden_sample_v0_1_0.md)
 - [Phase 14 local ASR product acceptance](product_acceptance_phase14_local_asr.md)
 - [Phase 14.4B elastic boundary acceptance](product_acceptance_phase14_4b_elastic_boundaries.md)
 - [Phase 14.4E audio boundary refinement acceptance](product_acceptance_phase14_4e_audio_boundary_refinement.md)
@@ -43,6 +46,8 @@ paths, summarize refreshed product runs with:
 This writes `delivery_readiness.json` and `delivery_readiness.md`.
 
 Agent-facing task contracts live in [`../skills`](../skills/README.md).
+Operational agent guidance lives in
+[`agent_usage_guide.md`](agent_usage_guide.md).
 
 ## Contracts
 
@@ -51,6 +56,10 @@ Agent-facing task contracts live in [`../skills`](../skills/README.md).
 - [Tool contracts](tool_contracts.md)
 - [Agent reviewer contract](agent_reviewer_contract.md)
 - [Workflow plan contract](workflow_plan_contract.md)
+- [Project manifest contract](project_manifest_contract.md)
+- [Feedback contract](feedback_contract.md)
+- [Platform profile contract](platform_profile_contract.md)
+- [Asset lifecycle](asset_lifecycle.md)
 
 ## Quality And Acceptance
 

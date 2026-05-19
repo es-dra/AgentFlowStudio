@@ -34,6 +34,11 @@ def test_workflow_runner_writes_run_manifest_and_trace(tmp_path) -> None:
     }
     assert run_manifest["artifacts"]["manifest"] == "manifest.json"
     assert run_manifest["artifacts"]["clips_dir"] == "clips/"
+    assert run_manifest["artifact_index"]["hooks"] == {
+        "path": "hooks.json",
+        "required": True,
+        "exists": True,
+    }
 
     assert trace["workflow"] == workflow_path
     assert trace["run_id"] == "run_full_mock"

@@ -62,6 +62,7 @@ Key fields:
 - `status`: `success` or `failed`
 - `inputs`: normalized input references, such as `text`
 - `artifacts`: run artifacts, including `manifest` and `clips_dir`
+- `artifact_index`: expanded artifact map for agents and future Web UI code
 - `environment`: whether FFmpeg or network access was required
 
 Example:
@@ -86,11 +87,43 @@ Example:
     "manifest": "manifest.json",
     "clips_dir": "clips/"
   },
+  "artifact_index": {
+    "hooks": {
+      "path": "hooks.json",
+      "required": true,
+      "exists": true
+    },
+    "package_report": {
+      "path": "package_report.md",
+      "required": false,
+      "exists": false
+    }
+  },
   "environment": {
     "ffmpeg_required": false,
     "network_required": false
   }
 }
+```
+
+`artifacts` remains a simple backward-compatible string map. `artifact_index`
+adds `path`, `required`, and `exists` so agents and UI code can distinguish
+missing optional reports from missing required workflow outputs. Product runs
+should expose at least these keys when applicable:
+
+```text
+transcript
+candidate_windows
+highlight_score_report
+selection_diagnostics
+highlight_plan
+clip_plan
+real_slice_manifest
+final_video_manifest
+finished_package_manifest
+package_report
+quality_report
+review_report
 ```
 
 ## `trace.json`

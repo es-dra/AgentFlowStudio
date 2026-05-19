@@ -1,13 +1,14 @@
 # Product Roadmap
 
-This roadmap records the mainline direction after Phase 13. NarratoCut is now a
-CLI-first technical MVP: it can produce real local video artifacts through
-workflow contracts, but it is not yet a consumer-facing product.
+This roadmap records the mainline direction after the v0.1.0 delivery closeout.
+NarratoCut is now the distribution-side short video highlight workflow module
+of AgentFlow Studio: it can produce local finished-package artifacts through
+workflow contracts, but it is not yet a consumer-facing product or Web UI.
 
 ## Product Positioning
 
-NarratoCut is an artifact-driven short-video workflow system for existing
-videos, transcripts, scripts, and clip plans.
+NarratoCut is an artifact-driven short-video distribution workflow system for
+existing videos, transcripts, scripts, and clip plans.
 
 Current product path:
 
@@ -140,7 +141,6 @@ review_report.json
 
 Not included:
 
-- one-command end-to-end product workflow
 - physical package directory or zip export
 - automatic music selection
 - advanced subtitle templates
@@ -148,82 +148,16 @@ Not included:
 - publishing/upload
 - Web UI
 
-## Next Direction: Phase 14 Productization
+## Next Direction After v0.1.0
 
-Phase 14 should not start as "Web UI first." The backend product path needs a
-stable Golden Path and one-command orchestration before a UI can be useful.
+NarratoCut v0.1.0 should be treated as the stable distribution-side MVP before
+opening broader AgentFlow Studio work.
 
 Recommended sequence:
 
-### Phase 14.0: Documentation and Golden Path
-
-Goals:
-
-- align README and roadmap with current capabilities
-- document current architecture
-- document the Phase 13 complete Golden Path
-- run a local product smoke with ignored media artifacts
-
-### Phase 14.1: One-command Finished Package Workflow
-
-Recommended workflow:
-
-```text
-workflows/final_video_to_finished_package.yaml
-```
-
-Initial scope:
-
-```text
-final_video.mp4
-+ optional transcript/subtitles
-+ optional BGM
-  -> subtitles.srt, if transcript is provided
-  -> final_video_with_subtitles.mp4, if subtitles are provided/enabled
-  -> cover.jpg
-  -> final_video_with_bgm.mp4, if BGM is provided
-  -> finished_package_manifest.json
-```
-
-This should compose Phase 13 capabilities only. It should not regenerate
-highlights, clip plans, real clips, or final assembly.
-
-### Phase 14.2: Physical Package Export and Report
-
-Goals:
-
-- create a package directory with copied final artifacts
-- write `package_report.md`
-- optionally write a zip archive later
-
-Candidate output:
-
-```text
-package/
-  final_video.mp4
-  final_video_with_subtitles.mp4
-  final_video_with_bgm.mp4
-  cover.jpg
-  subtitles.srt
-  finished_package_manifest.json
-  package_report.md
-  review_report.json
-```
-
-### Phase 14.3: Web UI v0
-
-Goal:
-
-- expose the stable Golden Path through a local product console
-
-The UI should call stable workflow/API surfaces instead of hard-coding demo
-paths.
-
-### Phase 14.4: Agent Workflow Tools
-
-Goal:
-
-- expose safe workflow actions as controlled agent tools
-- keep approval, risk checks, and audit trails explicit
-
-The project should not bind to one agent framework too early.
+1. Keep NarratoCut stable and fix contract or delivery-readiness regressions.
+2. Build a separate NarratoCut Web UI branch as a package/run/report viewer.
+3. On the mainline, expand AgentFlow Studio architecture and start
+   NarratoStudio production-side artifact contracts.
+4. Merge the viewer branch only after it reads stable run/package artifacts
+   instead of hard-coding demo paths.

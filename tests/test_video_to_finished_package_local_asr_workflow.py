@@ -70,6 +70,28 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     clip_plan = json.loads((output_dir / "clip_plan.json").read_text(encoding="utf-8"))
     assert transcript["metadata"]["asr_provider"] == "faster_whisper"
     assert highlight_plan["metadata"]["source"] == "candidate_scoring"
+    run_manifest = json.loads((output_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    for artifact_name in [
+        "transcript",
+        "candidate_windows",
+        "highlight_score_report",
+        "selection_diagnostics",
+        "highlight_plan",
+        "clip_plan",
+        "real_slice_manifest",
+        "final_video_manifest",
+        "finished_package_manifest",
+        "package_report",
+        "quality_report",
+        "review_report",
+    ]:
+        assert artifact_name in run_manifest["artifacts"]
+        assert artifact_name in run_manifest["artifact_index"]
+    assert run_manifest["artifact_index"]["package_report"] == {
+        "path": "package_report.md",
+        "required": True,
+        "exists": True,
+    }
     assert (output_dir / "selection_diagnostics.json").is_file()
     assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
     assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
@@ -77,6 +99,8 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"
     assert review["status"] == "passed"
+    assert review["quality_level"] == "product_mvp"
+    assert review["delivery_status"] == "pass"
     assert _product_warnings(inspection).isdisjoint(_six_quality_warnings())
 
 
