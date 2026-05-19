@@ -42,6 +42,13 @@ Phase 13.6 hardens the BGM mix path without changing its product scope. It adds
 bounded volume validation, a `bgm_only` mix strategy for silent final videos,
 known FFmpeg warning classification, and duration drift warnings.
 
+Phase 14.2B/C adds a deterministic OCR-subtitle timeline and candidate scoring
+path. It consumes frame-level OCR results, writes `ocr_transcript.json`, expands
+candidate windows, scores them with explainable local heuristics, and writes
+`highlight_score_report.json` plus a selected `highlight_plan.json`. It does
+not add a real OCR provider dependency, call a remote model, run FFmpeg, slice
+media, or provide a Web UI.
+
 Catalog file:
 
 ```text
@@ -73,6 +80,7 @@ Allowed:
 - Phase 13.3 subtitle burn-in nodes that consume existing final video and SRT artifacts
 - Phase 13.4 cover export nodes that consume an existing final video
 - Phase 13.5 BGM mix nodes that consume an existing final video and local audio
+- Phase 14.2B/C OCR timeline and candidate scoring nodes that already exist in code
 
 Not allowed:
 
@@ -367,6 +375,56 @@ selection.
 - Content source: the manifest records `content_channel` from transcript
   metadata when present. This keeps the candidate layer reusable for ASR
   transcripts, future OCR subtitle transcripts, or later fused transcripts.
+
+### `build_ocr_transcript`
+
+Builds a timestamped OCR subtitle `Transcript` from frame-level OCR results.
+
+- Category: OCR timeline
+- Main entry points: workflow node `build_ocr_transcript`,
+  `narratocut.ocr_sop.build_ocr_transcript_from_frames`
+- Inputs: `ocr_frames.json`, optional source video path and timeline settings
+- Outputs: workflow state `ocr_transcript` and `ocr_transcript_manifest`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: OCR transcript channel, segment count, timestamp validity
+- Boundary: this node consumes OCR results that already exist. It does not
+  sample frames or run PaddleOCR, RapidOCR, Tesseract, or any remote OCR model.
+
+### `write_ocr_transcript`
+
+Writes the OCR subtitle transcript and manifest artifacts.
+
+- Category: OCR timeline
+- Main entry point: workflow node `write_ocr_transcript`
+- Inputs: workflow state `ocr_transcript`, `ocr_transcript_manifest`
+- Outputs: `ocr_transcript.json`, `ocr_transcript_manifest.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+
+### `score_candidate_windows`
+
+Scores candidate windows with deterministic viral-selection heuristics and
+selects highlights.
+
+- Category: candidate scoring
+- Main entry points: workflow node `score_candidate_windows`,
+  `narratocut.candidate_sop.score_candidate_windows`
+- Inputs: `candidate_windows.json` or workflow state `candidate_windows`
+- Outputs: workflow state `highlight_score_report` and `highlight_plan`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: selected count, selected score breakdowns, candidate IDs in the
+  selected highlight plan
+- Boundary: this node is an explainable local scorer. It does not claim real
+  viral prediction, call an LLM, inspect frames, or slice media.
+
+### `write_highlight_score_report`
+
+Writes the candidate scoring report to `highlight_score_report.json`.
+
+- Category: candidate scoring
+- Main entry point: workflow node `write_highlight_score_report`
+- Inputs: workflow state `highlight_score_report`
+- Outputs: `highlight_score_report.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
 
 ### `write_subtitles`
 

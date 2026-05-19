@@ -462,6 +462,40 @@ ASR transcripts, OCR subtitle transcripts, or fused transcripts. It does not
 score candidates, write `highlight_plan.json`, write `clip_plan.json`, run
 FFmpeg, call an LLM, inspect video frames, or export a final video.
 
+### `video_subtitle_ocr_to_highlight_plan.yaml`
+
+Phase 14.2B/C OCR-subtitle timeline and candidate scoring workflow:
+
+1. `load_video`
+2. `build_ocr_transcript`
+3. `write_ocr_transcript`
+4. `generate_candidate_windows`
+5. `score_candidate_windows`
+6. `write_highlight_score_report`
+7. `write_highlight_plan`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/reports/video_subtitle_ocr_to_highlight_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+```
+
+The committed example expects a local ignored video at
+`data/raw/demo_ocr/source.mp4` and consumes the committed frame-level OCR
+fixture at `examples/demo_ocr/ocr_frames_fixture.json`. The workflow writes
+`ocr_transcript.json`, `ocr_transcript_manifest.json`,
+`candidate_windows.json`, `highlight_score_report.json`, and
+`highlight_plan.json`.
+
+This is an offline product skeleton for OCR evidence and explainable highlight
+selection. It does not extract frames, run a real OCR engine, call remote
+providers, slice media, generate `clip_plan.json`, add subtitles/BGM/covers, or
+provide a Web UI. A future local OCR provider can feed the same frame-result
+contract.
+
 ### `transcript_to_highlight_clip_plan.yaml`
 
 Phase 10 timestamped transcript workflow:

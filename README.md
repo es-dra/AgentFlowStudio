@@ -35,6 +35,8 @@ video / transcript / clip_plan
 Supported today:
 
 - deterministic script/transcript highlight workflows
+- OCR-subtitle timeline from frame-level OCR results
+- explainable candidate-window scoring to selected highlights
 - mock and explicit opt-in OpenAI-compatible ASR paths
 - local faster-whisper ASR path for offline product smokes
 - ClipPlan validation against probed video metadata
@@ -56,6 +58,7 @@ Not included yet:
 - automatic music selection or licensing management
 - transition templates or multi-track timeline editing
 - visual highlight detection from video frames
+- real OCR frame extraction/provider integration
 - publishing/upload integrations
 - physical package directory or zip export
 - hosted API, database, queue, or SaaS runtime
@@ -147,6 +150,7 @@ Planning and transcript workflows:
 
 - `workflows/script_to_highlight_plan.yaml`
 - `workflows/transcript_to_candidate_windows.yaml`
+- `workflows/video_subtitle_ocr_to_highlight_plan.yaml`
 - `workflows/transcript_to_highlight_clip_plan.yaml`
 - `workflows/video_to_transcript.yaml`
 - `workflows/video_to_transcript_real_asr.yaml`
@@ -178,7 +182,9 @@ run_manifest.json
 trace.json
 quality_report.json
 review_report.json
+ocr_transcript.json
 candidate_windows.json
+highlight_score_report.json
 real_slice_manifest.json
 final_video_manifest.json
 subtitle_manifest.json

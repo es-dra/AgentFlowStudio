@@ -585,3 +585,12 @@
 - Local product smoke:
   - video-only local ASR with `small/int8/cpu`: workflow succeeded, `inspect-run` passed with 0 warnings, `review-run` passed with 0 warnings.
   - video+script local ASR with `small/int8/cpu` and lower local alignment threshold: workflow succeeded, `inspect-run` passed with 0 warnings, `review-run` passed with 0 warnings.
+
+## 2026-05-19 - Phase 14.2B/C OCR Timeline and Candidate Scoring
+
+- Added a deterministic OCR-subtitle timeline SOP that converts frame-level OCR results into `ocr_transcript.json` and `ocr_transcript_manifest.json`.
+- Added an explainable candidate scoring SOP that writes `highlight_score_report.json` and selects scored candidates into `highlight_plan.json`.
+- Added `workflows/video_subtitle_ocr_to_highlight_plan.yaml` for the offline OCR evidence path: video path validation, OCR timeline, candidate windows, scoring, and selected highlights.
+- Added `candidate_scoring` inspect/review quality checks for OCR transcript presence, candidate count, selected score breakdowns, and candidate IDs in selected highlights.
+- Updated tool catalog, tool contract docs, workflow docs, and README workflow/artifact lists.
+- Boundary kept: no real OCR provider dependency, no frame extraction, no FFmpeg execution, no remote calls, no media slicing, no Web UI.

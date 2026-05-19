@@ -1,0 +1,24 @@
+{
+  "frames": [
+    {
+      "time_sec": 1.0,
+      "text": "90% of creators cut the wrong part",
+      "confidence": 0.91
+    },
+    {
+      "time_sec": 1.5,
+      "text": "90% of creators cut the wrong part",
+      "confidence": 0.9
+    },
+    {
+      "time_sec": 2.0,
+      "text": "but the real problem is the opening hook",
+      "confidence": 0.87
+    },
+    {
+      "time_sec": 4.0,
+      "text": "therefore choose the reversal first",
+      "confidence": 0.88
+    }
+  ]
+}

@@ -233,6 +233,33 @@ def test_draft_workflow_plan_lists_candidate_window_outputs() -> None:
     assert "candidate_windows.json" in plan["artifacts"]["expected"]
 
 
+def test_draft_workflow_plan_lists_ocr_scoring_outputs() -> None:
+    plan = draft_workflow_plan(
+        workflow_path="workflows/video_subtitle_ocr_to_highlight_plan.yaml",
+        input_path="examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json",
+    )
+
+    assert plan["status"] == "draft"
+    assert [step["tool"] for step in plan["steps"]] == [
+        "load_video",
+        "build_ocr_transcript",
+        "write_ocr_transcript",
+        "generate_candidate_windows",
+        "score_candidate_windows",
+        "write_highlight_score_report",
+        "write_highlight_plan",
+    ]
+    expected = plan["artifacts"]["expected"]
+    for artifact in [
+        "ocr_transcript.json",
+        "ocr_transcript_manifest.json",
+        "candidate_windows.json",
+        "highlight_score_report.json",
+        "highlight_plan.json",
+    ]:
+        assert artifact in expected
+
+
 def test_draft_workflow_plan_lists_cover_outputs() -> None:
     plan = draft_workflow_plan(
         workflow_path="workflows/final_video_to_cover.yaml",
