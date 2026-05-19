@@ -2,6 +2,38 @@
 
 This directory contains YAML workflow definitions for NarratoCut.
 
+## Current Recommended Product Workflows
+
+Agents and UI prototypes should prefer these workflows instead of scanning every
+component workflow:
+
+| Workflow | Kind | Use when | Main outputs |
+| --- | --- | --- | --- |
+| `video_to_finished_package_local_asr.yaml` | product / recommended | The user has only a source video. | `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `candidate_windows.json`, `highlight_score_report.json`, `finished_package_manifest.json`, `package_report.md` |
+| `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
+| `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
+
+Component workflows such as `transcript_to_candidate_windows.yaml`,
+`clip_plan_to_real_clips.yaml`, `clips_to_final_video.yaml`, and
+`final_video_package.yaml` are building blocks. Historical mock workflows are
+kept for regression and contract coverage, not as the primary product entry.
+
+Workflow YAML files may include `metadata.kind`, `metadata.status`, and
+`metadata.audience` so agents can choose the right entry without relying only
+on filenames.
+
+After a formal product run, use:
+
+```powershell
+.venv\Scripts\ncut inspect-run --run-dir <run_dir>
+.venv\Scripts\ncut review-run --run-dir <run_dir>
+.venv\Scripts\ncut package-report --run-dir <run_dir>
+```
+
+The workflow writes an initial `package_report.md`; the final command refreshes
+it with the latest quality and review status.
+
 ## Available workflows
 
 ### `mock_roi_to_script.yaml`

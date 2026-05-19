@@ -970,6 +970,41 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: write_package_report
+    description: Write a human- and agent-readable Markdown report for a finished package run.
+    category: finished_package_report
+    entrypoints:
+      cli: ncut package-report
+      workflow_node: write_package_report
+      python: narratocut.package_sop.write_package_report
+    input_artifacts:
+      - finished_package_manifest.json
+      - run_manifest.json
+      - quality_report.json
+      - review_report.json
+      - clip_plan.json
+      - highlight_score_report.json
+    output_artifacts:
+      - package_report.md
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - package_manifest_missing
+      - score_report_missing
+      - package_report_write_failed
+    quality_checks:
+      - package_report_exists
+      - selected_clips_documented
+      - quality_gates_documented
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: inspect_run
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection

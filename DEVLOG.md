@@ -610,3 +610,13 @@
   - video-only: 4 clips, clip durations 4.2s / 4.6s / 5.0s / 5.0s, final duration 18.82322s, `inspect-run` pass with 0 warnings, `review-run` passed with 0 warnings.
   - video+script: 4 clips, clip durations 5.0s / 5.0s / 4.98s / 5.0s, final duration 20.00322s, 4 aligned / 0 skipped script highlights, `inspect-run` pass with 0 warnings, `review-run` passed with 0 warnings.
 - Product judgment: this fixes the previous 30s/90s overlong-cut failure and makes the current local acceptance suitable for short promo validation. Remaining quality risk is editorial selection depth: scoring is still deterministic and text-first, with OCR/visual/audio fusion planned as later evidence channels.
+
+## 2026-05-20 - Phase 14.3 Workspace and Agent Contract Hardening
+
+- Added `package_report.md` generation for finished-package runs so humans and agents have one readable summary instead of scanning many JSON artifacts.
+- Added `ncut package-report --run-dir ...` to refresh the report after `inspect-run` and `review-run`; the workflow writes an initial report, while formal acceptance should refresh it after quality and review artifacts exist.
+- Added workflow metadata (`metadata.kind`, `metadata.status`, `metadata.audience`) to recommended product workflows so agents can choose product entrypoints without relying only on filenames.
+- Added `skills/` with agent-readable task contracts for video-only and video+script short highlight package generation.
+- Added `docs/workspace_contract.md`, refreshed docs/workflow navigation, and updated the tool catalog/docs for `write_package_report`.
+- Split FFmpeg CLI handling into `apps/cli/media_commands.py` while adding package-report CLI handling in `apps/cli/report_commands.py`, keeping `apps/cli/main.py` under the 300-line target.
+- Boundary kept: no Web UI, no new agent runtime, no autonomous workflow selection, no highlight scoring algorithm rewrite, and no cleanup of ignored local run/model/media artifacts.

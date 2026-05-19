@@ -552,6 +552,26 @@ Writes a finished-package manifest that indexes existing final video outputs.
   upload files, regenerate videos, burn subtitles, mix BGM, export covers, call
   remote providers, or provide a Web UI.
 
+### `write_package_report`
+
+Writes a human- and agent-readable Markdown report for a finished package run.
+
+- Category: finished package report
+- Main entry points: workflow node `write_package_report`,
+  `ncut package-report`, `narratocut.package_sop.write_package_report`
+- Inputs: `finished_package_manifest.json`, `run_manifest.json`, optional
+  `quality_report.json`, `review_report.json`, `clip_plan.json`, and
+  `highlight_score_report.json`
+- Outputs: `package_report.md`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `package_report_exists`, selected clips documented, quality
+  gates documented
+- Agent usage: safe for automatic execution, does not execute external
+  processes
+- Boundary: this report summarizes existing run artifacts only. Run
+  `inspect-run` and `review-run` first, then refresh with `package-report` when
+  the report must include final quality and review status.
+
 ### `inspect_run`
 
 Inspects a workflow run directory and writes `quality_report.json`.

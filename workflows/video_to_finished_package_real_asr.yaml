@@ -2,6 +2,13 @@ name: video_to_finished_package_real_asr
 version: 1
 mode: video_to_finished_package_real_asr
 quality_profile: finished_package
+metadata:
+  kind: product
+  status: optional
+  audience:
+    - cli
+    - agent
+  description: Explicit opt-in remote-ASR video-only short highlight package workflow.
 steps:
   - id: load_video
     type: load_video
@@ -155,3 +162,7 @@ steps:
       audio_mix_manifest: audio_mix_manifest
     outputs:
       finished_package_manifest: finished_package_manifest.json
+  - id: write_package_report
+    type: write_package_report
+    outputs:
+      package_report: package_report.md

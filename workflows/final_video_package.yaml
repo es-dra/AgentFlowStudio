@@ -2,6 +2,13 @@ name: final_video_package
 version: 1
 mode: final_video_package
 quality_profile: finished_package
+metadata:
+  kind: component
+  status: stable
+  audience:
+    - cli
+    - agent
+  description: Index an existing final video and optional package assets.
 steps:
   - id: write_finished_package
     type: write_finished_package
@@ -9,3 +16,7 @@ steps:
       final_video: final_video_path
     outputs:
       finished_package_manifest: finished_package_manifest.json
+  - id: write_package_report
+    type: write_package_report
+    outputs:
+      package_report: package_report.md
