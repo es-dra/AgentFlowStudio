@@ -133,6 +133,16 @@ review_report.json
 the human and agent summary. `quality_report.json` and `review_report.json` are
 the trust layer.
 
+For selected short clips, `package_report.md` should expose boundary evidence
+from the scoring report when it exists:
+
+- `Boundary`: the candidate boundary strategy, for example
+  `elastic_duration_split` or `elastic_duration_trim`.
+- `Target duration`: the intended short-clip duration used by candidate
+  generation.
+- `Source window`: the original transcript/alignment window from which the
+  selected clip was split or trimmed.
+
 Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown
 summary with `ncut package-report --run-dir <run_dir>` so the report captures

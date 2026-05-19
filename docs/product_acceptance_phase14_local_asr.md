@@ -94,6 +94,22 @@ video failure. The current local product outputs are now shaped like short promo
 cuts. Editorial selection quality is still deterministic and text-first; OCR,
 visual, and audio evidence remain future improvements.
 
+### Phase 14.4A Elastic Boundary Follow-up
+
+Phase 14.4A improves the short-clip boundary logic without changing the product
+workflow shape. Long transcript or alignment windows are no longer split into
+rigid five-second chunks. They are converted into elastic 4-6 second windows
+when possible, or trimmed to the target-length core when the source window is
+too short to split cleanly.
+
+This is a boundary-quality improvement, not a claim that viral selection is
+complete. Acceptance reports should now check `candidate_windows.json`,
+`highlight_score_report.json`, and `package_report.md` for:
+
+- `boundary_strategy: elastic_duration_split` on balanced subwindows.
+- `boundary_strategy: elastic_duration_trim` on unsplittable overlong windows.
+- `target_duration_sec` and source-window evidence on selected clips.
+
 ### Source Video Only
 
 Run directory:

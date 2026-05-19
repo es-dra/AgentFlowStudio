@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from narratocut.candidate_sop.boundaries import elastic_time_windows
 from narratocut.schemas import Transcript, TranscriptSegment
 
 
@@ -152,32 +153,28 @@ def _subwindow_candidates(
 ) -> list[dict[str, Any]]:
     segment_start = window[0].start_time
     segment_end = window[-1].end_time
-    target = min(target_window_sec or max_duration_sec, max_duration_sec)
+    windows = elastic_time_windows(
+        segment_start,
+        segment_end,
+        min_duration_sec=min_duration_sec,
+        max_duration_sec=max_duration_sec,
+        target_window_sec=target_window_sec,
+    )
     candidates: list[dict[str, Any]] = []
-    cursor = segment_start
-    while cursor < segment_end:
-        end = min(cursor + target, segment_end)
-        duration = round(end - cursor, 6)
-        if min_duration_sec is not None and duration < min_duration_sec:
-            if candidates:
-                previous = candidates[-1]
-                previous["end_sec"] = segment_end
-                previous["duration_sec"] = round(previous["end_sec"] - previous["start_sec"], 6)
-            break
-        if duration <= 0:
-            break
+    for start_sec, end_sec, boundary_strategy in windows:
         candidates.append(
             _subwindow_payload(
                 index=start_index + len(candidates),
                 window=window,
-                start_sec=round(cursor, 6),
-                end_sec=round(end, 6),
+                start_sec=start_sec,
+                end_sec=end_sec,
                 transcript_duration=transcript_duration,
                 content_channel=content_channel,
                 alignment_index=alignment_index,
+                target_window_sec=target_window_sec,
+                boundary_strategy=boundary_strategy,
             )
         )
-        cursor = end
     return candidates
 
 
@@ -190,6 +187,8 @@ def _subwindow_payload(
     transcript_duration: float | None,
     content_channel: str,
     alignment_index: list[dict[str, Any]],
+    target_window_sec: float | None,
+    boundary_strategy: str,
 ) -> dict[str, Any]:
     payload = _candidate_payload(
         index=index,
@@ -202,9 +201,10 @@ def _subwindow_payload(
     payload["start_sec"] = start_sec
     payload["end_sec"] = end_sec
     payload["duration_sec"] = round(end_sec - start_sec, 6)
-    payload["evidence"]["boundary_strategy"] = "fixed_duration_split"
+    payload["evidence"]["boundary_strategy"] = boundary_strategy
     payload["evidence"]["source_window_start_sec"] = window[0].start_time
     payload["evidence"]["source_window_end_sec"] = window[-1].end_time
+    payload["evidence"]["target_duration_sec"] = target_window_sec
     return payload
 
 

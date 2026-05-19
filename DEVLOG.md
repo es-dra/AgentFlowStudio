@@ -620,3 +620,12 @@
 - Added `docs/workspace_contract.md`, refreshed docs/workflow navigation, and updated the tool catalog/docs for `write_package_report`.
 - Split FFmpeg CLI handling into `apps/cli/media_commands.py` while adding package-report CLI handling in `apps/cli/report_commands.py`, keeping `apps/cli/main.py` under the 300-line target.
 - Boundary kept: no Web UI, no new agent runtime, no autonomous workflow selection, no highlight scoring algorithm rewrite, and no cleanup of ignored local run/model/media artifacts.
+
+## 2026-05-20 - Phase 14.4A Elastic Short Clip Boundaries
+
+- Replaced rigid long-window fixed splits with elastic short-clip boundary generation.
+- Long transcript/alignment windows now split into balanced 4-6 second candidates when possible instead of leaving a short tail fragment.
+- Unsplittable overlong windows now trim to the target-length core instead of producing sub-four-second weak fragments.
+- Candidate evidence now records `boundary_strategy`, `target_duration_sec`, and source-window bounds for selected clips.
+- `package_report.md` now displays boundary strategy, target duration, and source window for each selected clip when scoring evidence is available.
+- Boundary kept: this improves clip timing shape and explainability, but does not introduce scene/silence detection, visual models, Web UI, or a new viral scoring algorithm.

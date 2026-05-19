@@ -338,6 +338,19 @@ Goal:
 Use local non-LLM media signals to improve clip boundaries.
 ```
 
+Phase 14.4A starts with transcript-only boundary hardening before adding new
+media detectors:
+
+- Replace fixed five-second splits for long transcript windows with elastic
+  short-window boundaries.
+- Prefer balanced 4-6 second windows when a long source window can be split
+  cleanly.
+- Trim unsplittable 6-8 second source windows to a target-length core instead
+  of producing weak sub-four-second fragments.
+- Preserve `boundary_strategy`, `target_duration_sec`, and source-window
+  evidence so `package_report.md` can explain why the selected clip starts and
+  ends where it does.
+
 Do:
 
 - Scene boundary detection via FFmpeg.
