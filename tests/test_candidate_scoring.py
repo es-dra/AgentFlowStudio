@@ -141,6 +141,57 @@ def test_score_candidate_windows_rejects_repeated_split_source_window() -> None:
     )
 
 
+def test_score_candidate_windows_dedupes_audio_refined_split_source_window() -> None:
+    candidates = {
+        "schema_version": "0.1",
+        "status": "succeeded",
+        "source_transcript_id": "demo_transcript",
+        "source_video": "input.mp4",
+        "content_channel": "local_asr",
+        "candidates": [
+            _candidate(
+                "cand_001",
+                0.2,
+                5.1,
+                "The first refined beat explains the setup.",
+                source_window_start_sec=0.0,
+                source_window_end_sec=20.0,
+                boundary_strategy="audio_boundary_refined",
+                base_boundary_strategy="elastic_duration_split",
+            ),
+            _candidate(
+                "cand_002",
+                5.2,
+                10.1,
+                "The second refined beat repeats the same setup.",
+                source_window_start_sec=0.0,
+                source_window_end_sec=20.0,
+                boundary_strategy="audio_boundary_refined",
+                base_boundary_strategy="elastic_duration_split",
+            ),
+            _candidate(
+                "cand_003",
+                30.0,
+                35.0,
+                "A separate payoff gives the edit a different beat.",
+                source_window_start_sec=30.0,
+                source_window_end_sec=40.0,
+            ),
+        ],
+    }
+
+    report, plan = score_candidate_windows(candidates, max_selected=3)
+
+    selected_ids = [candidate["candidate_id"] for candidate in report["candidates"] if candidate["decision"] == "selected"]
+    assert selected_ids == ["cand_001", "cand_003"]
+    assert len(plan.highlights) == 2
+    assert any(
+        candidate["candidate_id"] == "cand_002"
+        and "duplicate_source_window" in candidate["rejection_reasons"]
+        for candidate in report["candidates"]
+    )
+
+
 def test_score_candidate_windows_prefers_short_clip_duration() -> None:
     candidates = {
         "schema_version": "0.1",
@@ -191,7 +242,18 @@ def _candidate(
     *,
     source_window_start_sec: float,
     source_window_end_sec: float,
+    boundary_strategy: str = "fixed_duration_split",
+    base_boundary_strategy: str | None = None,
 ) -> dict[str, object]:
+    evidence = {
+        "window_size": 2,
+        "content_channel": "local_asr",
+        "boundary_strategy": boundary_strategy,
+        "source_window_start_sec": source_window_start_sec,
+        "source_window_end_sec": source_window_end_sec,
+    }
+    if base_boundary_strategy is not None:
+        evidence["base_boundary_strategy"] = base_boundary_strategy
     return {
         "candidate_id": candidate_id,
         "source": "transcript_subwindow",
@@ -202,11 +264,5 @@ def _candidate(
         "text": text,
         "asr_confidence": 0.8,
         "script_alignment": None,
-        "evidence": {
-            "window_size": 2,
-            "content_channel": "local_asr",
-            "boundary_strategy": "fixed_duration_split",
-            "source_window_start_sec": source_window_start_sec,
-            "source_window_end_sec": source_window_end_sec,
-        },
+        "evidence": evidence,
     }

@@ -138,11 +138,16 @@ For selected short clips, `package_report.md` should expose boundary evidence
 from the scoring report when it exists:
 
 - `Boundary`: the candidate boundary strategy, for example
-  `elastic_duration_split` or `elastic_duration_trim`.
+  `elastic_duration_split`, `elastic_duration_trim`, or
+  `audio_boundary_refined`.
+- `Base boundary`: the original split strategy when audio boundary refinement
+  adjusted an elastic subwindow.
 - `Target duration`: the intended short-clip duration used by candidate
   generation.
 - `Source window`: the original transcript/alignment window from which the
   selected clip was split or trimmed.
+- `Audio refinement`: the before/after source time when the selected candidate
+  moved to nearby high-confidence audio boundary points.
 - `Audio boundary`: nearest low-energy boundary evidence when
   `boundary_signal_manifest.json` was available and could be attached to the
   selected candidate.

@@ -654,3 +654,12 @@
 - `package_report.md` now displays selected-clip audio boundary evidence alongside transcript boundary strategy and source-window evidence.
 - Updated workflow docs, workspace contract, tool catalog/contracts, and agent skill outputs so agents can treat audio boundary evidence as a first-class advisory artifact.
 - Boundary kept: audio signals are advisory and local-only. They do not replace transcript/scoring logic, do not call remote models, do not add visual/multimodal analysis, and do not fail the product workflow when mock audio or unsupported audio cannot be analyzed.
+
+## 2026-05-20 - Phase 14.4D Audio Boundary Cut-Point Refinement
+
+- Added safe audio-boundary refinement for candidate windows: nearby high-confidence audio boundaries can adjust candidate `start_sec` and/or `end_sec`.
+- Refinement is constrained by maximum adjustment distance, source transcript window bounds, and the existing short-clip duration gates, so it cannot produce overlong or underlong candidates.
+- Candidate evidence now records `audio_boundary_refinement`, `boundary_strategy=audio_boundary_refined`, and `base_boundary_strategy` for refined elastic subwindows.
+- Updated scoring duplicate-source-window rejection so audio-refined split candidates still dedupe against the original transcript/alignment window.
+- `package_report.md` now shows base boundary strategy and audio refinement before/after time ranges for selected clips.
+- Kept the boundary narrow: no Web UI, no remote LLM, no new dependencies, no visual model, and no claim that deterministic viral selection is editorially mature.

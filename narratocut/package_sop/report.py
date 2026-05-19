@@ -90,8 +90,10 @@ def _clip_lines(clip_plan: dict[str, Any] | None, score_report: dict[str, Any] |
                 f"- Score: {_score(scored)}",
                 f"- Reasons: {_reasons(scored)}",
                 f"- Boundary: {_boundary_strategy(scored)}",
+                f"- Base boundary: {_base_boundary_strategy(scored)}",
                 f"- Target duration: {_target_duration(scored)}",
                 f"- Source window: {_source_window(scored, start, end)}",
+                f"- Audio refinement: {_audio_refinement(scored)}",
                 f"- Audio boundary: {_audio_boundary(scored)}",
                 f"- Text: {segment.get('text') or '(empty)'}",
                 "",
@@ -224,6 +226,12 @@ def _boundary_strategy(candidate: dict[str, Any] | None) -> str:
     return "unknown"
 
 
+def _base_boundary_strategy(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    value = evidence.get("base_boundary_strategy") if evidence else None
+    return str(value) if value else "not applicable"
+
+
 def _target_duration(candidate: dict[str, Any] | None) -> str:
     evidence = _source_evidence(candidate)
     value = evidence.get("target_duration_sec") if evidence else None
@@ -239,6 +247,18 @@ def _source_window(candidate: dict[str, Any] | None, fallback_start: float | Non
     if _source_candidate(candidate) is not None:
         return _time_range(fallback_start, fallback_end)
     return "unknown"
+
+
+def _audio_refinement(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    refinement = evidence.get("audio_boundary_refinement") if evidence else None
+    if not isinstance(refinement, dict):
+        return "not applied"
+    original = _time_range(_float(refinement.get("original_start_sec")), _float(refinement.get("original_end_sec")))
+    refined = _time_range(_float(refinement.get("refined_start_sec")), _float(refinement.get("refined_end_sec")))
+    applied = refinement.get("applied")
+    applied_text = ", ".join(str(item) for item in applied) if isinstance(applied, list) else "unknown"
+    return f"{original} -> {refined} ({applied_text})"
 
 
 def _audio_boundary(candidate: dict[str, Any] | None) -> str:
