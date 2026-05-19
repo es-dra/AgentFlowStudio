@@ -519,6 +519,37 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: transcribe_audio_faster_whisper
+    description: Convert an audio artifact into a timestamped Transcript using a local faster-whisper model.
+    category: video_transcription_asr
+    entrypoints:
+      cli: null
+      workflow_node: transcribe_audio_faster_whisper
+      python: narratocut.asr_sop.FasterWhisperASRProvider
+    input_artifacts:
+      - audio_manifest.json
+      - audio/audio.wav
+    output_artifacts:
+      - workflow_state.transcript
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: true
+      api_key: false
+    failure_modes:
+      - local_asr_dependency_missing
+      - audio_artifact_missing
+      - local_asr_transcription_failed
+      - transcript_schema_invalid
+    quality_checks:
+      - transcript_segments_non_empty
+      - transcript_timestamps_valid
+    agent_usage:
+      safe_for_auto_execute: false
+      requires_human_review: true
+      mutates_workflow: false
+      executes_external_process: true
+
   - name: write_transcript
     description: Write the current timestamped Transcript state to transcript.json.
     category: video_transcription_output

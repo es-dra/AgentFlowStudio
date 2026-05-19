@@ -84,6 +84,20 @@ def test_detector_limits_highlight_count() -> None:
     assert len(plan.highlights) == 2
 
 
+def test_detector_matches_readable_chinese_keywords() -> None:
+    plan = detect_highlights_from_script(
+        "韩渊本以为自己会一直落魄，没想到觉醒系统后真相反转。\n"
+        "他被废修为逐出宗门，但凭杀猪刀重新杀回去。\n"
+        "所以这一集最强爆点就是扮猪吃虎后的打脸复仇。",
+        source_id="zh_script",
+        max_highlights=3,
+    )
+
+    types = {highlight.highlight_type for highlight in plan.highlights}
+    assert {"hook", "conflict", "cta"}.issubset(types)
+    assert any("以为" in highlight.metadata["matched_keywords"] for highlight in plan.highlights)
+
+
 def test_detector_rejects_empty_script_input() -> None:
     with pytest.raises(ValueError, match="script_text"):
         detect_highlights_from_script("   ")

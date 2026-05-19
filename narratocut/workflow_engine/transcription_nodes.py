@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.asr_sop import MockASRProvider, OpenAICompatibleASRProvider
+from narratocut.asr_sop import FasterWhisperASRProvider, MockASRProvider, OpenAICompatibleASRProvider
 from narratocut.audio_sop import AUDIO_MANIFEST, AudioArtifact, AudioExtractionConfig, extract_audio_from_video
 from narratocut.schemas import Transcript
 from narratocut.utils import write_json
@@ -62,6 +62,32 @@ def transcribe_audio_openai_compatible_node(step: WorkflowStepDefinition, contex
         api_key=str(api_key) if api_key is not None else None,
         api_key_env=str(api_key_env) if api_key_env is not None else None,
         timeout_sec=float(timeout_sec) if timeout_sec is not None else 60.0,
+    )
+    transcript = provider.transcribe(
+        audio_artifact,
+        language=str(language) if language is not None else None,
+    )
+    context.state["transcript"] = transcript
+    return []
+
+
+def transcribe_audio_faster_whisper_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    audio_artifact = _state_audio_artifact(context)
+    model = _optional_parameter_input(step, context, "model")
+    device = _optional_parameter_input(step, context, "device")
+    compute_type = _optional_parameter_input(step, context, "compute_type")
+    download_root = _optional_parameter_input(step, context, "download_root")
+    beam_size = _optional_parameter_input(step, context, "beam_size")
+    vad_filter = _optional_parameter_input(step, context, "vad_filter")
+    language = _optional_parameter_input(step, context, "language")
+
+    provider = FasterWhisperASRProvider(
+        model=str(model) if model is not None else "tiny",
+        device=str(device) if device is not None else "cpu",
+        compute_type=str(compute_type) if compute_type is not None else "int8",
+        download_root=str(download_root) if download_root is not None else None,
+        beam_size=int(beam_size) if beam_size is not None else 1,
+        vad_filter=_bool_input(vad_filter) if vad_filter is not None else False,
     )
     transcript = provider.transcribe(
         audio_artifact,
@@ -160,3 +186,9 @@ def _audio_extraction_mode(value: str) -> str:
     if text not in {"ffmpeg", "mock"}:
         raise ValueError("audio_extraction_mode must be ffmpeg or mock")
     return text
+
+
+def _bool_input(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}

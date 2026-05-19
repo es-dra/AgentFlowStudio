@@ -357,6 +357,28 @@ inspect video frames or run multimodal highlight detection. The BGM path must be
 local, ignored media, and `bgm_metadata_path` should point to local metadata
 with `quality_verified: true` when the music has actually been reviewed.
 
+### `video_to_finished_package_local_asr.yaml`
+
+Local-ASR variant of the Phase 14.1 source-video-only Golden Path. It has the
+same product chain as `video_to_finished_package_real_asr.yaml`, but step 3 is
+`transcribe_audio_faster_whisper` instead of a remote OpenAI-compatible ASR
+call.
+
+Example:
+
+```powershell
+.venv\Scripts\python.exe -m pip install faster-whisper
+.venv\Scripts\ncut run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_local_asr
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
+```
+
+The committed example uses `asr_model: small`, `asr_device: cpu`, and
+`asr_compute_type: int8` for better Chinese transcript quality on roughly
+one-minute local smokes without requiring a strong GPU. Use `tiny` for a faster
+engineering-only smoke, but expect weaker highlight quality. The first run may
+download model files into the configured local cache.
+
 ### `video_script_to_finished_package_real_asr.yaml`
 
 Phase 14.1 ASR-first product Golden Path for the source-video-plus-script case.
@@ -377,6 +399,26 @@ $env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
 Low-confidence script-to-transcript alignments are skipped and reported in the
 alignment manifest. This workflow does not do visual semantic search; the ASR
 transcript is the source of video timestamps.
+
+### `video_script_to_finished_package_local_asr.yaml`
+
+Local-ASR variant of the Phase 14.1 source-video-plus-script Golden Path. It
+uses `transcribe_audio_faster_whisper`, then aligns script highlights to local
+ASR transcript segments before slicing and packaging.
+
+Example:
+
+```powershell
+.venv\Scripts\python.exe -m pip install faster-whisper
+.venv\Scripts\ncut run-workflow --workflow workflows/video_script_to_finished_package_local_asr.yaml --input examples/demo_asr/video_script_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_local_asr
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
+```
+
+For local small-model Chinese ASR, the example uses a lower
+`alignment_min_confidence` because short ASR segments and imperfect transcript
+text make exact lexical overlap sparse. The aligner still records confidence,
+matched segment ids, and skipped highlights in `script_highlight_alignment.json`.
 
 ### `script_to_highlight_plan.yaml`
 

@@ -540,3 +540,22 @@
 - Added focused tests for script alignment, clip-timeline subtitles, BGM verified metadata, product package warning clearance, and both product Golden Path workflows with mocked ASR/FFmpeg.
 - Product-quality intent: the old Phase 13 demo warning set remains a useful negative smoke, while the Phase 14.1 workflows can clear the six known product warnings when they receive multi-segment highlights, final-timeline subtitles, and verified BGM metadata.
 - Boundaries kept: no visual/multimodal highlight detection, no Web UI, no publishing/upload, no automatic music recommendation, no real ASR in tests, and no default remote ASR without `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
+
+## 2026-05-19 - Local Faster-Whisper ASR Path
+
+- Added `FasterWhisperASRProvider` for local `faster-whisper` transcription with CPU-first defaults (`model=tiny`, `device=cpu`, `compute_type=int8`).
+- Added workflow node `transcribe_audio_faster_whisper` and local-ASR product workflow variants:
+  - `workflows/video_to_finished_package_local_asr.yaml`
+  - `workflows/video_script_to_finished_package_local_asr.yaml`
+- Added example input bundles that use ignored local media and local model cache paths, without API keys or remote ASR opt-in.
+- Updated tool contracts/catalog and workflow docs to distinguish remote ASR from local ASR.
+- Verification so far: focused provider/workflow tests pass with mocked local ASR and FFmpeg. Real local ASR smoke still depends on installing `faster-whisper` and downloading a local model cache.
+
+## 2026-05-19 - Local ASR Quality Hardening
+
+- Improved script-to-transcript alignment for Chinese text by adding Chinese character and bigram tokens instead of relying only on English/number word tokens.
+- Added transcript sliding-window matching so one script highlight can align to multiple adjacent ASR segments, which is important for local Whisper models that split Chinese speech into short fragments.
+- Updated local-ASR examples to prefer `small` + CPU `int8` for better Chinese quality, with `tiny` kept as the faster engineering-only option.
+- Local product smoke:
+  - video-only local ASR with `small/int8/cpu`: workflow succeeded, `inspect-run` passed with 0 warnings, `review-run` passed with 0 warnings.
+  - video+script local ASR with `small/int8/cpu` and lower local alignment threshold: workflow succeeded, `inspect-run` passed with 0 warnings, `review-run` passed with 0 warnings.
