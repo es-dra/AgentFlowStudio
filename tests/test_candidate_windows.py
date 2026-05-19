@@ -108,9 +108,80 @@ def test_generate_candidate_windows_splits_long_segments_into_short_product_wind
     )
 
     assert manifest["candidate_count"] == 3
-    assert [candidate["duration_sec"] for candidate in manifest["candidates"]] == [5.0, 5.0, 4.0]
+    assert [candidate["duration_sec"] for candidate in manifest["candidates"]] == pytest.approx(
+        [4.666667, 4.666666, 4.666667]
+    )
     assert all(candidate["source"] == "transcript_subwindow" for candidate in manifest["candidates"])
-    assert all(candidate["evidence"]["boundary_strategy"] == "fixed_duration_split" for candidate in manifest["candidates"])
+    assert all(candidate["evidence"]["boundary_strategy"] == "elastic_duration_split" for candidate in manifest["candidates"])
+
+
+def test_generate_candidate_windows_balances_long_segments_into_elastic_short_windows() -> None:
+    transcript = Transcript.model_validate(
+        {
+            "transcript_id": "demo_transcript",
+            "duration": 18.0,
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_time": 0.0,
+                    "end_time": 13.2,
+                    "text": "The long aligned segment contains a hook, conflict, and payoff.",
+                    "confidence": 0.92,
+                },
+            ],
+        }
+    )
+
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=2,
+        min_duration_sec=4.0,
+        max_duration_sec=6.0,
+        target_window_sec=5.0,
+    )
+
+    assert manifest["candidate_count"] == 3
+    assert [candidate["duration_sec"] for candidate in manifest["candidates"]] == [4.4, 4.4, 4.4]
+    assert [candidate["start_sec"] for candidate in manifest["candidates"]] == [0.0, 4.4, 8.8]
+    assert [candidate["end_sec"] for candidate in manifest["candidates"]] == [4.4, 8.8, 13.2]
+    assert {candidate["evidence"]["boundary_strategy"] for candidate in manifest["candidates"]} == {
+        "elastic_duration_split"
+    }
+    assert all(candidate["evidence"]["target_duration_sec"] == 5.0 for candidate in manifest["candidates"])
+
+
+def test_generate_candidate_windows_trims_unsplittable_overlong_window_to_target_duration() -> None:
+    transcript = Transcript.model_validate(
+        {
+            "transcript_id": "demo_transcript",
+            "duration": 10.0,
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_time": 0.0,
+                    "end_time": 7.2,
+                    "text": "A slightly long beat should not become two weak fragments.",
+                    "confidence": 0.91,
+                },
+            ],
+        }
+    )
+
+    manifest = generate_candidate_windows(
+        transcript,
+        max_window_size=2,
+        min_duration_sec=4.0,
+        max_duration_sec=6.0,
+        target_window_sec=5.0,
+    )
+
+    assert manifest["candidate_count"] == 1
+    candidate = manifest["candidates"][0]
+    assert candidate["start_sec"] == 0.0
+    assert candidate["end_sec"] == 5.0
+    assert candidate["duration_sec"] == 5.0
+    assert candidate["evidence"]["boundary_strategy"] == "elastic_duration_trim"
+    assert candidate["evidence"]["source_window_end_sec"] == 7.2
 
 
 def test_generate_candidate_windows_attaches_script_alignment_evidence() -> None:

@@ -135,6 +135,73 @@ def test_finished_package_records_quality_evidence_paths(tmp_path) -> None:
     }
 
 
+def test_package_report_documents_elastic_clip_boundary_evidence(tmp_path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    final_video = tmp_path / "final_video.mp4"
+    final_video.write_bytes(b"fake final video")
+    _write_package_run_manifest(run_dir)
+    write_json(run_dir / "final_video_manifest.json", {"status": "succeeded", "duration_sec": 18.0})
+    write_json(
+        run_dir / "finished_package_manifest.json",
+        {
+            "schema_version": "0.1",
+            "status": "succeeded",
+            "package_id": "pkg",
+            "primary_video": {"role": "final_video", "path": str(final_video), "required": True, "exists": True},
+            "assets": [{"role": "final_video", "path": str(final_video), "required": True, "exists": True}],
+            "errors": [],
+            "warnings": [],
+            "manifest_path": "finished_package_manifest.json",
+        },
+    )
+    write_json(
+        run_dir / "clip_plan.json",
+        {
+            "segments": [
+                {
+                    "segment_id": "seg_001",
+                    "start_sec": 0.0,
+                    "end_sec": 4.4,
+                    "text": "90% of creators cut the wrong part",
+                    "metadata": {
+                        "candidate_id": "cand_001",
+                        "scorer": "deterministic_viral_scorer_v0",
+                    },
+                }
+            ]
+        },
+    )
+    write_json(
+        run_dir / "highlight_score_report.json",
+        {
+            "candidates": [
+                {
+                    "candidate_id": "cand_001",
+                    "decision": "selected",
+                    "total_score": 0.82,
+                    "reasons": ["strong_hook", "duration_fit"],
+                    "source_candidate": {
+                        "evidence": {
+                            "boundary_strategy": "elastic_duration_split",
+                            "target_duration_sec": 5.0,
+                            "source_window_start_sec": 0.0,
+                            "source_window_end_sec": 13.2,
+                        }
+                    },
+                }
+            ]
+        },
+    )
+
+    write_package_report(output_dir := run_dir)
+
+    report_text = (output_dir / "package_report.md").read_text(encoding="utf-8")
+    assert "- Boundary: elastic_duration_split" in report_text
+    assert "- Target duration: 5.00s" in report_text
+    assert "- Source window: 0.00s - 13.20s" in report_text
+
+
 def test_final_video_package_fails_when_primary_final_video_missing(tmp_path) -> None:
     input_path = _write_input_bundle(tmp_path, missing_final_video=True)
     output_dir = tmp_path / "package_run"

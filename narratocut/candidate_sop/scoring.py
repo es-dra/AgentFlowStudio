@@ -304,7 +304,11 @@ def _source_window_key(item: dict[str, Any]) -> tuple[float, float] | None:
     if not isinstance(source_candidate, dict):
         return None
     evidence = source_candidate.get("evidence")
-    if not isinstance(evidence, dict) or evidence.get("boundary_strategy") != "fixed_duration_split":
+    if not isinstance(evidence, dict) or evidence.get("boundary_strategy") not in {
+        "fixed_duration_split",
+        "elastic_duration_split",
+        "elastic_duration_trim",
+    }:
         return None
     start = _optional_float(evidence.get("source_window_start_sec"))
     end = _optional_float(evidence.get("source_window_end_sec"))

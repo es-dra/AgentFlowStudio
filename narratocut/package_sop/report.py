@@ -89,6 +89,9 @@ def _clip_lines(clip_plan: dict[str, Any] | None, score_report: dict[str, Any] |
                 f"- Candidate ID: `{candidate_id or 'missing'}`",
                 f"- Score: {_score(scored)}",
                 f"- Reasons: {_reasons(scored)}",
+                f"- Boundary: {_boundary_strategy(scored)}",
+                f"- Target duration: {_target_duration(scored)}",
+                f"- Source window: {_source_window(scored)}",
                 f"- Text: {segment.get('text') or '(empty)'}",
                 "",
             ]
@@ -208,6 +211,35 @@ def _score(candidate: dict[str, Any] | None) -> str:
         return "missing"
     score = _float(candidate.get("total_score"))
     return f"{score:.3f}" if score is not None else "missing"
+
+
+def _boundary_strategy(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    value = evidence.get("boundary_strategy") if evidence else None
+    return str(value) if value else "unknown"
+
+
+def _target_duration(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    value = evidence.get("target_duration_sec") if evidence else None
+    return _seconds(_float(value))
+
+
+def _source_window(candidate: dict[str, Any] | None) -> str:
+    evidence = _source_evidence(candidate)
+    if not evidence:
+        return "unknown"
+    return _time_range(_float(evidence.get("source_window_start_sec")), _float(evidence.get("source_window_end_sec")))
+
+
+def _source_evidence(candidate: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not candidate:
+        return None
+    source_candidate = candidate.get("source_candidate")
+    if not isinstance(source_candidate, dict):
+        return None
+    evidence = source_candidate.get("evidence")
+    return evidence if isinstance(evidence, dict) else None
 
 
 def _time_range(start: float | None, end: float | None) -> str:
