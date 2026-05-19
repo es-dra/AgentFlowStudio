@@ -100,6 +100,7 @@ run_dir/
   boundary_signal_manifest.json
   candidate_windows.json
   highlight_score_report.json
+  selection_diagnostics.json
   highlight_plan.json
   clip_plan.json
   real_slice_manifest.json
@@ -153,6 +154,18 @@ from the scoring report when it exists:
   selected candidate. The Markdown report only displays this as nearby evidence
   when the boundary is within 1.0 second of the clip boundary; distant nearest
   boundaries are summarized as `not nearby`.
+
+For selection quality review, `selection_diagnostics.json` should summarize the
+candidate scoring report without changing it:
+
+- selected candidate score range
+- top near-miss rejected candidates
+- rejection reason counts
+- score gap between the selected floor and best rejected candidate
+- selected source-time distribution
+- boundary strategy distribution
+- warnings such as near-miss rejected candidates, clustered selection, duplicate
+  source-window pressure, or weak hook evidence
 
 Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown

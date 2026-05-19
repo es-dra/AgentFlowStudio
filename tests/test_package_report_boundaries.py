@@ -174,6 +174,46 @@ def test_package_report_documents_audio_boundary_refinement(tmp_path: Path) -> N
     assert "- Audio refinement: 1.80s - 6.30s -> 2.00s - 6.10s (start, end)" in report_text
 
 
+def test_package_report_summarizes_selection_diagnostics(tmp_path: Path) -> None:
+    run_dir = _write_base_package_run(tmp_path, final_duration=18.0)
+    _write_clip_plan(run_dir, start_sec=0.0, end_sec=4.4, candidate_id="cand_001")
+    _write_score_report(
+        run_dir,
+        {
+            "candidate_id": "cand_001",
+            "decision": "selected",
+            "total_score": 0.42,
+            "reasons": ["duration_fit"],
+            "source_candidate": {"source": "transcript_window", "evidence": {"window_size": 1}},
+        },
+    )
+    write_json(
+        run_dir / "selection_diagnostics.json",
+        {
+            "schema_version": "0.1",
+            "status": "succeeded",
+            "candidate_count": 4,
+            "selected_count": 1,
+            "selected_score_range": {"min": 0.42, "max": 0.42},
+            "score_gaps": {"best_rejected_gap_to_selected_floor": -0.01},
+            "near_misses": [{"candidate_id": "cand_002", "selection_score": 0.41, "rejection_reasons": ["selection_limit"]}],
+            "rejection_reason_counts": {"selection_limit": 2},
+            "boundary_strategy_counts": {"native_transcript_window": 4},
+            "selected_position_counts": {"early": 1},
+            "warnings": [{"code": "near_miss_rejected", "message": "A rejected candidate was close to the selected floor."}],
+        },
+    )
+
+    write_package_report(run_dir)
+
+    report_text = (run_dir / "package_report.md").read_text(encoding="utf-8")
+    assert "## Selection Diagnostics" in report_text
+    assert "- Candidates: 4 total, 1 selected" in report_text
+    assert "- Selected score range: 0.420 - 0.420" in report_text
+    assert "- Top near miss: `cand_002` score 0.410 (selection_limit)" in report_text
+    assert "- Warnings: near_miss_rejected" in report_text
+
+
 def _write_base_package_run(tmp_path: Path, *, final_duration: float) -> Path:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

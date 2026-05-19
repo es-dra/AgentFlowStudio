@@ -34,6 +34,7 @@ def test_video_to_finished_package_real_asr_workflow_definition() -> None:
         "generate_candidate_windows",
         "score_candidate_windows",
         "write_highlight_score_report",
+        "write_selection_diagnostics",
         "write_highlight_plan",
         "generate_clip_plan_from_highlights",
         "write_clip_plan",
@@ -78,7 +79,9 @@ def test_video_to_finished_package_real_asr_workflow_runs_product_path(tmp_path,
     assert subtitle_manifest["duration_sec"] <= 30.0
     assert package["evidence"]["real_slice_manifest"].endswith("real_slice_manifest.json")
     assert package["evidence"]["subtitle_manifest"].endswith("subtitle_manifest.json")
+    assert (output_dir / "selection_diagnostics.json").is_file()
     assert "## Selected Clips" in package_report
+    assert "## Selection Diagnostics" in package_report
     assert "Candidate ID" in package_report
 
     inspection = inspect_run(output_dir)
@@ -125,6 +128,7 @@ def _assert_product_outputs(output_dir: Path) -> None:
         "transcript.json",
         "candidate_windows.json",
         "highlight_score_report.json",
+        "selection_diagnostics.json",
         "highlight_plan.json",
         "clip_plan.json",
         "clip_plan_validation.json",

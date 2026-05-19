@@ -29,6 +29,7 @@ output_artifacts:
   - boundary_signal_manifest.json
   - candidate_windows.json
   - highlight_score_report.json
+  - selection_diagnostics.json
 quality_gates:
   - inspect-run
   - review-run
@@ -48,5 +49,5 @@ when_not_to_use:
 failure_recovery:
   low_alignment_confidence: Lower acceptance threshold only for smoke testing, or improve the script/transcript quality.
   skipped_script_highlights: Inspect script_highlight_alignment.json before rerunning.
-  weak_highlight_quality: Review rejected candidates and selected clip reasons in package_report.md.
+  weak_highlight_quality: Review rejected candidates, near misses, and selected clip reasons in package_report.md and selection_diagnostics.json.
   weak_boundary_evidence: Treat boundary_signal_manifest.json as advisory and review clip starts/ends manually.

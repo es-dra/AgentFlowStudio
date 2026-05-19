@@ -62,6 +62,7 @@ from narratocut.workflow_engine.ocr_nodes import (
     build_ocr_transcript_node,
     score_candidate_windows_node,
     write_highlight_score_report_node,
+    write_selection_diagnostics_node,
     write_ocr_transcript_node,
 )
 from narratocut.workflow_engine.package_nodes import write_finished_package_node, write_package_report_node
@@ -238,6 +239,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("write_ocr_transcript", write_ocr_transcript_node)
     registry.register("score_candidate_windows", score_candidate_windows_node)
     registry.register("write_highlight_score_report", write_highlight_score_report_node)
+    registry.register("write_selection_diagnostics", write_selection_diagnostics_node)
     registry.register("rank_highlights_by_roi", rank_highlights_by_roi_node)
     registry.register("generate_highlight_clip_plan", generate_highlight_clip_plan_node)
     registry.register("generate_clip_plan_from_highlights", generate_highlight_clip_plan_node)

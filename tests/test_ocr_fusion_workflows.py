@@ -24,6 +24,7 @@ def test_video_subtitle_ocr_to_highlight_plan_workflow_definition() -> None:
         "generate_candidate_windows",
         "score_candidate_windows",
         "write_highlight_score_report",
+        "write_selection_diagnostics",
         "write_highlight_plan",
     ]
 
@@ -73,6 +74,7 @@ def test_video_subtitle_ocr_to_highlight_plan_workflow_writes_scored_outputs(tmp
     transcript = json.loads((output_dir / "ocr_transcript.json").read_text(encoding="utf-8"))
     candidates = json.loads((output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
     score_report = json.loads((output_dir / "highlight_score_report.json").read_text(encoding="utf-8"))
+    diagnostics = json.loads((output_dir / "selection_diagnostics.json").read_text(encoding="utf-8"))
     highlight_plan = HighlightPlan.model_validate(
         json.loads((output_dir / "highlight_plan.json").read_text(encoding="utf-8"))
     )
@@ -80,5 +82,11 @@ def test_video_subtitle_ocr_to_highlight_plan_workflow_writes_scored_outputs(tmp
     assert transcript["metadata"]["content_channel"] == "ocr_subtitle"
     assert candidates["content_channel"] == "ocr_subtitle"
     assert score_report["selected_count"] >= 1
+    assert diagnostics["status"] == "succeeded"
+    assert diagnostics["candidate_count"] == score_report["candidate_count"]
     assert highlight_plan.highlights
     assert highlight_plan.highlights[0].metadata["candidate_id"]
+    inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
+    review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
+    assert inspection["status"] == "pass"
+    assert review["status"] == "passed"

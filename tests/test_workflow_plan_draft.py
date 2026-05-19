@@ -247,6 +247,7 @@ def test_draft_workflow_plan_lists_ocr_scoring_outputs() -> None:
         "generate_candidate_windows",
         "score_candidate_windows",
         "write_highlight_score_report",
+        "write_selection_diagnostics",
         "write_highlight_plan",
     ]
     expected = plan["artifacts"]["expected"]
@@ -255,6 +256,7 @@ def test_draft_workflow_plan_lists_ocr_scoring_outputs() -> None:
         "ocr_transcript_manifest.json",
         "candidate_windows.json",
         "highlight_score_report.json",
+        "selection_diagnostics.json",
         "highlight_plan.json",
     ]:
         assert artifact in expected

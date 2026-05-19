@@ -764,6 +764,37 @@ tools:
       mutates_workflow: false
       executes_external_process: false
 
+  - name: write_selection_diagnostics
+    description: Write selection diagnostics from the candidate scoring report.
+    category: candidate_scoring
+    entrypoints:
+      cli: null
+      workflow_node: write_selection_diagnostics
+      python: narratocut.workflow_engine.ocr_nodes.write_selection_diagnostics_node
+    input_artifacts:
+      - workflow_state.highlight_score_report
+      - highlight_score_report.json
+    output_artifacts:
+      - selection_diagnostics.json
+    requires:
+      ffmpeg: false
+      network: false
+      model_provider: false
+      api_key: false
+    failure_modes:
+      - highlight_score_report_missing
+      - selection_diagnostics_write_failed
+    quality_checks:
+      - selection_diagnostics_exists
+      - selection_diagnostics_status
+      - near_misses_documented
+      - rejection_reason_counts_documented
+    agent_usage:
+      safe_for_auto_execute: true
+      requires_human_review: false
+      mutates_workflow: false
+      executes_external_process: false
+
   - name: write_subtitles
     description: Export a timestamped Transcript to subtitles.srt and subtitle_manifest.json.
     category: subtitle_export
@@ -1016,6 +1047,7 @@ tools:
       - review_report.json
       - clip_plan.json
       - highlight_score_report.json
+      - selection_diagnostics.json
     output_artifacts:
       - package_report.md
     requires:

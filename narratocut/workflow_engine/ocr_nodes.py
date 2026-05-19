@@ -4,7 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from narratocut.candidate_sop import HIGHLIGHT_SCORE_REPORT, score_candidate_windows
+from narratocut.candidate_sop import (
+    HIGHLIGHT_SCORE_REPORT,
+    SELECTION_DIAGNOSTICS,
+    build_selection_diagnostics,
+    score_candidate_windows,
+)
 from narratocut.ocr_sop import OCR_TRANSCRIPT_MANIFEST, build_ocr_transcript_from_frames
 from narratocut.schemas import Transcript
 from narratocut.utils import write_json
@@ -64,6 +69,16 @@ def write_highlight_score_report_node(step: WorkflowStepDefinition, context: Wor
     output_ref = str(step.outputs.get("highlight_score_report") or HIGHLIGHT_SCORE_REPORT)
     write_json(context.output_path(output_ref), {**report, "manifest_path": output_ref})
     context.artifacts["highlight_score_report"] = output_ref
+    return [output_ref]
+
+
+def write_selection_diagnostics_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    report = _state_dict(context, str(step.inputs.get("highlight_score_report") or "highlight_score_report"))
+    diagnostics = build_selection_diagnostics(report)
+    output_ref = str(step.outputs.get("selection_diagnostics") or SELECTION_DIAGNOSTICS)
+    write_json(context.output_path(output_ref), {**diagnostics, "manifest_path": output_ref})
+    context.state["selection_diagnostics"] = diagnostics
+    context.artifacts["selection_diagnostics"] = output_ref
     return [output_ref]
 
 
