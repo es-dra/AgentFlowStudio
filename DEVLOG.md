@@ -629,3 +629,19 @@
 - Candidate evidence now records `boundary_strategy`, `target_duration_sec`, and source-window bounds for selected clips.
 - `package_report.md` now displays boundary strategy, target duration, and source window for each selected clip when scoring evidence is available.
 - Boundary kept: this improves clip timing shape and explainability, but does not introduce scene/silence detection, visual models, Web UI, or a new viral scoring algorithm.
+
+## 2026-05-20 - Phase 14.4B Elastic Boundary Acceptance
+
+- Synced `master` to PR #32 and cleaned the merged Phase 14.4A branch locally and remotely.
+- Re-ran the local video-only product workflow on `data/raw/demo_real_video/input.mp4`.
+  - Result: 4 clips, durations 4.2s / 4.6s / 4.79s / 4.59s, final duration 18.222331s.
+  - `inspect-run`: pass, 8 passed / 0 failed / 0 warnings.
+  - `review-run`: passed, 37 passed / 0 failed / 0 warnings.
+- Re-ran the local video+script product workflow on `data/raw/demo_zombie/input.mp4` and `script.txt`.
+  - Result: 4 clips, durations 4.9225s / 4.98s / 5.346667s / 4.785s, final duration 20.082292s.
+  - Script alignment: 4 aligned / 0 skipped.
+  - `inspect-run`: pass, 8 passed / 0 failed / 0 warnings.
+  - `review-run`: passed, 38 passed / 0 failed / 0 warnings.
+- Refined `package_report.md` boundary display so native short transcript windows are labeled `native_transcript_window` instead of `unknown`.
+- Added `docs/product_acceptance_phase14_4b_elastic_boundaries.md` as the acceptance record.
+- Boundary kept: this is an execution and boundary-evidence acceptance pass, not a claim that deterministic viral selection is editorially mature.
