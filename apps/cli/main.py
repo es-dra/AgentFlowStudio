@@ -8,7 +8,12 @@ import typer
 from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.plan_commands import write_draft_plan_from_cli
-from apps.cli.report_commands import inspect_run_output, package_report_command, review_run_output
+from apps.cli.report_commands import (
+    delivery_readiness_command,
+    inspect_run_output,
+    package_report_command,
+    review_run_output,
+)
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.workflow_commands import run_workflow_from_cli
 from narratocut import __version__
@@ -269,6 +274,7 @@ def review_run_command(
 
 
 app.command(name="package-report")(package_report_command)
+app.command(name="delivery-readiness")(delivery_readiness_command)
 
 
 def _display_ref(path: Path) -> str:

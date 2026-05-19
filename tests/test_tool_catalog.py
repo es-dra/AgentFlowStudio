@@ -42,6 +42,7 @@ EXPECTED_TOOLS = {
     "probe_bgm_mix",
     "write_finished_package",
     "write_package_report",
+    "delivery_readiness",
     "inspect_run",
 }
 FORBIDDEN_TOOLS = {

@@ -707,3 +707,31 @@
 - Refined `package_report.md` audio-boundary display so distant nearest boundaries are summarized as `not nearby` instead of cluttering acceptance reports with misleading far-away evidence.
 - Added `docs/product_acceptance_phase14_4e_audio_boundary_refinement.md` as the acceptance record.
 - Boundary kept: this is local product acceptance plus report readability hardening, not a broader scoring rewrite or Web UI step.
+
+## 2026-05-20 - Phase 14.6 Delivery Readiness Gate
+
+- Synced local `master` to PR #37, deleted the merged local and remote `feature/phase-14-5-selection-diagnostics` branch, and started `codex/phase-14-6-delivery-hardening` from the latest `master`.
+- Added `ncut delivery-readiness` to summarize one or more refreshed product run directories into `delivery_readiness.json` and `delivery_readiness.md`.
+- Added `narratocut.package_sop.delivery` as a report-only gate over existing run artifacts: package manifest, quality report, review report, package report, score report, and selection diagnostics.
+- Updated tool catalog, tool-contract docs, workspace docs, workflow docs, and agent skill contracts so the delivery readiness report becomes the final handoff gate after `inspect-run`, `review-run`, and `package-report`.
+- Smoke-tested the gate against the latest local Phase 14.4E acceptance run directories. The command wrote reports but correctly returned `fail` because those older local runs predate Phase 14.5 and do not contain `selection_diagnostics.json`; formal delivery readiness now requires rerunning the product paths after Phase 14.5+.
+- Re-ran both formal local product paths as Phase 14.6 acceptance runs:
+  - video-only: `product_acceptance_video_only_phase14_6`, 16 candidates, 4 selected clips, final duration 18.189323s, `inspect-run` pass, `review-run` passed with 39 checks / 0 warnings.
+  - video+script: `product_acceptance_video_script_phase14_6`, 18 candidates, 4 selected clips, final duration 20.082292s, 4 aligned / 0 skipped script highlights, `inspect-run` pass, `review-run` passed with 40 checks / 0 warnings.
+- Ran final `delivery-readiness` for both Phase 14.6 runs. Result: `warning`, 0 failed runs, 2 warning runs. The warnings are selection-quality signals (`near_miss_rejected`, `too_many_selection_limit_rejections`, `duplicate_source_window_pressure`, `few_strong_hooks`), not execution failures.
+- Added `docs/product_acceptance_phase14_6_delivery_readiness.md` as the acceptance record.
+- Boundary kept: this gate does not rerun ASR/OCR/slicing/assembly, does not call remote providers, does not add Web UI, and does not claim deterministic selection quality is editorially final.
+
+## 2026-05-20 - Phase 14.6 Selection-Quality Hardening
+
+- Investigated the Phase 14.6 delivery-readiness warnings and confirmed the main root cause was not execution failure: selected candidates were tying on duration-fit because the deterministic scorer did not recognize Chinese short-drama/promo hook, conflict, payoff, or specificity cues.
+- Added a focused `candidate_sop.signals` module for multilingual deterministic content signals, keeping `scoring.py` under the 300-line target.
+- Updated candidate scoring so Chinese terms such as `消失`, `后悔`, `重生`, `末世`, `广播`, `疫苗`, `年入`, `百万`, `穷酸`, and related payoff/conflict cues contribute to `hook_strength`, `conflict_intensity`, `payoff_or_reversal`, and `specificity_or_novelty`.
+- Added a small source-window position penalty for later repeated elastic subwindows, while preserving timeline-ordered `highlight_plan.json` output so final assembly remains natural.
+- Refined `selection_diagnostics.json` warnings so expected overlap and duplicate-source pruning remain visible as near-miss evidence but do not raise delivery-readiness warnings unless the pressure is actionable.
+- Added regression tests for Chinese short-drama hook prioritization, repeated source subwindow penalties, and non-actionable selection-limit/duplicate pruning warnings.
+- Re-ran formal local product paths as selection-quality acceptance runs:
+  - video-only: `product_acceptance_video_only_phase14_6_selection_quality`, 16 candidates, 4 selected clips, final duration 18.788998s, `selection_diagnostics.json` 0 warnings, `inspect-run` pass, `review-run` 39 passed / 0 warnings.
+  - video+script: `product_acceptance_video_script_phase14_6_selection_quality`, 18 candidates, 4 selected clips, final duration 20.419887s, `selection_diagnostics.json` 0 warnings, `inspect-run` pass, `review-run` 40 passed / 0 warnings.
+- Ran final `delivery-readiness` for the selection-quality reruns. Result: `pass`, 2 passed / 0 warning / 0 failed.
+- Boundary kept: this closes the visible deterministic selection warnings for current local acceptance素材, but it is still text-first heuristic scoring, not a claim that viral/editorial judgment is mature.
