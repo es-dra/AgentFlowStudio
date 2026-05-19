@@ -10,12 +10,14 @@ from narratocut.harness.highlight_artifacts import (
 )
 from narratocut.harness.bgm_quality import build_bgm_review_section
 from narratocut.harness.candidate_quality import build_candidate_review_section
+from narratocut.harness.candidate_scoring_quality import build_candidate_scoring_review_section
 from narratocut.harness.cover_quality import build_cover_review_section
 from narratocut.harness.package_quality import build_package_review_section
 from narratocut.harness.quality_profiles import (
     COVER_EXPORT_PROFILE,
     BGM_MIX_PROFILE,
     CANDIDATE_WINDOWS_PROFILE,
+    CANDIDATE_SCORING_PROFILE,
     FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
@@ -66,6 +68,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         sections.append(build_package_review_section(root))
     if run_manifest and run_manifest.get("quality_profile") == CANDIDATE_WINDOWS_PROFILE:
         sections.append(build_candidate_review_section(root))
+    if run_manifest and run_manifest.get("quality_profile") == CANDIDATE_SCORING_PROFILE:
+        sections.append(build_candidate_scoring_review_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
     if run_manifest and is_video_highlight_quality_profile(run_manifest.get("quality_profile")):

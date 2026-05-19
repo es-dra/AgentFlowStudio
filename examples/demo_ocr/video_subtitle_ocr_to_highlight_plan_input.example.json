@@ -1,0 +1,15 @@
+{
+  "video_path": "data/raw/demo_ocr/source.mp4",
+  "ocr_frames_path": "examples/demo_ocr/ocr_frames_fixture.json",
+  "language": "en",
+  "frame_interval_sec": 0.5,
+  "dedupe_similarity": 0.85,
+  "merge_gap_sec": 0.8,
+  "min_text_chars": 3,
+  "max_window_size": 2,
+  "min_duration_sec": 1,
+  "max_duration_sec": 12,
+  "max_selected": 2,
+  "max_overlap_ratio": 0.4,
+  "output_dir": "data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan"
+}
