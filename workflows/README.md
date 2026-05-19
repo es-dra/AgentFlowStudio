@@ -439,6 +439,29 @@ Example:
 This workflow writes a ranked `highlight_plan.json`. It intentionally does not
 write `clip_plan.json` because script-only input has no reliable timeline.
 
+### `transcript_to_candidate_windows.yaml`
+
+Phase 14.2A transcript candidate-window workflow:
+
+1. `load_transcript`
+2. `generate_candidate_windows`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut draft-plan --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/reports/transcript_candidate_windows_plan.json
+.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/processed/runs/demo_transcript_candidate_windows
+```
+
+This workflow writes `candidate_windows.json` from adjacent transcript segment
+windows. It is the Phase 14.2A selection-quality input artifact: later scoring
+can evaluate many candidate windows instead of selecting highlights directly
+from raw transcript segments. The manifest records the transcript
+`content_channel` when available, so the same candidate layer can later consume
+ASR transcripts, OCR subtitle transcripts, or fused transcripts. It does not
+score candidates, write `highlight_plan.json`, write `clip_plan.json`, run
+FFmpeg, call an LLM, inspect video frames, or export a final video.
+
 ### `transcript_to_highlight_clip_plan.yaml`
 
 Phase 10 timestamped transcript workflow:

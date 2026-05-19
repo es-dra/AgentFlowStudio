@@ -1,0 +1,18 @@
+name: transcript_to_candidate_windows
+version: 1
+mode: candidate_windows
+quality_profile: candidate_windows
+steps:
+  - id: load_transcript
+    type: load_transcript
+    inputs:
+      transcript: transcript_path
+  - id: generate_candidate_windows
+    type: generate_candidate_windows
+    inputs:
+      transcript: transcript
+      max_window_size: max_window_size
+      min_duration_sec: min_duration_sec
+      max_duration_sec: max_duration_sec
+    outputs:
+      candidate_windows: candidate_windows.json

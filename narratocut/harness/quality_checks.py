@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from narratocut.harness.bgm_quality import build_bgm_quality_report
+from narratocut.harness.candidate_quality import build_candidate_quality_report
 from narratocut.harness.highlight_artifacts import build_highlight_quality_report, is_highlight_quality_profile
 from narratocut.harness.cover_quality import build_cover_quality_report
 from narratocut.harness.final_video_quality import build_final_video_quality_report
@@ -14,6 +15,7 @@ from narratocut.harness.quality_profiles import (
     BGM_MIX_PROFILE,
     FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
+    CANDIDATE_WINDOWS_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
@@ -49,6 +51,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return build_bgm_quality_report(root)
         if quality_profile == FINISHED_PACKAGE_PROFILE:
             return build_package_quality_report(root)
+        if quality_profile == CANDIDATE_WINDOWS_PROFILE:
+            return build_candidate_quality_report(root)
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):

@@ -9,6 +9,7 @@ from narratocut.workflow_engine import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
 from narratocut.workflow_engine.highlight_nodes import (
     detect_highlights_node,
+    generate_candidate_windows_node,
     generate_highlight_clip_plan_node,
     load_script_node,
     load_transcript_node,
@@ -97,6 +98,33 @@ def test_transcript_highlight_nodes_write_highlight_plan_and_clip_plan(tmp_path)
     assert len(clip_plan.segments) == len(highlight_plan.highlights)
     assert clip_plan.segments[0].metadata["highlight_id"] == highlight_plan.highlights[0].highlight_id
     assert clip_plan.segments[0].metadata["ranking_factors"]["final_score"] >= 0
+
+
+def test_generate_candidate_windows_node_writes_candidate_manifest(tmp_path) -> None:
+    context = _context(tmp_path, inputs={"transcript_path": "examples/demo_highlight/transcript.json"})
+
+    load_transcript_node(_step("load_transcript", inputs={"transcript": "transcript_path"}), context)
+    artifacts = generate_candidate_windows_node(
+        _step(
+            "generate_candidate_windows",
+            inputs={
+                "transcript": "transcript",
+                "max_window_size": 2,
+                "min_duration_sec": 1,
+                "max_duration_sec": 30,
+            },
+            outputs={"candidate_windows": "candidate_windows.json"},
+        ),
+        context,
+    )
+
+    assert artifacts == ["candidate_windows.json"]
+    assert context.artifacts["candidate_windows"] == "candidate_windows.json"
+    assert "candidate_windows" in context.state
+    manifest = json.loads((context.output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
+    assert manifest["candidate_count"] >= 1
+    assert manifest["candidates"][0]["source"] == "transcript_window"
+    assert manifest["candidates"][0]["segment_ids"]
 
 
 def test_generate_highlight_clip_plan_node_rejects_script_only_plan(tmp_path) -> None:

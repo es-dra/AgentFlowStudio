@@ -12,6 +12,7 @@ from narratocut.utils import write_json
 
 SCRIPT_WORKFLOW = Path("workflows/script_to_highlight_plan.yaml")
 TRANSCRIPT_WORKFLOW = Path("workflows/transcript_to_highlight_clip_plan.yaml")
+CANDIDATE_WORKFLOW = Path("workflows/transcript_to_candidate_windows.yaml")
 
 
 def test_script_highlight_run_inspect_and_review_highlight_plan(tmp_path) -> None:
@@ -76,6 +77,35 @@ def test_transcript_highlight_run_inspect_and_review_clip_plan(tmp_path) -> None
     assert checks["clip_order_matches_highlights"]["status"] == "passed"
 
 
+def test_candidate_windows_run_inspect_and_review_candidate_manifest(tmp_path) -> None:
+    run_dir = tmp_path / "candidate_windows_run"
+    status, _ = run_workflow_from_cli(
+        workflow_path=CANDIDATE_WORKFLOW,
+        input_path=Path("examples/demo_highlight/transcript_candidate_windows_input.example.json"),
+        output_dir=run_dir,
+    )
+    assert status == "success"
+
+    inspection = inspect_run(run_dir)
+    review = review_run(run_dir)
+
+    assert inspection["status"] == "pass"
+    artifact_statuses = {item["path"]: item["status"] for item in inspection["artifacts"]}
+    assert artifact_statuses["candidate_windows.json"] == "found"
+    assert "hooks.json" not in artifact_statuses
+    assert "clips/" not in artifact_statuses
+
+    summary = inspection["quality_report"]["summary"]["candidate_windows"]
+    assert summary["candidate_count"] > 0
+    assert summary["content_channel"] == "transcript"
+
+    assert review["status"] == "passed"
+    checks = _checks_by_id(review, "candidate_windows")
+    assert checks["candidate_count_positive"]["status"] == "passed"
+    assert checks["candidate_timestamps_valid"]["status"] == "passed"
+    assert checks["candidate_duration_bounds"]["status"] == "passed"
+
+
 def test_highlight_review_fails_script_only_plan_with_timestamps(tmp_path) -> None:
     run_dir = _write_highlight_run(tmp_path / "bad_script", quality_profile="highlight_plan")
     highlight_plan = _base_highlight_plan(input_mode="script_only")
@@ -121,6 +151,36 @@ def test_highlight_review_fails_invalid_ranking_factors(tmp_path) -> None:
     assert checks["ranking_final_scores_valid"]["status"] == "failed"
 
 
+def test_candidate_windows_review_fails_invalid_manifest(tmp_path) -> None:
+    run_dir = _write_candidate_run(tmp_path / "bad_candidates")
+    write_json(
+        run_dir / "candidate_windows.json",
+        {
+            "status": "succeeded",
+            "content_channel": "transcript",
+            "candidate_count": 1,
+            "candidates": [
+                {
+                    "candidate_id": "cand_001",
+                    "start_sec": 5.0,
+                    "end_sec": 3.0,
+                    "duration_sec": -2.0,
+                    "segment_ids": [],
+                    "text": "bad",
+                }
+            ],
+        },
+    )
+    write_json(run_dir / "quality_report.json", build_quality_report(run_dir))
+
+    review = review_run(run_dir)
+
+    assert review["status"] == "failed"
+    checks = _checks_by_id(review, "candidate_windows")
+    assert checks["candidate_timestamps_valid"]["status"] == "failed"
+    assert checks["candidate_segment_ids_present"]["status"] == "failed"
+
+
 def _write_highlight_run(run_dir: Path, *, quality_profile: str) -> Path:
     run_dir.mkdir(parents=True)
     artifacts = {"highlight_plan": "highlight_plan.json", "manifest": "manifest.json"}
@@ -137,6 +197,23 @@ def _write_highlight_run(run_dir: Path, *, quality_profile: str) -> Path:
         },
     )
     write_json(run_dir / "trace.json", {"steps": [{"step_id": "detect_highlights", "status": "success"}]})
+    write_json(run_dir / "manifest.json", {"status": "success"})
+    return run_dir
+
+
+def _write_candidate_run(run_dir: Path) -> Path:
+    run_dir.mkdir(parents=True)
+    write_json(
+        run_dir / "run_manifest.json",
+        {
+            "run_id": run_dir.name,
+            "workflow": "workflows/transcript_to_candidate_windows.yaml",
+            "workflow_mode": "candidate_windows",
+            "quality_profile": "candidate_windows",
+            "artifacts": {"candidate_windows": "candidate_windows.json"},
+        },
+    )
+    write_json(run_dir / "trace.json", {"steps": [{"step_id": "generate_candidate_windows", "status": "success"}]})
     write_json(run_dir / "manifest.json", {"status": "success"})
     return run_dir
 

@@ -11,6 +11,7 @@ from narratocut.workflow_engine import load_workflow
 
 SCRIPT_WORKFLOW = Path("workflows/script_to_highlight_plan.yaml")
 TRANSCRIPT_WORKFLOW = Path("workflows/transcript_to_highlight_clip_plan.yaml")
+CANDIDATE_WORKFLOW = Path("workflows/transcript_to_candidate_windows.yaml")
 
 
 def test_highlight_workflow_definitions_keep_script_and_transcript_boundaries() -> None:
@@ -40,6 +41,38 @@ def test_highlight_workflow_definitions_keep_script_and_transcript_boundaries() 
         "write_highlight_plan",
         "write_clip_plan",
     ]
+
+
+def test_transcript_to_candidate_windows_workflow_definition() -> None:
+    workflow = load_workflow(CANDIDATE_WORKFLOW)
+
+    assert workflow.mode == "candidate_windows"
+    assert workflow.quality_profile == "candidate_windows"
+    assert [step.type for step in workflow.steps] == [
+        "load_transcript",
+        "generate_candidate_windows",
+    ]
+
+
+def test_transcript_to_candidate_windows_workflow_writes_candidate_manifest(tmp_path) -> None:
+    output_dir = tmp_path / "candidate_windows"
+
+    status, _ = run_workflow_from_cli(
+        workflow_path=CANDIDATE_WORKFLOW,
+        input_path=Path("examples/demo_highlight/transcript_candidate_windows_input.example.json"),
+        output_dir=output_dir,
+    )
+
+    assert status == "success"
+    manifest = json.loads((output_dir / "candidate_windows.json").read_text(encoding="utf-8"))
+    run_manifest = json.loads((output_dir / "run_manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["status"] == "succeeded"
+    assert manifest["candidate_count"] >= 1
+    assert manifest["candidates"][0]["segment_ids"]
+    assert run_manifest["workflow_mode"] == "candidate_windows"
+    assert run_manifest["quality_profile"] == "candidate_windows"
+    assert run_manifest["artifacts"]["candidate_windows"] == "candidate_windows.json"
 
 
 def test_script_highlight_workflow_writes_ranked_highlight_plan_only(tmp_path) -> None:

@@ -347,6 +347,27 @@ Writes the current timestamped `Transcript` state to `transcript.json`.
 - Requires: no FFmpeg, no network, no model provider, no API key
 - Main checks: `transcript_file_exists`, `transcript_schema_valid`
 
+### `generate_candidate_windows`
+
+Generates adjacent transcript-window candidates for later highlight scoring and
+selection.
+
+- Category: candidate generation
+- Main entry points: workflow node `generate_candidate_windows`,
+  `narratocut.candidate_sop.generate_candidate_windows`
+- Inputs: `transcript.json` or workflow state `transcript`
+- Outputs: `candidate_windows.json`
+- Requires: no FFmpeg, no network, no model provider, no API key
+- Main checks: `candidate_windows_manifest_exists`,
+  `candidate_count_positive`, `candidate_timestamps_valid`,
+  `candidate_duration_bounds`
+- Boundary: this node only expands transcript segments into candidate windows.
+  It does not score candidates, select final highlights, call an LLM, inspect
+  video frames, slice media, or build a final package.
+- Content source: the manifest records `content_channel` from transcript
+  metadata when present. This keeps the candidate layer reusable for ASR
+  transcripts, future OCR subtitle transcripts, or later fused transcripts.
+
 ### `write_subtitles`
 
 Exports the current timestamped `Transcript` state to `subtitles.srt` and

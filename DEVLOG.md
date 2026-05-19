@@ -1,5 +1,31 @@
 # DEVLOG
 
+## 2026-05-19 - Phase 14.2A Candidate Windows
+
+- Started `feature/phase-14-2a-candidate-windows` from the merged local-ASR
+  product acceptance `master`.
+- Added `narratocut.candidate_sop.generate_candidate_windows` to expand a
+  timestamped transcript into adjacent 1..N segment windows and record the
+  transcript content channel for future ASR/OCR/fused transcript inputs.
+- Added the `generate_candidate_windows` workflow node and
+  `workflows/transcript_to_candidate_windows.yaml`, producing
+  `candidate_windows.json` without scoring, highlight selection, FFmpeg,
+  remote models, or video-frame inspection.
+- Added a demo input and focused tests for window generation, duration bounds,
+  node artifact writing, workflow loading, and static plan drafting.
+- Added a `candidate_windows` inspect/review quality profile so
+  `inspect-run` and `review-run` validate `candidate_windows.json` directly
+  instead of falling back to the legacy mock hooks/scripts/clips checks.
+- Updated the static tool catalog, tool contracts, README, and workflow docs so
+  `candidate_windows.json` is a formal Phase 14.2A artifact for later viral
+  scoring.
+- Updated the viral quality plan after route review: keep Phase 14.2A narrow,
+  prioritize Subtitle OCR Timeline next, then add ASR/OCR candidate fusion and
+  scoring.
+- Boundary kept: Phase 14.2A only generates candidate windows. Viral scoring,
+  selected/rejected reasons, package reports, Web UI, and multimodal detection
+  remain future work.
+
 ## 2026-05-19 - Phase 14.0B Product Quality Smoke Reclassification
 
 - Started `feature/phase-14-0b-product-quality-smoke` from the merged Phase
