@@ -11,6 +11,7 @@ contracts obvious without reading every historical phase note.
 - [Product roadmap](product_roadmap.md)
 - [Golden Path](golden_path.md)
 - [Phase 14 local ASR product acceptance](product_acceptance_phase14_local_asr.md)
+- [Phase 14.4B elastic boundary acceptance](product_acceptance_phase14_4b_elastic_boundaries.md)
 
 ## Recommended Product Workflows
 
