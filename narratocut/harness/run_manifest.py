@@ -10,6 +10,20 @@ if TYPE_CHECKING:
 
 
 PROJECT_NAME = "NarratoCut"
+PRODUCT_ARTIFACT_DEFAULTS = {
+    "transcript": ("transcript.json", False),
+    "candidate_windows": ("candidate_windows.json", False),
+    "highlight_score_report": ("highlight_score_report.json", False),
+    "selection_diagnostics": ("selection_diagnostics.json", False),
+    "highlight_plan": ("highlight_plan.json", False),
+    "clip_plan": ("clip_plan.json", False),
+    "real_slice_manifest": ("real_slice_manifest.json", False),
+    "final_video_manifest": ("final_video_manifest.json", False),
+    "finished_package_manifest": ("finished_package_manifest.json", False),
+    "package_report": ("package_report.md", False),
+    "quality_report": ("quality_report.json", False),
+    "review_report": ("review_report.json", False),
+}
 
 
 def write_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, Any]:
@@ -19,7 +33,7 @@ def write_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, 
 
 
 def build_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, Any]:
-    artifacts = _contract_artifacts(context.artifacts)
+    artifacts = _contract_artifacts(context.artifacts, context)
     return {
         "project": PROJECT_NAME,
         "run_id": run.run_id,
@@ -31,6 +45,7 @@ def build_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, 
         "status": run.status,
         "inputs": _contract_inputs(context.inputs),
         "artifacts": artifacts,
+        "artifact_index": _artifact_index(artifacts, context),
         "environment": {
             "ffmpeg_required": context.ffmpeg_required,
             "network_required": context.network_required,
@@ -49,12 +64,52 @@ def _contract_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _contract_artifacts(artifacts: dict[str, str]) -> dict[str, str]:
+def _contract_artifacts(artifacts: dict[str, str], context: WorkflowContext) -> dict[str, str]:
     normalized = dict(artifacts)
     normalized["manifest"] = "manifest.json"
+    if _is_product_package_context(context):
+        for name, (path, _required) in PRODUCT_ARTIFACT_DEFAULTS.items():
+            normalized.setdefault(name, path)
     if "clips" in normalized:
         normalized["clips_dir"] = _as_directory_ref(normalized["clips"])
     return normalized
+
+
+def _is_product_package_context(context: WorkflowContext) -> bool:
+    return (
+        context.quality_profile == "finished_package"
+        or "finished_package_manifest" in context.artifacts
+        or "package_report" in context.artifacts
+    )
+
+
+def _artifact_index(artifacts: dict[str, str], context: WorkflowContext) -> dict[str, dict[str, Any]]:
+    index: dict[str, dict[str, Any]] = {}
+    for name, ref in artifacts.items():
+        if not isinstance(ref, str) or not ref:
+            continue
+        required = _artifact_required(name, context)
+        index[name] = {
+            "path": _display_ref(ref),
+            "required": required,
+            "exists": _artifact_exists(context, ref),
+        }
+    return index
+
+
+def _artifact_required(name: str, context: WorkflowContext) -> bool:
+    if name == "manifest":
+        return True
+    if name == "clips_dir" and "clips" in context.artifacts:
+        return True
+    if name in context.artifacts:
+        return True
+    return False
+
+
+def _artifact_exists(context: WorkflowContext, ref: str) -> bool:
+    path = context.output_path(ref.rstrip("/"))
+    return path.is_dir() if ref.endswith("/") else path.exists()
 
 
 def _as_directory_ref(path: str) -> str:

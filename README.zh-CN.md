@@ -2,7 +2,7 @@
 
 [English README](README.md)
 
-NarratoCut 是一个 Python 实现的 CLI-first technical MVP，用于探索 AI 辅助短视频生产流水线。当前项目的核心不是单个脚本，而是一套 artifact-driven workflow system：每个关键步骤都会写出可读的 JSON 或媒体产物，并且可以通过 inspect/review 做质量检查。
+NarratoCut 是 AgentFlow Studio 的分发侧短视频高光切片与成品包装模块。它是一个 Python 实现的 local-first CLI/Agent MVP：每个关键步骤都会写出可读的 JSON 或媒体产物，并且可以通过 inspect/review 做质量检查。
 
 这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移来源。
 
@@ -11,10 +11,10 @@ NarratoCut 是一个 Python 实现的 CLI-first technical MVP，用于探索 AI 
 NarratoCut 当前定位是：
 
 ```text
-面向开发者和高级用户的短视频生成流水线技术 MVP
+面向开发者、Agent 和高级用户的短视频分发侧工作流 MVP
 ```
 
-它还不是普通用户产品、SaaS、桌面端工具或 Web UI 产品。
+它还不是完整的 AgentFlow Studio 平台、普通用户 SaaS、桌面端工具或 Web UI 产品。
 
 当前主链路是：
 
@@ -46,11 +46,11 @@ video / transcript / clip_plan
 - 本地 BGM 混音和音量配置
 - finished package manifest 索引
 - inspect-run / review-run 质量报告
+- package_report.md 和 delivery-readiness 交付报告
 - draft-plan 静态 workflow 计划
 
 尚未包含：
 
-- 一键端到端产品 workflow
 - Web UI 或桌面 UI
 - 自动选曲或版权管理
 - 转场模板或多轨时间线
@@ -134,7 +134,7 @@ source video + clip_plan
   -> inspect/review
 ```
 
-所需本地文件、命令、预期产物和验收标准见 [`docs/golden_path.md`](docs/golden_path.md)。
+所需本地文件、命令、预期产物和验收标准见 [`docs/golden_path.md`](docs/golden_path.md)。v0.1.0 的最小验收路径见 [`docs/golden_sample_v0_1_0.md`](docs/golden_sample_v0_1_0.md)。
 
 ## 主要 Workflow
 
@@ -187,6 +187,8 @@ finished_package_manifest.json
 - [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md)
 - [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
 - [`docs/tool_contracts.md`](docs/tool_contracts.md)
+- [`docs/agent_usage_guide.md`](docs/agent_usage_guide.md)
+- [`docs/narratocut_delivery_checklist.md`](docs/narratocut_delivery_checklist.md)
 - [`docs/current_architecture.md`](docs/current_architecture.md)
 
 ## 远程 Provider 边界

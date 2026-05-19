@@ -1,14 +1,15 @@
 # Current Architecture
 
-This document summarizes the NarratoCut architecture after Phase 13. It is a
-reference for productization work, Golden Path smoke runs, and future UI/API or
-agent integration.
+This document summarizes the NarratoCut architecture for the `v0.1.0` delivery
+closeout. NarratoCut is the distribution-side short video highlight workflow
+module of AgentFlow Studio. It is a reference for productization work, Golden
+Sample runs, and future UI/API or agent integration.
 
 ## Current Position
 
-NarratoCut is a CLI-first technical MVP for short-video production workflows.
-It is designed around readable artifacts, deterministic workflow execution, and
-post-run inspection/review.
+NarratoCut is a CLI-first technical MVP for short-video distribution workflows.
+It is designed around readable artifacts, deterministic workflow execution,
+package reports, and post-run inspection/review.
 
 Current product path:
 
@@ -101,6 +102,13 @@ Run-level artifacts:
 - `trace.json`
 - `quality_report.json`
 - `review_report.json`
+- `delivery_readiness.json`
+- `delivery_readiness.md`
+
+`run_manifest.json` keeps a backward-compatible `artifacts` map and an expanded
+`artifact_index` for agents and future Web UI code. `review_report.json`
+includes `quality_level` and `delivery_status` so callers do not need to infer
+handoff state only from raw check counts.
 
 Planning artifacts:
 
@@ -150,9 +158,11 @@ Important profiles include:
 
 The system does not yet provide:
 
-- one-command product workflow
 - physical package directory or zip export
 - Web UI
+- NarratoStudio production-side planning workflows
+- AgentFlow Router runtime
+- AgentFlow Memory runtime
 - automatic music selection
 - publishing/upload
 - transition templates

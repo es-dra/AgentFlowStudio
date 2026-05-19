@@ -1,0 +1,20 @@
+schema_version: "0.1"
+platform_id: douyin
+display_name: Douyin
+aspect_ratio: "9:16"
+recommended_duration_sec:
+  min: 15
+  target: 20
+  max: 30
+opening_style:
+  target_hook_sec: 3
+  prefer:
+    - conflict
+    - reversal
+    - concrete_result
+subtitle_density:
+  style: dense
+  max_chars_per_line: 14
+packaging:
+  cover_required: true
+  bgm_optional: true

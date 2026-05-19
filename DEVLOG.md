@@ -1,5 +1,28 @@
 # DEVLOG
 
+## 2026-05-20 - NarratoCut v0.1.0 Delivery Closeout
+
+- Synced `master` to PR #38, confirmed the old delivery-hardening branch had an
+  identical tree to `origin/master`, deleted the stale remote branch, and
+  started `codex/phase-1-v0-1-delivery-closeout`.
+- Repositioned NarratoCut as the distribution-side short video highlight
+  workflow module of AgentFlow Studio while keeping the repo and local folder
+  named `NarratoCut`.
+- Extended `run_manifest.json` with an additive `artifact_index` while keeping
+  the existing `artifacts` string map backward-compatible for current tests,
+  reviewers, and workflows.
+- Extended `review_report.json` with `quality_level` and `delivery_status` so
+  agents and future UI code can read handoff state without inferring it only
+  from raw check counts.
+- Added v0.1.0 delivery docs: agent usage guide, delivery checklist, golden
+  sample path, project manifest contract, feedback contract, platform profile
+  contract, and asset lifecycle.
+- Added contract examples with `schema_version`: project manifest JSON,
+  feedback JSONL, and Douyin/Xiaohongshu/YouTube Shorts platform profiles.
+- Boundary kept: no Web UI, no NarratoStudio, no Router runtime, no Memory
+  runtime, and no claim that deterministic highlight scoring is editorially
+  mature.
+
 ## 2026-05-20 - Phase 14.5 Selection Diagnostics
 
 - Started `feature/phase-14-5-selection-diagnostics` from the merged Phase

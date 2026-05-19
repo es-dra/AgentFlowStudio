@@ -16,6 +16,8 @@ def test_review_run_builds_passed_report_for_complete_mock_run(tmp_path) -> None
     assert report["schema_version"] == "0.1"
     assert report["run_id"] == "demo_run"
     assert report["status"] == "passed"
+    assert report["quality_level"] == "engineering_pass"
+    assert report["delivery_status"] == "pass"
     assert report["summary"]["failed"] == 0
     assert report["summary"]["warnings"] == 0
     assert report["summary"]["passed"] == report["summary"]["total_checks"]
@@ -47,6 +49,8 @@ def test_review_run_fails_when_required_contract_files_are_missing(tmp_path) -> 
     report = review_run(run_dir)
 
     assert report["status"] == "failed"
+    assert report["quality_level"] == "needs_review"
+    assert report["delivery_status"] == "failed"
     failed_ids = _check_ids(report, "failed")
     assert "manifest_exists" in failed_ids
     assert "trace_exists" in failed_ids

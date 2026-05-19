@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.1",
+  "project_id": "proj_demo_distribution",
+  "project_type": "short_video_distribution",
+  "name": "Demo short highlight package",
+  "goal": "Generate a local-first short promotional package from one source video.",
+  "source_assets": [
+    {
+      "asset_id": "asset_source_video",
+      "asset_type": "raw_video",
+      "path": "data/raw/product_acceptance/video_only/input.mp4",
+      "lifecycle_state": "raw"
+    }
+  ],
+  "workflows": [
+    {
+      "workflow": "workflows/video_to_finished_package_local_asr.yaml",
+      "status": "recommended"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "product_acceptance_video_only_phase14_6_selection_quality",
+      "path": "data/processed/runs/product_acceptance_video_only_phase14_6_selection_quality",
+      "status": "pass"
+    }
+  ],
+  "packages": [
+    {
+      "package_id": "pkg_demo_video_only",
+      "manifest_path": "data/processed/runs/product_acceptance_video_only_phase14_6_selection_quality/finished_package_manifest.json",
+      "status": "product_mvp"
+    }
+  ],
+  "user_preferences": {
+    "target_platform": "douyin",
+    "target_duration_sec": 20
+  },
+  "status": "in_progress"
+}
