@@ -795,10 +795,10 @@
 - Added `narratostudio_production_handoff` inspect/review profile and agent skill contract.
 - Added `docs/narratostudio_contracts.md`, workflow docs, and the example creative brief.
 - Verification:
-  - `.venv\Scripts\python.exe -m pytest`: 332 passed
+  - `.venv\Scripts\python.exe -m pytest`: 333 passed
   - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
-  - `git diff --check`: passed with CRLF warnings only
+  - `git diff --check`: passed
   - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
   - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
-  - NarratoStudio CLI smoke: workflow success, inspect `44 passed / 0 failed / 0 warnings`, review `62 passed / 0 failed / 0 warnings`
+  - NarratoStudio CLI smoke: workflow success, inspect `58 passed / 0 failed / 0 warnings`, review `76 passed / 0 failed / 0 warnings`
 - Boundary kept: Web UI branch remains separate; this change does not migrate `D:\Projects\Zhike` and does not rename the repo or CLI.
