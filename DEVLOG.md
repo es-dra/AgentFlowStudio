@@ -1,5 +1,35 @@
 # DEVLOG
 
+## 2026-05-20 - Web UI M1 Static Artifact Viewer
+
+- Started `codex/narratocut-web-ui` from the v0.1.0 closeout baseline as a
+  narrow, mergeable Web UI branch.
+- Added a static, read-only `apps/web` artifact viewer with no backend, no
+  framework build chain, no provider calls, no upload, and no persistence.
+- Added a local file-picker contract for selected artifacts only. The viewer
+  does not scan run directories, does not follow manifest paths, and does not
+  write feedback or generated files.
+- Added artifact detection and normalization for `run_manifest.json`,
+  `finished_package_manifest.json`, `package_manifest.json`,
+  `quality_report.json`, `review_report.json`, `delivery_readiness.json`,
+  `package_report.md`, and `delivery_readiness.md`.
+- Normalized `finished_package_manifest.json` and `package_manifest.json` under
+  the internal `package_manifest` concept while preserving the selected file
+  name in the UI.
+- Kept `quality_report.json` as an optional trust artifact because the current
+  repo documents and generates it through `inspect-run`.
+- Rendered Markdown reports as escaped text instead of executable HTML.
+- Zhike boundary: used only as visual and interaction reference for a dark
+  workbench, status rail, artifact inventory, and inspector layout. No Zhike
+  runtime code, business logic, provider adapters, routes, database code, or
+  dependencies are included.
+- Follow-up boundary: local video preview, feedback event copy/export, and a
+  richer workbench shell are deferred to later slices.
+- Implementation note: `apps/web/app.js` is intentionally a single static
+  browser module for M1 because this branch avoids a bundler/build chain. If
+  the viewer grows beyond this read-only slice, split detection,
+  normalization, and rendering into separate modules before adding features.
+
 ## 2026-05-20 - NarratoCut v0.1.0 Delivery Closeout
 
 - Synced `master` to PR #38, confirmed the old delivery-hardening branch had an

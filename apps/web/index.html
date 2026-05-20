@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NarratoCut Artifact Viewer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell" aria-label="NarratoCut static artifact viewer">
+      <aside class="sidebar" aria-label="Artifact inventory">
+        <div class="brand">
+          <span class="brand-mark">NC</span>
+          <div>
+            <p class="eyebrow">Local read-only workbench</p>
+            <h1>NarratoCut Viewer</h1>
+          </div>
+        </div>
+
+        <label class="drop-zone" for="artifact-files">
+          <span>Select local artifacts</span>
+          <strong>JSON and Markdown files only</strong>
+          <input id="artifact-files" type="file" multiple accept=".json,.md,application/json,text/markdown,text/plain" />
+        </label>
+
+        <section class="panel" id="artifact-inventory" aria-labelledby="artifact-inventory-title">
+          <div class="panel-heading">
+            <h2 id="artifact-inventory-title">Artifact Inventory</h2>
+            <span id="artifact-count" class="count">0</span>
+          </div>
+          <div id="inventory-list" class="stack muted-box">
+            Select `run_manifest.json`, reports, or package manifests to inspect them locally.
+          </div>
+        </section>
+
+        <section class="panel compact" aria-labelledby="boundary-title">
+          <h2 id="boundary-title">Boundary</h2>
+          <ul class="boundary-list">
+            <li>No upload</li>
+            <li>No backend execution</li>
+            <li>No persistence</li>
+            <li>No directory scanning</li>
+          </ul>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="hero">
+          <div>
+            <p class="eyebrow">Artifact Contract Inspector</p>
+            <h2>Read NarratoCut run, package, review, and delivery evidence without leaving the browser.</h2>
+          </div>
+          <div id="overall-status" class="status-card status-unknown">
+            <span>Overall</span>
+            <strong>waiting</strong>
+          </div>
+        </header>
+
+        <div class="grid">
+          <section class="panel" id="summary-panel" aria-labelledby="summary-title">
+            <div class="panel-heading">
+              <h2 id="summary-title">Run and Package Summary</h2>
+              <span class="chip">local files</span>
+            </div>
+            <div id="summary-content" class="summary-grid"></div>
+          </section>
+
+          <section class="panel" id="inspector-panel" aria-labelledby="inspector-title">
+            <div class="panel-heading">
+              <h2 id="inspector-title">Quality and Review Inspector</h2>
+              <span class="chip">checks</span>
+            </div>
+            <div id="inspector-content" class="stack"></div>
+          </section>
+        </div>
+
+        <section class="panel" id="report-preview" aria-labelledby="report-title">
+          <div class="panel-heading">
+            <h2 id="report-title">Report Preview</h2>
+            <span class="chip">escaped text</span>
+          </div>
+          <pre id="report-content" class="report-text">Markdown reports are displayed as escaped text. Select `package_report.md` or `delivery_readiness.md`.</pre>
+        </section>
+
+        <section class="panel feedback-disabled" aria-labelledby="feedback-title">
+          <div>
+            <p class="eyebrow">M2 candidate</p>
+            <h2 id="feedback-title">Feedback</h2>
+          </div>
+          <p>This first static slice is read-only. Feedback event copy or export belongs to a later contract-backed slice.</p>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
