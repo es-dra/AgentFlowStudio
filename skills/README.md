@@ -11,6 +11,8 @@ Current recommended product skills:
   package generation.
 - `video_script_highlight_package.skill.yaml`: video plus script local-first
   short highlight package generation.
+- `narratostudio_production_handoff.skill.yaml`: production-side local-first
+  structured handoff generation from a creative brief.
 
 Agents should prefer these skill files over guessing from the full `workflows/`
 directory.

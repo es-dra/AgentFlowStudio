@@ -11,6 +11,10 @@ NarratoCut is a CLI-first technical MVP for short-video distribution workflows.
 It is designed around readable artifacts, deterministic workflow execution,
 package reports, and post-run inspection/review.
 
+NarratoStudio is now added as a sibling MVP module inside this repository for
+production-side validation. It is a local-first structured production handoff
+generator, not a replacement or rename of NarratoCut.
+
 Current product path:
 
 ```text
@@ -58,6 +62,9 @@ schemas
 harness
   -> run manifests, trace, inspect-run quality checks, review-run reports
 
+narratostudio
+  -> production-side contracts and deterministic handoff SOP logic
+
 workflows
   -> YAML workflow definitions
 
@@ -92,6 +99,10 @@ Final artifact workflows:
 - `final_video_to_cover.yaml`
 - `final_video_with_bgm.yaml`
 - `final_video_package.yaml`
+
+Production-side MVP workflow:
+
+- `narratostudio_brief_to_production_handoff.yaml`
 
 ## Important Artifacts
 
@@ -139,6 +150,21 @@ Enhancement/package artifacts:
 - `final_video_with_bgm.mp4`
 - `finished_package_manifest.json`
 
+NarratoStudio production handoff artifacts:
+
+- `creative_brief.json`
+- `story_bible.json`
+- `episode_outline.json`
+- `scene_plan.json`
+- `shot_plan.json`
+- `prompt_pack.json`
+- `production_handoff.json`
+- `production_report.md`
+- `memory_candidates.json`
+- `cost_quality_trace.json`
+- `feedback_signal_log.json`
+- `execution_trace.json`
+
 ## Quality Profiles
 
 Quality profiles route `inspect-run` and `review-run` to the right checks.
@@ -152,6 +178,7 @@ Important profiles include:
 - `cover_export`
 - `bgm_mix`
 - `finished_package`
+- `narratostudio_production_handoff`
 - video transcript and highlight profiles
 
 ## Current Boundaries
@@ -160,7 +187,7 @@ The system does not yet provide:
 
 - physical package directory or zip export
 - Web UI
-- NarratoStudio production-side planning workflows
+- hosted NarratoStudio runtime or Web UI
 - AgentFlow Router runtime
 - AgentFlow Memory runtime
 - automatic music selection

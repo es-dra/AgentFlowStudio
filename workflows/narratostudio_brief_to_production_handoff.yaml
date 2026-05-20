@@ -1,0 +1,60 @@
+name: narratostudio_brief_to_production_handoff_v0.1
+version: 1
+mode: local_deterministic
+quality_profile: narratostudio_production_handoff
+metadata:
+  module: NarratoStudio
+  content_mode: episodic_story_production
+  description: Local-first structured production handoff generator.
+steps:
+  - id: load_creative_brief
+    type: narratostudio_load_creative_brief
+    inputs:
+      creative_brief: creative_brief
+    outputs:
+      creative_brief: creative_brief.json
+  - id: build_story_bible
+    type: narratostudio_build_story_bible
+    inputs:
+      creative_brief: creative_brief
+    outputs:
+      story_bible: story_bible.json
+  - id: build_episode_outline
+    type: narratostudio_build_episode_outline
+    inputs:
+      creative_brief: creative_brief
+      story_bible: story_bible
+    outputs:
+      episode_outline: episode_outline.json
+  - id: build_scene_plan
+    type: narratostudio_build_scene_plan
+    inputs:
+      episode_outline: episode_outline
+    outputs:
+      scene_plan: scene_plan.json
+  - id: build_shot_plan
+    type: narratostudio_build_shot_plan
+    inputs:
+      creative_brief: creative_brief
+      scene_plan: scene_plan
+    outputs:
+      shot_plan: shot_plan.json
+  - id: build_prompt_pack
+    type: narratostudio_build_prompt_pack
+    inputs:
+      story_bible: story_bible
+      shot_plan: shot_plan
+    outputs:
+      prompt_pack: prompt_pack.json
+  - id: build_production_handoff
+    type: narratostudio_build_production_handoff
+    inputs:
+      creative_brief: creative_brief
+      story_bible: story_bible
+      episode_outline: episode_outline
+      scene_plan: scene_plan
+      shot_plan: shot_plan
+      prompt_pack: prompt_pack
+    outputs:
+      production_handoff: production_handoff.json
+      production_report: production_report.md

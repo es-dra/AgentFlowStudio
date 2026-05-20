@@ -10,6 +10,21 @@ if TYPE_CHECKING:
 
 
 PROJECT_NAME = "NarratoCut"
+NARRATOSTUDIO_PROFILE = "narratostudio_production_handoff"
+NARRATOSTUDIO_ARTIFACT_DEFAULTS = {
+    "creative_brief": ("creative_brief.json", True),
+    "story_bible": ("story_bible.json", True),
+    "episode_outline": ("episode_outline.json", True),
+    "scene_plan": ("scene_plan.json", True),
+    "shot_plan": ("shot_plan.json", True),
+    "prompt_pack": ("prompt_pack.json", True),
+    "production_handoff": ("production_handoff.json", True),
+    "production_report": ("production_report.md", True),
+    "memory_candidates": ("memory_candidates.json", True),
+    "cost_quality_trace": ("cost_quality_trace.json", True),
+    "feedback_signal_log": ("feedback_signal_log.json", True),
+    "execution_trace": ("execution_trace.json", True),
+}
 PRODUCT_ARTIFACT_DEFAULTS = {
     "transcript": ("transcript.json", False),
     "candidate_windows": ("candidate_windows.json", False),
@@ -34,8 +49,8 @@ def write_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, 
 
 def build_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, Any]:
     artifacts = _contract_artifacts(context.artifacts, context)
-    return {
-        "project": PROJECT_NAME,
+    manifest = {
+        "project": _project_name(context),
         "run_id": run.run_id,
         "workflow": _display_ref(context.workflow_path or run.workflow_name),
         "mode": context.mode,
@@ -51,6 +66,9 @@ def build_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, 
             "network_required": context.network_required,
         },
     }
+    if context.quality_profile == NARRATOSTUDIO_PROFILE:
+        manifest["module"] = "NarratoStudio"
+    return manifest
 
 
 def _contract_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -67,6 +85,9 @@ def _contract_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def _contract_artifacts(artifacts: dict[str, str], context: WorkflowContext) -> dict[str, str]:
     normalized = dict(artifacts)
     normalized["manifest"] = "manifest.json"
+    if context.quality_profile == NARRATOSTUDIO_PROFILE:
+        for name, (path, _required) in NARRATOSTUDIO_ARTIFACT_DEFAULTS.items():
+            normalized.setdefault(name, path)
     if _is_product_package_context(context):
         for name, (path, _required) in PRODUCT_ARTIFACT_DEFAULTS.items():
             normalized.setdefault(name, path)
@@ -100,6 +121,8 @@ def _artifact_index(artifacts: dict[str, str], context: WorkflowContext) -> dict
 def _artifact_required(name: str, context: WorkflowContext) -> bool:
     if name == "manifest":
         return True
+    if context.quality_profile == NARRATOSTUDIO_PROFILE and name in NARRATOSTUDIO_ARTIFACT_DEFAULTS:
+        return NARRATOSTUDIO_ARTIFACT_DEFAULTS[name][1]
     if name == "clips_dir" and "clips" in context.artifacts:
         return True
     if name in context.artifacts:
@@ -124,3 +147,9 @@ def _normalize_value(value: Any) -> Any:
     if isinstance(value, str):
         return _display_ref(value)
     return value
+
+
+def _project_name(context: WorkflowContext) -> str:
+    if context.quality_profile == NARRATOSTUDIO_PROFILE:
+        return "AgentFlow Studio"
+    return PROJECT_NAME
