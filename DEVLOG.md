@@ -1,5 +1,27 @@
 # DEVLOG
 
+## 2026-05-21 - Web UI M1.2 Chinese Workbench Polish
+
+- Merged the latest `origin/master` into `codex/narratocut-web-ui` after the
+  NarratoStudio mainline landed, keeping the open Web UI PR on a non-rebased
+  history.
+- Upgraded the static viewer presentation from an English artifact dashboard to
+  a Chinese-first local review workbench. Human-facing copy now defaults to
+  Chinese while artifact names, contract types, schema fields, and machine keys
+  remain English.
+- Added an in-memory language toggle between Chinese and English. It does not
+  use `localStorage`, IndexedDB, cookies, or any persistence mechanism; refresh
+  returns to the Chinese default.
+- Added a top metric strip and refined the dark workbench styling with
+  restrained grid/scan-line texture, cyan/lime/amber/red status colors, and
+  denser inspection panels inspired by the local Zhike reference.
+- Split static Web UI modules so `artifact-workspace.js` remains normalization
+  and view model logic, `app.js` handles orchestration, `ui-copy.js` owns zh/en
+  copy, and `render-helpers.js` owns status labels and small rendering helpers.
+- Boundary kept: no video preview, no feedback event, no directory scanning, no
+  manifest path reads, no CLI/API bridge, no backend, no React/Vite/Next, no
+  upload, and no persistence.
+
 ## 2026-05-20 - M1.1 Web UI Release Candidate Hardening
 
 - Hardened the static `apps/web` artifact viewer as a read-only, local-only release candidate slice. The branch still has no backend, no upload, no persistence, no CLI/API bridge, no workflow execution, no feedback writing, and no local video preview.

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NarratoCut Artifact Viewer</title>
+    <title>NarratoCut 本地验收工作台</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,34 +12,34 @@
         <div class="brand">
           <span class="brand-mark">NC</span>
           <div>
-            <p class="eyebrow">Local read-only workbench</p>
-            <h1>NarratoCut Viewer</h1>
+            <p class="eyebrow" data-copy="brandKicker">本地只读验收台</p>
+            <h1 data-copy="brandName">NarratoCut Viewer</h1>
           </div>
         </div>
 
         <label class="drop-zone" for="artifact-files">
-          <span>Select local artifacts</span>
-          <strong>JSON and Markdown files only</strong>
+          <span data-copy="dropTitle">选择本地 artifacts</span>
+          <strong data-copy="dropHint">支持 JSON / Markdown，多选后仅在浏览器内解析</strong>
           <input id="artifact-files" type="file" multiple accept=".json,.md,application/json,text/markdown,text/plain" />
         </label>
 
         <section class="panel" id="artifact-inventory" aria-labelledby="artifact-inventory-title">
           <div class="panel-heading">
-            <h2 id="artifact-inventory-title">Artifact Inventory</h2>
+            <h2 id="artifact-inventory-title" data-copy="inventoryTitle">Artifact Inventory</h2>
             <span id="artifact-count" class="count">0</span>
           </div>
           <div id="inventory-list" class="stack muted-box">
-            Select `run_manifest.json`, reports, or package manifests to inspect them locally.
+            选择本地 artifact 后，这里会显示文件名、合同类型、schema_version 和解析状态。
           </div>
         </section>
 
         <section class="panel compact" aria-labelledby="boundary-title">
-          <h2 id="boundary-title">Boundary</h2>
+          <h2 id="boundary-title" data-copy="boundaryTitle">边界</h2>
           <ul class="boundary-list">
-            <li>No upload</li>
-            <li>No backend execution</li>
-            <li>No persistence</li>
-            <li>No directory scanning</li>
+            <li data-copy="boundaryUpload">不上传</li>
+            <li data-copy="boundaryBackend">不执行后端</li>
+            <li data-copy="boundaryPersistence">不持久化</li>
+            <li data-copy="boundaryScanning">不扫描目录</li>
           </ul>
         </section>
       </aside>
@@ -47,28 +47,51 @@
       <section class="workspace">
         <header class="hero">
           <div>
-            <p class="eyebrow">Artifact Contract Inspector</p>
-            <h2>Read NarratoCut run, package, review, and delivery evidence without leaving the browser.</h2>
+            <p class="eyebrow" data-copy="heroKicker">Artifact Contract Inspector</p>
+            <h2 data-copy="heroTitle">把 NarratoCut 的运行结果、交付包、审查报告和可交付风险看清楚。</h2>
+            <p class="hero-subtitle" data-copy="heroSubtitle">本页面只读取你主动选择的本地文件，不跟随 manifest 路径，不调用 CLI/API，也不保存任何状态。</p>
           </div>
-          <div id="overall-status" class="status-card status-unknown">
-            <span>Overall</span>
-            <strong>waiting</strong>
+          <div class="hero-actions">
+            <button id="language-toggle" class="language-toggle" type="button">English</button>
+            <div id="overall-status" class="status-card status-unknown">
+              <span id="overall-status-label">总览状态</span>
+              <strong id="overall-status-value">未知 unknown</strong>
+            </div>
           </div>
         </header>
+
+        <section class="stat-strip" aria-label="artifact metrics">
+          <article>
+            <span data-copy="statArtifactsLabel">已选文件</span>
+            <strong id="stat-artifacts">0 项</strong>
+          </article>
+          <article>
+            <span data-copy="statKnownLabel">已识别合同</span>
+            <strong id="stat-known">0 项</strong>
+          </article>
+          <article>
+            <span data-copy="statWarningsLabel">警告</span>
+            <strong id="stat-warnings">0 项</strong>
+          </article>
+          <article>
+            <span data-copy="statErrorsLabel">错误</span>
+            <strong id="stat-errors">0 项</strong>
+          </article>
+        </section>
 
         <div class="grid">
           <section class="panel" id="summary-panel" aria-labelledby="summary-title">
             <div class="panel-heading">
-              <h2 id="summary-title">Run and Package Summary</h2>
-              <span class="chip">local files</span>
+              <h2 id="summary-title" data-copy="summaryTitle">Run / Package Summary</h2>
+              <span class="chip" data-copy="localChip">local files</span>
             </div>
             <div id="summary-content" class="summary-grid"></div>
           </section>
 
           <section class="panel" id="inspector-panel" aria-labelledby="inspector-title">
             <div class="panel-heading">
-              <h2 id="inspector-title">Quality and Review Inspector</h2>
-              <span class="chip">checks</span>
+              <h2 id="inspector-title" data-copy="inspectorTitle">Quality / Review Inspector</h2>
+              <span class="chip" data-copy="checksChip">checks</span>
             </div>
             <div id="inspector-content" class="stack"></div>
           </section>
@@ -76,18 +99,18 @@
 
         <section class="panel" id="report-preview" aria-labelledby="report-title">
           <div class="panel-heading">
-            <h2 id="report-title">Report Preview</h2>
-            <span class="chip">escaped text</span>
+            <h2 id="report-title" data-copy="reportTitle">Report Preview</h2>
+            <span class="chip" data-copy="escapedChip">escaped text</span>
           </div>
-          <pre id="report-content" class="report-text">Markdown reports are displayed as escaped text. Select `package_report.md` or `delivery_readiness.md`.</pre>
+          <pre id="report-content" class="report-text">Markdown 报告会以安全文本方式展示。请选择 package_report.md 或 delivery_readiness.md。</pre>
         </section>
 
         <section class="panel feedback-disabled" aria-labelledby="feedback-title">
           <div>
-            <p class="eyebrow">M2 candidate</p>
-            <h2 id="feedback-title">Feedback</h2>
+            <p class="eyebrow" data-copy="feedbackKicker">M2 candidate</p>
+            <h2 id="feedback-title" data-copy="feedbackTitle">Feedback</h2>
           </div>
-          <p>This first static slice is read-only. Feedback event copy or export belongs to a later contract-backed slice.</p>
+          <p data-copy="feedbackBody">当前静态切片保持只读。反馈事件复制或导出会在后续合同确认后单独实现。</p>
         </section>
       </section>
     </main>

@@ -1,8 +1,8 @@
 # NarratoCut Static Artifact Viewer
 
 This is a read-only, local-only static viewer for NarratoCut workflow artifacts.
-It is the M1.1 release candidate hardening slice for the
-`codex/narratocut-web-ui` branch.
+It currently includes the M1.1 hardening slice and the M1.2 Chinese workbench
+presentation slice for the `codex/narratocut-web-ui` branch.
 
 Open it directly in a browser:
 
@@ -11,6 +11,21 @@ apps/web/index.html
 ```
 
 No server is required.
+
+## M1.2 Workbench UI
+
+The M1.2 viewer uses default Chinese UI copy because the current review and
+delivery workflow is Chinese-facing. Contract names, artifact types, schema
+fields, and machine-readable keys remain in English.
+
+The language toggle is in-memory only. Refreshing the page returns to Chinese.
+The viewer does not use `localStorage`, IndexedDB, cookies, or any other
+persistence mechanism.
+
+M1.2 borrows only visual and interaction ideas from the local Zhike reference:
+dark workbench structure, status colors, a metric strip, and a right-side
+inspection rail. No Zhike runtime code, business logic, provider code, routes,
+database code, or dependencies are included.
 
 ## Supported Artifacts
 

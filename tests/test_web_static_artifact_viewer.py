@@ -23,8 +23,12 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
     assert 'href="styles.css"' in html
     assert 'src="app.js"' in html
     assert 'type="module"' in html
+    assert 'lang="zh-CN"' in html
     assert 'type="file"' in html
     assert "multiple" in html
+    assert 'id="language-toggle"' in html
+    assert 'class="stat-strip"' in html
+    assert "本地只读验收台" in html
     assert "<main" in html
     for landmark in [
         'id="artifact-inventory"',
@@ -38,9 +42,13 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
 def test_static_viewer_app_declares_artifact_aliases_and_normalized_types() -> None:
     app = _read_web_file("app.js")
     artifact_workspace = _read_web_file("artifact-workspace.js")
-    combined_source = app + artifact_workspace
+    ui_copy = _read_web_file("ui-copy.js")
+    render_helpers = _read_web_file("render-helpers.js")
+    combined_source = app + artifact_workspace + ui_copy + render_helpers
 
     assert 'from "./artifact-workspace.js"' in app
+    assert 'from "./ui-copy.js"' in app
+    assert 'from "./render-helpers.js"' in app
     assert "ARTIFACT_ALIASES" in artifact_workspace
     assert "finished_package_manifest.json" in artifact_workspace
     assert "package_manifest.json" in artifact_workspace
@@ -98,6 +106,23 @@ def test_static_viewer_declares_m11_artifact_classes_and_schema_warnings() -> No
 
     assert "artifact.artifactClass" in app
     assert "artifact.schemaWarnings" in app
+
+
+def test_static_viewer_declares_m12_chinese_copy_and_in_memory_language_switch() -> None:
+    app = _read_web_file("app.js")
+    ui_copy = _read_web_file("ui-copy.js")
+    render_helpers = _read_web_file("render-helpers.js")
+
+    assert 'language: "zh"' in app
+    assert 'state.language = state.language === "zh" ? "en" : "zh"' in app
+    assert "localStorage" not in app + ui_copy + render_helpers
+    assert "把 NarratoCut 的运行结果" in ui_copy
+    assert "通过 pass" in ui_copy
+    assert "警告 warning" in ui_copy
+    assert "未知 JSON unknown_json" not in ui_copy
+    assert "未找到详细检查项" in ui_copy
+    assert "statusPill" in render_helpers
+    assert "normalizeStatus" in render_helpers
 
 
 def test_static_viewer_normalizes_real_fixture_and_non_contract_inputs() -> None:
@@ -176,7 +201,7 @@ def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads(
     app = _read_web_file("app.js")
 
     assert "normalizeWorkspace(artifacts)" in app
-    assert "renderWorkspace(state)" in app
+    assert "renderWorkspace(state.workspace" in app
     for raw_contract_fragment in [
         ".payload",
         "artifact_index",
@@ -187,7 +212,12 @@ def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads(
 
 
 def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
-    app = _read_web_file("app.js") + _read_web_file("artifact-workspace.js")
+    app = (
+        _read_web_file("app.js")
+        + _read_web_file("artifact-workspace.js")
+        + _read_web_file("ui-copy.js")
+        + _read_web_file("render-helpers.js")
+    )
     forbidden_patterns = [
         "fetch(",
         "XMLHttpRequest",
@@ -210,7 +240,7 @@ def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
 
 
 def test_static_viewer_report_preview_uses_safe_text_rendering() -> None:
-    app = _read_web_file("app.js")
+    app = _read_web_file("app.js") + _read_web_file("render-helpers.js")
 
     assert "textContent" in app
     assert ".innerHTML" not in app
@@ -237,3 +267,7 @@ def test_static_viewer_readme_documents_boundaries() -> None:
         "no workflow execution",
     ]:
         assert phrase in readme
+
+    assert "m1.2" in readme
+    assert "default chinese" in readme
+    assert "in-memory" in readme
