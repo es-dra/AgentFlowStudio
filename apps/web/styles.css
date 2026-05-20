@@ -25,6 +25,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 18% 0%, rgba(85, 229, 240, 0.14), transparent 28rem),
     radial-gradient(circle at 80% 20%, rgba(182, 242, 74, 0.11), transparent 24rem),
@@ -53,6 +54,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  min-width: 0;
   padding: 28px;
 }
 
@@ -227,10 +229,13 @@ h3 {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .item-head strong,
-.metric strong {
+.metric strong,
+.check-row strong {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -260,6 +265,7 @@ h3 {
 }
 
 .report-text {
+  width: 100%;
   min-height: 220px;
   max-height: 460px;
   overflow: auto;
@@ -314,6 +320,19 @@ h3 {
 
   .hero,
   .feedback-disabled {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .workspace,
+  .sidebar {
+    padding: 18px;
+  }
+
+  .brand,
+  .panel-heading,
+  .status-card,
+  .check-row {
     align-items: flex-start;
     flex-direction: column;
   }

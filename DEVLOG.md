@@ -1,5 +1,17 @@
 # DEVLOG
 
+## 2026-05-20 - M1.1 Web UI Release Candidate Hardening
+
+- Hardened the static `apps/web` artifact viewer as a read-only, local-only release candidate slice. The branch still has no backend, no upload, no persistence, no CLI/API bridge, no workflow execution, no feedback writing, and no local video preview.
+- Strengthened `artifact-workspace.js` as the single normalization boundary for UI rendering. Selected files are now classified as `known_contract`, `unknown_json`, `unsupported_file`, or invalid, and only normalized `known_contract` artifacts participate in summary/inspector views.
+- Kept `package_manifest` as the internal canonical name while continuing to accept both `package_manifest.json` and `finished_package_manifest.json`.
+- Treated missing `schema_version` as a warning rather than a fatal error, matching current repo artifacts such as `run_manifest.json` and `quality_report.json`.
+- Added a sanitized real-shape fixture under `tests/fixtures/web_static_artifact_viewer/product_run/`, based on the local `final_video_package` workflow artifact structure. The fixture keeps run/package/quality/review/delivery/report contract fields, uses relative placeholder media paths, and commits no media files or generated run directories.
+- Updated inventory rendering to show file name, artifact type, artifact class, schema version/status, parse status, source role, summary inclusion, and schema warnings from the normalized view model.
+- Kept Markdown report preview safe by rendering escaped text only; the fixture includes a `<script>` probe that must display as text.
+- Documented that Zhike remains only a UX reference for a dark workbench, status visualization, and artifact panels. No Zhike runtime code, business logic, provider code, database, routing, or dependencies are included.
+- Follow-up risks remain out of scope for this PR: M1.5 explicit local video preview, M2 feedback event copy/export, and M3 Run Review Workspace. Those should stay on later branches.
+
 ## 2026-05-20 - Web UI M1 Static Artifact Viewer
 
 - Started `codex/narratocut-web-ui` from the v0.1.0 closeout baseline as a

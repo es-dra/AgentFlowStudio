@@ -1,0 +1,62 @@
+{
+  "schema_version": "0.1",
+  "run_id": "package_run_fixture",
+  "status": "passed",
+  "quality_level": "product_mvp",
+  "delivery_status": "pass",
+  "summary": {
+    "total_checks": 8,
+    "passed": 8,
+    "failed": 0,
+    "warnings": 0
+  },
+  "inputs": {
+    "run_dir": "fixtures/product_run",
+    "manifest": "run_manifest.json",
+    "trace": "trace.json",
+    "quality_report": "quality_report.json"
+  },
+  "sections": [
+    {
+      "name": "run_contract",
+      "status": "passed",
+      "checks": [
+        {
+          "id": "manifest_exists",
+          "status": "passed",
+          "message": "run_manifest.json exists"
+        },
+        {
+          "id": "trace_exists",
+          "status": "passed",
+          "message": "trace.json exists"
+        },
+        {
+          "id": "quality_report_exists",
+          "status": "passed",
+          "message": "quality_report.json exists"
+        }
+      ]
+    },
+    {
+      "name": "finished_package_outputs",
+      "status": "passed",
+      "checks": [
+        {
+          "id": "finished_package_manifest_exists",
+          "status": "passed",
+          "message": "finished_package_manifest_exists pass"
+        },
+        {
+          "id": "finished_package_assets_non_empty",
+          "status": "passed",
+          "message": "finished_package_assets_non_empty pass",
+          "details": {
+            "count": 5
+          }
+        }
+      ]
+    }
+  ],
+  "recommendations": []
+}

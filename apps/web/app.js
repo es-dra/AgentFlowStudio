@@ -42,9 +42,14 @@ function renderInventory(workspace) {
     item.append(
       row(artifact.fileName, statusPill(artifact.parseStatus)),
       metaLine(`type: ${artifact.artifactType}`),
-      metaLine(`schema: ${artifact.schemaVersion}`),
-      metaLine(`role: ${artifact.sourceRole} | ${artifact.known ? "known" : "unknown"}`),
+      metaLine(`class: ${artifact.artifactClass}`),
+      metaLine(`schema: ${artifact.schemaVersion} | ${artifact.schemaStatus}`),
+      metaLine(`role: ${artifact.sourceRole}`),
+      metaLine(`summary: ${artifact.participatesInSummary ? "included" : "not included"}`),
     );
+    for (const warning of artifact.schemaWarnings) {
+      item.append(metaLine(`warning: ${warning}`));
+    }
     elements.inventoryList.append(item);
   }
 }
@@ -100,11 +105,13 @@ function renderReport(workspace) {
     elements.reportContent.textContent = "Markdown reports are displayed as escaped text. Select `package_report.md` or `delivery_readiness.md`.";
     return;
   }
-  elements.reportContent.textContent = escapeHtml(report.rawText);
+  elements.reportContent.textContent = report.rawText;
 }
 
 function renderOverallStatus(workspace) {
-  const status = workspace.readiness?.status || workspace.review?.deliveryStatus || workspace.quality?.status || workspace.package?.status || workspace.run?.status || "unknown";
+  const status = normalizeStatus(
+    workspace.readiness?.status || workspace.review?.deliveryStatus || workspace.quality?.status || workspace.package?.status || workspace.run?.status,
+  );
   elements.overallStatus.className = `status-card status-${status}`;
   elements.overallStatus.querySelector("strong").textContent = status;
 }
@@ -170,13 +177,4 @@ function node(tagName, className = "", text = "") {
   if (className) element.className = className;
   if (text) element.textContent = text;
   return element;
-}
-
-function escapeHtml(text) {
-  return String(text)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }

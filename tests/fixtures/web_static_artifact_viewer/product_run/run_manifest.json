@@ -1,0 +1,104 @@
+{
+  "project": "NarratoCut",
+  "run_id": "package_run_fixture",
+  "workflow": "workflows/final_video_package.yaml",
+  "mode": "final_video_package",
+  "workflow_mode": "final_video_package",
+  "quality_profile": "finished_package",
+  "created_at": "2026-05-20T08:41:19.238168+00:00",
+  "status": "success",
+  "inputs": {
+    "package_id": "demo_package",
+    "final_video_path": "fixtures/product_run/final_video.mp4",
+    "subtitled_video_path": "fixtures/product_run/final_video_with_subtitles.mp4",
+    "bgm_video_path": "fixtures/product_run/final_video_with_bgm.mp4",
+    "cover_path": "fixtures/product_run/cover.jpg",
+    "review_report_path": "fixtures/product_run/review_report.json"
+  },
+  "artifacts": {
+    "finished_package_manifest": "finished_package_manifest.json",
+    "package_report": "package_report.md",
+    "manifest": "manifest.json",
+    "transcript": "transcript.json",
+    "candidate_windows": "candidate_windows.json",
+    "highlight_score_report": "highlight_score_report.json",
+    "selection_diagnostics": "selection_diagnostics.json",
+    "highlight_plan": "highlight_plan.json",
+    "clip_plan": "clip_plan.json",
+    "real_slice_manifest": "real_slice_manifest.json",
+    "final_video_manifest": "final_video_manifest.json",
+    "quality_report": "quality_report.json",
+    "review_report": "review_report.json"
+  },
+  "artifact_index": {
+    "finished_package_manifest": {
+      "path": "finished_package_manifest.json",
+      "required": true,
+      "exists": true
+    },
+    "package_report": {
+      "path": "package_report.md",
+      "required": true,
+      "exists": true
+    },
+    "manifest": {
+      "path": "manifest.json",
+      "required": true,
+      "exists": true
+    },
+    "transcript": {
+      "path": "transcript.json",
+      "required": false,
+      "exists": false
+    },
+    "candidate_windows": {
+      "path": "candidate_windows.json",
+      "required": false,
+      "exists": false
+    },
+    "highlight_score_report": {
+      "path": "highlight_score_report.json",
+      "required": false,
+      "exists": false
+    },
+    "selection_diagnostics": {
+      "path": "selection_diagnostics.json",
+      "required": false,
+      "exists": false
+    },
+    "highlight_plan": {
+      "path": "highlight_plan.json",
+      "required": false,
+      "exists": false
+    },
+    "clip_plan": {
+      "path": "clip_plan.json",
+      "required": false,
+      "exists": false
+    },
+    "real_slice_manifest": {
+      "path": "real_slice_manifest.json",
+      "required": false,
+      "exists": false
+    },
+    "final_video_manifest": {
+      "path": "final_video_manifest.json",
+      "required": false,
+      "exists": false
+    },
+    "quality_report": {
+      "path": "quality_report.json",
+      "required": false,
+      "exists": true
+    },
+    "review_report": {
+      "path": "review_report.json",
+      "required": false,
+      "exists": true
+    }
+  },
+  "environment": {
+    "ffmpeg_required": false,
+    "network_required": false
+  }
+}

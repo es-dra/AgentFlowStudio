@@ -15,6 +15,13 @@ const RECOMMENDED_ARTIFACTS = [
   "markdown_report",
 ];
 
+const ARTIFACT_CLASSES = {
+  KNOWN_CONTRACT: "known_contract",
+  UNKNOWN_JSON: "unknown_json",
+  UNSUPPORTED_FILE: "unsupported_file",
+  INVALID: "invalid",
+};
+
 export async function parseFiles(files) {
   const artifacts = [];
   for (const file of files) {
@@ -22,6 +29,18 @@ export async function parseFiles(files) {
     const extension = file.name.toLowerCase().split(".").pop();
     if (extension === "md") {
       artifacts.push(buildArtifact({ file, rawText: text, payload: null, parseStatus: "valid" }));
+      continue;
+    }
+    if (extension !== "json") {
+      artifacts.push(
+        buildArtifact({
+          file,
+          rawText: text,
+          payload: null,
+          parseStatus: "unsupported",
+          message: "Unsupported file type.",
+        }),
+      );
       continue;
     }
     try {
@@ -52,23 +71,29 @@ export async function parseFiles(files) {
 }
 
 export function normalizeWorkspace(artifacts) {
-  const validArtifacts = artifacts.filter((artifact) => artifact.parseStatus === "valid");
-  const byType = (type) => validArtifacts.find((artifact) => artifact.artifactType === type);
-  const reports = validArtifacts.filter((artifact) => artifact.artifactType === "markdown_report");
+  const summaryArtifacts = artifacts.filter((artifact) => artifact.participatesInSummary);
+  const byType = (type) => summaryArtifacts.find((artifact) => artifact.artifactType === type);
+  const reports = summaryArtifacts.filter((artifact) => artifact.artifactType === "markdown_report");
   const warnings = [];
   const errors = artifacts
-    .filter((artifact) => artifact.parseStatus !== "valid")
+    .filter((artifact) => artifact.artifactClass === ARTIFACT_CLASSES.INVALID)
     .map((artifact) => `${artifact.fileName}: ${artifact.message || "invalid artifact"}`);
 
   for (const type of RECOMMENDED_ARTIFACTS) {
-    if (!validArtifacts.some((artifact) => artifact.artifactType === type)) {
+    if (!summaryArtifacts.some((artifact) => artifact.artifactType === type)) {
       warnings.push(`Missing recommended artifact: ${type}`);
     }
   }
 
-  for (const artifact of validArtifacts) {
-    if (artifact.artifactType === "unknown") {
-      warnings.push(`Unknown artifact loaded: ${artifact.fileName}`);
+  for (const artifact of artifacts) {
+    for (const schemaWarning of artifact.schemaWarnings) {
+      warnings.push(`${artifact.fileName}: ${schemaWarning}`);
+    }
+    if (artifact.artifactClass === ARTIFACT_CLASSES.UNKNOWN_JSON) {
+      warnings.push(`${artifact.fileName}: parsed but not included in summary (unknown_json).`);
+    }
+    if (artifact.artifactClass === ARTIFACT_CLASSES.UNSUPPORTED_FILE) {
+      warnings.push(`${artifact.fileName}: unsupported_file; not included in summary.`);
     }
   }
 
@@ -87,10 +112,11 @@ export function normalizeWorkspace(artifacts) {
 
 export function normalizeStatus(value) {
   const status = asText(value, "unknown").toLowerCase();
-  if (["pass", "passed", "success", "succeeded"].includes(status)) return "pass";
-  if (["fail", "failed", "error"].includes(status)) return "fail";
-  if (status === "warning") return "warning";
+  if (["pass", "passed", "success", "succeeded", "valid"].includes(status)) return "pass";
+  if (["fail", "failed", "error", "invalid"].includes(status)) return "fail";
+  if (["warning", "unsupported"].includes(status)) return "warning";
   if (status === "missing") return "missing";
+  if (status === "optional") return "unknown";
   return status || "unknown";
 }
 
@@ -101,13 +127,19 @@ export function asText(value, fallback) {
 
 function buildArtifact({ file, rawText, payload, parseStatus, message = "" }) {
   const type = detectArtifactType(file.name, payload);
+  const schemaInfo = schemaInfoFor(type, payload, parseStatus);
+  const artifactClass = artifactClassFor(type, parseStatus);
   return {
     fileName: file.name,
     artifactType: type,
+    artifactClass,
     sourceRole: sourceRoleFor(type, file.name),
-    schemaVersion: schemaVersionFor(type, payload),
+    schemaVersion: schemaInfo.version,
+    schemaStatus: schemaInfo.status,
+    schemaWarnings: schemaInfo.warnings,
     parseStatus,
-    known: type !== "unknown",
+    known: artifactClass === ARTIFACT_CLASSES.KNOWN_CONTRACT,
+    participatesInSummary: artifactClass === ARTIFACT_CLASSES.KNOWN_CONTRACT,
     payload,
     rawText,
     message,
@@ -116,6 +148,8 @@ function buildArtifact({ file, rawText, payload, parseStatus, message = "" }) {
 
 function detectArtifactType(fileName, payload) {
   const normalizedName = fileName.toLowerCase();
+  const extension = normalizedName.split(".").pop();
+  if (!["json", "md"].includes(extension)) return "unsupported_file";
   for (const [type, aliases] of Object.entries(ARTIFACT_ALIASES)) {
     if (aliases.includes(normalizedName)) return type;
   }
@@ -124,7 +158,14 @@ function detectArtifactType(fileName, payload) {
   if (payload && payload.sections && payload.summary) return "review_report";
   if (payload && payload.runs && payload.summary) return "delivery_readiness";
   if (payload && payload.checks && payload.status) return "quality_report";
-  return normalizedName.endsWith(".md") ? "markdown_report" : "unknown";
+  return normalizedName.endsWith(".md") ? "unsupported_file" : "unknown";
+}
+
+function artifactClassFor(type, parseStatus) {
+  if (parseStatus === "invalid") return ARTIFACT_CLASSES.INVALID;
+  if (type === "unsupported_file" || parseStatus === "unsupported") return ARTIFACT_CLASSES.UNSUPPORTED_FILE;
+  if (type === "unknown") return ARTIFACT_CLASSES.UNKNOWN_JSON;
+  return ARTIFACT_CLASSES.KNOWN_CONTRACT;
 }
 
 function normalizeRun(artifact) {
@@ -225,12 +266,29 @@ function sourceRoleFor(type, fileName) {
   if (type === "package_manifest") return "package asset index";
   if (type === "run_manifest") return "workflow run index";
   if (type === "delivery_readiness") return "release gate";
+  if (type === "unsupported_file") return "unsupported file";
   return "unclassified";
 }
 
-function schemaVersionFor(type, payload) {
-  if (type === "markdown_report") return "n/a";
-  return asText(payload?.schema_version, "unknown");
+function schemaInfoFor(type, payload, parseStatus) {
+  if (type === "markdown_report" || type === "unsupported_file") {
+    return { version: "n/a", status: "n/a", warnings: [] };
+  }
+  if (parseStatus !== "valid") {
+    return { version: "unknown", status: "unknown", warnings: [] };
+  }
+  if (!payload || type === "unknown") {
+    return { version: "unknown", status: "unknown", warnings: [] };
+  }
+  const version = asText(payload.schema_version, "");
+  if (!version) {
+    return {
+      version: "unknown",
+      status: "warning",
+      warnings: ["schema_version missing; warning only, artifact remains readable."],
+    };
+  }
+  return { version, status: "present", warnings: [] };
 }
 
 function asList(value) {

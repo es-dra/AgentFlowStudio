@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 
 WEB_ROOT = Path("apps/web")
+WEB_FIXTURE_ROOT = Path("tests/fixtures/web_static_artifact_viewer/product_run")
 
 
 def _read_web_file(name: str) -> str:
     return (WEB_ROOT / name).read_text(encoding="utf-8")
+
+
+def _read_fixture_file(name: str) -> str:
+    return (WEB_FIXTURE_ROOT / name).read_text(encoding="utf-8")
 
 
 def test_static_viewer_html_declares_local_artifact_workbench() -> None:
@@ -42,12 +49,141 @@ def test_static_viewer_app_declares_artifact_aliases_and_normalized_types() -> N
     assert "normalizeWorkspace" in artifact_workspace
     for artifact_type in [
         "run_manifest",
+        "package_manifest",
         "quality_report",
         "review_report",
         "delivery_readiness",
         "markdown_report",
     ]:
         assert artifact_type in combined_source
+
+
+def test_static_viewer_real_fixture_covers_supported_artifact_shapes() -> None:
+    expected_files = [
+        "run_manifest.json",
+        "finished_package_manifest.json",
+        "quality_report.json",
+        "review_report.json",
+        "delivery_readiness.json",
+        "package_report.md",
+        "delivery_readiness.md",
+    ]
+
+    for name in expected_files:
+        assert (WEB_FIXTURE_ROOT / name).is_file()
+
+    assert '"artifact_index"' in _read_fixture_file("run_manifest.json")
+    assert '"assets"' in _read_fixture_file("finished_package_manifest.json")
+    assert '"checks"' in _read_fixture_file("quality_report.json")
+    assert '"sections"' in _read_fixture_file("review_report.json")
+    assert '"runs"' in _read_fixture_file("delivery_readiness.json")
+    assert "<script>" in _read_fixture_file("package_report.md")
+
+
+def test_static_viewer_declares_m11_artifact_classes_and_schema_warnings() -> None:
+    artifact_workspace = _read_web_file("artifact-workspace.js")
+    app = _read_web_file("app.js")
+
+    for source_token in [
+        "artifactClass",
+        "participatesInSummary",
+        "schemaWarnings",
+        "known_contract",
+        "unknown_json",
+        "unsupported_file",
+        "parsed but not included in summary",
+        "schema_version missing",
+    ]:
+        assert source_token in artifact_workspace
+
+    assert "artifact.artifactClass" in app
+    assert "artifact.schemaWarnings" in app
+
+
+def test_static_viewer_normalizes_real_fixture_and_non_contract_inputs() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+const fixtureRoot = "tests/fixtures/web_static_artifact_viewer/product_run";
+const artifactNames = [
+  "run_manifest.json",
+  "finished_package_manifest.json",
+  "quality_report.json",
+  "review_report.json",
+  "delivery_readiness.json",
+  "package_report.md",
+];
+const fixtureFiles = await Promise.all(artifactNames.map(async (name) => ({
+  name,
+  text: async () => await readFile(join(fixtureRoot, name), "utf8"),
+})));
+const extraFiles = [
+  { name: "notes.json", text: async () => JSON.stringify({ hello: "world" }) },
+  { name: "notes.txt", text: async () => "plain text note" },
+  { name: "bad.json", text: async () => "{" },
+];
+const artifacts = await parseFiles([...fixtureFiles, ...extraFiles]);
+const workspace = normalizeWorkspace(artifacts);
+const partial = normalizeWorkspace(await parseFiles([fixtureFiles[0]]));
+
+console.log(JSON.stringify({
+  classes: Object.fromEntries(artifacts.map((artifact) => [artifact.fileName, artifact.artifactClass])),
+  schemaStatuses: Object.fromEntries(artifacts.map((artifact) => [artifact.fileName, artifact.schemaStatus])),
+  warningText: workspace.warnings.join("\\n"),
+  errorText: workspace.errors.join("\\n"),
+  runId: workspace.run?.runId,
+  packageId: workspace.package?.packageId,
+  qualityStatus: workspace.quality?.status,
+  reviewStatus: workspace.review?.status,
+  readinessStatus: workspace.readiness?.status,
+  reportCount: workspace.reports.length,
+  partialRunId: partial.run?.runId,
+  partialPackageLoaded: Boolean(partial.package),
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["classes"]["run_manifest.json"] == "known_contract"
+    assert payload["classes"]["finished_package_manifest.json"] == "known_contract"
+    assert payload["classes"]["notes.json"] == "unknown_json"
+    assert payload["classes"]["notes.txt"] == "unsupported_file"
+    assert payload["classes"]["bad.json"] == "invalid"
+    assert payload["schemaStatuses"]["run_manifest.json"] == "warning"
+    assert payload["schemaStatuses"]["quality_report.json"] == "warning"
+    assert "schema_version missing" in payload["warningText"]
+    assert "parsed but not included in summary" in payload["warningText"]
+    assert "unsupported_file" in payload["warningText"]
+    assert "bad.json" in payload["errorText"]
+    assert payload["runId"] == "package_run_fixture"
+    assert payload["packageId"] == "demo_package"
+    assert payload["qualityStatus"] == "pass"
+    assert payload["reviewStatus"] == "pass"
+    assert payload["readinessStatus"] == "fail"
+    assert payload["reportCount"] == 1
+    assert payload["partialRunId"] == "package_run_fixture"
+    assert payload["partialPackageLoaded"] is False
+
+
+def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads() -> None:
+    app = _read_web_file("app.js")
+
+    assert "normalizeWorkspace(artifacts)" in app
+    assert "renderWorkspace(state)" in app
+    for raw_contract_fragment in [
+        ".payload",
+        "artifact_index",
+        "schema_version",
+        "finished_package_manifest",
+    ]:
+        assert raw_contract_fragment not in app
 
 
 def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
@@ -77,8 +213,8 @@ def test_static_viewer_report_preview_uses_safe_text_rendering() -> None:
     app = _read_web_file("app.js")
 
     assert "textContent" in app
-    assert "escapeHtml" in app
     assert ".innerHTML" not in app
+    assert "script" not in app.lower()
 
 
 def test_static_viewer_readme_documents_boundaries() -> None:
@@ -92,5 +228,12 @@ def test_static_viewer_readme_documents_boundaries() -> None:
         "no persistence",
         "feedback writing is out of scope",
         "does not scan directories",
+        "unknown_json",
+        "unsupported_file",
+        "schema_version",
+        "warning",
+        "no video preview",
+        "no provider config",
+        "no workflow execution",
     ]:
         assert phrase in readme

@@ -1,0 +1,42 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "manifest_file_exists",
+      "status": "pass"
+    },
+    {
+      "name": "run_manifest_file_exists",
+      "status": "pass"
+    },
+    {
+      "name": "trace_file_exists",
+      "status": "pass"
+    },
+    {
+      "name": "finished_package_manifest_exists",
+      "status": "pass"
+    },
+    {
+      "name": "finished_package_manifest_status",
+      "status": "pass",
+      "details": {
+        "status": "succeeded"
+      }
+    },
+    {
+      "name": "finished_package_assets_non_empty",
+      "status": "pass",
+      "details": {
+        "count": 5
+      }
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "summary": {
+    "quality_profile": "finished_package",
+    "package_id": "demo_package",
+    "asset_count": 5
+  }
+}

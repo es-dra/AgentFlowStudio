@@ -1,7 +1,8 @@
 # NarratoCut Static Artifact Viewer
 
 This is a read-only, local-only static viewer for NarratoCut workflow artifacts.
-It is the first Web UI slice for the `codex/narratocut-web-ui` branch.
+It is the M1.1 release candidate hardening slice for the
+`codex/narratocut-web-ui` branch.
 
 Open it directly in a browser:
 
@@ -44,6 +45,22 @@ finished_package_manifest.json
 Both are normalized internally as `package_manifest`. The original selected file
 name remains visible in the UI.
 
+## Artifact Classification
+
+The viewer normalizes selected files before any panel renders them:
+
+- `known_contract`: a supported NarratoCut artifact that participates in the
+  summary and inspector views.
+- `unknown_json`: a JSON object that parsed successfully but is not a known
+  NarratoCut contract. It is visible in inventory but not included in summary.
+- `unsupported_file`: a selected file type that the static viewer does not use.
+  It is visible as a load note but not included in summary.
+- invalid JSON or non-object JSON: shown as a recoverable load error.
+
+Missing `schema_version` is a warning, not a fatal error. Some current
+NarratoCut artifacts, including `run_manifest.json` and `quality_report.json`,
+may omit it while still being readable by this viewer.
+
 ## Privacy Boundary
 
 - read-only
@@ -54,10 +71,16 @@ name remains visible in the UI.
 - no provider calls
 - no workflow execution
 - no automatic directory scanning
+- no video preview
+- no provider config
+- no CLI/API bridge
 
 The viewer parses selected JSON and Markdown files in the browser and renders a
 temporary inspection view. It does not write files, save settings, submit
 feedback, or store state.
+
+Markdown reports are displayed as escaped text. Inline HTML such as `<script>`
+is shown literally and is not executed.
 
 ## Non-Goals
 
@@ -67,11 +90,23 @@ Also out of scope:
 
 - running `ncut`
 - scanning a run directory
+- backend execution
+- workflow execution
 - uploading artifacts
 - opening provider configuration
+- provider config
+- video preview
 - playing local videos
 - editing timelines
 - saving review decisions
+
+## Test Fixture
+
+`tests/fixtures/web_static_artifact_viewer/product_run/` contains a small,
+sanitized artifact set based on the real NarratoCut `final_video_package`
+workflow shape. It keeps contract fields for run/package/quality/review/delivery
+coverage, uses relative placeholder media paths, and does not include media
+files or generated runtime directories.
 
 Future slices may add feedback event copy/export or explicit local video preview,
 but those features must keep the local-only boundary.

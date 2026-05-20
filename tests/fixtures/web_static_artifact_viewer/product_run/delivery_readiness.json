@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1",
+  "status": "fail",
+  "summary": {
+    "total_runs": 1,
+    "passed": 0,
+    "warning": 0,
+    "failed": 1
+  },
+  "runs": [
+    {
+      "run_id": "package_run_fixture",
+      "status": "fail",
+      "mode": "final_video_package",
+      "run_dir": "fixtures/product_run",
+      "workflow": "workflows/final_video_package.yaml",
+      "package_id": "demo_package",
+      "candidate_count": 0,
+      "selected_count": 0,
+      "failures": [
+        "missing highlight_score_report.json",
+        "missing selection_diagnostics.json"
+      ],
+      "warnings": []
+    }
+  ]
+}

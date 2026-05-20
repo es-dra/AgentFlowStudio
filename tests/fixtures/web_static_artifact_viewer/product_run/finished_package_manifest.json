@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.1",
+  "status": "succeeded",
+  "package_id": "demo_package",
+  "primary_video": {
+    "role": "final_video",
+    "path": "fixtures/product_run/final_video.mp4",
+    "required": true,
+    "exists": true,
+    "size_bytes": 16
+  },
+  "assets": [
+    {
+      "role": "final_video",
+      "path": "fixtures/product_run/final_video.mp4",
+      "required": true,
+      "exists": true,
+      "size_bytes": 16
+    },
+    {
+      "role": "subtitled_video",
+      "path": "fixtures/product_run/final_video_with_subtitles.mp4",
+      "required": false,
+      "exists": true,
+      "size_bytes": 20
+    },
+    {
+      "role": "bgm_video",
+      "path": "fixtures/product_run/final_video_with_bgm.mp4",
+      "required": false,
+      "exists": true,
+      "size_bytes": 14
+    },
+    {
+      "role": "cover_image",
+      "path": "fixtures/product_run/cover.jpg",
+      "required": false,
+      "exists": true,
+      "size_bytes": 10
+    },
+    {
+      "role": "review_report",
+      "path": "fixtures/product_run/review_report.json",
+      "required": false,
+      "exists": true,
+      "size_bytes": 26
+    }
+  ],
+  "evidence": {},
+  "errors": [],
+  "warnings": [],
+  "manifest_path": "finished_package_manifest.json",
+  "created_at": "2026-05-20T08:41:19.238689Z"
+}
