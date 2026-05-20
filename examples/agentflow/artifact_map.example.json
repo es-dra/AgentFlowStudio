@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_artifact_map",
+  "project_id": "agentflow_demo_project",
+  "artifacts": [
+    {
+      "artifact_id": "creative_brief_demo",
+      "artifact_type": "creative_brief",
+      "module_owner": "NarratoStudio",
+      "artifact_class": "source",
+      "path": "examples/narratostudio/creative_brief.example.json",
+      "produced_by": "human",
+      "consumed_by": [
+        "workflows/narratostudio_brief_to_production_handoff.yaml"
+      ],
+      "source_refs": [],
+      "status": "available"
+    },
+    {
+      "artifact_id": "production_handoff_demo",
+      "artifact_type": "production_handoff",
+      "module_owner": "NarratoStudio",
+      "artifact_class": "contract",
+      "path": "production_handoff.json",
+      "produced_by": "workflows/narratostudio_brief_to_production_handoff.yaml",
+      "consumed_by": [
+        "future_production_execution_layer"
+      ],
+      "source_refs": [
+        "creative_brief_demo"
+      ],
+      "status": "draft"
+    },
+    {
+      "artifact_id": "distribution_package_demo",
+      "artifact_type": "finished_package_manifest",
+      "module_owner": "NarratoCut",
+      "artifact_class": "contract",
+      "path": "finished_package_manifest.json",
+      "produced_by": "workflows/video_to_finished_package_local_asr.yaml",
+      "consumed_by": [
+        "inspect-run",
+        "review-run",
+        "future_package_viewer"
+      ],
+      "source_refs": [],
+      "status": "draft"
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

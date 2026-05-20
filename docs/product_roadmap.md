@@ -188,7 +188,7 @@ Default boundary:
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -218,3 +218,41 @@ Boundary:
 - no database
 - no Web UI implementation
 - no migration from reference UI projects
+
+## Phase 15.2: AgentFlow Mainline Contracts
+
+Status: in progress.
+
+Purpose:
+
+- define the top-level AgentFlow Studio contract layer before runtime work
+- fix the boundary between NarratoStudio production-side artifacts and
+  NarratoCut distribution-side artifacts
+- document feedback, memory candidate, artifact map, and skill contract shapes
+  without implementing Router, Memory runtime, or cross-module execution
+
+Expected documents:
+
+- `docs/agentflow_studio_architecture.md`
+- `docs/module_boundary.md`
+- `docs/agentflow_artifact_map.md`
+- `docs/agentflow_memory_contract.md`
+- `docs/agentflow_skill_contract.md`
+
+Expected examples:
+
+- `examples/agentflow/project_manifest.example.json`
+- `examples/agentflow/artifact_map.example.json`
+- `examples/agentflow/feedback_event.example.jsonl`
+
+Boundary:
+
+- documentation and minimal examples only
+- no workflow changes
+- no CLI changes
+- no package rename
+- no tag changes
+- no AgentFlow Router runtime
+- no AgentFlow Memory runtime
+- no skill runtime
+- no Web UI

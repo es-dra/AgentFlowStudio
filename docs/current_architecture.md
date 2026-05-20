@@ -15,6 +15,10 @@ NarratoStudio is now added as a sibling MVP module inside this repository for
 production-side validation. It is a local-first structured production handoff
 generator, not a replacement or rename of NarratoCut.
 
+AgentFlow Studio is represented here by local-first module contracts only. The
+top-level platform architecture, module boundary, artifact map, memory
+contract, and skill contract are documented separately under the contract docs.
+
 Current product path:
 
 ```text
@@ -64,6 +68,10 @@ harness
 
 narratostudio
   -> production-side contracts and deterministic handoff SOP logic
+
+agentflow contract docs
+  -> platform architecture, module boundaries, artifact map, memory contract,
+     and skill contract drafts
 
 workflows
   -> YAML workflow definitions
@@ -190,6 +198,8 @@ The system does not yet provide:
 - hosted NarratoStudio runtime or Web UI
 - AgentFlow Router runtime
 - AgentFlow Memory runtime
+- AgentFlow skill runtime
+- cross-module execution
 - automatic music selection
 - publishing/upload
 - transition templates

@@ -1,0 +1,25 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_project_manifest",
+  "project_id": "agentflow_demo_project",
+  "project_name": "Echo City Launch",
+  "project_goal": "Create a structured production handoff and later package distribution-ready short video artifacts.",
+  "modules": [
+    {
+      "module_id": "narratostudio",
+      "role": "production_handoff",
+      "status": "available"
+    },
+    {
+      "module_id": "narratocut",
+      "role": "distribution_package",
+      "status": "available"
+    }
+  ],
+  "artifact_map": "examples/agentflow/artifact_map.example.json",
+  "feedback_events": "examples/agentflow/feedback_event.example.jsonl",
+  "status": "draft",
+  "metadata": {
+    "example": true
+  }
+}

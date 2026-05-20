@@ -47,3 +47,29 @@ def test_narratostudio_creative_brief_example_has_schema_version() -> None:
 
     assert payload["schema_version"] == "0.1.0"
     assert CreativeBrief.model_validate(payload).artifact_type == "creative_brief"
+
+
+def test_agentflow_project_manifest_example_has_schema_version() -> None:
+    payload = json.loads(Path("examples/agentflow/project_manifest.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_project_manifest"
+    assert {module["module_id"] for module in payload["modules"]} == {"narratostudio", "narratocut"}
+
+
+def test_agentflow_artifact_map_example_has_schema_version() -> None:
+    payload = json.loads(Path("examples/agentflow/artifact_map.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_artifact_map"
+    assert {artifact["module_owner"] for artifact in payload["artifacts"]} == {"NarratoStudio", "NarratoCut"}
+
+
+def test_agentflow_feedback_event_example_jsonl_has_schema_version() -> None:
+    lines = Path("examples/agentflow/feedback_event.example.jsonl").read_text(encoding="utf-8").splitlines()
+    events = [json.loads(line) for line in lines if line.strip()]
+
+    assert events
+    assert all(event["schema_version"] == "0.1.0" for event in events)
+    assert {event["artifact_type"] for event in events} == {"agentflow_feedback_event"}
+    assert {event["decision"] for event in events} <= {"accepted", "rejected", "needs_revision", "note", "published"}

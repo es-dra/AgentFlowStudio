@@ -802,3 +802,19 @@
   - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
   - NarratoStudio CLI smoke: workflow success, inspect `58 passed / 0 failed / 0 warnings`, review `76 passed / 0 failed / 0 warnings`
 - Boundary kept: Web UI branch remains separate; this change does not migrate `D:\Projects\Zhike` and does not rename the repo or CLI.
+
+## 2026-05-21 - Phase 15.2 AgentFlow Mainline Contracts
+
+- Synced local `master` to the merged NarratoStudio PR at `dd0b25e` and started `codex/agentflow-mainline-contracts` from a clean mainline.
+- Added AgentFlow Studio contract-layer docs:
+  - `docs/agentflow_studio_architecture.md`
+  - `docs/module_boundary.md`
+  - `docs/agentflow_artifact_map.md`
+  - `docs/agentflow_memory_contract.md`
+  - `docs/agentflow_skill_contract.md`
+- Added minimal AgentFlow examples under `examples/agentflow/`:
+  - `project_manifest.example.json`
+  - `artifact_map.example.json`
+  - `feedback_event.example.jsonl`
+- Updated docs navigation, current architecture, and roadmap so Phase 15.2 is discoverable from the main docs index.
+- Boundary kept: this is a platform contract layer only; no workflow, CLI, package name, tag, Router runtime, Memory runtime, skill runtime, Web UI, database, or remote provider behavior changed.
