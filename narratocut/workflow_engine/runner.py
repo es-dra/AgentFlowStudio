@@ -84,8 +84,8 @@ class WorkflowRunner:
         context: WorkflowContext,
     ) -> None:
         self._write_manifest(run, context)
-        write_run_manifest(run, context)
         write_trace(definition, run, context)
+        write_run_manifest(run, context)
         report_ref = context.artifacts.get("package_report")
         if report_ref:
             write_package_report(context.output_dir, report_ref)

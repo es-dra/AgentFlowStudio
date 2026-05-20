@@ -153,6 +153,9 @@ Not included:
 NarratoCut v0.1.0 should be treated as the stable distribution-side MVP before
 opening broader AgentFlow Studio work.
 
+The detailed post-release plan is in
+[`post_v0_1_0_plan.md`](post_v0_1_0_plan.md).
+
 Recommended sequence:
 
 1. Keep NarratoCut stable and fix contract or delivery-readiness regressions.
@@ -161,3 +164,57 @@ Recommended sequence:
    NarratoStudio production-side artifact contracts.
 4. Merge the viewer branch only after it reads stable run/package artifacts
    instead of hard-coding demo paths.
+
+## Phase 15: Post-v0.1.0 Productization
+
+Status: in progress.
+
+Purpose:
+
+- keep the `v0.1.0` CLI/Agent MVP stable
+- prepare a viewer-only Web UI branch around existing run/package artifacts
+- define AgentFlow Studio and NarratoStudio artifact boundaries before runtime
+  work
+- improve selection quality only through measurable artifact evidence
+- validate NarratoStudio as a local-first structured production handoff
+  generator before adding runtime or Web assumptions
+
+Default boundary:
+
+- do not change core workflow behavior until a specific branch goal requires it
+- do not treat test runs or internal validation samples as formal deliverables
+- do not add Web/API/database/platform runtime assumptions to the released CLI
+  path
+
+## Phase 15.1: NarratoStudio Mainline MVP
+
+Status: in progress.
+
+Purpose:
+
+- add `NarratoStudio` as a sibling module for production-side MVP validation
+- keep `NarratoCut` as the distribution-side module
+- prove the first production workflow through structured artifacts, not a chat
+  transcript
+
+First workflow:
+
+```text
+creative_brief.json
+-> story_bible.json
+-> episode_outline.json
+-> scene_plan.json
+-> shot_plan.json
+-> prompt_pack.json
+-> production_handoff.json
+-> production_report.md
+```
+
+Boundary:
+
+- local deterministic generation only
+- no remote LLM call
+- no Agent runtime
+- no database
+- no Web UI implementation
+- no migration from reference UI projects

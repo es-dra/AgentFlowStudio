@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from narratostudio import CreativeBrief
+
 
 def test_project_manifest_example_has_schema_version() -> None:
     payload = json.loads(Path("examples/contracts/project_manifest.example.json").read_text(encoding="utf-8"))
@@ -38,3 +40,10 @@ def test_platform_profile_examples_have_schema_version() -> None:
         assert payload["platform_id"]
         assert payload["recommended_duration_sec"]["min"] > 0
         assert payload["aspect_ratio"]
+
+
+def test_narratostudio_creative_brief_example_has_schema_version() -> None:
+    payload = json.loads(Path("examples/narratostudio/creative_brief.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert CreativeBrief.model_validate(payload).artifact_type == "creative_brief"

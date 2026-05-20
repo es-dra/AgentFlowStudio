@@ -10,6 +10,8 @@ and agent contracts obvious without reading every historical phase note.
 
 - [Current architecture](current_architecture.md)
 - [Product roadmap](product_roadmap.md)
+- [Post-v0.1.0 plan](post_v0_1_0_plan.md)
+- [NarratoStudio contracts](narratostudio_contracts.md)
 - [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
 - [Golden Path](golden_path.md)
 - [Golden Sample v0.1.0](golden_sample_v0_1_0.md)
@@ -49,6 +51,11 @@ Agent-facing task contracts live in [`../skills`](../skills/README.md).
 Operational agent guidance lives in
 [`agent_usage_guide.md`](agent_usage_guide.md).
 
+NarratoStudio is now represented as a sibling MVP module for the production
+side. Its first workflow is a local-first structured production handoff
+generator, documented in
+[`narratostudio_contracts.md`](narratostudio_contracts.md).
+
 ## Contracts
 
 - [Run contract](run_contract.md)
@@ -59,6 +66,7 @@ Operational agent guidance lives in
 - [Project manifest contract](project_manifest_contract.md)
 - [Feedback contract](feedback_contract.md)
 - [Platform profile contract](platform_profile_contract.md)
+- [NarratoStudio contracts](narratostudio_contracts.md)
 - [Asset lifecycle](asset_lifecycle.md)
 
 ## Quality And Acceptance

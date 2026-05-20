@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from narratocut.workflow_engine.context import WorkflowContext
     from narratocut.workflow_engine.definitions import WorkflowDefinition, WorkflowStepDefinition
 
+NARRATOSTUDIO_PROFILE = "narratostudio_production_handoff"
+
 
 def write_trace(
     definition: WorkflowDefinition,
@@ -18,6 +20,8 @@ def write_trace(
 ) -> dict[str, Any]:
     trace = build_trace(definition, run, context)
     write_json(context.output_path("trace.json"), trace)
+    if context.quality_profile == NARRATOSTUDIO_PROFILE:
+        write_json(context.output_path("execution_trace.json"), build_execution_trace(definition, run, context))
     return trace
 
 
@@ -34,6 +38,41 @@ def build_trace(
             _trace_step(result, step_definitions.get(result.step_id), context)
             for result in run.steps
         ],
+    }
+
+
+def build_execution_trace(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    context: WorkflowContext,
+) -> dict[str, Any]:
+    step_definitions = {step.id: step for step in definition.steps}
+    return {
+        "schema_version": "0.1.0",
+        "artifact_type": "execution_trace",
+        "run_id": run.run_id,
+        "workflow_name": definition.name,
+        "workflow": _display_ref(context.workflow_path or run.workflow_name),
+        "steps": [
+            _execution_trace_step(result, step_definitions.get(result.step_id), context)
+            for result in run.steps
+        ],
+    }
+
+
+def _execution_trace_step(
+    result: StepResult,
+    definition: WorkflowStepDefinition | None,
+    context: WorkflowContext,
+) -> dict[str, Any]:
+    return {
+        "step_id": result.step_id,
+        "status": result.status,
+        "started_at": _format_datetime(result.started_at),
+        "ended_at": _format_datetime(result.ended_at),
+        "inputs": _trace_inputs(definition, context),
+        "outputs": result.artifacts,
+        "error": result.error,
     }
 
 

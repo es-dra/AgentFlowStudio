@@ -758,3 +758,47 @@
   - video+script: `product_acceptance_video_script_phase14_6_selection_quality`, 18 candidates, 4 selected clips, final duration 20.419887s, `selection_diagnostics.json` 0 warnings, `inspect-run` pass, `review-run` 40 passed / 0 warnings.
 - Ran final `delivery-readiness` for the selection-quality reruns. Result: `pass`, 2 passed / 0 warning / 0 failed.
 - Boundary kept: this closes the visible deterministic selection warnings for current local acceptance素材, but it is still text-first heuristic scoring, not a claim that viral/editorial judgment is mature.
+
+## 2026-05-20 - Post-v0.1.0 Startup Scan and Phase 15 Planning
+
+- Confirmed the release baseline after the `v0.1.0` closeout:
+  - local `master`: `bf5e7a1`
+  - `origin/master`: `bf5e7a1`
+  - remote head: only `master`
+  - `v0.1.0` tag type: annotated tag
+  - `v0.1.0` tag object: `460deba`
+  - `v0.1.0^{}`: `bf5e7a1`
+  - working tree: clean before the planning edits
+- Added `docs/post_v0_1_0_plan.md` as the post-release operating plan.
+- Updated `docs/README.md` and `docs/product_roadmap.md` so future agents start from the Phase 15 plan instead of reopening older phase notes.
+- Planning boundary: keep the `v0.1.0` CLI/Agent MVP stable, open a future Web UI branch as a package/run viewer, and expand AgentFlow Studio mainline through architecture/contracts before runtime work.
+- Boundary kept: no workflow, schema, CLI, provider, media, or Web UI implementation changed in this planning pass.
+
+## 2026-05-20 - NarratoStudio Mainline MVP
+
+- Added `NarratoStudio` as a sibling production-side MVP module inside the current repository. `NarratoCut` remains the distribution-side module.
+- Implemented the first recommended workflow:
+  - `creative_brief.json`
+  - `story_bible.json`
+  - `episode_outline.json`
+  - `scene_plan.json`
+  - `shot_plan.json`
+  - `prompt_pack.json`
+  - `production_handoff.json`
+  - `production_report.md`
+- Added local deterministic SOP logic and Pydantic contracts under `narratostudio/`; no remote LLM, Agent runtime, database, or Web UI was added.
+- Added Agent-native auxiliary artifacts:
+  - `memory_candidates.json` with candidate-only promotion status
+  - `cost_quality_trace.json` with `execution_mode: local_deterministic`
+  - `feedback_signal_log.json` as a derived artifact, not a feedback source of truth
+  - `execution_trace.json` as a local workflow execution trace
+- Added `narratostudio_production_handoff` inspect/review profile and agent skill contract.
+- Added `docs/narratostudio_contracts.md`, workflow docs, and the example creative brief.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest`: 333 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+  - NarratoStudio CLI smoke: workflow success, inspect `58 passed / 0 failed / 0 warnings`, review `76 passed / 0 failed / 0 warnings`
+- Boundary kept: Web UI branch remains separate; this change does not migrate `D:\Projects\Zhike` and does not rename the repo or CLI.

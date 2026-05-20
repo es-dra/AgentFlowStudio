@@ -20,11 +20,13 @@ from narratocut.harness.quality_profiles import (
     CANDIDATE_SCORING_PROFILE,
     FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
+    NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
     VIDEO_REAL_CLIPS_PROFILE,
 )
+from narratocut.harness.narratostudio_quality import build_narratostudio_review_section
 from narratocut.harness.review_checks import build_quality_report_check
 from narratocut.harness.subtitle_burn_quality import build_subtitle_burn_review_section
 from narratocut.harness.subtitle_quality import build_subtitle_review_section
@@ -70,6 +72,8 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         sections.append(build_candidate_review_section(root))
     if run_manifest and run_manifest.get("quality_profile") == CANDIDATE_SCORING_PROFILE:
         sections.append(build_candidate_scoring_review_section(root))
+    if run_manifest and run_manifest.get("quality_profile") == NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE:
+        sections.append(build_narratostudio_review_section(root))
     if run_manifest and is_video_quality_profile(run_manifest.get("quality_profile")):
         sections.append(build_video_review_section(root, run_manifest))
     if run_manifest and is_video_highlight_quality_profile(run_manifest.get("quality_profile")):
