@@ -18,11 +18,13 @@ from narratocut.harness.quality_profiles import (
     FINAL_VIDEO_PROFILE,
     CANDIDATE_WINDOWS_PROFILE,
     CANDIDATE_SCORING_PROFILE,
+    NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
     VIDEO_REAL_CLIPS_PROFILE,
 )
+from narratocut.harness.narratostudio_quality import build_narratostudio_quality_report
 from narratocut.harness.real_clip_quality import (
     build_real_video_quality_report,
     build_video_real_clips_quality_report,
@@ -57,6 +59,8 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return build_candidate_quality_report(root)
         if quality_profile == CANDIDATE_SCORING_PROFILE:
             return build_candidate_scoring_quality_report(root)
+        if quality_profile == NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE:
+            return build_narratostudio_quality_report(root)
         if is_video_quality_profile(quality_profile):
             return build_video_quality_report(root, quality_profile)
         if is_highlight_quality_profile(quality_profile):

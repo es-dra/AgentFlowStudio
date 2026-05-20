@@ -13,6 +13,7 @@ component workflow:
 | `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `selection_diagnostics.json`, `finished_package_manifest.json`, `package_report.md` |
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
+| `narratostudio_brief_to_production_handoff.yaml` | production / recommended | The user needs a local-first structured production handoff. | `production_handoff.json`, `production_report.md`, `memory_candidates.json`, `cost_quality_trace.json` |
 
 Component workflows such as `transcript_to_candidate_windows.yaml`,
 `clip_plan_to_real_clips.yaml`, `clips_to_final_video.yaml`, and
@@ -54,6 +55,36 @@ nearby low-energy boundaries, but it does not block ASR, scoring, slicing, or
 package generation when the audio artifact is mocked or cannot be analyzed.
 
 ## Available workflows
+
+### `narratostudio_brief_to_production_handoff.yaml`
+
+NarratoStudio MVP production-side workflow:
+
+1. `narratostudio_load_creative_brief`
+2. `narratostudio_build_story_bible`
+3. `narratostudio_build_episode_outline`
+4. `narratostudio_build_scene_plan`
+5. `narratostudio_build_shot_plan`
+6. `narratostudio_build_prompt_pack`
+7. `narratostudio_build_production_handoff`
+
+Example:
+
+```powershell
+.venv\Scripts\ncut run-workflow --workflow workflows/narratostudio_brief_to_production_handoff.yaml --input examples/narratostudio/creative_brief.example.json --output data/processed/runs/demo_narratostudio_handoff
+.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_narratostudio_handoff
+.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_narratostudio_handoff
+```
+
+This workflow writes `creative_brief.json`, `story_bible.json`,
+`episode_outline.json`, `scene_plan.json`, `shot_plan.json`,
+`prompt_pack.json`, `production_handoff.json`, `production_report.md`,
+`memory_candidates.json`, `cost_quality_trace.json`,
+`feedback_signal_log.json`, and `execution_trace.json`.
+
+It is a local-first structured production handoff generator. It does not call a
+remote LLM, provide an Agent runtime, create media assets, publish content,
+write long-term memory, or provide a Web UI.
 
 ### `mock_roi_to_script.yaml`
 

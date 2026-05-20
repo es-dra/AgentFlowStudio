@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "creative_brief",
+  "brief_id": "brief_echo_city_001",
+  "project_title": "Echo City",
+  "content_mode": "episodic_story_production",
+  "logline": "A courier discovers that every delivery changes a hidden map of the city.",
+  "target_audience": "urban fantasy short drama viewers",
+  "platform": "short_video_series",
+  "tone": "restrained suspense",
+  "genre": "urban fantasy",
+  "core_theme": "trust under pressure",
+  "must_include": [
+    "A visual map motif",
+    "A clear cliffhanger"
+  ],
+  "constraints": [
+    "Keep locations practical",
+    "Avoid exposition-heavy dialogue"
+  ],
+  "episode_count": 1,
+  "target_episode_duration_sec": 90,
+  "metadata": {
+    "example": true
+  }
+}
