@@ -73,3 +73,25 @@ def test_agentflow_feedback_event_example_jsonl_has_schema_version() -> None:
     assert all(event["schema_version"] == "0.1.0" for event in events)
     assert {event["artifact_type"] for event in events} == {"agentflow_feedback_event"}
     assert {event["decision"] for event in events} <= {"accepted", "rejected", "needs_revision", "note", "published"}
+
+
+def test_agentflow_memory_candidate_example_is_candidate_only() -> None:
+    payload = json.loads(Path("examples/agentflow/memory_candidate.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_memory_candidate"
+    assert payload["promotion_status"] == "candidate"
+    assert payload["source_artifact"] == "memory_candidates.json"
+    assert payload["source_of_truth"] == "feedback.jsonl"
+    assert payload["evidence_refs"]
+
+
+def test_agentflow_memory_promotion_decision_example_is_explicit_review() -> None:
+    payload = json.loads(Path("examples/agentflow/memory_promotion_decision.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_memory_promotion_decision"
+    assert payload["source_candidate_id"]
+    assert payload["decision"] in {"promoted", "rejected", "merged", "expired"}
+    assert payload["promotion_mode"] == "human_reviewed"
+    assert payload["writes_long_term_memory"] is False

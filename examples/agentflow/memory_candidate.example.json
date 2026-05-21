@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_candidate",
+  "candidate_id": "af_memory_candidate_001",
+  "project_id": "agentflow_demo_project",
+  "module_owner": "NarratoStudio",
+  "source_artifact": "memory_candidates.json",
+  "source_of_truth": "feedback.jsonl",
+  "derived_from_feedback_signal": "feedback_signal_log.json",
+  "promotion_status": "candidate",
+  "memory_type": "style_preference",
+  "statement": "The project favors clear character-choice escalation over exposition-heavy scene planning.",
+  "evidence_refs": [
+    "af_feedback_001",
+    "production_handoff_demo",
+    "story_bible.json"
+  ],
+  "confidence": 0.64,
+  "suggested_promotion_condition": "Promote only after repeated human-reviewed feedback confirms the same preference.",
+  "metadata": {
+    "example": true
+  }
+}

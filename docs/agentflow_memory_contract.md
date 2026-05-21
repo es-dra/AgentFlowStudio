@@ -3,8 +3,8 @@
 AgentFlow Memory is the future platform layer that turns repeated execution and
 feedback into reusable project knowledge.
 
-Phase 15.2 only defines the contract boundaries. It does not implement a
-memory runtime, vector store, database, or automatic preference update.
+Phase 15.4 deepens the signal contracts. It still does not implement a memory
+runtime, vector store, database, or automatic preference update.
 
 ## Contract Chain
 
@@ -55,7 +55,8 @@ It may summarize:
 - confidence level
 - suggested follow-up
 
-It must not be used as the primary feedback store.
+It must not be used as the primary feedback store. `feedback.jsonl` remains the
+source of truth even when a derived signal is easier for an Agent to read.
 
 ## Memory Candidate
 
@@ -73,14 +74,40 @@ A memory candidate may include:
 
 For the current MVP, `promotion_status` must remain `candidate`.
 
+Candidate memory is not accepted memory. Agents may use candidates as review
+inputs, but must not treat them as durable preferences or project facts without
+an explicit promotion decision.
+
+See [`../examples/agentflow/memory_candidate.example.json`](../examples/agentflow/memory_candidate.example.json).
+
 ## Promotion Decision
 
-A future promotion decision should be explicit and reviewable. Suggested
-statuses:
+A promotion decision is explicit and reviewable. Current decision statuses:
 
 - `promoted`
 - `rejected`
 - `merged`
 - `expired`
 
-Automatic promotion is out of scope for the current repository phase.
+The current examples use `promotion_mode: human_reviewed` and
+`writes_long_term_memory: false` to avoid implying that this repository now owns
+a long-term memory store.
+
+See [`../examples/agentflow/memory_promotion_decision.example.json`](../examples/agentflow/memory_promotion_decision.example.json).
+
+## Cost-Quality Signal
+
+`cost_quality_trace.json` records execution strategy evidence, not a guarantee
+of creative quality.
+
+For local deterministic MVP runs, it should identify:
+
+- `provider`: `local_deterministic`
+- `execution_mode`: `local_deterministic`
+- input and output artifact refs
+- quality proxy metrics
+- estimated cost, usually `0`
+
+Future model-backed runs may extend provider, model, latency, token, retry, and
+cost fields, but those fields should remain trace evidence for strategy review,
+not a substitute for human acceptance.
