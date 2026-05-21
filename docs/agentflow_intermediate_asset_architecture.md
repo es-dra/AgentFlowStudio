@@ -1,0 +1,65 @@
+# AgentFlow Intermediate Asset Architecture
+
+Phase 15.13 defines the architecture language for reusable intermediate
+assets. It does not implement Memory runtime, does not implement Router runtime,
+does not implement skill runtime, does not implement a database, and does not
+execute workflows.
+
+## Core Chain
+
+The intended learning loop is:
+
+```text
+Agent action -> artifact -> feedback signal -> memory candidate -> promotion decision -> reusable asset
+```
+
+An intermediate asset is not a chat transcript, temporary UI state, or durable
+long-term memory. It is a structured, reviewable asset candidate that keeps
+source and evidence references so a later Agent can understand why it exists.
+
+## Contract Surfaces
+
+`agentflow_intermediate_asset` records a reusable candidate produced during a
+run. It must include source artifact references, evidence references, and
+`reuse_status: candidate`.
+
+`agentflow_reusable_asset_profile` records an asset that has been explicitly
+promoted for reuse. It must reference the source intermediate assets and a
+promotion decision. A reusable profile is still a contract artifact, not an
+automatic global preference store.
+
+`agentflow_asset_reuse_decision` records why an Agent chose to reuse one asset
+profile and reject another for a target task. It must be decision-only and must
+not execute the task.
+
+## NarratoStudio Asset Examples
+
+NarratoStudio should treat these as likely intermediate asset kinds:
+
+- character reference
+- style constraint
+- prompt attempt
+- generation result summary
+- acceptance or rejection reason
+- cost-quality evidence
+
+These assets help the system learn which creative rules, prompts, and execution
+strategies converge toward the user's preferred production style.
+
+## Boundaries
+
+This phase is still contract-layer work:
+
+- no Memory runtime
+- no vector store, database, cache service, or file repository service
+- no Router runtime
+- no skill runtime
+- no workflow changes
+- does not execute workflows
+- no CLI changes
+- no remote provider calls
+- no long-term memory writes
+
+Candidate memory must not be treated as accepted memory. A reusable asset
+profile must not become an active preference unless it references an explicit
+promotion decision.

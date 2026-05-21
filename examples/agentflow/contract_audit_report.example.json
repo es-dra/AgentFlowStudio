@@ -71,6 +71,30 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_intermediate_asset",
+      "example_path": "examples/agentflow/intermediate_asset.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_reusable_asset_profile",
+      "example_path": "examples/agentflow/reusable_asset_profile.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_asset_reuse_decision",
+      "example_path": "examples/agentflow/asset_reuse_decision.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
@@ -103,6 +127,21 @@
       "check_id": "cost_quality_trace_is_evidence",
       "status": "passed",
       "note": "Cost-quality trace is execution strategy evidence, not a quality guarantee."
+    },
+    {
+      "check_id": "candidate_memory_not_reusable_asset",
+      "status": "passed",
+      "note": "Candidate memory is not treated as a reusable asset profile without promotion."
+    },
+    {
+      "check_id": "reusable_asset_requires_promotion",
+      "status": "passed",
+      "note": "Reusable asset profiles require explicit promotion decision references."
+    },
+    {
+      "check_id": "intermediate_asset_has_evidence",
+      "status": "passed",
+      "note": "Intermediate assets keep source artifact and evidence references."
     }
   ],
   "validated_runtime_capabilities": [],

@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_intermediate_asset",
+  "asset_id": "af_intermediate_asset_001",
+  "asset_kind": "style_constraint",
+  "module_origin": "NarratoStudio",
+  "created_by": "agent",
+  "source_artifact_refs": [
+    "creative_brief.json",
+    "story_bible.json",
+    "prompt_pack.json"
+  ],
+  "evidence_refs": [
+    "feedback_event:af_feedback_001",
+    "review_report.json",
+    "cost_quality_trace.json"
+  ],
+  "summary": "A concise style constraint candidate extracted from a structured production handoff run.",
+  "reuse_status": "candidate",
+  "metadata": {
+    "example": true
+  }
+}

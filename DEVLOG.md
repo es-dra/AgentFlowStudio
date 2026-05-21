@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.13 AgentFlow Intermediate Asset Architecture
+
+- Synced local `master` to merged PR #52 at `7e42a30` and started `codex/agentflow-asset-memory-architecture-plan` from a clean mainline.
+- Added focused TDD coverage for intermediate asset examples, reusable asset profiles, asset reuse decisions, registry/audit coverage, and architecture docs.
+- First red run failed as expected because `docs/agentflow_intermediate_asset_architecture.md` and the three new AgentFlow asset examples did not exist, and registry/audit/roadmap entries had not been updated.
+- Added `docs/agentflow_intermediate_asset_architecture.md` to define the `Agent action -> artifact -> feedback signal -> memory candidate -> promotion decision -> reusable asset` loop.
+- Added minimal `agentflow_intermediate_asset`, `agentflow_reusable_asset_profile`, and `agentflow_asset_reuse_decision` examples.
+- Updated AgentFlow architecture, artifact map, memory contract, docs navigation, registry, audit report, product roadmap, Phase 15 roadmap, and DEVLOG while keeping the work contract-layer only.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_intermediate_asset_architecture.py`: 29 passed
+  - `.venv\Scripts\python.exe -m pytest`: 394 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, Memory runtime, Router runtime, skill runtime, database, vector store, cache service, file repository, Web UI, remote provider call, generated run artifact, or long-term memory write changes.
+
 ## 2026-05-21 - Phase 15.12 AgentFlow Skill Invocation / Result Replay Validator
 
 - Synced local `master` to merged PR #51 at `f2261b5` and started `codex/agentflow-skill-replay-validator` from a clean mainline.

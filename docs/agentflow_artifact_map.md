@@ -31,8 +31,28 @@ For contract discovery across examples and docs, see
 | decision | Auditable selection or promotion decision. | `router_decision.json`, promotion decision |
 | derived | Generated from other artifacts in one run. | `feedback_signal_log.json` |
 | candidate | Proposed reusable signal awaiting review. | `memory_candidates.json` |
+| intermediate_asset | Structured candidate asset from Agent execution. | prompt attempt, style constraint |
+| reusable_asset | Promoted asset profile for future reuse. | character reference, platform strategy |
 | report | Human-readable review surface. | `production_report.md`, `package_report.md` |
 | media | Local generated or source media file. | `final_video.mp4`, clips |
+
+## Intermediate Asset Types
+
+AgentFlow should preserve intermediate assets when they can improve future
+runs. Current contract-layer categories include:
+
+- prompt attempt
+- model output summary
+- selection decision
+- rejection reason
+- style reference
+- character reference
+- platform packaging strategy
+- cost-quality evidence
+
+Intermediate assets stay candidate-like until a promotion decision creates a
+reusable asset profile. A reusable asset profile is still evidence-backed; it
+must not become an implicit global preference without a promotion decision.
 
 ## Current Cross-Module Flow
 
@@ -55,6 +75,8 @@ project_manifest.example.json
 -> feedback.jsonl
 -> feedback_signal_log.json
 -> memory_candidates.json
+-> intermediate_asset.json
+-> future reusable_asset_profile.json
 -> future promotion decision
 ```
 

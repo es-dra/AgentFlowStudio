@@ -36,6 +36,7 @@ execution. Phase 15 has:
 | Phase 15.10 | complete | Runtime readiness spike |
 | Phase 15.11 | complete | Router dry-run decision validator |
 | Phase 15.12 | complete | Skill Invocation / Result Replay Validator |
+| Phase 15.13 | complete | Intermediate Asset & Memory Architecture Plan |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -347,3 +348,28 @@ Boundary:
 - does not write runtime state, long-term memory, database rows, or generated
   run artifacts
 - does not add CLI commands, hosted APIs, Web UI, or cross-module execution
+
+## Phase 15.13: AgentFlow Intermediate Asset & Memory Architecture Plan
+
+Status: complete.
+
+Purpose: define how Agent execution artifacts become reviewable intermediate
+assets and, after explicit promotion, reusable asset profiles.
+
+Output:
+
+- `docs/agentflow_intermediate_asset_architecture.md`
+- `agentflow_intermediate_asset` example
+- `agentflow_reusable_asset_profile` example
+- `agentflow_asset_reuse_decision` example
+- registry and static audit coverage for the new contract surfaces
+
+Boundary:
+
+- docs, examples, and tests only
+- does not implement Memory runtime
+- does not implement Router runtime
+- does not implement skill runtime
+- does not implement database, vector store, cache service, or file repository
+- does not change CLI or workflow execution
+- does not call local or remote providers

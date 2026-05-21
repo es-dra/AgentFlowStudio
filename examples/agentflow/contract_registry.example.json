@@ -53,6 +53,24 @@
       "example_path": "examples/agentflow/router_decision.example.json",
       "doc_path": "docs/agentflow_router_contract.md",
       "contract_surface": "router_decision"
+    },
+    {
+      "artifact_type": "agentflow_intermediate_asset",
+      "example_path": "examples/agentflow/intermediate_asset.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "contract_surface": "intermediate_asset"
+    },
+    {
+      "artifact_type": "agentflow_reusable_asset_profile",
+      "example_path": "examples/agentflow/reusable_asset_profile.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "contract_surface": "reusable_asset"
+    },
+    {
+      "artifact_type": "agentflow_asset_reuse_decision",
+      "example_path": "examples/agentflow/asset_reuse_decision.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "contract_surface": "asset_reuse_decision"
     }
   ],
   "validation_rules": [
@@ -75,6 +93,14 @@
     {
       "rule_id": "candidate_memory_only",
       "description": "Memory candidates remain candidate-only until an explicit promotion decision exists."
+    },
+    {
+      "rule_id": "reusable_asset_requires_promotion",
+      "description": "Reusable asset profiles must reference an explicit promotion decision."
+    },
+    {
+      "rule_id": "asset_reuse_decision_only",
+      "description": "Asset reuse decisions record selection reasoning and must not execute work."
     }
   ],
   "metadata": {
