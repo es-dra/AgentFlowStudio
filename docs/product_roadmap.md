@@ -187,4 +187,6 @@ Current Phase 15 rules:
 Current checkpoint:
 
 - contract-layer review gates are in place
-- roadmap detail split is in progress
+- runtime readiness gates are documented
+- the next narrow slice is Router dry-run decision validation, not Router
+  runtime

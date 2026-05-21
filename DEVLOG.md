@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.11 AgentFlow Router Dry-run Decision Validator
+
+- Synced local `master` to merged PR #50 at `d10fb55` and started `codex/agentflow-router-dry-run-validator` from a clean mainline.
+- Added focused TDD coverage in `tests/test_agentflow_router_dry_run_validator.py`; the first red run failed because `narratocut.harness.agentflow_router` did not exist.
+- Added `narratocut.harness.agentflow_router.validate_router_decision_dry_run` as a pure local harness validator for existing `agentflow_router_decision` artifacts.
+- Added checks for schema version, artifact type, request summary, selected known skill, selection reason, rejected candidate reasons, selected skill exclusion from rejected candidates, decision-only status, `executes_skill: false`, and private path or secret fragments.
+- Updated Router contract, runtime readiness, product roadmap, Phase 15 roadmap, and DEVLOG to keep this scoped as dry-run validation rather than Router runtime.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_router_dry_run_validator.py`: 8 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_router_dry_run_validator.py tests/test_agentflow_runtime_readiness.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_pr_review_checklist.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 41 passed
+  - `.venv\Scripts\python.exe -m pytest`: 377 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, skill execution, Router runtime, skill runtime, Memory runtime, database, Web UI, remote provider call, or generated run artifact changes.
+
 ## 2026-05-21 - Phase 15.10 AgentFlow Runtime Readiness Spike
 
 - Synced local `master` to merged PR #49 at `c2244d5` and started `codex/agentflow-runtime-readiness-spike` from a clean mainline.
