@@ -38,6 +38,7 @@ execution. Phase 15 has:
 | Phase 15.12 | complete | Skill Invocation / Result Replay Validator |
 | Phase 15.13 | complete | Intermediate Asset & Memory Architecture Plan |
 | Phase 15.14 | complete | Architecture Refactor Plan |
+| Phase 15.15 | complete | AgentFlow Package Skeleton |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -406,3 +407,29 @@ Boundary:
 - does not add skill runtime
 - does not add Memory runtime
 - does not merge or modify the Web UI branch
+
+## Phase 15.15: AgentFlow Package Skeleton
+
+Status: complete.
+
+Purpose: introduce the top-level `agentflow/` namespace before moving platform
+contract helpers or validators.
+
+Output:
+
+- `agentflow/__init__.py`
+- reserved namespace packages under `agentflow/contracts`, `agentflow/harness`,
+  `agentflow/memory`, `agentflow/router`, and `agentflow/skills`
+- import smoke tests proving the package exists and old validator imports still
+  work from `narratocut.harness`
+
+Boundary:
+
+- does not move validators
+- does not move contracts
+- does not change workflow execution
+- does not change CLI behavior
+- does not add Router runtime
+- does not add skill runtime
+- does not add Memory runtime
+- does not add database, provider, hosted API, or Web UI behavior
