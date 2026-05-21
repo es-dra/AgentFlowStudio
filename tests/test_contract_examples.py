@@ -13,6 +13,12 @@ AGENTFLOW_SKILL_ROUTER_EXAMPLES = [
     Path("examples/agentflow/router_decision.example.json"),
 ]
 
+AGENTFLOW_ASSET_EXAMPLES = [
+    Path("examples/agentflow/intermediate_asset.example.json"),
+    Path("examples/agentflow/reusable_asset_profile.example.json"),
+    Path("examples/agentflow/asset_reuse_decision.example.json"),
+]
+
 AGENTFLOW_EXAMPLE_PATHS = [
     Path("examples/agentflow/project_manifest.example.json"),
     Path("examples/agentflow/artifact_map.example.json"),
@@ -20,6 +26,7 @@ AGENTFLOW_EXAMPLE_PATHS = [
     Path("examples/agentflow/memory_candidate.example.json"),
     Path("examples/agentflow/memory_promotion_decision.example.json"),
     *AGENTFLOW_SKILL_ROUTER_EXAMPLES,
+    *AGENTFLOW_ASSET_EXAMPLES,
 ]
 
 
@@ -148,6 +155,44 @@ def test_agentflow_router_decision_example_selects_without_executing() -> None:
     assert payload["executes_skill"] is False
 
 
+def test_agentflow_intermediate_asset_example_is_candidate_with_evidence() -> None:
+    payload = json.loads(Path("examples/agentflow/intermediate_asset.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_intermediate_asset"
+    assert payload["asset_id"]
+    assert payload["asset_kind"]
+    assert payload["module_origin"] in {"NarratoStudio", "NarratoCut", "AgentFlow"}
+    assert payload["source_artifact_refs"]
+    assert payload["evidence_refs"]
+    assert payload["reuse_status"] == "candidate"
+
+
+def test_agentflow_reusable_asset_profile_requires_promotion_decision() -> None:
+    payload = json.loads(Path("examples/agentflow/reusable_asset_profile.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_reusable_asset_profile"
+    assert payload["asset_profile_id"]
+    assert payload["source_intermediate_asset_ids"]
+    assert payload["promotion_decision_ref"]
+    assert payload["reuse_policy"]
+    assert payload["active_status"] in {"active", "inactive", "superseded"}
+
+
+def test_agentflow_asset_reuse_decision_is_decision_only() -> None:
+    payload = json.loads(Path("examples/agentflow/asset_reuse_decision.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_asset_reuse_decision"
+    assert payload["decision_id"]
+    assert payload["target_task"]
+    assert payload["selected_asset_profile_ids"]
+    assert isinstance(payload["rejected_asset_profile_ids"], list)
+    assert payload["reason"]
+    assert payload["does_not_execute"] is True
+
+
 def test_agentflow_skill_router_examples_do_not_include_private_or_generated_paths() -> None:
     forbidden_fragments = [
         "D:\\",
@@ -164,6 +209,26 @@ def test_agentflow_skill_router_examples_do_not_include_private_or_generated_pat
     ]
 
     for path in AGENTFLOW_SKILL_ROUTER_EXAMPLES:
+        raw_text = path.read_text(encoding="utf-8").lower()
+        assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)
+
+
+def test_agentflow_asset_examples_do_not_include_private_or_generated_paths() -> None:
+    forbidden_fragments = [
+        "D:\\",
+        "C:\\",
+        "data/processed/runs",
+        "data/raw/",
+        ".mp4",
+        ".mov",
+        "api_key",
+        "token",
+        "secret",
+        "cookie",
+        "signed_url",
+    ]
+
+    for path in AGENTFLOW_ASSET_EXAMPLES:
         raw_text = path.read_text(encoding="utf-8").lower()
         assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)
 
@@ -187,6 +252,9 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",
+        "agentflow_intermediate_asset",
+        "agentflow_reusable_asset_profile",
+        "agentflow_asset_reuse_decision",
     }
     assert expected_types <= registered_types
     assert all(contract["example_path"] for contract in payload["contracts"])

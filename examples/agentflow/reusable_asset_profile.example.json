@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_reusable_asset_profile",
+  "asset_profile_id": "af_reusable_asset_profile_001",
+  "source_intermediate_asset_ids": [
+    "af_intermediate_asset_001"
+  ],
+  "promotion_decision_ref": "agentflow_memory_promotion_decision:af_promotion_decision_001",
+  "reuse_policy": {
+    "allowed_modules": [
+      "NarratoStudio"
+    ],
+    "requires_human_review": true,
+    "allowed_task_types": [
+      "episodic_story_production"
+    ]
+  },
+  "active_status": "active",
+  "metadata": {
+    "example": true
+  }
+}

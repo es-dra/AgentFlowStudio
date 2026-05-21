@@ -7,6 +7,10 @@ Phase 15.7 defines only a local example audit report and test coverage. It does
 not implement a runtime validator, registry service, Router runtime, skill
 runtime, Memory runtime, database, or cross-module execution.
 
+Phase 15.13 extends the static audit surface to include intermediate asset,
+reusable asset profile, and asset reuse decision examples. It still does not
+validate runtime asset storage, retrieval, or execution.
+
 ## Purpose
 
 The audit gate should catch contract drift before runtime work depends on the
@@ -22,6 +26,8 @@ It checks that:
   outputs
 - Router decisions remain decision-only
 - memory candidates remain candidate-only
+- reusable asset profiles require promotion decisions
+- asset reuse decisions remain decision-only
 - derived feedback and cost-quality traces do not become stronger claims than
   their contracts allow
 
@@ -53,7 +59,8 @@ For PR-level review readiness, use
 
 This audit gate is evidence for committed examples only. It must not be treated
 as proof that AgentFlow has a runtime router, skill executor, memory store, or
-workflow orchestrator.
+workflow orchestrator. It also must not be treated as proof that AgentFlow has
+an asset store or retrieval runtime.
 
 Future runtime validation may build on this shape, but it should be introduced
 as a separate phase with explicit execution semantics and failure modes.

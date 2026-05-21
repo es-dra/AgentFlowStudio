@@ -21,6 +21,23 @@ The platform moat is not model access. The durable asset is the structured
 history of what agents did, what artifacts were produced, what users accepted
 or rejected, and which execution strategy worked for which scenario.
 
+## Asset-First Memory-by-Doing Architecture
+
+AgentFlow Studio should treat every meaningful Agent action as a chance to
+produce a reusable data asset. The product loop is:
+
+```text
+Agent action -> artifact -> feedback signal -> memory candidate -> promotion decision -> reusable asset
+```
+
+This keeps the system from becoming a one-shot generation tool. Prompt
+attempts, style constraints, character references, selection decisions,
+rejection reasons, and cost-quality evidence should be preserved as structured
+intermediate assets when they can help the next run converge faster.
+
+For the current contract shape, see
+[`agentflow_intermediate_asset_architecture.md`](agentflow_intermediate_asset_architecture.md).
+
 ## Current Modules
 
 ### NarratoStudio
@@ -90,6 +107,10 @@ The current mainline should treat these as contract surfaces:
 - memory candidate: proposed reusable knowledge
 - promotion decision: explicit acceptance, rejection, merge, or expiration of a
   memory candidate
+- intermediate asset: structured candidate produced during Agent execution
+- reusable asset profile: explicitly promoted asset profile for future reuse
+- asset reuse decision: audited choice to apply or reject reusable assets for a
+  task
 - skill contract: agent-readable task capability description
 
 These contracts are intentionally local-first and file-based in this phase.

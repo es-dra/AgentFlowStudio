@@ -190,5 +190,7 @@ Current checkpoint:
 - runtime readiness gates are documented
 - Router dry-run decision validation is in place
 - skill invocation/result replay validation is in place
-- the next mainline slice should plan the architecture refactor around
-  reusable intermediate assets before changing runtime behavior
+- intermediate asset architecture is defined for reusable Agent execution
+  assets before runtime behavior changes
+- the next mainline slice should plan the actual architecture refactor before
+  moving contracts into a platform package

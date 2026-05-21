@@ -7,6 +7,10 @@ Phase 15.6 defines only the registry example and validation expectations. It
 does not implement a registry service, Router runtime, skill runtime, Memory
 runtime, database, permission engine, or cross-module execution.
 
+Phase 15.13 extends the registry to include intermediate asset, reusable asset
+profile, and asset reuse decision examples. These entries are still discovery
+records only and do not implement an asset store or Memory runtime.
+
 ## Purpose
 
 The registry should help an Agent answer:
@@ -59,6 +63,8 @@ Current validation should stay lightweight:
 - examples avoid private paths, secrets, generated media, and local run outputs
 - Router decisions remain decision-only
 - memory candidates remain candidate-only
+- reusable asset profiles require explicit promotion decision references
+- asset reuse decisions remain decision-only
 
 This is validation of committed contract examples. It is not runtime validation
 for workflow execution.
@@ -74,6 +80,7 @@ The registry must not:
 - call local or remote providers
 - select or invoke skills
 - write memory
+- store or retrieve reusable assets
 - publish content
 - replace `inspect-run` or `review-run`
 - become a database-backed registry service

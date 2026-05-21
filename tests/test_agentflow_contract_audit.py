@@ -68,6 +68,9 @@ def test_agentflow_contract_audit_report_records_boundary_checks() -> None:
         "memory_candidate_only",
         "feedback_signal_is_derived",
         "cost_quality_trace_is_evidence",
+        "candidate_memory_not_reusable_asset",
+        "reusable_asset_requires_promotion",
+        "intermediate_asset_has_evidence",
     } <= check_ids
     assert all(check["status"] == "passed" for check in report["boundary_checks"])
 

@@ -21,6 +21,18 @@ raw feedback event
 Each step must keep evidence references so future agents can explain why a
 preference or rule exists.
 
+Phase 15.13 adds intermediate asset language on top of this chain:
+
+```text
+memory candidate
+-> promotion decision
+-> reusable asset profile
+-> asset reuse decision
+```
+
+A candidate memory is not a reusable asset. A reusable asset profile must point
+back to source intermediate assets and an explicit promotion decision.
+
 ## Raw Feedback Event
 
 Raw feedback events are append-only records from a user, agent reviewer, or
@@ -94,6 +106,35 @@ The current examples use `promotion_mode: human_reviewed` and
 a long-term memory store.
 
 See [`../examples/agentflow/memory_promotion_decision.example.json`](../examples/agentflow/memory_promotion_decision.example.json).
+
+## Reusable Asset Profile
+
+`agentflow_reusable_asset_profile` records a promoted, evidence-backed asset
+that may be considered in a future task.
+
+Minimum fields:
+
+- `schema_version`: currently `0.1.0`.
+- `artifact_type`: `agentflow_reusable_asset_profile`.
+- `asset_profile_id`: stable profile id.
+- `source_intermediate_asset_ids`: source candidate assets.
+- `promotion_decision_ref`: explicit promotion decision reference.
+- `reuse_policy`: allowed modules, task types, and review requirements.
+- `active_status`: active, inactive, or superseded.
+
+Reusable asset profiles are not automatic long-term preference writes. They are
+reviewable assets that future Agents may consider through an asset reuse
+decision.
+
+See [`../examples/agentflow/reusable_asset_profile.example.json`](../examples/agentflow/reusable_asset_profile.example.json).
+
+## Asset Reuse Decision
+
+`agentflow_asset_reuse_decision` records why an Agent selected or rejected
+reusable assets for a target task. It is decision-only and must not execute a
+workflow or invoke a skill.
+
+See [`../examples/agentflow/asset_reuse_decision.example.json`](../examples/agentflow/asset_reuse_decision.example.json).
 
 ## Cost-Quality Signal
 
