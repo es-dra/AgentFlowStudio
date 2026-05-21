@@ -290,7 +290,7 @@ Boundary:
 
 ## Phase 15.4: AgentFlow Memory Signal Contracts
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -314,3 +314,39 @@ Boundary:
 - no database or vector store
 - no automatic long-term memory writes
 - no Router, Memory, or skill runtime
+
+## Phase 15.5: AgentFlow Skill / Router Contract Layer
+
+Status: in progress.
+
+Purpose:
+
+- define the minimum contract layer for skill invocation, skill result, and
+  Router decision artifacts
+- make skill selection reviewable before implementing any Router runtime
+- keep skill execution boundaries explicit through quality gates and forbidden
+  side effects
+
+Expected documents:
+
+- `docs/agentflow_skill_contract.md`
+- `docs/agentflow_router_contract.md`
+
+Expected examples:
+
+- `examples/agentflow/skill_invocation.example.json`
+- `examples/agentflow/skill_result.example.json`
+- `examples/agentflow/router_decision.example.json`
+
+Boundary:
+
+- contract docs and examples only
+- no workflow changes
+- no CLI changes
+- no Python runtime changes
+- no Pydantic schema package
+- no Router runtime
+- no skill runtime
+- no permission system
+- no cross-module execution
+- no Web UI

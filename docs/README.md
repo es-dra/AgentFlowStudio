@@ -63,6 +63,7 @@ generator, documented in
 - [AgentFlow artifact map](agentflow_artifact_map.md)
 - [AgentFlow memory contract](agentflow_memory_contract.md)
 - [AgentFlow skill contract](agentflow_skill_contract.md)
+- [AgentFlow router contract](agentflow_router_contract.md)
 - [Run contract](run_contract.md)
 - [Workspace contract](workspace_contract.md)
 - [Tool contracts](tool_contracts.md)

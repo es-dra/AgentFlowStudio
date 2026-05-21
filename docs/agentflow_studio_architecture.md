@@ -78,6 +78,10 @@ The current mainline should treat these as contract surfaces:
 
 - project manifest: project-level index and intent
 - artifact map: cross-module artifact registry
+- router decision: audited skill selection reasoning without execution
+- skill invocation: planned skill call and permitted side-effect boundary
+- skill result: execution outcome summary with output artifacts and quality
+  gate status
 - feedback event: raw user or external feedback
 - feedback signal: derived interpretation for one run
 - memory candidate: proposed reusable knowledge
@@ -86,10 +90,12 @@ The current mainline should treat these as contract surfaces:
 - skill contract: agent-readable task capability description
 
 These contracts are intentionally local-first and file-based in this phase.
+Router decisions are decision records only; they do not execute skills or
+replace workflow quality gates.
 
 ## Non-Goals
 
-Phase 15.2 does not implement:
+The current contract layer does not implement:
 
 - AgentFlow Router runtime
 - AgentFlow Memory runtime
@@ -108,5 +114,6 @@ Recommended mainline order:
 1. Stabilize platform contract docs and minimal examples.
 2. Strengthen NarratoStudio review gates around JSON artifact references.
 3. Deepen feedback, memory candidate, and cost-quality trace contracts.
-4. Only then extract broader AgentFlow Skills, Router, and Memory runtime
+4. Define minimal Skill and Router decision contracts without runtime behavior.
+5. Only then extract broader AgentFlow Skills, Router, and Memory runtime
    designs.
