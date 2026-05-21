@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_promotion_decision",
+  "decision_id": "af_memory_promotion_decision_001",
+  "project_id": "agentflow_demo_project",
+  "source_candidate_id": "af_memory_candidate_001",
+  "decision": "rejected",
+  "promotion_mode": "human_reviewed",
+  "writes_long_term_memory": false,
+  "reason_tags": [
+    "single_run_signal",
+    "insufficient_repetition"
+  ],
+  "review_note": "The candidate is useful for this run, but one feedback event is not enough to create durable project memory.",
+  "decided_by": "human",
+  "decided_at": "2026-05-21T11:00:00+08:00",
+  "metadata": {
+    "example": true
+  }
+}

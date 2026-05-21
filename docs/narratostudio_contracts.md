@@ -83,6 +83,10 @@ promotion_status: candidate
 The first MVP does not auto-promote, merge, reject, expire, or write long-term
 memory.
 
+`cost_quality_trace.json` records local deterministic execution strategy and
+quality proxy evidence. It helps compare future execution modes, but it is not a
+claim that the generated creative content is editorially mature.
+
 ## Quality Gate
 
 Use the standard gate sequence after a run:

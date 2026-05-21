@@ -1,5 +1,26 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.4 AgentFlow Memory Signal Contracts
+
+- Synced local `master` to merged PR #43 at `2f7feaa` and started `codex/agentflow-memory-signal-contracts` from a clean mainline.
+- Added minimal AgentFlow memory signal examples:
+  - `examples/agentflow/memory_candidate.example.json`
+  - `examples/agentflow/memory_promotion_decision.example.json`
+- Extended contract example tests so AgentFlow memory examples must use `schema_version: 0.1.0`, keep memory candidates as `promotion_status: candidate`, and make promotion decisions explicit human-reviewed artifacts that do not write long-term memory.
+- Updated memory and NarratoStudio docs to keep the boundaries clear:
+  - `feedback.jsonl` remains the raw feedback source of truth.
+  - `feedback_signal_log.json` is derived run interpretation only.
+  - `memory_candidates.json` is candidate-only and not durable memory.
+  - `cost_quality_trace.json` is execution strategy evidence, not a creative quality guarantee.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py`: 9 passed
+  - `.venv\Scripts\python.exe -m pytest`: 345 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, database, vector store, Router runtime, Memory runtime, skill runtime, Web UI, or remote provider behavior changed.
+
 ## 2026-05-21 - Phase 15.3 NarratoStudio Review Hardening
 
 - Synced local `master` to merged PR #42 at `8e1aff0` and started `codex/narratostudio-review-hardening` from a clean mainline.

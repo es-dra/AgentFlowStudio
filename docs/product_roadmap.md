@@ -259,7 +259,7 @@ Boundary:
 
 ## Phase 15.3: NarratoStudio Review Hardening
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -287,3 +287,30 @@ Boundary:
 - no Router, Memory, or skill runtime
 - no Web UI
 - no remote model calls
+
+## Phase 15.4: AgentFlow Memory Signal Contracts
+
+Status: in progress.
+
+Purpose:
+
+- deepen the feedback, memory candidate, promotion decision, and cost-quality
+  signal contracts before any Memory runtime work
+- prevent Agents from treating derived feedback signals or candidate memories as
+  durable project memory
+- keep memory evolution reviewable through explicit evidence and promotion
+  decisions
+
+Expected examples:
+
+- `examples/agentflow/memory_candidate.example.json`
+- `examples/agentflow/memory_promotion_decision.example.json`
+
+Boundary:
+
+- contract docs and examples only
+- no workflow changes
+- no CLI changes
+- no database or vector store
+- no automatic long-term memory writes
+- no Router, Memory, or skill runtime
