@@ -192,5 +192,7 @@ Current checkpoint:
 - skill invocation/result replay validation is in place
 - intermediate asset architecture is defined for reusable Agent execution
   assets before runtime behavior changes
-- the next mainline slice should plan the actual architecture refactor before
-  moving contracts into a platform package
+- the architecture refactor plan is defined before moving contracts into a
+  platform package
+- the next mainline slice should introduce only a minimal `agentflow/` package
+  skeleton before moving behavior

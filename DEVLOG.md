@@ -1018,3 +1018,12 @@
   - `feedback_event.example.jsonl`
 - Updated docs navigation, current architecture, and roadmap so Phase 15.2 is discoverable from the main docs index.
 - Boundary kept: this is a platform contract layer only; no workflow, CLI, package name, tag, Router runtime, Memory runtime, skill runtime, Web UI, database, or remote provider behavior changed.
+
+## 2026-05-22 - Phase 15.14 AgentFlow Architecture Refactor Plan
+
+- Synced `master` to the merged Phase 15.13 intermediate asset architecture PR and opened `codex/agentflow-architecture-refactor-plan`.
+- Added `docs/agentflow_architecture_refactor_plan.md` to define the future `agentflow/` platform package boundary before moving code.
+- The plan keeps `narratostudio/` responsible for production-side handoff logic and `narratocut/` responsible for distribution-side media workflows and current CLI behavior.
+- Defined a migration order: package skeleton, pure contract utilities, AgentFlow harness validators, compatibility imports, then docs/examples updates.
+- Added the regression matrix for contract examples, audit, Router dry-run validation, skill replay validation, NarratoStudio smoke, NarratoCut delivery readiness, CLI help/version, full tests, and compileall.
+- Boundary kept: this is a planning slice only; no Python modules were moved, no workflow/CLI behavior changed, and no Router, skill, Memory, database, hosted API, provider, or Web UI runtime was added.

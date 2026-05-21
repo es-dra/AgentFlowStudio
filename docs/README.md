@@ -63,6 +63,7 @@ generator, documented in
 - [Module boundary](module_boundary.md)
 - [AgentFlow artifact map](agentflow_artifact_map.md)
 - [AgentFlow intermediate asset architecture](agentflow_intermediate_asset_architecture.md)
+- [AgentFlow architecture refactor plan](agentflow_architecture_refactor_plan.md)
 - [AgentFlow contract registry](agentflow_contract_registry.md)
 - [AgentFlow contract validation](agentflow_contract_validation.md)
 - [AgentFlow PR review checklist](agentflow_pr_review_checklist.md)
