@@ -13,6 +13,15 @@ AGENTFLOW_SKILL_ROUTER_EXAMPLES = [
     Path("examples/agentflow/router_decision.example.json"),
 ]
 
+AGENTFLOW_EXAMPLE_PATHS = [
+    Path("examples/agentflow/project_manifest.example.json"),
+    Path("examples/agentflow/artifact_map.example.json"),
+    Path("examples/agentflow/feedback_event.example.jsonl"),
+    Path("examples/agentflow/memory_candidate.example.json"),
+    Path("examples/agentflow/memory_promotion_decision.example.json"),
+    *AGENTFLOW_SKILL_ROUTER_EXAMPLES,
+]
+
 
 def test_project_manifest_example_has_schema_version() -> None:
     payload = json.loads(Path("examples/contracts/project_manifest.example.json").read_text(encoding="utf-8"))
@@ -157,3 +166,64 @@ def test_agentflow_skill_router_examples_do_not_include_private_or_generated_pat
     for path in AGENTFLOW_SKILL_ROUTER_EXAMPLES:
         raw_text = path.read_text(encoding="utf-8").lower()
         assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)
+
+
+def test_agentflow_contract_registry_example_indexes_current_contracts() -> None:
+    payload = json.loads(Path("examples/agentflow/contract_registry.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_contract_registry"
+    assert payload["registry_scope"] == "contract_discovery"
+    assert payload["runtime_status"] == "not_implemented"
+    assert payload["does_not_execute"] is True
+
+    registered_types = {contract["artifact_type"] for contract in payload["contracts"]}
+    expected_types = {
+        "agentflow_project_manifest",
+        "agentflow_artifact_map",
+        "agentflow_feedback_event",
+        "agentflow_memory_candidate",
+        "agentflow_memory_promotion_decision",
+        "agentflow_skill_invocation",
+        "agentflow_skill_result",
+        "agentflow_router_decision",
+    }
+    assert expected_types <= registered_types
+    assert all(contract["example_path"] for contract in payload["contracts"])
+    assert all(contract["doc_path"] for contract in payload["contracts"])
+
+
+def test_agentflow_contract_registry_examples_exist_and_match_artifact_types() -> None:
+    payload = json.loads(Path("examples/agentflow/contract_registry.example.json").read_text(encoding="utf-8"))
+    json_examples = {path.as_posix() for path in AGENTFLOW_EXAMPLE_PATHS if path.suffix == ".json"}
+    jsonl_examples = {path.as_posix() for path in AGENTFLOW_EXAMPLE_PATHS if path.suffix == ".jsonl"}
+
+    for contract in payload["contracts"]:
+        example_path = contract["example_path"]
+        assert example_path in json_examples | jsonl_examples
+        if example_path in json_examples:
+            example_payload = json.loads(Path(example_path).read_text(encoding="utf-8"))
+            assert example_payload["artifact_type"] == contract["artifact_type"]
+        else:
+            events = [
+                json.loads(line)
+                for line in Path(example_path).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert events
+            assert {event["artifact_type"] for event in events} == {contract["artifact_type"]}
+
+
+def test_agentflow_contract_registry_declares_validation_rules_without_runtime() -> None:
+    payload = json.loads(Path("examples/agentflow/contract_registry.example.json").read_text(encoding="utf-8"))
+
+    rule_ids = {rule["rule_id"] for rule in payload["validation_rules"]}
+    assert {
+        "schema_version_0_1_0",
+        "example_path_exists",
+        "no_private_paths_or_secrets",
+        "router_decision_only",
+        "candidate_memory_only",
+    } <= rule_ids
+    assert "execute_workflow" not in rule_ids
+    assert "call_remote_provider" not in rule_ids

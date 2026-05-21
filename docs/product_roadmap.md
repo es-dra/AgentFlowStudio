@@ -317,7 +317,7 @@ Boundary:
 
 ## Phase 15.5: AgentFlow Skill / Router Contract Layer
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -350,3 +350,35 @@ Boundary:
 - no permission system
 - no cross-module execution
 - no Web UI
+
+## Phase 15.6: AgentFlow Contract Registry / Validation Layer
+
+Status: in progress.
+
+Purpose:
+
+- add a lightweight discovery registry for current AgentFlow contract examples
+- make artifact types, example paths, docs, and validation rules explicit
+- help future Agents find the right contract before any runtime work exists
+
+Expected documents:
+
+- `docs/agentflow_contract_registry.md`
+
+Expected examples:
+
+- `examples/agentflow/contract_registry.example.json`
+
+Boundary:
+
+- contract docs, examples, and tests only
+- no workflow changes
+- no CLI changes
+- no Python runtime changes
+- no Pydantic schema package
+- no registry service
+- no Router runtime
+- no skill runtime
+- no Memory runtime
+- no database
+- no cross-module execution

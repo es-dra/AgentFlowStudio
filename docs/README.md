@@ -61,6 +61,7 @@ generator, documented in
 - [AgentFlow Studio architecture](agentflow_studio_architecture.md)
 - [Module boundary](module_boundary.md)
 - [AgentFlow artifact map](agentflow_artifact_map.md)
+- [AgentFlow contract registry](agentflow_contract_registry.md)
 - [AgentFlow memory contract](agentflow_memory_contract.md)
 - [AgentFlow skill contract](agentflow_skill_contract.md)
 - [AgentFlow router contract](agentflow_router_contract.md)

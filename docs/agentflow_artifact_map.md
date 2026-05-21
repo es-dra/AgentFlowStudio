@@ -7,9 +7,13 @@ is a source, derived output, review surface, or candidate signal.
 This is a contract-layer document only. It does not implement a registry
 service.
 
+For contract discovery across examples and docs, see
+[`agentflow_contract_registry.md`](agentflow_contract_registry.md).
+
 ## Registry Rules
 
 - Every artifact map document must have `schema_version`.
+- Contract registry entries must point to committed examples and docs.
 - Machine-facing artifact names stay in English.
 - Human-facing descriptions may be localized.
 - Raw feedback and derived feedback signals must remain separate.
@@ -34,6 +38,7 @@ service.
 
 ```text
 project_manifest.example.json
+-> contract_registry.example.json
 -> creative_brief.json
 -> NarratoStudio workflow
 -> production_handoff.json

@@ -1,5 +1,21 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.6 AgentFlow Contract Registry
+
+- Synced local `master` to merged PR #45 at `fcd8127` and started `codex/agentflow-contract-registry` from a clean mainline.
+- Added a minimal AgentFlow contract registry example:
+  - `examples/agentflow/contract_registry.example.json`
+- Extended contract example tests so the registry must use `schema_version: 0.1.0`, declare `artifact_type: agentflow_contract_registry`, stay `contract_discovery` scoped, point to committed examples and docs, match indexed `artifact_type` values, and declare validation rules without runtime execution.
+- Added `docs/agentflow_contract_registry.md` and updated AgentFlow architecture, artifact map, docs navigation, and roadmap so the registry is discoverable as a local contract index.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py`: 16 passed
+  - `.venv\Scripts\python.exe -m pytest`: 352 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, Python runtime, Pydantic schema package, registry service, Router runtime, skill runtime, Memory runtime, database, cross-module execution, Web UI, or remote provider behavior changed.
+
 ## 2026-05-21 - Phase 15.5 AgentFlow Skill / Router Contracts
 
 - Synced local `master` to merged PR #44 at `2ce4b52` and started `codex/agentflow-skill-router-contracts` from a clean mainline.

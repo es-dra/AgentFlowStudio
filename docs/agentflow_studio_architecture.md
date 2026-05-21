@@ -78,6 +78,7 @@ The current mainline should treat these as contract surfaces:
 
 - project manifest: project-level index and intent
 - artifact map: cross-module artifact registry
+- contract registry: local discovery index for current contract examples
 - router decision: audited skill selection reasoning without execution
 - skill invocation: planned skill call and permitted side-effect boundary
 - skill result: execution outcome summary with output artifacts and quality
@@ -90,6 +91,8 @@ The current mainline should treat these as contract surfaces:
 - skill contract: agent-readable task capability description
 
 These contracts are intentionally local-first and file-based in this phase.
+The contract registry is a discovery index only; it does not execute workflows
+or replace runtime validation.
 Router decisions are decision records only; they do not execute skills or
 replace workflow quality gates.
 
@@ -115,5 +118,7 @@ Recommended mainline order:
 2. Strengthen NarratoStudio review gates around JSON artifact references.
 3. Deepen feedback, memory candidate, and cost-quality trace contracts.
 4. Define minimal Skill and Router decision contracts without runtime behavior.
-5. Only then extract broader AgentFlow Skills, Router, and Memory runtime
+5. Add a lightweight contract registry so Agents can discover current contract
+   examples before runtime work.
+6. Only then extract broader AgentFlow Skills, Router, and Memory runtime
    designs.

@@ -1,0 +1,83 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_contract_registry",
+  "registry_id": "agentflow_contract_registry_v0_1",
+  "registry_scope": "contract_discovery",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "contracts": [
+    {
+      "artifact_type": "agentflow_project_manifest",
+      "example_path": "examples/agentflow/project_manifest.example.json",
+      "doc_path": "docs/project_manifest_contract.md",
+      "contract_surface": "project_index"
+    },
+    {
+      "artifact_type": "agentflow_artifact_map",
+      "example_path": "examples/agentflow/artifact_map.example.json",
+      "doc_path": "docs/agentflow_artifact_map.md",
+      "contract_surface": "artifact_registry"
+    },
+    {
+      "artifact_type": "agentflow_feedback_event",
+      "example_path": "examples/agentflow/feedback_event.example.jsonl",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "raw_feedback"
+    },
+    {
+      "artifact_type": "agentflow_memory_candidate",
+      "example_path": "examples/agentflow/memory_candidate.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "candidate_memory"
+    },
+    {
+      "artifact_type": "agentflow_memory_promotion_decision",
+      "example_path": "examples/agentflow/memory_promotion_decision.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_promotion_review"
+    },
+    {
+      "artifact_type": "agentflow_skill_invocation",
+      "example_path": "examples/agentflow/skill_invocation.example.json",
+      "doc_path": "docs/agentflow_skill_contract.md",
+      "contract_surface": "skill_planning"
+    },
+    {
+      "artifact_type": "agentflow_skill_result",
+      "example_path": "examples/agentflow/skill_result.example.json",
+      "doc_path": "docs/agentflow_skill_contract.md",
+      "contract_surface": "skill_result_summary"
+    },
+    {
+      "artifact_type": "agentflow_router_decision",
+      "example_path": "examples/agentflow/router_decision.example.json",
+      "doc_path": "docs/agentflow_router_contract.md",
+      "contract_surface": "router_decision"
+    }
+  ],
+  "validation_rules": [
+    {
+      "rule_id": "schema_version_0_1_0",
+      "description": "AgentFlow contract examples must declare schema_version 0.1.0."
+    },
+    {
+      "rule_id": "example_path_exists",
+      "description": "Every registry entry must point to a committed minimal example."
+    },
+    {
+      "rule_id": "no_private_paths_or_secrets",
+      "description": "Examples must not include private local paths, generated media, credentials, tokens, cookies, or signed URLs."
+    },
+    {
+      "rule_id": "router_decision_only",
+      "description": "Router decisions record selection reasoning and must not claim skill execution."
+    },
+    {
+      "rule_id": "candidate_memory_only",
+      "description": "Memory candidates remain candidate-only until an explicit promotion decision exists."
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}
