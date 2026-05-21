@@ -39,6 +39,7 @@ execution. Phase 15 has:
 | Phase 15.13 | complete | Intermediate Asset & Memory Architecture Plan |
 | Phase 15.14 | complete | Architecture Refactor Plan |
 | Phase 15.15 | complete | AgentFlow Package Skeleton |
+| Phase 15.16 | complete | AgentFlow Contract Example Helpers |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -427,6 +428,33 @@ Boundary:
 
 - does not move validators
 - does not move contracts
+- does not change workflow execution
+- does not change CLI behavior
+- does not add Router runtime
+- does not add skill runtime
+- does not add Memory runtime
+- does not add database, provider, hosted API, or Web UI behavior
+
+## Phase 15.16: AgentFlow Contract Example Helpers
+
+Status: complete.
+
+Purpose: move pure AgentFlow contract example constants and JSON/JSONL loading
+helpers into the new platform package.
+
+Output:
+
+- `agentflow.contracts.examples`
+- `AGENTFLOW_CONTRACT_SCHEMA_VERSION`
+- committed AgentFlow example path and artifact type constants
+- read-only JSON/JSONL example loaders
+- contract example tests now reuse the platform helper constants
+
+Boundary:
+
+- does not move validators
+- does not move runtime behavior
+- does not change artifact contracts
 - does not change workflow execution
 - does not change CLI behavior
 - does not add Router runtime

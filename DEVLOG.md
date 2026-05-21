@@ -1034,3 +1034,10 @@
 - Added the top-level `agentflow/` package with reserved namespaces for `contracts`, `harness`, `memory`, `router`, and `skills`.
 - Added import smoke tests proving the new platform namespace imports without runtime side effects and that existing `narratocut.harness.agentflow_router` / `agentflow_skill` imports still work.
 - Boundary kept: no validators, contracts, workflow nodes, CLI commands, providers, database, Web UI, Router runtime, skill runtime, or Memory runtime were moved or added.
+
+## 2026-05-22 - Phase 15.16 AgentFlow Contract Example Helpers
+
+- Synced `master` to the merged Phase 15.15 package skeleton and opened `codex/agentflow-contract-helpers`.
+- Added `agentflow.contracts.examples` with schema version, committed AgentFlow example paths, artifact type constants, and read-only JSON/JSONL loading helpers.
+- Updated contract example tests to reuse the platform helper constants instead of duplicating example path lists.
+- Boundary kept: no validators, workflow nodes, CLI commands, artifact contracts, providers, database, Web UI, Router runtime, skill runtime, or Memory runtime were moved or added.

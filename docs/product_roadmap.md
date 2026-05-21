@@ -196,5 +196,7 @@ Current checkpoint:
   platform package
 - the minimal `agentflow/` package skeleton is available as a reserved platform
   namespace before moving behavior
-- the next mainline slice should move only pure contract constants/helpers, with
-  compatibility imports preserved
+- pure AgentFlow contract example constants and loaders are now in
+  `agentflow.contracts.examples`
+- the next mainline slice should migrate only validator constants or compatibility
+  wrappers, not validator behavior
