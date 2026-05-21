@@ -79,6 +79,7 @@ The current mainline should treat these as contract surfaces:
 - project manifest: project-level index and intent
 - artifact map: cross-module artifact registry
 - contract registry: local discovery index for current contract examples
+- contract audit report: static drift check for committed examples and docs
 - router decision: audited skill selection reasoning without execution
 - skill invocation: planned skill call and permitted side-effect boundary
 - skill result: execution outcome summary with output artifacts and quality
@@ -93,6 +94,8 @@ The current mainline should treat these as contract surfaces:
 These contracts are intentionally local-first and file-based in this phase.
 The contract registry is a discovery index only; it does not execute workflows
 or replace runtime validation.
+The contract audit report validates committed examples and docs only; it does
+not prove runtime execution.
 Router decisions are decision records only; they do not execute skills or
 replace workflow quality gates.
 
@@ -120,5 +123,6 @@ Recommended mainline order:
 4. Define minimal Skill and Router decision contracts without runtime behavior.
 5. Add a lightweight contract registry so Agents can discover current contract
    examples before runtime work.
-6. Only then extract broader AgentFlow Skills, Router, and Memory runtime
+6. Add a static audit gate to prevent contract drift before runtime work.
+7. Only then extract broader AgentFlow Skills, Router, and Memory runtime
    designs.
