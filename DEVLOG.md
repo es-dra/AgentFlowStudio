@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.12 AgentFlow Skill Invocation / Result Replay Validator
+
+- Synced local `master` to merged PR #51 at `f2261b5` and started `codex/agentflow-skill-replay-validator` from a clean mainline.
+- Added focused TDD coverage in `tests/test_agentflow_skill_replay_validator.py`; the first red run failed because `narratocut.harness.agentflow_skill` did not exist.
+- Added `narratocut.harness.agentflow_skill.validate_skill_invocation_result_replay` as a pure local harness validator for existing `agentflow_skill_invocation` and `agentflow_skill_result` artifacts.
+- Added checks for schema version, artifact type, invocation id, project id, skill id, planned invocation status, result status, expected output coverage, quality gate status coverage, passing required gates, review artifact declaration, `writes_long_term_memory: false`, and private path or secret fragments.
+- Updated Skill contract, runtime readiness, product roadmap, Phase 15 roadmap, and DEVLOG to keep this scoped as replay validation rather than skill runtime.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_replay_validator.py`: 9 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_replay_validator.py tests/test_agentflow_router_dry_run_validator.py tests/test_agentflow_runtime_readiness.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_pr_review_checklist.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 50 passed
+  - `.venv\Scripts\python.exe -m pytest`: 386 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, skill execution, Router runtime, skill runtime, Memory runtime, database, Web UI, remote provider call, or generated run artifact changes.
+
 ## 2026-05-21 - Phase 15.11 AgentFlow Router Dry-run Decision Validator
 
 - Synced local `master` to merged PR #50 at `d10fb55` and started `codex/agentflow-router-dry-run-validator` from a clean mainline.

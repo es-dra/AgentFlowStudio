@@ -34,7 +34,8 @@ execution. Phase 15 has:
 | Phase 15.8 | complete | Contract PR review checklist |
 | Phase 15.9 | complete | Roadmap document split |
 | Phase 15.10 | complete | Runtime readiness spike |
-| Phase 15.11 | in progress | Router dry-run decision validator |
+| Phase 15.11 | complete | Router dry-run decision validator |
+| Phase 15.12 | complete | Skill Invocation / Result Replay Validator |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -302,7 +303,7 @@ skill runtime, Memory runtime, or Web UI.
 
 ## Phase 15.11: AgentFlow Router Dry-run Decision Validator
 
-Status: in progress.
+Status: complete.
 
 Purpose: add the first narrow runtime-readiness validation surface for existing
 Router decision artifacts.
@@ -322,3 +323,27 @@ Boundary:
 - does not write runtime state, long-term memory, database rows, or generated
   run artifacts
 - does not add CLI commands, hosted APIs, Web UI, or remote provider behavior
+
+## Phase 15.12: AgentFlow Skill Invocation / Result Replay Validator
+
+Status: complete.
+
+Purpose: add a narrow replay validation surface for existing skill invocation
+and skill result artifacts.
+
+Output:
+
+- `narratocut.harness.agentflow_skill.validate_skill_invocation_result_replay`
+- `agentflow_skill_replay_validation` result shape
+- focused regression tests for skill invocation/result alignment
+
+Boundary:
+
+- validates existing `agentflow_skill_invocation` and `agentflow_skill_result`
+  artifacts
+- does not invoke skills
+- does not execute workflows
+- does not call local or remote providers
+- does not write runtime state, long-term memory, database rows, or generated
+  run artifacts
+- does not add CLI commands, hosted APIs, Web UI, or cross-module execution

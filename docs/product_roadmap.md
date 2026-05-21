@@ -188,5 +188,7 @@ Current checkpoint:
 
 - contract-layer review gates are in place
 - runtime readiness gates are documented
-- the next narrow slice is Router dry-run decision validation, not Router
-  runtime
+- Router dry-run decision validation is in place
+- skill invocation/result replay validation is in place
+- the next mainline slice should plan the architecture refactor around
+  reusable intermediate assets before changing runtime behavior
