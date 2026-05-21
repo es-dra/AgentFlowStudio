@@ -7,6 +7,12 @@ Phase 15.5 strengthens the contract shape for planned skill calls and skill
 results. It does not implement a skill runtime, permission engine, marketplace,
 or Router execution runtime.
 
+Phase 15.12 adds local replay validation for a committed or provided skill
+invocation/result pair. This still does not implement a skill runtime: it
+validates that a result matches the planned invocation and quality-gate
+expectations, but it does not invoke a skill, execute a workflow, call a
+provider, or write runtime state.
+
 ## Skill Contract Purpose
 
 A skill contract should answer:
@@ -97,6 +103,31 @@ Current gate status values:
 
 Markdown reports can support human review, but strong contract checks should
 remain on machine-readable artifacts and review reports.
+
+## Replay Validation Artifact
+
+`agentflow_skill_replay_validation` records the local validation result for a
+skill invocation/result pair. It is a harness validation surface, not skill
+runtime output.
+
+Minimum fields:
+
+- `schema_version`: currently `0.1.0`.
+- `artifact_type`: `agentflow_skill_replay_validation`.
+- `validation_scope`: `skill_invocation_result_replay`.
+- `runtime_status`: `not_implemented`.
+- `does_not_execute`: must be `true`.
+- `invocation_id`: validated invocation id.
+- `result_id`: validated result id.
+- `skill_id`: skill id from the planned invocation.
+- `overall_status`: `passed` or `failed`.
+- `checks`: per-check validation results.
+
+The current replay validator checks schema version, artifact type, invocation
+id, project id, skill id, planned invocation status, result status, expected
+output coverage, quality gate status coverage, passing required gates, review
+artifact declaration, `writes_long_term_memory: false`, and private path or
+secret fragments.
 
 ## Current Skill Surfaces
 

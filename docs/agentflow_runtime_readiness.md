@@ -117,6 +117,10 @@ Phase 15.11 starts with Router dry-run decision validation. This is still not
 Router runtime because it reads an existing decision artifact and validates its
 contract boundaries without selecting, executing, or mutating anything.
 
+Phase 15.12 continues with skill invocation/result replay validation. This is
+still not skill runtime because it compares existing plan/result artifacts
+without invoking a skill, executing a workflow, or writing runtime state.
+
 Not preferred as the first slice:
 
 - hosted API
