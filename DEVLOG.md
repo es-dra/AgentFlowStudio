@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.9 AgentFlow Roadmap Document Split
+
+- Synced local `master` to merged PR #48 at `89d7a7b` and started `codex/agentflow-roadmap-doc-split` from a clean mainline.
+- Added a focused test first in `tests/test_agentflow_roadmap_docs.py`; the red run failed because `docs/product_roadmap.md` was 415 lines and `docs/agentflow_phase15_roadmap.md` did not exist.
+- Moved detailed Phase 15.1-15.8 history into `docs/agentflow_phase15_roadmap.md`.
+- Shortened `docs/product_roadmap.md` back to a product-level roadmap with a Phase 15 detail link.
+- Updated docs navigation and DEVLOG.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_roadmap_docs.py`: 4 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_roadmap_docs.py tests/test_agentflow_pr_review_checklist.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 29 passed
+  - `.venv\Scripts\python.exe -m pytest`: 365 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: docs and tests only; no workflow, CLI, Python runtime, runtime validator, Router runtime, skill runtime, Memory runtime, Web UI, or generated run artifact changes.
+
 ## 2026-05-21 - Phase 15.8 AgentFlow PR Review Checklist
 
 - Synced local `master` to merged PR #47 at `3489e19` and started `codex/agentflow-pr-review-checklist` from a clean mainline.

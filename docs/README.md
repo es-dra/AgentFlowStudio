@@ -10,6 +10,7 @@ and agent contracts obvious without reading every historical phase note.
 
 - [Current architecture](current_architecture.md)
 - [Product roadmap](product_roadmap.md)
+- [AgentFlow Phase 15 roadmap](agentflow_phase15_roadmap.md)
 - [Post-v0.1.0 plan](post_v0_1_0_plan.md)
 - [NarratoStudio contracts](narratostudio_contracts.md)
 - [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
