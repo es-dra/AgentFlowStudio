@@ -194,5 +194,7 @@ Current checkpoint:
   assets before runtime behavior changes
 - the architecture refactor plan is defined before moving contracts into a
   platform package
-- the next mainline slice should introduce only a minimal `agentflow/` package
-  skeleton before moving behavior
+- the minimal `agentflow/` package skeleton is available as a reserved platform
+  namespace before moving behavior
+- the next mainline slice should move only pure contract constants/helpers, with
+  compatibility imports preserved

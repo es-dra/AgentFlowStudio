@@ -190,7 +190,7 @@ Phase 15.14 does not:
 
 ## First Implementation Slice After This Plan
 
-The next implementation branch should be:
+The first implementation slice after this plan is now:
 
 ```text
 codex/agentflow-package-skeleton
@@ -202,6 +202,10 @@ Scope:
 - add import smoke tests
 - do not move validators yet
 - do not change CLI, workflows, or artifact contracts
+
+Completion rule: this slice is complete when `agentflow` imports cleanly, the
+reserved namespaces import cleanly, and existing
+`narratocut.harness.agentflow_*` validator imports still work.
 
 The second implementation branch can move pure constants or validators only if
 the compatibility import strategy is already tested.

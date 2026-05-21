@@ -1027,3 +1027,10 @@
 - Defined a migration order: package skeleton, pure contract utilities, AgentFlow harness validators, compatibility imports, then docs/examples updates.
 - Added the regression matrix for contract examples, audit, Router dry-run validation, skill replay validation, NarratoStudio smoke, NarratoCut delivery readiness, CLI help/version, full tests, and compileall.
 - Boundary kept: this is a planning slice only; no Python modules were moved, no workflow/CLI behavior changed, and no Router, skill, Memory, database, hosted API, provider, or Web UI runtime was added.
+
+## 2026-05-22 - Phase 15.15 AgentFlow Package Skeleton
+
+- Synced `master` to the merged Phase 15.14 architecture refactor plan and opened `codex/agentflow-package-skeleton`.
+- Added the top-level `agentflow/` package with reserved namespaces for `contracts`, `harness`, `memory`, `router`, and `skills`.
+- Added import smoke tests proving the new platform namespace imports without runtime side effects and that existing `narratocut.harness.agentflow_router` / `agentflow_skill` imports still work.
+- Boundary kept: no validators, contracts, workflow nodes, CLI commands, providers, database, Web UI, Router runtime, skill runtime, or Memory runtime were moved or added.
