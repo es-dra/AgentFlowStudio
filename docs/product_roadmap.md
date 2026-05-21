@@ -221,7 +221,7 @@ Boundary:
 
 ## Phase 15.2: AgentFlow Mainline Contracts
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -256,3 +256,34 @@ Boundary:
 - no AgentFlow Memory runtime
 - no skill runtime
 - no Web UI
+
+## Phase 15.3: NarratoStudio Review Hardening
+
+Status: in progress.
+
+Purpose:
+
+- strengthen `narratostudio_production_handoff` inspect/review checks after the
+  first NarratoStudio MVP merge
+- keep strong consistency checks on JSON artifacts, not on the Markdown report
+- make broken outline/scene/shot/prompt/handoff references visible before later
+  AgentFlow runtime or UI work consumes the artifacts
+
+Planned checks:
+
+- outline beats referenced by scenes and covered by at least one scene
+- scenes referenced by shots and covered by at least one shot
+- shots referenced by prompts and covered by at least one prompt
+- `production_handoff.json` core artifact IDs match upstream artifacts
+- `production_handoff.json` artifact reference map includes required core
+  artifact paths
+- `production_report.md` has only light identity checks as a human review view
+
+Boundary:
+
+- no workflow generation logic changes
+- no CLI changes
+- no package rename
+- no Router, Memory, or skill runtime
+- no Web UI
+- no remote model calls

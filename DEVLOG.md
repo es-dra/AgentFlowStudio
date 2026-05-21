@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.3 NarratoStudio Review Hardening
+
+- Synced local `master` to merged PR #42 at `8e1aff0` and started `codex/narratostudio-review-hardening` from a clean mainline.
+- Added focused regression tests for NarratoStudio review failures when:
+  - a scene references a missing outline beat
+  - an outline beat has no scene coverage
+  - a scene has no shot coverage
+  - a shot has no prompt coverage
+  - `production_handoff.json` core artifact IDs drift from upstream artifacts
+  - `production_handoff.json` misses a required artifact reference
+  - `production_report.md` loses basic NarratoStudio handoff identity markers
+- Hardened `narratostudio_production_handoff` quality checks for the JSON artifact chain:
+  `episode_outline.json -> scene_plan.json -> shot_plan.json -> prompt_pack.json -> production_handoff.json`.
+- Kept `production_report.md` as a human-readable review surface only. The harness checks its presence and lightweight identity, but strong consistency remains in JSON artifacts and `production_handoff.json`.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_review_hardening.py tests/test_narratostudio_workflow.py tests/test_narratostudio_schemas.py`: 19 passed
+  - `.venv\Scripts\python.exe -m pytest`: 343 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+  - NarratoStudio smoke run: workflow success, inspect `65 passed / 0 failed / 0 warnings`, review `83 passed / 0 failed / 0 warnings`
+- Boundary kept: no workflow generation logic, CLI, package name, Router runtime, Memory runtime, skill runtime, Web UI, database, or remote provider behavior changed.
+
 ## 2026-05-20 - NarratoCut v0.1.0 Delivery Closeout
 
 - Synced `master` to PR #38, confirmed the old delivery-hardening branch had an
