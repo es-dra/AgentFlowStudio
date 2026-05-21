@@ -3,26 +3,22 @@
 This document preserves the detailed Phase 15 history after the v0.1.0
 NarratoCut delivery closeout.
 
-The short product roadmap stays in
-[`product_roadmap.md`](product_roadmap.md). This file is the detailed
-AgentFlow Studio mainline record for the contract-first work that follows the
-NarratoCut local-first CLI/Agent MVP.
+The short product roadmap stays in [`product_roadmap.md`](product_roadmap.md).
+This file is the detailed AgentFlow Studio mainline record for contract-first
+work after the NarratoCut local-first CLI/Agent MVP.
 
 ## Scope
 
 Phase 15 is contract-first and artifact-first.
 
 It does not implement AgentFlow runtime, hosted services, or cross-module
-execution. Unless a later phase explicitly changes this boundary, Phase 15 has:
+execution. Phase 15 has:
 
 - no Router runtime
 - no skill runtime
 - no Memory runtime
 - no Web UI
-- no hosted API
-- no database
-- no remote provider behavior
-- no repository or CLI rename
+- no hosted API, database, remote provider behavior, repository rename, or CLI rename
 
 ## Phase 15 Summary
 
@@ -36,17 +32,15 @@ execution. Unless a later phase explicitly changes this boundary, Phase 15 has:
 | Phase 15.6 | complete | Contract registry |
 | Phase 15.7 | complete | Contract audit gate |
 | Phase 15.8 | complete | Contract PR review checklist |
-| Phase 15.9 | in progress | Roadmap document split |
+| Phase 15.9 | complete | Roadmap document split |
+| Phase 15.10 | in progress | Runtime readiness spike |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
 Status: complete.
 
-Purpose:
-
-- add `NarratoStudio` as a sibling module for production-side MVP validation
-- keep `NarratoCut` as the distribution-side module
-- prove the first production workflow through structured artifacts
+Purpose: add `NarratoStudio` as a sibling production-side MVP module while
+keeping `NarratoCut` as the distribution-side module.
 
 First workflow:
 
@@ -61,14 +55,8 @@ creative_brief.json
 -> production_report.md
 ```
 
-Boundary:
-
-- local deterministic generation only
-- no remote LLM call
-- no Agent runtime
-- no database
-- no Web UI implementation
-- no migration from reference UI projects
+Boundary: local deterministic generation only; no remote LLM, Agent runtime,
+database, Web UI implementation, or migration from reference UI projects.
 
 ## Phase 15.2: AgentFlow Mainline Contracts
 
@@ -280,7 +268,7 @@ Boundary:
 
 ## Phase 15.9: AgentFlow Roadmap Document Split
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -298,3 +286,15 @@ Boundary:
 - no skill runtime
 - no Memory runtime
 - no Web UI
+
+## Phase 15.10: AgentFlow Runtime Readiness Spike
+
+Status: in progress.
+
+Purpose: define when AgentFlow runtime work is allowed to start through
+contract, artifact, review, feedback/memory, cost-quality, and operations
+gates.
+
+Output: `docs/agentflow_runtime_readiness.md`
+Boundary: docs/tests only; no workflow, CLI, runtime validator, Router runtime,
+skill runtime, Memory runtime, or Web UI.
