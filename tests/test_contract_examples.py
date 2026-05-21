@@ -5,29 +5,12 @@ from pathlib import Path
 
 import yaml
 
+from agentflow.contracts.examples import (
+    AGENTFLOW_ASSET_EXAMPLES,
+    AGENTFLOW_EXAMPLE_PATHS,
+    AGENTFLOW_SKILL_ROUTER_EXAMPLES,
+)
 from narratostudio import CreativeBrief
-
-AGENTFLOW_SKILL_ROUTER_EXAMPLES = [
-    Path("examples/agentflow/skill_invocation.example.json"),
-    Path("examples/agentflow/skill_result.example.json"),
-    Path("examples/agentflow/router_decision.example.json"),
-]
-
-AGENTFLOW_ASSET_EXAMPLES = [
-    Path("examples/agentflow/intermediate_asset.example.json"),
-    Path("examples/agentflow/reusable_asset_profile.example.json"),
-    Path("examples/agentflow/asset_reuse_decision.example.json"),
-]
-
-AGENTFLOW_EXAMPLE_PATHS = [
-    Path("examples/agentflow/project_manifest.example.json"),
-    Path("examples/agentflow/artifact_map.example.json"),
-    Path("examples/agentflow/feedback_event.example.jsonl"),
-    Path("examples/agentflow/memory_candidate.example.json"),
-    Path("examples/agentflow/memory_promotion_decision.example.json"),
-    *AGENTFLOW_SKILL_ROUTER_EXAMPLES,
-    *AGENTFLOW_ASSET_EXAMPLES,
-]
 
 
 def test_project_manifest_example_has_schema_version() -> None:
