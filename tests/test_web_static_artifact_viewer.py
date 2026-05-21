@@ -26,6 +26,7 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
     assert 'lang="zh-CN"' in html
     assert 'type="file"' in html
     assert "multiple" in html
+    assert ".mp4,.webm,.mov" in html
     assert 'id="language-toggle"' in html
     assert 'class="stat-strip"' in html
     assert "本地只读验收台" in html
@@ -34,6 +35,11 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
         'id="artifact-inventory"',
         'id="summary-panel"',
         'id="inspector-panel"',
+        'id="evidence-map-panel"',
+        'id="risk-ledger-panel"',
+        'id="asset-ledger-panel"',
+        'id="video-preview-panel"',
+        'id="feedback-panel"',
         'id="report-preview"',
     ]:
         assert landmark in html
@@ -42,17 +48,19 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
 def test_static_viewer_app_declares_artifact_aliases_and_normalized_types() -> None:
     app = _read_web_file("app.js")
     artifact_workspace = _read_web_file("artifact-workspace.js")
+    artifact_contracts = _read_web_file("artifact-contracts.js")
+    artifact_ledgers = _read_web_file("artifact-ledgers.js")
     ui_copy = _read_web_file("ui-copy.js")
     render_helpers = _read_web_file("render-helpers.js")
-    combined_source = app + artifact_workspace + ui_copy + render_helpers
+    combined_source = app + artifact_workspace + artifact_contracts + artifact_ledgers + ui_copy + render_helpers
 
     assert 'from "./artifact-workspace.js"' in app
     assert 'from "./ui-copy.js"' in app
     assert 'from "./render-helpers.js"' in app
-    assert "ARTIFACT_ALIASES" in artifact_workspace
-    assert "finished_package_manifest.json" in artifact_workspace
-    assert "package_manifest.json" in artifact_workspace
-    assert "package_manifest" in artifact_workspace
+    assert "ARTIFACT_ALIASES" in artifact_contracts
+    assert "finished_package_manifest.json" in artifact_contracts
+    assert "package_manifest.json" in artifact_contracts
+    assert "package_manifest" in artifact_contracts
     assert "detectArtifactType" in artifact_workspace
     assert "normalizeWorkspace" in artifact_workspace
     for artifact_type in [
@@ -62,6 +70,15 @@ def test_static_viewer_app_declares_artifact_aliases_and_normalized_types() -> N
         "review_report",
         "delivery_readiness",
         "markdown_report",
+        "selection_diagnostics",
+        "highlight_score_report",
+        "candidate_windows",
+        "clip_plan",
+        "real_slice_manifest",
+        "final_video_manifest",
+        "subtitle_manifest",
+        "audio_mix_manifest",
+        "cover_manifest",
     ]:
         assert artifact_type in combined_source
 
@@ -90,6 +107,8 @@ def test_static_viewer_real_fixture_covers_supported_artifact_shapes() -> None:
 
 def test_static_viewer_declares_m11_artifact_classes_and_schema_warnings() -> None:
     artifact_workspace = _read_web_file("artifact-workspace.js")
+    artifact_contracts = _read_web_file("artifact-contracts.js")
+    combined_source = artifact_workspace + artifact_contracts
     app = _read_web_file("app.js")
 
     for source_token in [
@@ -102,7 +121,7 @@ def test_static_viewer_declares_m11_artifact_classes_and_schema_warnings() -> No
         "parsed but not included in summary",
         "schema_version missing",
     ]:
-        assert source_token in artifact_workspace
+        assert source_token in combined_source
 
     assert "artifact.artifactClass" in app
     assert "artifact.schemaWarnings" in app
@@ -116,13 +135,28 @@ def test_static_viewer_declares_m12_chinese_copy_and_in_memory_language_switch()
     assert 'language: "zh"' in app
     assert 'state.language = state.language === "zh" ? "en" : "zh"' in app
     assert "localStorage" not in app + ui_copy + render_helpers
-    assert "把 NarratoCut 的运行结果" in ui_copy
+    assert "把 NarratoCut 的运行证据、交付资产和审查风险收进一个本地验收工作台。" in ui_copy
+    assert "Artifact 清单" in ui_copy
+    assert "运行与交付包摘要" in ui_copy
+    assert "质量与审查检查" in ui_copy
+    assert "报告预览" in ui_copy
     assert "通过 pass" in ui_copy
     assert "警告 warning" in ui_copy
-    assert "未知 JSON unknown_json" not in ui_copy
+    assert "未知 JSON unknown_json" in ui_copy
     assert "未找到详细检查项" in ui_copy
     assert "statusPill" in render_helpers
     assert "normalizeStatus" in render_helpers
+
+
+def test_static_viewer_declares_m121_acceptance_metrics_and_empty_state_boundary() -> None:
+    ui_copy = _read_web_file("ui-copy.js")
+    artifact_workspace = _read_web_file("artifact-workspace.js")
+
+    for phrase in ["已选文件", "参与验收", "风险提示", "解析错误"]:
+        assert phrase in ui_copy
+
+    assert "summaryArtifacts.length > 0" in artifact_workspace
+    assert "Missing recommended artifact" in artifact_workspace
 
 
 def test_static_viewer_normalizes_real_fixture_and_non_contract_inputs() -> None:
@@ -152,6 +186,7 @@ const extraFiles = [
 const artifacts = await parseFiles([...fixtureFiles, ...extraFiles]);
 const workspace = normalizeWorkspace(artifacts);
 const partial = normalizeWorkspace(await parseFiles([fixtureFiles[0]]));
+const empty = normalizeWorkspace([]);
 
 console.log(JSON.stringify({
   classes: Object.fromEntries(artifacts.map((artifact) => [artifact.fileName, artifact.artifactClass])),
@@ -166,6 +201,8 @@ console.log(JSON.stringify({
   reportCount: workspace.reports.length,
   partialRunId: partial.run?.runId,
   partialPackageLoaded: Boolean(partial.package),
+  partialWarnings: partial.warnings.join("\\n"),
+  emptyWarningCount: empty.warnings.length,
 }));
 """
     result = subprocess.run(
@@ -195,6 +232,64 @@ console.log(JSON.stringify({
     assert payload["reportCount"] == 1
     assert payload["partialRunId"] == "package_run_fixture"
     assert payload["partialPackageLoaded"] is False
+    assert "Missing recommended artifact" in payload["partialWarnings"]
+    assert payload["emptyWarningCount"] == 0
+
+
+def test_static_viewer_normalizes_expanded_artifact_universe_ledgers_and_local_video() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+
+const files = [
+  { name: "selection_diagnostics.json", text: async () => JSON.stringify({ status: "warning", warnings: ["few strong hooks"], rejection_reason_counts: { duplicate: 2 } }) },
+  { name: "highlight_score_report.json", text: async () => JSON.stringify({ status: "passed", selected_candidates: [{ candidate_id: "cand_1", final_score: 0.92 }], warnings: ["near miss rejected"] }) },
+  { name: "candidate_windows.json", text: async () => JSON.stringify({ status: "succeeded", candidates: [{ candidate_id: "cand_1", start_sec: 1, end_sec: 5 }] }) },
+  { name: "clip_plan.json", text: async () => JSON.stringify({ status: "succeeded", clip_plan_id: "clip_plan_1", segments: [{ output_name: "clips/cand_1.mp4", start_sec: 1, end_sec: 5 }] }) },
+  { name: "real_slice_manifest.json", text: async () => JSON.stringify({ status: "succeeded", clips: [{ path: "clips/cand_1.mp4", exists: true }] }) },
+  { name: "final_video_manifest.json", text: async () => JSON.stringify({ status: "succeeded", output_path: "final_video.mp4", duration_sec: 18.2 }) },
+  { name: "subtitle_manifest.json", text: async () => JSON.stringify({ status: "succeeded", subtitle_path: "subtitles.srt", timeline: "final_video" }) },
+  { name: "audio_mix_manifest.json", text: async () => JSON.stringify({ status: "succeeded", output_video_path: "final_video_with_bgm.mp4", bgm_path: "bgm.mp3" }) },
+  { name: "cover_manifest.json", text: async () => JSON.stringify({ status: "succeeded", cover_path: "cover.jpg" }) },
+  { name: "review.mp4", type: "video/mp4", text: async () => "not read for video" },
+];
+const workspace = normalizeWorkspace(await parseFiles(files));
+
+console.log(JSON.stringify({
+  classes: Object.fromEntries(workspace.artifacts.map((artifact) => [artifact.fileName, artifact.artifactClass])),
+  evidenceTypes: workspace.evidenceMap.map((item) => item.artifactType),
+  riskText: workspace.riskLedger.map((item) => item.message).join("\\n"),
+  assetRoles: workspace.assetLedger.map((item) => item.role),
+  videoNames: workspace.videos.map((item) => item.fileName),
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    for artifact_type in [
+        "selection_diagnostics",
+        "highlight_score_report",
+        "candidate_windows",
+        "clip_plan",
+        "real_slice_manifest",
+        "final_video_manifest",
+        "subtitle_manifest",
+        "audio_mix_manifest",
+        "cover_manifest",
+    ]:
+        assert artifact_type in payload["evidenceTypes"]
+
+    assert payload["classes"]["review.mp4"] == "local_media"
+    assert payload["videoNames"] == ["review.mp4"]
+    assert "few strong hooks" in payload["riskText"]
+    assert "near miss rejected" in payload["riskText"]
+    assert "final_video" in payload["assetRoles"]
+    assert "subtitle" in payload["assetRoles"]
+    assert "cover" in payload["assetRoles"]
 
 
 def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads() -> None:
@@ -202,6 +297,9 @@ def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads(
 
     assert "normalizeWorkspace(artifacts)" in app
     assert "renderWorkspace(state.workspace" in app
+    assert "workspace.evidenceMap" in app
+    assert "workspace.riskLedger" in app
+    assert "workspace.assetLedger" in app
     for raw_contract_fragment in [
         ".payload",
         "artifact_index",
@@ -215,6 +313,11 @@ def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
     app = (
         _read_web_file("app.js")
         + _read_web_file("artifact-workspace.js")
+        + _read_web_file("artifact-contracts.js")
+        + _read_web_file("artifact-ledgers.js")
+        + _read_web_file("artifact-values.js")
+        + _read_web_file("video-preview.js")
+        + _read_web_file("feedback-event.js")
         + _read_web_file("ui-copy.js")
         + _read_web_file("render-helpers.js")
     )
@@ -228,6 +331,7 @@ def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
         "createWritable",
         "indexedDB",
         "localStorage.setItem",
+        "FileSystemWritableFileStream",
         "OPENAI_API_KEY",
         "NARRATOCUT_OPENAI_API_KEY",
         "data/processed/runs/demo",
@@ -247,6 +351,37 @@ def test_static_viewer_report_preview_uses_safe_text_rendering() -> None:
     assert "script" not in app.lower()
 
 
+def test_static_viewer_video_preview_is_explicit_local_file_only() -> None:
+    html = _read_web_file("index.html")
+    video_preview = _read_web_file("video-preview.js")
+    app = _read_web_file("app.js")
+
+    assert ".mp4,.webm,.mov" in html
+    assert "URL.createObjectURL" in video_preview
+    assert "URL.revokeObjectURL" in video_preview
+    assert "canPlayType" in video_preview
+    assert "video/mp4" in video_preview
+    assert "video/webm" in video_preview
+    assert "video/quicktime" in video_preview
+    assert "workspace.videos" in app
+    assert "manifest" not in video_preview.lower()
+
+
+def test_static_viewer_feedback_event_copy_does_not_write_files() -> None:
+    html = _read_web_file("index.html")
+    feedback = _read_web_file("feedback-event.js")
+    app = _read_web_file("app.js")
+
+    assert "feedback_event" in feedback
+    assert "narratocut_web_static_viewer" in feedback
+    assert "navigator.clipboard.writeText" in feedback
+    assert "feedback-output" in html
+    assert "textarea" in html
+    assert "renderFeedbackArtifacts" in app
+    for forbidden in ["showSaveFilePicker", "createWritable", "fetch(", "sendBeacon"]:
+        assert forbidden not in feedback
+
+
 def test_static_viewer_readme_documents_boundaries() -> None:
     readme = _read_web_file("README.md").lower()
 
@@ -256,15 +391,19 @@ def test_static_viewer_readme_documents_boundaries() -> None:
         "no upload",
         "no backend execution",
         "no persistence",
-        "feedback writing is out of scope",
+        "feedback event copy",
         "does not scan directories",
         "unknown_json",
         "unsupported_file",
         "schema_version",
         "warning",
-        "no video preview",
+        "local video preview",
         "no provider config",
         "no workflow execution",
+        "m1.2.1",
+        "m1.3",
+        "m1.5",
+        "m2",
     ]:
         assert phrase in readme
 

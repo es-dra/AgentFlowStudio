@@ -1,4 +1,4 @@
-import { asText, normalizeStatus } from "./artifact-workspace.js";
+import { asText, normalizeStatus } from "./artifact-values.js";
 
 export function statusPill(status, copy) {
   const normalized = normalizeStatus(status);

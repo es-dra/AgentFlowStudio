@@ -70,9 +70,9 @@ input {
 .workspace {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
   min-width: 0;
-  padding: 28px;
+  padding: 22px 24px 28px;
 }
 
 .brand,
@@ -88,7 +88,7 @@ input {
 
 .brand {
   justify-content: flex-start;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .brand-mark {
@@ -127,7 +127,7 @@ h3 {
   position: relative;
   align-items: flex-start;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 22px;
+  padding-bottom: 14px;
 }
 
 .hero::after {
@@ -142,17 +142,17 @@ h3 {
 
 .hero h2 {
   max-width: 920px;
-  font-size: clamp(28px, 4vw, 52px);
-  line-height: 1.04;
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1.12;
   letter-spacing: 0;
 }
 
 .hero-subtitle {
   max-width: 760px;
-  margin-top: 12px;
+  margin-top: 8px;
   color: rgba(238, 248, 247, 0.62);
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.65;
 }
 
 .eyebrow {
@@ -209,11 +209,11 @@ h3 {
 }
 
 .panel {
-  padding: 18px;
+  padding: 16px;
 }
 
 .panel-heading {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .compact {
@@ -223,8 +223,12 @@ h3 {
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.28fr) minmax(340px, 0.72fr);
-  gap: 22px;
+  gap: 18px;
   align-items: start;
+}
+
+.ledger-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
 }
 
 .stack {
@@ -249,8 +253,8 @@ h3 {
 .stat-strip article {
   position: relative;
   overflow: hidden;
-  min-height: 104px;
-  padding: 16px;
+  min-height: 82px;
+  padding: 14px;
   background: rgba(255, 255, 255, 0.035);
 }
 
@@ -275,8 +279,8 @@ h3 {
 
 .stat-strip strong {
   display: block;
-  margin-top: 14px;
-  font-size: 30px;
+  margin-top: 10px;
+  font-size: 26px;
   letter-spacing: 0;
 }
 
@@ -300,10 +304,10 @@ h3 {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  min-width: 204px;
+  min-width: 190px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
   background: var(--panel-strong);
 }
 
@@ -341,7 +345,7 @@ h3 {
 }
 
 .metric {
-  min-height: 96px;
+  min-height: 90px;
 }
 
 .metric span {
@@ -369,7 +373,7 @@ h3 {
 
 .report-text {
   width: 100%;
-  min-height: 220px;
+  min-height: 200px;
   max-height: 460px;
   overflow: auto;
   margin: 0;
@@ -381,9 +385,62 @@ h3 {
   white-space: pre-wrap;
 }
 
-.feedback-disabled {
-  align-items: flex-start;
+.video-preview video {
+  width: 100%;
+  max-height: 520px;
+  border: 1px solid rgba(181, 231, 235, 0.18);
+  border-radius: 8px;
+  background: #000;
+}
+
+.feedback-intro {
+  margin-bottom: 14px;
+}
+
+.feedback-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.feedback-form label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
   color: var(--muted);
+  font-size: 12px;
+}
+
+.feedback-note-field {
+  grid-column: 1 / -1;
+}
+
+.feedback-form select,
+.feedback-form input,
+.feedback-form textarea,
+.feedback-output {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(181, 231, 235, 0.16);
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+}
+
+.feedback-form textarea,
+.feedback-output {
+  resize: vertical;
+}
+
+.feedback-copy {
+  align-self: end;
+  border-radius: 8px;
+}
+
+.feedback-output {
+  margin-top: 12px;
+  color: #d8eeee;
 }
 
 .status-pass {
@@ -409,6 +466,7 @@ h3 {
 @media (max-width: 1100px) {
   .shell,
   .grid,
+  .ledger-grid,
   .summary-grid {
     grid-template-columns: 1fr;
   }
@@ -422,12 +480,11 @@ h3 {
 @media (max-width: 760px) {
   .workspace,
   .sidebar {
-    padding: 18px;
+    padding: 14px;
   }
 
   .hero,
   .hero-actions,
-  .feedback-disabled,
   .panel-heading,
   .check-row,
   .status-card {
@@ -436,15 +493,53 @@ h3 {
   }
 
   .hero h2 {
-    font-size: 30px;
+    font-size: 25px;
   }
 
   .stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-strip article {
+    min-height: 76px;
+    padding: 12px;
+  }
+
+  .stat-strip strong {
+    font-size: 22px;
+  }
+
+  .feedback-form {
     grid-template-columns: 1fr;
   }
 
   .status-card,
   .language-toggle {
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  .stat-strip {
+    gap: 8px;
+  }
+
+  .stat-strip span,
+  .metric span,
+  .status-card span,
+  .meta,
+  .muted {
+    font-size: 11px;
+  }
+
+  .panel,
+  .item,
+  .metric,
+  .check-row {
+    padding: 11px;
+  }
+
+  .hero-actions {
     width: 100%;
   }
 }

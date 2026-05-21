@@ -1,5 +1,42 @@
 # DEVLOG
 
+## 2026-05-21 - Web UI Local Review Workbench Expansion
+
+- Continued local-only development on `codex/narratocut-web-ui` without pushing
+  the branch or merging latest `master`, per the current branch cadence.
+- Polished the M1.2 workbench into M1.2.1: reduced the hero height, switched
+  major panel titles to Chinese, changed the metric strip to acceptance
+  language (`已选文件`, `参与验收`, `风险提示`, `解析错误`), and stopped showing
+  missing recommended artifact warnings in the empty state.
+- Expanded the static viewer's read-only artifact universe for M1.3:
+  `selection_diagnostics.json`, `highlight_score_report.json`,
+  `candidate_windows.json`, `clip_plan.json`, `real_slice_manifest.json`,
+  `final_video_manifest.json`, `subtitle_manifest.json`,
+  `audio_mix_manifest.json`, and `cover_manifest.json`.
+- Added normalized Evidence Map, Risk Ledger, and Asset Ledger view-models so
+  the UI can inspect local artifact relationships, warning/failure signals, and
+  media asset paths without reading raw schemas directly in the render layer.
+- Added explicit local video preview for user-selected `.mp4`, `.webm`, and
+  `.mov` files only. The viewer uses temporary object URLs and revokes the
+  previous URL when switching; it still does not follow manifest paths or scan
+  directories.
+- Added M2 feedback event copy as a static browser-only utility:
+  `feedback_event` JSON can be generated and copied, with textarea fallback
+  when Clipboard is unavailable. It does not write files, upload, persist state,
+  or call a backend.
+- Split more static browser logic into small modules:
+  `artifact-contracts.js`, `artifact-values.js`, `artifact-ledgers.js`,
+  `video-preview.js`, and `feedback-event.js`, keeping `normalizeWorkspace()`
+  as the single UI view-model boundary.
+- External references remained conceptual only: W&B-style metadata/lineage,
+  LangSmith-style run debugging, Langfuse-style scores/comments, and Frame.io /
+  Workfront-style review status informed the workbench shape. No SaaS,
+  account, cloud storage, permission, backend, collaboration system, runtime
+  code, or dependency was added.
+- Boundary kept: no React/Vite/Next, no backend, no CLI/API execution, no
+  provider calls, no upload, no persistence, no automatic directory scanning,
+  and no manifest path auto-read.
+
 ## 2026-05-21 - Web UI M1.2 Chinese Workbench Polish
 
 - Merged the latest `origin/master` into `codex/narratocut-web-ui` after the

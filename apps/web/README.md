@@ -1,8 +1,7 @@
 # NarratoCut Static Artifact Viewer
 
 This is a read-only, local-only static viewer for NarratoCut workflow artifacts.
-It currently includes the M1.1 hardening slice and the M1.2 Chinese workbench
-presentation slice for the `codex/narratocut-web-ui` branch.
+It is the Web UI branch's local acceptance workbench, not a workflow console.
 
 Open it directly in a browser:
 
@@ -12,20 +11,23 @@ apps/web/index.html
 
 No server is required.
 
-## M1.2 Workbench UI
+## Current Slice
 
-The M1.2 viewer uses default Chinese UI copy because the current review and
-delivery workflow is Chinese-facing. Contract names, artifact types, schema
-fields, and machine-readable keys remain in English.
+The current branch includes:
 
-The language toggle is in-memory only. Refreshing the page returns to Chinese.
-The viewer does not use `localStorage`, IndexedDB, cookies, or any other
-persistence mechanism.
+- M1.1 release-candidate hardening for safe local artifact parsing.
+- M1.2 Chinese-first workbench presentation with an in-memory language toggle.
+- M1.2.1 polish for denser workbench layout, Chinese panel titles, quieter empty
+  state, and acceptance-oriented metrics.
+- M1.3 artifact universe expansion for additional NarratoCut run artifacts.
+- M1.5 local video preview for explicitly selected `.mp4`, `.webm`, or `.mov`
+  files only.
+- M2 feedback event copy, which generates JSON text for manual copy/export.
 
-M1.2 borrows only visual and interaction ideas from the local Zhike reference:
-dark workbench structure, status colors, a metric strip, and a right-side
-inspection rail. No Zhike runtime code, business logic, provider code, routes,
-database code, or dependencies are included.
+The viewer uses default Chinese UI copy for human-facing labels. The language
+toggle is in-memory only. Refreshing the page returns to Chinese.
+The viewer does not use `localStorage`, IndexedDB, cookies, or any persistence
+mechanism.
 
 ## Supported Artifacts
 
@@ -50,6 +52,20 @@ delivery_readiness.json
 delivery_readiness.md
 ```
 
+Expanded read-only artifact universe:
+
+```text
+selection_diagnostics.json
+highlight_score_report.json
+candidate_windows.json
+clip_plan.json
+real_slice_manifest.json
+final_video_manifest.json
+subtitle_manifest.json
+audio_mix_manifest.json
+cover_manifest.json
+```
+
 Package manifest aliases:
 
 ```text
@@ -65,16 +81,55 @@ name remains visible in the UI.
 The viewer normalizes selected files before any panel renders them:
 
 - `known_contract`: a supported NarratoCut artifact that participates in the
-  summary and inspector views.
+  summary, evidence map, risk ledger, asset ledger, and inspector views.
 - `unknown_json`: a JSON object that parsed successfully but is not a known
   NarratoCut contract. It is visible in inventory but not included in summary.
 - `unsupported_file`: a selected file type that the static viewer does not use.
   It is visible as a load note but not included in summary.
+- `local_media`: a user-selected video file eligible for local preview only.
 - invalid JSON or non-object JSON: shown as a recoverable load error.
 
 Missing `schema_version` is a warning, not a fatal error. Some current
 NarratoCut artifacts, including `run_manifest.json` and `quality_report.json`,
 may omit it while still being readable by this viewer.
+
+## Workbench Views
+
+- Artifact inventory: file name, artifact type, schema state, source role, parse
+  status, and whether the file participates in acceptance summary.
+- Run/package summary: loaded run, package, review, and delivery readiness
+  summary.
+- Quality/review inspector: checks, recommendations, readiness runs, warnings,
+  and failures from normalized artifacts.
+- Evidence Map: a local lineage-style list of selected artifacts and
+  `run_manifest.artifact_index` entries.
+- Risk Ledger: warnings, failures, review recommendations, diagnostics signals,
+  and viewer load notes.
+- Asset Ledger: final video, clips, subtitles, cover, BGM, and package asset
+  paths.
+- Report preview: Markdown rendered as escaped text.
+
+Markdown reports are displayed as escaped text. Inline HTML such as `<script>`
+is shown literally and is not executed.
+
+## Local Video Preview
+
+Local video preview is explicit-file-only:
+
+- The user must select a `.mp4`, `.webm`, or `.mov` file with the file picker.
+- The viewer uses a temporary object URL in the browser.
+- The viewer does not read manifest paths, open local paths automatically, scan
+  folders, upload media, or call a backend.
+- `.mov` playback depends on browser support and may not work in every browser.
+
+## Feedback Event Copy
+
+M2 feedback event copy generates a `feedback_event` JSON object in the browser
+and copies it when the Clipboard API is available. If Clipboard is unavailable,
+the JSON remains in a textarea for manual copy.
+
+This does not write files, append JSONL, upload data, call a backend, or persist
+state. It is a static local copy/export aid only.
 
 ## Privacy Boundary
 
@@ -86,22 +141,16 @@ may omit it while still being readable by this viewer.
 - no provider calls
 - no workflow execution
 - no automatic directory scanning
-- no video preview
+- no manifest path auto-read
 - no provider config
 - no CLI/API bridge
 
-The viewer parses selected JSON and Markdown files in the browser and renders a
-temporary inspection view. It does not write files, save settings, submit
-feedback, or store state.
-
-Markdown reports are displayed as escaped text. Inline HTML such as `<script>`
-is shown literally and is not executed.
+The viewer parses selected JSON, Markdown, and video files in the browser and
+renders a temporary inspection view.
 
 ## Non-Goals
 
-Feedback writing is out of scope for this first slice.
-
-Also out of scope:
+Out of scope for this static viewer:
 
 - running `ncut`
 - scanning a run directory
@@ -110,10 +159,21 @@ Also out of scope:
 - uploading artifacts
 - opening provider configuration
 - provider config
-- video preview
-- playing local videos
 - editing timelines
 - saving review decisions
+- writing feedback files
+
+## Reference Boundary
+
+M1.2+ borrows only visual and interaction ideas from the local Zhike reference:
+dark workbench structure, status colors, dense panels, and right-side inspection
+rhythm. No Zhike runtime code, business logic, provider code, routes, database
+code, or dependencies are included.
+
+The broader product references are W&B-style artifact metadata and lineage,
+LangSmith-style run debugging, Langfuse-style scores/comments, and Frame.io /
+Workfront-style review status. Those references are UX concepts only; this
+viewer remains static and local.
 
 ## Test Fixture
 
@@ -122,6 +182,3 @@ sanitized artifact set based on the real NarratoCut `final_video_package`
 workflow shape. It keeps contract fields for run/package/quality/review/delivery
 coverage, uses relative placeholder media paths, and does not include media
 files or generated runtime directories.
-
-Future slices may add feedback event copy/export or explicit local video preview,
-but those features must keep the local-only boundary.
