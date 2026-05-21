@@ -37,6 +37,7 @@ execution. Phase 15 has:
 | Phase 15.11 | complete | Router dry-run decision validator |
 | Phase 15.12 | complete | Skill Invocation / Result Replay Validator |
 | Phase 15.13 | complete | Intermediate Asset & Memory Architecture Plan |
+| Phase 15.14 | complete | Architecture Refactor Plan |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -373,3 +374,35 @@ Boundary:
 - does not implement database, vector store, cache service, or file repository
 - does not change CLI or workflow execution
 - does not call local or remote providers
+
+## Phase 15.14: AgentFlow Architecture Refactor Plan
+
+Status: complete.
+
+Purpose: define the architecture refactor sequence before moving contracts or
+validators into a platform package.
+
+Output:
+
+- `docs/agentflow_architecture_refactor_plan.md`
+
+Recommended target:
+
+- add a future top-level `agentflow/` package for the platform contract layer
+- keep `narratostudio/` responsible for production-side handoff domain logic
+- keep `narratocut/` responsible for distribution-side media workflows,
+  package review, and the current CLI path
+- preserve compatibility imports before moving validators out of
+  `narratocut.harness`
+
+Boundary:
+
+- docs and tests only
+- does not create the `agentflow/` package
+- does not move Python modules
+- does not change workflow execution
+- does not rename repository or CLI
+- does not add Router runtime
+- does not add skill runtime
+- does not add Memory runtime
+- does not merge or modify the Web UI branch
