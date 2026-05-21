@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_contract_audit_report",
+  "audit_id": "agentflow_contract_audit_v0_1",
+  "audit_scope": "static_contract_examples",
+  "source_registry": "examples/agentflow/contract_registry.example.json",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "overall_status": "passed",
+  "audited_contracts": [
+    {
+      "artifact_type": "agentflow_project_manifest",
+      "example_path": "examples/agentflow/project_manifest.example.json",
+      "doc_path": "docs/project_manifest_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_artifact_map",
+      "example_path": "examples/agentflow/artifact_map.example.json",
+      "doc_path": "docs/agentflow_artifact_map.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_feedback_event",
+      "example_path": "examples/agentflow/feedback_event.example.jsonl",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_candidate",
+      "example_path": "examples/agentflow/memory_candidate.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_promotion_decision",
+      "example_path": "examples/agentflow/memory_promotion_decision.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_skill_invocation",
+      "example_path": "examples/agentflow/skill_invocation.example.json",
+      "doc_path": "docs/agentflow_skill_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_skill_result",
+      "example_path": "examples/agentflow/skill_result.example.json",
+      "doc_path": "docs/agentflow_skill_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_router_decision",
+      "example_path": "examples/agentflow/router_decision.example.json",
+      "doc_path": "docs/agentflow_router_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    }
+  ],
+  "boundary_checks": [
+    {
+      "check_id": "no_private_paths_or_secrets",
+      "status": "passed",
+      "note": "Examples do not include private local paths, credentials, tokens, cookies, or signed URLs."
+    },
+    {
+      "check_id": "no_generated_media_or_run_outputs",
+      "status": "passed",
+      "note": "Examples do not include generated media files or local run output paths."
+    },
+    {
+      "check_id": "router_decision_only",
+      "status": "passed",
+      "note": "Router decisions remain selection records and do not execute skills."
+    },
+    {
+      "check_id": "memory_candidate_only",
+      "status": "passed",
+      "note": "Memory candidates remain candidate-only until an explicit promotion decision."
+    },
+    {
+      "check_id": "feedback_signal_is_derived",
+      "status": "passed",
+      "note": "Derived feedback signals do not replace feedback.jsonl as source of truth."
+    },
+    {
+      "check_id": "cost_quality_trace_is_evidence",
+      "status": "passed",
+      "note": "Cost-quality trace is execution strategy evidence, not a quality guarantee."
+    }
+  ],
+  "validated_runtime_capabilities": [],
+  "metadata": {
+    "example": true
+  }
+}

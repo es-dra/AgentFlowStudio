@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.7 AgentFlow Contract Audit Gate
+
+- Synced local `master` to merged PR #46 at `36dcdd1` and started `codex/agentflow-contract-audit-gate` from a clean mainline.
+- Added a static AgentFlow contract audit report example:
+  - `examples/agentflow/contract_audit_report.example.json`
+- Added focused audit tests in `tests/test_agentflow_contract_audit.py` so the audit report must cover registry contracts, keep docs/examples marked present, preserve `schema_version: 0.1.0`, record boundary checks, and avoid claiming runtime validation.
+- Added `docs/agentflow_contract_validation.md` and updated docs navigation, architecture, registry docs, roadmap, and DEVLOG.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_audit.py`: 5 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py`: 16 passed
+  - `.venv\Scripts\python.exe -m pytest`: 357 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, Python runtime, runtime validator, registry service, Router runtime, skill runtime, Memory runtime, database, cross-module execution, Web UI, or remote provider behavior changed.
+
 ## 2026-05-21 - Phase 15.6 AgentFlow Contract Registry
 
 - Synced local `master` to merged PR #45 at `fcd8127` and started `codex/agentflow-contract-registry` from a clean mainline.

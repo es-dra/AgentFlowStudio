@@ -63,6 +63,9 @@ Current validation should stay lightweight:
 This is validation of committed contract examples. It is not runtime validation
 for workflow execution.
 
+For the static audit report shape, see
+[`agentflow_contract_validation.md`](agentflow_contract_validation.md).
+
 ## Non-Goals
 
 The registry must not:

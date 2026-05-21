@@ -353,7 +353,7 @@ Boundary:
 
 ## Phase 15.6: AgentFlow Contract Registry / Validation Layer
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
@@ -376,6 +376,38 @@ Boundary:
 - no CLI changes
 - no Python runtime changes
 - no Pydantic schema package
+- no registry service
+- no Router runtime
+- no skill runtime
+- no Memory runtime
+- no database or cross-module execution
+
+## Phase 15.7: AgentFlow Contract Audit Gate
+
+Status: in progress.
+
+Purpose:
+
+- add a static audit report example for committed AgentFlow contracts
+- prevent registry, example, doc, and boundary drift before runtime work
+- keep Router, Memory, Skill, and cost-quality semantics reviewable as
+  contracts grow
+
+Expected documents:
+
+- `docs/agentflow_contract_validation.md`
+
+Expected examples:
+
+- `examples/agentflow/contract_audit_report.example.json`
+
+Boundary:
+
+- static docs, examples, and tests only
+- no workflow changes
+- no CLI changes
+- no Python runtime changes
+- no runtime validator
 - no registry service
 - no Router runtime
 - no skill runtime
