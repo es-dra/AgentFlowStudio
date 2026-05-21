@@ -113,6 +113,10 @@ Preferred first candidates:
 - skill invocation/result replay from committed examples
 - memory promotion decision validator
 
+Phase 15.11 starts with Router dry-run decision validation. This is still not
+Router runtime because it reads an existing decision artifact and validates its
+contract boundaries without selecting, executing, or mutating anything.
+
 Not preferred as the first slice:
 
 - hosted API

@@ -33,7 +33,8 @@ execution. Phase 15 has:
 | Phase 15.7 | complete | Contract audit gate |
 | Phase 15.8 | complete | Contract PR review checklist |
 | Phase 15.9 | complete | Roadmap document split |
-| Phase 15.10 | in progress | Runtime readiness spike |
+| Phase 15.10 | complete | Runtime readiness spike |
+| Phase 15.11 | in progress | Router dry-run decision validator |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -289,7 +290,7 @@ Boundary:
 
 ## Phase 15.10: AgentFlow Runtime Readiness Spike
 
-Status: in progress.
+Status: complete.
 
 Purpose: define when AgentFlow runtime work is allowed to start through
 contract, artifact, review, feedback/memory, cost-quality, and operations
@@ -298,3 +299,26 @@ gates.
 Output: `docs/agentflow_runtime_readiness.md`
 Boundary: docs/tests only; no workflow, CLI, runtime validator, Router runtime,
 skill runtime, Memory runtime, or Web UI.
+
+## Phase 15.11: AgentFlow Router Dry-run Decision Validator
+
+Status: in progress.
+
+Purpose: add the first narrow runtime-readiness validation surface for existing
+Router decision artifacts.
+
+Output:
+
+- `narratocut.harness.agentflow_router.validate_router_decision_dry_run`
+- `agentflow_router_dry_run_validation` result shape
+- focused regression tests for decision-only Router validation
+
+Boundary:
+
+- validates an existing `agentflow_router_decision`
+- does not select skills from live requests
+- does not execute skills
+- does not execute workflows
+- does not write runtime state, long-term memory, database rows, or generated
+  run artifacts
+- does not add CLI commands, hosted APIs, Web UI, or remote provider behavior
