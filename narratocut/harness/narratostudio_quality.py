@@ -68,6 +68,7 @@ def build_narratostudio_quality_report(root: str | Path) -> dict[str, Any]:
     _add_json_parse_checks(run_dir, checks)
     _add_schema_checks(artifacts, checks)
     _add_reference_checks(artifacts, checks)
+    _add_report_checks(run_dir, artifacts, checks)
     _add_auxiliary_checks(artifacts, checks)
 
     failed = [check for check in checks if check["status"] == "fail"]
@@ -150,6 +151,8 @@ def _add_reference_checks(artifacts: dict[str, dict[str, Any] | None], checks: l
     prompt_pack = artifacts.get("prompt_pack.json") or {}
     handoff = artifacts.get("production_handoff.json") or {}
 
+    beat_ids = _ids(outline.get("beats"), "beat_id")
+    scene_beat_ids = _ids(scene_plan.get("scenes"), "beat_id")
     scene_ids = _ids(scene_plan.get("scenes"), "scene_id")
     shot_scene_ids = _ids(shot_plan.get("shots"), "scene_id")
     shot_ids = _ids(shot_plan.get("shots"), "shot_id")
@@ -157,9 +160,37 @@ def _add_reference_checks(artifacts: dict[str, dict[str, Any] | None], checks: l
 
     _add_check(checks, "narratostudio_bible_references_brief", "pass" if bible.get("source_brief_id") == brief.get("brief_id") else "fail")
     _add_check(checks, "narratostudio_outline_references_bible", "pass" if outline.get("story_bible_id") == bible.get("story_bible_id") else "fail")
+    _add_check(checks, "narratostudio_scene_beats_exist", "pass" if scene_beat_ids <= beat_ids and bool(scene_beat_ids) else "fail")
+    _add_check(checks, "narratostudio_outline_beats_covered_by_scenes", "pass" if beat_ids <= scene_beat_ids and bool(beat_ids) else "fail")
     _add_check(checks, "narratostudio_shot_scenes_exist", "pass" if shot_scene_ids <= scene_ids and bool(shot_scene_ids) else "fail")
+    _add_check(checks, "narratostudio_scenes_covered_by_shots", "pass" if scene_ids <= shot_scene_ids and bool(scene_ids) else "fail")
     _add_check(checks, "narratostudio_prompt_shots_exist", "pass" if prompt_shot_ids <= shot_ids and bool(prompt_shot_ids) else "fail")
+    _add_check(checks, "narratostudio_shots_covered_by_prompts", "pass" if shot_ids <= prompt_shot_ids and bool(shot_ids) else "fail")
     _add_check(checks, "narratostudio_handoff_references_prompt_pack", "pass" if handoff.get("prompt_pack_id") == prompt_pack.get("prompt_pack_id") else "fail")
+    _add_check(
+        checks,
+        "narratostudio_handoff_core_ids_match",
+        "pass" if _handoff_core_ids_match(brief, bible, outline, scene_plan, shot_plan, prompt_pack, handoff) else "fail",
+    )
+    _add_check(
+        checks,
+        "narratostudio_handoff_artifact_refs_complete",
+        "pass" if _handoff_artifact_refs_complete(handoff) else "fail",
+    )
+
+
+def _add_report_checks(run_dir: Path, artifacts: dict[str, dict[str, Any] | None], checks: list[dict[str, Any]]) -> None:
+    path = run_dir / "production_report.md"
+    brief = artifacts.get("creative_brief.json") or {}
+    project_title = str(brief.get("project_title") or "")
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    status = "pass" if project_title and project_title in text and "Production Handoff" in text and "NarratoStudio" in text else "fail"
+    _add_check(
+        checks,
+        "narratostudio_production_report_identity",
+        status,
+        {"project_title": project_title, "strong_contract_source": False},
+    )
 
 
 def _add_auxiliary_checks(artifacts: dict[str, dict[str, Any] | None], checks: list[dict[str, Any]]) -> None:
@@ -186,6 +217,41 @@ def _add_auxiliary_checks(artifacts: dict[str, dict[str, Any] | None], checks: l
         and feedback.get("is_primary_feedback_store") is False
         else "fail",
     )
+
+
+def _handoff_core_ids_match(
+    brief: dict[str, Any],
+    bible: dict[str, Any],
+    outline: dict[str, Any],
+    scene_plan: dict[str, Any],
+    shot_plan: dict[str, Any],
+    prompt_pack: dict[str, Any],
+    handoff: dict[str, Any],
+) -> bool:
+    expected = {
+        "source_brief_id": brief.get("brief_id"),
+        "story_bible_id": bible.get("story_bible_id"),
+        "episode_outline_id": outline.get("episode_outline_id"),
+        "scene_plan_id": scene_plan.get("scene_plan_id"),
+        "shot_plan_id": shot_plan.get("shot_plan_id"),
+        "prompt_pack_id": prompt_pack.get("prompt_pack_id"),
+    }
+    return all(value and handoff.get(key) == value for key, value in expected.items())
+
+
+def _handoff_artifact_refs_complete(handoff: dict[str, Any]) -> bool:
+    refs = handoff.get("artifact_refs")
+    if not isinstance(refs, dict):
+        return False
+    expected = {
+        "creative_brief": "creative_brief.json",
+        "story_bible": "story_bible.json",
+        "episode_outline": "episode_outline.json",
+        "scene_plan": "scene_plan.json",
+        "shot_plan": "shot_plan.json",
+        "prompt_pack": "prompt_pack.json",
+    }
+    return all(refs.get(key) == value for key, value in expected.items())
 
 
 def _read_json_object(path: Path) -> dict[str, Any] | None:

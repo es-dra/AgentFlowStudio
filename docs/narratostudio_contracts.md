@@ -97,9 +97,19 @@ The `narratostudio_production_handoff` quality profile checks:
 - required artifact presence
 - schema version presence
 - brief to bible to outline references
+- outline beat to scene references and beat coverage by scenes
 - shot to scene references
+- scene coverage by shots
 - prompt to shot references
-- handoff to prompt pack reference
+- shot coverage by prompts
+- handoff references to all core artifact IDs
+- handoff artifact reference map completeness
+- production report presence and light identity markers
 - candidate-only memory status
 - local deterministic cost trace
 - derived feedback signal boundary
+
+`production_report.md` is intentionally checked only as a human-readable
+review surface. The quality profile verifies that it exists and identifies the
+project/NarratoStudio handoff, but strong consistency remains in the JSON
+artifacts and `production_handoff.json`.
