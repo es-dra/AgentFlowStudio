@@ -385,6 +385,28 @@ h3 {
   white-space: pre-wrap;
 }
 
+.report-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.report-tab {
+  border: 1px solid rgba(181, 231, 235, 0.16);
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--soft);
+  cursor: pointer;
+}
+
+.report-tab.active,
+.report-tab:hover {
+  border-color: rgba(103, 232, 249, 0.5);
+  color: var(--text);
+}
+
 .video-preview video {
   width: 100%;
   max-height: 520px;

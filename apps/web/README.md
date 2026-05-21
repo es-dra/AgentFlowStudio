@@ -102,12 +102,13 @@ may omit it while still being readable by this viewer.
 - Quality/review inspector: checks, recommendations, readiness runs, warnings,
   and failures from normalized artifacts.
 - Evidence Map: a local lineage-style list of selected artifacts and
-  `run_manifest.artifact_index` entries.
+  `run_manifest.artifact_index` plus `package_manifest.evidence` entries.
 - Risk Ledger: warnings, failures, review recommendations, diagnostics signals,
-  and viewer load notes.
+  delivery readiness failures, nested review warnings, and viewer load notes.
 - Asset Ledger: final video, clips, subtitles, cover, BGM, and package asset
   paths.
-- Report preview: Markdown rendered as escaped text.
+- Report preview: Markdown rendered as escaped text, with tabs when both
+  `package_report.md` and `delivery_readiness.md` are selected.
 
 Markdown reports are displayed as escaped text. Inline HTML such as `<script>`
 is shown literally and is not executed.
@@ -182,3 +183,14 @@ sanitized artifact set based on the real NarratoCut `final_video_package`
 workflow shape. It keeps contract fields for run/package/quality/review/delivery
 coverage, uses relative placeholder media paths, and does not include media
 files or generated runtime directories.
+
+## Real Smoke Notes
+
+The viewer has also been checked locally against ignored real run artifacts
+generated under `data/processed/runs/webui_smoke_*`. Those smoke artifacts are
+not committed, but they cover real FFmpeg-generated media, package manifest
+evidence paths, package report, quality report, review report, delivery
+readiness, and candidate-scoring artifacts.
+
+The real smoke is intentionally run from the CLI, not from the Web UI. This
+viewer remains a static artifact consumer.

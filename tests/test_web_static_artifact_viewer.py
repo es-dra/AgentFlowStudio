@@ -250,6 +250,8 @@ const files = [
   { name: "subtitle_manifest.json", text: async () => JSON.stringify({ status: "succeeded", subtitle_path: "subtitles.srt", timeline: "final_video" }) },
   { name: "audio_mix_manifest.json", text: async () => JSON.stringify({ status: "succeeded", output_video_path: "final_video_with_bgm.mp4", bgm_path: "bgm.mp3" }) },
   { name: "cover_manifest.json", text: async () => JSON.stringify({ status: "succeeded", cover_path: "cover.jpg" }) },
+  { name: "delivery_readiness.json", text: async () => JSON.stringify({ status: "fail", summary: { total_runs: 1, failed: 1 }, runs: [{ run_id: "package_run", status: "fail", failures: ["missing highlight_score_report.json"], warnings: ["review: 4 warnings"] }] }) },
+  { name: "finished_package_manifest.json", text: async () => JSON.stringify({ schema_version: "0.1", status: "succeeded", package_id: "pkg", assets: [], evidence: { final_video_manifest: "upstream/final_video_manifest.json", clip_plan: "upstream/clip_plan.json" } }) },
   { name: "review.mp4", type: "video/mp4", text: async () => "not read for video" },
 ];
 const workspace = normalizeWorkspace(await parseFiles(files));
@@ -287,9 +289,25 @@ console.log(JSON.stringify({
     assert payload["videoNames"] == ["review.mp4"]
     assert "few strong hooks" in payload["riskText"]
     assert "near miss rejected" in payload["riskText"]
+    assert "missing highlight_score_report.json" in payload["riskText"]
+    assert "upstream/final_video_manifest.json" in payload["assetRoles"] or "final_video" in payload["assetRoles"]
     assert "final_video" in payload["assetRoles"]
     assert "subtitle" in payload["assetRoles"]
     assert "cover" in payload["assetRoles"]
+
+
+def test_static_viewer_uses_package_evidence_and_multiple_report_tabs() -> None:
+    artifact_ledgers = _read_web_file("artifact-ledgers.js")
+    app = _read_web_file("app.js")
+    html = _read_web_file("index.html")
+
+    assert "package_manifest.evidence" in artifact_ledgers
+    assert "addDeliveryReadinessRisks" in artifact_ledgers
+    assert "addReviewSectionRisks" in artifact_ledgers
+    assert 'id="report-tabs"' in html
+    assert "renderReportTabs" in app
+    assert "selectedReport" in app
+    assert "const currentReport = selectedReport(workspace)" in app
 
 
 def test_static_viewer_rendering_consumes_normalized_workspace_not_raw_payloads() -> None:

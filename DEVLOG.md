@@ -37,6 +37,33 @@
   provider calls, no upload, no persistence, no automatic directory scanning,
   and no manifest path auto-read.
 
+## 2026-05-21 - Web UI Real Artifact Smoke and M1.3.1 Rendering Fixes
+
+- Ran a local real-media smoke with generated ignored media under
+  `data/raw/webui_smoke/` and ignored run artifacts under
+  `data/processed/runs/webui_smoke_*`. These artifacts are intentionally not
+  committed.
+- Exercised the workflow chain that the static viewer is expected to inspect:
+  `video_to_real_clips`, `clips_to_final_video`, `transcript_to_subtitles`,
+  `final_video_with_subtitles`, `final_video_to_cover`,
+  `final_video_with_bgm`, `final_video_package`, `inspect-run`, `review-run`,
+  `package-report`, and `delivery-readiness`.
+- Real smoke result: package inspect passed with warnings, review reported
+  warning status, and delivery readiness failed because the final package run
+  did not itself contain `highlight_score_report.json` or
+  `selection_diagnostics.json`. That is useful validation data for the Web UI
+  risk ledger rather than a Web UI failure.
+- Added an OCR candidate-scoring smoke run to produce real
+  `candidate_windows.json`, `highlight_score_report.json`, and
+  `selection_diagnostics.json` artifacts for Web UI normalization checks.
+- Fixed M1.3.1 rendering gaps found by the real artifacts:
+  `package_manifest.evidence` entries now appear in Evidence Map, nested
+  `review_report.sections[].checks` warnings and
+  `delivery_readiness.runs[].failures/warnings` now appear in Risk Ledger, and
+  multiple Markdown reports can be switched with report tabs.
+- Boundary kept: the Web UI still does not execute workflows. The real smoke
+  was performed from CLI only to validate the viewer against actual artifacts.
+
 ## 2026-05-21 - Web UI M1.2 Chinese Workbench Polish
 
 - Merged the latest `origin/master` into `codex/narratocut-web-ui` after the

@@ -102,6 +102,7 @@ function renderWorkspace(workspace, copy) {
   renderAssetLedger(workspace, copy);
   renderVideoPreview(workspace, copy);
   renderReport(workspace, copy);
+  renderReportTabs(workspace, copy);
   renderFeedbackArtifacts(workspace, copy);
   renderOverallStatus(workspace, copy);
 }
@@ -227,8 +228,30 @@ function renderVideoPreview(workspace, copy) {
 }
 
 function renderReport(workspace, copy) {
-  const report = workspace.reports[0];
+  const report = selectedReport(workspace);
   elements.reportContent.textContent = report ? report.rawText : copy.emptyReport;
+}
+
+function renderReportTabs(workspace, copy) {
+  const tabs = document.querySelector("#report-tabs");
+  if (!tabs) return;
+  clearNode(tabs);
+  if (workspace.reports.length <= 1) {
+    tabs.hidden = true;
+    return;
+  }
+  tabs.hidden = false;
+  const currentReport = selectedReport(workspace);
+  workspace.reports.forEach((report) => {
+    const button = node("button", `report-tab${report === currentReport ? " active" : ""}`, report.fileName);
+    button.type = "button";
+    button.addEventListener("click", () => {
+      for (const item of tabs.querySelectorAll(".report-tab")) item.classList.remove("active");
+      button.classList.add("active");
+      elements.reportContent.textContent = report.rawText || copy.emptyReport;
+    });
+    tabs.append(button);
+  });
 }
 
 function renderFeedbackArtifacts(workspace, copy) {
@@ -275,4 +298,8 @@ function readinessSummary(readiness, copy) {
   return `${summary.total_runs ?? readiness.runs.length} ${copy.labels.runs}, ${summary.failed ?? 0} ${copy.labels.failed}, ${
     summary.warning ?? 0
   } ${copy.labels.warning}`;
+}
+
+function selectedReport(workspace) {
+  return workspace.reports.find((report) => report.fileName === "package_report.md") || workspace.reports[0];
 }

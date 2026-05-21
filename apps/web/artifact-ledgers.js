@@ -13,6 +13,19 @@ export function normalizeEvidenceMap(summaryArtifacts, run) {
       path: "",
     }));
 
+  const packageEvidence = summaryArtifacts
+    .filter((artifact) => artifact.artifactType === "package_manifest")
+    .flatMap((artifact) =>
+      Object.entries(asObject(artifact.payload?.evidence)).map(([artifactType, path]) => ({
+        artifactType,
+        fileName: asText(path, artifactType),
+        sourceRole: "package evidence reference",
+        status: "unknown",
+        relation: "package_manifest.evidence",
+        path: asText(path, ""),
+      })),
+    );
+
   const indexed = (run?.artifacts || []).map((entry) => ({
     artifactType: entry.name,
     fileName: entry.path || entry.name,
@@ -22,7 +35,7 @@ export function normalizeEvidenceMap(summaryArtifacts, run) {
     path: entry.path || "",
   }));
 
-  return dedupeEvidence([...selected, ...indexed]);
+  return dedupeEvidence([...selected, ...packageEvidence, ...indexed]);
 }
 
 export function normalizeRiskLedger(summaryArtifacts, workspaceParts) {
@@ -38,6 +51,10 @@ export function normalizeRiskLedger(summaryArtifacts, workspaceParts) {
     }
     if (artifact.artifactType === "review_report") {
       addListRisks(risks, artifact, "warning", payload.recommendations);
+      addReviewSectionRisks(risks, artifact, payload);
+    }
+    if (artifact.artifactType === "delivery_readiness") {
+      addDeliveryReadinessRisks(risks, artifact, payload);
     }
   }
 
@@ -131,6 +148,37 @@ function addSelectionDiagnosticsRisks(risks, artifact, payload) {
         message: `${reason}: ${count}`,
       });
     }
+  }
+}
+
+function addReviewSectionRisks(risks, artifact, payload) {
+  const sections = Array.isArray(payload.sections) ? payload.sections : [];
+  for (const section of sections) {
+    const checks = Array.isArray(section?.checks) ? section.checks : [];
+    for (const check of checks) {
+      const status = normalizeStatus(check?.status);
+      if (status !== "warning" && status !== "fail" && status !== "missing") continue;
+      risks.push({
+        source: `${artifact.artifactType}:${asText(section.name, "section")}`,
+        severity: status,
+        message: describeValue(check?.message || check?.id || check),
+      });
+    }
+  }
+}
+
+function addDeliveryReadinessRisks(risks, artifact, payload) {
+  const runs = Array.isArray(payload.runs) ? payload.runs : [];
+  for (const run of runs) {
+    const source = `${artifact.artifactType}:${asText(run.run_id, "run")}`;
+    addRunMessages(risks, source, "fail", run.failures);
+    addRunMessages(risks, source, "warning", run.warnings);
+  }
+}
+
+function addRunMessages(risks, source, severity, values) {
+  for (const message of asList(values)) {
+    risks.push({ source, severity, message });
   }
 }
 
