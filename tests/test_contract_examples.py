@@ -7,6 +7,12 @@ import yaml
 
 from narratostudio import CreativeBrief
 
+AGENTFLOW_SKILL_ROUTER_EXAMPLES = [
+    Path("examples/agentflow/skill_invocation.example.json"),
+    Path("examples/agentflow/skill_result.example.json"),
+    Path("examples/agentflow/router_decision.example.json"),
+]
+
 
 def test_project_manifest_example_has_schema_version() -> None:
     payload = json.loads(Path("examples/contracts/project_manifest.example.json").read_text(encoding="utf-8"))
@@ -95,3 +101,59 @@ def test_agentflow_memory_promotion_decision_example_is_explicit_review() -> Non
     assert payload["decision"] in {"promoted", "rejected", "merged", "expired"}
     assert payload["promotion_mode"] == "human_reviewed"
     assert payload["writes_long_term_memory"] is False
+
+
+def test_agentflow_skill_invocation_example_declares_planned_call() -> None:
+    payload = json.loads(Path("examples/agentflow/skill_invocation.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_skill_invocation"
+    assert payload["skill_id"]
+    assert payload["execution_status"] == "planned"
+    assert payload["input_artifacts"]
+    assert payload["forbidden_side_effects"]
+
+
+def test_agentflow_skill_result_example_records_outputs_and_gates() -> None:
+    payload = json.loads(Path("examples/agentflow/skill_result.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_skill_result"
+    assert payload["skill_id"]
+    assert payload["execution_status"] in {"succeeded", "failed", "blocked"}
+    assert payload["output_artifacts"]
+    assert payload["quality_gate_status"]["inspect_run"] in {"passed", "failed", "not_run"}
+    assert payload["quality_gate_status"]["review_run"] in {"passed", "failed", "not_run"}
+
+
+def test_agentflow_router_decision_example_selects_without_executing() -> None:
+    payload = json.loads(Path("examples/agentflow/router_decision.example.json").read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_router_decision"
+    assert payload["selected_skill_id"]
+    assert payload["selection_reason"]
+    assert payload["rejected_candidate_skills"]
+    assert all(candidate["skill_id"] and candidate["reason"] for candidate in payload["rejected_candidate_skills"])
+    assert payload["execution_status"] == "decision_only"
+    assert payload["executes_skill"] is False
+
+
+def test_agentflow_skill_router_examples_do_not_include_private_or_generated_paths() -> None:
+    forbidden_fragments = [
+        "D:\\",
+        "C:\\",
+        "data/processed/runs",
+        "data/raw/",
+        ".mp4",
+        ".mov",
+        "api_key",
+        "token",
+        "secret",
+        "cookie",
+        "signed_url",
+    ]
+
+    for path in AGENTFLOW_SKILL_ROUTER_EXAMPLES:
+        raw_text = path.read_text(encoding="utf-8").lower()
+        assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)

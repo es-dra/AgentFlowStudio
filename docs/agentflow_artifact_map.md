@@ -24,6 +24,7 @@ service.
 | --- | --- | --- |
 | source | Human, project, or external input. | `creative_brief.json`, source video |
 | contract | Machine-readable artifact contract. | `production_handoff.json`, `run_manifest.json` |
+| decision | Auditable selection or promotion decision. | `router_decision.json`, promotion decision |
 | derived | Generated from other artifacts in one run. | `feedback_signal_log.json` |
 | candidate | Proposed reusable signal awaiting review. | `memory_candidates.json` |
 | report | Human-readable review surface. | `production_report.md`, `package_report.md` |
@@ -37,6 +38,9 @@ project_manifest.example.json
 -> NarratoStudio workflow
 -> production_handoff.json
 -> production_report.md
+-> router_decision.json
+-> skill_invocation.json
+-> skill_result.json
 -> future production execution layer
 -> media / clip plan / final video
 -> NarratoCut workflow

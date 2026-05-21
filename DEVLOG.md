@@ -1,5 +1,27 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.5 AgentFlow Skill / Router Contracts
+
+- Synced local `master` to merged PR #44 at `2ce4b52` and started `codex/agentflow-skill-router-contracts` from a clean mainline.
+- Added minimal AgentFlow skill and Router examples:
+  - `examples/agentflow/skill_invocation.example.json`
+  - `examples/agentflow/skill_result.example.json`
+  - `examples/agentflow/router_decision.example.json`
+- Extended contract example tests so the new examples must use `schema_version: 0.1.0`, declare the correct `artifact_type`, keep Router decisions as `decision_only`, include rejected candidate skill reasons, and avoid private paths, secrets, generated media, or local run artifacts.
+- Updated AgentFlow docs so:
+  - skill invocation is a planned call artifact, not execution proof
+  - skill result is an output and quality-gate summary, not a runtime implementation
+  - Router decision is an auditable selection record and does not execute skills
+  - Phase 15.4 is marked complete and Phase 15.5 is scoped to docs/examples/tests only
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py`: 13 passed
+  - `.venv\Scripts\python.exe -m pytest`: 349 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, Python runtime, Pydantic schema package, Router runtime, skill runtime, permission system, cross-module execution, Web UI, or remote provider behavior changed.
+
 ## 2026-05-21 - Phase 15.4 AgentFlow Memory Signal Contracts
 
 - Synced local `master` to merged PR #43 at `2f7feaa` and started `codex/agentflow-memory-signal-contracts` from a clean mainline.
