@@ -80,6 +80,7 @@ The current mainline should treat these as contract surfaces:
 - artifact map: cross-module artifact registry
 - contract registry: local discovery index for current contract examples
 - contract audit report: static drift check for committed examples and docs
+- PR review checklist: human review gate for contract-layer changes
 - router decision: audited skill selection reasoning without execution
 - skill invocation: planned skill call and permitted side-effect boundary
 - skill result: execution outcome summary with output artifacts and quality
@@ -96,6 +97,8 @@ The contract registry is a discovery index only; it does not execute workflows
 or replace runtime validation.
 The contract audit report validates committed examples and docs only; it does
 not prove runtime execution.
+The PR review checklist is a human review aid only; it is not CI, runtime
+validation, or workflow execution.
 Router decisions are decision records only; they do not execute skills or
 replace workflow quality gates.
 
@@ -124,5 +127,6 @@ Recommended mainline order:
 5. Add a lightweight contract registry so Agents can discover current contract
    examples before runtime work.
 6. Add a static audit gate to prevent contract drift before runtime work.
-7. Only then extract broader AgentFlow Skills, Router, and Memory runtime
+7. Add a PR review checklist for contract-layer changes.
+8. Only then extract broader AgentFlow Skills, Router, and Memory runtime
    designs.

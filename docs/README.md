@@ -63,6 +63,7 @@ generator, documented in
 - [AgentFlow artifact map](agentflow_artifact_map.md)
 - [AgentFlow contract registry](agentflow_contract_registry.md)
 - [AgentFlow contract validation](agentflow_contract_validation.md)
+- [AgentFlow PR review checklist](agentflow_pr_review_checklist.md)
 - [AgentFlow memory contract](agentflow_memory_contract.md)
 - [AgentFlow skill contract](agentflow_skill_contract.md)
 - [AgentFlow router contract](agentflow_router_contract.md)
