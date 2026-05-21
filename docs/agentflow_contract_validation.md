@@ -46,6 +46,9 @@ Minimum fields:
 See
 [`../examples/agentflow/contract_audit_report.example.json`](../examples/agentflow/contract_audit_report.example.json).
 
+For PR-level review readiness, use
+[`agentflow_pr_review_checklist.md`](agentflow_pr_review_checklist.md).
+
 ## Boundary
 
 This audit gate is evidence for committed examples only. It must not be treated

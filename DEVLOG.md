@@ -1,5 +1,21 @@
 # DEVLOG
 
+## 2026-05-21 - Phase 15.8 AgentFlow PR Review Checklist
+
+- Synced local `master` to merged PR #47 at `3489e19` and started `codex/agentflow-pr-review-checklist` from a clean mainline.
+- Added a focused test first in `tests/test_agentflow_pr_review_checklist.py`; the red run failed because `docs/agentflow_pr_review_checklist.md` did not exist.
+- Added `docs/agentflow_pr_review_checklist.md` as the human review gate for AgentFlow contract-layer PRs.
+- Updated docs navigation, contract validation docs, architecture, roadmap, and DEVLOG.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_pr_review_checklist.py`: 4 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_pr_review_checklist.py`: 25 passed
+  - `.venv\Scripts\python.exe -m pytest`: 361 passed
+  - `.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+- Boundary kept: no workflow, CLI, Python runtime, CI config, runtime validator, registry service, Router runtime, skill runtime, Memory runtime, database, cross-module execution, Web UI, or remote provider behavior changed.
+
 ## 2026-05-21 - Phase 15.7 AgentFlow Contract Audit Gate
 
 - Synced local `master` to merged PR #46 at `36dcdd1` and started `codex/agentflow-contract-audit-gate` from a clean mainline.

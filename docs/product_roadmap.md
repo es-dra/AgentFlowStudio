@@ -384,33 +384,32 @@ Boundary:
 
 ## Phase 15.7: AgentFlow Contract Audit Gate
 
-Status: in progress.
+Status: complete.
 
 Purpose:
 
 - add a static audit report example for committed AgentFlow contracts
 - prevent registry, example, doc, and boundary drift before runtime work
-- keep Router, Memory, Skill, and cost-quality semantics reviewable as
-  contracts grow
+- keep Router, Memory, Skill, and cost-quality semantics reviewable
 
-Expected documents:
+Output:
 
 - `docs/agentflow_contract_validation.md`
-
-Expected examples:
-
 - `examples/agentflow/contract_audit_report.example.json`
 
 Boundary:
 
-- static docs, examples, and tests only
-- no workflow changes
-- no CLI changes
-- no Python runtime changes
-- no runtime validator
-- no registry service
-- no Router runtime
-- no skill runtime
-- no Memory runtime
-- no database
-- no cross-module execution
+- static docs, examples, and tests only; no workflow, CLI, Python runtime,
+  runtime validator, registry service, Router runtime, skill runtime, Memory
+  runtime, database, or cross-module execution
+
+## Phase 15.8: AgentFlow PR Review Checklist
+
+Status: in progress.
+
+Purpose: add `docs/agentflow_pr_review_checklist.md` so contract PRs keep
+schema, artifact, semantic boundary, and verification checks consistent.
+
+Boundary: docs/tests only; no workflow, CLI, Python runtime, CI config, runtime
+validator, registry service, Router/skill/Memory runtime, database, Web UI, or
+cross-module execution.
