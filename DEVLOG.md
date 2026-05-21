@@ -1,5 +1,23 @@
 # DEVLOG
 
+## 2026-05-21 - Web UI M1.4 Production Review Workbench IA
+
+- Reworked the static Web UI information architecture from an artifact-first
+  dashboard into a production-oriented local review workbench.
+- Removed the large hero-first surface and replaced it with a compact top bar
+  for delivery status, metrics, language toggle, and explicit local file
+  selection.
+- Added a left review path rail and recommended file sets grouped by package
+  run, upstream evidence, and delivery handoff. This addresses the real-smoke
+  finding that useful review evidence often spans multiple run directories.
+- Re-centered the main stage on delivery overview, explicit local video
+  preview, asset check, and report review. Artifact contract details now live
+  in the right-side `Contract Inspector` instead of dominating the default
+  view.
+- Kept the same local-only boundary: no upload, no persistence, no backend, no
+  directory scanning, no manifest path auto-read, and no CLI/API execution from
+  the Web UI.
+
 ## 2026-05-21 - Web UI Local Review Workbench Expansion
 
 - Continued local-only development on `codex/narratocut-web-ui` without pushing

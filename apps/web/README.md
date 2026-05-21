@@ -23,6 +23,8 @@ The current branch includes:
 - M1.5 local video preview for explicitly selected `.mp4`, `.webm`, or `.mov`
   files only.
 - M2 feedback event copy, which generates JSON text for manual copy/export.
+- M1.4 information architecture polish, which turns the default surface from an
+  artifact-first dashboard into a production-oriented local review workbench.
 
 The viewer uses default Chinese UI copy for human-facing labels. The language
 toggle is in-memory only. Refreshing the page returns to Chinese.
@@ -95,19 +97,28 @@ may omit it while still being readable by this viewer.
 
 ## Workbench Views
 
-- Artifact inventory: file name, artifact type, schema state, source role, parse
-  status, and whether the file participates in acceptance summary.
-- Run/package summary: loaded run, package, review, and delivery readiness
+- Top bar: selected file count, acceptance input count, risk count, parse error
+  count, delivery status, language toggle, and local file picker.
+- Review path: a compact navigation rail for delivery overview, video preview,
+  asset check, risk handling, report review, and contract inspection.
+- Recommended file sets: package run, upstream evidence, and handoff gate
+  checklists to help users select the right cross-run artifacts.
+- Delivery overview: loaded run, package, review, and delivery readiness
   summary.
-- Quality/review inspector: checks, recommendations, readiness runs, warnings,
-  and failures from normalized artifacts.
-- Evidence Map: a local lineage-style list of selected artifacts and
-  `run_manifest.artifact_index` plus `package_manifest.evidence` entries.
-- Risk Ledger: warnings, failures, review recommendations, diagnostics signals,
-  delivery readiness failures, nested review warnings, and viewer load notes.
-- Asset Ledger: final video, clips, subtitles, cover, BGM, and package asset
+- Video preview: explicit selected local media only; no manifest path auto-read.
+- Asset check: final video, clips, subtitles, cover, BGM, and package asset
   paths.
-- Report preview: Markdown rendered as escaped text, with tabs when both
+- Risk handling: warnings, failures, review recommendations, diagnostics
+  signals, delivery readiness failures, nested review warnings, and viewer load
+  notes.
+- Review inspector: quality/review checks, recommendations, readiness runs,
+  warnings, and failures from normalized artifacts.
+- Evidence chain: selected artifacts plus `run_manifest.artifact_index` and
+  `package_manifest.evidence` entries.
+- Contract Inspector: file name, artifact type, schema state, source role, parse
+  status, and whether the file participates in acceptance summary. This is an
+  engineering inspector, not the default production focus.
+- Report review: Markdown rendered as escaped text, with tabs when both
   `package_report.md` and `delivery_readiness.md` are selected.
 
 Markdown reports are displayed as escaped text. Inline HTML such as `<script>`

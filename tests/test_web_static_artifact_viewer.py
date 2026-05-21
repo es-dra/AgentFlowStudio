@@ -28,8 +28,8 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
     assert "multiple" in html
     assert ".mp4,.webm,.mov" in html
     assert 'id="language-toggle"' in html
-    assert 'class="stat-strip"' in html
-    assert "本地只读验收台" in html
+    assert "stat-strip" in html
+    assert "内容生产验收" in html
     assert "<main" in html
     for landmark in [
         'id="artifact-inventory"',
@@ -135,14 +135,14 @@ def test_static_viewer_declares_m12_chinese_copy_and_in_memory_language_switch()
     assert 'language: "zh"' in app
     assert 'state.language = state.language === "zh" ? "en" : "zh"' in app
     assert "localStorage" not in app + ui_copy + render_helpers
-    assert "把 NarratoCut 的运行证据、交付资产和审查风险收进一个本地验收工作台。" in ui_copy
-    assert "Artifact 清单" in ui_copy
-    assert "运行与交付包摘要" in ui_copy
-    assert "质量与审查检查" in ui_copy
-    assert "报告预览" in ui_copy
+    assert "先看成品能否交付，再看证据和风险。" in ui_copy
+    assert "交付总览" in ui_copy
+    assert "审查 Inspector" in ui_copy
+    assert "报告审阅" in ui_copy
+    assert "Contract Inspector" in ui_copy
     assert "通过 pass" in ui_copy
     assert "警告 warning" in ui_copy
-    assert "未知 JSON unknown_json" in ui_copy
+    assert "未知 unknown" in ui_copy
     assert "未找到详细检查项" in ui_copy
     assert "statusPill" in render_helpers
     assert "normalizeStatus" in render_helpers
@@ -157,6 +157,30 @@ def test_static_viewer_declares_m121_acceptance_metrics_and_empty_state_boundary
 
     assert "summaryArtifacts.length > 0" in artifact_workspace
     assert "Missing recommended artifact" in artifact_workspace
+
+
+def test_static_viewer_declares_m14_productive_review_workbench_layout() -> None:
+    html = _read_web_file("index.html")
+    css = _read_web_file("styles.css")
+    ui_copy = _read_web_file("ui-copy.js")
+
+    for token in [
+        'class="topbar"',
+        'class="workflow-rail"',
+        'class="content-stage"',
+        'class="review-rail"',
+        'id="recommended-artifacts"',
+        'id="contract-inspector"',
+    ]:
+        assert token in html
+
+    assert 'class="hero"' not in html
+    assert "交付总览" in ui_copy
+    assert "推荐文件组" in ui_copy
+    assert "Contract Inspector" in ui_copy
+    assert "topbar" in css
+    assert "content-stage" in css
+    assert "review-rail" in css
 
 
 def test_static_viewer_normalizes_real_fixture_and_non_contract_inputs() -> None:
