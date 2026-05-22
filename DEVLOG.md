@@ -17,6 +17,10 @@
   as a pure in-memory review surface that composes source validation, the
   NarratoStudio asset/memory smoke adapter, and AgentFlow asset/memory
   contract-set validation.
+- Added a committed
+  `examples/agentflow/narratostudio_asset_feedback_review.example.json`,
+  registered it in AgentFlow contract helpers, registry, and audit examples,
+  and covered it in contract example tests.
 - Added a packaging regression in `tests/test_agentflow_package_skeleton.py`
   and included `agentflow*` in `pyproject.toml` package discovery so the
   platform package remains present after editable or wheel installs.
@@ -33,11 +37,13 @@
 - Verification started:
   - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_review'`
   - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py`: 2 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: contract example regression first failed because the review artifact was missing from examples, registry, and audit coverage
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 31 passed
   - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_package_skeleton.py`: packaging regression first failed because `agentflow` was missing from setuptools package discovery
   - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_package_skeleton.py`: 6 passed
 - Final verification:
-  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py tests/test_narratostudio_asset_feedback_contract_validator.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_package_skeleton.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 34 passed
-  - `.venv\Scripts\python.exe -m pytest`: 436 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py tests/test_narratostudio_asset_feedback_contract_validator.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_package_skeleton.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 65 passed
+  - `.venv\Scripts\python.exe -m pytest`: 437 passed
   - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
   - `git diff --check`: passed with CRLF warnings only
   - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
