@@ -1,10 +1,11 @@
-# NarratoCut Docs
+# AgentFlow Studio Docs
 
-Use this page as the current navigation surface. NarratoCut is the
-distribution-side short video highlight workflow module of AgentFlow Studio. It
-is now a local-first CLI/Agent product MVP with an agent-readable artifact
-chain. The main documentation goal is to make the product path, quality gates,
-and agent contracts obvious without reading every historical phase note.
+Use this page as the current navigation surface. AgentFlow Studio is the
+platform repository. NarratoCut is the distribution-side short video highlight
+workflow module, NarratoStudio is the production-side structured handoff
+module, and `agentflow/` is the platform contract and harness migration layer.
+The main documentation goal is to make the product path, quality gates, and
+agent contracts obvious without reading every historical phase note.
 
 ## Current Product State
 

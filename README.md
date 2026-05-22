@@ -1,22 +1,47 @@
-# NarratoCut
+# AgentFlow Studio
 
 [中文 README](README.zh-CN.md)
 
-NarratoCut is the distribution-side short video highlight workflow module of
-AgentFlow Studio. It is a Python-based, local-first CLI/Agent MVP for
-AI-assisted short video packaging: each major step writes readable JSON or
-media artifacts, and those artifacts can be inspected and reviewed after a run.
+AgentFlow Studio is an agent-native content production and distribution
+workflow platform. The repository container is now `AgentFlowStudio`; the
+existing Python package names, CLI commands, workflow files, and artifact
+contracts are intentionally unchanged in this phase.
+
+Current top-level modules:
+
+- `agentflow/`: platform contracts, harness helpers, router, memory, and skill
+  boundaries as they are gradually migrated into the platform layer.
+- `narratostudio/`: production-side structured content handoff MVP.
+- `narratocut/`: distribution-side short video highlight, packaging, report,
+  and review MVP.
+
+NarratoCut remains the Python-based, local-first CLI/Agent MVP for AI-assisted
+short video packaging: each major step writes readable JSON or media artifacts,
+and those artifacts can be inspected and reviewed after a run.
 
 The project is clean-room. The previous AVP workspace is reference material
 only and is not used as a source-code base.
 
 ## Current Status
 
-NarratoCut is now a CLI-first technical MVP for developer- and agent-facing
-short-video distribution workflows. It is not yet the full AgentFlow Studio
-platform, a consumer SaaS app, desktop app, or Web UI product.
+AgentFlow Studio is currently a local-first platform repository with working
+MVP modules and contract-layer AgentFlow helpers. It is not yet a hosted
+platform, consumer SaaS app, desktop app, or Web UI product.
 
-The current product path is:
+NarratoStudio's current production-side workflow is:
+
+```text
+creative_brief
+  -> story_bible
+  -> episode_outline
+  -> scene_plan
+  -> shot_plan
+  -> prompt_pack
+  -> production_handoff
+  -> production_report
+```
+
+NarratoCut's current distribution-side product path is:
 
 ```text
 video / transcript / clip_plan
@@ -67,7 +92,9 @@ Not included yet:
 
 ```text
 apps/                 CLI, API, and future web entrypoints
-narratocut/           Core Python package
+agentflow/            Platform contract and harness migration layer
+narratostudio/        Production-side structured handoff module
+narratocut/           Distribution-side media workflow module
 workflows/            YAML workflow definitions
 prompts/              Auditable prompt templates
 configs/              Example configuration and tool catalog files
@@ -92,7 +119,7 @@ tests/                Automated tests and fixtures
 PowerShell:
 
 ```powershell
-cd D:\Projects\NarratoCut
+cd D:\Projects\AgentFlowStudio
 python -m venv .venv
 .venv\Scripts\pip install -e .[dev]
 .venv\Scripts\python -m pytest
@@ -242,7 +269,7 @@ FFmpeg/FFprobe.
 
 ```powershell
 .venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall apps narratocut tests
+.venv\Scripts\python -m compileall apps agentflow narratocut narratostudio tests
 git diff --check
 .venv\Scripts\python -m apps.cli.main --help
 .venv\Scripts\python -m apps.cli.main version

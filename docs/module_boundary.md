@@ -1,11 +1,42 @@
 # Module Boundary
 
 This document defines the current module responsibilities inside the
-`NarratoCut` repository after the NarratoStudio MVP merge.
+`AgentFlowStudio` repository after the container rename.
 
-The repository name is unchanged. NarratoCut and NarratoStudio are sibling MVP
+The repository container is now `AgentFlowStudio`. The Python package names,
+CLI commands, workflow files, and module artifact contracts are intentionally
+unchanged in this phase. NarratoCut and NarratoStudio remain sibling MVP
 modules used to validate AgentFlow Studio's distribution-side and
-production-side contract surfaces.
+production-side contract surfaces, while `agentflow/` owns platform contract
+helpers as they migrate out of module-specific locations.
+
+## AgentFlow
+
+Owns:
+
+- platform contract constants and example loaders
+- shared platform harness helpers as they are migrated
+- Router, Memory, and Skill contract boundaries before runtime implementation
+- compatibility guidance for module-owned imports during migration
+
+Consumes:
+
+- committed AgentFlow contract examples
+- module-produced artifacts when a platform-level validator explicitly targets
+  them
+
+Emits:
+
+- static contract helper outputs and validation result shapes only
+
+Out of scope:
+
+- workflow orchestration
+- media execution
+- production handoff generation
+- long-term memory writes
+- Router runtime, Memory runtime, or skill runtime
+- hosted API, database, provider calls, or Web UI
 
 ## NarratoStudio
 

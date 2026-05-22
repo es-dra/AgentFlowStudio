@@ -1,22 +1,37 @@
-# NarratoCut
+# AgentFlow Studio
 
 [English README](README.md)
 
-NarratoCut 是 AgentFlow Studio 的分发侧短视频高光切片与成品包装模块。它是一个 Python 实现的 local-first CLI/Agent MVP：每个关键步骤都会写出可读的 JSON 或媒体产物，并且可以通过 inspect/review 做质量检查。
+AgentFlow Studio 是面向 Agent 的内容生产与分发工作流平台。当前仓库容器已经改名为 `AgentFlowStudio`；本阶段刻意不改 Python 包名、CLI 命令、workflow 文件或 artifact 契约。
+
+当前顶层模块：
+
+- `agentflow/`：平台合同、harness、router、memory、skills 的逐步迁移层。
+- `narratostudio/`：承制侧结构化内容生产 handoff MVP。
+- `narratocut/`：分发侧短视频高光切片、包装、报告、验收 MVP。
+
+NarratoCut 仍然是 Python 实现的 local-first CLI/Agent MVP：每个关键步骤都会写出可读的 JSON 或媒体产物，并且可以通过 inspect/review 做质量检查。
 
 这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移来源。
 
 ## 当前状态
 
-NarratoCut 当前定位是：
+AgentFlow Studio 当前定位是本地优先的平台仓库，包含已经工作的 MVP 模块和 AgentFlow 合同层 helper。它还不是 Hosted 平台、普通用户 SaaS、桌面端工具或 Web UI 产品。
+
+NarratoStudio 当前承制侧 workflow 是：
 
 ```text
-面向开发者、Agent 和高级用户的短视频分发侧工作流 MVP
+creative_brief
+  -> story_bible
+  -> episode_outline
+  -> scene_plan
+  -> shot_plan
+  -> prompt_pack
+  -> production_handoff
+  -> production_report
 ```
 
-它还不是完整的 AgentFlow Studio 平台、普通用户 SaaS、桌面端工具或 Web UI 产品。
-
-当前主链路是：
+NarratoCut 当前分发侧主链路是：
 
 ```text
 video / transcript / clip_plan
@@ -63,7 +78,9 @@ video / transcript / clip_plan
 
 ```text
 apps/                 CLI、API 和未来 Web 入口
-narratocut/           核心 Python package
+agentflow/            平台合同和 harness 迁移层
+narratostudio/        承制侧结构化 handoff 模块
+narratocut/           分发侧媒体 workflow 模块
 workflows/            YAML workflow 定义
 prompts/              可审计 prompt 模板
 configs/              示例配置和 tool catalog
@@ -86,7 +103,7 @@ tests/                自动化测试和 fixtures
 PowerShell：
 
 ```powershell
-cd D:\Projects\NarratoCut
+cd D:\Projects\AgentFlowStudio
 python -m venv .venv
 .venv\Scripts\pip install -e .[dev]
 .venv\Scripts\python -m pytest
@@ -223,7 +240,7 @@ $env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
 
 ```powershell
 .venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall apps narratocut tests
+.venv\Scripts\python -m compileall apps agentflow narratocut narratostudio tests
 git diff --check
 .venv\Scripts\python -m apps.cli.main --help
 .venv\Scripts\python -m apps.cli.main version
