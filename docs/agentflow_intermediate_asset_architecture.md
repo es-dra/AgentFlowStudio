@@ -32,6 +32,12 @@ automatic global preference store.
 profile and reject another for a target task. It must be decision-only and must
 not execute the task.
 
+The implementation entry point for asset/memory contract validation is
+`agentflow.memory.assets.validate_asset_memory_contract_set`. It validates an
+in-memory artifact set and returns `agentflow_asset_memory_validation`; it does
+not execute workflows, promote memory, create asset profiles, or write durable
+state.
+
 ## NarratoStudio Asset Examples
 
 NarratoStudio should treat these as likely intermediate asset kinds:

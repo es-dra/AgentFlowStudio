@@ -1,5 +1,43 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.20 Intermediate Asset / Memory Validator
+
+- Synced local `master` to merged PR #60 at `5806508`.
+- Removed the merged `codex/agentflow-skill-validator-migration` branch
+  locally and remotely after confirming the feature branch and `origin/master`
+  had identical tree hashes.
+- Started `codex/agentflow-asset-memory-validator` from a clean mainline.
+- Added focused TDD coverage in `tests/test_agentflow_asset_memory_validator.py`;
+  the first red run failed because `agentflow.memory.assets` did not exist.
+- Added `agentflow.memory.assets.validate_asset_memory_contract_set` as a pure
+  in-memory artifact validator for the current intermediate asset, reusable
+  asset profile, asset reuse decision, memory candidate, and memory promotion
+  decision contracts.
+- Added a chain check that `reusable_asset_profile.promotion_decision_ref`
+  points to the provided memory promotion decision, and corrected the committed
+  reusable asset profile example to reference the current decision id.
+- Updated `agentflow.memory` package metadata from reserved namespace to
+  platform memory helper layer while keeping runtime status `not_implemented`.
+- Updated intermediate asset, memory, architecture refactor, product roadmap,
+  and Phase 15 roadmap docs to record this as contract-set validation only.
+- Boundary kept: no Memory runtime, candidate promotion, long-term memory write,
+  reusable asset creation, workflow execution, skill execution, Router runtime,
+  provider call, database/vector-store/file-repository write, CLI change,
+  workflow change, schema version change, hosted API, or Web UI change.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.assets'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py`: 7 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_package_skeleton.py`: 12 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_package_skeleton.py tests/test_agentflow_architecture_refactor_plan.py tests/test_agentflow_intermediate_asset_architecture.py tests/test_agentflow_roadmap_docs.py`: 25 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py`: one added chain test failed before the promotion decision reference check was implemented
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_agentflow_contract_helpers.py`: 33 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest`: 423 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-22 - Phase 15.19 Skill Replay Validator Migration
 
 - Synced local `master` to merged PR #59 at `70604b3`.

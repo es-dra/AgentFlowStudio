@@ -1,4 +1,6 @@
-"""Reserved namespace for AgentFlow memory signal and asset helpers."""
+"""AgentFlow memory signal and asset contract helpers."""
 
-PACKAGE_SCOPE = "reserved_namespace"
+PACKAGE_SCOPE = "platform_memory_helper_layer"
 RUNTIME_STATUS = "not_implemented"
+
+__all__ = ("PACKAGE_SCOPE", "RUNTIME_STATUS")

@@ -146,6 +146,14 @@ Step 5: update docs and examples.
 - Do not change artifact names unless a separate contract migration document
   exists.
 
+Step 6: add memory and asset contract validators.
+
+- Keep validators in `agentflow.memory.*` as pure in-memory artifact checks.
+- Do not promote candidates, create reusable profiles, execute reuse decisions,
+  write long-term memory, or connect a database/vector store in this step.
+- Keep runtime entry points out of this package until Memory runtime readiness
+  is opened as a separate phase.
+
 ## Compatibility Strategy
 
 Compatibility import paths are required for the first migration stage. Current
