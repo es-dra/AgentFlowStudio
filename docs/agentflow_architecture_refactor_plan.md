@@ -125,6 +125,8 @@ Step 3: split AgentFlow harness validators.
   `narratocut.harness.agentflow_skill` as compatibility import wrappers.
 - No validator should execute workflows, select skills, invoke providers, or
   write durable state.
+- Migrate Router dry-run validation before Skill replay validation so each
+  behavior surface can keep a narrow regression matrix.
 
 Step 4: expose compatibility imports.
 

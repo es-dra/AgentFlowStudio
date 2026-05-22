@@ -83,6 +83,11 @@ candidate reasons, selected skill exclusion from rejected candidates,
 decision-only execution status, `executes_skill: false`, and private path or
 secret fragments.
 
+The implementation entry point for new code is
+`agentflow.harness.agentflow_router.validate_router_decision_dry_run`.
+`narratocut.harness.agentflow_router` remains a compatibility import wrapper
+for the first migration window.
+
 ## Boundaries
 
 Router must not:

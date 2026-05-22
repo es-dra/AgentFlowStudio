@@ -4,7 +4,7 @@ import copy
 import json
 from pathlib import Path
 
-from narratocut.harness.agentflow_router import validate_router_decision_dry_run
+from agentflow.harness.agentflow_router import validate_router_decision_dry_run
 
 
 ROUTER_DECISION_EXAMPLE = Path("examples/agentflow/router_decision.example.json")
