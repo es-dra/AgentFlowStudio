@@ -38,6 +38,12 @@ in-memory artifact set and returns `agentflow_asset_memory_validation`; it does
 not execute workflows, promote memory, create asset profiles, or write durable
 state.
 
+`agentflow.memory.narratostudio_assets.build_narratostudio_asset_memory_contract_set`
+is the NarratoStudio smoke adapter. It maps existing run payloads into the same
+contract set for validation only. It does not read run directories, write
+profiles, execute durable candidate promotion, or make the resulting profile
+durable.
+
 ## NarratoStudio Asset Examples
 
 NarratoStudio should treat these as likely intermediate asset kinds:
@@ -51,6 +57,16 @@ NarratoStudio should treat these as likely intermediate asset kinds:
 
 These assets help the system learn which creative rules, prompts, and execution
 strategies converge toward the user's preferred production style.
+
+The Phase 15.21 smoke loop uses current NarratoStudio artifacts as evidence:
+
+- `production_handoff.json`
+- `memory_candidates.json`
+- `feedback_signal_log.json`
+- `cost_quality_trace.json`
+
+The resulting reusable profile is still a contract payload requiring human
+review. It is not a persisted asset store entry.
 
 ## Boundaries
 

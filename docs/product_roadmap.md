@@ -215,3 +215,6 @@ Current checkpoint:
   with NarratoCut compatibility imports preserved
 - intermediate asset and memory contract-set validation now lives in
   `agentflow.memory.assets` without Memory runtime behavior
+- NarratoStudio workflow outputs can now be adapted into an in-memory
+  asset-feedback smoke contract set without changing workflow execution or
+  writing durable memory

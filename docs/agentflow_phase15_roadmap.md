@@ -46,6 +46,7 @@ execution. Phase 15 has:
 | Phase 15.18 | complete | Router dry-run validator migration |
 | Phase 15.19 | complete | Skill replay validator migration |
 | Phase 15.20 | complete | Intermediate Asset / Memory Validator |
+| Phase 15.21 | complete | NarratoStudio asset feedback loop smoke |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -603,3 +604,32 @@ Boundary:
   writes, vector-store writes, or file repository writes
 - does not change CLI, workflow execution, artifact contracts, schema version,
   hosted API, or Web UI behavior
+
+## Phase 15.21: NarratoStudio Asset Feedback Loop Smoke
+
+Status: complete.
+
+Purpose: prove that a current NarratoStudio production handoff run can be
+adapted into the AgentFlow asset/memory contract set and validated through the
+platform memory helper layer.
+
+Output:
+
+- `agentflow.memory.narratostudio_assets.build_narratostudio_asset_memory_contract_set`
+- focused smoke tests that run the local NarratoStudio workflow in `tmp_path`,
+  build the in-memory contract set from `production_handoff.json`,
+  `memory_candidates.json`, `feedback_signal_log.json`, and
+  `cost_quality_trace.json`, and validate it with
+  `agentflow.memory.assets.validate_asset_memory_contract_set`
+
+Boundary:
+
+- validates a smoke contract loop only
+- does not implement Memory runtime
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not persist reusable asset profiles
+- does not read from or write to `data/processed/runs/`
+- does not change CLI or workflow execution
+- does not execute skills, Router decisions, providers, database writes,
+  vector-store writes, hosted APIs, or Web UI behavior
