@@ -113,6 +113,9 @@ Step 2: move pure contract utilities.
 - Move only constant lists, artifact type helpers, and example loading helpers.
 - Keep old imports as compatibility import wrappers.
 - Do not move workflow nodes, SOP logic, or media-specific checks.
+- The first harness utility slice centralizes AgentFlow validator schema,
+  status, and forbidden-fragment constants in `agentflow.harness.constants`
+  while keeping validator functions in `narratocut.harness.*`.
 
 Step 3: split AgentFlow harness validators.
 

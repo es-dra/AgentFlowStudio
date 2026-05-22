@@ -41,7 +41,8 @@ execution. Phase 15 has:
 | Phase 15.14 | complete | Architecture Refactor Plan |
 | Phase 15.15 | complete | AgentFlow Package Skeleton |
 | Phase 15.16 | complete | AgentFlow Contract Example Helpers |
-| Phase 15.17a | in progress | AgentFlow repo rename docs alignment |
+| Phase 15.17a | complete | AgentFlow repo rename docs alignment |
+| Phase 15.17 | complete | AgentFlow validator constants |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -466,7 +467,7 @@ Boundary:
 
 ## Phase 15.17a: AgentFlow Repo Rename Docs Alignment
 
-Status: in progress.
+Status: complete.
 
 Purpose: align documentation after the repository container was renamed to
 `AgentFlowStudio`.
@@ -494,18 +495,21 @@ Boundary:
 
 ## Phase 15.17: AgentFlow Validator Constants
 
-Status: planned.
+Status: complete.
 
 Purpose: migrate platform-level shared validator constants into
 `agentflow.harness` while keeping actual validator behavior and compatibility
 imports stable.
 
-Recommended output:
+Output:
 
 - `agentflow/harness/constants.py`
 - shared schema version, result status strings, and forbidden fragment lists
 - focused tests proving existing router and skill validators still behave the
   same
+- `narratocut.harness.agentflow_router` and
+  `narratocut.harness.agentflow_skill` import the shared constants while
+  keeping their public validator functions in place
 
 Boundary:
 
@@ -513,3 +517,4 @@ Boundary:
 - no workflow changes
 - no CLI changes
 - no runtime behavior
+- no package, workflow, artifact, or schema version rename
