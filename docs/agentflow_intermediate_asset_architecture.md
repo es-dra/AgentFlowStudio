@@ -44,6 +44,13 @@ contract set for validation only. It does not read run directories, write
 profiles, execute durable candidate promotion, or make the resulting profile
 durable.
 
+`agentflow.memory.narratostudio_assets.validate_narratostudio_asset_feedback_sources`
+validates the NarratoStudio source payloads before that mapping. It keeps
+`memory_candidates.json` candidate-only, verifies `feedback_signal_log.json` is
+derived from `feedback.jsonl`, requires local deterministic cost-quality
+evidence, and checks that `production_handoff.json` still references the prompt
+pack artifact.
+
 ## NarratoStudio Asset Examples
 
 NarratoStudio should treat these as likely intermediate asset kinds:
@@ -67,6 +74,10 @@ The Phase 15.21 smoke loop uses current NarratoStudio artifacts as evidence:
 
 The resulting reusable profile is still a contract payload requiring human
 review. It is not a persisted asset store entry.
+
+Phase 15.22 adds a source validation step before mapping these artifacts. This
+keeps the smoke adapter from hiding broken source semantics behind a successful
+asset/memory contract-set validation.
 
 ## Boundaries
 
