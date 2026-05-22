@@ -224,3 +224,5 @@ Current checkpoint:
 - NarratoStudio asset-feedback review now has a composed in-memory review
   artifact that stops before asset/memory adaptation when source validation
   fails
+- NarratoStudio asset-feedback review artifacts now have a harness-level
+  validator for Agent-readable gating without adding runtime execution

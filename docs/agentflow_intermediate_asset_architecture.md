@@ -57,6 +57,11 @@ asset/memory contract-set validation into one review artifact. If source
 validation fails, it marks the asset/memory step `not_run` instead of building
 contracts from broken source semantics.
 
+`agentflow.harness.narratostudio_review.validate_narratostudio_asset_feedback_review`
+validates that composed review artifact as a harness-level gate. It checks the
+review-only boundary, embedded validation status consistency, failed-source
+skip behavior, and private path/secret hygiene without re-running workflows.
+
 ## NarratoStudio Asset Examples
 
 NarratoStudio should treat these as likely intermediate asset kinds:
@@ -88,6 +93,10 @@ asset/memory contract-set validation.
 Phase 15.23 adds a composed review surface over the same in-memory payloads. It
 is meant for Agent-readable review and gating, not persistence or runtime
 execution.
+
+Phase 15.24 adds the harness validator for that review artifact. The validator
+inspects an already-built review artifact only; it does not rebuild contracts
+or make the review durable.
 
 ## Boundaries
 
