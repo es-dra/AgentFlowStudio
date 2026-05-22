@@ -1,5 +1,48 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.22 NarratoStudio Asset Feedback Source Validator
+
+- Synced local `master` to merged PR #62 at `0a197e2`.
+- Removed the merged `codex/narratostudio-asset-feedback-smoke` branch locally
+  and remotely after confirming its tree matched `origin/master`.
+- Started `codex/agentflow-asset-feedback-contract-validator` from a clean
+  mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_feedback_contract_validator.py`; the first
+  red run failed because
+  `validate_narratostudio_asset_feedback_sources` did not exist.
+- Added
+  `agentflow.memory.narratostudio_assets.validate_narratostudio_asset_feedback_sources`
+  to validate NarratoStudio source payloads before mapping them into the
+  AgentFlow asset/memory contract set.
+- The validator checks source schema/type, `production_handoff.json` prompt-pack
+  refs, candidate-only `memory_candidates.json`, derived
+  `feedback_signal_log.json`, and local deterministic `cost_quality_trace.json`.
+- Added a regression for malformed candidate stores; the first run exposed a
+  `TypeError`, then the validator was tightened to return failed validation
+  instead of throwing.
+- Added a regression for missing candidate identity fields so source validation
+  fails before the mapping helper can raise on missing `id` or `statement`.
+- Updated Phase 15 roadmap, product roadmap, and intermediate asset architecture
+  docs to record Phase 15.22 as source-payload validation only.
+- Boundary kept: no Memory runtime, durable candidate promotion, long-term
+  memory write, persisted reusable asset profile, workflow execution change,
+  CLI change, provider call, database/vector-store/file-repository write,
+  hosted API, Web UI behavior, or `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py`: first red run failed with `ImportError: cannot import name 'validate_narratostudio_asset_feedback_sources'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py`: 4 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py`: malformed candidate store regression first failed with `TypeError: 'NoneType' object is not iterable`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_agentflow_asset_memory_validator.py`: 17 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py`: candidate identity regression first failed because the validator accepted a candidate without `id`
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_contract_validator.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 26 passed
+  - `.venv\Scripts\python.exe -m pytest`: 433 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.21 NarratoStudio Asset Feedback Loop Smoke
 
 - Continued from merged PR #61 at `a552c45` on

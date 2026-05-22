@@ -218,3 +218,6 @@ Current checkpoint:
 - NarratoStudio workflow outputs can now be adapted into an in-memory
   asset-feedback smoke contract set without changing workflow execution or
   writing durable memory
+- NarratoStudio asset-feedback source payloads now have a pre-mapping validator
+  so broken candidate memory, derived feedback, cost trace, or handoff-reference
+  semantics fail before contract-set adaptation

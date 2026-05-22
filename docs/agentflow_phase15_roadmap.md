@@ -47,6 +47,7 @@ execution. Phase 15 has:
 | Phase 15.19 | complete | Skill replay validator migration |
 | Phase 15.20 | complete | Intermediate Asset / Memory Validator |
 | Phase 15.21 | complete | NarratoStudio asset feedback loop smoke |
+| Phase 15.22 | complete | NarratoStudio asset feedback source validator |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -633,3 +634,29 @@ Boundary:
 - does not change CLI or workflow execution
 - does not execute skills, Router decisions, providers, database writes,
   vector-store writes, hosted APIs, or Web UI behavior
+
+## Phase 15.22: NarratoStudio Asset Feedback Source Validator
+
+Status: complete.
+
+Purpose: validate the NarratoStudio source payloads used by the asset-feedback
+smoke adapter before mapping them into AgentFlow asset/memory contracts.
+
+Output:
+
+- `agentflow.memory.narratostudio_assets.validate_narratostudio_asset_feedback_sources`
+- focused tests that reject malformed candidate stores, primary feedback-store
+  misuse, non-local cost traces, and incomplete production handoff artifact
+  references
+
+Boundary:
+
+- validates existing in-memory NarratoStudio source payloads only
+- does not execute workflows
+- does not build or persist reusable asset profiles
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not read from or write to `data/processed/runs/`
+- does not change CLI, workflow execution, artifact contracts, schema version,
+  provider behavior, hosted API, database/vector-store writes, or Web UI
+  behavior
