@@ -48,6 +48,7 @@ execution. Phase 15 has:
 | Phase 15.20 | complete | Intermediate Asset / Memory Validator |
 | Phase 15.21 | complete | NarratoStudio asset feedback loop smoke |
 | Phase 15.22 | complete | NarratoStudio asset feedback source validator |
+| Phase 15.23 | complete | NarratoStudio asset feedback review surface |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -654,6 +655,36 @@ Boundary:
 - validates existing in-memory NarratoStudio source payloads only
 - does not execute workflows
 - does not build or persist reusable asset profiles
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not read from or write to `data/processed/runs/`
+- does not change CLI, workflow execution, artifact contracts, schema version,
+  provider behavior, hosted API, database/vector-store writes, or Web UI
+  behavior
+
+## Phase 15.23: NarratoStudio Asset Feedback Review Surface
+
+Status: complete.
+
+Purpose: compose the NarratoStudio source-payload validator, asset/memory smoke
+adapter, and AgentFlow asset/memory contract-set validator into one
+Agent-readable in-memory review artifact.
+
+Output:
+
+- `agentflow.memory.narratostudio_review.review_narratostudio_asset_feedback_loop`
+- `agentflow_narratostudio_asset_feedback_review` result shape
+- focused tests that prove valid current NarratoStudio workflow outputs pass
+  the composed review and invalid source payloads stop before contract-set
+  adaptation
+
+Boundary:
+
+- returns a review artifact only
+- validates existing in-memory NarratoStudio source payloads only
+- does not execute workflows
+- does not build or persist reusable asset profiles outside the returned
+  in-memory contract-set review
 - does not execute durable candidate promotion
 - does not write long-term memory
 - does not read from or write to `data/processed/runs/`

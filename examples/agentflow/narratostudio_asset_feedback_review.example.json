@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_narratostudio_asset_feedback_review",
+  "validation_scope": "narratostudio_asset_feedback_loop",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "writes_long_term_memory": false,
+  "handoff_id": "production_handoff_demo",
+  "run_id": "narratostudio_demo_run",
+  "overall_status": "passed",
+  "source_validation": {
+    "schema_version": "0.1.0",
+    "artifact_type": "agentflow_narratostudio_asset_feedback_source_validation",
+    "validation_scope": "narratostudio_asset_feedback_sources",
+    "runtime_status": "not_implemented",
+    "does_not_execute": true,
+    "writes_long_term_memory": false,
+    "handoff_id": "production_handoff_demo",
+    "run_id": "narratostudio_demo_run",
+    "overall_status": "passed",
+    "checks": [
+      {
+        "check_id": "memory_candidates_candidate_only",
+        "status": "passed",
+        "message": "memory candidates remain candidate-only"
+      }
+    ]
+  },
+  "asset_memory_step_status": "passed",
+  "asset_memory_validation": {
+    "schema_version": "0.1.0",
+    "artifact_type": "agentflow_asset_memory_validation",
+    "validation_scope": "asset_memory_contract_set",
+    "runtime_status": "not_implemented",
+    "does_not_execute": true,
+    "writes_long_term_memory": false,
+    "intermediate_asset_id": "af_intermediate_asset_001",
+    "asset_profile_id": "af_reusable_asset_profile_001",
+    "asset_reuse_decision_id": "af_asset_reuse_decision_001",
+    "memory_candidate_id": "af_memory_candidate_001",
+    "memory_promotion_decision_id": "af_memory_promotion_decision_001",
+    "overall_status": "passed",
+    "checks": [
+      {
+        "check_id": "promotion_decision_does_not_write_memory",
+        "status": "passed",
+        "message": "promotion decision does not write long-term memory"
+      }
+    ]
+  },
+  "contract_set_keys": [
+    "asset_reuse_decision",
+    "intermediate_asset",
+    "memory_candidate",
+    "memory_promotion_decision",
+    "reusable_asset_profile"
+  ],
+  "metadata": {
+    "example": true
+  }
+}

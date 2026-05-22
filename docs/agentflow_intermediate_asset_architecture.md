@@ -51,6 +51,12 @@ derived from `feedback.jsonl`, requires local deterministic cost-quality
 evidence, and checks that `production_handoff.json` still references the prompt
 pack artifact.
 
+`agentflow.memory.narratostudio_review.review_narratostudio_asset_feedback_loop`
+composes the source validation, NarratoStudio smoke adapter, and AgentFlow
+asset/memory contract-set validation into one review artifact. If source
+validation fails, it marks the asset/memory step `not_run` instead of building
+contracts from broken source semantics.
+
 ## NarratoStudio Asset Examples
 
 NarratoStudio should treat these as likely intermediate asset kinds:
@@ -78,6 +84,10 @@ review. It is not a persisted asset store entry.
 Phase 15.22 adds a source validation step before mapping these artifacts. This
 keeps the smoke adapter from hiding broken source semantics behind a successful
 asset/memory contract-set validation.
+
+Phase 15.23 adds a composed review surface over the same in-memory payloads. It
+is meant for Agent-readable review and gating, not persistence or runtime
+execution.
 
 ## Boundaries
 

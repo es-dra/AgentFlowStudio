@@ -71,6 +71,12 @@
       "example_path": "examples/agentflow/asset_reuse_decision.example.json",
       "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
       "contract_surface": "asset_reuse_decision"
+    },
+    {
+      "artifact_type": "agentflow_narratostudio_asset_feedback_review",
+      "example_path": "examples/agentflow/narratostudio_asset_feedback_review.example.json",
+      "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
+      "contract_surface": "narratostudio_asset_feedback_review"
     }
   ],
   "validation_rules": [

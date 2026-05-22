@@ -221,3 +221,6 @@ Current checkpoint:
 - NarratoStudio asset-feedback source payloads now have a pre-mapping validator
   so broken candidate memory, derived feedback, cost trace, or handoff-reference
   semantics fail before contract-set adaptation
+- NarratoStudio asset-feedback review now has a composed in-memory review
+  artifact that stops before asset/memory adaptation when source validation
+  fails

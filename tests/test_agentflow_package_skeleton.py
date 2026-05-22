@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import tomllib
+from pathlib import Path
 
 
 def test_agentflow_package_skeleton_imports_without_runtime_side_effects() -> None:
@@ -36,6 +38,14 @@ def test_agentflow_memory_namespace_hosts_contract_helpers_without_runtime() -> 
 
     assert memory.PACKAGE_SCOPE == "platform_memory_helper_layer"
     assert memory.RUNTIME_STATUS == "not_implemented"
+
+
+def test_agentflow_packages_are_included_in_setuptools_discovery() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    package_find = pyproject["tool"]["setuptools"]["packages"]["find"]
+
+    assert package_find["where"] == ["."]
+    assert "agentflow*" in package_find["include"]
 
 
 def test_existing_agentflow_validator_imports_stay_in_narratocut_harness() -> None:
