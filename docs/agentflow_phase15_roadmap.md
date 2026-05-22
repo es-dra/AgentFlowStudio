@@ -43,6 +43,7 @@ execution. Phase 15 has:
 | Phase 15.16 | complete | AgentFlow Contract Example Helpers |
 | Phase 15.17a | complete | AgentFlow repo rename docs alignment |
 | Phase 15.17 | complete | AgentFlow validator constants |
+| Phase 15.18 | complete | Router dry-run validator migration |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -518,3 +519,30 @@ Boundary:
 - no CLI changes
 - no runtime behavior
 - no package, workflow, artifact, or schema version rename
+
+## Phase 15.18: Router Dry-run Validator Migration
+
+Status: complete.
+
+Purpose: move the Router dry-run validator implementation into
+`agentflow.harness` while keeping the legacy NarratoCut import path as a
+compatibility wrapper.
+
+Output:
+
+- `agentflow.harness.agentflow_router.validate_router_decision_dry_run`
+- `narratocut.harness.agentflow_router` compatibility wrapper
+- focused tests proving new platform imports and old compatibility imports
+  reference the same validator function
+- existing Router dry-run validator behavior remains unchanged
+
+Boundary:
+
+- does not migrate Skill replay validation
+- does not implement Router runtime
+- does not select skills from live requests
+- does not execute skills or workflows
+- does not write runtime state, long-term memory, database rows, or generated
+  run artifacts
+- does not change CLI, workflow execution, artifact contracts, schema version,
+  provider behavior, hosted API, or Web UI behavior

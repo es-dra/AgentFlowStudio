@@ -1,5 +1,36 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.18 Router Dry-run Validator Migration
+
+- Synced local `master` to merged PR #58 at `9382d97` and started
+  `codex/agentflow-router-validator-migration` from a clean mainline.
+- Removed the merged `codex/agentflow-validator-constants` branch locally and
+  remotely after confirming patch equivalence with `origin/master`.
+- Added focused TDD coverage in
+  `tests/test_agentflow_router_validator_migration.py`; the first red run
+  failed because `agentflow.harness.agentflow_router` did not exist.
+- Moved Router dry-run validator implementation to
+  `agentflow.harness.agentflow_router`.
+- Updated `agentflow.harness` package metadata from reserved namespace to
+  platform harness layer while keeping runtime status `not_implemented`.
+- Replaced `narratocut.harness.agentflow_router` with a compatibility wrapper
+  that re-exports the platform validator and constants.
+- Updated Router validator tests to import from the platform path for new code,
+  while keeping compatibility coverage for the legacy NarratoCut path.
+- Updated Router contract, architecture refactor plan, product roadmap, and
+  Phase 15 roadmap to record this as Router validator migration only.
+- Boundary kept: no Skill replay validator migration, Router runtime, live skill
+  selection, skill execution, workflow execution, runtime state, long-term
+  memory write, database row, generated run artifact, CLI change, workflow
+  change, provider behavior, hosted API, or Web UI change.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_package_skeleton.py tests/test_agentflow_router_validator_migration.py tests/test_agentflow_router_dry_run_validator.py tests/test_agentflow_harness_constants.py tests/test_agentflow_contract_helpers.py tests/test_agentflow_skill_replay_validator.py`: 30 passed
+  - `.venv\Scripts\python.exe -m pytest`: 412 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-22 - Phase 15.17 AgentFlow Validator Constants
 
 - Synced local `master` to merged PR #57 at `dd7c2e8` and started

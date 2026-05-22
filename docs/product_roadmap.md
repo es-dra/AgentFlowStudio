@@ -209,5 +209,7 @@ Current checkpoint:
   namespace before moving behavior
 - pure AgentFlow contract example constants and loaders are now in
   `agentflow.contracts.examples`
-- the validator schema, status, and forbidden-fragment constants are migrating
-  into `agentflow.harness.constants` before validator behavior moves
+- the validator schema, status, and forbidden-fragment constants are in
+  `agentflow.harness.constants`
+- Router dry-run validation is the first validator behavior moving into
+  `agentflow.harness` with NarratoCut compatibility imports preserved
