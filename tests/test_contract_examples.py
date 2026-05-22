@@ -192,6 +192,23 @@ def test_agentflow_narratostudio_asset_feedback_review_is_review_only() -> None:
     assert payload["asset_memory_validation"]["artifact_type"] == "agentflow_asset_memory_validation"
 
 
+def test_agentflow_narratostudio_asset_feedback_review_validation_is_harness_only() -> None:
+    payload = json.loads(
+        Path("examples/agentflow/narratostudio_asset_feedback_review_validation.example.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_narratostudio_asset_feedback_review_validation"
+    assert payload["validation_scope"] == "narratostudio_asset_feedback_review"
+    assert payload["runtime_status"] == "not_implemented"
+    assert payload["does_not_execute"] is True
+    assert payload["writes_long_term_memory"] is False
+    assert payload["overall_status"] in {"passed", "failed"}
+    assert payload["checks"]
+
+
 def test_agentflow_skill_router_examples_do_not_include_private_or_generated_paths() -> None:
     forbidden_fragments = [
         "D:\\",
@@ -255,6 +272,7 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_reusable_asset_profile",
         "agentflow_asset_reuse_decision",
         "agentflow_narratostudio_asset_feedback_review",
+        "agentflow_narratostudio_asset_feedback_review_validation",
     }
     assert expected_types <= registered_types
     assert all(contract["example_path"] for contract in payload["contracts"])

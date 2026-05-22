@@ -77,6 +77,12 @@
       "example_path": "examples/agentflow/narratostudio_asset_feedback_review.example.json",
       "doc_path": "docs/agentflow_intermediate_asset_architecture.md",
       "contract_surface": "narratostudio_asset_feedback_review"
+    },
+    {
+      "artifact_type": "agentflow_narratostudio_asset_feedback_review_validation",
+      "example_path": "examples/agentflow/narratostudio_asset_feedback_review_validation.example.json",
+      "doc_path": "docs/agentflow_phase15_roadmap.md",
+      "contract_surface": "narratostudio_asset_feedback_review_harness"
     }
   ],
   "validation_rules": [

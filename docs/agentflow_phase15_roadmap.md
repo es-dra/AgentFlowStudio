@@ -49,6 +49,7 @@ execution. Phase 15 has:
 | Phase 15.21 | complete | NarratoStudio asset feedback loop smoke |
 | Phase 15.22 | complete | NarratoStudio asset feedback source validator |
 | Phase 15.23 | complete | NarratoStudio asset feedback review surface |
+| Phase 15.24 | complete | NarratoStudio asset feedback review harness |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -691,3 +692,33 @@ Boundary:
 - does not change CLI, workflow execution, artifact contracts, schema version,
   provider behavior, hosted API, database/vector-store writes, or Web UI
   behavior
+
+## Phase 15.24: NarratoStudio Asset Feedback Review Harness
+
+Status: complete.
+
+Purpose: add a harness-level validator for the
+`agentflow_narratostudio_asset_feedback_review` artifact so Agents can inspect
+the composed review result without re-running workflows or rebuilding contract
+sets.
+
+Output:
+
+- `agentflow.harness.narratostudio_review.validate_narratostudio_asset_feedback_review`
+- `agentflow_narratostudio_asset_feedback_review_validation` result shape
+- committed validation example and contract registry/audit coverage
+- focused tests for valid review artifacts, runtime-claim rejection,
+  source-failure step consistency, and private path/secret rejection
+
+Boundary:
+
+- validates an existing in-memory review artifact only
+- does not call the NarratoStudio workflow
+- does not rebuild source validation, asset-memory contract sets, or reusable
+  profiles
+- does not implement Memory runtime
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not read from or write to `data/processed/runs/`
+- does not change CLI, workflow execution, artifact schema version, provider
+  behavior, hosted API, database/vector-store writes, or Web UI behavior

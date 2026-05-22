@@ -18,6 +18,7 @@ AGENTFLOW_ASSET_EXAMPLES = (
     Path("examples/agentflow/reusable_asset_profile.example.json"),
     Path("examples/agentflow/asset_reuse_decision.example.json"),
     Path("examples/agentflow/narratostudio_asset_feedback_review.example.json"),
+    Path("examples/agentflow/narratostudio_asset_feedback_review_validation.example.json"),
 )
 
 AGENTFLOW_EXAMPLE_PATHS = (
@@ -44,6 +45,7 @@ AGENTFLOW_EXAMPLE_TYPES = frozenset(
         "agentflow_reusable_asset_profile",
         "agentflow_asset_reuse_decision",
         "agentflow_narratostudio_asset_feedback_review",
+        "agentflow_narratostudio_asset_feedback_review_validation",
     }
 )
 

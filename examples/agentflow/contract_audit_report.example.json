@@ -103,6 +103,14 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_narratostudio_asset_feedback_review_validation",
+      "example_path": "examples/agentflow/narratostudio_asset_feedback_review_validation.example.json",
+      "doc_path": "docs/agentflow_phase15_roadmap.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
