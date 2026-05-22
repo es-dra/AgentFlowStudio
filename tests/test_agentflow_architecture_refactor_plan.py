@@ -33,6 +33,7 @@ def test_architecture_refactor_plan_lists_migration_order_and_compatibility_stra
         "Step 3: split AgentFlow harness validators",
         "Step 4: expose compatibility imports",
         "Step 5: update docs and examples",
+        "Step 6: add memory and asset contract validators",
         "compatibility import",
         "deprecation window",
     ]:

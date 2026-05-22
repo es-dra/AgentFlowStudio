@@ -136,6 +136,11 @@ workflow or invoke a skill.
 
 See [`../examples/agentflow/asset_reuse_decision.example.json`](../examples/agentflow/asset_reuse_decision.example.json).
 
+`agentflow.memory.assets.validate_asset_memory_contract_set` validates the
+current asset and memory contract chain as an in-memory artifact set. It is a
+contract validator, not Memory runtime: it does not promote candidates, write
+long-term memory, create reusable profiles, or execute asset reuse decisions.
+
 ## Cost-Quality Signal
 
 `cost_quality_trace.json` records execution strategy evidence, not a guarantee

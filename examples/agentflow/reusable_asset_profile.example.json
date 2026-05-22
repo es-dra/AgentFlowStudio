@@ -5,7 +5,7 @@
   "source_intermediate_asset_ids": [
     "af_intermediate_asset_001"
   ],
-  "promotion_decision_ref": "agentflow_memory_promotion_decision:af_promotion_decision_001",
+  "promotion_decision_ref": "agentflow_memory_promotion_decision:af_memory_promotion_decision_001",
   "reuse_policy": {
     "allowed_modules": [
       "NarratoStudio"

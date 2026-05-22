@@ -213,3 +213,5 @@ Current checkpoint:
   `agentflow.harness.constants`
 - Router dry-run and Skill replay validation now live in `agentflow.harness`
   with NarratoCut compatibility imports preserved
+- intermediate asset and memory contract-set validation now lives in
+  `agentflow.memory.assets` without Memory runtime behavior

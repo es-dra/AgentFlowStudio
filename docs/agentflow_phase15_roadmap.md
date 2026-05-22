@@ -45,6 +45,7 @@ execution. Phase 15 has:
 | Phase 15.17 | complete | AgentFlow validator constants |
 | Phase 15.18 | complete | Router dry-run validator migration |
 | Phase 15.19 | complete | Skill replay validator migration |
+| Phase 15.20 | complete | Intermediate Asset / Memory Validator |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -574,3 +575,31 @@ Boundary:
   run artifacts
 - does not change CLI, workflow execution, artifact contracts, schema version,
   provider behavior, hosted API, or Web UI behavior
+
+## Phase 15.20: Intermediate Asset / Memory Validator
+
+Status: complete.
+
+Purpose: add a narrow validation surface for committed or provided
+intermediate asset, reusable asset profile, asset reuse decision, memory
+candidate, and memory promotion decision artifacts.
+
+Output:
+
+- `agentflow.memory.assets.validate_asset_memory_contract_set`
+- `agentflow_asset_memory_validation` result shape
+- focused tests for the current asset/memory examples and failure boundaries
+- `agentflow.memory` package metadata updated to platform memory helper layer
+  while keeping runtime status `not_implemented`
+
+Boundary:
+
+- validates existing in-memory artifact payloads only
+- does not implement Memory runtime
+- does not promote candidate memory
+- does not write long-term memory
+- does not create reusable asset profiles
+- does not execute workflows, skills, Router decisions, providers, database
+  writes, vector-store writes, or file repository writes
+- does not change CLI, workflow execution, artifact contracts, schema version,
+  hosted API, or Web UI behavior
