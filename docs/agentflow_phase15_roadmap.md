@@ -18,7 +18,8 @@ execution. Phase 15 has:
 - no skill runtime
 - no Memory runtime
 - no Web UI
-- no hosted API, database, remote provider behavior, repository rename, or CLI rename
+- no hosted API, database, remote provider behavior, Python package rename,
+  workflow rename, or CLI rename
 
 ## Phase 15 Summary
 
@@ -40,6 +41,7 @@ execution. Phase 15 has:
 | Phase 15.14 | complete | Architecture Refactor Plan |
 | Phase 15.15 | complete | AgentFlow Package Skeleton |
 | Phase 15.16 | complete | AgentFlow Contract Example Helpers |
+| Phase 15.17a | in progress | AgentFlow repo rename docs alignment |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -461,3 +463,53 @@ Boundary:
 - does not add skill runtime
 - does not add Memory runtime
 - does not add database, provider, hosted API, or Web UI behavior
+
+## Phase 15.17a: AgentFlow Repo Rename Docs Alignment
+
+Status: in progress.
+
+Purpose: align documentation after the repository container was renamed to
+`AgentFlowStudio`.
+
+Expected output:
+
+- README and docs describe `AgentFlowStudio` as the platform repository
+- NarratoCut remains documented as the distribution-side module
+- NarratoStudio remains documented as the production-side module
+- `agentflow/` remains documented as the platform contract and harness
+  migration layer
+- DEVLOG records that package, CLI, workflow, artifact, and version names are
+  intentionally unchanged
+
+Boundary:
+
+- docs only
+- does not rename Python packages
+- does not rename CLI commands
+- does not rename workflows or artifact contracts
+- does not change version or tags
+- does not change workflow execution
+- does not add Router runtime, skill runtime, Memory runtime, database,
+  provider behavior, hosted API, or Web UI behavior
+
+## Phase 15.17: AgentFlow Validator Constants
+
+Status: planned.
+
+Purpose: migrate platform-level shared validator constants into
+`agentflow.harness` while keeping actual validator behavior and compatibility
+imports stable.
+
+Recommended output:
+
+- `agentflow/harness/constants.py`
+- shared schema version, result status strings, and forbidden fragment lists
+- focused tests proving existing router and skill validators still behave the
+  same
+
+Boundary:
+
+- no validator behavior migration yet
+- no workflow changes
+- no CLI changes
+- no runtime behavior

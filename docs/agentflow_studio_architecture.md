@@ -3,10 +3,11 @@
 AgentFlow Studio is an agent-native content production and distribution
 workflow platform.
 
-This repository still keeps the `NarratoCut` name. In this repository,
-AgentFlow Studio is represented only by MVP module contracts and local-first
-workflow artifacts. This document records the platform direction; it does not
-define a hosted runtime, database, Web UI, or Agent runtime.
+This repository container is now `AgentFlowStudio`. In this repository,
+AgentFlow Studio is represented by MVP module contracts, local-first workflow
+artifacts, and the gradual `agentflow/` platform-layer migration. This document
+records the platform direction; it does not define a hosted runtime, database,
+Web UI, or Agent runtime.
 
 ## Product Principle
 
@@ -39,6 +40,21 @@ For the current contract shape, see
 [`agentflow_intermediate_asset_architecture.md`](agentflow_intermediate_asset_architecture.md).
 
 ## Current Modules
+
+### AgentFlow
+
+`agentflow/` is the platform contract and harness migration layer.
+
+Current role:
+
+- centralizes AgentFlow contract example constants and loaders
+- reserves platform namespaces for contracts, harness, memory, router, and
+  skills
+- keeps platform-level helpers separate from NarratoStudio production logic and
+  NarratoCut distribution logic
+
+It is not an Agent runtime, Router runtime, Memory runtime, database, hosted
+API, or cross-module orchestrator.
 
 ### NarratoStudio
 
@@ -135,7 +151,7 @@ The current contract layer does not implement:
 - hosted API
 - Web UI
 - remote LLM, I2V, or T2V execution
-- repository or CLI renaming
+- Python package, CLI, or workflow renaming
 
 ## Next Development Order
 

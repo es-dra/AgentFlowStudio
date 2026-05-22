@@ -2,9 +2,18 @@
 
 ## Mission
 
-NarratoCut is an AI narrative-to-promo video workflow system.
+AgentFlow Studio is an agent-native content production and distribution
+workflow platform.
 
-Current MVP chain:
+Current repository roles:
+
+```text
+agentflow/        platform contracts, harness, router, memory, and skills
+narratostudio/    production-side structured content handoff
+narratocut/       distribution-side short video packaging and review
+```
+
+Current NarratoCut MVP chain:
 
 ```text
 subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata

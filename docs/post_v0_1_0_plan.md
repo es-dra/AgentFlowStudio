@@ -4,17 +4,17 @@ This page records the first operating plan after the NarratoCut `v0.1.0`
 delivery closeout.
 
 NarratoCut is the distribution-side short-video highlight, packaging, report,
-and review module of AgentFlow Studio. The repository name stays `NarratoCut`
-for now. The post-`v0.1.0` goal is to protect the local-first CLI/Agent MVP
-while preparing the next workstreams without turning this repository into the
-full AgentFlow Studio platform too early.
+and review module of AgentFlow Studio. The repository container was later
+renamed to `AgentFlowStudio`; the post-`v0.1.0` goal remains to protect the
+local-first CLI/Agent MVP while preparing the next workstreams without turning
+the stable distribution module into a premature hosted platform runtime.
 
 ## Baseline
 
 Current release baseline confirmed during the post-`v0.1.0` startup scan:
 
 - branch: `master`
-- remote: `git@github.com:es-dra/NarratoCut.git`
+- remote at release time: `git@github.com:es-dra/NarratoCut.git`
 - `master`, `origin/master`, and `v0.1.0^{}`: `bf5e7a1`
 - `v0.1.0` tag type: annotated tag
 - `v0.1.0` tag object: `460deba`
@@ -119,7 +119,8 @@ Near-term architecture documents should define:
 
 Boundaries:
 
-- do not rename this repository yet
+- do not rename Python packages, workflows, artifacts, or CLI commands in this
+  post-release lane
 - do not add a platform runtime inside NarratoCut before the contracts are clear
 - keep AgentFlow keys machine-readable and stable
 - keep human-facing product docs clear about what is implemented versus planned

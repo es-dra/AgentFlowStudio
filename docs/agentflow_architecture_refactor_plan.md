@@ -27,9 +27,9 @@ AgentFlow Studio now has three concerns in one repository:
   signals, intermediate assets, router decisions, skill invocation/result
   records, static contract audit, and replay validators.
 
-The current repository still keeps the `NarratoCut` name. The refactor should
-make the platform contract layer explicit without breaking the current
-NarratoCut CLI/Agent MVP.
+The repository container is now `AgentFlowStudio`. The refactor should make the
+platform contract layer explicit without breaking the current NarratoCut
+CLI/Agent MVP, package imports, workflow files, or artifact contracts.
 
 ## Target Package Boundary
 
@@ -178,7 +178,7 @@ Phase 15.14 does not:
 - create `agentflow/` files
 - move existing Python modules
 - change workflow execution
-- rename the repository
+- rename Python packages, workflows, artifacts, or the CLI
 - rename the CLI or add `agentflow run-workflow`
 - change artifact names or schema versions
 - add Router runtime

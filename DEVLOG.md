@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.17a AgentFlow Repo Rename Docs Alignment
+
+- Synced local `master` to merged PR #56 at `be215ad` and started
+  `codex/agentflow-repo-rename-docs` from a clean mainline.
+- Updated README, docs navigation, AgentFlow architecture, module boundary,
+  product roadmap, Phase 15 roadmap, NarratoStudio contracts, post-v0.1.0
+  plan, and AGENTS guidance to describe the repository container as
+  `AgentFlowStudio`.
+- Preserved module names and implementation boundaries:
+  - `agentflow/` remains the platform contract and harness migration layer.
+  - `narratostudio/` remains the production-side structured handoff MVP.
+  - `narratocut/` remains the distribution-side short-video packaging and
+    review MVP.
+- Boundary kept: docs-only alignment; no Python package rename, CLI rename,
+  workflow rename, artifact contract change, version/tag change, runtime
+  migration, provider call, Web UI change, or generated artifact change.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_contract_examples.py tests/test_agentflow_contract_helpers.py`: 25 passed
+  - `.venv\Scripts\python.exe -m pytest`: 407 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-22 - Phase 15.13 AgentFlow Intermediate Asset Architecture
 
 - Synced local `master` to merged PR #52 at `7e42a30` and started `codex/agentflow-asset-memory-architecture-plan` from a clean mainline.

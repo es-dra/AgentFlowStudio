@@ -1,11 +1,18 @@
 # Product Roadmap
 
 This roadmap records the mainline direction after the v0.1.0 delivery closeout.
-NarratoCut is now the distribution-side short video highlight workflow module
-of AgentFlow Studio: it can produce local finished-package artifacts through
-workflow contracts, but it is not yet a consumer-facing product or Web UI.
+The repository container is now `AgentFlowStudio`. NarratoCut remains the
+distribution-side short video highlight workflow module of AgentFlow Studio: it
+can produce local finished-package artifacts through workflow contracts, but it
+is not yet a consumer-facing product or Web UI.
 
 ## Product Positioning
+
+AgentFlow Studio is the platform repository for agent-native content production
+and distribution workflows. Its current mainline focus is contract-first:
+artifact-first workflow contracts, review/harness boundaries, feedback and
+memory signal contracts, cost-quality traceability, and gradual platform-layer
+migration under `agentflow/`.
 
 NarratoCut is an artifact-driven short-video distribution workflow system for
 existing videos, transcripts, scripts, and clip plans.
@@ -172,6 +179,10 @@ Status: in progress.
 Phase 15 keeps the `v0.1.0` CLI/Agent MVP stable while the mainline defines the
 AgentFlow Studio contract layer and validates NarratoStudio as the
 production-side sibling module.
+
+Phase 15.17a records the repository container rename to `AgentFlowStudio` in
+docs only. It does not rename Python packages, CLI commands, workflow files,
+artifact contracts, or the `v0.1.0` tag.
 
 Detailed Phase 15 history now lives in
 [`agentflow_phase15_roadmap.md`](agentflow_phase15_roadmap.md).

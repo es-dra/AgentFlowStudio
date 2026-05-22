@@ -3,8 +3,10 @@
 NarratoStudio MVP is a local-first structured production handoff generator.
 
 NarratoCut remains the distribution-side module of AgentFlow Studio.
-NarratoStudio is added as a sibling module under this repository for MVP
-validation only. The repository is not being renamed.
+NarratoStudio is a sibling module under the `AgentFlowStudio` repository for
+MVP validation. The repository container has been renamed, but the
+NarratoStudio package, NarratoCut package, current CLI, workflows, and artifact
+contracts are intentionally unchanged.
 
 ## Workflow Boundary
 
@@ -24,7 +26,8 @@ The existing workflow runner is reused:
 .venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/narratostudio_brief_to_production_handoff.yaml --input examples/narratostudio/creative_brief.example.json --output data/processed/runs/demo_narratostudio_handoff
 ```
 
-CLI naming will be revisited when AgentFlow Studio is separated.
+CLI naming will be revisited in a separate migration phase when the platform
+runtime boundary is ready.
 
 ## Artifact Chain
 

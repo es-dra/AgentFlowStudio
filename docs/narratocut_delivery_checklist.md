@@ -26,7 +26,7 @@ selection, slicing, packaging, reporting, and review.
   requirements.
 - Full verification passes:
   - `pytest`
-  - `python -m compileall apps narratocut tests`
+  - `python -m compileall apps agentflow narratocut narratostudio tests`
   - `git diff --check`
   - `python -m apps.cli.main --help`
   - `python -m apps.cli.main version`
