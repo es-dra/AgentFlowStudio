@@ -1,5 +1,36 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.17 AgentFlow Validator Constants
+
+- Synced local `master` to merged PR #57 at `dd7c2e8` and started
+  `codex/agentflow-validator-constants` from a clean mainline.
+- Cleaned up stale AgentFlow remote branches whose patches were already present
+  on `origin/master`:
+  - `codex/agentflow-architecture-refactor-plan`
+  - `codex/agentflow-asset-memory-architecture-plan`
+  - `codex/agentflow-contract-helpers`
+  - `codex/agentflow-package-skeleton`
+- Removed local stale AgentFlow branches after confirming patch equivalence with
+  `git cherry`; preserved `codex/narratocut-web-ui`.
+- Added `agentflow.harness.constants` for shared AgentFlow validator schema
+  version, result status strings, and forbidden private/generated/secret
+  fragments.
+- Updated Router dry-run and Skill replay validators to import the shared
+  constants while keeping validator functions in `narratocut.harness.*`.
+- Added focused TDD coverage in `tests/test_agentflow_harness_constants.py`;
+  the first red run failed because `agentflow.harness.constants` did not exist.
+- Updated roadmap/refactor docs to record this as constants migration only.
+- Boundary kept: no validator behavior migration, workflow change, CLI change,
+  runtime behavior, package rename, workflow rename, artifact contract change,
+  provider call, Web UI change, or generated artifact change.
+- Verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_harness_constants.py tests/test_agentflow_router_dry_run_validator.py tests/test_agentflow_skill_replay_validator.py tests/test_agentflow_package_skeleton.py`: 22 passed
+  - `.venv\Scripts\python.exe -m pytest`: 409 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-22 - Phase 15.17a AgentFlow Repo Rename Docs Alignment
 
 - Synced local `master` to merged PR #56 at `be215ad` and started

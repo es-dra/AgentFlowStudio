@@ -3,27 +3,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-
-SCHEMA_VERSION = "0.1.0"
-PASSED = "passed"
-FAILED = "failed"
-FORBIDDEN_DECISION_FRAGMENTS = (
-    "D:\\",
-    "C:\\",
-    "data/processed/runs",
-    "data/raw/",
-    ".mp4",
-    ".mov",
-    "api_key",
-    "access_token",
-    "refresh_token",
-    "secret_key",
-    "client_secret",
-    "authorization:",
-    "bearer ",
-    "cookie=",
-    "signed_url",
+from agentflow.harness.constants import (
+    AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS,
+    AGENTFLOW_VALIDATION_SCHEMA_VERSION,
+    FAILED,
+    PASSED,
 )
+
+SCHEMA_VERSION = AGENTFLOW_VALIDATION_SCHEMA_VERSION
+FORBIDDEN_DECISION_FRAGMENTS = AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 
 
 def validate_router_decision_dry_run(

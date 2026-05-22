@@ -209,5 +209,5 @@ Current checkpoint:
   namespace before moving behavior
 - pure AgentFlow contract example constants and loaders are now in
   `agentflow.contracts.examples`
-- the next mainline slice should migrate only validator constants or compatibility
-  wrappers, not validator behavior
+- the validator schema, status, and forbidden-fragment constants are migrating
+  into `agentflow.harness.constants` before validator behavior moves
