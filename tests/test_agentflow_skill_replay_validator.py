@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from narratocut.harness.agentflow_skill import validate_skill_invocation_result_replay
+from agentflow.harness.agentflow_skill import validate_skill_invocation_result_replay
 
 
 SKILL_INVOCATION_EXAMPLE = Path("examples/agentflow/skill_invocation.example.json")

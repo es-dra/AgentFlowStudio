@@ -211,5 +211,5 @@ Current checkpoint:
   `agentflow.contracts.examples`
 - the validator schema, status, and forbidden-fragment constants are in
   `agentflow.harness.constants`
-- Router dry-run validation is the first validator behavior moving into
-  `agentflow.harness` with NarratoCut compatibility imports preserved
+- Router dry-run and Skill replay validation now live in `agentflow.harness`
+  with NarratoCut compatibility imports preserved
