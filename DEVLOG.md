@@ -1,5 +1,48 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.23 NarratoStudio Asset Feedback Review Surface
+
+- Synced local `master` to merged PR #63 at `f1308e7`.
+- Removed the merged `codex/agentflow-asset-feedback-contract-validator`
+  branch locally and remotely after confirming its tree matched
+  `origin/master`; preserved the separate `codex/narratocut-web-ui` worktree
+  branch.
+- Started `codex/agentflow-asset-feedback-review-surface` from a clean
+  mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_feedback_review_surface.py`; the first red
+  run failed because `agentflow.memory.narratostudio_review` did not exist.
+- Added
+  `agentflow.memory.narratostudio_review.review_narratostudio_asset_feedback_loop`
+  as a pure in-memory review surface that composes source validation, the
+  NarratoStudio asset/memory smoke adapter, and AgentFlow asset/memory
+  contract-set validation.
+- Added a packaging regression in `tests/test_agentflow_package_skeleton.py`
+  and included `agentflow*` in `pyproject.toml` package discovery so the
+  platform package remains present after editable or wheel installs.
+- The review surface returns
+  `agentflow_narratostudio_asset_feedback_review` and marks the
+  asset/memory step `not_run` when source validation fails, so broken source
+  semantics are not hidden by downstream adaptation.
+- Updated Phase 15 roadmap, product roadmap, and intermediate asset
+  architecture docs to record Phase 15.23 as review-surface work only.
+- Boundary kept: no Memory runtime, durable candidate promotion, long-term
+  memory write, persisted reusable asset profile, workflow execution change,
+  CLI change, provider call, database/vector-store/file-repository write,
+  hosted API, Web UI behavior, or `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_review'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py`: 2 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_package_skeleton.py`: packaging regression first failed because `agentflow` was missing from setuptools package discovery
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_package_skeleton.py`: 6 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_feedback_review_surface.py tests/test_narratostudio_asset_feedback_contract_validator.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_package_skeleton.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 34 passed
+  - `.venv\Scripts\python.exe -m pytest`: 436 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.22 NarratoStudio Asset Feedback Source Validator
 
 - Synced local `master` to merged PR #62 at `0a197e2`.

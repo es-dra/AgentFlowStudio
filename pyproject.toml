@@ -25,7 +25,7 @@ ncut = "apps.cli.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["apps*", "narratocut*", "narratostudio*"]
+include = ["apps*", "agentflow*", "narratocut*", "narratostudio*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
