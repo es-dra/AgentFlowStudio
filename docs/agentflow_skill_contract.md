@@ -129,6 +129,11 @@ output coverage, quality gate status coverage, passing required gates, review
 artifact declaration, `writes_long_term_memory: false`, and private path or
 secret fragments.
 
+The implementation entry point for new code is
+`agentflow.harness.agentflow_skill.validate_skill_invocation_result_replay`.
+`narratocut.harness.agentflow_skill` remains a compatibility import wrapper for
+the first migration window.
+
 ## Current Skill Surfaces
 
 Current repository skill files remain under [`../skills`](../skills/README.md).

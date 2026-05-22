@@ -44,6 +44,7 @@ execution. Phase 15 has:
 | Phase 15.17a | complete | AgentFlow repo rename docs alignment |
 | Phase 15.17 | complete | AgentFlow validator constants |
 | Phase 15.18 | complete | Router dry-run validator migration |
+| Phase 15.19 | complete | Skill replay validator migration |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -542,6 +543,33 @@ Boundary:
 - does not implement Router runtime
 - does not select skills from live requests
 - does not execute skills or workflows
+- does not write runtime state, long-term memory, database rows, or generated
+  run artifacts
+- does not change CLI, workflow execution, artifact contracts, schema version,
+  provider behavior, hosted API, or Web UI behavior
+
+## Phase 15.19: Skill Replay Validator Migration
+
+Status: complete.
+
+Purpose: move the Skill invocation/result replay validator implementation into
+`agentflow.harness` while keeping the legacy NarratoCut import path as a
+compatibility wrapper.
+
+Output:
+
+- `agentflow.harness.agentflow_skill.validate_skill_invocation_result_replay`
+- `narratocut.harness.agentflow_skill` compatibility wrapper
+- focused tests proving new platform imports and old compatibility imports
+  reference the same validator function
+- existing Skill replay validator behavior remains unchanged
+
+Boundary:
+
+- does not implement skill runtime
+- does not invoke skills
+- does not execute workflows
+- does not call local or remote providers
 - does not write runtime state, long-term memory, database rows, or generated
   run artifacts
 - does not change CLI, workflow execution, artifact contracts, schema version,

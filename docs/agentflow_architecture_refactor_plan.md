@@ -127,6 +127,9 @@ Step 3: split AgentFlow harness validators.
   write durable state.
 - Migrate Router dry-run validation before Skill replay validation so each
   behavior surface can keep a narrow regression matrix.
+- New code should import these validators from `agentflow.harness.*`; the
+  `narratocut.harness.*` paths exist only for compatibility during the first
+  migration window.
 
 Step 4: expose compatibility imports.
 

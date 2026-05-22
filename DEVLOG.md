@@ -1,5 +1,36 @@
 # DEVLOG
 
+## 2026-05-22 - Phase 15.19 Skill Replay Validator Migration
+
+- Synced local `master` to merged PR #59 at `70604b3`.
+- Removed the merged `codex/agentflow-router-validator-migration` branch
+  locally and remotely after confirming the feature branch and `origin/master`
+  had identical tree hashes.
+- Started `codex/agentflow-skill-validator-migration` from a clean mainline.
+- Added focused TDD coverage in
+  `tests/test_agentflow_skill_validator_migration.py`; the first red run failed
+  because `agentflow.harness.agentflow_skill` did not exist.
+- Moved Skill replay validator implementation to
+  `agentflow.harness.agentflow_skill`.
+- Replaced `narratocut.harness.agentflow_skill` with a compatibility wrapper
+  that re-exports the platform validator and constants.
+- Updated Skill replay validator tests to import from the platform path for new
+  code, while keeping compatibility coverage for the legacy NarratoCut path.
+- Boundary kept: no skill runtime, skill execution, workflow execution,
+  provider call, runtime state, long-term memory write, database row, generated
+  run artifact, CLI change, workflow change, schema version change, hosted API,
+  or Web UI change.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_validator_migration.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.harness.agentflow_skill'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_validator_migration.py tests/test_agentflow_skill_replay_validator.py tests/test_agentflow_harness_constants.py tests/test_agentflow_package_skeleton.py`: 17 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_validator_migration.py tests/test_agentflow_skill_replay_validator.py tests/test_agentflow_router_validator_migration.py tests/test_agentflow_router_dry_run_validator.py tests/test_agentflow_harness_constants.py tests/test_agentflow_package_skeleton.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_architecture_refactor_plan.py tests/test_agentflow_runtime_readiness.py`: 40 passed
+  - `.venv\Scripts\python.exe -m pytest`: 414 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-22 - Phase 15.18 Router Dry-run Validator Migration
 
 - Synced local `master` to merged PR #58 at `9382d97` and started
