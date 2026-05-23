@@ -1,5 +1,44 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.26 NarratoStudio Asset Reuse Dry-run Planner
+
+- Synced local `master` to merged PR #66 at `df44ec6`.
+- Removed the merged `codex/agentflow-asset-feedback-review-gate` branch
+  locally and remotely after confirming its tree matched `origin/master`;
+  preserved the separate `codex/narratocut-web-ui` worktree branch.
+- Started `codex/agentflow-asset-reuse-dry-run-planner` from a clean mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_reuse_dry_run_planner.py`; the first red
+  run failed because `agentflow.memory.narratostudio_reuse` did not exist.
+- Added
+  `agentflow.memory.narratostudio_reuse.plan_narratostudio_asset_reuse_dry_run`
+  as a pure in-memory dry-run planner for existing review and gate artifacts.
+- The planner returns
+  `agentflow_narratostudio_asset_reuse_dry_run_plan`, blocks failed gates,
+  keeps selected asset profiles dry-run-only, and rejects runtime or
+  long-term-memory-write claims.
+- Added a committed
+  `examples/agentflow/narratostudio_asset_reuse_dry_run_plan.example.json`,
+  registered it in AgentFlow contract helpers, registry, and audit examples,
+  and covered it in contract example tests.
+- Updated Phase 15 roadmap, product roadmap, and intermediate asset
+  architecture docs to record Phase 15.26 as dry-run planning only.
+- Boundary kept: no Memory runtime, durable candidate promotion, long-term
+  memory write, persisted reusable asset profile, workflow execution change,
+  CLI change, provider call, database/vector-store/file-repository write,
+  hosted API, Web UI behavior, or `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_dry_run_planner.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_reuse'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_dry_run_planner.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 37 passed
+  - `.venv\Scripts\python.exe -m pytest`: first full run found the existing `tests/test_agentflow_narratostudio_asset_reuse_dry_run.py` interface and failed because the planner only accepted `review`/`gate`
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_narratostudio_asset_reuse_dry_run.py tests/test_narratostudio_asset_reuse_dry_run_planner.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 50 passed after supporting the existing direct contract-input interface
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest`: 457 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.25 NarratoStudio Asset Feedback Review Gate
 
 - Synced local `master` to merged PR #65 at `cfd155f`.

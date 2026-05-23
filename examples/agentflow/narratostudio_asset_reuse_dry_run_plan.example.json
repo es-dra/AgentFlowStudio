@@ -1,0 +1,101 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_narratostudio_asset_reuse_dry_run_plan",
+  "plan_scope": "narratostudio_asset_reuse_dry_run",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "writes_long_term_memory": false,
+  "dry_run_only": true,
+  "handoff_id": "production_handoff_demo",
+  "run_id": "narratostudio_demo_run",
+  "plan_status": "ready",
+  "source_review_artifact_type": "agentflow_narratostudio_asset_feedback_review",
+  "source_review_status": "passed",
+  "source_gate_artifact_type": "agentflow_narratostudio_asset_feedback_review_gate",
+  "source_gate_status": "passed",
+  "reusable_asset_profile_id": "af_reusable_asset_profile_001",
+  "target_task": "narratostudio_brief_to_production_handoff",
+  "selected_asset_profile_ids": [
+    "af_reusable_asset_profile_001"
+  ],
+  "candidate_reuse_actions": [
+    {
+      "action_id": "review_reusable_asset_profile:af_reusable_asset_profile_001",
+      "action_type": "review_reusable_asset_profile",
+      "asset_profile_id": "af_reusable_asset_profile_001",
+      "does_not_execute": true,
+      "requires_human_review": true
+    }
+  ],
+  "required_pre_execution_reviews": [
+    "human_review_reusable_asset_candidate",
+    "prepare_asset_reuse_dry_run"
+  ],
+  "required_human_decisions": [
+    "confirm_asset_profile_still_applies_to_next_brief",
+    "confirm_reuse_policy_before_execution"
+  ],
+  "forbidden_actions": [
+    "execute_workflow",
+    "write_long_term_memory",
+    "persist_reusable_asset_profile",
+    "call_remote_provider"
+  ],
+  "blocking_reasons": [],
+  "blocking_check_ids": [],
+  "checks": [
+    {
+      "check_id": "review_artifact_type",
+      "status": "passed",
+      "message": "source review artifact_type is agentflow_narratostudio_asset_feedback_review"
+    },
+    {
+      "check_id": "review_passed",
+      "status": "passed",
+      "message": "source review passed"
+    },
+    {
+      "check_id": "review_does_not_execute",
+      "status": "passed",
+      "message": "source review does not execute workflows or tasks"
+    },
+    {
+      "check_id": "review_does_not_write_memory",
+      "status": "passed",
+      "message": "source review does not write long-term memory"
+    },
+    {
+      "check_id": "gate_artifact_type",
+      "status": "passed",
+      "message": "source gate artifact_type is agentflow_narratostudio_asset_feedback_review_gate"
+    },
+    {
+      "check_id": "gate_passed",
+      "status": "passed",
+      "message": "source gate passed"
+    },
+    {
+      "check_id": "source_gate_executes",
+      "status": "passed",
+      "message": "source gate does not execute workflows or tasks"
+    },
+    {
+      "check_id": "source_gate_writes_memory",
+      "status": "passed",
+      "message": "source gate does not write long-term memory"
+    },
+    {
+      "check_id": "asset_memory_validation_passed",
+      "status": "passed",
+      "message": "embedded asset-memory validation passed"
+    },
+    {
+      "check_id": "asset_profile_selected",
+      "status": "passed",
+      "message": "at least one reusable asset profile is available for dry-run review"
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

@@ -31,6 +31,7 @@ def test_agentflow_contract_helpers_list_committed_examples() -> None:
         "agentflow_narratostudio_asset_feedback_review",
         "agentflow_narratostudio_asset_feedback_review_validation",
         "agentflow_narratostudio_asset_feedback_review_gate",
+        "agentflow_narratostudio_asset_reuse_dry_run_plan",
     }
     assert expected_types <= AGENTFLOW_EXAMPLE_TYPES
 

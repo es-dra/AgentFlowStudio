@@ -234,6 +234,33 @@ def test_agentflow_narratostudio_asset_feedback_review_gate_is_decision_only() -
     } <= check_ids
 
 
+def test_agentflow_narratostudio_asset_reuse_dry_run_plan_is_plan_only() -> None:
+    payload = json.loads(
+        Path("examples/agentflow/narratostudio_asset_reuse_dry_run_plan.example.json").read_text(encoding="utf-8")
+    )
+
+    assert payload["schema_version"] == "0.1.0"
+    assert payload["artifact_type"] == "agentflow_narratostudio_asset_reuse_dry_run_plan"
+    assert payload["plan_scope"] == "narratostudio_asset_reuse_dry_run"
+    assert payload["runtime_status"] == "not_implemented"
+    assert payload["does_not_execute"] is True
+    assert payload["writes_long_term_memory"] is False
+    assert payload["dry_run_only"] is True
+    assert payload["plan_status"] in {"ready", "blocked"}
+    assert isinstance(payload["selected_asset_profile_ids"], list)
+    assert isinstance(payload["candidate_reuse_actions"], list)
+    assert isinstance(payload["required_pre_execution_reviews"], list)
+    check_ids = {check["check_id"] for check in payload["checks"]}
+    assert {
+        "review_artifact_type",
+        "review_passed",
+        "source_gate_executes",
+        "source_gate_writes_memory",
+        "asset_memory_validation_passed",
+        "asset_profile_selected",
+    } <= check_ids
+
+
 def test_agentflow_skill_router_examples_do_not_include_private_or_generated_paths() -> None:
     forbidden_fragments = [
         "D:\\",
@@ -299,6 +326,7 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_narratostudio_asset_feedback_review",
         "agentflow_narratostudio_asset_feedback_review_validation",
         "agentflow_narratostudio_asset_feedback_review_gate",
+        "agentflow_narratostudio_asset_reuse_dry_run_plan",
     }
     assert expected_types <= registered_types
     assert all(contract["example_path"] for contract in payload["contracts"])

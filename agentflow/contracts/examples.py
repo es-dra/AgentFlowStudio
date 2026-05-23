@@ -20,6 +20,7 @@ AGENTFLOW_ASSET_EXAMPLES = (
     Path("examples/agentflow/narratostudio_asset_feedback_review.example.json"),
     Path("examples/agentflow/narratostudio_asset_feedback_review_validation.example.json"),
     Path("examples/agentflow/narratostudio_asset_feedback_review_gate.example.json"),
+    Path("examples/agentflow/narratostudio_asset_reuse_dry_run_plan.example.json"),
 )
 
 AGENTFLOW_EXAMPLE_PATHS = (
@@ -48,6 +49,7 @@ AGENTFLOW_EXAMPLE_TYPES = frozenset(
         "agentflow_narratostudio_asset_feedback_review",
         "agentflow_narratostudio_asset_feedback_review_validation",
         "agentflow_narratostudio_asset_feedback_review_gate",
+        "agentflow_narratostudio_asset_reuse_dry_run_plan",
     }
 )
 
