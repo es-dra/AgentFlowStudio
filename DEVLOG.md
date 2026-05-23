@@ -1,5 +1,42 @@
 # DEVLOG
 
+## 2026-05-23 - PosterFlow Memory Demo Remote Image Workflow
+
+- Added a PosterFlow visual memory demo that runs inside the existing
+  AgentFlow Studio workflow engine.
+- Added `narratostudio/posterflow/` with focused schema, SOP, OpenAI-compatible
+  image provider, and report/HTML preview modules.
+- Added `workflows/posterflow_memory_demo.yaml` plus
+  `examples/posterflow/poster_brief.example.json` and
+  `examples/posterflow/poster_feedback.example.json`.
+- Added `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` as a separate remote-image gate
+  from the existing LLM/ASR gates. The provider uses
+  `NARRATOCUT_IMAGE_BASE_URL`, `NARRATOCUT_IMAGE_API_KEY`, and
+  `NARRATOCUT_IMAGE_MODEL`.
+- Added PosterFlow inspect/review quality checks for required artifacts,
+  candidate images, feedback-to-candidate references, candidate-only memory,
+  accepted-memory profile references, and no long-term memory writes.
+- Kept the generated preference profile `demo_only` so it cannot be confused
+  with a durable project memory profile.
+- Boundary kept: no Web UI, database/vector store, long-term Memory runtime,
+  automatic durable preference write, publishing integration, or default remote
+  provider call.
+- TDD red run:
+  - `pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py`: failed with `ModuleNotFoundError: No module named 'narratostudio.posterflow'`
+  - `pytest tests/test_posterflow_provider.py -q`: failed because the image
+    provider checked API-key configuration before the remote-image opt-in gate.
+  - `pytest tests/test_posterflow_provider.py -q`: failed because HTTP error
+    response bodies could enter provider exception messages.
+- Targeted verification:
+  - `pytest tests/test_posterflow_provider.py -q`: 6 passed
+  - `pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py -q`: 12 passed
+- Full verification before final handoff:
+  - `python -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `python -m apps.cli.main --help`: passed
+  - `python -m apps.cli.main version`: `0.1.0`
+  - `pytest`: 485 passed
+
 ## 2026-05-23 - Phase 15.29 NarratoStudio Asset Reuse Chain Audit Smoke
 
 - Synced local `master` to merged PR #69 at `c665a4b`.

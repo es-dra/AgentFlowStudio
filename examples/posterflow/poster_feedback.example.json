@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "poster_feedback_fixture",
+  "project_id": "cyber_xianxia_001",
+  "run_id": "run_001",
+  "signals": [
+    {
+      "feedback_id": "fb_001",
+      "candidate_id": "candidate_001",
+      "decision": "preferred",
+      "reason_tags": ["cinematic", "low saturation", "premium composition", "clear subject"],
+      "user_note": "这张电影感和高级感最接近。"
+    },
+    {
+      "feedback_id": "fb_002",
+      "candidate_id": "candidate_002",
+      "decision": "rejected",
+      "reason_tags": ["oversaturated neon", "cheap mobile game advertisement", "plastic AI face"],
+      "user_note": "太像廉价网游广告。"
+    },
+    {
+      "feedback_id": "fb_003",
+      "candidate_id": "candidate_003",
+      "decision": "pending",
+      "reason_tags": ["usable composition", "needs stronger emotion"],
+      "user_note": "构图可以，但情绪不够强。"
+    }
+  ]
+}

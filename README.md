@@ -73,6 +73,7 @@ Supported today:
 - cover image export from an existing final video
 - local BGM mixing with bounded volume settings
 - finished package manifest indexing
+- PosterFlow Memory Demo with explicit remote-image opt-in and local preview
 - `inspect-run` and `review-run` reports for generated run artifacts
 - `package_report.md` and delivery-readiness reports for handoff
 - `draft-plan` for static workflow plans

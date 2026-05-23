@@ -1,0 +1,36 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "poster_brief",
+  "project_id": "cyber_xianxia_001",
+  "task_id": "poster_task_001",
+  "task_type": "poster_generation",
+  "use_case": "short_drama_cover",
+  "platform": "xiaohongshu",
+  "target_audience": "18-30 female short-drama users who prefer premium fantasy visuals",
+  "theme": "Cyber xianxia episode one cover",
+  "business_goal": "Increase click-through by showing a premium heroine awakening moment.",
+  "content_goal": "Show the heroine awakening from ordinary person into a cultivator.",
+  "visual_requirements": {
+    "style_keywords": ["cinematic", "low saturation", "eastern fantasy", "premium poster"],
+    "composition_preferences": ["single character centered", "clear subject", "uncluttered background"],
+    "color_preferences": ["blue-black", "dark gray", "cold gold"],
+    "negative_visuals": ["cheap mobile game advertisement", "oversaturated neon", "plastic AI face"]
+  },
+  "text_requirements": {
+    "title": "她醒来后，整个仙门都怕了",
+    "subtitle": "第一集",
+    "text_density": "low",
+    "negative_text_styles": ["full-screen loud text", "cheap marketing font"]
+  },
+  "constraints": {
+    "aspect_ratio": "3:4",
+    "must_include": ["heroine", "golden spiritual aura", "ruined city"],
+    "must_avoid": ["blood", "revealing clothing", "game UI"]
+  },
+  "memory_policy": {
+    "allow_project_memory": true,
+    "allow_cross_project_memory": false,
+    "allow_remote_provider": true
+  },
+  "raw_user_request": "帮我做一张赛博修仙短剧的小红书封面，要高级一点，不要像廉价网游广告。"
+}
