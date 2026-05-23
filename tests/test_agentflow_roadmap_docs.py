@@ -71,3 +71,12 @@ def test_phase15_roadmap_records_asset_reuse_review_surface() -> None:
     assert "NarratoStudio Asset Reuse Review Surface" in phase15
     assert "agentflow_narratostudio_asset_reuse_review" in phase15
     assert "reviews existing in-memory review, validation, gate, and dry-run plan" in phase15
+
+
+def test_phase15_roadmap_records_asset_reuse_chain_fixtures() -> None:
+    phase15 = _text(PHASE15_ROADMAP)
+
+    assert "Phase 15.28" in phase15
+    assert "NarratoStudio Asset Reuse Chain Fixtures" in phase15
+    assert "build_narratostudio_asset_reuse_dry_run_chain" in phase15
+    assert "does not define a new contract artifact type" in phase15

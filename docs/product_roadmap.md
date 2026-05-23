@@ -233,3 +233,5 @@ Current checkpoint:
 - NarratoStudio asset reuse dry-run chains now have a read-only review surface
   that checks review, validation, gate, and plan consistency before any runtime
   reuse path is opened
+- The same NarratoStudio asset reuse chain now has a reusable in-memory fixture
+  builder for tests, without adding a new runtime or contract artifact type

@@ -112,6 +112,10 @@ It checks that the review, validation, gate, and dry-run plan refer to the same
 handoff/run, preserve side-effect boundaries, and remain ready or blocked
 without executing reuse.
 
+Phase 15.28 adds a reusable in-memory fixture builder for that same chain. It
+does not define a new artifact type; it only composes the existing review,
+validation, gate, dry-run plan, and reuse review payloads for repeatable tests.
+
 ## Boundaries
 
 This phase is still contract-layer work:
