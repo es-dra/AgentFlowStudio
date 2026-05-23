@@ -228,3 +228,5 @@ Current checkpoint:
   validator for Agent-readable gating without adding runtime execution
 - NarratoStudio asset-feedback review validations now have a decision-only gate
   that blocks reuse planning when validation fails
+- NarratoStudio asset-feedback review gates can now produce a dry-run reuse
+  plan for human/Agent inspection without executing reuse

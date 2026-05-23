@@ -53,3 +53,12 @@ def test_phase15_roadmap_keeps_mainline_boundaries_explicit() -> None:
     assert "no skill runtime" in phase15
     assert "no Memory runtime" in phase15
     assert "no Web UI" in phase15
+
+
+def test_phase15_roadmap_records_asset_reuse_dry_run_planner() -> None:
+    phase15 = _text(PHASE15_ROADMAP)
+
+    assert "Phase 15.26" in phase15
+    assert "NarratoStudio Asset Reuse Dry-run Planner" in phase15
+    assert "agentflow_narratostudio_asset_reuse_dry_run_plan" in phase15
+    assert "does not execute asset reuse" in phase15

@@ -102,6 +102,11 @@ Phase 15.25 adds a decision-only gate over that validation artifact. Passing the
 gate only allows later dry-run reuse planning or human review; it does not
 promote memory, persist reusable assets, or execute workflows.
 
+Phase 15.26 adds that dry-run reuse planning surface. It turns a passed gate and
+existing review artifact into `agentflow_narratostudio_asset_reuse_dry_run_plan`
+so a later Agent can see candidate reuse actions before any execution path is
+opened.
+
 ## Boundaries
 
 This phase is still contract-layer work:
