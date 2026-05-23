@@ -14,6 +14,7 @@ component workflow:
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
 | `narratostudio_brief_to_production_handoff.yaml` | production / recommended | The user needs a local-first structured production handoff. | `production_handoff.json`, `production_report.md`, `memory_candidates.json`, `cost_quality_trace.json` |
+| `posterflow_memory_demo.yaml` | demo / optional remote image | The user needs a visual poster-memory demo with explicit remote-image opt-in. | `poster_candidates_manifest.json`, `poster_preview.html`, `poster_memory_candidates.json`, `next_round_prompt.json` |
 
 Component workflows such as `transcript_to_candidate_windows.yaml`,
 `clip_plan_to_real_clips.yaml`, `clips_to_final_video.yaml`, and
@@ -85,6 +86,37 @@ This workflow writes `creative_brief.json`, `story_bible.json`,
 It is a local-first structured production handoff generator. It does not call a
 remote LLM, provide an Agent runtime, create media assets, publish content,
 write long-term memory, or provide a Web UI.
+
+### `posterflow_memory_demo.yaml`
+
+PosterFlow Memory Demo workflow:
+
+1. `posterflow_load_brief`
+2. `posterflow_build_plan`
+3. `posterflow_build_prompt_pack`
+4. `posterflow_generate_candidates`
+5. `posterflow_apply_demo_feedback`
+6. `posterflow_extract_memory`
+7. `posterflow_build_profile`
+8. `posterflow_build_next_prompt`
+9. `posterflow_write_report`
+
+Example:
+
+```powershell
+$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
+$env:NARRATOCUT_IMAGE_BASE_URL="https://your-openai-compatible-host/v1"
+$env:NARRATOCUT_IMAGE_API_KEY="<local-secret>"
+$env:NARRATOCUT_IMAGE_MODEL="<image-model>"
+.venv\Scripts\ncut run-workflow --workflow workflows/posterflow_memory_demo.yaml --input examples/posterflow/poster_brief.example.json --output data/processed/poster_runs/cyber_xianxia_001/run_001
+.venv\Scripts\ncut inspect-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
+.venv\Scripts\ncut review-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
+```
+
+Open `poster_preview.html` from the run directory to inspect the three
+generated candidate posters, demo feedback, memory candidates, preference
+profile, and next-round prompt. This workflow writes local artifacts only; it
+does not provide a Web UI, database, vector store, or long-term memory runtime.
 
 ### `mock_roi_to_script.yaml`
 

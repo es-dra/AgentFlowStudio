@@ -1,0 +1,54 @@
+name: posterflow_memory_demo_v0.1
+version: 1
+mode: remote_image
+quality_profile: posterflow_memory_demo
+metadata:
+  module: PosterFlow
+  description: Remote-image PosterFlow memory demo with human-reviewed preference reuse artifacts.
+steps:
+  - id: load_poster_brief
+    type: posterflow_load_brief
+    inputs:
+      poster_brief: poster_brief
+    outputs:
+      poster_brief: poster_brief.json
+  - id: build_poster_plan
+    type: posterflow_build_plan
+    outputs:
+      poster_plan: poster_plan.json
+  - id: build_poster_prompt_pack
+    type: posterflow_build_prompt_pack
+    outputs:
+      poster_prompt_pack: poster_prompt_pack.json
+  - id: generate_poster_candidates
+    type: posterflow_generate_candidates
+    inputs:
+      candidate_count: 3
+    outputs:
+      poster_candidates_manifest: poster_candidates_manifest.json
+      poster_model_invocations: poster_model_invocations.json
+  - id: apply_demo_feedback
+    type: posterflow_apply_demo_feedback
+    inputs:
+      poster_feedback: examples/posterflow/poster_feedback.example.json
+    outputs:
+      poster_feedback_signal_log: poster_feedback_signal_log.json
+  - id: extract_poster_memory
+    type: posterflow_extract_memory
+    outputs:
+      poster_memory_candidates: poster_memory_candidates.json
+      poster_memory_decisions: poster_memory_decisions.json
+  - id: build_poster_profile
+    type: posterflow_build_profile
+    outputs:
+      poster_preference_profile: poster_preference_profile.json
+      project_prefix: project_prefix.md
+  - id: build_next_round_prompt
+    type: posterflow_build_next_prompt
+    outputs:
+      next_round_prompt: next_round_prompt.json
+  - id: write_poster_report
+    type: posterflow_write_report
+    outputs:
+      poster_report: poster_report.md
+      poster_preview: poster_preview.html

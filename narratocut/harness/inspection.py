@@ -21,11 +21,13 @@ from narratocut.harness.quality_profiles import (
     FINISHED_PACKAGE_PROFILE,
     FINAL_VIDEO_PROFILE,
     NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE,
+    POSTERFLOW_MEMORY_DEMO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
     SUBTITLE_BURN_PROFILE,
     SUBTITLE_EXPORT_PROFILE,
 )
 from narratocut.harness.narratostudio_quality import narratostudio_artifacts_to_inspect
+from narratocut.harness.posterflow_quality import posterflow_artifacts_to_inspect
 from narratocut.harness.subtitle_burn_quality import subtitle_burn_artifacts_to_inspect
 from narratocut.harness.subtitle_quality import subtitle_artifacts_to_inspect
 from narratocut.harness.video_artifacts import (
@@ -132,6 +134,8 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = candidate_artifacts_to_inspect()
     elif quality_profile == NARRATOSTUDIO_PRODUCTION_HANDOFF_PROFILE:
         artifacts = narratostudio_artifacts_to_inspect()
+    elif quality_profile == POSTERFLOW_MEMORY_DEMO_PROFILE:
+        artifacts = posterflow_artifacts_to_inspect()
     else:
         artifacts = ARTIFACTS_TO_INSPECT
     for artifact in artifacts:

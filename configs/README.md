@@ -7,3 +7,5 @@ Commit only example configuration files.
 - The default provider is `mock`; OpenAI-compatible providers must be explicitly configured locally.
 
 Remote LLM calls must remain disabled unless `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
+Remote image calls for PosterFlow must remain disabled unless
+`NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.

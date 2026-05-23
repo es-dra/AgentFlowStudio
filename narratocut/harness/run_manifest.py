@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 PROJECT_NAME = "NarratoCut"
 NARRATOSTUDIO_PROFILE = "narratostudio_production_handoff"
+POSTERFLOW_PROFILE = "posterflow_memory_demo"
 NARRATOSTUDIO_ARTIFACT_DEFAULTS = {
     "creative_brief": ("creative_brief.json", True),
     "story_bible": ("story_bible.json", True),
@@ -24,6 +25,22 @@ NARRATOSTUDIO_ARTIFACT_DEFAULTS = {
     "cost_quality_trace": ("cost_quality_trace.json", True),
     "feedback_signal_log": ("feedback_signal_log.json", True),
     "execution_trace": ("execution_trace.json", True),
+}
+POSTERFLOW_ARTIFACT_DEFAULTS = {
+    "poster_brief": ("poster_brief.json", True),
+    "poster_plan": ("poster_plan.json", True),
+    "poster_prompt_pack": ("poster_prompt_pack.json", True),
+    "poster_model_invocations": ("poster_model_invocations.json", True),
+    "poster_candidates_manifest": ("poster_candidates_manifest.json", True),
+    "poster_feedback_signal_log": ("poster_feedback_signal_log.json", True),
+    "poster_memory_candidates": ("poster_memory_candidates.json", True),
+    "poster_memory_decisions": ("poster_memory_decisions.json", True),
+    "poster_preference_profile": ("poster_preference_profile.json", True),
+    "project_prefix": ("project_prefix.md", True),
+    "next_round_prompt": ("next_round_prompt.json", True),
+    "poster_report": ("poster_report.md", True),
+    "poster_preview": ("poster_preview.html", True),
+    "image_candidates": ("image_candidates/", True),
 }
 PRODUCT_ARTIFACT_DEFAULTS = {
     "transcript": ("transcript.json", False),
@@ -68,6 +85,9 @@ def build_run_manifest(run: WorkflowRun, context: WorkflowContext) -> dict[str, 
     }
     if context.quality_profile == NARRATOSTUDIO_PROFILE:
         manifest["module"] = "NarratoStudio"
+    if context.quality_profile == POSTERFLOW_PROFILE:
+        manifest["project"] = "AgentFlow Studio"
+        manifest["module"] = "PosterFlow"
     return manifest
 
 
@@ -87,6 +107,9 @@ def _contract_artifacts(artifacts: dict[str, str], context: WorkflowContext) -> 
     normalized["manifest"] = "manifest.json"
     if context.quality_profile == NARRATOSTUDIO_PROFILE:
         for name, (path, _required) in NARRATOSTUDIO_ARTIFACT_DEFAULTS.items():
+            normalized.setdefault(name, path)
+    if context.quality_profile == POSTERFLOW_PROFILE:
+        for name, (path, _required) in POSTERFLOW_ARTIFACT_DEFAULTS.items():
             normalized.setdefault(name, path)
     if _is_product_package_context(context):
         for name, (path, _required) in PRODUCT_ARTIFACT_DEFAULTS.items():
@@ -123,6 +146,8 @@ def _artifact_required(name: str, context: WorkflowContext) -> bool:
         return True
     if context.quality_profile == NARRATOSTUDIO_PROFILE and name in NARRATOSTUDIO_ARTIFACT_DEFAULTS:
         return NARRATOSTUDIO_ARTIFACT_DEFAULTS[name][1]
+    if context.quality_profile == POSTERFLOW_PROFILE and name in POSTERFLOW_ARTIFACT_DEFAULTS:
+        return POSTERFLOW_ARTIFACT_DEFAULTS[name][1]
     if name == "clips_dir" and "clips" in context.artifacts:
         return True
     if name in context.artifacts:
@@ -151,5 +176,7 @@ def _normalize_value(value: Any) -> Any:
 
 def _project_name(context: WorkflowContext) -> str:
     if context.quality_profile == NARRATOSTUDIO_PROFILE:
+        return "AgentFlow Studio"
+    if context.quality_profile == POSTERFLOW_PROFILE:
         return "AgentFlow Studio"
     return PROJECT_NAME

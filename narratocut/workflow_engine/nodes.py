@@ -67,6 +67,7 @@ from narratocut.workflow_engine.ocr_nodes import (
 )
 from narratocut.workflow_engine.package_nodes import write_finished_package_node, write_package_report_node
 from narratocut.workflow_engine.narratostudio_nodes import register_narratostudio_nodes
+from narratocut.workflow_engine.posterflow_nodes import register_posterflow_nodes
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
@@ -268,6 +269,7 @@ def default_node_registry() -> NodeRegistry:
     registry.register("write_finished_package", write_finished_package_node)
     registry.register("write_package_report", write_package_report_node)
     register_narratostudio_nodes(registry)
+    register_posterflow_nodes(registry)
     return registry
 
 
