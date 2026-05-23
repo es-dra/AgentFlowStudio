@@ -98,6 +98,10 @@ Phase 15.24 adds the harness validator for that review artifact. The validator
 inspects an already-built review artifact only; it does not rebuild contracts
 or make the review durable.
 
+Phase 15.25 adds a decision-only gate over that validation artifact. Passing the
+gate only allows later dry-run reuse planning or human review; it does not
+promote memory, persist reusable assets, or execute workflows.
+
 ## Boundaries
 
 This phase is still contract-layer work:
