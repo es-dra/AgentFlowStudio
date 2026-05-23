@@ -230,3 +230,6 @@ Current checkpoint:
   that blocks reuse planning when validation fails
 - NarratoStudio asset-feedback review gates can now produce a dry-run reuse
   plan for human/Agent inspection without executing reuse
+- NarratoStudio asset reuse dry-run chains now have a read-only review surface
+  that checks review, validation, gate, and plan consistency before any runtime
+  reuse path is opened

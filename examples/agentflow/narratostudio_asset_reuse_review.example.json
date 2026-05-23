@@ -1,0 +1,96 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_narratostudio_asset_reuse_review",
+  "review_scope": "narratostudio_asset_reuse_dry_run_chain",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "writes_long_term_memory": false,
+  "dry_run_only": true,
+  "handoff_id": "production_handoff_demo",
+  "run_id": "narratostudio_demo_run",
+  "overall_status": "passed",
+  "source_artifact_types": {
+    "review": "agentflow_narratostudio_asset_feedback_review",
+    "validation": "agentflow_narratostudio_asset_feedback_review_validation",
+    "gate": "agentflow_narratostudio_asset_feedback_review_gate",
+    "dry_run_plan": "agentflow_narratostudio_asset_reuse_dry_run_plan"
+  },
+  "source_statuses": {
+    "review": "passed",
+    "validation": "passed",
+    "gate": "passed",
+    "dry_run_plan": "ready"
+  },
+  "selected_asset_profile_ids": [
+    "af_reusable_asset_profile_001"
+  ],
+  "candidate_reuse_actions": [
+    {
+      "action_id": "review_reusable_asset_profile:af_reusable_asset_profile_001",
+      "action_type": "review_reusable_asset_profile",
+      "asset_profile_id": "af_reusable_asset_profile_001",
+      "does_not_execute": true,
+      "requires_human_review": true
+    }
+  ],
+  "next_required_human_decisions": [
+    "confirm_asset_profile_still_applies_to_next_brief",
+    "confirm_reuse_policy_before_execution"
+  ],
+  "required_pre_execution_reviews": [
+    "human_review_reusable_asset_candidate",
+    "prepare_asset_reuse_dry_run"
+  ],
+  "forbidden_actions": [
+    "execute_workflow",
+    "write_long_term_memory",
+    "persist_reusable_asset_profile",
+    "call_remote_provider"
+  ],
+  "blocking_check_ids": [],
+  "checks": [
+    {
+      "check_id": "review_artifact_type",
+      "status": "passed",
+      "message": "source review artifact_type is agentflow_narratostudio_asset_feedback_review"
+    },
+    {
+      "check_id": "validation_artifact_type",
+      "status": "passed",
+      "message": "source validation artifact_type is agentflow_narratostudio_asset_feedback_review_validation"
+    },
+    {
+      "check_id": "gate_artifact_type",
+      "status": "passed",
+      "message": "source gate artifact_type is agentflow_narratostudio_asset_feedback_review_gate"
+    },
+    {
+      "check_id": "dry_run_plan_artifact_type",
+      "status": "passed",
+      "message": "source dry-run plan artifact_type is agentflow_narratostudio_asset_reuse_dry_run_plan"
+    },
+    {
+      "check_id": "gate_passed",
+      "status": "passed",
+      "message": "source gate passed"
+    },
+    {
+      "check_id": "dry_run_plan_ready",
+      "status": "passed",
+      "message": "source dry-run plan is ready"
+    },
+    {
+      "check_id": "chain_handoff_ids_match",
+      "status": "passed",
+      "message": "review, validation, gate, and dry-run plan refer to the same handoff_id"
+    },
+    {
+      "check_id": "chain_run_ids_match",
+      "status": "passed",
+      "message": "review, validation, gate, and dry-run plan refer to the same run_id"
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

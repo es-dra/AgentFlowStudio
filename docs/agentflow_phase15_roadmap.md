@@ -52,6 +52,7 @@ execution. Phase 15 has:
 | Phase 15.24 | complete | NarratoStudio asset feedback review harness |
 | Phase 15.25 | complete | NarratoStudio asset feedback review gate |
 | Phase 15.26 | complete | NarratoStudio asset reuse dry-run planner |
+| Phase 15.27 | complete | NarratoStudio asset reuse review surface |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -779,6 +780,37 @@ Boundary:
 - does not call the NarratoStudio workflow
 - does not rebuild source validation, review artifacts, asset-memory contract
   sets, reusable profiles, or promotion decisions
+- does not implement Memory runtime
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not read from or write to `data/processed/runs/`
+- does not change CLI, workflow execution, artifact schema version, provider
+  behavior, hosted API, database/vector-store writes, or Web UI behavior
+
+## Phase 15.27: NarratoStudio Asset Reuse Review Surface
+
+Status: complete.
+
+Purpose: review an existing NarratoStudio asset-feedback/reuse chain after
+dry-run planning so a later Agent can inspect whether reuse remains blocked,
+failed, or ready for human review without executing the task.
+
+Output:
+
+- `agentflow.memory.narratostudio_reuse_review.review_narratostudio_asset_reuse_dry_run_chain`
+- `agentflow_narratostudio_asset_reuse_review` result shape
+- committed reuse-review example and contract registry/audit coverage
+- focused tests for ready chains, blocked gates, mismatched chain ids, and
+  runtime or long-term-memory-write claim rejection
+
+Boundary:
+
+- reviews existing in-memory review, validation, gate, and dry-run plan
+  artifacts only
+- does not execute asset reuse
+- does not call the NarratoStudio workflow
+- does not rebuild source validation, review artifacts, asset-memory contract
+  sets, reusable profiles, promotion decisions, gates, or dry-run plans
 - does not implement Memory runtime
 - does not execute durable candidate promotion
 - does not write long-term memory

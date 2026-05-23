@@ -1,5 +1,45 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.27 NarratoStudio Asset Reuse Review Surface
+
+- Synced local `master` to merged PR #67 at `063b39e`.
+- Removed the merged `codex/agentflow-asset-reuse-dry-run-planner` branch
+  locally and remotely after confirming its tree matched `origin/master`;
+  preserved the separate `codex/narratocut-web-ui` worktree branch.
+- Started `codex/agentflow-asset-reuse-review-surface` from a clean mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_reuse_review_surface.py`; the first red run
+  failed because `agentflow.memory.narratostudio_reuse_review` did not exist.
+- Added
+  `agentflow.memory.narratostudio_reuse_review.review_narratostudio_asset_reuse_dry_run_chain`
+  as a pure in-memory review surface for existing review, validation, gate, and
+  dry-run plan artifacts.
+- The review surface returns
+  `agentflow_narratostudio_asset_reuse_review`, checks chain id consistency,
+  preserves blocked/failed/ready status, and rejects runtime or
+  long-term-memory-write claims.
+- Added a committed
+  `examples/agentflow/narratostudio_asset_reuse_review.example.json`,
+  registered it in AgentFlow contract helpers, registry, and audit examples,
+  and covered it in contract example tests.
+- Updated Phase 15 roadmap, product roadmap, and intermediate asset
+  architecture docs to record Phase 15.27 as chain review only.
+- Boundary kept: no Memory runtime, durable candidate promotion, long-term
+  memory write, persisted reusable asset profile, workflow execution change,
+  CLI change, provider call, database/vector-store/file-repository write,
+  hosted API, Web UI behavior, or `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_review_surface.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_reuse_review'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_review_surface.py`: first implementation found blocking id ordering mismatch for blocked gates
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_review_surface.py`: 4 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_review_surface.py tests/test_agentflow_narratostudio_asset_reuse_review_example.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 49 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest`: 463 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.26 NarratoStudio Asset Reuse Dry-run Planner
 
 - Synced local `master` to merged PR #66 at `df44ec6`.

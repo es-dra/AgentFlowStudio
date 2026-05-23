@@ -95,6 +95,12 @@
       "example_path": "examples/agentflow/narratostudio_asset_reuse_dry_run_plan.example.json",
       "doc_path": "docs/agentflow_phase15_roadmap.md",
       "contract_surface": "narratostudio_asset_reuse_dry_run_plan"
+    },
+    {
+      "artifact_type": "agentflow_narratostudio_asset_reuse_review",
+      "example_path": "examples/agentflow/narratostudio_asset_reuse_review.example.json",
+      "doc_path": "docs/agentflow_phase15_roadmap.md",
+      "contract_surface": "narratostudio_asset_reuse_review"
     }
   ],
   "validation_rules": [
