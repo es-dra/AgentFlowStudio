@@ -54,6 +54,7 @@ execution. Phase 15 has:
 | Phase 15.26 | complete | NarratoStudio asset reuse dry-run planner |
 | Phase 15.27 | complete | NarratoStudio asset reuse review surface |
 | Phase 15.28 | complete | NarratoStudio asset reuse chain fixtures |
+| Phase 15.29 | complete | NarratoStudio asset reuse chain audit smoke |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -838,6 +839,31 @@ Boundary:
 
 - builds existing in-memory artifact payloads only
 - does not define a new contract artifact type
+- does not execute asset reuse
+- does not call the NarratoStudio workflow
+- does not read from or write to run directories
+- does not persist reusable profiles or write long-term memory
+- does not change CLI, workflow execution, artifact schema version, provider
+  behavior, hosted API, database/vector-store writes, or Web UI behavior
+
+## Phase 15.29: NarratoStudio Asset Reuse Chain Audit Smoke
+
+Status: complete.
+
+Purpose: add a narrow smoke audit for the fixture-built NarratoStudio
+asset-feedback/reuse chain so future changes cannot quietly turn the fixture
+path into runtime behavior or a new contract surface.
+
+Output:
+
+- `agentflow.memory.narratostudio_reuse_audit.audit_narratostudio_asset_reuse_chain_fixture`
+- focused tests for ready chains, blocked chains, runtime-claim rejection, and
+  unexpected contract-surface rejection
+
+Boundary:
+
+- audits existing fixture-built in-memory artifact payloads only
+- does not register a new contract artifact type
 - does not execute asset reuse
 - does not call the NarratoStudio workflow
 - does not read from or write to run directories

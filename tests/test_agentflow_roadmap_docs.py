@@ -80,3 +80,12 @@ def test_phase15_roadmap_records_asset_reuse_chain_fixtures() -> None:
     assert "NarratoStudio Asset Reuse Chain Fixtures" in phase15
     assert "build_narratostudio_asset_reuse_dry_run_chain" in phase15
     assert "does not define a new contract artifact type" in phase15
+
+
+def test_phase15_roadmap_records_asset_reuse_chain_audit_smoke() -> None:
+    phase15 = _text(PHASE15_ROADMAP)
+
+    assert "Phase 15.29" in phase15
+    assert "NarratoStudio Asset Reuse Chain Audit Smoke" in phase15
+    assert "audit_narratostudio_asset_reuse_chain_fixture" in phase15
+    assert "does not register a new contract artifact type" in phase15

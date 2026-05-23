@@ -1,5 +1,42 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.29 NarratoStudio Asset Reuse Chain Audit Smoke
+
+- Synced local `master` to merged PR #69 at `c665a4b`.
+- Removed the merged `codex/agentflow-asset-reuse-chain-fixtures` branch
+  locally and remotely after confirming it matched `origin/master`; preserved
+  the separate `codex/narratocut-web-ui` worktree branch.
+- Started `codex/agentflow-asset-reuse-chain-audit-smoke` from a clean
+  mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`; the first red
+  run failed because `agentflow.memory.narratostudio_reuse_audit` did not
+  exist.
+- Added
+  `agentflow.memory.narratostudio_reuse_audit.audit_narratostudio_asset_reuse_chain_fixture`
+  as a pure in-memory audit smoke for fixture-built asset reuse chains.
+- The audit smoke checks expected chain keys, artifact types, ready/blocked
+  status shapes, no-execute/no-memory-write boundaries, and unexpected
+  contract-surface drift.
+- Boundary kept: no new contract artifact type, Memory runtime, durable
+  candidate promotion, long-term memory write, persisted reusable asset
+  profile, workflow execution change, CLI change, provider call,
+  database/vector-store/file-repository write, hosted API, Web UI behavior, or
+  `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_reuse_audit'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`: 4 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: first red run failed because Phase 15.29 docs were not recorded yet
+- Final verification was run in a clean temporary worktree at
+  `origin/master` plus only the Phase 15.29 staged patch because the main
+  working tree contains unrelated PosterFlow draft changes:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_narratostudio_asset_reuse_chain_fixtures.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 20 passed
+  - `.venv\Scripts\python.exe -m pytest`: 473 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.28 NarratoStudio Asset Reuse Chain Fixtures
 
 - Synced local `master` to merged PR #68 at `e54b06b`.

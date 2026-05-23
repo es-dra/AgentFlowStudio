@@ -52,3 +52,11 @@ def test_phase15_and_product_roadmaps_include_phase_15_13() -> None:
     assert "Phase 15.13" in phase15
     assert "Intermediate Asset & Memory Architecture Plan" in phase15
     assert "intermediate asset architecture" in product
+
+
+def test_intermediate_asset_architecture_records_asset_reuse_chain_audit_smoke() -> None:
+    text = _text(ARCHITECTURE_DOC)
+
+    assert "Phase 15.29" in text
+    assert "audit_narratostudio_asset_reuse_chain_fixture" in text
+    assert "does not create a contract artifact" in text
