@@ -107,6 +107,11 @@ existing review artifact into `agentflow_narratostudio_asset_reuse_dry_run_plan`
 so a later Agent can see candidate reuse actions before any execution path is
 opened.
 
+Phase 15.27 adds a read-only review surface for the whole dry-run reuse chain.
+It checks that the review, validation, gate, and dry-run plan refer to the same
+handoff/run, preserve side-effect boundaries, and remain ready or blocked
+without executing reuse.
+
 ## Boundaries
 
 This phase is still contract-layer work:

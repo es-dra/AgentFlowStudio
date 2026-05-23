@@ -62,3 +62,12 @@ def test_phase15_roadmap_records_asset_reuse_dry_run_planner() -> None:
     assert "NarratoStudio Asset Reuse Dry-run Planner" in phase15
     assert "agentflow_narratostudio_asset_reuse_dry_run_plan" in phase15
     assert "does not execute asset reuse" in phase15
+
+
+def test_phase15_roadmap_records_asset_reuse_review_surface() -> None:
+    phase15 = _text(PHASE15_ROADMAP)
+
+    assert "Phase 15.27" in phase15
+    assert "NarratoStudio Asset Reuse Review Surface" in phase15
+    assert "agentflow_narratostudio_asset_reuse_review" in phase15
+    assert "reviews existing in-memory review, validation, gate, and dry-run plan" in phase15

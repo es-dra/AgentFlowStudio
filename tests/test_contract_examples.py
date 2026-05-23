@@ -327,6 +327,7 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_narratostudio_asset_feedback_review_validation",
         "agentflow_narratostudio_asset_feedback_review_gate",
         "agentflow_narratostudio_asset_reuse_dry_run_plan",
+        "agentflow_narratostudio_asset_reuse_review",
     }
     assert expected_types <= registered_types
     assert all(contract["example_path"] for contract in payload["contracts"])
