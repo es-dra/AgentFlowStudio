@@ -1,5 +1,48 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.25 NarratoStudio Asset Feedback Review Gate
+
+- Synced local `master` to merged PR #65 at `cfd155f`.
+- Removed the merged `codex/agentflow-asset-feedback-review-harness` branch
+  locally and remotely after confirming its tree matched `origin/master`;
+  preserved the separate `codex/narratocut-web-ui` worktree branch.
+- Started `codex/agentflow-asset-feedback-review-gate` from a clean mainline.
+- Added focused TDD coverage in
+  `tests/test_agentflow_narratostudio_asset_feedback_review_gate.py`; the
+  first red run failed because
+  `gate_narratostudio_asset_feedback_review` did not exist.
+- Added
+  `agentflow.harness.narratostudio_review.gate_narratostudio_asset_feedback_review`
+  as a pure in-memory decision-only gate for existing
+  `agentflow_narratostudio_asset_feedback_review_validation` artifacts.
+- The gate returns
+  `agentflow_narratostudio_asset_feedback_review_gate`, blocks failed review
+  validations, keeps blocking check ids focused on source validation failures,
+  and rejects runtime or long-term-memory-write claims.
+- Added a committed
+  `examples/agentflow/narratostudio_asset_feedback_review_gate.example.json`,
+  registered it in AgentFlow contract helpers, registry, and audit examples,
+  and covered it in contract example tests.
+- Updated Phase 15 roadmap, product roadmap, and intermediate asset
+  architecture docs to record Phase 15.25 as decision-only gate work.
+- Boundary kept: no Memory runtime, durable candidate promotion, long-term
+  memory write, persisted reusable asset profile, workflow execution change,
+  CLI change, provider call, database/vector-store/file-repository write,
+  hosted API, Web UI behavior, or `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_narratostudio_asset_feedback_review_gate.py`: first red run failed with `ImportError: cannot import name 'gate_narratostudio_asset_feedback_review'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_narratostudio_asset_feedback_review_gate.py`: first implementation failed because blocking ids included the generic `validation_passed` check instead of only the source validation failure id
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_narratostudio_asset_feedback_review_gate.py tests/test_agentflow_narratostudio_asset_feedback_review_harness.py`: 7 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py`: contract example regression first failed because the gate artifact was missing from examples, registry, and helpers
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py`: 33 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest tests/test_agentflow_narratostudio_asset_feedback_review_gate.py tests/test_agentflow_narratostudio_asset_feedback_review_harness.py tests/test_narratostudio_asset_feedback_review_surface.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 50 passed
+  - `.venv\Scripts\python.exe -m pytest`: 446 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.24 NarratoStudio Asset Feedback Review Harness
 
 - Synced local `master` to merged PR #64 at `f007a85`.

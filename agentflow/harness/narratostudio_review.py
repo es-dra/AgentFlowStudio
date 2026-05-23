@@ -11,6 +11,11 @@ from agentflow.harness.constants import (
 
 SCHEMA_VERSION = AGENTFLOW_VALIDATION_SCHEMA_VERSION
 FORBIDDEN_REVIEW_FRAGMENTS = AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
+GATE_PASSED_ACTIONS = [
+    "human_review_reusable_asset_candidate",
+    "prepare_asset_reuse_dry_run",
+]
+GATE_BLOCKED_ACTIONS = ["repair_source_artifacts_before_reuse"]
 
 
 def validate_narratostudio_asset_feedback_review(review: dict[str, Any]) -> dict[str, Any]:
@@ -98,6 +103,55 @@ def validate_narratostudio_asset_feedback_review(review: dict[str, Any]) -> dict
     }
 
 
+def gate_narratostudio_asset_feedback_review(validation: dict[str, Any]) -> dict[str, Any]:
+    """Convert a review validation artifact into a decision-only gate result."""
+    checks = [
+        _check(
+            "validation_artifact_type",
+            validation.get("artifact_type") == "agentflow_narratostudio_asset_feedback_review_validation",
+            "source artifact is a NarratoStudio asset-feedback review validation",
+        ),
+        _check(
+            "validation_scope",
+            validation.get("validation_scope") == "narratostudio_asset_feedback_review",
+            "source validation scope is narratostudio_asset_feedback_review",
+        ),
+        _check(
+            "validation_passed",
+            validation.get("overall_status") == PASSED,
+            "review validation passed",
+        ),
+        _check(
+            "validation_does_not_execute",
+            validation.get("does_not_execute") is True,
+            "source validation does not execute workflows or tasks",
+        ),
+        _check(
+            "validation_does_not_write_memory",
+            validation.get("writes_long_term_memory") is False,
+            "source validation does not write long-term memory",
+        ),
+    ]
+    blocking_check_ids = _blocking_check_ids(validation, checks)
+    gate_status = PASSED if not blocking_check_ids else "blocked"
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "artifact_type": "agentflow_narratostudio_asset_feedback_review_gate",
+        "gate_scope": "narratostudio_asset_feedback_review",
+        "runtime_status": "not_implemented",
+        "does_not_execute": True,
+        "writes_long_term_memory": False,
+        "handoff_id": validation.get("handoff_id"),
+        "run_id": validation.get("run_id"),
+        "gate_status": gate_status,
+        "source_validation_artifact_type": validation.get("artifact_type"),
+        "source_validation_status": validation.get("overall_status"),
+        "blocking_check_ids": blocking_check_ids,
+        "next_allowed_actions": GATE_PASSED_ACTIONS if gate_status == PASSED else GATE_BLOCKED_ACTIONS,
+        "checks": checks,
+    }
+
+
 def _overall_status(payload: Any) -> Any:
     if not isinstance(payload, dict):
         return None
@@ -115,12 +169,31 @@ def _contains_no_forbidden_fragments(payload: Any) -> bool:
     return not any(fragment.lower() in raw_text for fragment in FORBIDDEN_REVIEW_FRAGMENTS)
 
 
+def _blocking_check_ids(validation: dict[str, Any], gate_checks: list[dict[str, str]]) -> list[str]:
+    failed_ids = [
+        check["check_id"]
+        for check in gate_checks
+        if check["status"] == FAILED and check["check_id"] != "validation_passed"
+    ]
+    validation_failed_ids = [
+        check["check_id"]
+        for check in validation.get("checks", [])
+        if isinstance(check, dict) and check.get("status") == FAILED and isinstance(check.get("check_id"), str)
+    ]
+    if validation.get("overall_status") == FAILED:
+        failed_ids.extend(validation_failed_ids or ["validation_passed"])
+    return sorted(set(failed_ids))
+
+
 def _check(check_id: str, passed: bool, message: str) -> dict[str, str]:
     return {"check_id": check_id, "status": PASSED if passed else FAILED, "message": message}
 
 
 __all__ = (
     "FORBIDDEN_REVIEW_FRAGMENTS",
+    "GATE_BLOCKED_ACTIONS",
+    "GATE_PASSED_ACTIONS",
     "SCHEMA_VERSION",
+    "gate_narratostudio_asset_feedback_review",
     "validate_narratostudio_asset_feedback_review",
 )

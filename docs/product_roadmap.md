@@ -226,3 +226,5 @@ Current checkpoint:
   fails
 - NarratoStudio asset-feedback review artifacts now have a harness-level
   validator for Agent-readable gating without adding runtime execution
+- NarratoStudio asset-feedback review validations now have a decision-only gate
+  that blocks reuse planning when validation fails

@@ -50,6 +50,7 @@ execution. Phase 15 has:
 | Phase 15.22 | complete | NarratoStudio asset feedback source validator |
 | Phase 15.23 | complete | NarratoStudio asset feedback review surface |
 | Phase 15.24 | complete | NarratoStudio asset feedback review harness |
+| Phase 15.25 | complete | NarratoStudio asset feedback review gate |
 
 ## Phase 15.1: NarratoStudio Mainline MVP
 
@@ -716,6 +717,36 @@ Boundary:
 - does not call the NarratoStudio workflow
 - does not rebuild source validation, asset-memory contract sets, or reusable
   profiles
+- does not implement Memory runtime
+- does not execute durable candidate promotion
+- does not write long-term memory
+- does not read from or write to `data/processed/runs/`
+- does not change CLI, workflow execution, artifact schema version, provider
+  behavior, hosted API, database/vector-store writes, or Web UI behavior
+
+## Phase 15.25: NarratoStudio Asset Feedback Review Gate
+
+Status: complete.
+
+Purpose: convert an existing
+`agentflow_narratostudio_asset_feedback_review_validation` artifact into a
+decision-only gate result that tells a later Agent whether asset reuse planning
+may proceed or source artifacts must be repaired first.
+
+Output:
+
+- `agentflow.harness.narratostudio_review.gate_narratostudio_asset_feedback_review`
+- `agentflow_narratostudio_asset_feedback_review_gate` result shape
+- committed gate example and contract registry/audit coverage
+- focused tests for passed validation, failed validation blocking, and runtime
+  or memory-write claim rejection
+
+Boundary:
+
+- gates an existing in-memory review validation artifact only
+- does not call the NarratoStudio workflow
+- does not rebuild source validation, review artifacts, asset-memory contract
+  sets, or reusable profiles
 - does not implement Memory runtime
 - does not execute durable candidate promotion
 - does not write long-term memory
