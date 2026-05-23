@@ -116,6 +116,11 @@ Phase 15.28 adds a reusable in-memory fixture builder for that same chain. It
 does not define a new artifact type; it only composes the existing review,
 validation, gate, dry-run plan, and reuse review payloads for repeatable tests.
 
+Phase 15.29 adds `audit_narratostudio_asset_reuse_chain_fixture` as a narrow
+smoke audit over that fixture-built chain. It verifies expected chain keys,
+artifact types, ready/blocked status shapes, and side-effect boundaries. It
+does not create a contract artifact or execute reuse.
+
 ## Boundaries
 
 This phase is still contract-layer work:

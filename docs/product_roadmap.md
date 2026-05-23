@@ -235,3 +235,6 @@ Current checkpoint:
   reuse path is opened
 - The same NarratoStudio asset reuse chain now has a reusable in-memory fixture
   builder for tests, without adding a new runtime or contract artifact type
+- The fixture-built NarratoStudio asset reuse chain now has a narrow audit
+  smoke that keeps ready/blocked status shapes, side-effect boundaries, and
+  contract-surface boundaries explicit
