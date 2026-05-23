@@ -1,5 +1,38 @@
 # DEVLOG
 
+## 2026-05-24 - Alpha Readiness Evidence Report
+
+- Replayed the alpha evidence report from the old
+  `codex/alpha-readiness-evidence` branch onto current `master` without
+  merging the stale provider stack below it.
+- Did not use the MiniMax key pasted in chat. The original evidence treated
+  PosterFlow live smoke as blocked by provider configuration; this replay keeps
+  that evidence boundary and does not perform remote image calls.
+- Re-ran NarratoStudio Alpha handoff evidence in the original branch:
+  - workflow success at
+    `data/processed/runs/demo_narratostudio_handoff_alpha`
+  - `inspect-run`: 65 passed / 0 failed / 0 warnings
+  - `review-run`: 83 passed / 0 failed / 0 warnings
+- Reproduced and fixed committed ASR/BGM demo example drift:
+  - old example inputs pointed to missing `data/raw/demo_bgm/bgm.mp3` and
+    `data/raw/demo_bgm/bgm.metadata.json`
+  - examples now point to `data/raw/demo_bgm/bgm.wav` plus committed
+    `examples/demo_bgm/bgm.metadata.example.json`
+  - added a focused regression test so finished-package local-ASR examples keep
+    valid BGM metadata references
+- Re-ran NarratoCut Alpha package evidence in the original branch:
+  - workflow success at `data/processed/runs/demo_narratocut_package_alpha`
+  - `inspect-run`: 8 passed / 0 failed / 0 warnings
+  - `review-run`: 41 passed / 0 failed / 0 warnings
+  - `package-report`: refreshed `package_report.md`
+- Added `docs/alpha_readiness_report.md` and linked it from `docs/README.md`.
+  The report explicitly separates passed evidence, blocked PosterFlow live
+  provider state, demo-only memory, deterministic skeleton boundaries, and
+  generated-artifact submission boundaries.
+- Boundary kept: no generated media or run artifacts committed, no remote image
+  call made, no Web UI, database, durable Memory runtime, Agent runtime,
+  provider auto-selection, or workflow/CLI rename added.
+
 ## 2026-05-26 - AFS-PROV-001 PosterFlow MiniMax Provider Replay
 
 - Rebuilt the old MiniMax provider branch on fresh `master` in

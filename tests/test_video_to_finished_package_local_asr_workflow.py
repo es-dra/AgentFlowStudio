@@ -52,6 +52,23 @@ def test_video_script_to_finished_package_local_asr_workflow_definition() -> Non
     assert "transcribe_audio_openai_compatible" not in step_types
 
 
+def test_finished_package_demo_examples_reference_committed_bgm_metadata() -> None:
+    example_paths = [
+        Path("examples/demo_asr/video_to_finished_package_local_asr_input.example.json"),
+        Path("examples/demo_asr/video_script_to_finished_package_local_asr_input.example.json"),
+        Path("examples/demo_asr/video_to_finished_package_real_asr_input.example.json"),
+        Path("examples/demo_asr/video_script_to_finished_package_real_asr_input.example.json"),
+    ]
+    for example_path in example_paths:
+        payload = json.loads(example_path.read_text(encoding="utf-8"))
+        metadata_path = Path(payload["bgm_metadata_path"])
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+        assert payload["bgm_path"] == "data/raw/demo_bgm/bgm.wav"
+        assert metadata_path == Path("examples/demo_bgm/bgm.metadata.example.json")
+        assert metadata["quality_verified"] is True
+
+
 def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path, monkeypatch) -> None:
     input_path = _write_local_input_bundle(tmp_path)
     output_dir = tmp_path / "run"

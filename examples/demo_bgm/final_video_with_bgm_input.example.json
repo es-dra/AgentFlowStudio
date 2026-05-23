@@ -1,6 +1,6 @@
 {
   "final_video_path": "data/processed/runs/demo_clips_to_final_video/final_video.mp4",
-  "bgm_path": "data/raw/demo_bgm/bgm.mp3",
+  "bgm_path": "data/raw/demo_bgm/bgm.wav",
   "bgm_volume": 0.2,
   "original_audio_volume": 1.0,
   "output_name": "final_video_with_bgm.mp4"
