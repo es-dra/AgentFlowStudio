@@ -1,5 +1,35 @@
 # DEVLOG
 
+## 2026-05-23 - Phase 15.28 NarratoStudio Asset Reuse Chain Fixtures
+
+- Synced local `master` to merged PR #68 at `e54b06b`.
+- Removed the merged `codex/agentflow-asset-reuse-review-surface` branch
+  locally and remotely after confirming its tree matched `origin/master`;
+  preserved the separate `codex/narratocut-web-ui` worktree branch.
+- Started `codex/agentflow-asset-reuse-chain-fixtures` from a clean mainline.
+- Added focused TDD coverage in
+  `tests/test_narratostudio_asset_reuse_chain_fixtures.py`; the first red run
+  failed because `agentflow.memory.narratostudio_reuse_chain` did not exist.
+- Added
+  `agentflow.memory.narratostudio_reuse_chain.build_narratostudio_asset_reuse_dry_run_chain`
+  as a pure in-memory fixture builder that composes the existing review,
+  validation, gate, dry-run plan, and reuse review artifacts.
+- Boundary kept: no new contract artifact type, Memory runtime, durable
+  candidate promotion, long-term memory write, persisted reusable asset
+  profile, workflow execution change, CLI change, provider call,
+  database/vector-store/file-repository write, hosted API, Web UI behavior, or
+  `data/processed/runs/` artifact write.
+- Verification started:
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_fixtures.py`: first red run failed with `ModuleNotFoundError: No module named 'agentflow.memory.narratostudio_reuse_chain'`
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_fixtures.py`: 3 passed
+  - `.venv\Scripts\python.exe -m pytest tests/test_narratostudio_asset_reuse_chain_fixtures.py tests/test_narratostudio_asset_reuse_review_surface.py tests/test_agentflow_narratostudio_asset_reuse_review_example.py tests/test_agentflow_contract_helpers.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_agentflow_roadmap_docs.py tests/test_agentflow_intermediate_asset_architecture.py`: 53 passed
+- Final verification:
+  - `.venv\Scripts\python.exe -m pytest`: 467 passed
+  - `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests`: passed
+  - `git diff --check`: passed with CRLF warnings only
+  - `.venv\Scripts\python.exe -m apps.cli.main --help`: passed
+  - `.venv\Scripts\python.exe -m apps.cli.main version`: `0.1.0`
+
 ## 2026-05-23 - Phase 15.27 NarratoStudio Asset Reuse Review Surface
 
 - Synced local `master` to merged PR #67 at `063b39e`.
