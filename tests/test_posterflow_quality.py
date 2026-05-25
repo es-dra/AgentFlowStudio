@@ -74,6 +74,50 @@ def test_posterflow_review_fails_when_profile_uses_unapproved_memory(monkeypatch
     assert "posterflow_profile_uses_accepted_memory" in _failed_ids(review)
 
 
+def test_posterflow_review_fails_when_feedback_signal_replaces_raw_feedback(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    (output_dir / "poster_feedback.jsonl").unlink()
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_poster_feedback_exists" in _failed_ids(review)
+    assert "posterflow_feedback_source_of_truth_is_raw_jsonl" in _failed_ids(review)
+
+
+def test_posterflow_review_fails_when_memory_review_claims_durable_write(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    review_events = _jsonl(output_dir / "poster_memory_review.jsonl")
+    review_events[0]["writes_long_term_memory"] = True
+    (output_dir / "poster_memory_review.jsonl").write_text(
+        "\n".join(json.dumps(event, ensure_ascii=False) for event in review_events) + "\n",
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_memory_review_no_long_term_write" in _failed_ids(review)
+
+
+def test_posterflow_review_fails_when_context_trace_points_to_wrong_bundle(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    trace = _json(output_dir / "context_assembly_trace.json")
+    trace["bundle_id"] = "wrong_bundle"
+    (output_dir / "context_assembly_trace.json").write_text(
+        json.dumps(trace, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_context_trace_refs_bundle" in _failed_ids(review)
+
+
 def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
     def fake_urlopen(request, timeout):
         return FakeResponse()
@@ -105,3 +149,7 @@ def _failed_ids(review: dict) -> set[str]:
 
 def _json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]

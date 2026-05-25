@@ -124,11 +124,34 @@ class PosterFeedbackSignal(SchemaBase):
     source: Literal["human", "demo_fixture"] = "demo_fixture"
 
 
+class PosterRawFeedbackEvent(SchemaBase):
+    schema_version: str = SCHEMA_VERSION
+    feedback_id: str
+    project_id: str
+    run_id: str
+    source: Literal["human", "agent", "external", "demo_fixture"] = "demo_fixture"
+    target_type: Literal["poster_candidate"] = "poster_candidate"
+    target_id: str
+    decision: Literal["accepted", "rejected", "needs_revision", "note", "published", "preferred", "pending"]
+    reason_tags: list[str] = Field(default_factory=list)
+    user_note: str = ""
+    created_at: str
+
+    @field_validator("schema_version")
+    @classmethod
+    def schema_version_must_match(cls, value: str) -> str:
+        if not SEMVER_RE.match(value):
+            raise ValueError("schema_version must use semver, for example 0.1.0")
+        if value != SCHEMA_VERSION:
+            raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
+        return value
+
+
 class PosterFeedbackSignalLog(PosterArtifact):
     artifact_type: Literal["poster_feedback_signal_log"] = "poster_feedback_signal_log"
     project_id: str
     run_id: str
-    source_of_truth: str = "poster_feedback.example.json"
+    source_of_truth: str = "poster_feedback.jsonl"
     is_primary_feedback_store: Literal[False] = False
     signals: list[PosterFeedbackSignal] = Field(default_factory=list)
 
@@ -144,6 +167,29 @@ class PosterMemoryCandidate(SchemaBase):
     requires_human_review: bool = True
     recommended_action: str = "promote_to_project_profile"
     status: Literal["pending_review"] = "pending_review"
+
+
+class PosterMemoryReviewEvent(SchemaBase):
+    schema_version: str = SCHEMA_VERSION
+    review_id: str
+    project_id: str
+    run_id: str
+    memory_candidate_id: str
+    decision: Literal["accepted", "rejected", "merged", "expired"]
+    review_mode: Literal["demo_human_review_gate"] = "demo_human_review_gate"
+    reviewer: Literal["demo_human_review_gate"] = "demo_human_review_gate"
+    source_artifact: Literal["poster_memory_candidates.jsonl"] = "poster_memory_candidates.jsonl"
+    writes_long_term_memory: Literal[False] = False
+    reason: str
+
+    @field_validator("schema_version")
+    @classmethod
+    def schema_version_must_match(cls, value: str) -> str:
+        if not SEMVER_RE.match(value):
+            raise ValueError("schema_version must use semver, for example 0.1.0")
+        if value != SCHEMA_VERSION:
+            raise ValueError(f"schema_version must be {SCHEMA_VERSION}")
+        return value
 
 
 class PosterMemoryCandidates(PosterArtifact):
@@ -181,6 +227,34 @@ class PosterPreferenceProfile(PosterArtifact):
     source_memory_candidates: list[str] = Field(default_factory=list)
     scope: Literal["project"] = "project"
     status: Literal["demo_only"] = "demo_only"
+    writes_long_term_memory: Literal[False] = False
+
+
+class ContextBundle(PosterArtifact):
+    artifact_type: Literal["context_bundle"] = "context_bundle"
+    project_id: str
+    run_id: str
+    bundle_id: str
+    target_artifact: Literal["next_round_prompt"] = "next_round_prompt"
+    project_prefix_path: str
+    preference_profile_path: str
+    source_artifacts: dict[str, str] = Field(default_factory=dict)
+    context_layers: dict[str, Any] = Field(default_factory=dict)
+    quality_rules: list[str] = Field(default_factory=list)
+    cache_plan: dict[str, Any] = Field(default_factory=dict)
+    retrieval_status: Literal["not_configured"] = "not_configured"
+    writes_long_term_memory: Literal[False] = False
+
+
+class ContextAssemblyTrace(PosterArtifact):
+    artifact_type: Literal["context_assembly_trace"] = "context_assembly_trace"
+    project_id: str
+    run_id: str
+    bundle_id: str
+    selection_decisions: list[dict[str, Any]] = Field(default_factory=list)
+    budget: dict[str, Any] = Field(default_factory=dict)
+    rejected_context: list[dict[str, Any]] = Field(default_factory=list)
+    cache_key: str
     writes_long_term_memory: Literal[False] = False
 
 

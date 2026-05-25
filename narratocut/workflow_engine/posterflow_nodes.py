@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
@@ -8,14 +11,17 @@ from narratocut.workflow_engine.definitions import WorkflowStepDefinition
 from narratocut.workflow_engine.registry import NodeRegistry
 from narratostudio.posterflow.provider import OpenAICompatibleImageProvider
 from narratostudio.posterflow.report import render_poster_preview, render_poster_report
+from narratostudio.posterflow.context_runtime import build_context_assembly_trace, build_context_bundle
 from narratostudio.posterflow.sop import (
     accept_memory_candidates,
     build_feedback_signal_log,
+    build_memory_review_events,
     build_next_round_prompt,
     build_poster_plan,
     build_poster_prompt_pack,
     build_preference_profile,
     build_project_prefix,
+    build_raw_feedback_events,
     extract_memory_candidates,
     load_poster_brief,
 )
@@ -29,6 +35,7 @@ def register_posterflow_nodes(registry: NodeRegistry) -> None:
     registry.register("posterflow_apply_demo_feedback", apply_demo_feedback_node)
     registry.register("posterflow_extract_memory", extract_poster_memory_node)
     registry.register("posterflow_build_profile", build_poster_profile_node)
+    registry.register("posterflow_build_context", build_context_node)
     registry.register("posterflow_build_next_prompt", build_next_prompt_node)
     registry.register("posterflow_write_report", write_poster_report_node)
 
@@ -94,25 +101,39 @@ def apply_demo_feedback_node(step: WorkflowStepDefinition, context: WorkflowCont
         project_id=context.state["poster_brief"].project_id,
         run_id=context.run_id,
     )
+    raw_feedback = build_raw_feedback_events(feedback, created_at=datetime.now(UTC).isoformat())
+    raw_feedback_ref = _require_output(step, "poster_feedback")
     output_ref = _require_output(step, "poster_feedback_signal_log")
+    _write_jsonl(context.output_path(raw_feedback_ref), raw_feedback)
     write_json(context.output_path(output_ref), feedback)
+    context.state["poster_feedback"] = raw_feedback
     context.state["poster_feedback_signal_log"] = feedback
+    context.artifacts["poster_feedback"] = raw_feedback_ref
     context.artifacts["poster_feedback_signal_log"] = output_ref
-    return [output_ref]
+    return [raw_feedback_ref, output_ref]
 
 
 def extract_poster_memory_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     memory = extract_memory_candidates(context.state["poster_feedback_signal_log"])
     decisions = accept_memory_candidates(memory)
+    review = build_memory_review_events(decisions)
+    memory_jsonl_ref = _require_output(step, "poster_memory_candidates_jsonl")
     memory_ref = _require_output(step, "poster_memory_candidates")
     decisions_ref = _require_output(step, "poster_memory_decisions")
+    review_ref = _require_output(step, "poster_memory_review")
+    _write_jsonl(context.output_path(memory_jsonl_ref), memory.candidates)
     write_json(context.output_path(memory_ref), memory)
     write_json(context.output_path(decisions_ref), decisions)
+    _write_jsonl(context.output_path(review_ref), review)
+    context.state["poster_memory_candidates_jsonl"] = memory.candidates
     context.state["poster_memory_candidates"] = memory
     context.state["poster_memory_decisions"] = decisions
+    context.state["poster_memory_review"] = review
+    context.artifacts["poster_memory_candidates_jsonl"] = memory_jsonl_ref
     context.artifacts["poster_memory_candidates"] = memory_ref
     context.artifacts["poster_memory_decisions"] = decisions_ref
-    return [memory_ref, decisions_ref]
+    context.artifacts["poster_memory_review"] = review_ref
+    return [memory_jsonl_ref, memory_ref, decisions_ref, review_ref]
 
 
 def build_poster_profile_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -131,10 +152,30 @@ def build_poster_profile_node(step: WorkflowStepDefinition, context: WorkflowCon
     return [profile_ref, prefix_ref]
 
 
+def build_context_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    bundle = build_context_bundle(
+        context.state["poster_prompt_pack"],
+        context.state["poster_preference_profile"],
+        project_prefix_path=context.artifacts["project_prefix"],
+        preference_profile_path=context.artifacts["poster_preference_profile"],
+    )
+    trace = build_context_assembly_trace(bundle)
+    bundle_ref = _require_output(step, "context_bundle")
+    trace_ref = _require_output(step, "context_assembly_trace")
+    write_json(context.output_path(bundle_ref), bundle)
+    write_json(context.output_path(trace_ref), trace)
+    context.state["context_bundle"] = bundle
+    context.state["context_assembly_trace"] = trace
+    context.artifacts["context_bundle"] = bundle_ref
+    context.artifacts["context_assembly_trace"] = trace_ref
+    return [bundle_ref, trace_ref]
+
+
 def build_next_prompt_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     next_prompt = build_next_round_prompt(
         context.state["poster_prompt_pack"],
         context.state["poster_preference_profile"],
+        context.state.get("context_bundle"),
     )
     output_ref = _require_output(step, "next_round_prompt")
     write_json(context.output_path(output_ref), next_prompt)
@@ -184,3 +225,22 @@ def _require_output(step: WorkflowStepDefinition, name: str) -> str:
     if name not in step.outputs:
         raise ValueError(f"Step {step.id} missing required output: {name}")
     return step.outputs[name]
+
+
+def _write_jsonl(path: Path, rows: list[Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps(_to_jsonable(row), ensure_ascii=False) for row in rows]
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    return path
+
+
+def _to_jsonable(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, list):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _to_jsonable(item) for key, item in value.items()}
+    return value

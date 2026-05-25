@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from narratostudio.posterflow.schemas import (
+    ContextAssemblyTrace,
+    ContextBundle,
     NextRoundPrompt,
     PosterBrief,
     PosterCandidatesManifest,
@@ -13,6 +15,8 @@ from narratostudio.posterflow.schemas import (
 )
 
 __all__ = [
+    "ContextAssemblyTrace",
+    "ContextBundle",
     "NextRoundPrompt",
     "PosterBrief",
     "PosterCandidatesManifest",

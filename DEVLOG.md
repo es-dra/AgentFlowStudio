@@ -1591,3 +1591,41 @@
 - Added `agentflow.contracts.examples` with schema version, committed AgentFlow example paths, artifact type constants, and read-only JSON/JSONL loading helpers.
 - Updated contract example tests to reuse the platform helper constants instead of duplicating example path lists.
 - Boundary kept: no validators, workflow nodes, CLI commands, artifact contracts, providers, database, Web UI, Router runtime, skill runtime, or Memory runtime were moved or added.
+
+## 2026-05-25 - AFS-MEM-001 PosterFlow Memory OS Loop
+
+- Started `codex/memory-os-loop` in global worktree `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` because the main checkout contained intentional uncommitted company-rule projection files.
+- Added PosterFlow sidecar Memory OS artifacts while preserving the existing JSON artifacts:
+  - `poster_feedback.jsonl` as the raw feedback source of truth.
+  - `poster_memory_candidates.jsonl` as candidate-only memory rows.
+  - `poster_memory_review.jsonl` as explicit demo human-review decisions with `writes_long_term_memory: false`.
+- Kept the slice local and contract-oriented: no remote-provider behavior changed, no durable Memory runtime was added, and no `agentflow/memory/*` runtime expansion was started.
+- Extended PosterFlow quality checks and run manifest defaults so inspect/review can reject missing raw feedback, feedback logs that replace raw feedback, JSON/JSONL mismatches, and memory review rows claiming durable writes.
+- Used a read-only Explorer subagent for code-location confirmation only; implementation stayed on the main controller to avoid overlapping write scopes.
+- Verification:
+  - targeted red step: new PosterFlow tests failed on missing `poster_feedback.jsonl` / `poster_memory_review.jsonl`.
+  - `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py`: 14 passed.
+  - `python -m pytest`: 487 passed.
+  - `git diff --check`: passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+- Boundary kept: this is structure/runtime verification for artifact contracts, not human acceptance of poster creative quality or business validation of Memory OS.
+
+## 2026-05-25 - AFS-CTX-001 PosterFlow Context Runtime Trace
+
+- Continued as a stacked slice on `codex/memory-os-loop` because the Context Runtime artifacts depend on the unintegrated AFS-MEM-001 feedback and memory-review artifacts.
+- Added a minimal PosterFlow context assembly layer:
+  - `context_bundle.json` records hot/warm/cold/policy context layers, project prefix path, preference profile path, source artifacts, quality rules, retrieval status, and cache plan.
+  - `context_assembly_trace.json` records why project prefix, preference profile, retrieval memory, and quality policy were included or excluded.
+- Added `narratostudio.posterflow.context_runtime` so context assembly logic stays out of `sop.py` and files remain under the 300-line target.
+- Updated `next_round_prompt.json` memory context to reference `context_bundle.json` and the generated cache key.
+- Extended PosterFlow inspect/review checks to validate context bundle/profile/prefix refs, trace-to-bundle refs, cache-key match, and no long-term memory writes.
+- Verification:
+  - targeted red step: `tests/test_posterflow_workflow.py` failed on missing `ContextBundle` / `ContextAssemblyTrace` schema.
+  - `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py`: 15 passed.
+  - `python -m pytest`: 488 passed.
+  - `git diff --check`: passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+- Boundary kept: this is an artifact-first Context Runtime trace, not RAG, not prefix-cache service, not Router runtime, and not model/provider orchestration.
+- Follow-up: before starting `AFS-QLT-001`, integrate or intentionally keep this stacked branch; `narratocut/harness/posterflow_quality.py` is now 285 lines and should be split before adding more PosterFlow quality checks.

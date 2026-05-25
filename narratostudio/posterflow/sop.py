@@ -5,14 +5,17 @@ from pathlib import Path
 from typing import Any
 
 from narratostudio.posterflow.schemas import (
+    ContextBundle,
     NextRoundPrompt,
     PosterBrief,
+    PosterRawFeedbackEvent,
     PosterFeedbackSignal,
     PosterFeedbackSignalLog,
     PosterMemoryCandidate,
     PosterMemoryCandidates,
     PosterMemoryDecision,
     PosterMemoryDecisions,
+    PosterMemoryReviewEvent,
     PosterPlan,
     PosterPreferenceProfile,
     PosterPromptPack,
@@ -102,9 +105,30 @@ def build_feedback_signal_log(
     return PosterFeedbackSignalLog(
         project_id=project_id,
         run_id=run_id,
-        source_of_truth=Path(feedback_path).name,
+        source_of_truth="poster_feedback.jsonl",
         signals=signals,
     )
+
+
+def build_raw_feedback_events(
+    feedback: PosterFeedbackSignalLog,
+    *,
+    created_at: str,
+) -> list[PosterRawFeedbackEvent]:
+    return [
+        PosterRawFeedbackEvent(
+            feedback_id=signal.feedback_id,
+            project_id=feedback.project_id,
+            run_id=feedback.run_id,
+            source=signal.source,
+            target_id=signal.candidate_id,
+            decision=signal.decision,
+            reason_tags=signal.reason_tags,
+            user_note=signal.user_note,
+            created_at=created_at,
+        )
+        for signal in feedback.signals
+    ]
 
 
 def extract_memory_candidates(feedback: PosterFeedbackSignalLog) -> PosterMemoryCandidates:
@@ -137,6 +161,20 @@ def extract_memory_candidates(feedback: PosterFeedbackSignalLog) -> PosterMemory
             )
         )
     return PosterMemoryCandidates(project_id=feedback.project_id, run_id=feedback.run_id, candidates=candidates)
+
+
+def build_memory_review_events(decisions: PosterMemoryDecisions) -> list[PosterMemoryReviewEvent]:
+    return [
+        PosterMemoryReviewEvent(
+            review_id=decision.decision_id,
+            project_id=decisions.project_id,
+            run_id=decisions.run_id,
+            memory_candidate_id=decision.memory_candidate_id,
+            decision=decision.decision,
+            reason=decision.reason,
+        )
+        for decision in decisions.decisions
+    ]
 
 
 def accept_memory_candidates(memory: PosterMemoryCandidates) -> PosterMemoryDecisions:
@@ -198,6 +236,7 @@ def build_project_prefix(profile: PosterPreferenceProfile) -> str:
 def build_next_round_prompt(
     prompt_pack: PosterPromptPack,
     profile: PosterPreferenceProfile,
+    context_bundle: ContextBundle | None = None,
 ) -> NextRoundPrompt:
     positive_memory = " ".join(profile.visual_preferences + profile.layout_preferences)
     negative_memory = " ".join(profile.negative_visual_preferences)
@@ -208,8 +247,10 @@ def build_next_round_prompt(
         memory_context={
             "project_prefix_path": "project_prefix.md",
             "preference_profile_path": "poster_preference_profile.json",
+            "context_bundle_path": "context_bundle.json" if context_bundle else None,
             "memory_refs": profile.source_memory_candidates,
             "rag_refs": [],
+            "cache_key": context_bundle.cache_plan["cache_key"] if context_bundle else None,
         },
         task_delta={
             "new_request": "Next PosterFlow demo round should reuse confirmed project preferences.",

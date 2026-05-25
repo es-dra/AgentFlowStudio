@@ -9,6 +9,8 @@ from narratocut.harness.inspection import inspect_run
 from narratocut.harness.reviewer import review_run
 from narratostudio.posterflow import provider as poster_provider
 from narratostudio.posterflow.schemas import (
+    ContextAssemblyTrace,
+    ContextBundle,
     NextRoundPrompt,
     PosterCandidatesManifest,
     PosterFeedbackSignalLog,
@@ -47,11 +49,16 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
         "poster_prompt_pack.json",
         "poster_model_invocations.json",
         "poster_candidates_manifest.json",
+        "poster_feedback.jsonl",
         "poster_feedback_signal_log.json",
         "poster_memory_candidates.json",
+        "poster_memory_candidates.jsonl",
         "poster_memory_decisions.json",
+        "poster_memory_review.jsonl",
         "poster_preference_profile.json",
         "project_prefix.md",
+        "context_bundle.json",
+        "context_assembly_trace.json",
         "next_round_prompt.json",
         "poster_report.md",
         "poster_preview.html",
@@ -70,13 +77,34 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     feedback = PosterFeedbackSignalLog.model_validate(_json(output_dir / "poster_feedback_signal_log.json"))
     memory = PosterMemoryCandidates.model_validate(_json(output_dir / "poster_memory_candidates.json"))
     profile = PosterPreferenceProfile.model_validate(_json(output_dir / "poster_preference_profile.json"))
+    context_bundle = ContextBundle.model_validate(_json(output_dir / "context_bundle.json"))
+    context_trace = ContextAssemblyTrace.model_validate(_json(output_dir / "context_assembly_trace.json"))
     next_prompt = NextRoundPrompt.model_validate(_json(output_dir / "next_round_prompt.json"))
+    raw_feedback = _jsonl(output_dir / "poster_feedback.jsonl")
+    memory_candidates = _jsonl(output_dir / "poster_memory_candidates.jsonl")
+    memory_review = _jsonl(output_dir / "poster_memory_review.jsonl")
 
+    assert feedback.source_of_truth == "poster_feedback.jsonl"
     assert feedback.is_primary_feedback_store is False
+    assert {event["target_id"] for event in raw_feedback} == {"candidate_001", "candidate_002", "candidate_003"}
+    assert {event["target_type"] for event in raw_feedback} == {"poster_candidate"}
+    assert {candidate["promotion_status"] for candidate in memory_candidates} == {"candidate"}
     assert {candidate.promotion_status for candidate in memory.candidates} == {"candidate"}
+    assert {decision["writes_long_term_memory"] for decision in memory_review} == {False}
+    assert {decision["review_mode"] for decision in memory_review} == {"demo_human_review_gate"}
     assert profile.status == "demo_only"
     assert profile.writes_long_term_memory is False
+    assert context_bundle.project_prefix_path == "project_prefix.md"
+    assert context_bundle.preference_profile_path == "poster_preference_profile.json"
+    assert context_bundle.context_layers["hot"]["project_prefix"] == "project_prefix.md"
+    assert set(context_bundle.context_layers["warm"]["memory_refs"]) == set(profile.source_memory_candidates)
+    assert context_bundle.cache_plan["cache_key"].startswith(f"{profile.project_id}:1:")
+    assert {decision["status"] for decision in context_trace.selection_decisions} == {"included", "excluded"}
+    assert "no_rag_configured" in {
+        decision["reason"] for decision in context_trace.selection_decisions if decision["status"] == "excluded"
+    }
     assert next_prompt.memory_context["preference_profile_path"] == "poster_preference_profile.json"
+    assert next_prompt.memory_context["context_bundle_path"] == "context_bundle.json"
     assert "candidate_001.png" in (output_dir / "poster_preview.html").read_text(encoding="utf-8")
 
 
@@ -125,3 +153,7 @@ def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
 
 def _json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]

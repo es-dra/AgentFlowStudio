@@ -32,17 +32,25 @@ steps:
     inputs:
       poster_feedback: examples/posterflow/poster_feedback.example.json
     outputs:
+      poster_feedback: poster_feedback.jsonl
       poster_feedback_signal_log: poster_feedback_signal_log.json
   - id: extract_poster_memory
     type: posterflow_extract_memory
     outputs:
+      poster_memory_candidates_jsonl: poster_memory_candidates.jsonl
       poster_memory_candidates: poster_memory_candidates.json
       poster_memory_decisions: poster_memory_decisions.json
+      poster_memory_review: poster_memory_review.jsonl
   - id: build_poster_profile
     type: posterflow_build_profile
     outputs:
       poster_preference_profile: poster_preference_profile.json
       project_prefix: project_prefix.md
+  - id: build_context
+    type: posterflow_build_context
+    outputs:
+      context_bundle: context_bundle.json
+      context_assembly_trace: context_assembly_trace.json
   - id: build_next_round_prompt
     type: posterflow_build_next_prompt
     outputs:
