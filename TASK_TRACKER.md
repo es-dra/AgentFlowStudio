@@ -23,8 +23,8 @@ docs/company_operating_model.md
 | ID | Branch / worktree | Owner role | Scope | Status | Verification | Evidence / notes |
 |---|---|---|---|---|---|---|
 | AFS-OPS-001 | `codex/company-os-projection` | Orchestrator | Project-facing projection of Company rules into `AGENTS.md`, `docs/company_operating_model.md`, and `TASK_TRACKER.md` | completed | `git diff --check`; targeted doc review | Completed in main checkout per user request |
-| AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | implemented, pending integration | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 14 passed; `python -m pytest` -> 487 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL in worktree |
-| AFS-CTX-001 | stacked on `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | implemented, pending integration | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Stacked because AFS-MEM-001 is not integrated yet |
+| AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL |
+| AFS-CTX-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Integrated together with AFS-MEM-001 because both slices share schema/workflow/quality surfaces |
 | AFS-QLT-001 | `codex/quality-feedback-signals` | Worker + QA | Add failure attribution / quality feedback signal path for Memory OS learning loop | planned | harness quality tests | Should not block context trace |
 | AFS-DEMO-001 | `codex/posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | planned | PosterFlow workflow/quality/provider tests; inspect/review artifacts | Starts after memory/context artifacts stabilize |
 
@@ -32,16 +32,24 @@ docs/company_operating_model.md
 
 Current gate:
 
-- Do not start a third feature track on `codex/memory-os-loop`.
-- `AFS-MEM-001` and `AFS-CTX-001` are intentionally stacked because the
-  context trace consumes the memory-loop artifacts.
-- The next task is integration cleanup: review scope, decide whether to split
-  into one or two commits, re-run verification, and integrate or explicitly
-  preserve the stack.
-- `AFS-QLT-001` is blocked until the integration boundary is handled.
+- `AFS-MEM-001` and `AFS-CTX-001` are integrated to `master`.
+- The next code track can start, but `AFS-QLT-001` must begin by splitting or
+  refactoring `narratocut/harness/posterflow_quality.py`.
 - Before `AFS-QLT-001`, split or refactor
   `narratocut/harness/posterflow_quality.py`; it is close to the 300-line
   project limit.
+
+## Remote Branch Hygiene
+
+Current branch classification as of 2026-05-25:
+
+| Branch | Classification | Next action |
+|---|---|---|
+| `origin/codex/memory-os-loop` | integrated to `master` | Delete after confirming GitHub branch protection / PR preference. |
+| `origin/codex/posterflow-memory-demo` | stale pre-merge PosterFlow demo branch | Compare against PR #71 history; likely delete after confirming no unique changes are needed. |
+| `origin/codex/posterflow-minimax-provider-tests` | unintegrated provider branch | Keep as candidate future provider track. |
+| `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with MiniMax provider changes | Keep until split or reviewed. |
+| `origin/codex/narratocut-web-ui` | independent Web UI line | Keep, but repair or recreate its worktree under the AgentFlowStudio path before further development. |
 
 ## Current Task Detail
 
