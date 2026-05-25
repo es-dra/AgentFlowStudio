@@ -21,6 +21,20 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 
 ## Operating Rules
 
+- Treat `D:\Learning materials\Learning_notes\Company` as the local company
+  source-of-truth knowledge base. This repository should contain only the
+  execution-facing projection needed for AgentFlow Studio development.
+- Use the company AI-native workflow hierarchy when planning substantial work:
+  Company source rules -> global workflow skills -> project `AGENTS.md` ->
+  task tracker / branch handoff.
+- Do not copy confidential company strategy, private retrospectives, real costs,
+  provider secrets, customer details, or unpublished business assumptions from
+  `Company/` into this repository.
+- For multi-line development, keep the main checkout stable and use isolated
+  `codex/*` worktrees with explicit write scopes, verification commands, and
+  integration order.
+- Agent/subagent work must use bounded tasks: goal, non-goals, write scope,
+  acceptance criteria, verification, remote-provider policy, and return format.
 - Do not migrate code from `D:\Projects\AVP` unless the user explicitly asks.
 - Do not commit secrets, provider keys, signed URLs, cookies, tokens, or private credentials.
 - Do not commit large media files or generated runtime artifacts.
@@ -30,6 +44,10 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 - Keep files focused. Ideal file length is 300 lines or less.
 - Keep `workflow_engine` responsible for execution order.
 - Keep `harness` responsible for task contracts, evidence, and gates.
+- Distinguish structure verification, runtime verification, human acceptance,
+  and business validation in reports and handoffs.
+- Candidate memory, demo artifacts, and successful tests are evidence, not
+  durable company memory or product validation until explicitly reviewed.
 
 ## Local Configuration
 
@@ -48,3 +66,7 @@ python -m apps.cli.main --help
 python -m apps.cli.main version
 pytest
 ```
+
+For current AI-native company workflow projection, also keep
+`TASK_TRACKER.md` current for multi-session work and read
+`docs/company_operating_model.md` before opening parallel workstreams.
