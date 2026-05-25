@@ -45,7 +45,7 @@ Current branch classification as of 2026-05-25:
 
 | Branch | Classification | Next action |
 |---|---|---|
-| `origin/codex/memory-os-loop` | integrated to `master` | Delete after confirming GitHub branch protection / PR preference. |
+| `origin/codex/memory-os-loop` | integrated to `master` | Deleted after fast-forward merge and verification. |
 | `origin/codex/posterflow-memory-demo` | stale pre-merge PosterFlow demo branch | Compare against PR #71 history; likely delete after confirming no unique changes are needed. |
 | `origin/codex/posterflow-minimax-provider-tests` | unintegrated provider branch | Keep as candidate future provider track. |
 | `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with MiniMax provider changes | Keep until split or reviewed. |
