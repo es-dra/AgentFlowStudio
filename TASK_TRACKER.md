@@ -25,7 +25,7 @@ docs/company_operating_model.md
 | AFS-OPS-001 | `codex/company-os-projection` | Orchestrator | Project-facing projection of Company rules into `AGENTS.md`, `docs/company_operating_model.md`, and `TASK_TRACKER.md` | completed | `git diff --check`; targeted doc review | Completed in main checkout per user request |
 | AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL |
 | AFS-CTX-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Integrated together with AFS-MEM-001 because both slices share schema/workflow/quality surfaces |
-| AFS-QLT-001 | `codex/quality-feedback-signals` | Worker + QA | Add failure attribution / quality feedback signal path for Memory OS learning loop | planned | harness quality tests | Should not block context trace |
+| AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | implemented, pending integration | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed | Started after AFS-MEM-001 / AFS-CTX-001 integration |
 | AFS-DEMO-001 | `codex/posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | planned | PosterFlow workflow/quality/provider tests; inspect/review artifacts | Starts after memory/context artifacts stabilize |
 
 ## Integration Gate
@@ -33,11 +33,10 @@ docs/company_operating_model.md
 Current gate:
 
 - `AFS-MEM-001` and `AFS-CTX-001` are integrated to `master`.
-- The next code track can start, but `AFS-QLT-001` must begin by splitting or
-  refactoring `narratocut/harness/posterflow_quality.py`.
-- Before `AFS-QLT-001`, split or refactor
-  `narratocut/harness/posterflow_quality.py`; it is close to the 300-line
-  project limit.
+- `AFS-QLT-001` is implemented in its own worktree and pending integration.
+- Do not start `AFS-DEMO-001` on top of `AFS-QLT-001`; it should branch from
+  `master` after this quality branch is integrated, or explicitly consume this
+  branch only after review.
 
 ## Remote Branch Hygiene
 
@@ -166,8 +165,7 @@ D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
 
 Status:
 
-- implemented as a stacked follow-up on `codex/memory-os-loop`; pending final
-  integration / commit flow
+- integrated to `master` with AFS-MEM-001
 
 Evidence:
 
@@ -176,9 +174,43 @@ Evidence:
 
 Follow-up:
 
-- Before starting `AFS-QLT-001`, either integrate this stacked branch or
-  explicitly continue stacked. `narratocut/harness/posterflow_quality.py` is at
-  285 lines and should be split before adding more quality checks.
+- AFS-QLT-001 started after this integration and handles the quality harness
+  split plus candidate quality feedback signals.
+
+### AFS-QLT-001: PosterFlow Quality Feedback Signals
+
+Goal:
+
+- Split the PosterFlow quality harness so future checks do not expand one large
+  file, then add a minimal quality-failure feedback signal path for Memory OS
+  learning.
+
+Acceptance criteria:
+
+- [x] `narratocut/harness/posterflow_quality.py` is reduced below 300 lines.
+- [x] JSON/JSONL reading and schema checks are moved into a focused module.
+- [x] Cross-artifact reference checks are moved into a focused module.
+- [x] Failed PosterFlow quality checks produce candidate feedback signals in
+      `quality_report.json`.
+- [x] Passing PosterFlow runs produce zero quality feedback signals.
+- [x] Quality feedback signals are candidate-only and set
+      `writes_long_term_memory: false`.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py
+# 15 passed
+```
+
+Status:
+
+- implemented in worktree; pending full verification / integration
+
+Evidence:
+
+- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals`
+- Branch: `codex/quality-feedback-signals`
 
 ## Planned Worktree Layout
 

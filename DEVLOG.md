@@ -1629,3 +1629,25 @@
   - `python -m apps.cli.main version`: `0.1.0`.
 - Boundary kept: this is an artifact-first Context Runtime trace, not RAG, not prefix-cache service, not Router runtime, and not model/provider orchestration.
 - Follow-up: before starting `AFS-QLT-001`, integrate or intentionally keep this stacked branch; `narratocut/harness/posterflow_quality.py` is now 285 lines and should be split before adding more PosterFlow quality checks.
+
+## 2026-05-25 - AFS-QLT-001 PosterFlow Quality Feedback Signals
+
+- Started `codex/quality-feedback-signals` from clean `master` after integrating
+  AFS-MEM-001 and AFS-CTX-001.
+- Split `narratocut/harness/posterflow_quality.py` into focused modules:
+  - `posterflow_quality_io.py` for required artifacts, JSON/JSONL parsing, and schema checks.
+  - `posterflow_quality_references.py` for cross-artifact reference checks and candidate counts.
+  - `posterflow_quality_feedback.py` for candidate quality feedback signals from failed checks.
+- Reduced `posterflow_quality.py` from 338 lines to 102 lines; all new modules
+  stay under the 300-line project limit.
+- Added a minimal quality feedback path:
+  - failed PosterFlow quality checks emit `quality_report.json.feedback_signals`;
+  - passing PosterFlow runs emit no feedback signals;
+  - feedback signals are candidate-only and set `writes_long_term_memory: false`.
+- TDD evidence:
+  - red: `tests/test_posterflow_quality.py::test_posterflow_review_fails_when_candidate_image_is_missing` failed with missing `feedback_signals`.
+  - green: the same test passed after adding `posterflow_quality_feedback.py`.
+- Verification:
+  - `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py`: 15 passed.
+- Boundary kept: no durable Memory runtime, no RAG, no provider behavior change,
+  no workflow output contract change, and no automatic long-term memory write.

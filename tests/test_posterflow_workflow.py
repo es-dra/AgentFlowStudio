@@ -126,6 +126,8 @@ def test_posterflow_inspect_and_review_pass_for_valid_run(monkeypatch, tmp_path)
 
     assert inspection["status"] == "pass"
     assert inspection["quality_report"]["summary"]["quality_profile"] == "posterflow_memory_demo"
+    assert inspection["quality_report"]["summary"]["quality_feedback_signal_count"] == 0
+    assert inspection["quality_report"]["feedback_signals"] == []
     assert review["status"] == "passed"
     assert "posterflow_artifacts" in [section["name"] for section in review["sections"]]
 

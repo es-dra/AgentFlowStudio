@@ -36,10 +36,23 @@ def test_posterflow_review_fails_when_candidate_image_is_missing(monkeypatch, tm
 
     inspection = inspect_run(output_dir)
     review = review_run(output_dir)
+    signals = inspection["quality_report"]["feedback_signals"]
 
     assert inspection["status"] == "fail"
     assert review["status"] == "failed"
     assert "posterflow_candidate_images_exist" in _failed_ids(review)
+    assert inspection["quality_report"]["summary"]["quality_feedback_signal_count"] >= 1
+    assert {
+        signal["source_check_id"]
+        for signal in signals
+    } >= {"posterflow_candidate_images_exist"}
+    candidate_signal = next(
+        signal for signal in signals if signal["source_check_id"] == "posterflow_candidate_images_exist"
+    )
+    assert candidate_signal["failure_category"] == "generated_artifact_failure"
+    assert candidate_signal["status"] == "candidate"
+    assert candidate_signal["writes_long_term_memory"] is False
+    assert candidate_signal["evidence_refs"] == ["quality_report.json"]
 
 
 def test_posterflow_review_fails_when_feedback_references_unknown_candidate(monkeypatch, tmp_path) -> None:
