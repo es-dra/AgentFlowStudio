@@ -132,11 +132,14 @@ data/processed/runs/local_alpha_0_4_product_loop
 Expected evidence files include:
 
 - `run_manifest.json`
+- `trace.json`
 - `transcript.json`
 - `script_highlight_alignment.json`
 - `boundary_signal_manifest.json`
+- `candidate_windows.json`
 - `highlight_score_report.json`
 - `selection_diagnostics.json`
+- `highlight_plan.json`
 - `clip_plan.json`
 - `clip_plan_validation.json`
 - `real_slice_manifest.json`
@@ -147,6 +150,9 @@ Expected evidence files include:
 - `quality_report.json` from `inspect-run`
 - `review_report.json` from `review-run`
 - `package_report.md` from `package-report`
+- `clips/`
+- `final_video.mp4`
+- `final_video_with_bgm.mp4`
 
 The Web lane may reference these paths in operator feedback, but it must not
 persist browser state, upload files, scan directories automatically, or store
@@ -154,13 +160,24 @@ provider configuration.
 
 ## Blocked-State Rules
 
-If any required ignored input is missing, `AFS-RUN-PACKAGE-001` should return
-`BLOCKED` rather than creating substitute sample media or claiming product
-acceptance.
+If any required ignored input or local media tool is missing,
+`AFS-RUN-PACKAGE-001` should return `BLOCKED` rather than creating substitute
+sample media or claiming product acceptance.
+
+Blocking checks include:
+
+| Missing item | Blocker category |
+|---|---|
+| `data/raw/demo_real_video/input.mp4` | missing source video |
+| `data/raw/demo_bgm/bgm.wav` | missing BGM audio |
+| `data/models/faster-whisper/` | missing local ASR model cache |
+| `data/processed/local_alpha_0_4/video_script_local_asr_input.json` | missing local input bundle |
+| FFmpeg or FFprobe unavailable | missing local media tool |
 
 The blocked handoff must list:
 
 - exact missing paths;
+- whether the missing item is local media, model cache, input bundle, or tool;
 - the command that was attempted or intentionally skipped;
 - whether the repository state stayed clean except committed docs/handoff
   updates;
