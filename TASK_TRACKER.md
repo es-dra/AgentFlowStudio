@@ -50,9 +50,10 @@ Current gate:
 - `AFS-WEB-REPLAY` is integrated to `master` at `5d0392f`.
 - The old preserved Web UI branch `origin/codex/narratocut-web-ui` at
   `de8ca8e` is now superseded by the replay branch. Do not merge it into
-  `master`; it can be archived after push/remote cleanup.
-- All four lanes from the current dispatch batch are integrated. The next gate
-  is mainline full verification, push, and branch/worktree cleanup.
+  `master`; it should be deleted remotely after the current mainline is pushed.
+- All four lanes from the current dispatch batch are integrated. Mainline full
+  verification passed with 548 tests. The four replay/integration worktrees and
+  local branches were removed after merge.
 - `AFS-OPS-002` is complete; the current work is integration and consolidation
   of the four already-opened parallel lanes.
 
@@ -122,7 +123,19 @@ Current branch classification as of 2026-05-26:
 | `origin/codex/posterflow-minimax-rebase` | integrated replacement provider branch | Deleted after fast-forward integration and verification. |
 | `origin/codex/alpha-readiness-evidence` | stale stacked alpha evidence branch | Deleted after `AFS-ALPHA-001` replayed the evidence on current `master`. |
 | `origin/codex/alpha-readiness-rebase` | integrated replacement alpha evidence branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/narratocut-web-ui` | preserved independent Web UI line | Keep. Worktree repaired and moved to the AgentFlowStudio path; next action is rebase/replay before any merge to `master`. |
+| `origin/codex/narratocut-web-ui` | superseded independent Web UI line | Delete after pushing current `master`. The replay branch integrated the useful Web UI surface and the old branch would now regress `apps/cli/main.py`, `apps/web_bridge/bridge.py`, Web bridge tests, and handoff docs. |
+
+Current local cleanup as of 2026-05-27:
+
+- Removed integrated worktrees:
+  `afs-prod-alpha-smoke`, `afs-quality-evidence-summary`,
+  `afs-memory-promotion-review`, and `afs-web-ui-replay`.
+- Deleted integrated local branches:
+  `codex/afs-prod-alpha-smoke`, `codex/afs-quality-evidence-summary`,
+  `codex/afs-memory-promotion-review`, and `codex/afs-web-ui-replay`.
+- Preserved local historical worktree:
+  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui`
+  until remote cleanup is complete.
 
 ## Current Task Detail
 
