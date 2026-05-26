@@ -9,7 +9,7 @@ from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
 from narratocut.workflow_engine.registry import NodeRegistry
-from narratostudio.posterflow.provider import OpenAICompatibleImageProvider
+from narratostudio.posterflow.provider import create_image_provider_from_env
 from narratostudio.posterflow.report import render_poster_preview, render_poster_report
 from narratostudio.posterflow.context_runtime import build_context_assembly_trace, build_context_bundle
 from narratostudio.posterflow.sop import (
@@ -84,7 +84,7 @@ def build_poster_prompt_pack_node(step: WorkflowStepDefinition, context: Workflo
 
 def generate_poster_candidates_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
     candidate_count = int(step.inputs.get("candidate_count", 3))
-    provider = OpenAICompatibleImageProvider.from_env()
+    provider = create_image_provider_from_env()
     manifest, invocations = provider.generate(
         context.state["poster_prompt_pack"],
         context.output_dir,
@@ -198,7 +198,7 @@ def generate_round_2_node(step: WorkflowStepDefinition, context: WorkflowContext
         context.state["poster_prompt_pack"],
         context.state["next_round_prompt"],
     )
-    provider = OpenAICompatibleImageProvider.from_env()
+    provider = create_image_provider_from_env()
     manifest, invocations = provider.generate(
         prompt_pack,
         context.output_dir / round_dir,

@@ -26,17 +26,17 @@ docs/company_operating_model.md
 | AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL |
 | AFS-CTX-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Integrated together with AFS-MEM-001 because both slices share schema/workflow/quality surfaces |
 | AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | integrated to `master` | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Remote/local branch and worktree deleted after integration |
-| AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | implemented, pending integration | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Adds `round_2/`, `poster_round_comparison.json`, and `poster_two_round_report.md`; keeps remote image calls behind existing env gate |
+| AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Integrated at `ff77b30`; local and remote branch/worktree deleted after verification |
+| AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | implemented, pending integration | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Supersedes stale `origin/codex/posterflow-minimax-provider-tests`; no remote image calls made |
 
 ## Integration Gate
 
 Current gate:
 
 - `AFS-MEM-001`, `AFS-CTX-001`, and `AFS-QLT-001` are integrated to `master`.
-- `AFS-DEMO-001` is active in `codex/posterflow-two-round-demo`.
-- Before opening another PosterFlow feature line, integrate or intentionally
-  keep `AFS-DEMO-001` separate so workflow output-contract changes do not
-  diverge.
+- `AFS-DEMO-001` is integrated to `master` at `ff77b30`.
+- `AFS-PROV-001` is active in `codex/posterflow-minimax-rebase` and should be
+  integrated before deleting the stale MiniMax reference branch.
 
 ## Remote Branch Hygiene
 
@@ -47,8 +47,8 @@ Current branch classification as of 2026-05-26:
 | `origin/codex/memory-os-loop` | integrated to `master` | Deleted after fast-forward merge and verification. |
 | `origin/codex/quality-feedback-signals` | integrated to `master` | Deleted after fast-forward merge and verification. |
 | `origin/codex/posterflow-memory-demo` | patch-equivalent stale pre-merge PosterFlow demo branch | Deleted after `git cherry -v master codex/posterflow-memory-demo` showed the branch patch is already in `master`. |
-| `origin/codex/posterflow-minimax-provider-tests` | unintegrated provider branch | Keep as candidate future provider track. |
-| `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with MiniMax provider changes | Keep until split or reviewed. |
+| `origin/codex/posterflow-minimax-provider-tests` | stale provider reference branch | Do not merge directly; delete after `AFS-PROV-001` is merged because the new branch selectively replays provider code on current `master`. |
+| `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with old MiniMax provider changes | Keep until split or reviewed; do not merge before separating stale provider changes. |
 | `origin/codex/narratocut-web-ui` | independent Web UI line | Keep, but repair or recreate its worktree under the AgentFlowStudio path before further development. |
 
 ## Current Task Detail
@@ -259,7 +259,7 @@ D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_poster
 
 Status:
 
-- implemented in worktree; pending integration
+- integrated to `master` at `ff77b30`
 
 Evidence:
 
@@ -268,6 +268,65 @@ Evidence:
 - Main implementation module: `narratostudio/posterflow/two_round.py`
 - Full verification in the worktree: 489 tests passed, CLI help/version
   passed, and `git diff --check` passed with Windows line-ending warnings only.
+- Branch and worktree were deleted after integration and remote cleanup.
+
+### AFS-PROV-001: PosterFlow MiniMax Provider Replay
+
+Goal:
+
+- Add native MiniMax image provider support to PosterFlow without directly
+  merging the stale old MiniMax branch or changing default provider behavior.
+
+Acceptance criteria:
+
+- [x] `NARRATOCUT_IMAGE_PROVIDER=openai_compatible` remains the default.
+- [x] `NARRATOCUT_IMAGE_PROVIDER=minimax` selects a native MiniMax provider via
+      `create_image_provider_from_env()`.
+- [x] MiniMax requests use `/v1/image_generation`,
+      `response_format=base64`, `image-01` by default, and support base URLs
+      with or without a trailing `/v1`.
+- [x] MiniMax candidate count is validated in-process before any remote call.
+- [x] Provider invocation logs do not include API keys, provider base URLs, raw
+      response ids, or response error bodies.
+- [x] PosterFlow round 1 and round 2 generation nodes use the provider factory
+      and keep the existing remote-image opt-in gate.
+- [x] New and touched code files remain below the 300-line target.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_provider.py
+# 12 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py
+# 22 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
+# 495 passed
+
+git diff --check
+# passed with Windows line-ending warnings only
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+```
+
+Status:
+
+- implemented in worktree; pending integration
+
+Evidence:
+
+- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase`
+- Branch: `codex/posterflow-minimax-rebase`
+- Main implementation modules:
+  `narratostudio/posterflow/minimax_provider.py` and
+  `narratostudio/posterflow/provider_common.py`
+- Reference branch deliberately not merged:
+  `origin/codex/posterflow-minimax-provider-tests`
 
 ## Planned Worktree Layout
 

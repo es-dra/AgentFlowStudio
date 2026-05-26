@@ -8,8 +8,9 @@ import urllib.error
 import pytest
 
 from narratocut.model_gateway import ModelProviderError
-from narratostudio.posterflow import provider as poster_provider
-from narratostudio.posterflow.provider import OpenAICompatibleImageProvider
+from narratostudio.posterflow import minimax_provider, provider as poster_provider
+from narratostudio.posterflow.minimax_provider import MiniMaxImageProvider
+from narratostudio.posterflow.provider import OpenAICompatibleImageProvider, create_image_provider_from_env
 from narratostudio.posterflow.schemas import PosterPromptPack
 
 
@@ -146,6 +147,158 @@ def test_openai_compatible_image_provider_does_not_expose_http_error_body(monkey
     message = str(exc_info.value)
     assert "HTTP error 401" in message
     assert "secret-key" not in message
+
+
+def test_minimax_image_provider_writes_base64_images_without_secrets(monkeypatch, tmp_path) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        captured["headers"] = dict(request.header_items())
+        captured["timeout"] = timeout
+        return FakeResponse(
+            {
+                "id": "minimax_task_001",
+                "data": {"image_base64": [PNG_B64, PNG_B64, PNG_B64]},
+                "metadata": {"success_count": "3", "failed_count": "0"},
+                "base_resp": {"status_code": 0, "status_msg": "success"},
+            }
+        )
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io",
+        api_key="secret-key",
+        model="image-01",
+        timeout_sec=12.5,
+    )
+
+    manifest, invocations = provider.generate(_prompt_pack(), tmp_path, candidate_count=3)
+
+    assert captured["url"] == "https://api.minimax.io/v1/image_generation"
+    assert captured["payload"]["model"] == "image-01"
+    assert captured["payload"]["n"] == 3
+    assert captured["payload"]["response_format"] == "base64"
+    assert captured["payload"]["aspect_ratio"] == "3:4"
+    assert captured["headers"]["Authorization"] == "Bearer secret-key"
+    assert captured["timeout"] == 12.5
+    assert len(manifest.candidates) == 3
+    assert all(candidate.provider == "minimax_image" for candidate in manifest.candidates)
+    assert all((tmp_path / candidate.image_path).is_file() for candidate in manifest.candidates)
+
+    serialized_invocations = json.dumps(invocations.model_dump(mode="json"), ensure_ascii=False)
+    assert "secret-key" not in serialized_invocations
+    assert "api.minimax.io" not in serialized_invocations
+
+
+def test_minimax_image_provider_accepts_v1_base_url_without_double_v1(monkeypatch, tmp_path) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        return FakeResponse(
+            {
+                "data": {"image_base64": [PNG_B64]},
+                "base_resp": {"status_code": 0, "status_msg": "success"},
+            }
+        )
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io/v1",
+        api_key="secret-key",
+        model="image-01",
+    )
+
+    provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
+
+    assert captured["url"] == "https://api.minimax.io/v1/image_generation"
+
+
+def test_minimax_image_provider_rejects_candidate_count_outside_api_range(monkeypatch, tmp_path) -> None:
+    def fake_urlopen(request, timeout):  # pragma: no cover - must not call provider
+        raise AssertionError("MiniMax provider should validate n before remote calls")
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io",
+        api_key="secret-key",
+        model="image-01",
+    )
+
+    with pytest.raises(ModelProviderError, match="candidate_count must be between 1 and 9"):
+        provider.generate(_prompt_pack(), tmp_path, candidate_count=10)
+
+
+def test_minimax_image_provider_does_not_expose_http_error_body(monkeypatch, tmp_path) -> None:
+    def fake_urlopen(request, timeout):
+        raise urllib.error.HTTPError(
+            url=request.full_url,
+            code=401,
+            msg="Unauthorized",
+            hdrs={},
+            fp=io.BytesIO(b'{"status_msg":"secret-key should not enter trace artifacts"}'),
+        )
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io",
+        api_key="secret-key",
+        model="image-01",
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
+
+    message = str(exc_info.value)
+    assert "MiniMax image HTTP error 401" in message
+    assert "secret-key" not in message
+
+
+def test_minimax_image_provider_rejects_nonzero_base_response_without_leaking_message(monkeypatch, tmp_path) -> None:
+    def fake_urlopen(request, timeout):
+        return FakeResponse(
+            {
+                "data": {},
+                "base_resp": {
+                    "status_code": 1004,
+                    "status_msg": "secret-key should not enter trace artifacts",
+                },
+            }
+        )
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io",
+        api_key="secret-key",
+        model="image-01",
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
+
+    message = str(exc_info.value)
+    assert "MiniMax image response status_code 1004" in message
+    assert "secret-key" not in message
+
+
+def test_create_image_provider_from_env_selects_minimax(monkeypatch) -> None:
+    monkeypatch.setenv("NARRATOCUT_IMAGE_PROVIDER", "minimax")
+    monkeypatch.setenv("NARRATOCUT_IMAGE_API_KEY", "secret-key")
+    monkeypatch.delenv("NARRATOCUT_IMAGE_BASE_URL", raising=False)
+    monkeypatch.delenv("NARRATOCUT_IMAGE_MODEL", raising=False)
+
+    provider = create_image_provider_from_env()
+
+    assert isinstance(provider, MiniMaxImageProvider)
+    assert provider.base_url == "https://api.minimax.io"
+    assert provider.model == "image-01"
 
 
 def _prompt_pack() -> PosterPromptPack:

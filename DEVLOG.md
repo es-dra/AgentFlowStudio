@@ -1,5 +1,46 @@
 # DEVLOG
 
+## 2026-05-26 - AFS-PROV-001 PosterFlow MiniMax Provider Replay
+
+- Rebuilt the old MiniMax provider branch on fresh `master` in
+  `codex/posterflow-minimax-rebase` instead of merging
+  `origin/codex/posterflow-minimax-provider-tests` directly. The old branch
+  was stale against current Memory OS, quality, context, and two-round demo
+  contracts.
+- Added a native MiniMax PosterFlow image provider:
+  - `NARRATOCUT_IMAGE_PROVIDER=minimax` selects MiniMax through
+    `create_image_provider_from_env()`.
+  - MiniMax defaults to `https://api.minimax.io` and `image-01`.
+  - The provider calls `/v1/image_generation`, requests base64 output, enforces
+    MiniMax's `n` range of 1 to 9, writes image candidates, and keeps response
+    ids hashed in metadata.
+- Kept existing OpenAI-compatible behavior as the default provider and moved
+  shared remote-image gate / input-hash helpers into
+  `narratostudio.posterflow.provider_common`.
+- Updated PosterFlow round 1 and round 2 generation nodes to use the provider
+  factory while preserving the existing `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`
+  safety gate.
+- Added provider tests for MiniMax payload shape, secret-safe invocation logs,
+  candidate-count validation before remote calls, HTTP/base response error
+  hygiene, env provider selection, and base URLs that already include `/v1`.
+- TDD evidence:
+  - red: `python -m pytest tests/test_posterflow_provider.py` failed with
+    `ModuleNotFoundError: No module named 'narratostudio.posterflow.minimax_provider'`.
+  - red: the `/v1` base-url regression test failed with
+    `https://api.minimax.io/v1/v1/image_generation`.
+  - green: provider tests passed after adding the MiniMax provider and endpoint
+    normalization.
+- Verification:
+  - `python -m pytest tests/test_posterflow_provider.py`: 12 passed.
+  - `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py`: 22 passed.
+  - `python -m pytest`: 495 passed.
+  - `git diff --check`: passed with Windows line-ending warnings only.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+- Boundary kept: no remote image call was made, no secrets were written, no
+  durable Memory runtime or provider orchestration was added, and the stale old
+  MiniMax branch was not integrated directly.
+
 ## 2026-05-23 - PosterFlow Memory Demo Remote Image Workflow
 
 - Added a PosterFlow visual memory demo that runs inside the existing
