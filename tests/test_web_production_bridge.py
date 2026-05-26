@@ -96,8 +96,8 @@ def test_bridge_workflow_profiles_include_readiness_guidance() -> None:
     product = next(workflow for workflow in workflows if workflow["name"] == "video_to_finished_package_local_asr")
     demo = next(workflow for workflow in workflows if workflow["name"] == "mock_text_to_slices")
 
-    assert demo["web_profile"]["next_step_hint"] == "可直接生成计划并运行本机演示。"
-    assert product["web_profile"]["next_step_hint"] == "先补齐本地视频、BGM、FFmpeg/FFprobe 和 local ASR 依赖。"
+    assert demo["web_profile"]["next_step_hint"] == "可直接生成计划并运行本机演示；成功后刷新验收报告。"
+    assert product["web_profile"]["next_step_hint"] == "先补齐本地视频、BGM、FFmpeg/FFprobe 和 local ASR 依赖，再生成计划。"
     assert product["web_profile"]["review_focus"] == ["final_video", "subtitles", "cover", "bgm", "delivery_package"]
 
 

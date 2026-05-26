@@ -484,6 +484,10 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .topbar {
+    position: static;
+  }
+
   .workflow-rail,
   .review-rail {
     position: static;

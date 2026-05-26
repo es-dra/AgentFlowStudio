@@ -43,6 +43,8 @@ export function collectAppElements() {
     refreshReviewButton: document.querySelector("#refresh-review-button"),
     productionOverview: document.querySelector("#production-overview"),
     readinessChecklist: document.querySelector("#readiness-checklist"),
+    productionNextAction: document.querySelector("#production-next-action"),
+    acceptancePathDetail: document.querySelector("#acceptance-path-detail"),
     stepTimeline: document.querySelector("#step-timeline"),
     productionArtifacts: document.querySelector("#production-artifacts"),
     productionVideoPreview: document.querySelector("#production-video-preview"),
