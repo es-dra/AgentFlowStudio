@@ -191,9 +191,10 @@ For Memory OS work, keep these boundaries explicit:
 ## Current Product Push
 
 Mainline is the stable integration surface. Local Alpha 0.2 is integrated and
-cleaned up: the acceptance package, Web UX pass, Memory OS demo hardening, and
-PosterFlow live-smoke checklist are on `master`; temporary branches,
-worktrees, smoke servers, and remote branches were removed.
+cleaned up. Local Alpha 0.3 engineering acceptance is now integrated on
+`master` for the planning boundary, Web operator loop, and Memory runtime
+contract. PosterFlow live image smoke remains intentionally blocked until a
+local image-provider environment is configured.
 
 The next milestone is:
 
@@ -220,19 +221,18 @@ local brief / local media
 Use `docs/local_alpha_0_3_validation_goals.md` as the milestone boundary and
 `TASK_TRACKER.md` as the live project ledger.
 
-Current recommended queue:
+Local Alpha 0.3 queue status:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
-| AFS-PROD-NEXT-001 | Finalize Local Alpha 0.3 task briefs and acceptance matrix | `codex/afs-product-next-briefs` | planning brief exists |
-| AFS-WEB-REVIEW-001 | Make the operator plan/run/review/feedback Web path repeatable | `codex/afs-web-review-loop` | wait for fresh brief |
-| AFS-MEMORY-RUNTIME-001 | Strengthen candidate promotion and context reuse without durable memory writes | `codex/afs-memory-runtime-contract` | wait for fresh brief |
-| AFS-POSTER-LIVE-002 | Run or keep blocked the explicit PosterFlow live image smoke | `codex/afs-poster-live-002` | wait for local provider boundary |
+| AFS-PROD-NEXT-001 | Finalize Local Alpha 0.3 task briefs and acceptance matrix | `codex/afs-product-next-briefs` | integrated |
+| AFS-WEB-REVIEW-001 | Make the operator plan/run/review/feedback Web path repeatable | `codex/afs-web-review-loop` | integrated |
+| AFS-MEMORY-RUNTIME-001 | Strengthen candidate promotion and context reuse without durable memory writes | `codex/afs-memory-runtime-contract` | integrated |
+| AFS-POSTER-LIVE-002 | Run or keep blocked the explicit PosterFlow live image smoke | `codex/afs-poster-live-002` | blocked by missing local provider env |
 
-Open implementation worktrees only after the matching Local Alpha 0.3 brief
-records write scope, verification, provider policy, evidence path, and
-integration order. Treat `docs/task_briefs/` as the copy-paste source for
-delegated workers.
+Open post-0.3 implementation worktrees only after a fresh brief records write
+scope, verification, provider policy, evidence path, and integration order.
+Treat `docs/task_briefs/` as the copy-paste source for delegated workers.
 
 ## Promotion Back To Company
 

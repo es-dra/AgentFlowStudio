@@ -96,15 +96,15 @@ Keep work local when:
 Do not keep generic subagents open just because the project is agent-native.
 Idle agents create stale context, not capacity.
 
-## Next Parallel Queue
+## Current Parallel Queue Status
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` | Orchestrator + Product Lead | Local Alpha 0.3 task briefs and acceptance matrix | Start first; no implementation lanes before this is accepted |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | Operator plan/run/review/feedback Web path | Wait for fresh brief from AFS-PROD-NEXT-001 |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable writes | Wait for fresh brief from AFS-PROD-NEXT-001 |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | Run last unless local image env is already configured |
+| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` | Orchestrator + Product Lead | Local Alpha 0.3 task briefs and acceptance matrix | Integrated |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | Operator plan/run/review/feedback Web path | Integrated |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable writes | Integrated |
+| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | Blocked until local image env is intentionally configured |
 
-Open these as separate worktrees only if their write scopes remain disjoint.
+Open the next queue as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign
 one Contract Engineer owner first.

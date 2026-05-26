@@ -2,6 +2,12 @@
 
 Date: 2026-05-27
 
+Current status: engineering acceptance integrated on `master` for
+`AFS-PROD-NEXT-001`, `AFS-WEB-REVIEW-001`, and
+`AFS-MEMORY-RUNTIME-001`. `AFS-POSTER-LIVE-002` remains blocked by missing
+local image-provider environment and is not required for the local-only
+engineering pass.
+
 ## Purpose
 
 Local Alpha 0.3 validates whether AgentFlow Studio can support a repeatable
@@ -133,24 +139,28 @@ Evidence:
 
 ## Overall Pass Criteria
 
-Local Alpha 0.3 can be marked accepted when all of the following are true:
+Local Alpha 0.3 engineering acceptance can be marked accepted when all of the
+following are true:
 
-- [ ] A documented local operator path can be followed from entry point to
+- [x] A documented local operator path can be followed from entry point to
       review result.
-- [ ] At least one local or mocked workflow completes plan/run/review through
+- [x] At least one local or mocked workflow completes plan/run/review through
       the Web or bridge surface.
-- [ ] Feedback-to-candidate-to-context evidence chain is visible and
+- [x] Feedback-to-candidate-to-context evidence chain is visible and
       side-effect-free.
-- [ ] `alpha-smoke --json` reports accurate `pass`, `blocked`, or `fail`
+- [x] `alpha-smoke --json` reports accurate `pass`, `blocked`, or `fail`
       states without provider calls.
-- [ ] PosterFlow live image smoke is either completed under the explicit image
+- [x] PosterFlow live image smoke is either completed under the explicit image
       gate or recorded as blocked by missing local env.
-- [ ] Browser smoke, focused tests, and `git diff --check` pass for changed
+- [x] Browser smoke, focused tests, and `git diff --check` pass for changed
       surfaces.
-- [ ] Reports separate structure verification, runtime verification, human
+- [x] Reports separate structure verification, runtime verification, human
       acceptance, business validation, and memory promotion.
-- [ ] All generated media, run artifacts, provider config, and private Company
+- [x] All generated media, run artifacts, provider config, and private Company
       content remain out of committed files.
+
+This is not commercial or human creative-quality validation. Those remain
+outside the Local Alpha 0.3 engineering pass.
 
 ## Non-Claims
 
@@ -166,25 +176,24 @@ Local Alpha 0.3 does not claim:
 - publishing or distribution integration;
 - business validation from real customers.
 
-## Recommended Parallel Queue
+## Parallel Queue Outcome
 
-Open the next queue only after this validation target is accepted as the
-milestone boundary.
+This queue has been executed as the Local Alpha 0.3 engineering pass.
 
-| ID | Suggested branch | Owner role | Purpose |
+| ID | Branch | Owner role | Outcome |
 |---|---|---|---|
-| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` | Orchestrator + Product Lead | Finalize Local Alpha 0.3 task briefs and acceptance matrix |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | Make the operator plan/run/review/feedback path repeatable in Web |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | Strengthen candidate promotion and context reuse without durable memory writes |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Run or keep blocked the explicit PosterFlow live image smoke |
+| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | integrated |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | integrated |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | integrated |
+| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | blocked by missing local image-provider env |
 
 Integration order:
 
 ```text
 AFS-PROD-NEXT-001
   -> AFS-WEB-REVIEW-001 and AFS-MEMORY-RUNTIME-001 in parallel
-  -> AFS-POSTER-LIVE-002 after provider boundary is known
-  -> controller-side verification and cleanup
+  -> AFS-POSTER-LIVE-002 remained blocked by local provider boundary
+  -> controller-side verification and project/company memory updates
 ```
 
 ## Controller Responsibilities

@@ -41,9 +41,9 @@ docs/company_operating_model.md
 | AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | completed | PosterFlow workflow/quality/provider tests -> 23 passed; `alpha-smoke --json` -> blocked as expected because remote image provider is disabled; `git diff --check` -> passed | Added explicit `poster_round_comparison.json.evidence_chain` and review checks; handoff: `docs/handoff/AFS-MEMORY-DEMO-001.md`; integrated into current merge batch |
 | AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | blocked checklist integrated | `alpha-smoke --json` -> blocked because image provider env is unset; PosterFlow provider/workflow/quality tests -> 22 passed; `git diff --check` -> passed | Evidence: `docs/handoff/AFS-POSTER-LIVE-001.md`; no live provider call, no provider config, no secrets |
 | AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | Define Local Alpha 0.3 validation goals and next task briefs before opening a new queue | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 10 passed; `python -m apps.cli.main alpha-smoke --json` -> blocked as expected because image provider env is unset; `git diff --check` -> passed | Evidence: `docs/local_alpha_0_3_validation_goals.md` and four Local Alpha 0.3 task briefs; no runtime code or provider calls |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | Local Alpha 0.3 operator plan/run/review/feedback Web path | in progress | baseline Web tests -> 42 passed | Worker: Nash `019e65da-9878-74f2-9ee8-cf9ecebff6a2`; no provider calls authorized |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable memory writes | in progress | baseline memory/posterflow tests -> 60 passed | Worker: Zeno `019e65da-ac65-7b81-a634-74b0e2ab63c1`; no provider calls authorized |
-| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | blocked before dispatch | `alpha-smoke --json` -> blocked because image provider env is unset | Do not open live-smoke worktree until local image env is intentionally configured or a blocked-evidence-only pass is requested |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | Local Alpha 0.3 operator plan/run/review/feedback Web path | integrated to `master` | Web targeted tests -> 44 passed; JS `node --check`; compileall; desktop and 390x844 browser smoke; mainline integration tests -> 102 passed | Integrated at `6e3fbab`; handoff: `docs/handoff/AFS-WEB-REVIEW-001.md`; controller fixed review refs after polling overwrite; no provider calls |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable memory writes | integrated to `master` | focused memory/posterflow tests -> 65 passed; mainline integration tests -> 102 passed; `alpha-smoke --json` -> blocked as expected; compileall; `git diff --check` | Integrated at `6853fc1`; handoff: `docs/handoff/AFS-MEMORY-RUNTIME-001.md`; no durable Memory runtime, DB, RAG, or provider calls |
+| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | blocked by missing local env | `alpha-smoke --json` -> blocked because image provider env is unset | No live provider call; open only after local image env is intentionally configured or for a blocked-evidence-only pass |
 
 ## Integration Gate
 
@@ -70,6 +70,13 @@ Current gate:
   expected PosterFlow image-provider `blocked` state.
 - The four Local Alpha 0.2 worktrees, local branches, and remote branches were
   removed after integration. Main checkout is the only remaining worktree.
+- The Local Alpha 0.3 engineering queue is integrated to `master` through
+  `6853fc1` and `6e3fbab`: `AFS-PROD-NEXT-001`, `AFS-MEMORY-RUNTIME-001`, and
+  `AFS-WEB-REVIEW-001` are complete; `AFS-POSTER-LIVE-002` remains blocked by
+  missing local image-provider env.
+- Mainline Local Alpha 0.3 verification passed with 102 targeted tests, Web JS
+  syntax checks, compileall, `git diff --check`, and `alpha-smoke --json`
+  reporting the expected image-provider `blocked` state.
 
 ## Operating Entry Points
 
@@ -85,27 +92,27 @@ Subagents are ephemeral. A visible old agent card is not an active lane unless
 the agent manager can still resume or close that ID. If a close attempt returns
 `not found`, record the agent as inactive history.
 
-## Next Parallel Queue
+## Local Alpha 0.3 Queue Outcome
 
-Current queue is partially opened. Local Alpha 0.3 validation goals and
-fresh task briefs exist; Web and Memory implementation worktrees are active.
-Poster live remains blocked until local image-provider env is intentionally configured.
+The Local Alpha 0.3 engineering queue is integrated/blocked. Web and Memory
+lanes are merged into `master`; Poster live remains blocked until local
+image-provider env is intentionally configured.
 
-Local Alpha 0.3 queue:
+Local Alpha 0.3 queue outcome:
 
-| ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
+| ID | Branch / worktree | Owner role | Primary write scope | Outcome verification |
 |---|---|---|---|---|
-| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-product-next-briefs` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `alpha-smoke --json`; `git diff --check` |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, Web docs/handoff | Web targeted tests; JS `node --check`; browser smoke |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow memory/context contracts, focused tests/docs | focused memory/posterflow tests; `alpha-smoke --json`; `compileall`; `git diff --check` |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | provider env check; no-secret scan; PosterFlow tests; explicit live smoke only with local env |
+| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | integrated; roadmap docs tests -> 10 passed; `alpha-smoke --json` -> blocked as expected; `git diff --check` |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, Web docs/handoff | integrated; Web targeted tests -> 44 passed; JS checks; browser smoke desktop/narrow |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow memory/context contracts, focused tests/docs | integrated; focused tests -> 65 passed; `alpha-smoke --json` -> blocked as expected; compileall; diff check |
+| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | blocked by missing local image-provider env; no live provider call |
 
 Integration rule remains unchanged: open separate `codex/*` worktrees for
 implementation lanes, keep `master` as the integration surface, and delete
 temporary branches/worktrees after verified merge.
 
-Do not dispatch subagents until the controller has created the matching
-worktree and passed the brief from `docs/task_briefs/`.
+Do not dispatch the next subagents until the controller has created fresh
+post-0.3 briefs, matching worktrees, and a non-overlapping write map.
 
 ## Remote Branch Hygiene
 

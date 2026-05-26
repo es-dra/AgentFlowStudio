@@ -1,5 +1,48 @@
 # DEVLOG
 
+## 2026-05-27 - Local Alpha 0.3 Web And Memory Integration
+
+- Integrated the two Local Alpha 0.3 implementation lanes into `master`:
+  - `AFS-MEMORY-RUNTIME-001` from `codex/afs-memory-runtime-contract`,
+    commit `7d19b5a`, merge commit `6853fc1`.
+  - `AFS-WEB-REVIEW-001` from `codex/afs-web-review-loop`, commit
+    `4e63bf7`, merge commit `6e3fbab`.
+- Web lane result:
+  - Production Mode now exposes a repeatable local operator loop from workflow
+    selection through plan, supervised run, artifact inspection, review
+    refresh, and feedback capture.
+  - `run_feedback_event` now includes `review_status`, `review_report`, and
+    `quality_report` after review refresh.
+  - Controller-side browser smoke caught a real state-flow gap: run polling can
+    refresh `productionState.run` after review refresh, so feedback capture must
+    fall back to `productionState.review` instead of trusting only the run
+    object.
+- Memory lane result:
+  - PosterFlow promotion decisions, context bundles, next-round prompts, and
+    comparison reports now keep raw feedback, derived signals, candidate
+    memory, promotion decisions, context reuse, and quality feedback as
+    separate auditable roles.
+  - Added contract/audit examples and docs for Local Alpha 0.3 memory runtime
+    boundaries without claiming durable Memory runtime writes.
+- Controller-side verification after both merges:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_contract_audit.py tests/test_contract_examples.py tests/test_posterflow_quality.py tests/test_posterflow_workflow.py`: 102 passed.
+  - Web JavaScript `node --check` commands: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli agentflow\memory agentflow\harness narratostudio\posterflow narratocut\harness tests`: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json`: `status: blocked`, expected because image-provider env is unset; no providers called and no runtime artifacts written.
+  - `git diff --check`: passed.
+- Browser smoke evidence:
+  - Desktop and 390 x 844 narrow Production Mode operator loops both reached
+    feedback capture with `review_status=passed`, `review_report`, and
+    `quality_report`.
+  - No browser console errors and no narrow horizontal overflow were observed.
+- Company memory feedback:
+  - Added the anti-pattern that worker/subagent reports are not final evidence;
+    the controller must reproduce browser/provider/secret-sensitive claims on
+    the real integration path.
+- Boundary kept: no remote provider call, no provider config, no generated
+  media, no secrets, no private Company content, no durable Memory runtime, no
+  RAG/vector store, no SaaS backend, and no browser persistence was added.
+
 ## 2026-05-27 - Local Alpha 0.3 Parallel Queue Launch
 
 - Committed the Local Alpha 0.3 planning baseline as

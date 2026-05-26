@@ -7,9 +7,12 @@ agents. Use them after reading `AGENTS.md`, `docs/company_operating_model.md`,
 Current queue state:
 
 - Local Alpha 0.2 briefs below are completed historical briefs.
-- The next implementation queue should start from
+- Local Alpha 0.3 planning, Web review loop, and memory runtime contract briefs
+  have been executed and integrated on `master`.
+- The next implementation queue should start from the accepted 0.3 evidence in
   [`../local_alpha_0_3_validation_goals.md`](../local_alpha_0_3_validation_goals.md).
-- Do not open new worktrees until fresh Local Alpha 0.3 briefs are written.
+- Do not open new worktrees until fresh post-0.3 briefs are written or the
+  blocked PosterFlow live-smoke lane is intentionally enabled.
 
 Completed Local Alpha 0.2 queue:
 
@@ -20,7 +23,7 @@ Completed Local Alpha 0.2 queue:
 | AFS-MEMORY-DEMO-001 | [AFS-MEMORY-DEMO-001.md](AFS-MEMORY-DEMO-001.md) | Memory OS demo hardening |
 | AFS-POSTER-LIVE-001 | [AFS-POSTER-LIVE-001.md](AFS-POSTER-LIVE-001.md) | Gated PosterFlow live-smoke path |
 
-Planned Local Alpha 0.3 queue:
+Completed / blocked Local Alpha 0.3 queue:
 
 | ID | Brief | Purpose |
 |---|---|---|
