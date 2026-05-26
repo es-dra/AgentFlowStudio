@@ -82,7 +82,7 @@ def test_web_production_mode_declares_readiness_wizard_and_task_workspace() -> N
         'id="production-acceptance-path"',
         'id="production-next-action"',
         "生产准备",
-        "Local Alpha 0.3 operator loop",
+        "Local Alpha 0.4 operator loop",
         "本机环境",
         "输入诊断",
         "下一步动作",
@@ -99,7 +99,7 @@ def test_web_production_mode_declares_readiness_wizard_and_task_workspace() -> N
         assert token in combined
 
 
-def test_web_production_mode_declares_alpha_0_3_operator_loop_and_feedback_gate() -> None:
+def test_web_production_mode_declares_alpha_0_4_operator_loop_and_feedback_gate() -> None:
     html = _read_web_file("index.html")
     production = _read_web_file("production-mode.js")
     production_render = _read_web_file("production-render.js")
@@ -108,7 +108,7 @@ def test_web_production_mode_declares_alpha_0_3_operator_loop_and_feedback_gate(
     combined = html + production + production_render + feedback + feedback_wiring
 
     for token in [
-        "Local Alpha 0.3",
+        "Local Alpha 0.4",
         "operator loop",
         "workflow selection",
         "artifact inspection",
@@ -238,10 +238,18 @@ def test_web_production_mode_polls_background_run_status() -> None:
 def test_web_production_mode_defaults_match_preferred_workflow() -> None:
     html = _read_web_file("index.html")
     production = _read_web_file("production-mode.js")
+    production_render = _read_web_file("production-render.js")
     production_workflows = _read_web_file("production-workflows.js")
 
-    assert "video_to_finished_package_local_asr_input.example.json" in html
-    assert "video_to_finished_package_local_asr_input.example.json" in production + production_workflows
+    combined = html + production + production_render + production_workflows
+
+    assert "data/processed/local_alpha_0_4/video_script_local_asr_input.json" in html
+    assert "data/processed/runs/local_alpha_0_4_product_loop" in html + production_workflows
+    assert 'PRODUCT_WORKFLOW_NAME = "video_script_to_finished_package_local_asr"' in production_workflows
+    assert "local_setup_blockers" in combined
+    assert "docs/local_alpha_0_4_scenario_package.md" in combined
+    assert "Local Alpha 0.4" in combined
+    assert "video_to_finished_package_local_asr_input.example.json" in production_workflows
     assert "FALLBACK_WORKFLOW_INPUTS" in production_workflows
     assert "applyWorkflowDefaults" in production
 

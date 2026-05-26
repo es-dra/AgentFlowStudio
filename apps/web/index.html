@@ -257,7 +257,7 @@
               </div>
               <span class="chip">local bridge</span>
             </div>
-            <ol id="production-path" class="production-path" aria-label="Local Alpha 0.3 operator loop">
+            <ol id="production-path" class="production-path" aria-label="Local Alpha 0.4 operator loop">
               <li>输入准备</li>
               <li>生成 workflow_plan.json</li>
               <li>运行 workflow</li>
@@ -286,11 +286,11 @@
               </label>
               <label>
                 <span>Input file</span>
-                <input id="workflow-input-path" type="text" value="examples/demo_asr/video_to_finished_package_local_asr_input.example.json" />
+                <input id="workflow-input-path" type="text" value="data/processed/local_alpha_0_4/video_script_local_asr_input.json" />
               </label>
               <label>
                 <span>Output directory</span>
-                <input id="workflow-output-dir" type="text" value="data/processed/runs/web_bridge/video_to_finished_package_local_asr" />
+                <input id="workflow-output-dir" type="text" value="data/processed/runs/local_alpha_0_4_product_loop" />
               </label>
               <div class="action-row">
                 <button id="create-plan-button" class="ghost-button" type="button">生成计划</button>
@@ -317,7 +317,7 @@
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Acceptance Path</p>
-                <h2 id="production-acceptance-title">Local Alpha 0.3 operator loop</h2>
+                <h2 id="production-acceptance-title">Local Alpha 0.4 operator loop</h2>
               </div>
               <span id="production-next-action" class="chip">等待 bridge</span>
             </div>
@@ -332,7 +332,7 @@
               Production Mode 不保存浏览器状态；验收证据来自本机 run artifacts、inspect/review/package report。
             </div>
             <div id="operator-loop-status" class="muted-box operator-loop-status">
-              Local Alpha 0.3 operator loop waits for workflow selection, artifact inspection, review refresh, and feedback capture.
+              Local Alpha 0.4 operator loop waits for local input setup, workflow selection, artifact inspection, review refresh, and feedback capture.
             </div>
           </section>
 

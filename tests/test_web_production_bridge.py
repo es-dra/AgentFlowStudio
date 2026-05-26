@@ -101,6 +101,23 @@ def test_bridge_workflow_profiles_include_readiness_guidance() -> None:
     assert product["web_profile"]["review_focus"] == ["final_video", "subtitles", "cover", "bgm", "delivery_package"]
 
 
+def test_bridge_video_script_profile_points_to_local_alpha_0_4_scenario() -> None:
+    workflows = list_workflows()
+    product = next(workflow for workflow in workflows if workflow["name"] == "video_script_to_finished_package_local_asr")
+    profile = product["web_profile"]
+
+    assert profile["scenario_id"] == "local_alpha_0_4"
+    assert profile["recommended_input"] == "data/processed/local_alpha_0_4/video_script_local_asr_input.json"
+    assert profile["runbook"] == "docs/local_alpha_0_4_scenario_package.md"
+    assert profile["local_setup_blockers"] == [
+        "data/raw/demo_real_video/input.mp4",
+        "data/raw/demo_bgm/bgm.wav",
+        "data/models/faster-whisper/",
+        "data/processed/local_alpha_0_4/video_script_local_asr_input.json",
+    ]
+    assert "Local Alpha 0.4" in profile["next_step_hint"]
+
+
 def test_bridge_workflow_profile_logic_is_split_from_bridge_module() -> None:
     bridge_source = Path("apps/web_bridge/bridge.py").read_text(encoding="utf-8")
     profile_source = Path("apps/web_bridge/workflow_profiles.py").read_text(encoding="utf-8")
