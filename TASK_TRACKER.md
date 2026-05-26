@@ -28,6 +28,7 @@ docs/company_operating_model.md
 | AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | integrated to `master` | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Remote/local branch and worktree deleted after integration |
 | AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Integrated at `ff77b30`; local and remote branch/worktree deleted after verification |
 | AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | integrated to `master` | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Integrated at `649d736`; superseded stale MiniMax branch and both provider branches were deleted |
+| AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
 
 ## Integration Gate
 
@@ -36,8 +37,8 @@ Current gate:
 - `AFS-MEM-001`, `AFS-CTX-001`, and `AFS-QLT-001` are integrated to `master`.
 - `AFS-DEMO-001` is integrated to `master` at `ff77b30`.
 - `AFS-PROV-001` is integrated to `master` at `649d736`.
-- Remaining active work is outside PosterFlow provider integration:
-  `origin/codex/alpha-readiness-evidence` and
+- `AFS-ALPHA-001` is integrated to `master` at `ac2254e`.
+- Remaining active work is the independent Web UI line:
   `origin/codex/narratocut-web-ui`.
 
 ## Remote Branch Hygiene
@@ -51,7 +52,8 @@ Current branch classification as of 2026-05-26:
 | `origin/codex/posterflow-memory-demo` | patch-equivalent stale pre-merge PosterFlow demo branch | Deleted after `git cherry -v master codex/posterflow-memory-demo` showed the branch patch is already in `master`. |
 | `origin/codex/posterflow-minimax-provider-tests` | stale provider reference branch | Deleted after `AFS-PROV-001` replaced it on current `master`. |
 | `origin/codex/posterflow-minimax-rebase` | integrated replacement provider branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with old MiniMax provider changes | Keep until split or reviewed; do not merge before separating stale provider changes. |
+| `origin/codex/alpha-readiness-evidence` | stale stacked alpha evidence branch | Deleted after `AFS-ALPHA-001` replayed the evidence on current `master`. |
+| `origin/codex/alpha-readiness-rebase` | integrated replacement alpha evidence branch | Deleted after fast-forward integration and verification. |
 | `origin/codex/narratocut-web-ui` | independent Web UI line | Keep, but repair or recreate its worktree under the AgentFlowStudio path before further development. |
 
 ## Current Task Detail
