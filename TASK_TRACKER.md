@@ -29,12 +29,13 @@ docs/company_operating_model.md
 | AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Integrated at `ff77b30`; local and remote branch/worktree deleted after verification |
 | AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | integrated to `master` | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Integrated at `649d736`; superseded stale MiniMax branch and both provider branches were deleted |
 | AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
-| AFS-WEB-001 | `codex/narratocut-web-ui` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui` | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | preserved parallel branch | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Pushed at `de8ca8e`; worktree repaired and moved; branch still diverges from `master` and must be rebased or replayed before integration |
+| AFS-WEB-001 | `codex/narratocut-web-ui` / archived | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | archived and superseded | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Archived at tag `archive/narratocut-web-ui-de8ca8e`; useful work replayed by `AFS-WEB-REPLAY`; branch/worktree deleted |
 | AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
 | AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
 | AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | Add shared evidence summary vocabulary for quality and review reports | integrated to `master` | `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 26 passed; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `17c72e5`; additive report field only, no provider calls |
 | AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | Validate memory promotion review decisions without durable memory writes | integrated to `master` | `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 57 passed; `compileall agentflow\memory agentflow\harness`; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `8fd9fe4`; no DB, RAG, provider calls, or durable Memory runtime |
 | AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay local Review/Production Web UI workbench on current mainline | integrated to `master` | Web targeted tests -> 60 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; CLI help/version/web-bridge help; browser smoke: local bridge + static UI + mock workflow + review refresh | Integrated at `5d0392f`; local-only, no provider calls, no browser persistence |
+| AFS-OPS-003 | main checkout | Orchestrator | Align operating docs with the Local Alpha 0.2 product queue and create task briefs | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `python -m apps.cli.main alpha-smoke --json`; `git diff --check` | Updates only project execution docs; no runtime code or provider calls |
 
 ## Integration Gate
 
@@ -49,13 +50,12 @@ Current gate:
 - `AFS-MEM-002` is integrated to `master` at `8fd9fe4`.
 - `AFS-WEB-REPLAY` is integrated to `master` at `5d0392f`.
 - The old preserved Web UI branch `origin/codex/narratocut-web-ui` at
-  `de8ca8e` is now superseded by the replay branch. Do not merge it into
-  `master`; it should be deleted remotely after the current mainline is pushed.
-- All four lanes from the current dispatch batch are integrated. Mainline full
+  `de8ca8e` is archived by tag `archive/narratocut-web-ui-de8ca8e` and deleted.
+- All four lanes from the previous dispatch batch are integrated. Mainline full
   verification passed with 548 tests. The four replay/integration worktrees and
   local branches were removed after merge.
-- `AFS-OPS-002` is complete; the current work is integration and consolidation
-  of the four already-opened parallel lanes.
+- `AFS-OPS-003` is the current docs-only setup slice for the first formal
+  Local Alpha 0.2 product push.
 
 ## Operating Entry Points
 
@@ -74,41 +74,22 @@ the agent manager can still resume or close that ID. If a close attempt returns
 ## Next Parallel Queue
 
 Do not start these from the main checkout. Create separate `codex/*` worktrees
-after `AFS-OPS-002` verification is recorded.
+after `AFS-OPS-003` verification is recorded.
 
 | ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
 |---|---|---|---|---|
-| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | `apps/cli/`, workflow docs, focused tests | `tests/test_video_to_finished_package_local_asr_workflow.py`, `tests/test_narratostudio_workflow.py`, `tests/test_posterflow_provider.py`, CLI help/version |
-| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | `agentflow/harness/`, `narratocut/harness/`, quality tests | `tests/test_agent_reviewer.py`, `tests/test_harness_quality_checks.py`, `tests/test_posterflow_quality.py`, `tests/test_narratostudio_review_hardening.py` |
-| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow/NarratoStudio memory tests | `tests/test_agentflow_asset_memory_validator.py`, `tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`, `tests/test_posterflow_quality.py` |
-| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | `apps/web`, `apps/web_bridge`, Web UI tests | Web UI targeted tests, Python 3.12 full relevant suite, JS syntax checks |
+| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | `docs/`, `TASK_TRACKER.md` integration notes only | `python -m apps.cli.main alpha-smoke --json`; `python -m pytest tests/test_agentflow_roadmap_docs.py`; `git diff --check` |
+| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, `apps/web/README.md` | Web targeted tests; JS `node --check`; browser smoke with local bridge |
+| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | PosterFlow demo artifacts/docs/tests under `narratostudio/posterflow`, `workflows`, `tests`, `docs` | PosterFlow workflow/provider/quality tests; `alpha-smoke --json`; `git diff --check` |
+| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | PosterFlow live-smoke docs/checklist and optional ignored local run evidence | provider env check; no-secret scan; PosterFlow provider tests; optional live smoke only with explicit local env |
 
-Integration order should prefer `AFS-PROD-001` or `AFS-QA-001` first because
-they create better artifact summaries for later Web UI replay.
+Integration order:
 
-Current dispatch:
-
-| ID | Branch | Worker |
-|---|---|---|
-| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` | subagent `019e6549-7170-72c3-b588-8eecf1b05784` (`Dewey`) |
-| AFS-QA-001 | `codex/afs-quality-evidence-summary` | subagent `019e6549-8563-72b0-b6fb-6f5a486b5d52` (`Nietzsche`) |
-| AFS-MEM-002 | `codex/afs-memory-promotion-review` | subagent `019e6549-9a28-79a1-92be-d7e39a082350` (`Mencius`) |
-| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` | main controller until a worker slot is free |
-
-All four branches were created from `6d0cf88 docs: add agent operating entry
-points`.
-
-Completed dispatch:
-
-- `AFS-PROD-001`: worker returned `DONE`, was closed, then the branch was
-  reviewed, rebased onto `master`, verified, and fast-forward integrated.
-- `AFS-QA-001`: worker returned `DONE`, was closed, then the branch was
-  reviewed, rebased onto `master`, verified, and fast-forward integrated.
-- `AFS-MEM-002`: worker returned `DONE`, was closed, then the branch was
-  reviewed, rebased onto `master`, verified, and fast-forward integrated.
-- `AFS-WEB-REPLAY`: replay branch was reviewed, rebased onto `master`,
-  corrected to expose `web-bridge` through the CLI, browser-smoke tested, and
-  fast-forward integrated.
+1. `AFS-ALPHA-PKG-001` first, because it defines what Local Alpha 0.2 accepts.
+2. `AFS-MEMORY-DEMO-001` and `AFS-WEB-UX-001` can integrate in either order if
+   their write scopes stay disjoint.
+3. `AFS-POSTER-LIVE-001` last, because live provider evidence must remain
+   gated and may be blocked by local environment.
 
 ## Remote Branch Hygiene
 
@@ -123,7 +104,7 @@ Current branch classification as of 2026-05-26:
 | `origin/codex/posterflow-minimax-rebase` | integrated replacement provider branch | Deleted after fast-forward integration and verification. |
 | `origin/codex/alpha-readiness-evidence` | stale stacked alpha evidence branch | Deleted after `AFS-ALPHA-001` replayed the evidence on current `master`. |
 | `origin/codex/alpha-readiness-rebase` | integrated replacement alpha evidence branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/narratocut-web-ui` | superseded independent Web UI line | Delete after pushing current `master`. The replay branch integrated the useful Web UI surface and the old branch would now regress `apps/cli/main.py`, `apps/web_bridge/bridge.py`, Web bridge tests, and handoff docs. |
+| `origin/codex/narratocut-web-ui` | superseded independent Web UI line | Deleted after pushing current `master` and archive tag `archive/narratocut-web-ui-de8ca8e`. The replay branch integrated the useful Web UI surface and the old branch would now regress `apps/cli/main.py`, `apps/web_bridge/bridge.py`, Web bridge tests, and handoff docs. |
 
 Current local cleanup as of 2026-05-27:
 
@@ -260,6 +241,48 @@ Evidence:
   `D:\Learning materials\Learning_notes\Company\30-engineering\01-分支-worktree-子智能体协作规范.md`
   and
   `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式库.md`
+
+### AFS-OPS-003: Local Alpha 0.2 Product Queue
+
+Goal:
+
+- Align project execution docs with the real post-cleanup branch state and
+  create executable task briefs for the first formal product push.
+
+Acceptance criteria:
+
+- [x] `docs/company_operating_model.md` names Local Alpha 0.2 as the current
+      product milestone.
+- [x] `docs/agent_operating_roster.md` removes stale preserved Web branch
+      language and lists the next product queue.
+- [x] `TASK_TRACKER.md` records the current queue, integration order, and branch
+      hygiene state.
+- [x] `docs/task_briefs/` contains direct briefs for the next four lanes.
+- [x] No runtime code, generated artifacts, provider config, or Company private
+      content is copied.
+
+Verification:
+
+```powershell
+python -m pytest tests/test_agentflow_roadmap_docs.py
+# 8 passed
+
+python -m apps.cli.main alpha-smoke --json
+# status: blocked because remote image provider is not enabled
+
+git diff --check
+# passed with Windows line-ending warnings only
+```
+
+Status:
+
+- completed
+
+Evidence:
+
+- `docs/company_operating_model.md`
+- `docs/agent_operating_roster.md`
+- `docs/task_briefs/`
 
 ### AFS-PROD-001: Alpha Smoke Status CLI
 
@@ -723,17 +746,15 @@ git diff --check
 
 Status:
 
-- preserved parallel branch at `de8ca8e`; not integrated to `master`
+- archived at tag `archive/narratocut-web-ui-de8ca8e`; useful work replayed by
+  `AFS-WEB-REPLAY`; local and remote branches deleted
 
 Evidence:
 
-- Worktree:
-  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui`
-- Branch: `codex/narratocut-web-ui`
-- Remote: `origin/codex/narratocut-web-ui`
-- Current integration note: rebase or replay the branch on current `master`
-  before opening a PR or merging. The old verification ran under Python 3.13.5;
-  integration verification should rerun under Python 3.12.
+- Archive tag: `archive/narratocut-web-ui-de8ca8e`
+- Replay integration: `AFS-WEB-REPLAY` at `5d0392f`
+- Old worktree, local branch, and remote branch were deleted after replay and
+  final verification.
 
 ## Planned Worktree Layout
 

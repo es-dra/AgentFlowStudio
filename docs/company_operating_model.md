@@ -188,35 +188,49 @@ For Memory OS work, keep these boundaries explicit:
 - context bundle existence does not prove context selection quality;
 - demo success is not product validation.
 
-## Current Parallel Tracks
+## Current Product Push
 
-Current tracked lanes:
+Mainline is the stable integration surface. The previous parallel development
+batch is complete: alpha smoke, evidence summary, memory promotion review, and
+the local Web workbench are integrated into `master`; old Web UI branch state is
+archived and cleaned.
 
-| Branch | Purpose | Primary write scope | Status |
-|---|---|---|---|
-| `codex/company-os-projection` | Project-facing projection of company rules | `AGENTS.md`, `docs/company_operating_model.md`, `TASK_TRACKER.md` | completed |
-| `codex/memory-os-loop` | Feedback to memory review to preference/profile/prefix loop | `agentflow/memory`, `narratostudio/posterflow`, tests | integrated |
-| `codex/context-runtime-trace` | Minimal `context_bundle` and `context_assembly_trace` artifacts | `agentflow/context`, examples, tests | integrated with memory loop |
-| `codex/quality-feedback-signals` | Failure attribution and quality feedback signal contracts | harness and quality tests | integrated |
-| `codex/posterflow-two-round-demo` | True two-round Memory OS demo and comparison report | PosterFlow workflow/report/tests | integrated |
-| `codex/posterflow-minimax-rebase` | MiniMax image provider replay on current mainline | `narratostudio/posterflow`, tests | integrated and branch cleaned |
-| `codex/alpha-readiness-rebase` | Alpha readiness evidence replay on current mainline | docs, examples, tests | integrated and branch cleaned |
-| `codex/narratocut-web-ui` | Independent local Web UI workbench | `apps/web`, `apps/web_bridge`, Web UI tests | preserved; rebase/replay required before merge |
+The next milestone is:
+
+```text
+AgentFlow Studio Local Alpha 0.2:
+evidence-driven local AI content production workbench
+```
+
+The product loop for this milestone is:
+
+```text
+brief / local media
+  -> workflow plan
+  -> supervised local run
+  -> artifacts
+  -> inspect / review / package report
+  -> Web workbench acceptance
+  -> feedback event
+  -> memory candidate
+  -> next-round context reuse
+```
 
 For exact verification and branch hygiene state, use `TASK_TRACKER.md` as the
 live project ledger.
 
-Next recommended parallel queue:
+Current recommended parallel queue:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
-| AFS-PROD-001 | Alpha smoke/status entry that reports pass/blocked/fail without remote calls by default | `codex/afs-prod-alpha-smoke` | next |
-| AFS-QA-001 | Shared evidence summary vocabulary across inspect/review surfaces | `codex/afs-quality-evidence-summary` | next |
-| AFS-MEM-002 | Memory candidate promotion review decisions without durable memory writes | `codex/afs-memory-promotion-review` | next |
-| AFS-WEB-REPLAY | Replay useful Web UI work onto current `master` instead of merging the preserved branch directly | `codex/afs-web-ui-replay` | independent |
+| AFS-ALPHA-PKG-001 | Turn existing evidence into a coherent local Alpha acceptance package | `codex/afs-alpha-package` | ready to open |
+| AFS-WEB-UX-001 | Productize the local Web workbench for repeated real use | `codex/afs-web-ux-pass` | ready to open |
+| AFS-MEMORY-DEMO-001 | Harden the two-round Memory OS demonstration without claiming durable memory runtime | `codex/afs-memory-demo-hardening` | ready to open |
+| AFS-POSTER-LIVE-001 | Prepare or run the gated PosterFlow live image smoke without committing secrets or runtime artifacts | `codex/afs-poster-live-smoke` | ready to open |
 
-Start these in separate worktrees only after a task brief records write scope,
-verification, and integration order.
+Start these in separate worktrees only after the matching task brief records
+write scope, verification, provider policy, and integration order. Treat
+`docs/task_briefs/` as the copy-paste source for delegated workers.
 
 ## Promotion Back To Company
 

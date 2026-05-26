@@ -1970,3 +1970,23 @@
   new provider policy, and no automatic long-term memory write. The second
   remote-image call remains protected by the existing
   `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` gate.
+
+## 2026-05-27 - AFS-OPS-003 Local Alpha 0.2 Product Queue
+
+- Realigned project operating docs after the previous parallel batch was fully
+  integrated and branch cleanup completed.
+- Updated `docs/company_operating_model.md` and
+  `docs/agent_operating_roster.md` so they no longer treat the old Web UI branch
+  as preserved work; it is now archived by tag and deleted.
+- Created `docs/task_briefs/` with four direct execution briefs for the first
+  formal product push:
+  - `AFS-ALPHA-PKG-001`: Local Alpha acceptance package.
+  - `AFS-WEB-UX-001`: Web workbench usability pass.
+  - `AFS-MEMORY-DEMO-001`: Memory OS demo hardening.
+  - `AFS-POSTER-LIVE-001`: gated PosterFlow live-smoke path.
+- Updated `TASK_TRACKER.md` to make Local Alpha 0.2 the active product queue and
+  preserve the integration order: Alpha package first, Web UX and Memory Demo in
+  parallel, Poster live smoke last.
+- Boundary kept: this pass only updates project execution docs. It does not
+  change runtime code, call providers, write generated artifacts, or copy private
+  Company knowledge into the repository.

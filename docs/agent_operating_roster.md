@@ -16,8 +16,8 @@ D:\Learning materials\Learning_notes\Company
   integration, and final verification.
 - Worktree root:
   `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\`.
-- Preserved branch: `origin/codex/narratocut-web-ui` at `de8ca8e`.
-  It is backed up but not merge-ready.
+- Current branch state: `master` is the only active local/remote branch. The
+  old Web UI branch was replayed, archived by tag, and deleted.
 - Subagents are ephemeral task workers. A visible historical agent card in the
   UI is not an active lane unless the agent manager can still resume or close
   the ID.
@@ -59,7 +59,7 @@ controller, or a fresh subagent for the current task.
 | Role | Use when | Guardrail |
 |---|---|---|
 | Provider Adapter Agent | ASR, image, LLM, or video provider behavior changes | Must name the capability gate and avoid live calls unless opted in |
-| Web UI Agent | Rebase, replay, or evaluate `codex/narratocut-web-ui` | Must not pull stale backend contracts into `master` |
+| Web UI Agent | Improve `apps/web` or `apps/web_bridge` product usability | Must keep browser state local-only and avoid provider secrets or persistence |
 | Media QA Agent | Real video, subtitle, BGM, cover, or package artifact checks | Must separate runtime verification from human acceptance |
 | Security / Secret Audit Agent | Config, provider, release, or publishing-sensitive work | Must inspect for secrets and private paths before integration |
 | Docs Projection Agent | Company-to-project rule projection or public docs alignment | Must not copy confidential Company content into the repo |
@@ -100,10 +100,10 @@ Idle agents create stale context, not capacity.
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` | Workflow Engineer | CLI/status command for alpha smoke readiness | Can start after this ops pass |
-| AFS-QA-001 | `codex/afs-quality-evidence-summary` | Harness / QA Reviewer | Unified evidence summary vocabulary | Can start after this ops pass |
-| AFS-MEM-002 | `codex/afs-memory-promotion-review` | Memory / Evidence Steward | Candidate promotion review decisions | Can start after this ops pass |
-| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay useful Web UI work onto current `master` | Should not block runtime/evidence work |
+| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | Start first; informs the other lanes |
+| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability, copy, and browser smoke evidence | Can run after the Alpha package target is clear |
+| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo evidence and context reuse explanation | Can run in parallel with Web UX |
+| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or local run evidence | Run last unless image env is already configured |
 
 Open these as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign

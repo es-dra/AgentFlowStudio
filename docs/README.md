@@ -15,6 +15,7 @@ agent contracts obvious without reading every historical phase note.
 - [Company operating model projection](company_operating_model.md)
 - [Agent operating roster](agent_operating_roster.md)
 - [Agent task brief template](agent_task_brief_template.md)
+- [Current task briefs](task_briefs/README.md)
 - [Post-v0.1.0 plan](post_v0_1_0_plan.md)
 - [NarratoStudio contracts](narratostudio_contracts.md)
 - [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
