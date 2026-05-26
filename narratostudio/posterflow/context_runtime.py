@@ -22,10 +22,13 @@ def build_context_bundle(
         bundle_id=f"{prompt_pack.run_id}_context_bundle_001",
         project_prefix_path=project_prefix_path,
         preference_profile_path=preference_profile_path,
+        source_memory_candidates=profile.source_memory_candidates,
+        source_promotion_decisions=profile.source_promotion_decisions,
         source_artifacts={
             "prompt_pack": "poster_prompt_pack.json",
             "project_prefix": project_prefix_path,
             "preference_profile": preference_profile_path,
+            "memory_candidates": "poster_memory_candidates.jsonl",
             "memory_review": "poster_memory_review.jsonl",
         },
         context_layers={
@@ -36,6 +39,7 @@ def build_context_bundle(
             "warm": {
                 "preference_profile": preference_profile_path,
                 "memory_refs": profile.source_memory_candidates,
+                "promotion_decision_refs": profile.source_promotion_decisions,
                 "visual_preferences": profile.visual_preferences,
                 "negative_visual_preferences": profile.negative_visual_preferences,
             },
@@ -57,7 +61,7 @@ def build_context_bundle(
             "cache_key": cache_key,
             "prefix_version": profile.profile_version,
             "cacheable_layers": ["hot", "policy"],
-            "invalidation_refs": profile.source_memory_candidates,
+            "invalidation_refs": profile.source_memory_candidates + profile.source_promotion_decisions,
         },
     )
 
@@ -67,6 +71,7 @@ def build_context_assembly_trace(bundle: ContextBundle) -> ContextAssemblyTrace:
         project_id=bundle.project_id,
         run_id=bundle.run_id,
         bundle_id=bundle.bundle_id,
+        promotion_decision_refs=bundle.source_promotion_decisions,
         cache_key=str(bundle.cache_plan["cache_key"]),
         selection_decisions=[
             {

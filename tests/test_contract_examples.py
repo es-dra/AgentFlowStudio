@@ -93,14 +93,16 @@ def test_agentflow_memory_candidate_example_is_candidate_only() -> None:
 
 def test_agentflow_memory_promotion_decision_example_is_explicit_review() -> None:
     payload = json.loads(Path("examples/agentflow/memory_promotion_decision.example.json").read_text(encoding="utf-8"))
+    candidate = json.loads(Path("examples/agentflow/memory_candidate.example.json").read_text(encoding="utf-8"))
 
     assert payload["schema_version"] == "0.1.0"
     assert payload["artifact_type"] == "agentflow_memory_promotion_decision"
-    assert payload["source_candidate_id"]
+    assert payload["source_candidate_id"] == candidate["candidate_id"]
     assert payload["decision"] in {"promoted", "rejected", "merged", "expired"}
     assert payload["promotion_mode"] == "human_reviewed"
     assert payload["writes_long_term_memory"] is False
     assert payload["evidence_refs"]
+    assert set(candidate["evidence_refs"]) <= set(payload["evidence_refs"])
 
 
 def test_agentflow_skill_invocation_example_declares_planned_call() -> None:
@@ -366,6 +368,8 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
         "no_private_paths_or_secrets",
         "router_decision_only",
         "candidate_memory_only",
+        "promotion_decision_required_for_context_reuse",
+        "context_reuse_no_durable_write",
     } <= rule_ids
     assert "execute_workflow" not in rule_ids
     assert "call_remote_provider" not in rule_ids

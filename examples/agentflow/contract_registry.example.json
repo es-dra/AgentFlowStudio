@@ -129,6 +129,14 @@
       "description": "Reusable asset profiles must reference an explicit promotion decision."
     },
     {
+      "rule_id": "promotion_decision_required_for_context_reuse",
+      "description": "Preference profiles, context bundles, and next-round prompts may reuse candidate memory only through explicit promotion decision references."
+    },
+    {
+      "rule_id": "context_reuse_no_durable_write",
+      "description": "Context reuse artifacts are review inputs and must keep writes_long_term_memory false."
+    },
+    {
       "rule_id": "asset_reuse_decision_only",
       "description": "Asset reuse decisions record selection reasoning and must not execute work."
     }

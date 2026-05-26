@@ -75,6 +75,10 @@ project_manifest.example.json
 -> feedback.jsonl
 -> feedback_signal_log.json
 -> memory_candidates.json
+-> promotion decision
+-> preference profile
+-> context bundle
+-> next-round prompt
 -> intermediate_asset.json
 -> future reusable_asset_profile.json
 -> future promotion decision
@@ -98,3 +102,21 @@ An artifact map entry should include:
 - `status`: draft, available, superseded, or archived.
 
 See [`../examples/agentflow/artifact_map.example.json`](../examples/agentflow/artifact_map.example.json).
+
+## Memory Runtime Demo Chain
+
+For Local Alpha 0.3, the PosterFlow memory demo uses this auditable chain:
+
+| Artifact | Class | Role | Durable write |
+| --- | --- | --- | --- |
+| `poster_feedback.jsonl` | source | Raw feedback event source of truth | no |
+| `poster_feedback_signal_log.json` | derived | Run-local interpretation of raw feedback | no |
+| `poster_memory_candidates.jsonl` / `.json` | candidate | Candidate memory proposed from feedback signals | no |
+| `poster_memory_review.jsonl` / `poster_memory_decisions.json` | decision | Explicit review decision for each candidate | no |
+| `poster_preference_profile.json` | derived | Demo-only prompt profile from accepted decisions | no |
+| `context_bundle.json` | derived | Hot/warm/cold/policy context bundle | no |
+| `context_assembly_trace.json` | report | Why context was included or excluded | no |
+| `next_round_prompt.json` | contract | Next-round prompt handoff with accepted evidence refs | no |
+
+Quality and review checks should fail when candidate-to-promotion,
+promotion-to-context, or context-to-next-prompt references are broken.
