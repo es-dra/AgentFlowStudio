@@ -17,6 +17,10 @@ FAILURE_CATEGORY_BY_CHECK = {
     "posterflow_context_trace_refs_bundle": "context_trace_contract_failure",
     "posterflow_context_trace_cache_key_matches": "context_trace_contract_failure",
     "posterflow_context_does_not_write_long_term_memory": "context_policy_failure",
+    "posterflow_evidence_chain_stages_complete": "evidence_chain_contract_failure",
+    "posterflow_evidence_chain_review_decision_refs_review": "evidence_chain_contract_failure",
+    "posterflow_evidence_chain_context_refs_bundle": "evidence_chain_contract_failure",
+    "posterflow_evidence_chain_no_long_term_write": "evidence_chain_policy_failure",
 }
 
 

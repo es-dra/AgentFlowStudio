@@ -111,6 +111,7 @@ def build_round_comparison(
             "round_2 candidates were generated from the memory-aware prompt pack",
             "comparison records reused memory refs without durable long-term writes",
         ],
+        "evidence_chain": _evidence_chain(profile, next_prompt, context_bundle),
         "validation_boundary": (
             "demo evidence only; passing artifacts prove workflow structure and memory reuse, "
             "not human acceptance or business validation"
@@ -135,6 +136,12 @@ def render_two_round_report(comparison: dict[str, Any]) -> str:
             "## Memory Reuse",
             *[f"- {item}" for item in comparison["memory_reuse"]["memory_refs"]],
             "",
+            "## Evidence Chain",
+            *[
+                f"- {item['stage']}: {', '.join(item['artifact_refs'])}"
+                for item in comparison.get("evidence_chain", [])
+            ],
+            "",
             "## Boundary",
             comparison["validation_boundary"],
             "",
@@ -150,3 +157,64 @@ def _round_summary(manifest: PosterCandidatesManifest) -> dict[str, Any]:
         "candidate_images": [candidate.image_path for candidate in manifest.candidates],
         "provider_mode": manifest.provider_mode,
     }
+
+
+def _evidence_chain(
+    profile: PosterPreferenceProfile,
+    next_prompt: NextRoundPrompt,
+    context_bundle: ContextBundle | None,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "stage": "round_1_evidence",
+            "artifact_refs": [
+                "poster_candidates_manifest.json",
+                "poster_feedback.jsonl",
+                "poster_feedback_signal_log.json",
+            ],
+            "source_refs": {},
+            "summary": "Round 1 generated candidates plus raw feedback produce derived feedback signals.",
+            "writes_long_term_memory": False,
+        },
+        {
+            "stage": "candidate_memory",
+            "artifact_refs": ["poster_memory_candidates.jsonl", "poster_memory_candidates.json"],
+            "source_refs": {"feedback_signal_log": "poster_feedback_signal_log.json"},
+            "summary": "Derived feedback signals become candidate-only project preference memory.",
+            "writes_long_term_memory": False,
+        },
+        {
+            "stage": "review_decision",
+            "artifact_refs": ["poster_memory_decisions.json", "poster_memory_review.jsonl"],
+            "source_refs": {"memory_candidates": "poster_memory_candidates.jsonl"},
+            "summary": "Demo review gate accepts candidates for downstream profile use only.",
+            "writes_long_term_memory": False,
+        },
+        {
+            "stage": "context_bundle",
+            "artifact_refs": ["poster_preference_profile.json", "project_prefix.md", "context_bundle.json"],
+            "source_refs": {
+                "memory_review": "poster_memory_review.jsonl",
+                "profile_memory_refs": ", ".join(profile.source_memory_candidates),
+            },
+            "summary": "Reviewed candidates feed a demo-only profile and context bundle.",
+            "writes_long_term_memory": False,
+        },
+        {
+            "stage": "round_2_reuse",
+            "artifact_refs": ["next_round_prompt.json", "round_2/poster_prompt_pack.json"],
+            "source_refs": {
+                "context_bundle": next_prompt.memory_context.get("context_bundle_path") or "",
+                "cache_key": str(next_prompt.memory_context.get("cache_key") or ""),
+            },
+            "summary": "Round 2 prompt pack reuses context refs from the next-round prompt.",
+            "writes_long_term_memory": False,
+        },
+        {
+            "stage": "comparison_output",
+            "artifact_refs": ["poster_round_comparison.json", "poster_two_round_report.md"],
+            "source_refs": {"context_bundle_id": context_bundle.bundle_id if context_bundle else ""},
+            "summary": "Comparison records reuse evidence without claiming acceptance or durable memory.",
+            "writes_long_term_memory": False,
+        },
+    ]

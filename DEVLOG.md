@@ -2010,3 +2010,27 @@
 - Boundary kept: documentation only. No runtime code changed, no providers were
   called, no generated artifacts were written, and no private Company knowledge
   was copied into the repository.
+
+## 2026-05-27 - AFS-MEMORY-DEMO-001 Evidence Chain Hardening
+
+- Started from `codex/afs-memory-demo-hardening` at `46fe4ae`.
+- Added an explicit `evidence_chain` to `poster_round_comparison.json` so the
+  demo shows round 1 evidence -> candidate memory -> review decision -> context
+  bundle -> round 2 reuse -> comparison output.
+- Rendered the same chain in `poster_two_round_report.md` for agent-readable
+  handoff.
+- Extended PosterFlow quality reference checks so inspect/review fails if the
+  evidence chain loses required stages, the memory review artifact, the context
+  bundle artifact, or the `writes_long_term_memory: false` boundary.
+- TDD evidence:
+  - red: targeted PosterFlow workflow/quality tests failed because
+    `poster_round_comparison.json` had no `evidence_chain`.
+  - green: targeted PosterFlow workflow/quality tests passed after adding the
+    comparison field, report section, and quality checks.
+- Verification:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py`: 23 passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json`: exited 0 with `status: blocked` because remote image provider env is unset.
+  - `git diff --check`: passed with Windows line-ending warnings only.
+- Boundary kept: no durable Memory runtime, no RAG/vector store, no database,
+  no provider behavior change, no Web UI change, and no automatic long-term
+  memory write.

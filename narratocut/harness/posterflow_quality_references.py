@@ -89,6 +89,7 @@ def _add_round_2_checks(
     round_2_images = _candidate_image_paths(round_2_manifest)
     comparison_round_2 = comparison.get("round_2") if isinstance(comparison.get("round_2"), dict) else {}
     comparison_memory = comparison.get("memory_reuse") if isinstance(comparison.get("memory_reuse"), dict) else {}
+    evidence_chain = comparison.get("evidence_chain")
 
     _add_check(checks, "posterflow_round_2_prompt_uses_next_run_id", "pass" if round_2_prompt.get("run_id") == next_run_id else "fail")
     _add_check(
@@ -118,6 +119,31 @@ def _add_round_2_checks(
         and comparison_memory.get("writes_long_term_memory") is False
         else "fail",
     )
+    _add_check(
+        checks,
+        "posterflow_evidence_chain_stages_complete",
+        "pass" if _evidence_chain_stages(evidence_chain) == _expected_evidence_chain_stages() else "fail",
+    )
+    _add_check(
+        checks,
+        "posterflow_evidence_chain_review_decision_refs_review",
+        "pass"
+        if _chain_stage_refs(evidence_chain, "review_decision") >= {
+            "poster_memory_decisions.json",
+            "poster_memory_review.jsonl",
+        }
+        else "fail",
+    )
+    _add_check(
+        checks,
+        "posterflow_evidence_chain_context_refs_bundle",
+        "pass" if "context_bundle.json" in _chain_stage_refs(evidence_chain, "context_bundle") else "fail",
+    )
+    _add_check(
+        checks,
+        "posterflow_evidence_chain_no_long_term_write",
+        "pass" if _evidence_chain_no_long_term_write(evidence_chain) else "fail",
+    )
 
 
 def _candidate_images_exist(run_dir: Path, manifest: dict[str, Any]) -> bool:
@@ -132,6 +158,38 @@ def _candidate_image_paths(manifest: dict[str, Any]) -> set[str]:
     if not isinstance(candidates, list):
         return set()
     return {str(item.get("image_path")) for item in candidates if isinstance(item, dict) and item.get("image_path")}
+
+
+def _expected_evidence_chain_stages() -> list[str]:
+    return [
+        "round_1_evidence",
+        "candidate_memory",
+        "review_decision",
+        "context_bundle",
+        "round_2_reuse",
+        "comparison_output",
+    ]
+
+
+def _evidence_chain_stages(chain: object) -> list[str]:
+    if not isinstance(chain, list):
+        return []
+    return [str(item.get("stage")) for item in chain if isinstance(item, dict) and item.get("stage")]
+
+
+def _chain_stage_refs(chain: object, stage: str) -> set[str]:
+    if not isinstance(chain, list):
+        return set()
+    for item in chain:
+        if isinstance(item, dict) and item.get("stage") == stage and isinstance(item.get("artifact_refs"), list):
+            return {str(ref) for ref in item["artifact_refs"] if ref}
+    return set()
+
+
+def _evidence_chain_no_long_term_write(chain: object) -> bool:
+    if not isinstance(chain, list) or not chain:
+        return False
+    return all(isinstance(item, dict) and item.get("writes_long_term_memory") is False for item in chain)
 
 
 def _candidate_only(memory: dict[str, Any]) -> bool:

@@ -135,8 +135,28 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     assert comparison["round_2"]["run_id"] == round_2_manifest.run_id
     assert comparison["memory_reuse"]["writes_long_term_memory"] is False
     assert set(comparison["memory_reuse"]["memory_refs"]) == set(profile.source_memory_candidates)
+    assert [step["stage"] for step in comparison["evidence_chain"]] == [
+        "round_1_evidence",
+        "candidate_memory",
+        "review_decision",
+        "context_bundle",
+        "round_2_reuse",
+        "comparison_output",
+    ]
+    assert comparison["evidence_chain"][0]["artifact_refs"] == [
+        "poster_candidates_manifest.json",
+        "poster_feedback.jsonl",
+        "poster_feedback_signal_log.json",
+    ]
+    assert comparison["evidence_chain"][2]["source_refs"]["memory_candidates"] == "poster_memory_candidates.jsonl"
+    assert comparison["evidence_chain"][3]["source_refs"]["memory_review"] == "poster_memory_review.jsonl"
+    assert comparison["evidence_chain"][4]["source_refs"]["context_bundle"] == "context_bundle.json"
+    assert {step["writes_long_term_memory"] for step in comparison["evidence_chain"]} == {False}
     assert "demo evidence only" in comparison["validation_boundary"]
-    assert "Round 2" in (output_dir / "poster_two_round_report.md").read_text(encoding="utf-8")
+    two_round_report = (output_dir / "poster_two_round_report.md").read_text(encoding="utf-8")
+    assert "Round 2" in two_round_report
+    assert "Evidence Chain" in two_round_report
+    assert "candidate_memory" in two_round_report
 
 
 def test_posterflow_examples_keep_readable_chinese_copy() -> None:

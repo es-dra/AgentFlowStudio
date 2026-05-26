@@ -147,6 +147,23 @@ def test_posterflow_review_fails_when_round_2_manifest_breaks_memory_reuse(monke
     assert "posterflow_round_2_comparison_candidate_images_match" in _failed_ids(review)
 
 
+def test_posterflow_review_fails_when_evidence_chain_loses_review_decision(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    comparison = _json(output_dir / "poster_round_comparison.json")
+    review_step = next(step for step in comparison["evidence_chain"] if step["stage"] == "review_decision")
+    review_step["artifact_refs"] = ["poster_memory_candidates.jsonl"]
+    (output_dir / "poster_round_comparison.json").write_text(
+        json.dumps(comparison, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_evidence_chain_review_decision_refs_review" in _failed_ids(review)
+
+
 def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
     def fake_urlopen(request, timeout):
         return FakeResponse()
