@@ -68,6 +68,14 @@ toggle is in-memory only. Refreshing the page returns to Chinese.
 The viewer does not use `localStorage`, IndexedDB, cookies, or any persistence
 mechanism.
 
+## Chinese Copy And Terminal Mojibake
+
+The source files are UTF-8 and the browser renders Chinese copy directly. Some
+Windows terminal sessions may show terminal mojibake when printing those files
+with legacy code pages. For review, prefer the browser, an editor opened as
+UTF-8, or a `unicode_escape`/UTF-8-aware check instead of judging the raw
+terminal rendering.
+
 ## Supported Artifacts
 
 The viewer reads only files explicitly selected by the user with the file picker.

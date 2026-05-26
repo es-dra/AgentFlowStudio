@@ -442,6 +442,8 @@ def test_static_viewer_readme_documents_boundaries() -> None:
         "local video preview",
         "no provider config",
         "no workflow execution",
+        "terminal mojibake",
+        "source files are utf-8",
         "m1.2.1",
         "m1.3",
         "m1.5",

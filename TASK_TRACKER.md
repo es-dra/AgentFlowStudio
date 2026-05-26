@@ -37,8 +37,8 @@ docs/company_operating_model.md
 | AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay local Review/Production Web UI workbench on current mainline | integrated to `master` | Web targeted tests -> 60 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; CLI help/version/web-bridge help; browser smoke: local bridge + static UI + mock workflow + review refresh | Integrated at `5d0392f`; local-only, no provider calls, no browser persistence |
 | AFS-OPS-003 | main checkout | Orchestrator | Align operating docs with the Local Alpha 0.2 product queue and create task briefs | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `python -m apps.cli.main alpha-smoke --json`; `git diff --check` | Updates only project execution docs; no runtime code or provider calls |
 | AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | completed | `python -m apps.cli.main alpha-smoke --json`; `python -m pytest tests/test_agentflow_roadmap_docs.py`; `git diff --check` | Evidence: `docs/local_alpha_0_2_acceptance.md`; no runtime code or provider calls |
-| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | opened and pushed | branch/worktree clean; tracks `origin/codex/afs-web-ux-pass` | Can run after Alpha target is clear; brief: `docs/task_briefs/AFS-WEB-UX-001.md` |
-| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | completed | PosterFlow workflow/quality/provider tests -> 23 passed; `alpha-smoke --json` -> blocked as expected because remote image provider is disabled; `git diff --check` -> passed | Added explicit `poster_round_comparison.json.evidence_chain` and review checks; handoff: `docs/handoff/AFS-MEMORY-DEMO-001.md`; ready for integration after review |
+| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | completed | Web targeted tests -> 42 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; `git diff --check`; browser smoke local bridge + static UI + mock workflow + review refresh | Evidence: `docs/handoff/AFS-WEB-UX-001.md`; temp smoke screenshot outside repo at `C:\Users\chenzy\AppData\Local\Temp\afs-web-ux-pass-smoke-main.png`; fixed small-screen sticky topbar click coverage; no provider calls or browser persistence |
+| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | completed | PosterFlow workflow/quality/provider tests -> 23 passed; `alpha-smoke --json` -> blocked as expected because remote image provider is disabled; `git diff --check` -> passed | Added explicit `poster_round_comparison.json.evidence_chain` and review checks; handoff: `docs/handoff/AFS-MEMORY-DEMO-001.md`; integrated into current merge batch |
 | AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | opened and pushed | branch/worktree clean; tracks `origin/codex/afs-poster-live-smoke` | Integrate last; brief: `docs/task_briefs/AFS-POSTER-LIVE-001.md` |
 
 ## Integration Gate
@@ -198,7 +198,7 @@ Evidence:
 - Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop`
 - Branch: `codex/memory-os-loop`
 - Project record: `DEVLOG.md` in the implementation worktree
-- Company memory update: `Company/60-assets-and-memory/02-失败归因与反模式库.md`
+- Company memory update: `Company/60-assets-and-memory/02-失败归因与反模式�?md`
 
 ### AFS-OPS-002: Agent Operating Entry Points
 
@@ -246,7 +246,7 @@ Evidence:
 - Company rule updates:
   `D:\Learning materials\Learning_notes\Company\30-engineering\01-分支-worktree-子智能体协作规范.md`
   and
-  `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式库.md`
+  `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式�?md`
 
 ### AFS-OPS-003: Local Alpha 0.2 Product Queue
 

@@ -79,13 +79,20 @@ def test_web_production_mode_declares_readiness_wizard_and_task_workspace() -> N
     for token in [
         'id="production-readiness"',
         'id="readiness-checklist"',
+        'id="production-acceptance-path"',
+        'id="production-next-action"',
         "生产准备",
+        "Local Alpha 0.2 验收路径",
         "本机环境",
         "输入诊断",
         "下一步动作",
         "当前任务",
         "阻塞项",
         "可交付物",
+        "先连 bridge，再生成计划",
+        "运行完成后刷新验收报告",
+        "回到 Review Mode 选择产物审片",
+        "renderAcceptancePath",
         "renderReadinessWizard",
         "readiness-grid",
     ]:
@@ -148,6 +155,16 @@ def test_web_production_mode_has_no_mojibake_literals() -> None:
     for mojibake in ["鐢", "楠", "鏈", "浜", "绛", "闃", "鏆", "鍙"]:
         assert mojibake not in combined
 
+    for readable in [
+        "生产准备",
+        "本机演示",
+        "完整成品包",
+        "生成 workflow_plan.json",
+        "刷新验收报告",
+        "进入 Review Mode 审片",
+    ]:
+        assert readable in combined
+
 
 def test_web_app_orchestration_is_split_from_feedback_wiring() -> None:
     app = _read_web_file("app.js")
@@ -207,6 +224,7 @@ def test_web_production_mode_has_demo_quick_start_without_storage() -> None:
     production = _read_web_file("production-mode.js")
     production_workflows = _read_web_file("production-workflows.js")
     production_css = _read_web_file("production.css")
+    styles = _read_web_file("styles.css")
 
     for token in [
         "quick-demo-button",
@@ -221,6 +239,8 @@ def test_web_production_mode_has_demo_quick_start_without_storage() -> None:
     ]:
         assert token in html + production + production_workflows + production_css
     assert "localStorage" not in production + production_workflows
+    assert "@media (max-width: 1240px)" in styles
+    assert ".topbar {\n    position: static;\n  }" in styles
 
 
 def test_web_production_mode_blocks_asr_only_when_selected_workflow_requires_it() -> None:

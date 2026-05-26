@@ -1,5 +1,6 @@
 import {
   renderArtifactTimeline,
+  renderAcceptancePath,
   renderBridgeHealth,
   renderOverview,
   renderProductionVideoReview,
@@ -126,7 +127,10 @@ export function renderProductionState(elements, copy, workspace = null) {
   renderBridgeHealth(elements, productionState.bridge);
   renderWorkflowProfile(elements, workflow, copy);
   renderReadinessWizard(elements, productionState, workflow, readiness);
-  renderOverview(elements, productionState, workflow, blockerText(), inputCheckText(), nextAction());
+  const blockers = blockerText();
+  const action = nextAction();
+  renderAcceptancePath(elements, productionState, action, blockers);
+  renderOverview(elements, productionState, workflow, blockers, inputCheckText(), action);
   renderProductionPath(productionState.run?.status || "pending", activePathIndex);
   renderStepTimeline(elements, productionState.run?.steps || productionState.plan?.steps || workflow?.steps || [], copy);
   renderArtifactTimeline(elements, productionState.run?.files || [], productionState.plan?.artifacts?.expected || workflow?.outputs || []);

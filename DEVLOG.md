@@ -2011,6 +2011,46 @@
   called, no generated artifacts were written, and no private Company knowledge
   was copied into the repository.
 
+## 2026-05-27 - AFS-WEB-UX-001 Web UX Pass
+
+- Updated the Local Alpha 0.2 Web workbench in
+  `codex/afs-web-ux-pass`.
+- Added a Production Mode acceptance path panel with a dynamic next-action
+  chip so the user sees the path from local bridge health to plan generation,
+  workflow run, review refresh, and Review Mode artifact inspection.
+- Tightened Web bridge workflow profile copy:
+  - demo workflows now point users to refresh review after a successful local
+    demo run;
+  - product workflows now tell users to fix local media, FFmpeg/FFprobe, and
+    local ASR blockers before plan generation.
+- Added a README note that the source files are UTF-8 and browser Chinese copy
+  is the review surface; some Windows terminal sessions may display terminal
+  mojibake when printing UTF-8 files through a legacy code page.
+- Added/updated static tests for readable Chinese copy, Production Mode
+  acceptance path, bridge next-step guidance, local-only bridge behavior, and
+  no browser persistence.
+- Verification:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py`: 42 passed.
+  - `node --check apps/web/app.js apps/web/app-elements.js apps/web/feedback-wiring.js apps/web/feedback-event.js apps/web/production-mode.js apps/web/production-render.js apps/web/production-workflows.js apps/web/artifact-values.js apps/web/video-preview.js apps/web/artifact-contracts.js apps/web/artifact-ledgers.js apps/web/artifact-workspace.js apps/web/render-helpers.js apps/web/ui-copy.js`: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps/web_bridge apps/cli tests`: passed.
+  - `git diff --check`: passed with Windows LF/CRLF warnings only.
+- Browser smoke:
+  - Started the local bridge on `127.0.0.1:8787` and the static UI on
+    `127.0.0.1:8769`.
+  - Confirmed readable Chinese Review Mode copy and no browser error logs.
+  - Found and fixed a small-screen layout issue where the sticky topbar could
+    cover Production Mode buttons, making Playwright clicks hit the top stat
+    cards instead of the workflow controls.
+  - In Production Mode, confirmed `bridge ready`, the Local Alpha 0.2
+    acceptance path panel, `mock_text_to_slices` plan generation, workflow
+    `success`, artifact listing, and review refresh to `passed`.
+  - Used and then removed temp output under
+    `C:\Users\chenzy\AppData\Local\Temp\afs-web-ux-smoke-main`.
+  - Saved smoke screenshot outside the repo at
+    `C:\Users\chenzy\AppData\Local\Temp\afs-web-ux-pass-smoke-main.png`.
+- Boundaries kept: no provider calls, no browser persistence, no SaaS/cloud
+  backend, no automatic directory scanning, no provider config or secrets.
+
 ## 2026-05-27 - AFS-MEMORY-DEMO-001 Evidence Chain Hardening
 
 - Started from `codex/afs-memory-demo-hardening` at `46fe4ae`.

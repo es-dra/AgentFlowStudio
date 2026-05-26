@@ -8,6 +8,16 @@ export function renderBridgeHealth(elements, bridge) {
   elements.bridgeHealth.className = `chip status-${status === "ready" ? "pass" : status === "offline" ? "fail" : "warning"}`;
 }
 
+export function renderAcceptancePath(elements, state, nextAction, blockerText) {
+  if (!elements.productionNextAction || !elements.acceptancePathDetail) return;
+  const blocked = Boolean(blockerText && blockerText !== "暂无阻塞");
+  elements.productionNextAction.textContent = nextAction;
+  elements.productionNextAction.className = `chip status-${blocked ? "warning" : "pass"}`;
+  elements.acceptancePathDetail.textContent = blocked
+    ? `先处理：${blockerText}`
+    : acceptanceDetail(state);
+}
+
 export function renderWorkflowProfile(elements, workflow, copy) {
   if (!elements.workflowProfile) return;
   clearNode(elements.workflowProfile);
@@ -22,6 +32,13 @@ export function renderWorkflowProfile(elements, workflow, copy) {
     metaLine(workflowProfileSummary(workflow)),
     metaLine(`依赖: ${workflowRequirementsText(workflow)}`),
   );
+}
+
+function acceptanceDetail(state) {
+  if (!state.plan) return "当前验收路径：先连 bridge，再生成计划。浏览器不保存状态，不读取 provider secrets。";
+  if (!state.run) return "当前验收路径：计划已生成，下一步运行本机 workflow。";
+  if (!state.review) return "当前验收路径：运行完成后刷新验收报告。";
+  return "当前验收路径：回到 Review Mode 选择产物审片，并记录人工验收意见。";
 }
 
 export function renderReadinessWizard(elements, state, workflow, readiness) {
