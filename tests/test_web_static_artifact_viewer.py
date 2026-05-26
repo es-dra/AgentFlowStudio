@@ -21,7 +21,7 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
     html = _read_web_file("index.html")
 
     assert 'href="styles.css"' in html
-    assert 'src="app.js"' in html
+    assert 'src="app.js?v=m3-production-workbench"' in html
     assert 'type="module"' in html
     assert 'lang="zh-CN"' in html
     assert 'type="file"' in html

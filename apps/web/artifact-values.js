@@ -2,7 +2,7 @@ export function normalizeStatus(value) {
   const status = asText(value, "unknown").toLowerCase();
   if (["pass", "passed", "success", "succeeded", "valid"].includes(status)) return "pass";
   if (["fail", "failed", "error", "invalid", "blocked"].includes(status)) return "fail";
-  if (["warning", "warn", "unsupported", "needs_changes"].includes(status)) return "warning";
+  if (["warning", "warn", "unsupported", "needs_changes", "running", "pending", "not_started"].includes(status)) return "warning";
   if (status === "missing") return "missing";
   if (["optional", "not_applicable", "n/a"].includes(status)) return "unknown";
   return status || "unknown";

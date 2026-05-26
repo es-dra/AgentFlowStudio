@@ -1,7 +1,7 @@
-let currentVideoUrl = "";
+const currentVideoUrls = new WeakMap();
 
 export function renderLocalVideoPreview(container, videoArtifact, copy) {
-  revokeCurrentVideoUrl();
+  revokeContainerVideoUrl(container);
   container.replaceChildren();
 
   if (!videoArtifact?.localFile) {
@@ -9,7 +9,8 @@ export function renderLocalVideoPreview(container, videoArtifact, copy) {
     return;
   }
 
-  currentVideoUrl = URL.createObjectURL(videoArtifact.localFile);
+  const currentVideoUrl = URL.createObjectURL(videoArtifact.localFile);
+  currentVideoUrls.set(container, currentVideoUrl);
   const video = document.createElement("video");
   video.controls = true;
   video.preload = "metadata";
@@ -33,10 +34,16 @@ export function renderLocalVideoPreview(container, videoArtifact, copy) {
 }
 
 export function revokeCurrentVideoUrl() {
-  if (currentVideoUrl) {
-    URL.revokeObjectURL(currentVideoUrl);
-    currentVideoUrl = "";
+  for (const video of document.querySelectorAll(".video-preview")) {
+    revokeContainerVideoUrl(video);
   }
+}
+
+function revokeContainerVideoUrl(container) {
+  const currentVideoUrl = currentVideoUrls.get(container);
+  if (!currentVideoUrl) return;
+  URL.revokeObjectURL(currentVideoUrl);
+  currentVideoUrls.delete(container);
 }
 
 function mediaTypeFor(fileName) {

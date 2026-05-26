@@ -172,6 +172,7 @@ h3 {
 
 .panel {
   padding: 15px;
+  min-width: 0;
 }
 
 .stage-intro {
@@ -350,6 +351,8 @@ h3 {
 
 .metric {
   min-height: 88px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .metric span {

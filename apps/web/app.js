@@ -1,5 +1,6 @@
 import { normalizeWorkspace, parseFiles } from "./artifact-workspace.js";
-import { buildFeedbackEvent, copyFeedbackText, formatFeedbackEvent } from "./feedback-event.js";
+import { applyStaticCopy, collectAppElements } from "./app-elements.js";
+import { attachFeedbackHandlers } from "./feedback-wiring.js";
 import {
   clearNode,
   formatCount,
@@ -12,41 +13,16 @@ import {
   wideBlock,
 } from "./render-helpers.js";
 import { getCopy } from "./ui-copy.js";
+import { initializeProductionMode, productionState, recordSupervisionIntent, renderProductionState } from "./production-mode.js";
 import { renderLocalVideoPreview, revokeCurrentVideoUrl } from "./video-preview.js";
 
 const state = {
   language: "zh",
+  mode: "review",
   workspace: normalizeWorkspace([]),
 };
 
-const elements = {
-  fileInput: document.querySelector("#artifact-files"),
-  languageToggle: document.querySelector("#language-toggle"),
-  artifactCount: document.querySelector("#artifact-count"),
-  inventoryList: document.querySelector("#inventory-list"),
-  summaryContent: document.querySelector("#summary-content"),
-  inspectorContent: document.querySelector("#inspector-content"),
-  evidenceMapContent: document.querySelector("#evidence-map-content"),
-  riskLedgerContent: document.querySelector("#risk-ledger-content"),
-  assetLedgerContent: document.querySelector("#asset-ledger-content"),
-  videoPreviewContent: document.querySelector("#video-preview-content"),
-  reportContent: document.querySelector("#report-content"),
-  overallStatus: document.querySelector("#overall-status"),
-  statusLabel: document.querySelector("#overall-status-label"),
-  statusValue: document.querySelector("#overall-status-value"),
-  statArtifacts: document.querySelector("#stat-artifacts"),
-  statKnown: document.querySelector("#stat-known"),
-  statWarnings: document.querySelector("#stat-warnings"),
-  statErrors: document.querySelector("#stat-errors"),
-  feedbackArtifact: document.querySelector("#feedback-artifact"),
-  feedbackDecision: document.querySelector("#feedback-decision"),
-  feedbackRisk: document.querySelector("#feedback-risk"),
-  feedbackTime: document.querySelector("#feedback-time"),
-  feedbackNote: document.querySelector("#feedback-note"),
-  feedbackOutput: document.querySelector("#feedback-output"),
-  feedbackStatus: document.querySelector("#feedback-status"),
-  feedbackCopy: document.querySelector("#feedback-copy"),
-};
+const elements = collectAppElements();
 
 elements.fileInput.addEventListener("change", async (event) => {
   const files = Array.from(event.target.files || []);
@@ -60,36 +36,44 @@ elements.languageToggle.addEventListener("click", () => {
   render();
 });
 
-elements.feedbackCopy.addEventListener("click", async () => {
-  const copy = getCopy(state.language);
-  const event = buildFeedbackEvent({
-    artifactFile: elements.feedbackArtifact.value,
-    decision: elements.feedbackDecision.value,
-    riskCategory: elements.feedbackRisk.value,
-    note: elements.feedbackNote.value,
-    videoTimeSec: elements.feedbackTime.value,
-  });
-  await copyFeedbackText(formatFeedbackEvent(event), elements.feedbackOutput, elements.feedbackStatus, copy);
+elements.modeReview.addEventListener("click", () => setMode("review"));
+elements.modeProduction.addEventListener("click", () => setMode("production"));
+elements.supervisionActions.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-supervision]");
+  if (!button) return;
+  recordSupervisionIntent(button.dataset.supervision, elements, getCopy(state.language));
+});
+
+attachFeedbackHandlers(elements, {
+  getCopyForLanguage: () => getCopy(state.language),
+  productionState,
 });
 
 window.addEventListener("beforeunload", revokeCurrentVideoUrl);
 
+initializeProductionMode(elements, getCopy(state.language));
 render();
+
+function setMode(mode) {
+  state.mode = mode;
+  render();
+}
 
 function render() {
   const copy = getCopy(state.language);
   document.documentElement.lang = state.language === "zh" ? "zh-CN" : "en";
-  renderStaticCopy(copy);
+  applyStaticCopy(copy, elements);
+  renderMode();
   renderWorkspace(state.workspace, copy);
+  renderProductionState(elements, copy, state.workspace);
 }
 
-function renderStaticCopy(copy) {
-  for (const [key, value] of Object.entries(copy.staticText)) {
-    const target = document.querySelector(`[data-copy="${key}"]`);
-    if (target) target.textContent = value;
-  }
-  elements.languageToggle.textContent = copy.languageToggle;
-  elements.fileInput.setAttribute("aria-label", copy.fileInputLabel);
+function renderMode() {
+  const production = state.mode === "production";
+  elements.reviewWorkbench.hidden = production;
+  elements.productionWorkbench.hidden = !production;
+  elements.modeReview.classList.toggle("active", !production);
+  elements.modeProduction.classList.toggle("active", production);
 }
 
 function renderWorkspace(workspace, copy) {
@@ -233,7 +217,7 @@ function renderReport(workspace, copy) {
 }
 
 function renderReportTabs(workspace, copy) {
-  const tabs = document.querySelector("#report-tabs");
+  const tabs = elements.reportTabs;
   if (!tabs) return;
   clearNode(tabs);
   if (workspace.reports.length <= 1) {

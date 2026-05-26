@@ -15,6 +15,7 @@ from apps.cli.report_commands import (
     review_run_output,
 )
 from apps.cli.real_slicing_commands import slice_real_command
+from apps.web_bridge.server import serve as serve_web_bridge
 from apps.cli.workflow_commands import run_workflow_from_cli
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
@@ -231,6 +232,23 @@ def mock_slice_command(
 
 app.command(name="slice-real")(slice_real_command)
 app.command(name="ffmpeg-check")(ffmpeg_check_command)
+
+
+@app.command(name="web-bridge")
+def web_bridge_command(
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Local host for the Web UI bridge.",
+    ),
+    port: int = typer.Option(
+        8787,
+        "--port",
+        help="Local port for the Web UI bridge.",
+    ),
+) -> None:
+    """Run the local Web UI bridge for supervised production mode."""
+    serve_web_bridge(host=host, port=port)
 
 
 @app.command(name="inspect-run")

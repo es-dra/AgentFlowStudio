@@ -1,0 +1,70 @@
+export function collectAppElements() {
+  return {
+    fileInput: document.querySelector("#artifact-files"),
+    languageToggle: document.querySelector("#language-toggle"),
+    artifactCount: document.querySelector("#artifact-count"),
+    inventoryList: document.querySelector("#inventory-list"),
+    summaryContent: document.querySelector("#summary-content"),
+    inspectorContent: document.querySelector("#inspector-content"),
+    evidenceMapContent: document.querySelector("#evidence-map-content"),
+    riskLedgerContent: document.querySelector("#risk-ledger-content"),
+    assetLedgerContent: document.querySelector("#asset-ledger-content"),
+    videoPreviewContent: document.querySelector("#video-preview-content"),
+    reportContent: document.querySelector("#report-content"),
+    reportTabs: document.querySelector("#report-tabs"),
+    overallStatus: document.querySelector("#overall-status"),
+    statusLabel: document.querySelector("#overall-status-label"),
+    statusValue: document.querySelector("#overall-status-value"),
+    statArtifacts: document.querySelector("#stat-artifacts"),
+    statKnown: document.querySelector("#stat-known"),
+    statWarnings: document.querySelector("#stat-warnings"),
+    statErrors: document.querySelector("#stat-errors"),
+    feedbackArtifact: document.querySelector("#feedback-artifact"),
+    feedbackDecision: document.querySelector("#feedback-decision"),
+    feedbackRisk: document.querySelector("#feedback-risk"),
+    feedbackTime: document.querySelector("#feedback-time"),
+    feedbackNote: document.querySelector("#feedback-note"),
+    feedbackOutput: document.querySelector("#feedback-output"),
+    feedbackStatus: document.querySelector("#feedback-status"),
+    feedbackCopy: document.querySelector("#feedback-copy"),
+    modeReview: document.querySelector("#mode-review"),
+    modeProduction: document.querySelector("#mode-production"),
+    reviewWorkbench: document.querySelector("#review-workbench"),
+    productionWorkbench: document.querySelector("#production-workbench"),
+    bridgeHealth: document.querySelector("#bridge-health"),
+    workflowSelect: document.querySelector("#workflow-select"),
+    workflowInputPath: document.querySelector("#workflow-input-path"),
+    workflowOutputDir: document.querySelector("#workflow-output-dir"),
+    workflowProfile: document.querySelector("#workflow-profile"),
+    quickDemoButton: document.querySelector("#quick-demo-button"),
+    productWorkflowButton: document.querySelector("#product-workflow-button"),
+    createPlanButton: document.querySelector("#create-plan-button"),
+    runWorkflowButton: document.querySelector("#run-workflow-button"),
+    refreshReviewButton: document.querySelector("#refresh-review-button"),
+    productionOverview: document.querySelector("#production-overview"),
+    readinessChecklist: document.querySelector("#readiness-checklist"),
+    stepTimeline: document.querySelector("#step-timeline"),
+    productionArtifacts: document.querySelector("#production-artifacts"),
+    productionVideoPreview: document.querySelector("#production-video-preview"),
+    productionAssetMatch: document.querySelector("#production-asset-match"),
+    supervisionPanel: document.querySelector("#supervision-panel"),
+    supervisionActions: document.querySelector("#supervision-actions"),
+    productionLog: document.querySelector("#production-log"),
+    runFeedbackDecision: document.querySelector("#run-feedback-decision"),
+    runFeedbackRisk: document.querySelector("#run-feedback-risk"),
+    runFeedbackTime: document.querySelector("#run-feedback-time"),
+    runFeedbackNote: document.querySelector("#run-feedback-note"),
+    runFeedbackCopy: document.querySelector("#run-feedback-copy"),
+    runFeedbackOutput: document.querySelector("#run-feedback-output"),
+    runFeedbackStatus: document.querySelector("#run-feedback-status"),
+  };
+}
+
+export function applyStaticCopy(copy, elements) {
+  for (const [key, value] of Object.entries(copy.staticText)) {
+    const target = document.querySelector(`[data-copy="${key}"]`);
+    if (target) target.textContent = value;
+  }
+  elements.languageToggle.textContent = copy.languageToggle;
+  elements.fileInput.setAttribute("aria-label", copy.fileInputLabel);
+}

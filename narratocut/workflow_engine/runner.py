@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from collections.abc import Callable
 from typing import Any
 
 from narratocut.harness import write_run_manifest, write_trace
@@ -12,9 +13,16 @@ from narratocut.workflow_engine.definitions import WorkflowDefinition, WorkflowS
 from narratocut.workflow_engine.registry import NodeRegistry
 
 
+ProgressCallback = Callable[
+    [WorkflowDefinition, WorkflowRun, WorkflowContext, WorkflowStepDefinition | None, str],
+    None,
+]
+
+
 class WorkflowRunner:
-    def __init__(self, registry: NodeRegistry) -> None:
+    def __init__(self, registry: NodeRegistry, progress_callback: ProgressCallback | None = None) -> None:
         self.registry = registry
+        self.progress_callback = progress_callback
 
     def run(self, definition: WorkflowDefinition, context: WorkflowContext) -> WorkflowRun:
         run = WorkflowRun(
@@ -23,22 +31,27 @@ class WorkflowRunner:
             status="running",
             input=context.inputs,
         )
+        self._notify_progress(definition, run, context, None, "run_started")
 
         for step in definition.steps:
+            self._notify_progress(definition, run, context, step, "step_started")
             result = self._run_step(step, context)
             context.step_results.append(result)
             run.steps.append(result)
+            self._notify_progress(definition, run, context, step, "step_finished")
             if result.status == "failed":
                 run.status = "failed"
                 run.error = result.error
                 run.ended_at = datetime.now().astimezone()
                 self._write_run_artifacts(definition, run, context)
+                self._notify_progress(definition, run, context, step, "run_failed")
                 return run
 
         run.status = "success"
         run.outputs = dict(context.artifacts)
         run.ended_at = datetime.now().astimezone()
         self._write_run_artifacts(definition, run, context)
+        self._notify_progress(definition, run, context, None, "run_finished")
         return run
 
     def _run_step(self, step: WorkflowStepDefinition, context: WorkflowContext) -> StepResult:
@@ -89,3 +102,15 @@ class WorkflowRunner:
         report_ref = context.artifacts.get("package_report")
         if report_ref:
             write_package_report(context.output_dir, report_ref)
+
+    def _notify_progress(
+        self,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        context: WorkflowContext,
+        step: WorkflowStepDefinition | None,
+        event: str,
+    ) -> None:
+        if self.progress_callback is None:
+            return
+        self.progress_callback(definition, run, context, step, event)

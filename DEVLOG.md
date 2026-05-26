@@ -1,5 +1,91 @@
 # DEVLOG
 
+## 2026-05-26 - Web UI Branch Baseline Repair
+
+- Repaired the dedicated Web UI worktree after the repository rename left its
+  `.git` pointer aimed at the removed `D:\Projects\NarratoCut` checkout.
+- Verified the branch as a preserved parallel lane, not a direct merge
+  candidate: it is useful Web UI work, but it still trails current
+  `master` and must be rebased or replayed before integration.
+- Sealed the current M3.1 production workbench slice for remote backup:
+  modularized Web UI code, local bridge, production readiness workspace,
+  supervised local demo path, and bridge-backed run observation.
+- Verification: targeted Web UI tests `41 passed`, full branch pytest
+  `374 passed`, CLI help/version passed, JS syntax checks passed,
+  `compileall` passed, and `git diff --check` passed.
+- Environment note: this old worktree currently ran verification with
+  Python 3.13.5; future integration into `master` should rerun the same matrix
+  with the project-preferred Python 3.12 environment.
+
+## 2026-05-22 - Web UI Production Workbench Modularization
+
+- Closed the remaining module-size debt in the supervised production workbench
+  slice.
+- Split DOM reference collection and static copy binding into
+  `apps/web/app-elements.js`, keeping `apps/web/app.js` focused on UI
+  orchestration and rendering flow.
+- Split review/run feedback event wiring into `apps/web/feedback-wiring.js`
+  so feedback JSON construction and copy actions no longer live in the main
+  app entrypoint.
+- Split product-facing workflow profile text and readiness hints into
+  `apps/web_bridge/workflow_profiles.py`, keeping the local bridge focused on
+  HTTP request handling and workflow runner integration.
+- Verification: JS syntax checks passed, bridge/Python compile passed, and
+  focused production Web UI tests passed.
+
+## 2026-05-22 - Web UI Production Readiness Workspace
+
+- Added a production readiness wizard to Production Mode: production target,
+  local environment, input diagnostics, and next action now sit above the run
+  workspace.
+- Extended bridge workflow profiles with product-facing display names,
+  readiness hints, and review focus fields while still reading workflows from
+  `workflows/*.yaml`.
+- Extended input diagnostics with missing-reference categories, summaries, and
+  next actions so missing video/BGM/script/config paths can be shown as
+  actionable blockers.
+- Reorganized Production Mode toward a task-first run workspace: current task,
+  blocker, next action, deliverable, step timeline, and artifact timeline are
+  still visible, but readiness now leads the workflow.
+- Added a Production Mode video review panel. It only previews explicitly
+  selected local video files and only weak-matches artifact file names; it does
+  not auto-read manifest paths or scan directories.
+- Renamed supervision controls to honest first-slice actions: confirm continue,
+  record pause note, record rerun suggestion, and record change request. The UI
+  no longer implies true pause/resume or step-level rerun.
+- Added run-level feedback JSON copy for Production Mode. It includes run,
+  workflow, decision, risk category, reviewer note, and optional video timestamp
+  while still avoiding file writes, uploads, browser persistence, or
+  `feedback.jsonl` mutation.
+- Verification so far: production focused tests passed, bridge compile passed,
+  and production JS syntax checks passed.
+
+## 2026-05-22 - Web UI Supervised Production Demo Path
+
+- Added Web UI workflow profiles for Production Mode so the UI can distinguish product workflows from runnable local demo workflows.
+- Added quick actions for local demo and complete product in the Production Mode workflow selector.
+- Kept video_to_finished_package_local_asr visible as the complete product path while showing its current blockers, including missing local ASR dependencies on this machine.
+- Added a runnable mock_text_to_slices demo path that needs no media, FFmpeg, or ASR and can verify the bridge-backed supervision loop end-to-end.
+- Fixed a real browser smoke issue where the workflow select value and internal production state could diverge after quick switching.
+- Split Production Mode UI code into production-render.js and production-workflows.js; production-mode.js is back under the 300-line target.
+- Browser smoke on http://127.0.0.1:8769/ with bridge http://127.0.0.1:8787 verified: select local demo, generate plan, run mock_text_to_slices to success, list artifacts, and refresh review to passed.
+- Boundary kept: no SaaS, no cloud upload, no remote provider call, no database, no directory scanning, no true pause/resume, and no step-level rerun yet.
+
+## 2026-05-21 - Web UI M3 Supervised Local Production Bridge
+
+- Added the first supervised Production Mode for the Web UI branch while preserving the existing Review Mode artifact viewer.
+- Added apps/web_bridge, a small stdlib local HTTP bridge bound to 127.0.0.1 by default. It intentionally avoids FastAPI, database, upload, provider configuration, SaaS accounts, and remote execution.
+- Added ncut web-bridge as the explicit local startup command for browser production mode.
+- Bridge endpoints: GET /health, GET /workflows, POST /plans, POST /runs, GET /runs/{id}, and POST /runs/{id}/review.
+- Added Web UI Production Mode with workflow selection, explicit input/output paths, bridge health, current task, next action, blockers, step timeline, artifact timeline, execution log, and human supervision controls.
+- Added bridge_status.json progress snapshots and a WorkflowRunner progress callback so Production Mode can show pending/running/success/failed step states while a local run is still in progress.
+- Added browser-side polling of GET /runs/{id} after starting a run. The UI disables duplicate run/plan/review actions during an active run and records supervision button intent in memory for the current page session.
+- Added input_check diagnostics to plan/run responses so the workbench can flag missing referenced local media/config files before users waste a run on an unavailable input bundle.
+- Added optional local ASR dependency reporting in bridge health. On this machine faster_whisper / ctranslate2 are not installed, so full local-ASR product workflows are correctly shown as blocked even though mock workflows and Review Mode remain usable.
+- Boundary change: Review Mode remains static/read-only/no-network. Production Mode allows local fetch only to http://127.0.0.1:8787.
+- Current limitation: supervision buttons make intent visible but do not yet implement true pause/resume, step-level rerun, or run-note persistence.
+
+
 ## 2026-05-21 - Web UI M1.4 Production Review Workbench IA
 
 - Reworked the static Web UI information architecture from an artifact-first

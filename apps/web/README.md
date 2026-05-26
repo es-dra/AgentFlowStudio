@@ -1,15 +1,27 @@
-# NarratoCut Static Artifact Viewer
+# NarratoCut Web UI Workbench
 
-This is a read-only, local-only static viewer for NarratoCut workflow artifacts.
-It is the Web UI branch's local acceptance workbench, not a workflow console.
+This branch now has two local modes:
 
-Open it directly in a browser:
+- `Review Mode`: the original read-only, local-only artifact viewer.
+- `Production Mode`: a supervised local production workbench that talks only to
+  the optional NarratoCut Web Bridge on `127.0.0.1`.
+
+Open the UI directly in a browser:
 
 ```text
 apps/web/index.html
 ```
 
-No server is required.
+No server is required for Review Mode.
+
+For Production Mode, start the local bridge in a separate terminal:
+
+```powershell
+python -m apps.cli.main web-bridge --host 127.0.0.1 --port 8787
+```
+
+Then open `apps/web/index.html` or serve it locally. The browser connects only
+to `http://127.0.0.1:8787`.
 
 ## Current Slice
 
@@ -25,6 +37,31 @@ The current branch includes:
 - M2 feedback event copy, which generates JSON text for manual copy/export.
 - M1.4 information architecture polish, which turns the default surface from an
   artifact-first dashboard into a production-oriented local review workbench.
+- M3 supervised production workbench foundation:
+  - optional stdlib local bridge, with no FastAPI dependency;
+  - workflow discovery from `workflows/*.yaml`;
+  - `workflow_plan.json` generation through the same planner used by
+    `ncut draft-plan`;
+  - input bundle diagnostics that surface missing local media/config references
+    before or during a run;
+  - background workflow execution through the existing workflow engine path;
+  - step progress polling through `bridge_status.json`;
+  - review refresh through `inspect-run`, `review-run`, and `package-report`;
+  - step timeline, artifact timeline, current task, blockers, and supervision
+    controls in the browser.
+- M3.1 production readiness workspace:
+  - product-facing workflow display names such as `本机演示：文本到切片` and
+    `完整成品包：本地 ASR`;
+  - a preflight panel for production target, local environment, input
+    diagnostics, and next action;
+  - categorized input blockers for local media, BGM, script, config, and other
+    file references;
+  - a Production Mode video review panel for explicitly selected local video
+    files only;
+  - honest supervision actions that record intent instead of pretending to
+    pause, resume, or rerun a Python step;
+  - run-level feedback JSON copy with run/workflow context and optional video
+    timestamp.
 
 The viewer uses default Chinese UI copy for human-facing labels. The language
 toggle is in-memory only. Refreshing the page returns to Chinese.
@@ -120,6 +157,10 @@ may omit it while still being readable by this viewer.
   engineering inspector, not the default production focus.
 - Report review: Markdown rendered as escaped text, with tabs when both
   `package_report.md` and `delivery_readiness.md` are selected.
+- Production Mode: workflow selector, input/output fields, plan generation,
+  local run launch, production readiness, review refresh, step timeline,
+  artifact timeline, bridge health, execution log, video review, and human
+  supervision controls.
 
 Markdown reports are displayed as escaped text. Inline HTML such as `<script>`
 is shown literally and is not executed.
@@ -143,37 +184,102 @@ the JSON remains in a textarea for manual copy.
 This does not write files, append JSONL, upload data, call a backend, or persist
 state. It is a static local copy/export aid only.
 
+## Production Mode Boundary
+
+Production Mode is local execution, not SaaS:
+
+- It requires the user to start `ncut web-bridge` explicitly.
+- It only connects to `http://127.0.0.1:8787`.
+- Workflow execution still goes through `WorkflowRunner` and existing CLI
+  contracts; browser code does not run Python directly.
+- `GET /health` reports local bridge, Python, workspace, FFmpeg, and FFprobe
+  readiness plus optional local ASR dependency state without exposing provider
+  keys or environment secrets.
+- `GET /workflows` lists workflow definitions from `workflows/*.yaml`.
+- `POST /plans` writes `workflow_plan.json` without running the workflow.
+- `POST /runs` starts a local workflow run.
+- `GET /runs/{id}` returns run status, steps, files, artifact index, and next
+  actions.
+- `POST /runs/{id}/review` refreshes `quality_report.json`,
+  `review_report.json`, and `package_report.md`.
+
+`POST /plans` and `POST /runs` also return `input_check`, a local diagnostic
+summary of file-like values from the selected input bundle. Missing referenced
+media, BGM, script, config, or other files are shown as categorized blockers in
+the Production Mode readiness panel.
+`GET /health` reports whether optional `faster-whisper` local ASR dependencies
+are installed. A missing ASR dependency is shown as a blocker for local-ASR
+workflows, but it does not prevent Review Mode or mock workflows from working.
+
+The workflow list now includes a Web UI profile for the production surface:
+
+- `完整成品`: product workflows such as
+  `video_to_finished_package_local_asr`, which require local media, FFmpeg,
+  BGM, and local ASR dependencies before they can complete.
+- `本机演示`: demo workflows such as `mock_text_to_slices`, which require no
+  media, FFmpeg, or ASR and can be used to verify the supervised production
+  loop on a clean machine.
+
+The Production Mode form exposes quick buttons for both paths. The default
+product path is still visible, but the demo path can now run end-to-end through
+plan generation, background workflow execution, step polling, artifact listing,
+and review refresh.
+
+Current supervision controls are first-slice UI gates. They make the user intent
+visible (`continue`, `pause`, `rerun`, `needs changes`) but do not yet support
+true step-level pause/resume or rerun-from-step. The button labels are explicit:
+they record pause notes, rerun suggestions, and change requests rather than
+interrupting a running local Python step.
+
+Production Mode can generate a run-level feedback JSON event for manual copy.
+It includes `run_dir`, `run_id`, workflow, decision, risk category, reviewer
+note, and optional `video_time_sec`. It does not write `feedback.jsonl`, upload
+data, or persist browser state.
+
+Workflow runs started from Production Mode are launched in a background bridge
+thread. The page polls `GET /runs/{id}` and reads `bridge_status.json`, so the
+user can see pending/running/success/failed step states while the run is still
+in progress. This is observability, not full orchestration: the current bridge
+does not interrupt an already running Python step.
+
 ## Privacy Boundary
 
-- read-only
-- local-only
+- Review Mode is read-only and local-only.
+- Production Mode is local-only and explicitly bridge-backed.
 - no upload
-- no backend execution
-- no persistence
+- no backend execution in Review Mode
+- no remote backend execution
+- no persistence in browser state
+- no browser persistence
 - no provider calls
-- no workflow execution
+- no workflow execution in Review Mode
+- no browser-side workflow execution
 - no automatic directory scanning
 - no manifest path auto-read
 - no provider config
-- no CLI/API bridge
+- no SaaS, account system, cloud storage, database, or collaboration service
 
-The viewer parses selected JSON, Markdown, and video files in the browser and
-renders a temporary inspection view.
+Review Mode parses selected JSON, Markdown, and video files in the browser and
+renders a temporary inspection view. Production Mode sends explicit workflow
+paths, input paths, and output directories to the local bridge selected by the
+user.
 
 ## Non-Goals
 
 Out of scope for this static viewer:
 
-- running `ncut`
 - scanning a run directory
-- backend execution
-- workflow execution
 - uploading artifacts
 - opening provider configuration
 - provider config
 - editing timelines
 - saving review decisions
 - writing feedback files
+- remote/cloud execution
+- step-level pause/resume
+- rerun-from-step
+- timeline editing
+- provider credential management
 
 ## Reference Boundary
 
@@ -205,3 +311,15 @@ readiness, and candidate-scoring artifacts.
 
 The real smoke is intentionally run from the CLI, not from the Web UI. This
 viewer remains a static artifact consumer.
+
+Production Mode smoke now also covers the local bridge path:
+
+```text
+python -m apps.cli.main web-bridge --host 127.0.0.1 --port 8787
+python -m http.server 8769 -d apps/web
+```
+
+In the browser, selecting `生产 -> 本机演示` with `mock_text_to_slices` has been
+verified to generate `workflow_plan.json`, run to `success`, show all four step
+states as passed, list actual run artifacts, and refresh the review report to
+`passed`.
