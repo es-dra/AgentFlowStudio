@@ -39,7 +39,7 @@ docs/company_operating_model.md
 | AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | completed | `python -m apps.cli.main alpha-smoke --json`; `python -m pytest tests/test_agentflow_roadmap_docs.py`; `git diff --check` | Evidence: `docs/local_alpha_0_2_acceptance.md`; no runtime code or provider calls |
 | AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | opened and pushed | branch/worktree clean; tracks `origin/codex/afs-web-ux-pass` | Can run after Alpha target is clear; brief: `docs/task_briefs/AFS-WEB-UX-001.md` |
 | AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | opened and pushed | branch/worktree clean; tracks `origin/codex/afs-memory-demo-hardening` | Can run in parallel with Web UX; brief: `docs/task_briefs/AFS-MEMORY-DEMO-001.md` |
-| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | opened and pushed | branch/worktree clean; tracks `origin/codex/afs-poster-live-smoke` | Integrate last; brief: `docs/task_briefs/AFS-POSTER-LIVE-001.md` |
+| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | blocked by missing env | `python -m apps.cli.main alpha-smoke --json`; PosterFlow tests; `git diff --check` | Evidence: `docs/handoff/AFS-POSTER-LIVE-001.md`; no live provider call |
 
 ## Integration Gate
 
@@ -328,6 +328,44 @@ Evidence:
 
 - `docs/local_alpha_0_2_acceptance.md`
 - `docs/task_briefs/AFS-ALPHA-PKG-001.md`
+
+### AFS-POSTER-LIVE-001: PosterFlow Live Smoke Checklist
+
+Goal:
+
+- Close the current Alpha blocker when local image-provider environment
+  variables are available, or record a precise checklist when they are not.
+
+Acceptance criteria:
+
+- [x] Environment readiness is checked without printing secrets.
+- [x] Missing live env is recorded as the blocker.
+- [x] The checklist explains exact local-only variables and commands to run
+      later.
+- [x] No live provider call is made without `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [x] No provider keys, signed URLs, generated images, or run directories are
+      staged.
+
+Verification:
+
+```powershell
+python -m apps.cli.main alpha-smoke --json
+# status: blocked because remote image provider is not enabled
+
+python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py
+# 22 passed
+
+git diff --check
+# passed with Windows line-ending warnings only
+```
+
+Status:
+
+- blocked by missing local image-provider environment
+
+Evidence:
+
+- `docs/handoff/AFS-POSTER-LIVE-001.md`
 
 ### AFS-PROD-001: Alpha Smoke Status CLI
 

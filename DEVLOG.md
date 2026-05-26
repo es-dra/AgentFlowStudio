@@ -2010,3 +2010,14 @@
 - Boundary kept: documentation only. No runtime code changed, no providers were
   called, no generated artifacts were written, and no private Company knowledge
   was copied into the repository.
+
+## 2026-05-27 - AFS-POSTER-LIVE-001 Live Smoke Checklist
+
+- Checked PosterFlow image-provider environment without printing secrets:
+  `NARRATOCUT_ALLOW_REMOTE_IMAGE`, `NARRATOCUT_IMAGE_PROVIDER`,
+  `NARRATOCUT_IMAGE_BASE_URL`, `NARRATOCUT_IMAGE_API_KEY`, and
+  `NARRATOCUT_IMAGE_MODEL` are all unset in the current shell.
+- Added `docs/handoff/AFS-POSTER-LIVE-001.md` with the local-only setup,
+  live-smoke commands, expected evidence, and no-secret review checklist.
+- Boundary kept: no live provider call, no runtime code change, no generated
+  artifacts, no provider config, and no secrets committed.
