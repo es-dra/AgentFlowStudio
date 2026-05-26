@@ -22,6 +22,7 @@ agent contracts obvious without reading every historical phase note.
 - [Golden Path](golden_path.md)
 - [Golden Sample v0.1.0](golden_sample_v0_1_0.md)
 - [Alpha readiness report](alpha_readiness_report.md)
+- [Local Alpha 0.2 acceptance package](local_alpha_0_2_acceptance.md)
 - [Phase 14 local ASR product acceptance](product_acceptance_phase14_local_asr.md)
 - [Phase 14.4B elastic boundary acceptance](product_acceptance_phase14_4b_elastic_boundaries.md)
 - [Phase 14.4E audio boundary refinement acceptance](product_acceptance_phase14_4e_audio_boundary_refinement.md)

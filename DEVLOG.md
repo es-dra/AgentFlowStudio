@@ -1995,3 +1995,18 @@
 - Boundary kept: this pass only updates project execution docs. It does not
   change runtime code, call providers, write generated artifacts, or copy private
   Company knowledge into the repository.
+
+## 2026-05-27 - AFS-ALPHA-PKG-001 Local Alpha 0.2 Acceptance Package
+
+- Added `docs/local_alpha_0_2_acceptance.md` as the first formal Local Alpha
+  0.2 acceptance entry point.
+- The package consolidates current demoable capabilities, rerun commands,
+  acceptance checklist, blockers, non-claims, and next product lanes.
+- Linked the package from `docs/README.md` and recorded lane status in
+  `TASK_TRACKER.md`.
+- Verification in this global worktree used
+  `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe` because global
+  worktrees do not carry the main checkout's `.venv` directory.
+- Boundary kept: documentation only. No runtime code changed, no providers were
+  called, no generated artifacts were written, and no private Company knowledge
+  was copied into the repository.
