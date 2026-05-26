@@ -1987,7 +1987,7 @@
 - Updated `TASK_TRACKER.md` to make Local Alpha 0.2 the active product queue and
   preserve the integration order: Alpha package first, Web UX and Memory Demo in
   parallel, Poster live smoke last.
-- Opened four clean worktrees from the same `ace4d2a` baseline:
+- Opened and pushed four clean worktrees from the Local Alpha 0.2 baseline:
   - `codex/afs-alpha-package`
   - `codex/afs-web-ux-pass`
   - `codex/afs-memory-demo-hardening`
