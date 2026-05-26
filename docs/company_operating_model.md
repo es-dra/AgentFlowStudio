@@ -100,6 +100,14 @@ Parallel work is allowed only when:
 - integration order is clear;
 - remote provider calls remain explicitly gated.
 
+Preserved branches need an extra gate:
+
+- repair or move old worktrees after repository renames;
+- compare divergence against `master`;
+- push useful checkpoints for backup;
+- classify the branch as `integrated`, `preserved`, `stale`, or `delete`;
+- rebase or replay preserved branches before integration.
+
 ## Agent Work Policy
 
 Subagent or delegated work must have:
@@ -141,17 +149,23 @@ For Memory OS work, keep these boundaries explicit:
 - context bundle existence does not prove context selection quality;
 - demo success is not product validation.
 
-## Initial Parallel Tracks
+## Current Parallel Tracks
 
-Recommended first tracks:
+Current tracked lanes:
 
 | Branch | Purpose | Primary write scope | Status |
 |---|---|---|---|
-| `codex/company-os-projection` | Project-facing projection of company rules | `AGENTS.md`, `docs/company_operating_model.md`, `TASK_TRACKER.md` | active |
-| `codex/memory-os-loop` | Feedback to memory review to preference/profile/prefix loop | `agentflow/memory`, `narratostudio/posterflow`, tests | planned |
-| `codex/context-runtime-trace` | Minimal `context_bundle` and `context_assembly_trace` artifacts | `agentflow/context`, examples, tests | planned |
-| `codex/quality-feedback-signals` | Failure attribution and quality feedback signal contracts | harness and quality tests | planned |
-| `codex/posterflow-two-round-demo` | True two-round Memory OS demo and comparison report | PosterFlow workflow/report/tests | planned |
+| `codex/company-os-projection` | Project-facing projection of company rules | `AGENTS.md`, `docs/company_operating_model.md`, `TASK_TRACKER.md` | completed |
+| `codex/memory-os-loop` | Feedback to memory review to preference/profile/prefix loop | `agentflow/memory`, `narratostudio/posterflow`, tests | integrated |
+| `codex/context-runtime-trace` | Minimal `context_bundle` and `context_assembly_trace` artifacts | `agentflow/context`, examples, tests | integrated with memory loop |
+| `codex/quality-feedback-signals` | Failure attribution and quality feedback signal contracts | harness and quality tests | integrated |
+| `codex/posterflow-two-round-demo` | True two-round Memory OS demo and comparison report | PosterFlow workflow/report/tests | integrated |
+| `codex/posterflow-minimax-rebase` | MiniMax image provider replay on current mainline | `narratostudio/posterflow`, tests | integrated and branch cleaned |
+| `codex/alpha-readiness-rebase` | Alpha readiness evidence replay on current mainline | docs, examples, tests | integrated and branch cleaned |
+| `codex/narratocut-web-ui` | Independent local Web UI workbench | `apps/web`, `apps/web_bridge`, Web UI tests | preserved; rebase/replay required before merge |
+
+For exact verification and branch hygiene state, use `TASK_TRACKER.md` as the
+live project ledger.
 
 ## Promotion Back To Company
 

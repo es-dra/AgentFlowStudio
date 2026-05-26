@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-26 - Web UI Branch Baseline Repair And Hygiene
+
+- Repaired the preserved `codex/narratocut-web-ui` worktree after the
+  repository rename left its `.git` pointer aimed at the removed
+  `D:\Projects\NarratoCut` checkout.
+- Committed and pushed the branch-local Web UI M3.1 supervised production
+  workbench checkpoint at `de8ca8e`.
+- Moved the worktree to the AgentFlow Studio convention:
+  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui`.
+- Classified the branch as preserved but not merge-ready. It is synced to
+  `origin/codex/narratocut-web-ui`, but still diverges from `master` and must
+  be rebased or replayed before mainline integration.
+- Web UI branch verification before push:
+  - `python -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py`: 41 passed.
+  - `python -m pytest`: 374 passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+  - JS syntax checks, `compileall`, and `git diff --check`: passed.
+- Environment note: the old Web UI worktree used Python 3.13.5 during this
+  verification. Mainline integration should rerun the same matrix in the
+  project-preferred Python 3.12 environment.
+- Boundary kept: no Web UI code was merged into `master`; this pass only
+  repaired, backed up, relocated, and classified the parallel branch.
+
 ## 2026-05-24 - Alpha Readiness Evidence Report
 
 - Replayed the alpha evidence report from the old

@@ -33,6 +33,13 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 - For multi-line development, keep the main checkout stable and use isolated
   `codex/*` worktrees with explicit write scopes, verification commands, and
   integration order.
+- Keep project worktrees under
+  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\`.
+  If a preserved branch still points to an old repository path, repair or move
+  the worktree before continuing.
+- Do not merge a preserved branch just because it is pushed. If it trails
+  `master`, record the divergence and rebase or replay it on a fresh branch
+  before integration.
 - Agent/subagent work must use bounded tasks: goal, non-goals, write scope,
   acceptance criteria, verification, remote-provider policy, and return format.
 - Do not migrate code from `D:\Projects\AVP` unless the user explicitly asks.

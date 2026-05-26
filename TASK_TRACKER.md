@@ -29,6 +29,7 @@ docs/company_operating_model.md
 | AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Integrated at `ff77b30`; local and remote branch/worktree deleted after verification |
 | AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | integrated to `master` | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Integrated at `649d736`; superseded stale MiniMax branch and both provider branches were deleted |
 | AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
+| AFS-WEB-001 | `codex/narratocut-web-ui` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui` | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | preserved parallel branch | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Pushed at `de8ca8e`; worktree repaired and moved; branch still diverges from `master` and must be rebased or replayed before integration |
 
 ## Integration Gate
 
@@ -38,8 +39,11 @@ Current gate:
 - `AFS-DEMO-001` is integrated to `master` at `ff77b30`.
 - `AFS-PROV-001` is integrated to `master` at `649d736`.
 - `AFS-ALPHA-001` is integrated to `master` at `ac2254e`.
-- Remaining active work is the independent Web UI line:
-  `origin/codex/narratocut-web-ui`.
+- Remaining active work is the independent Web UI line
+  `origin/codex/narratocut-web-ui` at `de8ca8e`.
+- Do not merge the Web UI line directly. It is preserved and backed up, but
+  still diverges from `master`; the next integration step is a fresh
+  rebase/replay branch with Python 3.12 verification.
 
 ## Remote Branch Hygiene
 
@@ -54,7 +58,7 @@ Current branch classification as of 2026-05-26:
 | `origin/codex/posterflow-minimax-rebase` | integrated replacement provider branch | Deleted after fast-forward integration and verification. |
 | `origin/codex/alpha-readiness-evidence` | stale stacked alpha evidence branch | Deleted after `AFS-ALPHA-001` replayed the evidence on current `master`. |
 | `origin/codex/alpha-readiness-rebase` | integrated replacement alpha evidence branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/narratocut-web-ui` | independent Web UI line | Keep, but repair or recreate its worktree under the AgentFlowStudio path before further development. |
+| `origin/codex/narratocut-web-ui` | preserved independent Web UI line | Keep. Worktree repaired and moved to the AgentFlowStudio path; next action is rebase/replay before any merge to `master`. |
 
 ## Current Task Detail
 
@@ -334,6 +338,71 @@ Evidence:
   `origin/codex/posterflow-minimax-provider-tests`
 - Local worktree and both remote provider branches were deleted after
   integration.
+
+### AFS-WEB-001: Web UI Parallel Lane Repair
+
+Goal:
+
+- Preserve the independent NarratoCut Web UI line without letting stale
+  branch/worktree state block future parallel development.
+
+Acceptance criteria:
+
+- [x] Broken worktree metadata from the old `D:\Projects\NarratoCut` path is
+      repaired.
+- [x] The worktree is moved under the AgentFlowStudio global worktree root.
+- [x] Uncommitted Web UI M3.1 production workbench changes are committed and
+      pushed to `origin/codex/narratocut-web-ui`.
+- [x] The branch is explicitly classified as preserved but not merge-ready.
+- [x] Verification evidence is recorded before the branch is treated as
+      backed up.
+
+Verification:
+
+```powershell
+python -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py
+# 41 passed
+
+python -m pytest
+# 374 passed
+
+python -m apps.cli.main --help
+# passed
+
+python -m apps.cli.main version
+# 0.1.0
+
+node --check apps/web/app.js
+node --check apps/web/app-elements.js
+node --check apps/web/feedback-wiring.js
+node --check apps/web/feedback-event.js
+node --check apps/web/production-mode.js
+node --check apps/web/production-render.js
+node --check apps/web/production-workflows.js
+node --check apps/web/artifact-values.js
+node --check apps/web/video-preview.js
+# passed
+
+python -m compileall apps/web_bridge apps/cli narratocut/workflow_engine tests
+# passed
+
+git diff --check
+# passed
+```
+
+Status:
+
+- preserved parallel branch at `de8ca8e`; not integrated to `master`
+
+Evidence:
+
+- Worktree:
+  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui`
+- Branch: `codex/narratocut-web-ui`
+- Remote: `origin/codex/narratocut-web-ui`
+- Current integration note: rebase or replay the branch on current `master`
+  before opening a PR or merging. The old verification ran under Python 3.13.5;
+  integration verification should rerun under Python 3.12.
 
 ## Planned Worktree Layout
 
