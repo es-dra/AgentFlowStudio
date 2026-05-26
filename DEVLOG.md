@@ -35,10 +35,10 @@
 - After all four integration lanes were merged, removed the integrated
   worktrees and local branches for `AFS-PROD-001`, `AFS-QA-001`,
   `AFS-MEM-002`, and `AFS-WEB-REPLAY`.
-- Preserved the old `codex/narratocut-web-ui` worktree only as a historical
-  backup until remote cleanup is complete. It is superseded and should not be
-  merged because it would regress the new CLI bridge entrypoint and handoff
-  state.
+- Archived the old `codex/narratocut-web-ui` branch as
+  `archive/narratocut-web-ui-de8ca8e`, deleted the remote branch, then removed
+  the old local worktree and branch. It was superseded by the replay and would
+  regress the new CLI bridge entrypoint and handoff state if merged directly.
 - Boundary kept: no remote provider calls, durable Memory runtime, database,
   SaaS/backend account system, cloud storage, browser persistence, or automatic
   manifest path scanning was added.

@@ -133,9 +133,10 @@ Current local cleanup as of 2026-05-27:
 - Deleted integrated local branches:
   `codex/afs-prod-alpha-smoke`, `codex/afs-quality-evidence-summary`,
   `codex/afs-memory-promotion-review`, and `codex/afs-web-ui-replay`.
-- Preserved local historical worktree:
-  `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui`
-  until remote cleanup is complete.
+- Pushed `master` and archive tag `archive/narratocut-web-ui-de8ca8e`, then
+  deleted remote `origin/codex/narratocut-web-ui`.
+- Removed the old local `narratocut-web-ui` worktree and local branch after
+  confirming the archive tag points to the same commit.
 
 ## Current Task Detail
 
