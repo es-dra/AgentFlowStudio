@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
+from apps.cli.main import app
 from apps.web_bridge.bridge import (
     bridge_health,
     create_workflow_plan,
@@ -37,6 +40,20 @@ def test_bridge_health_reports_local_runtime_without_secrets() -> None:
 
 def test_bridge_exposes_standalone_server_entrypoint() -> None:
     assert callable(serve)
+
+
+def test_web_bridge_cli_command_starts_local_bridge(monkeypatch) -> None:
+    calls = []
+
+    def fake_serve(*, host: str, port: int) -> None:
+        calls.append({"host": host, "port": port})
+
+    monkeypatch.setattr("apps.cli.main.serve_web_bridge", fake_serve)
+
+    result = CliRunner().invoke(app, ["web-bridge", "--host", "127.0.0.1", "--port", "8799"])
+
+    assert result.exit_code == 0, result.output
+    assert calls == [{"host": "127.0.0.1", "port": 8799}]
 
 
 def test_bridge_lists_workflows_from_yaml_metadata() -> None:

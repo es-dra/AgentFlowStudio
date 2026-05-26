@@ -17,6 +17,7 @@ from apps.cli.report_commands import (
 )
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.workflow_commands import run_workflow_from_cli
+from apps.web_bridge.server import serve as serve_web_bridge
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
@@ -277,6 +278,23 @@ def review_run_command(
 app.command(name="package-report")(package_report_command)
 app.command(name="delivery-readiness")(delivery_readiness_command)
 app.command(name="alpha-smoke")(alpha_smoke_command)
+
+
+@app.command(name="web-bridge")
+def web_bridge_command(
+    host: str = typer.Option(
+        "127.0.0.1",
+        "--host",
+        help="Host for the local Web UI bridge.",
+    ),
+    port: int = typer.Option(
+        8787,
+        "--port",
+        help="Port for the local Web UI bridge.",
+    ),
+) -> None:
+    """Run the local Web UI bridge for supervised Production Mode."""
+    serve_web_bridge(host=host, port=port)
 
 
 def _display_ref(path: Path) -> str:
