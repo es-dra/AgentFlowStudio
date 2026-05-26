@@ -34,6 +34,7 @@ docs/company_operating_model.md
 | AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
 | AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | Add shared evidence summary vocabulary for quality and review reports | integrated to `master` | `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 26 passed; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `17c72e5`; additive report field only, no provider calls |
 | AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | Validate memory promotion review decisions without durable memory writes | integrated to `master` | `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 57 passed; `compileall agentflow\memory agentflow\harness`; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `8fd9fe4`; no DB, RAG, provider calls, or durable Memory runtime |
+| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay local Review/Production Web UI workbench on current mainline | integrated to `master` | Web targeted tests -> 60 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; CLI help/version/web-bridge help; browser smoke: local bridge + static UI + mock workflow + review refresh | Integrated at `5d0392f`; local-only, no provider calls, no browser persistence |
 
 ## Integration Gate
 
@@ -46,14 +47,12 @@ Current gate:
 - `AFS-PROD-001` is integrated to `master` at `5c88d21`.
 - `AFS-QA-001` is integrated to `master` at `17c72e5`.
 - `AFS-MEM-002` is integrated to `master` at `8fd9fe4`.
-- Next integration target is `AFS-WEB-REPLAY`. Integrate it last because it
-  has the largest UI/runtime surface and must be checked against the now-current
-  evidence and memory contracts.
-- Remaining active work is the independent Web UI line
-  `origin/codex/narratocut-web-ui` at `de8ca8e`.
-- Do not merge the Web UI line directly. It is preserved and backed up, but
-  still diverges from `master`; the next integration step is a fresh
-  rebase/replay branch with Python 3.12 verification.
+- `AFS-WEB-REPLAY` is integrated to `master` at `5d0392f`.
+- The old preserved Web UI branch `origin/codex/narratocut-web-ui` at
+  `de8ca8e` is now superseded by the replay branch. Do not merge it into
+  `master`; it can be archived after push/remote cleanup.
+- All four lanes from the current dispatch batch are integrated. The next gate
+  is mainline full verification, push, and branch/worktree cleanup.
 - `AFS-OPS-002` is complete; the current work is integration and consolidation
   of the four already-opened parallel lanes.
 
@@ -106,6 +105,9 @@ Completed dispatch:
   reviewed, rebased onto `master`, verified, and fast-forward integrated.
 - `AFS-MEM-002`: worker returned `DONE`, was closed, then the branch was
   reviewed, rebased onto `master`, verified, and fast-forward integrated.
+- `AFS-WEB-REPLAY`: replay branch was reviewed, rebased onto `master`,
+  corrected to expose `web-bridge` through the CLI, browser-smoke tested, and
+  fast-forward integrated.
 
 ## Remote Branch Hygiene
 
@@ -379,6 +381,76 @@ Evidence:
 - `examples/agentflow/memory_promotion_decision.example.json`
 - `tests/test_agentflow_asset_memory_validator.py`
 - `docs/handoff/AFS-MEM-002.md`
+
+### AFS-WEB-REPLAY: Local Web UI Workbench
+
+Goal:
+
+- Replay the preserved Web UI line onto current `master` without bringing back
+  stale backend/module changes from the old branch.
+
+Acceptance criteria:
+
+- [x] Only Web-facing code, Web bridge code, Web fixtures, and Web tests are
+      integrated from the replay lane.
+- [x] Review Mode remains local-only and reads only explicitly selected files.
+- [x] Production Mode connects only to the local bridge at `127.0.0.1`.
+- [x] `python -m apps.cli.main web-bridge` starts the local bridge entrypoint
+      used by the README.
+- [x] Production Mode can generate a plan, run a demo workflow, poll status,
+      list artifacts, and refresh review reports.
+- [x] Browser state remains non-persistent: no `localStorage`, IndexedDB,
+      cookies, uploads, provider config, SaaS, or cloud backend.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py tests/test_alpha_smoke_cli.py tests/test_evidence_summary.py tests/test_agentflow_asset_memory_validator.py
+# 60 passed
+
+node --check apps/web/app.js
+node --check apps/web/app-elements.js
+node --check apps/web/feedback-wiring.js
+node --check apps/web/feedback-event.js
+node --check apps/web/production-mode.js
+node --check apps/web/production-render.js
+node --check apps/web/production-workflows.js
+node --check apps/web/artifact-values.js
+node --check apps/web/video-preview.js
+node --check apps/web/artifact-contracts.js
+node --check apps/web/artifact-ledgers.js
+node --check apps/web/artifact-workspace.js
+node --check apps/web/render-helpers.js
+node --check apps/web/ui-copy.js
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli tests
+# passed
+```
+
+Browser smoke:
+
+- Started `python -m apps.cli.main web-bridge --host 127.0.0.1 --port 8787`.
+- Started `python -m http.server 8769 -d apps/web --bind 127.0.0.1`.
+- Opened `http://127.0.0.1:8769/index.html`.
+- Confirmed Review Mode rendered with no browser error logs.
+- Confirmed Production Mode bridge health showed `bridge ready`.
+- Selected `mock_text_to_slices`, generated `workflow_plan.json`, ran workflow
+  to `success`, saw all four steps pass, and refreshed review to `passed`.
+
+Status:
+
+- integrated to `master` at `5d0392f`
+
+Evidence:
+
+- `apps/web/`
+- `apps/web_bridge/`
+- `apps/cli/main.py`
+- `tests/test_web_static_artifact_viewer.py`
+- `tests/test_web_production_mode_static.py`
+- `tests/test_web_production_bridge.py`
+- `docs/handoff/AFS-WEB-REPLAY.md`
 
 ### AFS-CTX-001: PosterFlow Context Runtime Trace
 

@@ -1,5 +1,41 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-WEB-REPLAY Local Web UI Workbench
+
+- Reviewed and integrated `codex/afs-web-ui-replay`.
+- Replayed the preserved Web UI branch onto current `master` instead of
+  merging stale `codex/narratocut-web-ui` history directly.
+- Added `apps/web/` as a local Review/Production workbench:
+  - Review Mode reads only explicitly selected JSON, Markdown, and video files.
+  - Production Mode connects only to the local bridge at `127.0.0.1:8787`.
+  - The UI keeps browser state non-persistent and does not use `localStorage`,
+    IndexedDB, cookies, uploads, provider config, SaaS, or cloud backend.
+- Added `apps/web_bridge/` as a stdlib local bridge for workflow discovery,
+  plan generation, background local workflow runs, status polling, and review
+  refresh.
+- Added `python -m apps.cli.main web-bridge` so the README and actual
+  executable entrypoint match.
+- Verification:
+  - `python -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py tests/test_alpha_smoke_cli.py tests/test_evidence_summary.py tests/test_agentflow_asset_memory_validator.py`: 60 passed.
+  - JS syntax checks with `node --check` for all Web modules: passed.
+  - `python -m compileall apps\web_bridge apps\cli tests`: passed.
+  - `python -m apps.cli.main --help`: passed and listed `web-bridge`.
+  - `python -m apps.cli.main web-bridge --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+  - `git diff --check`: passed with Windows line-ending warnings only.
+- Browser smoke:
+  - Started the bridge on `127.0.0.1:8787` and served the UI on
+    `127.0.0.1:8769`.
+  - Confirmed Review Mode rendered with no browser error logs.
+  - Confirmed Production Mode showed `bridge ready`.
+  - Selected `mock_text_to_slices`, generated `workflow_plan.json`, ran the
+    workflow to `success`, saw all four steps pass, and refreshed review to
+    `passed`.
+- Integrated to `master` at `5d0392f`.
+- Boundary kept: no remote provider calls, durable Memory runtime, database,
+  SaaS/backend account system, cloud storage, browser persistence, or automatic
+  manifest path scanning was added.
+
 ## 2026-05-27 - AFS-MEM-002 Memory Promotion Review Decisions
 
 - Reviewed and integrated `codex/afs-memory-promotion-review`.
