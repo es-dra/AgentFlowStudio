@@ -2085,3 +2085,18 @@
   live-smoke commands, expected evidence, and no-secret review checklist.
 - Boundary kept: no live provider call, no runtime code change, no generated
   artifacts, no provider config, and no secrets committed.
+
+## 2026-05-27 - Local Alpha 0.2 Batch Integration And Cleanup
+
+- Integrated `AFS-WEB-UX-001`, `AFS-MEMORY-DEMO-001`, and `AFS-POSTER-LIVE-001`
+  into `master` after `AFS-ALPHA-PKG-001` had already landed.
+- Re-verified the combined mainline instead of relying on subagent reports:
+  73 targeted tests passed, JS syntax checks passed, compileall passed,
+  `git diff --check` passed, and `alpha-smoke --json` stayed `blocked` only
+  because the remote image provider env is unset.
+- Closed the two subagents and removed the four completed Local Alpha worktrees,
+  local branches, and remote branches.
+- Stopped the local Web bridge/static smoke servers on ports `8787` and `8769`.
+- Lesson recorded: delegated browser-smoke claims still need controller-side
+  reproduction; this caught and fixed a small-screen sticky-topbar click
+  coverage issue before merge.

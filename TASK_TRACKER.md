@@ -58,10 +58,14 @@ Current gate:
 - All four lanes from the previous dispatch batch are integrated. Mainline full
   verification passed with 548 tests. The four replay/integration worktrees and
   local branches were removed after merge.
-- `AFS-OPS-003` is the current docs-only setup slice for the first formal
-  Local Alpha 0.2 product push.
-- Four Local Alpha 0.2 worktrees are opened, pushed, tracking origin, and ready
-  for task execution. Main checkout remains the integration surface.
+- The Local Alpha 0.2 dispatch batch is integrated to `master` at `7f2dec4`:
+  `AFS-ALPHA-PKG-001`, `AFS-WEB-UX-001`, `AFS-MEMORY-DEMO-001`, and
+  `AFS-POSTER-LIVE-001`.
+- Mainline targeted verification passed with 73 tests, JS syntax checks,
+  compileall, `git diff --check`, and `alpha-smoke --json` reporting the
+  expected PosterFlow image-provider `blocked` state.
+- The four Local Alpha 0.2 worktrees, local branches, and remote branches were
+  removed after integration. Main checkout is the only remaining worktree.
 
 ## Operating Entry Points
 
@@ -79,23 +83,22 @@ the agent manager can still resume or close that ID. If a close attempt returns
 
 ## Next Parallel Queue
 
-Do not start these from the main checkout. Create separate `codex/*` worktrees
-after `AFS-OPS-003` verification is recorded.
+Current queue is empty after the Local Alpha 0.2 dispatch batch. Start the next
+parallel queue only after defining the next product milestone and writing fresh
+task briefs.
+
+Recommended next queue candidates:
 
 | ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
 |---|---|---|---|---|
-| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | `docs/`, `TASK_TRACKER.md` integration notes only | `python -m apps.cli.main alpha-smoke --json`; `python -m pytest tests/test_agentflow_roadmap_docs.py`; `git diff --check` |
-| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, `apps/web/README.md` | Web targeted tests; JS `node --check`; browser smoke with local bridge |
-| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | PosterFlow demo artifacts/docs/tests under `narratostudio/posterflow`, `workflows`, `tests`, `docs` | PosterFlow workflow/provider/quality tests; `alpha-smoke --json`; `git diff --check` |
-| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | PosterFlow live-smoke docs/checklist and optional ignored local run evidence | provider env check; no-secret scan; PosterFlow provider tests; optional live smoke only with explicit local env |
+| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-product-next-briefs` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `alpha-smoke --json`; `git diff --check` |
+| AFS-WEB-REVIEW-001 | TBD after milestone definition | Web UI Agent + QA Reviewer | Web review/product acceptance polish | Web targeted tests; JS `node --check`; browser smoke |
+| AFS-MEMORY-RUNTIME-001 | TBD after milestone definition | Memory / Evidence Steward | Candidate promotion/runtime contract slice | focused memory/posterflow tests; `alpha-smoke --json`; `git diff --check` |
+| AFS-POSTER-LIVE-002 | TBD after local provider env is configured | Provider Adapter Agent + Security / Secret Audit Agent | ignored local live-smoke evidence plus docs-only summary | provider env check; no-secret scan; PosterFlow tests; explicit live smoke only with local env |
 
-Integration order:
-
-1. `AFS-ALPHA-PKG-001` first, because it defines what Local Alpha 0.2 accepts.
-2. `AFS-MEMORY-DEMO-001` and `AFS-WEB-UX-001` can integrate in either order if
-   their write scopes stay disjoint.
-3. `AFS-POSTER-LIVE-001` last, because live provider evidence must remain
-   gated and may be blocked by local environment.
+Integration rule remains unchanged: open separate `codex/*` worktrees for
+implementation lanes, keep `master` as the integration surface, and delete
+temporary branches/worktrees after verified merge.
 
 ## Remote Branch Hygiene
 
@@ -124,6 +127,14 @@ Current local cleanup as of 2026-05-27:
   deleted remote `origin/codex/narratocut-web-ui`.
 - Removed the old local `narratocut-web-ui` worktree and local branch after
   confirming the archive tag points to the same commit.
+- Integrated and removed the Local Alpha 0.2 batch worktrees and branches:
+  `afs-alpha-package`, `afs-web-ux-pass`, `afs-memory-demo-hardening`, and
+  `afs-poster-live-smoke`.
+- Deleted remote branches:
+  `origin/codex/afs-alpha-package`, `origin/codex/afs-web-ux-pass`,
+  `origin/codex/afs-memory-demo-hardening`, and
+  `origin/codex/afs-poster-live-smoke`.
+- Stopped the local Web bridge/static smoke servers on ports `8787` and `8769`.
 
 ## Current Task Detail
 
