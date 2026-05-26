@@ -100,9 +100,9 @@ Idle agents create stale context, not capacity.
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | First |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | After scenario package |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | After scenario package |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | Complete after integration |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | Ready after scenario package integration |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | Ready after scenario package integration |
 | AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | After runtime evidence shape is known |
 | AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | Optional; blocked until local image env is intentionally configured |
 

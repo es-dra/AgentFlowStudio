@@ -8,6 +8,7 @@ MAIN_ROADMAP = Path("docs/product_roadmap.md")
 PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 LOCAL_ALPHA_0_3_GOALS = Path("docs/local_alpha_0_3_validation_goals.md")
 LOCAL_ALPHA_0_4_GOALS = Path("docs/local_alpha_0_4_product_loop_goals.md")
+LOCAL_ALPHA_0_4_SCENARIO = Path("docs/local_alpha_0_4_scenario_package.md")
 TASK_BRIEFS_INDEX = Path("docs/task_briefs/README.md")
 
 
@@ -126,9 +127,23 @@ def test_local_alpha_0_4_product_loop_goals_are_discoverable() -> None:
     assert "local_alpha_0_4_product_loop_goals.md" in docs_index
     assert "local_alpha_0_4_product_loop_goals.md" in task_briefs_index
     assert "one real local product loop" in goals
+    assert "local_alpha_0_4_scenario_package.md" in goals
     assert "AFS-PROD-LOOP-001" in goals
     assert "AFS-WEB-OPERATOR-002" in goals
     assert "AFS-MEMORY-QUALITY-002" in goals
+
+
+def test_local_alpha_0_4_scenario_package_is_discoverable() -> None:
+    docs_index = _text(DOCS_INDEX)
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    scenario = _text(LOCAL_ALPHA_0_4_SCENARIO)
+
+    assert LOCAL_ALPHA_0_4_SCENARIO.exists()
+    assert "local_alpha_0_4_scenario_package.md" in docs_index
+    assert "local_alpha_0_4_scenario_package.md" in task_briefs_index
+    assert "video_script_to_finished_package_local_asr.yaml" in scenario
+    assert "data/processed/local_alpha_0_4/video_script_local_asr_input.json" in scenario
+    assert "AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 may run in parallel" in scenario
 
 
 def test_local_alpha_0_4_task_briefs_exist() -> None:

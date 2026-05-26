@@ -220,17 +220,17 @@ local content project brief
   -> context bundle for a second pass
 ```
 
-Use `docs/local_alpha_0_4_product_loop_goals.md` as the milestone boundary and
-`TASK_TRACKER.md` as the live project ledger. `AFS-PROD-LOOP-001` must create
-the concrete scenario package before opening implementation worktrees.
+Use `docs/local_alpha_0_4_product_loop_goals.md` as the milestone boundary,
+`docs/local_alpha_0_4_scenario_package.md` as the shared scenario package, and
+`TASK_TRACKER.md` as the live project ledger.
 
 Local Alpha 0.4 planned queue:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
-| AFS-PROD-LOOP-001 | Define the 0.4 scenario package and runbook | `codex/afs-prod-loop-brief` | ready after this planning baseline |
-| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | depends on scenario package |
-| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | depends on scenario package |
+| AFS-PROD-LOOP-001 | Define the 0.4 scenario package and runbook | `codex/afs-prod-loop-brief` | complete after integration |
+| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | ready after scenario package integration |
+| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | ready after scenario package integration |
 | AFS-MEMORY-QUALITY-002 | Evaluate traceable evidence reuse in a second pass | `codex/afs-memory-quality-loop` | depends on runtime evidence shape |
 | AFS-POSTER-LIVE-002 | Optional live image smoke or blocked evidence | `codex/afs-poster-live-002` | optional; blocked by missing local provider env |
 

@@ -13,9 +13,10 @@ Current queue state:
   [`../local_alpha_0_3_validation_goals.md`](../local_alpha_0_3_validation_goals.md).
 - Local Alpha 0.4 is the next product-loop queue. Start from
   [`../local_alpha_0_4_product_loop_goals.md`](../local_alpha_0_4_product_loop_goals.md).
-- Do not open new worktrees until `AFS-PROD-LOOP-001` has produced the concrete
-  scenario package, unless the work is strictly the optional blocked
-  PosterFlow live-smoke lane.
+- `AFS-PROD-LOOP-001` has produced the concrete scenario package at
+  [`../local_alpha_0_4_scenario_package.md`](../local_alpha_0_4_scenario_package.md).
+  Share that package before opening `AFS-RUN-PACKAGE-001` or
+  `AFS-WEB-OPERATOR-002`.
 
 Planned Local Alpha 0.4 queue:
 

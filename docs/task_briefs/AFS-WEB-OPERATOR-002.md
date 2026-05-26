@@ -70,7 +70,7 @@ modify:
 - `TASK_TRACKER.md`
 - `docs/agent_operating_roster.md`
 - `docs/local_alpha_0_4_product_loop_goals.md`
-- `docs/local_alpha_0_4_scenario_package.md` if already created
+- `docs/local_alpha_0_4_scenario_package.md`
 - `apps/web/README.md`
 - `docs/handoff/AFS-WEB-REVIEW-001.md`
 

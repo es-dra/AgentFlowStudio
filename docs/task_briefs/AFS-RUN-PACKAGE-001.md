@@ -64,7 +64,7 @@ modify:
 - `TASK_TRACKER.md`
 - `docs/agent_operating_roster.md`
 - `docs/local_alpha_0_4_product_loop_goals.md`
-- `docs/local_alpha_0_4_scenario_package.md` if already created
+- `docs/local_alpha_0_4_scenario_package.md`
 - `docs/golden_sample_v0_1_0.md`
 - `docs/product_acceptance_phase14_6_delivery_readiness.md`
 

@@ -65,7 +65,7 @@ Acceptance criteria:
 Evidence:
 
 - `docs/local_alpha_0_4_product_loop_goals.md`.
-- A scenario package or runbook created by `AFS-PROD-LOOP-001`.
+- `docs/local_alpha_0_4_scenario_package.md`.
 - `alpha-smoke --json` status.
 
 ### 2. Local Runtime Package Acceptance
@@ -177,9 +177,9 @@ Local Alpha 0.4 does not claim:
 
 | ID | Suggested branch | Owner role | Primary outcome | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | 0.4 scenario package and runbook | first |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | after scenario package |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web path for the 0.4 scenario | after scenario package |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | 0.4 scenario package and runbook | complete after integration |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | ready after scenario package integration |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web path for the 0.4 scenario | ready after scenario package integration |
 | AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | after runtime evidence shape is known |
 | AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | optional |
 

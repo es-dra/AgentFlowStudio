@@ -44,9 +44,9 @@ docs/company_operating_model.md
 | AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | Local Alpha 0.3 operator plan/run/review/feedback Web path | integrated to `master` | Web targeted tests -> 44 passed; JS `node --check`; compileall; desktop and 390x844 browser smoke; mainline integration tests -> 102 passed | Integrated at `6e3fbab`; handoff: `docs/handoff/AFS-WEB-REVIEW-001.md`; controller fixed review refs after polling overwrite; no provider calls |
 | AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable memory writes | integrated to `master` | focused memory/posterflow tests -> 65 passed; mainline integration tests -> 102 passed; `alpha-smoke --json` -> blocked as expected; compileall; `git diff --check` | Integrated at `6853fc1`; handoff: `docs/handoff/AFS-MEMORY-RUNTIME-001.md`; no durable Memory runtime, DB, RAG, or provider calls |
 | AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | blocked by missing local env | `alpha-smoke --json` -> blocked because image provider env is unset | No live provider call; open only after local image env is intentionally configured or for a blocked-evidence-only pass |
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | planned | Pending | Must run first before opening implementation worktrees |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package evidence or actionable local-input blocker | planned | Pending | Depends on `AFS-PROD-LOOP-001` scenario package |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | planned | Pending | Can run in parallel with runtime package after scenario package |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | complete after integration | Roadmap docs tests; `alpha-smoke --json`; `git diff --check` | Evidence: `docs/local_alpha_0_4_scenario_package.md`; no runtime code, provider calls, generated artifacts, local media, or private Company content |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package evidence or actionable local-input blocker | ready after scenario package integration | Pending | Can run in parallel with `AFS-WEB-OPERATOR-002` |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | ready after scenario package integration | Pending | Can run in parallel with `AFS-RUN-PACKAGE-001` |
 | AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation for a second pass | planned | Pending | Start after runtime evidence shape is known |
 
 ## Integration Gate
@@ -81,9 +81,9 @@ Current gate:
 - Mainline Local Alpha 0.3 verification passed with 102 targeted tests, Web JS
   syntax checks, compileall, `git diff --check`, and `alpha-smoke --json`
   reporting the expected image-provider `blocked` state.
-- Local Alpha 0.4 planning baseline is being prepared from the accepted 0.3
-  evidence. No 0.4 implementation worktree should be opened until
-  `AFS-PROD-LOOP-001` creates the concrete scenario package.
+- Local Alpha 0.4 scenario package is defined by `AFS-PROD-LOOP-001` in
+  `docs/local_alpha_0_4_scenario_package.md`. After this branch is integrated,
+  `AFS-RUN-PACKAGE-001` and `AFS-WEB-OPERATOR-002` may open in parallel.
 
 ## Operating Entry Points
 
@@ -128,9 +128,9 @@ Local Alpha 0.4 planned queue:
 
 | ID | Branch / worktree | Owner role | Primary write scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | first |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | local workflow runbook, handoff, focused tests if needed | after scenario package |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests/docs | after scenario package |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | complete after integration |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | local workflow runbook, handoff, focused tests if needed | ready after scenario package integration |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests/docs | ready after scenario package integration |
 | AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | memory/context contracts, examples, focused tests/docs | after runtime evidence shape is known |
 | AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | optional; blocked by missing image-provider env |
 
@@ -144,8 +144,8 @@ AFS-PROD-LOOP-001
   -> controller-side verification, branch cleanup, and memory promotion review
 ```
 
-Do not dispatch the next subagents until the controller has created the 0.4
-scenario package, matching worktrees, and a non-overlapping write map.
+After `AFS-PROD-LOOP-001` is integrated, dispatch `AFS-RUN-PACKAGE-001` and
+`AFS-WEB-OPERATOR-002` as separate worktrees with non-overlapping write scopes.
 
 ## Remote Branch Hygiene
 

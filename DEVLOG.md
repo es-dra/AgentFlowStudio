@@ -1,5 +1,27 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-PROD-LOOP-001 Local Alpha 0.4 Scenario Package
+
+- Added `docs/local_alpha_0_4_scenario_package.md` as the shared execution
+  package for the next Local Alpha 0.4 push.
+- Fixed the first real 0.4 scenario to the existing local-first workflow
+  `workflows/video_script_to_finished_package_local_asr.yaml`: local source
+  video, local script, local ASR transcript, script-aligned highlight
+  selection, real slicing, BGM package, inspect/review/package report, Web
+  operator feedback, and later evidence-to-context reuse.
+- Kept all required operator inputs local and ignored:
+  `data/raw/demo_real_video/input.mp4`, `data/raw/demo_bgm/bgm.wav`,
+  `data/models/faster-whisper/`, and
+  `data/processed/local_alpha_0_4/video_script_local_asr_input.json`.
+- Updated docs discovery, task briefs, operating model, roster, and tracker so
+  `AFS-RUN-PACKAGE-001` and `AFS-WEB-OPERATOR-002` can open as parallel
+  worktrees after this scenario package is integrated.
+- Added roadmap-doc tests that assert the scenario package is discoverable and
+  names the selected workflow and ignored input bundle.
+- Boundary kept: documentation, tests, and task tracking only. No runtime code,
+  provider calls, generated artifacts, local media, secrets, or private Company
+  content were changed.
+
 ## 2026-05-27 - Local Alpha 0.4 Product Loop Planning Baseline
 
 - Added `docs/local_alpha_0_4_product_loop_goals.md` to define the next
