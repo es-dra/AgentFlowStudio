@@ -17,6 +17,20 @@ It is an engineering readiness report. It does not certify creative quality,
 durable Memory runtime, Web UI readiness, hosted service readiness, or provider
 cost-quality optimization.
 
+## Read-Only Status Entry
+
+Use the Alpha smoke/status command when you need a quick local summary without
+running remote providers or heavy media workflows:
+
+```powershell
+python -m apps.cli.main alpha-smoke
+python -m apps.cli.main alpha-smoke --json
+```
+
+The command reads repository-local evidence and image-provider environment
+presence only. It does not write run artifacts, does not call LLM/ASR/image/video
+providers, and does not claim human acceptance or business validation.
+
 ## Repository And Branch State
 
 - Original evidence branch: `codex/alpha-readiness-evidence`

@@ -53,6 +53,18 @@ paths, summarize refreshed product runs with:
 
 This writes `delivery_readiness.json` and `delivery_readiness.md`.
 
+For a read-only Alpha smoke/status summary that does not call providers or
+write run artifacts, use:
+
+```powershell
+python -m apps.cli.main alpha-smoke
+python -m apps.cli.main alpha-smoke --json
+```
+
+This reports the current NarratoStudio handoff, NarratoCut package, and
+PosterFlow provider-readiness state as `pass`, `blocked`, or `fail` and points
+back to [`alpha_readiness_report.md`](alpha_readiness_report.md).
+
 Agent-facing task contracts live in [`../skills`](../skills/README.md).
 Operational agent guidance lives in
 [`agent_usage_guide.md`](agent_usage_guide.md). Development agent roles and

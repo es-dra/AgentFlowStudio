@@ -5,6 +5,7 @@ from typing import Optional
 
 import typer
 
+from apps.cli.alpha_commands import alpha_smoke_command
 from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.plan_commands import write_draft_plan_from_cli
@@ -275,6 +276,7 @@ def review_run_command(
 
 app.command(name="package-report")(package_report_command)
 app.command(name="delivery-readiness")(delivery_readiness_command)
+app.command(name="alpha-smoke")(alpha_smoke_command)
 
 
 def _display_ref(path: Path) -> str:
