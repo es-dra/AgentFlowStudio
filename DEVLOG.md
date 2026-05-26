@@ -1,5 +1,20 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-RUN-PACKAGE-001 Local Alpha 0.4 Runtime Blocker
+
+- Checked the Local Alpha 0.4 runtime package inputs for
+  `workflows/video_script_to_finished_package_local_asr.yaml`.
+- Recorded `docs/handoff/AFS-RUN-PACKAGE-001.md` with `BLOCKED` status because
+  the ignored local source video, BGM audio, faster-whisper model cache, and
+  0.4 input bundle are not present.
+- Verified FFmpeg and FFprobe are available at
+  `C:\ProgramData\chocolatey\bin\ffmpeg.exe` and
+  `C:\ProgramData\chocolatey\bin\ffprobe.exe`, so the current blocker is local
+  inputs rather than media tooling.
+- Boundary kept: no remote providers called, no runtime package command run
+  without required inputs, no generated media or `data/processed/` artifacts
+  committed, and no Web UI or Memory runtime code changed.
+
 ## 2026-05-27 - AFS-PROD-LOOP-001 Local Alpha 0.4 Scenario Package
 
 - Added `docs/local_alpha_0_4_scenario_package.md` as the shared execution
