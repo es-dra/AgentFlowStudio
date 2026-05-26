@@ -94,6 +94,14 @@
   overflow-wrap: anywhere;
 }
 
+.operator-loop-status {
+  margin-top: 10px;
+  min-height: 58px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .readiness-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -62,6 +62,13 @@ The current branch includes:
     pause, resume, or rerun a Python step;
   - run-level feedback JSON copy with run/workflow context and optional video
     timestamp.
+- Local Alpha 0.3 operator loop:
+  - the Production Path now follows workflow selection -> plan -> supervised
+    run -> artifact inspection -> review refresh -> feedback capture;
+  - the acceptance panel shows the current loop state, review report refs, and
+    whether run feedback has been captured for copy;
+  - run-level feedback JSON includes review status plus `review_report` and
+    `quality_report` refs after review refresh.
 
 The viewer uses default Chinese UI copy for human-facing labels. The language
 toggle is in-memory only. Refreshing the page returns to Chinese.
@@ -241,8 +248,9 @@ interrupting a running local Python step.
 
 Production Mode can generate a run-level feedback JSON event for manual copy.
 It includes `run_dir`, `run_id`, workflow, decision, risk category, reviewer
-note, and optional `video_time_sec`. It does not write `feedback.jsonl`, upload
-data, or persist browser state.
+note, optional `video_time_sec`, and review refs when review refresh has run:
+`review_status`, `review_report`, and `quality_report`. It does not write
+`feedback.jsonl`, upload data, or persist browser state.
 
 Workflow runs started from Production Mode are launched in a background bridge
 thread. The page polls `GET /runs/{id}` and reads `bridge_status.json`, so the

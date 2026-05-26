@@ -16,6 +16,7 @@ export function renderAcceptancePath(elements, state, nextAction, blockerText) {
   elements.acceptancePathDetail.textContent = blocked
     ? `先处理：${blockerText}`
     : acceptanceDetail(state);
+  renderOperatorLoopStatus(elements, state);
 }
 
 export function renderWorkflowProfile(elements, workflow, copy) {
@@ -37,8 +38,23 @@ export function renderWorkflowProfile(elements, workflow, copy) {
 function acceptanceDetail(state) {
   if (!state.plan) return "当前验收路径：先连 bridge，再生成计划。浏览器不保存状态，不读取 provider secrets。";
   if (!state.run) return "当前验收路径：计划已生成，下一步运行本机 workflow。";
-  if (!state.review) return "当前验收路径：运行完成后刷新验收报告。";
-  return "当前验收路径：回到 Review Mode 选择产物审片，并记录人工验收意见。";
+  if (!state.review) return "当前验收路径：运行完成后先做 artifact inspection，再刷新验收报告。";
+  if (!state.feedbackCaptured) return "当前验收路径：review refresh 已完成，下一步做 feedback capture。";
+  return "当前验收路径：Local Alpha 0.3 operator loop 已完成到 feedback capture；可用复制出的 JSON 进入人工验收或 memory candidate 评审。";
+}
+
+function renderOperatorLoopStatus(elements, state) {
+  if (!elements.operatorLoopStatus) return;
+  const reviewStatus = state.review?.review?.status || state.review?.status || "not_refreshed";
+  const lines = [
+    `workflow selection: ${state.selectedWorkflowPath || "not_selected"}`,
+    `plan: ${state.plan?.plan_path || "not_generated"}`,
+    `run: ${state.run?.status || "not_started"}`,
+    `artifact inspection: ${state.run?.files?.length ? `${state.run.files.length} run files listed` : "waiting_for_run_artifacts"}`,
+    `review refresh: review_status=${reviewStatus}; review_report=${state.review?.artifacts?.review_report || "not_refreshed"}; quality_report=${state.review?.artifacts?.quality_report || "not_refreshed"}`,
+    `feedback capture: ${state.feedbackCaptured ? "captured_in_memory_for_copy" : "waiting_for_run_feedback_json"}`,
+  ];
+  elements.operatorLoopStatus.textContent = `Local Alpha 0.3 operator loop | ${lines.join(" | ")}`;
 }
 
 export function renderReadinessWizard(elements, state, workflow, readiness) {
@@ -63,7 +79,7 @@ export function renderOverview(elements, state, workflow, blockerText, inputChec
   const review = state.review;
   elements.productionOverview.append(
     metricCard("当前任务", workflowDisplayName(workflow), workflow?.name || "未选择 workflow"),
-    metricCard("下一步", nextAction, "生成计划、运行流程、刷新验收或进入 Review Mode"),
+    metricCard("下一步", nextAction, "workflow selection、plan、run、artifact inspection、review refresh、feedback capture"),
     metricCard("阻塞项", blockerText, inputCheckText || "本地 bridge、输入文件、FFmpeg/ASR 依赖会影响执行"),
     metricCard("当前步骤", run?.current_step || run?.event || "等待启动", "运行中会轮询 bridge_status.json"),
     metricCard(

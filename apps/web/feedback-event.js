@@ -12,7 +12,9 @@ export function buildFeedbackEvent({ artifactFile, decision, riskCategory, note,
   };
 }
 
-export function buildRunFeedbackEvent({ run, workflow, decision, riskCategory, note, videoTimeSec }) {
+export function buildRunFeedbackEvent({ run, workflow, review, decision, riskCategory, note, videoTimeSec }) {
+  const reviewArtifacts = run?.review_artifacts || review?.artifacts || {};
+  const reviewStatus = run?.review_status || review?.status || review?.review?.status || null;
   return {
     schema_version: "0.1.0",
     event_type: "run_feedback_event",
@@ -22,6 +24,9 @@ export function buildRunFeedbackEvent({ run, workflow, decision, riskCategory, n
     run_id: run?.run_id || null,
     workflow: workflow?.name || run?.workflow || null,
     artifact_file: run?.manifest_path || run?.bridge_status_path || null,
+    review_status: reviewStatus,
+    review_report: reviewArtifacts.review_report || null,
+    quality_report: reviewArtifacts.quality_report || null,
     decision: decision || "needs_changes",
     risk_category: riskCategory || "production_readiness",
     reviewer_note: note || "",

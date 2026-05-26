@@ -13,7 +13,7 @@ import {
   wideBlock,
 } from "./render-helpers.js";
 import { getCopy } from "./ui-copy.js";
-import { initializeProductionMode, productionState, recordSupervisionIntent, renderProductionState } from "./production-mode.js";
+import { initializeProductionMode, productionState, recordRunFeedbackCaptured, recordSupervisionIntent, renderProductionState } from "./production-mode.js";
 import { renderLocalVideoPreview, revokeCurrentVideoUrl } from "./video-preview.js";
 
 const state = {
@@ -47,6 +47,7 @@ elements.supervisionActions.addEventListener("click", (event) => {
 attachFeedbackHandlers(elements, {
   getCopyForLanguage: () => getCopy(state.language),
   productionState,
+  onRunFeedbackCaptured: () => recordRunFeedbackCaptured(elements, getCopy(state.language)),
 });
 
 window.addEventListener("beforeunload", revokeCurrentVideoUrl);
