@@ -15,6 +15,44 @@
   without required inputs, no generated media or `data/processed/` artifacts
   committed, and no Web UI or Memory runtime code changed.
 
+## 2026-05-27 - AFS-WEB-OPERATOR-002 Local Alpha 0.4 Web Operator Path
+
+- Updated the Web operator path to default to
+  `workflows/video_script_to_finished_package_local_asr.yaml` for the Local
+  Alpha 0.4 scenario.
+- Changed the Web default input and output to the ignored local 0.4 paths:
+  `data/processed/local_alpha_0_4/video_script_local_asr_input.json` and
+  `data/processed/runs/local_alpha_0_4_product_loop`.
+- Extended workflow web profiles with `scenario_id`, `runbook`,
+  `recommended_output`, and `local_setup_blockers`, so the operator sees the
+  0.4 runbook and the four required local setup paths before attempting a run.
+- Kept the browser honest: the setup blockers are displayed as preflight
+  guidance, while the bridge remains responsible for the actual input check
+  during plan/run creation.
+- Added `docs/handoff/AFS-WEB-OPERATOR-002.md`.
+- TDD evidence:
+  - red: new Web/bridge tests failed because `scenario_id` and the 0.4 default
+    input path were missing.
+  - green: focused tests passed after adding the 0.4 profile/default/render
+    updates.
+- Verification:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py`: 45 passed.
+  - JS `node --check` for the Web modules: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli tests`: passed.
+  - `git diff --check`: passed with Windows LF/CRLF warnings only.
+- Browser smoke:
+  - Started the branch Web bridge on `127.0.0.1:8787` and static page on
+    `127.0.0.1:8768`.
+  - Confirmed `Local Alpha 0.4 operator loop`, selected
+    `workflows/video_script_to_finished_package_local_asr.yaml`, 0.4 input and
+    output defaults, `docs/local_alpha_0_4_scenario_package.md`, the four local
+    setup blockers, and `bridge ready`.
+  - Local page console errors: none. An unrelated browser automation telemetry
+    timeout to `ab.chatgpt.com` appeared outside the local app.
+- Boundary kept: no provider calls, generated media, runtime package artifacts,
+  browser persistence, automatic directory scanning, local media/model cache,
+  provider config, secrets, or private Company knowledge changed.
+
 ## 2026-05-27 - AFS-PROD-LOOP-001 Local Alpha 0.4 Scenario Package
 
 - Added `docs/local_alpha_0_4_scenario_package.md` as the shared execution

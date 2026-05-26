@@ -19,6 +19,7 @@ import {
   workflowByName,
   workflowDefaultInput,
   workflowDefaultOutput,
+  workflowLocalSetupBlockers,
   workflowRequires,
 } from "./production-workflows.js";
 
@@ -235,6 +236,10 @@ function blockerText() {
   const inputCheck = productionState.run?.input_check || productionState.plan?.input_check;
   if (inputCheck?.status === "fail") return inputCheck.warnings?.join("; ") || "输入文件引用缺失";
   if (productionState.run?.status === "failed") return (productionState.run.errors || []).join("; ") || "workflow failed";
+  const localSetupBlockers = workflowLocalSetupBlockers(selectedWorkflow());
+  if (!productionState.plan && localSetupBlockers.length) {
+    return `Local Alpha 0.4 setup: ${localSetupBlockers.join("; ")}`;
+  }
   if (
     workflowRequires(selectedWorkflow(), "local_asr") &&
     productionState.bridge.local_asr?.status === "missing_optional_dependency"

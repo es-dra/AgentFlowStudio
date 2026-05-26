@@ -17,6 +17,12 @@ def workflow_web_profile(definition: Any, path: Path) -> dict[str, Any]:
     profile["quick_start"] = bool(explicit.get("quick_start", profile["quick_start"]))
     profile["requirements"] = _string_list(explicit.get("requirements", profile["requirements"]))
     profile["review_focus"] = _string_list(explicit.get("review_focus", profile["review_focus"]))
+    profile["scenario_id"] = str(explicit.get("scenario_id") or profile.get("scenario_id") or "")
+    profile["runbook"] = str(explicit.get("runbook") or profile.get("runbook") or "")
+    profile["recommended_output"] = str(explicit.get("recommended_output") or profile.get("recommended_output") or "")
+    profile["local_setup_blockers"] = _string_list(
+        explicit.get("local_setup_blockers", profile.get("local_setup_blockers", []))
+    )
     return profile
 
 
@@ -61,8 +67,17 @@ def _default_web_profile(name: str, path: Path) -> dict[str, Any]:
             "quick_start": False,
             "display_name": "完整成品包：视频脚本",
             "summary": "完整成品 workflow：用视频和脚本生成交付包，需要本地媒体、BGM、FFmpeg 和 local ASR。",
-            "recommended_input": "examples/demo_asr/video_script_to_finished_package_local_asr_input.example.json",
-            "next_step_hint": "先补齐本地视频、脚本、BGM、FFmpeg/FFprobe 和 local ASR 依赖，再生成计划。",
+            "scenario_id": "local_alpha_0_4",
+            "recommended_input": "data/processed/local_alpha_0_4/video_script_local_asr_input.json",
+            "recommended_output": "data/processed/runs/local_alpha_0_4_product_loop",
+            "runbook": "docs/local_alpha_0_4_scenario_package.md",
+            "local_setup_blockers": [
+                "data/raw/demo_real_video/input.mp4",
+                "data/raw/demo_bgm/bgm.wav",
+                "data/models/faster-whisper/",
+                "data/processed/local_alpha_0_4/video_script_local_asr_input.json",
+            ],
+            "next_step_hint": "Local Alpha 0.4: prepare the ignored local media, BGM, ASR model cache, and input bundle before running.",
             "requirements": ["local_media", "script", "bgm", "ffmpeg", "ffprobe", "local_asr"],
             "review_focus": ["final_video", "script_alignment", "subtitles", "cover", "delivery_package"],
         },
