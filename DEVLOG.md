@@ -1,5 +1,36 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-MEM-002 Memory Promotion Review Decisions
+
+- Reviewed and integrated `codex/afs-memory-promotion-review`.
+- Added `agentflow.memory.promotion` as a side-effect-free promotion review
+  validator for candidate memory decisions.
+- Reused the new promotion checks from the existing asset-memory contract set
+  validator so the example chain and the standalone review surface enforce the
+  same rules.
+- Required promotion decisions to:
+  - use one of `promoted`, `rejected`, `merged`, or `expired`;
+  - link the source memory candidate;
+  - preserve non-empty `evidence_refs`;
+  - include the candidate's evidence refs;
+  - keep `writes_long_term_memory: false`;
+  - reject durable-memory claim fields such as `durable_memory_ref` and
+    `persisted_memory_id`.
+- Updated the committed promotion decision example and memory contract docs so
+  `promoted` means review approval for downstream artifacts, not a durable
+  Memory runtime write.
+- Verification after rebase onto mainline:
+  - `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py`: 57 passed.
+  - `python -m compileall agentflow\memory agentflow\harness`: passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+  - `python -m apps.cli.main alpha-smoke --json`: returned
+    `status: blocked` because remote image provider env is unset.
+  - `git diff --check`: passed.
+- Integrated to `master` at `8fd9fe4`.
+- Boundary kept: no durable Memory runtime, database, vector store, RAG,
+  provider call, Web UI change, or alpha smoke behavior change was added.
+
 ## 2026-05-27 - AFS-QA-001 Evidence Summary Adapter
 
 - Reviewed and integrated `codex/afs-quality-evidence-summary`.

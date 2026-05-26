@@ -33,6 +33,7 @@ docs/company_operating_model.md
 | AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
 | AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
 | AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | Add shared evidence summary vocabulary for quality and review reports | integrated to `master` | `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 26 passed; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `17c72e5`; additive report field only, no provider calls |
+| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | Validate memory promotion review decisions without durable memory writes | integrated to `master` | `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 57 passed; `compileall agentflow\memory agentflow\harness`; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `8fd9fe4`; no DB, RAG, provider calls, or durable Memory runtime |
 
 ## Integration Gate
 
@@ -44,8 +45,10 @@ Current gate:
 - `AFS-ALPHA-001` is integrated to `master` at `ac2254e`.
 - `AFS-PROD-001` is integrated to `master` at `5c88d21`.
 - `AFS-QA-001` is integrated to `master` at `17c72e5`.
-- Next integration target is `AFS-MEM-002`; after that, integrate
-  `AFS-WEB-REPLAY` last because it has the largest UI/runtime surface.
+- `AFS-MEM-002` is integrated to `master` at `8fd9fe4`.
+- Next integration target is `AFS-WEB-REPLAY`. Integrate it last because it
+  has the largest UI/runtime surface and must be checked against the now-current
+  evidence and memory contracts.
 - Remaining active work is the independent Web UI line
   `origin/codex/narratocut-web-ui` at `de8ca8e`.
 - Do not merge the Web UI line directly. It is preserved and backed up, but
@@ -100,6 +103,8 @@ Completed dispatch:
 - `AFS-PROD-001`: worker returned `DONE`, was closed, then the branch was
   reviewed, rebased onto `master`, verified, and fast-forward integrated.
 - `AFS-QA-001`: worker returned `DONE`, was closed, then the branch was
+  reviewed, rebased onto `master`, verified, and fast-forward integrated.
+- `AFS-MEM-002`: worker returned `DONE`, was closed, then the branch was
   reviewed, rebased onto `master`, verified, and fast-forward integrated.
 
 ## Remote Branch Hygiene
@@ -328,6 +333,52 @@ Evidence:
 - `agentflow/harness/evidence_summary.py`
 - `tests/test_evidence_summary.py`
 - `docs/handoff/AFS-QA-001.md`
+
+### AFS-MEM-002: Memory Promotion Review Decisions
+
+Goal:
+
+- Validate candidate memory promotion decisions as review artifacts without
+  writing durable memory or implying a Memory runtime exists.
+
+Acceptance criteria:
+
+- [x] `agentflow.memory.promotion` validates promotion review decisions as a
+      side-effect-free contract surface.
+- [x] Supported decisions are limited to `promoted`, `rejected`, `merged`, and
+      `expired`.
+- [x] Promotion decisions must link exactly one source candidate.
+- [x] Promotion decisions must keep non-empty `evidence_refs` and preserve the
+      candidate evidence refs.
+- [x] Durable memory claim fields such as `durable_memory_ref` and
+      `persisted_memory_id` are rejected.
+- [x] Outputs keep `runtime_status: not_implemented`,
+      `does_not_execute: true`, and `writes_long_term_memory: false`.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py
+# 57 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness
+# passed
+
+git diff --check
+# passed
+```
+
+Status:
+
+- integrated to `master` at `8fd9fe4`
+
+Evidence:
+
+- `agentflow/memory/promotion.py`
+- `docs/agentflow_memory_contract.md`
+- `examples/agentflow/memory_promotion_decision.example.json`
+- `tests/test_agentflow_asset_memory_validator.py`
+- `docs/handoff/AFS-MEM-002.md`
 
 ### AFS-CTX-001: PosterFlow Context Runtime Trace
 
