@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-PROD-001 Alpha Smoke Status CLI
+
+- Reviewed and integrated `codex/afs-prod-alpha-smoke`.
+- Added `python -m apps.cli.main alpha-smoke` and `--json` as a read-only
+  Alpha engineering-readiness summary.
+- The command reports:
+  - NarratoStudio handoff: `pass` when local evidence references exist.
+  - NarratoCut package: `pass` when local evidence references exist.
+  - PosterFlow live smoke: `blocked` by default when
+    `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` is not set.
+- Kept provider boundaries explicit: the command does not call remote LLM,
+  ASR, image, or video providers and does not write `data/processed` run
+  artifacts.
+- Added `tests/test_alpha_smoke_cli.py` and linked the command from
+  `docs/alpha_readiness_report.md` and `docs/README.md`.
+- Verification after rebase onto mainline:
+  - `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py`: 25 passed.
+  - `python -m apps.cli.main alpha-smoke --json`: returned
+    `status: blocked` with PosterFlow provider env shown as unset.
+  - `git diff --check`: passed with Windows line-ending warnings only.
+- Integrated to `master` at `5c88d21`.
+- Boundary kept: no human acceptance or business validation claim, no live
+  provider smoke, no generated media, no Web UI, no durable Memory runtime.
+
 ## 2026-05-27 - Parallel Worktree Launch
 
 - Committed the operating-system projection baseline as

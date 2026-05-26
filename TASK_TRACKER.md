@@ -31,6 +31,7 @@ docs/company_operating_model.md
 | AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
 | AFS-WEB-001 | `codex/narratocut-web-ui` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui` | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | preserved parallel branch | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Pushed at `de8ca8e`; worktree repaired and moved; branch still diverges from `master` and must be rebased or replayed before integration |
 | AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
+| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
 
 ## Integration Gate
 
@@ -48,6 +49,7 @@ Current gate:
 - `AFS-OPS-002` is an operating-system projection pass in the main checkout.
   It must finish before opening the next batch of parallel implementation
   worktrees.
+- `AFS-PROD-001` is integrated to `master` at `5c88d21`.
 
 ## Operating Entry Points
 
@@ -89,6 +91,11 @@ Current dispatch:
 
 All four branches were created from `6d0cf88 docs: add agent operating entry
 points`.
+
+Completed dispatch:
+
+- `AFS-PROD-001`: worker returned `DONE`, was closed, then the branch was
+  reviewed, rebased onto `master`, verified, and fast-forward integrated.
 
 ## Remote Branch Hygiene
 
@@ -227,6 +234,50 @@ Evidence:
   `D:\Learning materials\Learning_notes\Company\30-engineering\01-分支-worktree-子智能体协作规范.md`
   and
   `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式库.md`
+
+### AFS-PROD-001: Alpha Smoke Status CLI
+
+Goal:
+
+- Add a read-only Alpha smoke/status entry that summarizes current engineering
+  readiness without running workflows, writing run artifacts, or calling
+  providers.
+
+Acceptance criteria:
+
+- [x] CLI exposes `alpha-smoke`.
+- [x] `alpha-smoke` prints human-readable status for NarratoStudio handoff,
+      NarratoCut finished package, and PosterFlow provider readiness.
+- [x] `alpha-smoke --json` prints machine-readable JSON.
+- [x] With no image-provider environment, PosterFlow is `blocked`, not
+      `pass`.
+- [x] The command does not call remote providers and does not write runtime
+      artifacts.
+- [x] Documentation links the command from the alpha readiness report and docs
+      index.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py
+# 25 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
+# status: blocked; no providers called
+
+git diff --check
+# passed with Windows line-ending warnings only
+```
+
+Status:
+
+- integrated to `master` at `5c88d21`
+
+Evidence:
+
+- `apps/cli/alpha_commands.py`
+- `tests/test_alpha_smoke_cli.py`
+- `docs/handoff/AFS-PROD-001.md`
 
 ### AFS-CTX-001: PosterFlow Context Runtime Trace
 
