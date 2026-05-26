@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-QA-001 Evidence Summary Adapter
+
+- Reviewed and integrated `codex/afs-quality-evidence-summary`.
+- Added `agentflow.harness.evidence_summary` as a compact shared evidence
+  summary vocabulary for report surfaces.
+- `narratocut.harness.quality_checks.build_quality_report()` now adds an
+  additive `evidence_summary` field to quality reports.
+- `narratocut.harness.reviewer.review_run()` now adds an additive
+  `evidence_summary` field to review reports.
+- The summary normalizes pass/fail/warning status variants, preserves artifact
+  refs, and explicitly separates machine verification from human acceptance,
+  business validation, and memory promotion.
+- Verification after rebase onto mainline:
+  - `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py`: 26 passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+  - `python -m apps.cli.main alpha-smoke --json`: returned
+    `status: blocked` because remote image provider env is unset.
+  - `git diff --check`: passed.
+- Integrated to `master` at `17c72e5`.
+- Boundary kept: no report consumer was forced to infer human acceptance or
+  business validation from machine checks; no provider calls, workflow
+  execution, Web UI change, or durable Memory runtime was added.
+
 ## 2026-05-27 - AFS-PROD-001 Alpha Smoke Status CLI
 
 - Reviewed and integrated `codex/afs-prod-alpha-smoke`.

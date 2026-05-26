@@ -32,6 +32,7 @@ docs/company_operating_model.md
 | AFS-WEB-001 | `codex/narratocut-web-ui` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui` | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | preserved parallel branch | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Pushed at `de8ca8e`; worktree repaired and moved; branch still diverges from `master` and must be rebased or replayed before integration |
 | AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
 | AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
+| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | Add shared evidence summary vocabulary for quality and review reports | integrated to `master` | `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 26 passed; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `17c72e5`; additive report field only, no provider calls |
 
 ## Integration Gate
 
@@ -41,15 +42,17 @@ Current gate:
 - `AFS-DEMO-001` is integrated to `master` at `ff77b30`.
 - `AFS-PROV-001` is integrated to `master` at `649d736`.
 - `AFS-ALPHA-001` is integrated to `master` at `ac2254e`.
+- `AFS-PROD-001` is integrated to `master` at `5c88d21`.
+- `AFS-QA-001` is integrated to `master` at `17c72e5`.
+- Next integration target is `AFS-MEM-002`; after that, integrate
+  `AFS-WEB-REPLAY` last because it has the largest UI/runtime surface.
 - Remaining active work is the independent Web UI line
   `origin/codex/narratocut-web-ui` at `de8ca8e`.
 - Do not merge the Web UI line directly. It is preserved and backed up, but
   still diverges from `master`; the next integration step is a fresh
   rebase/replay branch with Python 3.12 verification.
-- `AFS-OPS-002` is an operating-system projection pass in the main checkout.
-  It must finish before opening the next batch of parallel implementation
-  worktrees.
-- `AFS-PROD-001` is integrated to `master` at `5c88d21`.
+- `AFS-OPS-002` is complete; the current work is integration and consolidation
+  of the four already-opened parallel lanes.
 
 ## Operating Entry Points
 
@@ -95,6 +98,8 @@ points`.
 Completed dispatch:
 
 - `AFS-PROD-001`: worker returned `DONE`, was closed, then the branch was
+  reviewed, rebased onto `master`, verified, and fast-forward integrated.
+- `AFS-QA-001`: worker returned `DONE`, was closed, then the branch was
   reviewed, rebased onto `master`, verified, and fast-forward integrated.
 
 ## Remote Branch Hygiene
@@ -278,6 +283,51 @@ Evidence:
 - `apps/cli/alpha_commands.py`
 - `tests/test_alpha_smoke_cli.py`
 - `docs/handoff/AFS-PROD-001.md`
+
+### AFS-QA-001: Evidence Summary Adapter
+
+Goal:
+
+- Add a compact shared evidence summary vocabulary that report consumers can
+  use without inferring acceptance or business validation from raw test status.
+
+Acceptance criteria:
+
+- [x] `agentflow.harness.evidence_summary` exposes builders for quality and
+      review surfaces.
+- [x] `build_quality_report()` adds `evidence_summary` without changing
+      existing report fields.
+- [x] `review_run()` adds `evidence_summary` without changing existing report
+      fields.
+- [x] Pass/fail/warning variants are normalized to the shared AgentFlow
+      status constants.
+- [x] Decision boundaries distinguish machine verification, human acceptance,
+      business validation, and memory promotion.
+- [x] The change does not call providers, run workflows, or write durable
+      memory.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py
+# 26 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
+# status: blocked because remote image provider is not enabled
+
+git diff --check
+# passed
+```
+
+Status:
+
+- integrated to `master` at `17c72e5`
+
+Evidence:
+
+- `agentflow/harness/evidence_summary.py`
+- `tests/test_evidence_summary.py`
+- `docs/handoff/AFS-QA-001.md`
 
 ### AFS-CTX-001: PosterFlow Context Runtime Trace
 
