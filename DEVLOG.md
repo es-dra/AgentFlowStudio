@@ -1,5 +1,28 @@
 # DEVLOG
 
+## 2026-05-27 - Local Alpha 0.3 Parallel Queue Launch
+
+- Committed the Local Alpha 0.3 planning baseline as
+  `348b34d docs: define local alpha 0.3 queue`.
+- Created two implementation worktrees from that baseline:
+  - `codex/afs-web-review-loop` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop`
+  - `codex/afs-memory-runtime-contract` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract`
+- Verified clean baselines before dispatch:
+  - Web worktree targeted tests: 42 passed.
+  - Memory/runtime worktree targeted tests: 60 passed.
+- Dispatched two worker subagents:
+  - `Nash` / `019e65da-9878-74f2-9ee8-cf9ecebff6a2` for
+    `AFS-WEB-REVIEW-001`.
+  - `Zeno` / `019e65da-ac65-7b81-a634-74b0e2ab63c1` for
+    `AFS-MEMORY-RUNTIME-001`.
+- Kept `AFS-POSTER-LIVE-002` closed because the current image-provider
+  environment is unset and `alpha-smoke --json` reports the expected blocked
+  state.
+- Boundary kept: no remote providers were called; main checkout remains the
+  integration surface.
+
 ## 2026-05-27 - AFS-PROD-NEXT-001 Local Alpha 0.3 Validation Boundary
 
 - Added `docs/local_alpha_0_3_validation_goals.md` to define the next milestone
