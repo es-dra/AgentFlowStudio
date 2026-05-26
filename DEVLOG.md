@@ -1,5 +1,28 @@
 # DEVLOG
 
+## 2026-05-27 - Local Alpha 0.4 Product Loop Planning Baseline
+
+- Added `docs/local_alpha_0_4_product_loop_goals.md` to define the next
+  milestone before opening new parallel implementation worktrees.
+- Reframed the next push from an engineering-loop proof to one concrete local
+  product loop: local project brief and ignored media, local finished package,
+  inspect/review/package report, Web operator review, feedback capture, memory
+  candidate, promotion decision, and second-pass context reuse.
+- Added four new Local Alpha 0.4 task briefs:
+  - `AFS-PROD-LOOP-001`: scenario package and runbook.
+  - `AFS-RUN-PACKAGE-001`: local runtime package or actionable local-input
+    blocker.
+  - `AFS-WEB-OPERATOR-002`: Web operator path for the 0.4 scenario.
+  - `AFS-MEMORY-QUALITY-002`: traceable evidence reuse evaluation.
+- Kept `AFS-POSTER-LIVE-002` optional and blocked by default until local image
+  provider env is intentionally configured.
+- Updated the docs index, task brief index, company operating projection,
+  agent roster, and task tracker so the next queue is discoverable and does not
+  conflict with the completed Local Alpha 0.3 evidence.
+- Boundary kept: documentation and task planning only. No runtime code,
+  provider calls, generated artifacts, local media, secrets, or private Company
+  content were changed.
+
 ## 2026-05-27 - Local Alpha 0.3 Web And Memory Integration
 
 - Integrated the two Local Alpha 0.3 implementation lanes into `master`:

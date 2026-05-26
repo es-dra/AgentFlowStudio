@@ -8,11 +8,24 @@ Current queue state:
 
 - Local Alpha 0.2 briefs below are completed historical briefs.
 - Local Alpha 0.3 planning, Web review loop, and memory runtime contract briefs
-  have been executed and integrated on `master`.
-- The next implementation queue should start from the accepted 0.3 evidence in
+  have been executed and integrated on `master`; the accepted 0.3 evidence is
+  recorded in
   [`../local_alpha_0_3_validation_goals.md`](../local_alpha_0_3_validation_goals.md).
-- Do not open new worktrees until fresh post-0.3 briefs are written or the
-  blocked PosterFlow live-smoke lane is intentionally enabled.
+- Local Alpha 0.4 is the next product-loop queue. Start from
+  [`../local_alpha_0_4_product_loop_goals.md`](../local_alpha_0_4_product_loop_goals.md).
+- Do not open new worktrees until `AFS-PROD-LOOP-001` has produced the concrete
+  scenario package, unless the work is strictly the optional blocked
+  PosterFlow live-smoke lane.
+
+Planned Local Alpha 0.4 queue:
+
+| ID | Brief | Purpose |
+|---|---|---|
+| AFS-PROD-LOOP-001 | [AFS-PROD-LOOP-001.md](AFS-PROD-LOOP-001.md) | 0.4 product scenario package and runbook |
+| AFS-RUN-PACKAGE-001 | [AFS-RUN-PACKAGE-001.md](AFS-RUN-PACKAGE-001.md) | Local runtime package or actionable blocker |
+| AFS-WEB-OPERATOR-002 | [AFS-WEB-OPERATOR-002.md](AFS-WEB-OPERATOR-002.md) | Web operator path for the 0.4 scenario |
+| AFS-MEMORY-QUALITY-002 | [AFS-MEMORY-QUALITY-002.md](AFS-MEMORY-QUALITY-002.md) | Traceable evidence reuse evaluation |
+| AFS-POSTER-LIVE-002 | [AFS-POSTER-LIVE-002.md](AFS-POSTER-LIVE-002.md) | Optional live image smoke or blocked evidence |
 
 Completed Local Alpha 0.2 queue:
 

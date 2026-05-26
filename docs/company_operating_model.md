@@ -191,48 +191,52 @@ For Memory OS work, keep these boundaries explicit:
 ## Current Product Push
 
 Mainline is the stable integration surface. Local Alpha 0.2 is integrated and
-cleaned up. Local Alpha 0.3 engineering acceptance is now integrated on
-`master` for the planning boundary, Web operator loop, and Memory runtime
-contract. PosterFlow live image smoke remains intentionally blocked until a
-local image-provider environment is configured.
+cleaned up. Local Alpha 0.3 engineering acceptance is integrated on `master`
+for the planning boundary, Web operator loop, and Memory runtime contract.
+PosterFlow live image smoke remains intentionally blocked until a local
+image-provider environment is configured.
 
 The next milestone is:
 
 ```text
-AgentFlow Studio Local Alpha 0.3:
-repeatable local operator loop with evidence-to-memory reuse
+AgentFlow Studio Local Alpha 0.4:
+one real local product loop with evidence-to-memory reuse
 ```
 
 The product loop for this milestone is:
 
 ```text
-local brief / local media
-  -> workflow selection
-  -> workflow plan
-  -> supervised local run
-  -> artifact inspection
-  -> review report
-  -> Web workbench acceptance event
+local content project brief
+  + local ignored source media
+  + optional local script / notes
+  + local BGM
+  -> production handoff or workflow plan
+  -> local finished package run
+  -> inspect / review / package report
+  -> Web workbench artifact review
+  -> operator acceptance feedback
   -> memory candidate
   -> explicit promotion decision
-  -> context bundle / next-round prompt
+  -> context bundle for a second pass
 ```
 
-Use `docs/local_alpha_0_3_validation_goals.md` as the milestone boundary and
-`TASK_TRACKER.md` as the live project ledger.
+Use `docs/local_alpha_0_4_product_loop_goals.md` as the milestone boundary and
+`TASK_TRACKER.md` as the live project ledger. `AFS-PROD-LOOP-001` must create
+the concrete scenario package before opening implementation worktrees.
 
-Local Alpha 0.3 queue status:
+Local Alpha 0.4 planned queue:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
-| AFS-PROD-NEXT-001 | Finalize Local Alpha 0.3 task briefs and acceptance matrix | `codex/afs-product-next-briefs` | integrated |
-| AFS-WEB-REVIEW-001 | Make the operator plan/run/review/feedback Web path repeatable | `codex/afs-web-review-loop` | integrated |
-| AFS-MEMORY-RUNTIME-001 | Strengthen candidate promotion and context reuse without durable memory writes | `codex/afs-memory-runtime-contract` | integrated |
-| AFS-POSTER-LIVE-002 | Run or keep blocked the explicit PosterFlow live image smoke | `codex/afs-poster-live-002` | blocked by missing local provider env |
+| AFS-PROD-LOOP-001 | Define the 0.4 scenario package and runbook | `codex/afs-prod-loop-brief` | ready after this planning baseline |
+| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | depends on scenario package |
+| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | depends on scenario package |
+| AFS-MEMORY-QUALITY-002 | Evaluate traceable evidence reuse in a second pass | `codex/afs-memory-quality-loop` | depends on runtime evidence shape |
+| AFS-POSTER-LIVE-002 | Optional live image smoke or blocked evidence | `codex/afs-poster-live-002` | optional; blocked by missing local provider env |
 
-Open post-0.3 implementation worktrees only after a fresh brief records write
-scope, verification, provider policy, evidence path, and integration order.
-Treat `docs/task_briefs/` as the copy-paste source for delegated workers.
+Open 0.4 implementation worktrees only after a fresh brief records write scope,
+verification, provider policy, evidence path, and integration order. Treat
+`docs/task_briefs/` as the copy-paste source for delegated workers.
 
 ## Promotion Back To Company
 

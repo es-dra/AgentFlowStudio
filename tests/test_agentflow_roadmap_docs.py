@@ -7,6 +7,7 @@ DOCS_INDEX = Path("docs/README.md")
 MAIN_ROADMAP = Path("docs/product_roadmap.md")
 PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 LOCAL_ALPHA_0_3_GOALS = Path("docs/local_alpha_0_3_validation_goals.md")
+LOCAL_ALPHA_0_4_GOALS = Path("docs/local_alpha_0_4_product_loop_goals.md")
 TASK_BRIEFS_INDEX = Path("docs/task_briefs/README.md")
 
 
@@ -111,6 +112,31 @@ def test_local_alpha_0_3_task_briefs_exist() -> None:
         "AFS-PROD-NEXT-001.md",
         "AFS-WEB-REVIEW-001.md",
         "AFS-MEMORY-RUNTIME-001.md",
+        "AFS-POSTER-LIVE-002.md",
+    ]:
+        assert (Path("docs/task_briefs") / brief).exists()
+
+
+def test_local_alpha_0_4_product_loop_goals_are_discoverable() -> None:
+    docs_index = _text(DOCS_INDEX)
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    goals = _text(LOCAL_ALPHA_0_4_GOALS)
+
+    assert LOCAL_ALPHA_0_4_GOALS.exists()
+    assert "local_alpha_0_4_product_loop_goals.md" in docs_index
+    assert "local_alpha_0_4_product_loop_goals.md" in task_briefs_index
+    assert "one real local product loop" in goals
+    assert "AFS-PROD-LOOP-001" in goals
+    assert "AFS-WEB-OPERATOR-002" in goals
+    assert "AFS-MEMORY-QUALITY-002" in goals
+
+
+def test_local_alpha_0_4_task_briefs_exist() -> None:
+    for brief in [
+        "AFS-PROD-LOOP-001.md",
+        "AFS-RUN-PACKAGE-001.md",
+        "AFS-WEB-OPERATOR-002.md",
+        "AFS-MEMORY-QUALITY-002.md",
         "AFS-POSTER-LIVE-002.md",
     ]:
         assert (Path("docs/task_briefs") / brief).exists()

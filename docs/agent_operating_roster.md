@@ -100,10 +100,11 @@ Idle agents create stale context, not capacity.
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` | Orchestrator + Product Lead | Local Alpha 0.3 task briefs and acceptance matrix | Integrated |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | Operator plan/run/review/feedback Web path | Integrated |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable writes | Integrated |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | Blocked until local image env is intentionally configured |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | First |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | After scenario package |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | After scenario package |
+| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | After runtime evidence shape is known |
+| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | Optional; blocked until local image env is intentionally configured |
 
 Open the next queue as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign
