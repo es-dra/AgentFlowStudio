@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agentflow.harness.constants import FAILED, PASSED, WARNING
+from agentflow.harness.evidence_summary import build_review_evidence_summary
 from narratocut.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
@@ -41,9 +43,6 @@ from narratocut.utils import write_json
 
 
 SCHEMA_VERSION = "0.1"
-PASSED = "passed"
-WARNING = "warning"
-FAILED = "failed"
 
 
 def review_run(run_dir: str | Path) -> dict[str, Any]:
@@ -103,6 +102,7 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
             "quality_report": "quality_report.json",
         },
         "sections": sections,
+        "evidence_summary": build_review_evidence_summary(status=status, sections=sections),
         "recommendations": _recommendations(root, run_manifest, quality_report),
     }
 
