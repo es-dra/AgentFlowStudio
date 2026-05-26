@@ -1,5 +1,22 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-PROD-NEXT-001 Local Alpha 0.3 Validation Boundary
+
+- Added `docs/local_alpha_0_3_validation_goals.md` to define the next milestone
+  before opening a new parallel queue.
+- Framed Local Alpha 0.3 around a repeatable local operator loop:
+  workflow selection, plan, supervised run, artifact inspection, review,
+  feedback event, memory candidate, explicit promotion decision, and
+  next-round context reuse.
+- Updated the docs index, task brief index, company operating projection, and
+  agent roster so they no longer advertise the completed Local Alpha 0.2 lanes
+  as ready to open.
+- Added `docs/task_briefs/AFS-PROD-NEXT-001.md` as the first 0.3 planning
+  packet. Implementation lanes remain blocked until fresh 0.3 briefs exist.
+- Boundary kept: documentation and task planning only. No runtime code,
+  provider calls, generated artifacts, secrets, or private Company content were
+  changed.
+
 ## 2026-05-27 - AFS-WEB-REPLAY Local Web UI Workbench
 
 - Reviewed and integrated `codex/afs-web-ui-replay`.

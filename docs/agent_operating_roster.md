@@ -100,10 +100,10 @@ Idle agents create stale context, not capacity.
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | Start first; informs the other lanes |
-| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability, copy, and browser smoke evidence | Can run after the Alpha package target is clear |
-| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo evidence and context reuse explanation | Can run in parallel with Web UX |
-| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or local run evidence | Run last unless image env is already configured |
+| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` | Orchestrator + Product Lead | Local Alpha 0.3 task briefs and acceptance matrix | Start first; no implementation lanes before this is accepted |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` | Web UI Agent + QA Reviewer | Operator plan/run/review/feedback Web path | Wait for fresh brief from AFS-PROD-NEXT-001 |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable writes | Wait for fresh brief from AFS-PROD-NEXT-001 |
+| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | Run last unless local image env is already configured |
 
 Open these as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign

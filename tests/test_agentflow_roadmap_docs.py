@@ -6,6 +6,8 @@ from pathlib import Path
 DOCS_INDEX = Path("docs/README.md")
 MAIN_ROADMAP = Path("docs/product_roadmap.md")
 PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
+LOCAL_ALPHA_0_3_GOALS = Path("docs/local_alpha_0_3_validation_goals.md")
+TASK_BRIEFS_INDEX = Path("docs/task_briefs/README.md")
 
 
 def _text(path: Path) -> str:
@@ -89,3 +91,26 @@ def test_phase15_roadmap_records_asset_reuse_chain_audit_smoke() -> None:
     assert "NarratoStudio Asset Reuse Chain Audit Smoke" in phase15
     assert "audit_narratostudio_asset_reuse_chain_fixture" in phase15
     assert "does not register a new contract artifact type" in phase15
+
+
+def test_local_alpha_0_3_validation_goals_are_discoverable() -> None:
+    docs_index = _text(DOCS_INDEX)
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    goals = _text(LOCAL_ALPHA_0_3_GOALS)
+
+    assert LOCAL_ALPHA_0_3_GOALS.exists()
+    assert "local_alpha_0_3_validation_goals.md" in docs_index
+    assert "local_alpha_0_3_validation_goals.md" in task_briefs_index
+    assert "repeatable\nlocal operator loop" in goals
+    assert "AFS-WEB-REVIEW-001" in goals
+    assert "AFS-MEMORY-RUNTIME-001" in goals
+
+
+def test_local_alpha_0_3_task_briefs_exist() -> None:
+    for brief in [
+        "AFS-PROD-NEXT-001.md",
+        "AFS-WEB-REVIEW-001.md",
+        "AFS-MEMORY-RUNTIME-001.md",
+        "AFS-POSTER-LIVE-002.md",
+    ]:
+        assert (Path("docs/task_briefs") / brief).exists()

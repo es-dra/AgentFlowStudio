@@ -190,47 +190,49 @@ For Memory OS work, keep these boundaries explicit:
 
 ## Current Product Push
 
-Mainline is the stable integration surface. The previous parallel development
-batch is complete: alpha smoke, evidence summary, memory promotion review, and
-the local Web workbench are integrated into `master`; old Web UI branch state is
-archived and cleaned.
+Mainline is the stable integration surface. Local Alpha 0.2 is integrated and
+cleaned up: the acceptance package, Web UX pass, Memory OS demo hardening, and
+PosterFlow live-smoke checklist are on `master`; temporary branches,
+worktrees, smoke servers, and remote branches were removed.
 
 The next milestone is:
 
 ```text
-AgentFlow Studio Local Alpha 0.2:
-evidence-driven local AI content production workbench
+AgentFlow Studio Local Alpha 0.3:
+repeatable local operator loop with evidence-to-memory reuse
 ```
 
 The product loop for this milestone is:
 
 ```text
-brief / local media
+local brief / local media
+  -> workflow selection
   -> workflow plan
   -> supervised local run
-  -> artifacts
-  -> inspect / review / package report
-  -> Web workbench acceptance
-  -> feedback event
+  -> artifact inspection
+  -> review report
+  -> Web workbench acceptance event
   -> memory candidate
-  -> next-round context reuse
+  -> explicit promotion decision
+  -> context bundle / next-round prompt
 ```
 
-For exact verification and branch hygiene state, use `TASK_TRACKER.md` as the
-live project ledger.
+Use `docs/local_alpha_0_3_validation_goals.md` as the milestone boundary and
+`TASK_TRACKER.md` as the live project ledger.
 
-Current recommended parallel queue:
+Current recommended queue:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
-| AFS-ALPHA-PKG-001 | Turn existing evidence into a coherent local Alpha acceptance package | `codex/afs-alpha-package` | ready to open |
-| AFS-WEB-UX-001 | Productize the local Web workbench for repeated real use | `codex/afs-web-ux-pass` | ready to open |
-| AFS-MEMORY-DEMO-001 | Harden the two-round Memory OS demonstration without claiming durable memory runtime | `codex/afs-memory-demo-hardening` | ready to open |
-| AFS-POSTER-LIVE-001 | Prepare or run the gated PosterFlow live image smoke without committing secrets or runtime artifacts | `codex/afs-poster-live-smoke` | ready to open |
+| AFS-PROD-NEXT-001 | Finalize Local Alpha 0.3 task briefs and acceptance matrix | `codex/afs-product-next-briefs` | planning brief exists |
+| AFS-WEB-REVIEW-001 | Make the operator plan/run/review/feedback Web path repeatable | `codex/afs-web-review-loop` | wait for fresh brief |
+| AFS-MEMORY-RUNTIME-001 | Strengthen candidate promotion and context reuse without durable memory writes | `codex/afs-memory-runtime-contract` | wait for fresh brief |
+| AFS-POSTER-LIVE-002 | Run or keep blocked the explicit PosterFlow live image smoke | `codex/afs-poster-live-002` | wait for local provider boundary |
 
-Start these in separate worktrees only after the matching task brief records
-write scope, verification, provider policy, and integration order. Treat
-`docs/task_briefs/` as the copy-paste source for delegated workers.
+Open implementation worktrees only after the matching Local Alpha 0.3 brief
+records write scope, verification, provider policy, evidence path, and
+integration order. Treat `docs/task_briefs/` as the copy-paste source for
+delegated workers.
 
 ## Promotion Back To Company
 
