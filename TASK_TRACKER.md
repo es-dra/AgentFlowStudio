@@ -36,6 +36,10 @@ docs/company_operating_model.md
 | AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | Validate memory promotion review decisions without durable memory writes | integrated to `master` | `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 57 passed; `compileall agentflow\memory agentflow\harness`; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `8fd9fe4`; no DB, RAG, provider calls, or durable Memory runtime |
 | AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay local Review/Production Web UI workbench on current mainline | integrated to `master` | Web targeted tests -> 60 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; CLI help/version/web-bridge help; browser smoke: local bridge + static UI + mock workflow + review refresh | Integrated at `5d0392f`; local-only, no provider calls, no browser persistence |
 | AFS-OPS-003 | main checkout | Orchestrator | Align operating docs with the Local Alpha 0.2 product queue and create task briefs | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `python -m apps.cli.main alpha-smoke --json`; `git diff --check` | Updates only project execution docs; no runtime code or provider calls |
+| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | opened | baseline branch/worktree clean at `ace4d2a` | Start first; brief: `docs/task_briefs/AFS-ALPHA-PKG-001.md` |
+| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | opened | baseline branch/worktree clean at `ace4d2a` | Can run after Alpha target is clear; brief: `docs/task_briefs/AFS-WEB-UX-001.md` |
+| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | opened | baseline branch/worktree clean at `ace4d2a` | Can run in parallel with Web UX; brief: `docs/task_briefs/AFS-MEMORY-DEMO-001.md` |
+| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | opened | baseline branch/worktree clean at `ace4d2a` | Integrate last; brief: `docs/task_briefs/AFS-POSTER-LIVE-001.md` |
 
 ## Integration Gate
 
@@ -56,6 +60,8 @@ Current gate:
   local branches were removed after merge.
 - `AFS-OPS-003` is the current docs-only setup slice for the first formal
   Local Alpha 0.2 product push.
+- Four Local Alpha 0.2 worktrees are opened from `ace4d2a` and are ready for
+  task execution. Main checkout remains the integration surface.
 
 ## Operating Entry Points
 
