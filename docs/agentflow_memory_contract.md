@@ -101,9 +101,22 @@ A promotion decision is explicit and reviewable. Current decision statuses:
 - `merged`
 - `expired`
 
+Every promotion decision must point to exactly one source candidate through
+`source_candidate_id` and must keep `evidence_refs`. Those refs are not
+optional bookkeeping: they are the reason a later Agent can audit why the
+candidate was promoted, rejected, merged into another preference, or expired.
+The current validator also requires the decision evidence to preserve the
+candidate evidence refs.
+
 The current examples use `promotion_mode: human_reviewed` and
 `writes_long_term_memory: false` to avoid implying that this repository now owns
 a long-term memory store.
+
+`promoted` means "reviewed and allowed to feed a downstream review artifact",
+not "written into durable Memory runtime". `merged` should be used when the
+candidate is absorbed into another reviewed rule or profile. `expired` should
+be used when the candidate is no longer actionable, stale, or superseded by
+newer evidence.
 
 See [`../examples/agentflow/memory_promotion_decision.example.json`](../examples/agentflow/memory_promotion_decision.example.json).
 

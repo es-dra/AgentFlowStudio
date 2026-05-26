@@ -163,6 +163,7 @@ def build_narratostudio_asset_memory_contract_set(
         "decision": "promoted",
         "promotion_mode": "human_reviewed",
         "writes_long_term_memory": False,
+        "evidence_refs": memory_candidate["evidence_refs"],
         "reason_tags": [
             "smoke_contract",
             "requires_human_review",

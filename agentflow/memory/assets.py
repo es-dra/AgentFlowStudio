@@ -8,6 +8,7 @@ from agentflow.harness.constants import (
     FAILED,
     PASSED,
 )
+from agentflow.memory.promotion import PROMOTION_DECISION_STATUSES, memory_promotion_review_checks
 
 SCHEMA_VERSION = AGENTFLOW_VALIDATION_SCHEMA_VERSION
 FORBIDDEN_ASSET_MEMORY_FRAGMENTS = AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
@@ -84,21 +85,9 @@ def validate_asset_memory_contract_set(
             memory_candidate.get("source_of_truth") == "feedback.jsonl",
             "memory candidate keeps feedback.jsonl as source of truth",
         ),
-        _check(
-            "promotion_decision_links_candidate",
-            _non_empty_str(memory_candidate.get("candidate_id"))
-            and memory_promotion_decision.get("source_candidate_id") == memory_candidate.get("candidate_id"),
-            "promotion decision references the memory candidate",
-        ),
-        _check(
-            "promotion_decision_is_reviewed",
-            memory_promotion_decision.get("promotion_mode") == "human_reviewed",
-            "promotion decision is human reviewed",
-        ),
-        _check(
-            "promotion_decision_does_not_write_memory",
-            memory_promotion_decision.get("writes_long_term_memory") is False,
-            "promotion decision does not write long-term memory",
+        *memory_promotion_review_checks(
+            memory_candidate=memory_candidate,
+            memory_promotion_decision=memory_promotion_decision,
         ),
         _check(
             "reusable_profile_links_intermediate_asset",
@@ -200,6 +189,7 @@ def _check(check_id: str, passed: bool, message: str) -> dict[str, str]:
 
 __all__ = (
     "FORBIDDEN_ASSET_MEMORY_FRAGMENTS",
+    "PROMOTION_DECISION_STATUSES",
     "SCHEMA_VERSION",
     "validate_asset_memory_contract_set",
 )

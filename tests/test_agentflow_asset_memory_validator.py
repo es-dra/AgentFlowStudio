@@ -5,6 +5,10 @@ import json
 from pathlib import Path
 
 from agentflow.memory.assets import validate_asset_memory_contract_set
+from agentflow.memory.promotion import (
+    PROMOTION_DECISION_STATUSES,
+    validate_memory_promotion_review,
+)
 
 
 INTERMEDIATE_ASSET_EXAMPLE = Path("examples/agentflow/intermediate_asset.example.json")
@@ -61,6 +65,64 @@ def test_asset_memory_validator_requires_explicit_non_writing_promotion_decision
 
     assert validation["overall_status"] == "failed"
     assert _failed_check_ids(validation) >= {"promotion_decision_does_not_write_memory"}
+
+
+def test_asset_memory_validator_requires_supported_promotion_decision_status() -> None:
+    contracts = _contract_set()
+    contracts["memory_promotion_decision"]["decision"] = "accepted"
+
+    validation = validate_asset_memory_contract_set(**contracts)
+
+    assert validation["overall_status"] == "failed"
+    assert _failed_check_ids(validation) >= {"promotion_decision_status_supported"}
+
+
+def test_asset_memory_validator_requires_promotion_decision_evidence_refs() -> None:
+    contracts = _contract_set()
+    contracts["memory_promotion_decision"]["evidence_refs"] = []
+
+    validation = validate_asset_memory_contract_set(**contracts)
+
+    assert validation["overall_status"] == "failed"
+    assert _failed_check_ids(validation) >= {"promotion_decision_has_evidence_refs"}
+
+
+def test_memory_promotion_review_helper_accepts_all_supported_statuses() -> None:
+    contracts = _contract_set()
+
+    for decision_status in PROMOTION_DECISION_STATUSES:
+        contracts["memory_promotion_decision"]["decision"] = decision_status
+        review = validate_memory_promotion_review(
+            memory_candidate=contracts["memory_candidate"],
+            memory_promotion_decision=contracts["memory_promotion_decision"],
+        )
+
+        assert review["overall_status"] == "passed"
+        assert review["decision"] == decision_status
+        assert all(check["status"] == "passed" for check in review["checks"])
+
+
+def test_memory_promotion_review_helper_rejects_durable_memory_claims() -> None:
+    contracts = _contract_set()
+    contracts["memory_promotion_decision"]["durable_memory_ref"] = "agentflow_memory:durable_001"
+
+    review = validate_memory_promotion_review(
+        memory_candidate=contracts["memory_candidate"],
+        memory_promotion_decision=contracts["memory_promotion_decision"],
+    )
+
+    assert review["overall_status"] == "failed"
+    assert _failed_check_ids(review) >= {"promotion_decision_no_durable_memory_claims"}
+
+
+def test_asset_memory_validator_rejects_durable_memory_claim_refs() -> None:
+    contracts = _contract_set()
+    contracts["memory_promotion_decision"]["persisted_memory_id"] = "project_memory_001"
+
+    validation = validate_asset_memory_contract_set(**contracts)
+
+    assert validation["overall_status"] == "failed"
+    assert _failed_check_ids(validation) >= {"promotion_decision_no_durable_memory_claims"}
 
 
 def test_asset_memory_validator_requires_asset_promotion_chain() -> None:

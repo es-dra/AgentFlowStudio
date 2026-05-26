@@ -100,6 +100,7 @@ def test_agentflow_memory_promotion_decision_example_is_explicit_review() -> Non
     assert payload["decision"] in {"promoted", "rejected", "merged", "expired"}
     assert payload["promotion_mode"] == "human_reviewed"
     assert payload["writes_long_term_memory"] is False
+    assert payload["evidence_refs"]
 
 
 def test_agentflow_skill_invocation_example_declares_planned_call() -> None:

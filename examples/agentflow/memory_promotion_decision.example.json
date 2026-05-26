@@ -7,6 +7,11 @@
   "decision": "rejected",
   "promotion_mode": "human_reviewed",
   "writes_long_term_memory": false,
+  "evidence_refs": [
+    "af_feedback_001",
+    "production_handoff_demo",
+    "story_bible.json"
+  ],
   "reason_tags": [
     "single_run_signal",
     "insufficient_repetition"
