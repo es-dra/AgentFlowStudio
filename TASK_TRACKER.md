@@ -70,13 +70,25 @@ after `AFS-OPS-002` verification is recorded.
 
 | ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
 |---|---|---|---|---|
-| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `...\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | `apps/cli/`, workflow docs, focused tests | `tests/test_video_to_finished_package_local_asr_workflow.py`, `tests/test_narratostudio_workflow.py`, `tests/test_posterflow_provider.py`, CLI help/version |
-| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `...\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | `agentflow/harness/`, `narratocut/harness/`, quality tests | `tests/test_agent_reviewer.py`, `tests/test_harness_quality_checks.py`, `tests/test_posterflow_quality.py`, `tests/test_narratostudio_review_hardening.py` |
-| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `...\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow/NarratoStudio memory tests | `tests/test_agentflow_asset_memory_validator.py`, `tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`, `tests/test_posterflow_quality.py` |
-| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `...\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | `apps/web`, `apps/web_bridge`, Web UI tests | Web UI targeted tests, Python 3.12 full relevant suite, JS syntax checks |
+| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | `apps/cli/`, workflow docs, focused tests | `tests/test_video_to_finished_package_local_asr_workflow.py`, `tests/test_narratostudio_workflow.py`, `tests/test_posterflow_provider.py`, CLI help/version |
+| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | `agentflow/harness/`, `narratocut/harness/`, quality tests | `tests/test_agent_reviewer.py`, `tests/test_harness_quality_checks.py`, `tests/test_posterflow_quality.py`, `tests/test_narratostudio_review_hardening.py` |
+| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow/NarratoStudio memory tests | `tests/test_agentflow_asset_memory_validator.py`, `tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`, `tests/test_posterflow_quality.py` |
+| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | `apps/web`, `apps/web_bridge`, Web UI tests | Web UI targeted tests, Python 3.12 full relevant suite, JS syntax checks |
 
 Integration order should prefer `AFS-PROD-001` or `AFS-QA-001` first because
 they create better artifact summaries for later Web UI replay.
+
+Current dispatch:
+
+| ID | Branch | Worker |
+|---|---|---|
+| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` | subagent `019e6549-7170-72c3-b588-8eecf1b05784` (`Dewey`) |
+| AFS-QA-001 | `codex/afs-quality-evidence-summary` | subagent `019e6549-8563-72b0-b6fb-6f5a486b5d52` (`Nietzsche`) |
+| AFS-MEM-002 | `codex/afs-memory-promotion-review` | subagent `019e6549-9a28-79a1-92be-d7e39a082350` (`Mencius`) |
+| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` | main controller until a worker slot is free |
+
+All four branches were created from `6d0cf88 docs: add agent operating entry
+points`.
 
 ## Remote Branch Hygiene
 

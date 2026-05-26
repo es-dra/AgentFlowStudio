@@ -1,5 +1,29 @@
 # DEVLOG
 
+## 2026-05-27 - Parallel Worktree Launch
+
+- Committed the operating-system projection baseline as
+  `6d0cf88 docs: add agent operating entry points` so new worktrees inherit
+  `docs/agent_operating_roster.md` and `docs/agent_task_brief_template.md`.
+- Created four independent worktrees from that baseline:
+  - `codex/afs-prod-alpha-smoke` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke`
+  - `codex/afs-quality-evidence-summary` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary`
+  - `codex/afs-memory-promotion-review` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review`
+  - `codex/afs-web-ui-replay` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay`
+- Dispatched three worker subagents due to the current active-agent limit:
+  - `Dewey` / `019e6549-7170-72c3-b588-8eecf1b05784` for `AFS-PROD-001`
+  - `Nietzsche` / `019e6549-8563-72b0-b6fb-6f5a486b5d52` for `AFS-QA-001`
+  - `Mencius` / `019e6549-9a28-79a1-92be-d7e39a082350` for `AFS-MEM-002`
+- `AFS-WEB-REPLAY` remains an opened worktree and is assigned to the main
+  controller until a worker slot is free.
+- Boundary kept: this launch pass only created branches/worktrees and
+  dispatched bounded tasks. No remote providers were called and no generated
+  artifacts were committed.
+
 ## 2026-05-27 - AFS-OPS-002 Agent Operating Entry Points
 
 - Added project-level execution entry points for the AI-native company
