@@ -1,6 +1,6 @@
 # AgentFlow Studio Task Tracker
 
-Last updated: 2026-05-25 by Codex
+Last updated: 2026-05-26 by Codex
 
 This tracker records multi-session AgentFlow Studio work under the local
 AI-native company operating model. A task is complete only when acceptance
@@ -25,27 +25,28 @@ docs/company_operating_model.md
 | AFS-OPS-001 | `codex/company-os-projection` | Orchestrator | Project-facing projection of Company rules into `AGENTS.md`, `docs/company_operating_model.md`, and `TASK_TRACKER.md` | completed | `git diff --check`; targeted doc review | Completed in main checkout per user request |
 | AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL |
 | AFS-CTX-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Integrated together with AFS-MEM-001 because both slices share schema/workflow/quality surfaces |
-| AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | implemented, pending integration | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed | Started after AFS-MEM-001 / AFS-CTX-001 integration |
-| AFS-DEMO-001 | `codex/posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | planned | PosterFlow workflow/quality/provider tests; inspect/review artifacts | Starts after memory/context artifacts stabilize |
+| AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | integrated to `master` | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Remote/local branch and worktree deleted after integration |
+| AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | implemented, pending integration | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Adds `round_2/`, `poster_round_comparison.json`, and `poster_two_round_report.md`; keeps remote image calls behind existing env gate |
 
 ## Integration Gate
 
 Current gate:
 
-- `AFS-MEM-001` and `AFS-CTX-001` are integrated to `master`.
-- `AFS-QLT-001` is implemented in its own worktree and pending integration.
-- Do not start `AFS-DEMO-001` on top of `AFS-QLT-001`; it should branch from
-  `master` after this quality branch is integrated, or explicitly consume this
-  branch only after review.
+- `AFS-MEM-001`, `AFS-CTX-001`, and `AFS-QLT-001` are integrated to `master`.
+- `AFS-DEMO-001` is active in `codex/posterflow-two-round-demo`.
+- Before opening another PosterFlow feature line, integrate or intentionally
+  keep `AFS-DEMO-001` separate so workflow output-contract changes do not
+  diverge.
 
 ## Remote Branch Hygiene
 
-Current branch classification as of 2026-05-25:
+Current branch classification as of 2026-05-26:
 
 | Branch | Classification | Next action |
 |---|---|---|
 | `origin/codex/memory-os-loop` | integrated to `master` | Deleted after fast-forward merge and verification. |
-| `origin/codex/posterflow-memory-demo` | stale pre-merge PosterFlow demo branch | Compare against PR #71 history; likely delete after confirming no unique changes are needed. |
+| `origin/codex/quality-feedback-signals` | integrated to `master` | Deleted after fast-forward merge and verification. |
+| `origin/codex/posterflow-memory-demo` | patch-equivalent stale pre-merge PosterFlow demo branch | Deleted after `git cherry -v master codex/posterflow-memory-demo` showed the branch patch is already in `master`. |
 | `origin/codex/posterflow-minimax-provider-tests` | unintegrated provider branch | Keep as candidate future provider track. |
 | `origin/codex/alpha-readiness-evidence` | unintegrated docs/evidence branch stacked with MiniMax provider changes | Keep until split or reviewed. |
 | `origin/codex/narratocut-web-ui` | independent Web UI line | Keep, but repair or recreate its worktree under the AgentFlowStudio path before further development. |
@@ -201,16 +202,72 @@ Verification:
 ```powershell
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py
 # 15 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
+# 488 passed
+
+git diff --check
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
 ```
 
 Status:
 
-- implemented in worktree; pending full verification / integration
+- integrated to `master`
 
 Evidence:
 
 - Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals`
 - Branch: `codex/quality-feedback-signals`
+- Integration commit: `34dd51b feat(posterflow): add quality feedback signals`
+- Remote/local branch and worktree were deleted after integration.
+
+### AFS-DEMO-001: PosterFlow Two-Round Memory Demo
+
+Goal:
+
+- Turn the single-run PosterFlow memory demo into a true two-round workflow:
+  round 1 generates candidates and memory-context artifacts; round 2 uses the
+  next-round prompt to generate new candidates and writes an auditable
+  comparison report.
+
+Acceptance criteria:
+
+- [x] `next_round_prompt.json` is converted into a second-round prompt pack.
+- [x] Round 2 writes its own prompt pack, candidate manifest, model invocation
+      log, and image candidates under `round_2/`.
+- [x] Round 2 uses the existing remote-image provider gate; no new provider
+      policy or automatic remote call path is added.
+- [x] `poster_round_comparison.json` records round 1 vs round 2, reused memory
+      refs, cache key, and `writes_long_term_memory: false`.
+- [x] `poster_two_round_report.md` gives an agent-readable summary.
+- [x] Inspect/review fails when the round-2 comparison no longer matches the
+      round-2 candidate manifest.
+- [x] New and touched code files remain below the 300-line target.
+
+Verification:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
+# 16 passed
+```
+
+Status:
+
+- implemented in worktree; pending integration
+
+Evidence:
+
+- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo`
+- Branch: `codex/posterflow-two-round-demo`
+- Main implementation module: `narratostudio/posterflow/two_round.py`
+- Full verification in the worktree: 489 tests passed, CLI help/version
+  passed, and `git diff --check` passed with Windows line-ending warnings only.
 
 ## Planned Worktree Layout
 

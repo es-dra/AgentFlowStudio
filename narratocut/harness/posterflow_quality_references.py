@@ -21,6 +21,9 @@ def add_reference_checks(
     context_bundle = artifacts.get("context_bundle.json") or {}
     context_trace = artifacts.get("context_assembly_trace.json") or {}
     next_prompt = artifacts.get("next_round_prompt.json") or {}
+    round_2_prompt = artifacts.get("round_2/poster_prompt_pack.json") or {}
+    round_2_manifest = artifacts.get("round_2/poster_candidates_manifest.json") or {}
+    comparison = artifacts.get("poster_round_comparison.json") or {}
 
     candidate_ids = _ids(manifest.get("candidates"), "candidate_id")
     raw_feedback_ids = _ids(raw_feedback, "target_id")
@@ -63,6 +66,7 @@ def add_reference_checks(
         if (next_prompt.get("memory_context") or {}).get("preference_profile_path") == "poster_preference_profile.json"
         else "fail",
     )
+    _add_round_2_checks(run_dir, next_prompt, profile, round_2_prompt, round_2_manifest, comparison, checks)
 
 
 def candidate_count(payload: dict[str, Any] | None) -> int:
@@ -70,11 +74,64 @@ def candidate_count(payload: dict[str, Any] | None) -> int:
     return len(items) if isinstance(items, list) else 0
 
 
+def _add_round_2_checks(
+    run_dir: Path,
+    next_prompt: dict[str, Any],
+    profile: dict[str, Any],
+    round_2_prompt: dict[str, Any],
+    round_2_manifest: dict[str, Any],
+    comparison: dict[str, Any],
+    checks: list[dict[str, Any]],
+) -> None:
+    next_run_id = str(next_prompt.get("new_run_id") or "")
+    memory_refs = set(profile.get("source_memory_candidates", [])) if isinstance(profile.get("source_memory_candidates"), list) else set()
+    round_2_usage = round_2_prompt.get("context_usage") if isinstance(round_2_prompt.get("context_usage"), dict) else {}
+    round_2_images = _candidate_image_paths(round_2_manifest)
+    comparison_round_2 = comparison.get("round_2") if isinstance(comparison.get("round_2"), dict) else {}
+    comparison_memory = comparison.get("memory_reuse") if isinstance(comparison.get("memory_reuse"), dict) else {}
+
+    _add_check(checks, "posterflow_round_2_prompt_uses_next_run_id", "pass" if round_2_prompt.get("run_id") == next_run_id else "fail")
+    _add_check(
+        checks,
+        "posterflow_round_2_prompt_uses_memory_context",
+        "pass"
+        if round_2_usage.get("preference_profile_used") is True
+        and round_2_usage.get("project_prefix_used") is True
+        and set(round_2_usage.get("memory_refs", [])) == memory_refs
+        and bool(memory_refs)
+        else "fail",
+    )
+    _add_check(checks, "posterflow_round_2_manifest_uses_next_run_id", "pass" if round_2_manifest.get("run_id") == next_run_id else "fail")
+    _add_check(checks, "posterflow_round_2_candidate_count_three", "pass" if len(round_2_images) == 3 else "fail", {"count": len(round_2_images)})
+    _add_check(checks, "posterflow_round_2_candidate_images_exist", "pass" if _candidate_images_exist(run_dir, round_2_manifest) else "fail")
+    _add_check(
+        checks,
+        "posterflow_round_2_comparison_candidate_images_match",
+        "pass" if set(comparison_round_2.get("candidate_images", [])) == round_2_images and bool(round_2_images) else "fail",
+    )
+    _add_check(
+        checks,
+        "posterflow_round_2_comparison_refs_memory",
+        "pass"
+        if comparison.get("artifact_type") == "poster_round_comparison"
+        and set(comparison_memory.get("memory_refs", [])) == memory_refs
+        and comparison_memory.get("writes_long_term_memory") is False
+        else "fail",
+    )
+
+
 def _candidate_images_exist(run_dir: Path, manifest: dict[str, Any]) -> bool:
     candidates = manifest.get("candidates")
     if not isinstance(candidates, list) or not candidates:
         return False
     return all(isinstance(item, dict) and (run_dir / str(item.get("image_path", ""))).is_file() for item in candidates)
+
+
+def _candidate_image_paths(manifest: dict[str, Any]) -> set[str]:
+    candidates = manifest.get("candidates")
+    if not isinstance(candidates, list):
+        return set()
+    return {str(item.get("image_path")) for item in candidates if isinstance(item, dict) and item.get("image_path")}
 
 
 def _candidate_only(memory: dict[str, Any]) -> bool:

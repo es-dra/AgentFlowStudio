@@ -1651,3 +1651,46 @@
   - `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py`: 15 passed.
 - Boundary kept: no durable Memory runtime, no RAG, no provider behavior change,
   no workflow output contract change, and no automatic long-term memory write.
+
+## 2026-05-26 - AFS-DEMO-001 PosterFlow Two-Round Memory Demo
+
+- Started `codex/posterflow-two-round-demo` from updated `master` after
+  integrating `AFS-QLT-001` and deleting stale integrated branches.
+- Added a true second PosterFlow generation round:
+  - `round_2/poster_prompt_pack.json` is derived from
+    `next_round_prompt.json`.
+  - `round_2/poster_candidates_manifest.json`,
+    `round_2/poster_model_invocations.json`, and
+    `round_2/image_candidates/` are written by the existing image provider
+    path.
+  - `poster_round_comparison.json` records round 1 vs round 2 candidate
+    evidence, reused memory refs, cache key, and
+    `writes_long_term_memory: false`.
+  - `poster_two_round_report.md` gives an agent-readable comparison summary.
+- Added `narratostudio.posterflow.two_round` so second-round prompt assembly,
+  path normalization, comparison JSON, and report rendering stay out of the
+  workflow node file.
+- Extended PosterFlow inspect/review checks to cover second-round prompt usage,
+  second-round candidate images, and comparison-to-manifest consistency.
+- TDD evidence:
+  - red: `tests/test_posterflow_workflow.py::test_posterflow_memory_demo_workflow_generates_visual_artifacts`
+    failed on missing `round_2/poster_prompt_pack.json`.
+  - green: the same test passed after adding the second-round nodes.
+  - red: `tests/test_posterflow_quality.py::test_posterflow_review_fails_when_round_2_manifest_breaks_memory_reuse`
+    passed review incorrectly after a broken comparison report.
+  - green: the same test passed after adding round-2 quality reference checks.
+  - red: targeted workflow checks failed while round-2 provenance still pointed
+    at the first-round prompt pack and inspection did not list
+    `round_2/image_candidates/`.
+  - green: the same targeted checks passed after fixing round-2 source refs and
+    inspection artifact coverage.
+- Verification:
+  - `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py`: 16 passed.
+  - `python -m pytest`: 489 passed.
+  - `git diff --check`: passed with Windows line-ending warnings only.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+- Boundary kept: no durable Memory runtime, no RAG, no Web UI, no database, no
+  new provider policy, and no automatic long-term memory write. The second
+  remote-image call remains protected by the existing
+  `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` gate.

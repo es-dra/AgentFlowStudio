@@ -25,6 +25,12 @@ from narratostudio.posterflow.sop import (
     extract_memory_candidates,
     load_poster_brief,
 )
+from narratostudio.posterflow.two_round import (
+    build_round_2_prompt_pack,
+    build_round_comparison,
+    prefix_candidate_paths,
+    render_two_round_report,
+)
 
 
 def register_posterflow_nodes(registry: NodeRegistry) -> None:
@@ -37,6 +43,8 @@ def register_posterflow_nodes(registry: NodeRegistry) -> None:
     registry.register("posterflow_build_profile", build_poster_profile_node)
     registry.register("posterflow_build_context", build_context_node)
     registry.register("posterflow_build_next_prompt", build_next_prompt_node)
+    registry.register("posterflow_generate_round_2", generate_round_2_node)
+    registry.register("posterflow_write_two_round_report", write_two_round_report_node)
     registry.register("posterflow_write_report", write_poster_report_node)
 
 
@@ -182,6 +190,54 @@ def build_next_prompt_node(step: WorkflowStepDefinition, context: WorkflowContex
     context.state["next_round_prompt"] = next_prompt
     context.artifacts["next_round_prompt"] = output_ref
     return [output_ref]
+
+
+def generate_round_2_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    round_dir = str(step.inputs.get("round_dir", "round_2")).strip("/\\") or "round_2"
+    prompt_pack = build_round_2_prompt_pack(
+        context.state["poster_prompt_pack"],
+        context.state["next_round_prompt"],
+    )
+    provider = OpenAICompatibleImageProvider.from_env()
+    manifest, invocations = provider.generate(
+        prompt_pack,
+        context.output_dir / round_dir,
+        candidate_count=int(step.inputs.get("candidate_count", 3)),
+    )
+    manifest, invocations = prefix_candidate_paths(manifest, invocations, path_prefix=round_dir)
+    prompt_ref = _require_output(step, "round_2_prompt_pack")
+    candidates_ref = _require_output(step, "round_2_candidates_manifest")
+    invocations_ref = _require_output(step, "round_2_model_invocations")
+    write_json(context.output_path(prompt_ref), prompt_pack)
+    write_json(context.output_path(candidates_ref), manifest)
+    write_json(context.output_path(invocations_ref), invocations)
+    context.state["round_2_prompt_pack"] = prompt_pack
+    context.state["round_2_candidates_manifest"] = manifest
+    context.state["round_2_model_invocations"] = invocations
+    context.artifacts["round_2_prompt_pack"] = prompt_ref
+    context.artifacts["round_2_candidates_manifest"] = candidates_ref
+    context.artifacts["round_2_model_invocations"] = invocations_ref
+    context.artifacts["round_2_image_candidates"] = f"{round_dir}/image_candidates/"
+    return [prompt_ref, candidates_ref, invocations_ref, f"{round_dir}/image_candidates/"]
+
+
+def write_two_round_report_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
+    comparison = build_round_comparison(
+        round_1_manifest=context.state["poster_candidates_manifest"],
+        round_2_manifest=context.state["round_2_candidates_manifest"],
+        memory=context.state["poster_memory_candidates"],
+        profile=context.state["poster_preference_profile"],
+        next_prompt=context.state["next_round_prompt"],
+        context_bundle=context.state.get("context_bundle"),
+    )
+    comparison_ref = _require_output(step, "poster_round_comparison")
+    report_ref = _require_output(step, "poster_two_round_report")
+    write_json(context.output_path(comparison_ref), comparison)
+    context.output_path(report_ref).write_text(render_two_round_report(comparison), encoding="utf-8")
+    context.state["poster_round_comparison"] = comparison
+    context.artifacts["poster_round_comparison"] = comparison_ref
+    context.artifacts["poster_two_round_report"] = report_ref
+    return [comparison_ref, report_ref]
 
 
 def write_poster_report_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:

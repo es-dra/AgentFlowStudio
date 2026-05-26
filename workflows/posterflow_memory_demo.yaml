@@ -55,6 +55,20 @@ steps:
     type: posterflow_build_next_prompt
     outputs:
       next_round_prompt: next_round_prompt.json
+  - id: generate_round_2
+    type: posterflow_generate_round_2
+    inputs:
+      candidate_count: 3
+      round_dir: round_2
+    outputs:
+      round_2_prompt_pack: round_2/poster_prompt_pack.json
+      round_2_candidates_manifest: round_2/poster_candidates_manifest.json
+      round_2_model_invocations: round_2/poster_model_invocations.json
+  - id: write_two_round_report
+    type: posterflow_write_two_round_report
+    outputs:
+      poster_round_comparison: poster_round_comparison.json
+      poster_two_round_report: poster_two_round_report.md
   - id: write_poster_report
     type: posterflow_write_report
     outputs:

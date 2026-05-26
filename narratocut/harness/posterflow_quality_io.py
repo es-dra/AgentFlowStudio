@@ -44,6 +44,11 @@ REQUIRED_ARTIFACTS = [
     "context_bundle.json",
     "context_assembly_trace.json",
     "next_round_prompt.json",
+    "round_2/poster_prompt_pack.json",
+    "round_2/poster_model_invocations.json",
+    "round_2/poster_candidates_manifest.json",
+    "poster_round_comparison.json",
+    "poster_two_round_report.md",
     "poster_report.md",
     "poster_preview.html",
     "trace.json",
@@ -64,6 +69,9 @@ SCHEMA_MODELS = {
     "context_bundle.json": ContextBundle,
     "context_assembly_trace.json": ContextAssemblyTrace,
     "next_round_prompt.json": NextRoundPrompt,
+    "round_2/poster_prompt_pack.json": PosterPromptPack,
+    "round_2/poster_model_invocations.json": PosterModelInvocations,
+    "round_2/poster_candidates_manifest.json": PosterCandidatesManifest,
 }
 
 JSONL_SCHEMA_MODELS = {
@@ -165,7 +173,14 @@ def read_jsonl(path: Path) -> list[dict[str, Any]] | None:
 
 
 def check_name(filename: str) -> str:
-    return filename.replace(".jsonl", "").replace(".json", "").replace(".md", "").replace(".html", "")
+    return (
+        filename.replace("\\", "_")
+        .replace("/", "_")
+        .replace(".jsonl", "")
+        .replace(".json", "")
+        .replace(".md", "")
+        .replace(".html", "")
+    )
 
 
 def _add_check(checks: list[dict[str, Any]], name: str, status: str, details: dict[str, Any] | None = None) -> None:

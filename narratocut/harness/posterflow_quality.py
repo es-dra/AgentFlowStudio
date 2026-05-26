@@ -18,7 +18,7 @@ from narratocut.harness.quality_profiles import POSTERFLOW_MEMORY_DEMO_PROFILE
 
 
 def posterflow_artifacts_to_inspect() -> list[str]:
-    return list(REQUIRED_ARTIFACTS) + ["image_candidates/"]
+    return list(REQUIRED_ARTIFACTS) + ["image_candidates/", "round_2/image_candidates/"]
 
 
 def build_posterflow_quality_report(root: str | Path) -> dict[str, Any]:

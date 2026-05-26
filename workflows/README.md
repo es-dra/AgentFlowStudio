@@ -14,7 +14,7 @@ component workflow:
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
 | `narratostudio_brief_to_production_handoff.yaml` | production / recommended | The user needs a local-first structured production handoff. | `production_handoff.json`, `production_report.md`, `memory_candidates.json`, `cost_quality_trace.json` |
-| `posterflow_memory_demo.yaml` | demo / optional remote image | The user needs a visual poster-memory demo with explicit remote-image opt-in. | `poster_candidates_manifest.json`, `poster_preview.html`, `poster_memory_candidates.json`, `next_round_prompt.json` |
+| `posterflow_memory_demo.yaml` | demo / optional remote image | The user needs a visual poster-memory demo with explicit remote-image opt-in. | `poster_candidates_manifest.json`, `poster_preview.html`, `poster_memory_candidates.json`, `next_round_prompt.json`, `round_2/poster_candidates_manifest.json`, `poster_round_comparison.json` |
 
 Component workflows such as `transcript_to_candidate_windows.yaml`,
 `clip_plan_to_real_clips.yaml`, `clips_to_final_video.yaml`, and
@@ -98,8 +98,11 @@ PosterFlow Memory Demo workflow:
 5. `posterflow_apply_demo_feedback`
 6. `posterflow_extract_memory`
 7. `posterflow_build_profile`
-8. `posterflow_build_next_prompt`
-9. `posterflow_write_report`
+8. `posterflow_build_context`
+9. `posterflow_build_next_prompt`
+10. `posterflow_generate_round_2`
+11. `posterflow_write_two_round_report`
+12. `posterflow_write_report`
 
 Example:
 
@@ -115,8 +118,12 @@ $env:NARRATOCUT_IMAGE_MODEL="<image-model>"
 
 Open `poster_preview.html` from the run directory to inspect the three
 generated candidate posters, demo feedback, memory candidates, preference
-profile, and next-round prompt. This workflow writes local artifacts only; it
-does not provide a Web UI, database, vector store, or long-term memory runtime.
+profile, and next-round prompt. The workflow also writes a second generated
+round under `round_2/`, plus `poster_round_comparison.json` and
+`poster_two_round_report.md` so agents can verify that the next-round prompt
+was actually used to generate new candidates. This workflow writes local
+artifacts only; it does not provide a Web UI, database, vector store, or
+long-term memory runtime.
 
 ### `mock_roi_to_script.yaml`
 

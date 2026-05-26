@@ -15,6 +15,7 @@ from narratostudio.posterflow.schemas import (
     PosterCandidatesManifest,
     PosterFeedbackSignalLog,
     PosterMemoryCandidates,
+    PosterModelInvocations,
     PosterPreferenceProfile,
     PosterPromptPack,
 )
@@ -60,6 +61,12 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
         "context_bundle.json",
         "context_assembly_trace.json",
         "next_round_prompt.json",
+        "round_2/poster_prompt_pack.json",
+        "round_2/poster_candidates_manifest.json",
+        "round_2/poster_model_invocations.json",
+        "round_2/image_candidates/candidate_001.png",
+        "poster_round_comparison.json",
+        "poster_two_round_report.md",
         "poster_report.md",
         "poster_preview.html",
         "manifest.json",
@@ -107,6 +114,30 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     assert next_prompt.memory_context["context_bundle_path"] == "context_bundle.json"
     assert "candidate_001.png" in (output_dir / "poster_preview.html").read_text(encoding="utf-8")
 
+    round_2_prompt = PosterPromptPack.model_validate(_json(output_dir / "round_2/poster_prompt_pack.json"))
+    round_2_manifest = PosterCandidatesManifest.model_validate(_json(output_dir / "round_2/poster_candidates_manifest.json"))
+    PosterModelInvocations.model_validate(_json(output_dir / "round_2/poster_model_invocations.json"))
+    comparison = _json(output_dir / "poster_round_comparison.json")
+
+    assert round_2_prompt.run_id == next_prompt.new_run_id
+    assert round_2_prompt.prompt_id == f"{next_prompt.new_run_id}_poster_prompt_001"
+    assert round_2_prompt.positive_prompt == next_prompt.composed_positive_prompt
+    assert round_2_prompt.context_usage["preference_profile_used"] is True
+    assert round_2_prompt.context_usage["project_prefix_used"] is True
+    assert set(round_2_prompt.context_usage["memory_refs"]) == set(profile.source_memory_candidates)
+    assert round_2_manifest.run_id == next_prompt.new_run_id
+    assert round_2_manifest.source_refs["poster_prompt_pack"] == "round_2/poster_prompt_pack.json"
+    assert len(round_2_manifest.candidates) == 3
+    assert all(candidate.image_path.startswith("round_2/image_candidates/") for candidate in round_2_manifest.candidates)
+    assert all((output_dir / candidate.image_path).is_file() for candidate in round_2_manifest.candidates)
+    assert comparison["artifact_type"] == "poster_round_comparison"
+    assert comparison["round_1"]["run_id"] == manifest.run_id
+    assert comparison["round_2"]["run_id"] == round_2_manifest.run_id
+    assert comparison["memory_reuse"]["writes_long_term_memory"] is False
+    assert set(comparison["memory_reuse"]["memory_refs"]) == set(profile.source_memory_candidates)
+    assert "demo evidence only" in comparison["validation_boundary"]
+    assert "Round 2" in (output_dir / "poster_two_round_report.md").read_text(encoding="utf-8")
+
 
 def test_posterflow_examples_keep_readable_chinese_copy() -> None:
     brief = _json(Path("examples/posterflow/poster_brief.example.json"))
@@ -130,6 +161,8 @@ def test_posterflow_inspect_and_review_pass_for_valid_run(monkeypatch, tmp_path)
     assert inspection["quality_report"]["feedback_signals"] == []
     assert review["status"] == "passed"
     assert "posterflow_artifacts" in [section["name"] for section in review["sections"]]
+    artifact_statuses = {item["path"]: item["status"] for item in inspection["artifacts"]}
+    assert artifact_statuses["round_2/image_candidates/"] == "found"
 
 
 def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
