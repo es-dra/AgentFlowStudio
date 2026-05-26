@@ -80,6 +80,21 @@ It should track branch/worktree, owner role, write scope, acceptance criteria,
 verification, evidence, and handoff status. A task is not complete just because
 code was written.
 
+## Fast Entry Points
+
+Use the lightest entry that fits the task:
+
+- Small local question or one-file doc edit: `AGENTS.md` plus the touched file.
+- Normal project work: `AGENTS.md`, this document, and `TASK_TRACKER.md`.
+- Parallel or delegated work: also use `docs/agent_operating_roster.md` and
+  `docs/agent_task_brief_template.md`.
+- Company-rule change: edit the source rule in `Company/` first, then project
+  only the execution-facing subset back into this repository.
+
+The goal is to reduce routing overhead. Do not reread every Company document
+for routine implementation after the relevant source rule has already been
+projected here.
+
 ## Worktree Policy
 
 Keep the main checkout stable for scan, sync, and integration.
@@ -132,6 +147,30 @@ spec compliance
   -> integration
 ```
 
+Subagents are task-scoped. Close them after the assigned artifact, review, or
+QA result is collected. If the agent manager reports an old agent ID as
+`not found`, treat it as inactive history rather than an open workstream.
+
+Use `docs/agent_operating_roster.md` for role selection and
+`docs/agent_task_brief_template.md` for the brief passed to workers or
+reviewers.
+
+### Provider Capability Gates
+
+Remote-provider policy must name the capability:
+
+| Capability | Default | Required gate |
+|---|---|---|
+| LLM | off | `NARRATOCUT_ALLOW_REMOTE_LLM=true` |
+| ASR | off | `NARRATOCUT_ALLOW_REMOTE_ASR=true` |
+| image generation | off | `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` |
+| video generation | off | task-specific explicit approval until a project gate exists |
+| external download | off | task-specific source and artifact policy |
+
+Authorization for one capability does not authorize another. Tests and dry-run
+validators should prefer mocked providers unless a task explicitly requests a
+live provider smoke.
+
 ## Quality And Evidence
 
 Separate these levels in reports:
@@ -166,6 +205,18 @@ Current tracked lanes:
 
 For exact verification and branch hygiene state, use `TASK_TRACKER.md` as the
 live project ledger.
+
+Next recommended parallel queue:
+
+| ID | Purpose | Suggested branch | Status |
+|---|---|---|---|
+| AFS-PROD-001 | Alpha smoke/status entry that reports pass/blocked/fail without remote calls by default | `codex/afs-prod-alpha-smoke` | next |
+| AFS-QA-001 | Shared evidence summary vocabulary across inspect/review surfaces | `codex/afs-quality-evidence-summary` | next |
+| AFS-MEM-002 | Memory candidate promotion review decisions without durable memory writes | `codex/afs-memory-promotion-review` | next |
+| AFS-WEB-REPLAY | Replay useful Web UI work onto current `master` instead of merging the preserved branch directly | `codex/afs-web-ui-replay` | independent |
+
+Start these in separate worktrees only after a task brief records write scope,
+verification, and integration order.
 
 ## Promotion Back To Company
 

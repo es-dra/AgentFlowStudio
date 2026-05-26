@@ -12,6 +12,9 @@ agent contracts obvious without reading every historical phase note.
 - [Current architecture](current_architecture.md)
 - [Product roadmap](product_roadmap.md)
 - [AgentFlow Phase 15 roadmap](agentflow_phase15_roadmap.md)
+- [Company operating model projection](company_operating_model.md)
+- [Agent operating roster](agent_operating_roster.md)
+- [Agent task brief template](agent_task_brief_template.md)
 - [Post-v0.1.0 plan](post_v0_1_0_plan.md)
 - [NarratoStudio contracts](narratostudio_contracts.md)
 - [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
@@ -52,7 +55,9 @@ This writes `delivery_readiness.json` and `delivery_readiness.md`.
 
 Agent-facing task contracts live in [`../skills`](../skills/README.md).
 Operational agent guidance lives in
-[`agent_usage_guide.md`](agent_usage_guide.md).
+[`agent_usage_guide.md`](agent_usage_guide.md). Development agent roles and
+parallel dispatch rules live in
+[`agent_operating_roster.md`](agent_operating_roster.md).
 
 NarratoStudio is now represented as a sibling MVP module for the production
 side. Its first workflow is a local-first structured production handoff

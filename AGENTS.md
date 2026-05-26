@@ -33,6 +33,9 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 - For multi-line development, keep the main checkout stable and use isolated
   `codex/*` worktrees with explicit write scopes, verification commands, and
   integration order.
+- For substantial work, use `docs/agent_operating_roster.md` to choose the
+  owner role and `docs/agent_task_brief_template.md` before spawning subagents
+  or opening parallel worktrees.
 - Keep project worktrees under
   `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\`.
   If a preserved branch still points to an old repository path, repair or move
@@ -42,10 +45,18 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
   before integration.
 - Agent/subagent work must use bounded tasks: goal, non-goals, write scope,
   acceptance criteria, verification, remote-provider policy, and return format.
+- Treat subagents as ephemeral task workers, not permanent unattended staff.
+  Close them after their artifact, review, or QA result has been collected.
+  If the agent manager reports an old ID as `not found`, treat it as inactive
+  history rather than an open execution lane.
+- Remote-provider policy must name the capability being authorized: LLM, ASR,
+  image, video, or external download. One provider gate does not imply another.
 - Do not migrate code from `D:\Projects\AVP` unless the user explicitly asks.
 - Do not commit secrets, provider keys, signed URLs, cookies, tokens, or private credentials.
 - Do not commit large media files or generated runtime artifacts.
 - Do not call remote LLMs unless `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
+- Do not call remote ASR unless `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
+- Do not call remote image providers unless `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
 - Prefer schema-first design for workflow inputs, outputs, and intermediate artifacts.
 - New features should include focused tests or a clear reason when tests are deferred.
 - Keep files focused. Ideal file length is 300 lines or less.

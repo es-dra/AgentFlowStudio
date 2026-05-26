@@ -1,5 +1,37 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-OPS-002 Agent Operating Entry Points
+
+- Added project-level execution entry points for the AI-native company
+  operating model:
+  - `docs/agent_operating_roster.md` defines standing roles, temporary roles,
+    dispatch triggers, subagent lifecycle, and the next parallel queue.
+  - `docs/agent_task_brief_template.md` provides the bounded task brief to use
+    before opening worktrees or spawning subagents.
+- Updated `AGENTS.md` and `docs/company_operating_model.md` so substantial
+  AFS work routes through the roster and task brief instead of ad hoc prompts.
+- Added capability-specific remote provider gates for LLM, ASR, image, video,
+  and external downloads. Authorization for one provider capability does not
+  authorize another.
+- Updated `TASK_TRACKER.md` with the next parallel queue:
+  `AFS-PROD-001`, `AFS-QA-001`, `AFS-MEM-002`, and `AFS-WEB-REPLAY`.
+- Fixed stale AFS-MEM-001 tracker wording so its detailed status matches the
+  integrated mainline state.
+- Promoted reusable lessons back to the Company knowledge base:
+  subagent lifecycle, old-agent history handling, context trace evidence
+  boundaries, and provider capability gates.
+- Checked the three previous audit subagent IDs. The agent manager returned
+  `not found` for each, so they are inactive history rather than open
+  workstreams.
+- Verification:
+  - `git diff --check`: passed.
+  - Company knowledge base `git diff --check`: passed.
+  - `python -m pytest tests/test_agentflow_roadmap_docs.py`: 8 passed.
+  - `python -m apps.cli.main --help`: passed.
+  - `python -m apps.cli.main version`: `0.1.0`.
+- Boundary kept: no runtime code, workflow behavior, provider behavior, Web UI
+  code, generated artifacts, secrets, or remote calls were changed.
+
 ## 2026-05-26 - Web UI Branch Baseline Repair And Hygiene
 
 - Repaired the preserved `codex/narratocut-web-ui` worktree after the

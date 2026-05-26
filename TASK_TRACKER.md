@@ -1,6 +1,6 @@
 # AgentFlow Studio Task Tracker
 
-Last updated: 2026-05-26 by Codex
+Last updated: 2026-05-27 by Codex
 
 This tracker records multi-session AgentFlow Studio work under the local
 AI-native company operating model. A task is complete only when acceptance
@@ -30,6 +30,7 @@ docs/company_operating_model.md
 | AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | integrated to `master` | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Integrated at `649d736`; superseded stale MiniMax branch and both provider branches were deleted |
 | AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
 | AFS-WEB-001 | `codex/narratocut-web-ui` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\narratocut-web-ui` | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | preserved parallel branch | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Pushed at `de8ca8e`; worktree repaired and moved; branch still diverges from `master` and must be rebased or replayed before integration |
+| AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
 
 ## Integration Gate
 
@@ -44,6 +45,38 @@ Current gate:
 - Do not merge the Web UI line directly. It is preserved and backed up, but
   still diverges from `master`; the next integration step is a fresh
   rebase/replay branch with Python 3.12 verification.
+- `AFS-OPS-002` is an operating-system projection pass in the main checkout.
+  It must finish before opening the next batch of parallel implementation
+  worktrees.
+
+## Operating Entry Points
+
+Use this minimum entry set:
+
+- Small local doc edits: `AGENTS.md` plus the touched file.
+- Normal AFS work: `AGENTS.md`, `docs/company_operating_model.md`, and this
+  tracker.
+- Parallel or delegated work: also use `docs/agent_operating_roster.md` and
+  `docs/agent_task_brief_template.md`.
+
+Subagents are ephemeral. A visible old agent card is not an active lane unless
+the agent manager can still resume or close that ID. If a close attempt returns
+`not found`, record the agent as inactive history.
+
+## Next Parallel Queue
+
+Do not start these from the main checkout. Create separate `codex/*` worktrees
+after `AFS-OPS-002` verification is recorded.
+
+| ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
+|---|---|---|---|---|
+| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `...\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | `apps/cli/`, workflow docs, focused tests | `tests/test_video_to_finished_package_local_asr_workflow.py`, `tests/test_narratostudio_workflow.py`, `tests/test_posterflow_provider.py`, CLI help/version |
+| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `...\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | `agentflow/harness/`, `narratocut/harness/`, quality tests | `tests/test_agent_reviewer.py`, `tests/test_harness_quality_checks.py`, `tests/test_posterflow_quality.py`, `tests/test_narratostudio_review_hardening.py` |
+| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `...\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow/NarratoStudio memory tests | `tests/test_agentflow_asset_memory_validator.py`, `tests/test_narratostudio_asset_reuse_chain_audit_smoke.py`, `tests/test_posterflow_quality.py` |
+| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `...\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | `apps/web`, `apps/web_bridge`, Web UI tests | Web UI targeted tests, Python 3.12 full relevant suite, JS syntax checks |
+
+Integration order should prefer `AFS-PROD-001` or `AFS-QA-001` first because
+they create better artifact summaries for later Web UI replay.
 
 ## Remote Branch Hygiene
 
@@ -126,7 +159,7 @@ D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
 
 Status:
 
-- implemented in worktree; pending final integration / commit flow
+- integrated to `master` with AFS-CTX-001
 
 Evidence:
 
@@ -134,6 +167,54 @@ Evidence:
 - Branch: `codex/memory-os-loop`
 - Project record: `DEVLOG.md` in the implementation worktree
 - Company memory update: `Company/60-assets-and-memory/02-失败归因与反模式库.md`
+
+### AFS-OPS-002: Agent Operating Entry Points
+
+Goal:
+
+- Convert the Company operating rules and recent AFS lessons into concrete
+  project entry points for parallel development.
+
+Acceptance criteria:
+
+- [x] `AGENTS.md` points substantial work to the agent roster and task brief.
+- [x] `docs/company_operating_model.md` records fast entry points,
+      capability-specific provider gates, and next parallel lanes.
+- [x] `docs/agent_operating_roster.md` defines standing roles, temporary
+      roles, dispatch triggers, lifecycle, and next queue.
+- [x] `docs/agent_task_brief_template.md` provides the AFS task template.
+- [x] `TASK_TRACKER.md` fixes stale integrated-task status and records the next
+      parallel queue.
+- [x] Reusable lessons are promoted to Company source rules and anti-patterns.
+
+Verification:
+
+```powershell
+git diff --check
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_roadmap_docs.py
+# 8 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+```
+
+Status:
+
+- completed
+
+Evidence:
+
+- Project docs: `docs/agent_operating_roster.md`,
+  `docs/agent_task_brief_template.md`, `docs/company_operating_model.md`
+- Company rule updates:
+  `D:\Learning materials\Learning_notes\Company\30-engineering\01-分支-worktree-子智能体协作规范.md`
+  and
+  `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式库.md`
 
 ### AFS-CTX-001: PosterFlow Context Runtime Trace
 
