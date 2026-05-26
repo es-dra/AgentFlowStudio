@@ -99,19 +99,31 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     assert {candidate.promotion_status for candidate in memory.candidates} == {"candidate"}
     assert {decision["writes_long_term_memory"] for decision in memory_review} == {False}
     assert {decision["review_mode"] for decision in memory_review} == {"demo_human_review_gate"}
+    review_decision_ids = {decision["review_id"] for decision in memory_review}
     assert profile.status == "demo_only"
     assert profile.writes_long_term_memory is False
+    assert set(profile.source_promotion_decisions) == review_decision_ids
     assert context_bundle.project_prefix_path == "project_prefix.md"
     assert context_bundle.preference_profile_path == "poster_preference_profile.json"
+    assert set(context_bundle.source_promotion_decisions) == review_decision_ids
+    assert context_bundle.source_artifacts["memory_review"] == "poster_memory_review.jsonl"
+    assert context_bundle.source_artifacts["memory_candidates"] == "poster_memory_candidates.jsonl"
     assert context_bundle.context_layers["hot"]["project_prefix"] == "project_prefix.md"
     assert set(context_bundle.context_layers["warm"]["memory_refs"]) == set(profile.source_memory_candidates)
+    assert set(context_bundle.context_layers["warm"]["promotion_decision_refs"]) == review_decision_ids
     assert context_bundle.cache_plan["cache_key"].startswith(f"{profile.project_id}:1:")
+    assert set(context_bundle.cache_plan["invalidation_refs"]) == set(
+        profile.source_memory_candidates + profile.source_promotion_decisions
+    )
     assert {decision["status"] for decision in context_trace.selection_decisions} == {"included", "excluded"}
+    assert set(context_trace.promotion_decision_refs) == review_decision_ids
     assert "no_rag_configured" in {
         decision["reason"] for decision in context_trace.selection_decisions if decision["status"] == "excluded"
     }
     assert next_prompt.memory_context["preference_profile_path"] == "poster_preference_profile.json"
     assert next_prompt.memory_context["context_bundle_path"] == "context_bundle.json"
+    assert set(next_prompt.memory_context["promotion_decision_refs"]) == review_decision_ids
+    assert next_prompt.writes_long_term_memory is False
     assert "candidate_001.png" in (output_dir / "poster_preview.html").read_text(encoding="utf-8")
 
     round_2_prompt = PosterPromptPack.model_validate(_json(output_dir / "round_2/poster_prompt_pack.json"))
@@ -135,6 +147,7 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     assert comparison["round_2"]["run_id"] == round_2_manifest.run_id
     assert comparison["memory_reuse"]["writes_long_term_memory"] is False
     assert set(comparison["memory_reuse"]["memory_refs"]) == set(profile.source_memory_candidates)
+    assert set(comparison["memory_reuse"]["promotion_decision_refs"]) == review_decision_ids
     assert [step["stage"] for step in comparison["evidence_chain"]] == [
         "round_1_evidence",
         "candidate_memory",
@@ -150,7 +163,13 @@ def test_posterflow_memory_demo_workflow_generates_visual_artifacts(monkeypatch,
     ]
     assert comparison["evidence_chain"][2]["source_refs"]["memory_candidates"] == "poster_memory_candidates.jsonl"
     assert comparison["evidence_chain"][3]["source_refs"]["memory_review"] == "poster_memory_review.jsonl"
+    assert comparison["evidence_chain"][3]["source_refs"]["promotion_decision_refs"] == ", ".join(
+        sorted(review_decision_ids)
+    )
     assert comparison["evidence_chain"][4]["source_refs"]["context_bundle"] == "context_bundle.json"
+    assert comparison["evidence_chain"][4]["source_refs"]["promotion_decision_refs"] == ", ".join(
+        sorted(review_decision_ids)
+    )
     assert {step["writes_long_term_memory"] for step in comparison["evidence_chain"]} == {False}
     assert "demo evidence only" in comparison["validation_boundary"]
     two_round_report = (output_dir / "poster_two_round_report.md").read_text(encoding="utf-8")

@@ -87,6 +87,16 @@ def test_asset_memory_validator_requires_promotion_decision_evidence_refs() -> N
     assert _failed_check_ids(validation) >= {"promotion_decision_has_evidence_refs"}
 
 
+def test_asset_memory_validator_requires_promotion_decision_to_preserve_candidate_evidence() -> None:
+    contracts = _contract_set()
+    contracts["memory_promotion_decision"]["evidence_refs"] = ["unrelated_review_note"]
+
+    validation = validate_asset_memory_contract_set(**contracts)
+
+    assert validation["overall_status"] == "failed"
+    assert _failed_check_ids(validation) >= {"promotion_decision_preserves_candidate_evidence"}
+
+
 def test_memory_promotion_review_helper_accepts_all_supported_statuses() -> None:
     contracts = _contract_set()
 

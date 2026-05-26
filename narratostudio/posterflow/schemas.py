@@ -225,6 +225,7 @@ class PosterPreferenceProfile(PosterArtifact):
     text_preferences: list[str] = Field(default_factory=list)
     prompt_rules: list[str] = Field(default_factory=list)
     source_memory_candidates: list[str] = Field(default_factory=list)
+    source_promotion_decisions: list[str] = Field(default_factory=list)
     scope: Literal["project"] = "project"
     status: Literal["demo_only"] = "demo_only"
     writes_long_term_memory: Literal[False] = False
@@ -238,6 +239,8 @@ class ContextBundle(PosterArtifact):
     target_artifact: Literal["next_round_prompt"] = "next_round_prompt"
     project_prefix_path: str
     preference_profile_path: str
+    source_memory_candidates: list[str] = Field(default_factory=list)
+    source_promotion_decisions: list[str] = Field(default_factory=list)
     source_artifacts: dict[str, str] = Field(default_factory=dict)
     context_layers: dict[str, Any] = Field(default_factory=dict)
     quality_rules: list[str] = Field(default_factory=list)
@@ -251,6 +254,7 @@ class ContextAssemblyTrace(PosterArtifact):
     project_id: str
     run_id: str
     bundle_id: str
+    promotion_decision_refs: list[str] = Field(default_factory=list)
     selection_decisions: list[dict[str, Any]] = Field(default_factory=list)
     budget: dict[str, Any] = Field(default_factory=dict)
     rejected_context: list[dict[str, Any]] = Field(default_factory=list)
@@ -268,3 +272,4 @@ class NextRoundPrompt(PosterArtifact):
     composed_positive_prompt: str
     composed_negative_prompt: str
     diff_from_previous_prompt: dict[str, list[str]]
+    writes_long_term_memory: Literal[False] = False

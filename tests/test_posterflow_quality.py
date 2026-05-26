@@ -87,6 +87,56 @@ def test_posterflow_review_fails_when_profile_uses_unapproved_memory(monkeypatch
     assert "posterflow_profile_uses_accepted_memory" in _failed_ids(review)
 
 
+def test_posterflow_review_fails_when_memory_review_links_unknown_candidate(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    review_events = _jsonl(output_dir / "poster_memory_review.jsonl")
+    review_events[0]["memory_candidate_id"] = "missing_memory_candidate"
+    (output_dir / "poster_memory_review.jsonl").write_text(
+        "\n".join(json.dumps(event, ensure_ascii=False) for event in review_events) + "\n",
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_memory_review_refs_candidates" in _failed_ids(review)
+    assert "posterflow_memory_review_matches_decisions" in _failed_ids(review)
+
+
+def test_posterflow_review_fails_when_context_bundle_loses_promotion_decision_refs(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    bundle = _json(output_dir / "context_bundle.json")
+    bundle["source_promotion_decisions"] = []
+    bundle["context_layers"]["warm"]["promotion_decision_refs"] = []
+    (output_dir / "context_bundle.json").write_text(
+        json.dumps(bundle, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_context_bundle_refs_promotion_decisions" in _failed_ids(review)
+
+
+def test_posterflow_review_fails_when_next_prompt_loses_promotion_decision_refs(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    next_prompt = _json(output_dir / "next_round_prompt.json")
+    next_prompt["memory_context"]["promotion_decision_refs"] = []
+    (output_dir / "next_round_prompt.json").write_text(
+        json.dumps(next_prompt, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_next_prompt_refs_promotion_decisions" in _failed_ids(review)
+
+
 def test_posterflow_review_fails_when_feedback_signal_replaces_raw_feedback(monkeypatch, tmp_path) -> None:
     output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
     (output_dir / "poster_feedback.jsonl").unlink()
@@ -162,6 +212,23 @@ def test_posterflow_review_fails_when_evidence_chain_loses_review_decision(monke
 
     assert review["status"] == "failed"
     assert "posterflow_evidence_chain_review_decision_refs_review" in _failed_ids(review)
+
+
+def test_posterflow_review_fails_when_evidence_chain_loses_promotion_decision_refs(monkeypatch, tmp_path) -> None:
+    output_dir = _run_posterflow_workflow(monkeypatch, tmp_path)
+    comparison = _json(output_dir / "poster_round_comparison.json")
+    reuse_step = next(step for step in comparison["evidence_chain"] if step["stage"] == "round_2_reuse")
+    reuse_step["source_refs"].pop("promotion_decision_refs", None)
+    (output_dir / "poster_round_comparison.json").write_text(
+        json.dumps(comparison, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    inspect_run(output_dir)
+    review = review_run(output_dir)
+
+    assert review["status"] == "failed"
+    assert "posterflow_evidence_chain_reuse_refs_promotion_decisions" in _failed_ids(review)
 
 
 def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
