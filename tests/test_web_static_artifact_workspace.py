@@ -203,3 +203,60 @@ console.log(JSON.stringify({
     assert facts["context_projection_ready"] == "false"
     assert facts["human_acceptance_recorded"] == "false"
     assert facts["provider_calls_started"] == "false"
+
+
+def test_static_viewer_recognizes_loulan_b01_decision_crosswalk() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
+
+const crosswalk = {
+  schema_version: "0.1.0",
+  artifact_type: "loulan_afs_b01_decision_crosswalk",
+  status: "blocked_pending_human_review",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  human_acceptance_recorded: false,
+  media_generation_started: false,
+  decision_layers: [
+    { layer_id: "loulan_local_b01_shot_gate", decision_count: 5, pending_count: 5, target_refs: ["shot:B01-S01", "shot:B01-S02", "shot:B01-S03", "shot:B01-S04", "shot:B01-S05"] },
+    { layer_id: "afs_b01_import_gate", decision_count: 7, pending_count: 7, target_refs: ["shot:B01-S01", "shot:B01-S02", "shot:B01-S03", "shot:B01-S04", "shot:B01-S05", "character:zhou_tong_school_v1", "character:zhou_tong_qipao_front_v1"] },
+    { layer_id: "afs_broader_decision_review_gate", decision_count: 47, pending_count: 47, target_refs_summary: { shot_slots: 5, asset_slots: 42 } }
+  ]
+};
+const artifacts = await parseFiles([
+  { name: "afs_b01_decision_crosswalk.json", text: async () => JSON.stringify(crosswalk) },
+]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
+
+console.log(JSON.stringify({
+  artifactType: artifacts[0].artifactType,
+  artifactClass: artifacts[0].artifactClass,
+  sourceRole: artifacts[0].sourceRole,
+  memoryBundleCount: workspace.memoryBundle.length,
+  sourceStatus: view.source_status,
+  inspector: view.artifact_inspector[0],
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["artifactType"] == "loulan_afs_b01_decision_crosswalk"
+    assert payload["artifactClass"] == "known_contract"
+    assert payload["sourceRole"] == "Loulan B01 decision crosswalk"
+    assert payload["memoryBundleCount"] == 1
+    assert payload["sourceStatus"]["label"] == "Selected files"
+    assert payload["inspector"]["title"] == "Loulan B01 decision crosswalk"
+    assert payload["inspector"]["status"] == "blocked_pending_human_review"
+    facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
+    assert facts["local_shot_decisions"] == "5"
+    assert facts["afs_import_decisions"] == "7"
+    assert facts["broader_review_decisions"] == "47"
+    assert facts["human_acceptance_recorded"] == "false"
+    assert facts["provider_calls_started"] == "false"

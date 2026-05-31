@@ -21,6 +21,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_memory_video_pipeline_presentation_package: ["memory_video_pipeline_presentation_package.json", "memory_video_pipeline_presentation_package.example.json"],
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
   loulan_afs_b01_feedback_loop_gate: ["afs_b01_feedback_loop_gate.json"],
+  loulan_afs_b01_decision_crosswalk: ["afs_b01_decision_crosswalk.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -42,7 +43,7 @@ export const ARTIFACT_CLASSES = {
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov"]);
 
 export function isMemoryArtifactType(type) {
-  return typeof type === "string" && (type.startsWith("agentflow_") || type === "loulan_afs_b01_feedback_loop_gate");
+  return typeof type === "string" && (type.startsWith("agentflow_") || type === "loulan_afs_b01_feedback_loop_gate" || type === "loulan_afs_b01_decision_crosswalk");
 }
 
 export function sourceRoleFor(type, fileName) {
@@ -71,6 +72,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_loulan_decision_worksheet") return "Loulan manual decision worksheet";
   if (type === "agentflow_loulan_decision_intake_report") return "Loulan decision intake report";
   if (type === "loulan_afs_b01_feedback_loop_gate") return "Loulan B01 feedback loop gate";
+  if (type === "loulan_afs_b01_decision_crosswalk") return "Loulan B01 decision crosswalk";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";

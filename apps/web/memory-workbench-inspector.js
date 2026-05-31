@@ -1,3 +1,5 @@
+import { isLoulanB01Artifact, loulanB01Facts, loulanB01FocusTargets, loulanB01Status, loulanB01TypeLabel } from "./memory-workbench-loulan-b01-inspector.js";
+
 const TYPE_LABELS = {
   agentflow_memory_video_pipeline_package: "Pipeline package",
   agentflow_memory_video_pipeline_protocol: "Pipeline protocol",
@@ -12,7 +14,6 @@ const TYPE_LABELS = {
   agentflow_loulan_decision_worksheet: "Loulan decision worksheet",
   agentflow_loulan_decision_intake_report: "Loulan decision intake report",
   agentflow_loulan_context_bundle_projection: "Loulan context bundle projection",
-  loulan_afs_b01_feedback_loop_gate: "Loulan B01 feedback loop gate",
   agentflow_feedback_event: "Feedback draft",
 };
 
@@ -29,7 +30,7 @@ function summarizeArtifact(artifact) {
     id: artifact.fileName,
     artifact_type: type,
     focus_targets: focusTargetsFor(type),
-    title: TYPE_LABELS[type] || type,
+    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || type,
     status: statusFor(type, payload),
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
@@ -51,7 +52,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_loulan_decision_worksheet") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_decision_intake_report") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_context_bundle_projection") return ["memory-loaded", "next-pass"];
-  if (type === "loulan_afs_b01_feedback_loop_gate") return ["review", "feedback", "next-pass"];
+  if (isLoulanB01Artifact(type)) return loulanB01FocusTargets(type);
   return [];
 }
 
@@ -69,7 +70,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_loulan_decision_worksheet") return loulanDecisionWorksheetFacts(payload);
   if (type === "agentflow_loulan_decision_intake_report") return loulanDecisionIntakeFacts(payload);
   if (type === "agentflow_loulan_context_bundle_projection") return loulanContextBundleFacts(payload);
-  if (type === "loulan_afs_b01_feedback_loop_gate") return loulanB01FeedbackGateFacts(payload);
+  if (isLoulanB01Artifact(type)) return loulanB01Facts(type, payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -178,19 +179,6 @@ function loulanContextBundleFacts(payload) {
   ];
 }
 
-function loulanB01FeedbackGateFacts(payload) {
-  const summary = objectValue(payload.current_gate_summary);
-  return [
-    fact("status", payload.status || "unknown"),
-    fact("pending_decisions", summary.pending_decisions ?? "unknown"),
-    fact("validation_status", summary.validation_status || "unknown"),
-    fact("apply_status", summary.apply_status || "unknown"),
-    fact("context_projection_ready", yesNo(summary.context_projection_ready)),
-    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
 function packageFacts(payload) {
   const refs = ["plan_ref", "review_ref", "observation_ref", "presentation_ref", "feedback_event_draft_ref"].filter((key) => payload[key]);
   return [
@@ -257,7 +245,7 @@ function feedbackFacts(payload) {
 }
 
 function statusFor(type, payload) {
-  if (type === "loulan_afs_b01_feedback_loop_gate") return payload.status || "review ready";
+  if (isLoulanB01Artifact(type)) return loulanB01Status(type, payload);
   if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
   if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
   if (payload.writes_long_term_memory === true) return "blocked";
