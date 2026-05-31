@@ -323,6 +323,31 @@ Required boundaries:
 - the package is a workflow/review artifact, not human product acceptance or
   business validation.
 
+## Loulan Memory Package
+
+`agentflow_loulan_memory_package` is the first real-project pilot package for
+the Memory Production Architecture. It lets AgentFlow Studio read an explicit
+Loulan asset/evidence project as a no-call production-memory package.
+
+Required boundaries:
+
+- package generation reads explicit local manifests only, does not restructure
+  Loulan, and does not start image, video, LLM, ASR, or download calls;
+- package output must not contain absolute paths, generated media refs,
+  provider credentials, bearer headers, signed URLs, or data URLs;
+- `candidate`, `rejected`, `expired`, and missing-hash assets are blocked;
+- `approved`, `promoted`, or `merged` assets may become eligible refs, but still
+  require a reviewable promotion decision before durable memory use;
+- unsafe built-in image routes must be blocked until the API workbench and
+  provider ledger exist;
+- the Web projection is read-only/copy-only, not a scanner, executor, Company
+  memory writer, or provider UI;
+- structure verification, runtime verification, human acceptance, provider
+  smoke, business validation, and durable Memory runtime remain separate
+  labels.
+
+See [`../examples/agentflow/loulan_memory_package.example.json`](../examples/agentflow/loulan_memory_package.example.json).
+
 ## Reusable Asset Profile
 
 `agentflow_reusable_asset_profile` records a promoted, evidence-backed asset

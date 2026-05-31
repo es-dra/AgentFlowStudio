@@ -5,9 +5,10 @@ Status: active short development log. Long historical narrative has been compres
 Current references:
 
 - Live work ledger: `TASK_TRACKER.md`.
-- Mainline slimming boundary: `docs/maintenance/AFS-SLIMMING-BOUNDARY-001.md`.
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
+
+2026-06-01: Loulan memory pilot package contract, CLI, Web projection, example, tracker row, task brief, and handoff added; see `docs/handoff/AFS-LOULAN-PILOT-001.md`.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 

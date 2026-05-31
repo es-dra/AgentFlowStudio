@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from apps.cli.alpha_commands import alpha_smoke_command
+from apps.cli.loulan_memory_command import loulan_memory_package_command
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.memory_review_command import memory_evidence_reuse_review_command
 from apps.cli.memory_video_pipeline_command import (
@@ -46,6 +47,7 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="memory-video-pipeline-present")(memory_video_pipeline_present_command)
     app.command(name="memory-video-pipeline-package")(memory_video_pipeline_package_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
+    app.command(name="loulan-memory-package")(loulan_memory_package_command)
     app.command(name="web-bridge")(web_bridge_command)
 
 

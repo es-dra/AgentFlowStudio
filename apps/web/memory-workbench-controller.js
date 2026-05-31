@@ -4,6 +4,7 @@ import { buildDemoEvidenceSummary } from "./memory-workbench-demo-summary.js";
 import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
 import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
+import { buildLoulanWorkbenchPackageView } from "./memory-workbench-loulan-package.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
@@ -20,10 +21,15 @@ export function memorySourceForArtifacts(artifacts) {
 }
 
 export function buildMemoryWorkbenchView(workspace, source) {
-  const memoryView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
+  const memoryView = buildLoulanWorkbenchPackageView(
+    workspace,
+    buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture),
+  );
   memoryView.source_status = memorySourceStatus(source, workspace);
   memoryView.artifact_inspector = buildMemoryArtifactInspector(workspace, memoryView.artifact_inspector);
-  memoryView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  if (!workspace?.loulanPackage) {
+    memoryView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  }
   memoryView.demo_summary = buildDemoEvidenceSummary(memoryView);
   memoryView.demo_checklist = buildDemoReadyChecklist(memoryView);
   return memoryView;

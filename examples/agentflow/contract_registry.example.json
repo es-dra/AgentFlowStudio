@@ -73,6 +73,12 @@
       "contract_surface": "memory_video_pipeline_package"
     },
     {
+      "artifact_type": "agentflow_loulan_memory_package",
+      "example_path": "examples/agentflow/loulan_memory_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "loulan_memory_package"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -191,6 +197,10 @@
     {
       "rule_id": "memory_video_package_no_call_feedback_draft",
       "description": "Memory video pipeline packages link plan, review, observation, presentation, and a feedback-event draft without provider calls or durable memory writes."
+    },
+    {
+      "rule_id": "loulan_package_no_call_pilot",
+      "description": "Loulan pilot packages summarize explicit local manifests, block unsafe provider routes, and must not copy generated media or write durable memory."
     },
     {
       "rule_id": "asset_reuse_decision_only",

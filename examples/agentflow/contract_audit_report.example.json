@@ -183,6 +183,14 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_loulan_memory_package",
+      "example_path": "examples/agentflow/loulan_memory_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
@@ -255,6 +263,11 @@
       "check_id": "memory_video_presentation_no_media_copy",
       "status": "passed",
       "note": "Presentation packages summarize protocol, review, and observation evidence without copying generated media or claiming final proof."
+    },
+    {
+      "check_id": "loulan_package_no_call_pilot",
+      "status": "passed",
+      "note": "Loulan pilot packages read explicit manifests, block unsafe provider routes, and do not write durable memory."
     },
     {
       "check_id": "intermediate_asset_has_evidence",

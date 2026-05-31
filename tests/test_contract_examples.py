@@ -313,6 +313,7 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_memory_video_pipeline_human_observation",
         "agentflow_memory_video_pipeline_presentation_package",
         "agentflow_memory_video_pipeline_package",
+        "agentflow_loulan_memory_package",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",
@@ -368,6 +369,7 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
         "memory_video_observation_not_acceptance",
         "memory_video_presentation_no_media_copy",
         "memory_video_package_no_call_feedback_draft",
+        "loulan_package_no_call_pilot",
     } <= rule_ids
     assert "execute_workflow" not in rule_ids
     assert "call_remote_provider" not in rule_ids
