@@ -136,6 +136,7 @@ def _load_artifact(item: dict[str, Any]) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     _reject_unsafe_refs(manifest)
     output = _single_output(manifest)
+    source_image_sha256 = _source_image_sha256(manifest)
     return {
         "run_id": run_id,
         "lane_id": lane_id,
@@ -144,7 +145,7 @@ def _load_artifact(item: dict[str, Any]) -> dict[str, Any]:
         "api_family": manifest.get("api_family"),
         "model": manifest.get("model"),
         "task_status": manifest.get("task", {}).get("task_status"),
-        "source_image_sha256": manifest.get("input_image", {}).get("sha256"),
+        "source_image_sha256": source_image_sha256,
         "output": output,
     }
 
@@ -169,6 +170,18 @@ def _single_output(manifest: dict[str, Any]) -> dict[str, Any]:
         "sha256": output.get("sha256"),
         "content_type": output.get("content_type"),
     }
+
+
+def _source_image_sha256(manifest: dict[str, Any]) -> str:
+    if manifest.get("api_family") != "i2v":
+        raise ValueError("I2V manifest api_family must be i2v")
+    input_image = manifest.get("input_image")
+    if not isinstance(input_image, dict):
+        raise ValueError("I2V manifest requires input_image.sha256")
+    source_image_sha256 = input_image.get("sha256")
+    if not isinstance(source_image_sha256, str) or not source_image_sha256.strip():
+        raise ValueError("I2V manifest requires input_image.sha256")
+    return source_image_sha256
 
 
 def _validate_expected_lanes(plan: dict[str, Any], artifacts: list[dict[str, Any]]) -> None:

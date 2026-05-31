@@ -85,6 +85,30 @@ def test_review_rejects_provider_urls_and_absolute_video_paths(tmp_path) -> None
         build_memory_video_pipeline_review(protocol, artifacts)
 
 
+def test_review_rejects_i2v_manifest_without_source_image_hash(tmp_path) -> None:
+    protocol = _protocol()
+    artifacts = _artifact_manifest(tmp_path, run_count=1)
+    first_manifest = Path(artifacts["artifacts"][0]["i2v_manifest_path"])
+    manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
+    manifest["input_image"].pop("sha256")
+    first_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="input_image.sha256"):
+        build_memory_video_pipeline_review(protocol, artifacts)
+
+
+def test_review_rejects_non_i2v_manifest_before_source_parity(tmp_path) -> None:
+    protocol = _protocol()
+    artifacts = _artifact_manifest(tmp_path, run_count=1)
+    first_manifest = Path(artifacts["artifacts"][0]["i2v_manifest_path"])
+    manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
+    manifest["api_family"] = "t2v"
+    first_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="api_family"):
+        build_memory_video_pipeline_review(protocol, artifacts)
+
+
 def test_cli_writes_review_from_protocol_and_explicit_artifact_manifest(tmp_path) -> None:
     protocol_path = tmp_path / "protocol.json"
     artifacts_path = tmp_path / "artifacts.json"

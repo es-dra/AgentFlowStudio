@@ -213,7 +213,16 @@ Remote readiness follow-up on 2026-05-31:
   GitHub then reported PR #72 as draft and `mergeable=true` at head `5962a2a`.
 - PR #73 was merged to `master` as `94401afe`; PR #72 was then rebased on top
   of `origin/master`, retargeted to `master`, and marked ready for review at
-  head `61e4892` after a readiness comment was added.
+  head `0c70bf4` after a readiness comment was added.
+
+PR #72 review follow-up on 2026-05-31:
+
+- Automated review found that memory video pipeline review could report source
+  image parity when an I2V manifest lacked `input_image.sha256` or was not
+  actually an I2V manifest.
+- The review path now requires `api_family == i2v` and a non-empty
+  `input_image.sha256` before computing `same_source_image_sha256`.
+- Regression tests cover missing source hashes and non-I2V manifest rejection.
 
 ## Commit Boundary
 
