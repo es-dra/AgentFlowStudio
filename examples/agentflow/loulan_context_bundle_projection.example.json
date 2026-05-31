@@ -1,0 +1,72 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_loulan_context_bundle_projection",
+  "projection_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_context_projection_v0",
+  "created_at": "2026-06-01T12:00:00+08:00",
+  "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "decision_audit": {
+    "status": "partial_ready",
+    "required_decision_refs": [
+      "shot:B01-S01",
+      "shot:B01-S02",
+      "character:guan_pingping_v2"
+    ],
+    "missing_decision_refs": [],
+    "invalid_decisions": [],
+    "accepted_decision_ids": [
+      "loulan_decision_b01_s01",
+      "loulan_decision_guan_pingping_v2"
+    ],
+    "blocked_refs": [
+      "shot:B01-S02"
+    ],
+    "writes_long_term_memory": false
+  },
+  "context_bundle": {
+    "bundle_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_context_bundle_v0",
+    "status": "partial_ready",
+    "created_at": "2026-06-01T12:00:00+08:00",
+    "source_review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+    "source_decision_ids": [
+      "loulan_decision_b01_s01",
+      "loulan_decision_b01_s02",
+      "loulan_decision_guan_pingping_v2"
+    ],
+    "memory_refs": [
+      "character:guan_pingping_v2"
+    ],
+    "shot_anchor_refs": [
+      "shot:B01-S01"
+    ],
+    "blocked_refs": [
+      "shot:B01-S02"
+    ],
+    "writes_long_term_memory": false
+  },
+  "next_prompt_draft": {
+    "prompt_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_context_bundle_v0_next_prompt_draft",
+    "status": "partial_ready",
+    "created_at": "2026-06-01T12:00:00+08:00",
+    "context_bundle_ref": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_context_bundle_v0",
+    "memory_refs": [
+      "character:guan_pingping_v2"
+    ],
+    "shot_anchor_refs": [
+      "shot:B01-S01"
+    ],
+    "blocked_refs": [
+      "shot:B01-S02"
+    ],
+    "writes_long_term_memory": false
+  },
+  "claim_boundaries": {
+    "structure_verification": "context_bundle_projection_only",
+    "runtime_verification": "not_run",
+    "provider_smoke": "not_run",
+    "human_acceptance": "decision_records_only_not_product_acceptance",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_implemented"
+  }
+}

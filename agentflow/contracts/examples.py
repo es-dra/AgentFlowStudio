@@ -39,6 +39,7 @@ AGENTFLOW_EXAMPLE_PATHS = (
     Path("examples/agentflow/loulan_memory_package.example.json"),
     Path("examples/agentflow/loulan_api_workbench_plan.example.json"),
     Path("examples/agentflow/loulan_human_review_pack.example.json"),
+    Path("examples/agentflow/loulan_context_bundle_projection.example.json"),
     *AGENTFLOW_SKILL_ROUTER_EXAMPLES,
     *AGENTFLOW_ASSET_EXAMPLES,
 )
@@ -59,6 +60,7 @@ AGENTFLOW_EXAMPLE_TYPES = frozenset(
         "agentflow_loulan_memory_package",
         "agentflow_loulan_api_workbench_plan",
         "agentflow_loulan_human_review_pack",
+        "agentflow_loulan_context_bundle_projection",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",

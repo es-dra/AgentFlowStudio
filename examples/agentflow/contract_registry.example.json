@@ -91,6 +91,12 @@
       "contract_surface": "loulan_human_review_pack"
     },
     {
+      "artifact_type": "agentflow_loulan_context_bundle_projection",
+      "example_path": "examples/agentflow/loulan_context_bundle_projection.example.json",
+      "doc_path": "docs/loulan_context_bundle_contract.md",
+      "contract_surface": "loulan_context_bundle_projection"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -221,6 +227,10 @@
     {
       "rule_id": "loulan_human_review_pack_no_acceptance",
       "description": "Loulan human review packs prepare pending review decisions and must not record acceptance, call providers, or write durable memory."
+    },
+    {
+      "rule_id": "loulan_context_bundle_decisions_only",
+      "description": "Loulan context bundle projections consume explicit human decisions only and must not promote draft review items by inference."
     },
     {
       "rule_id": "asset_reuse_decision_only",
