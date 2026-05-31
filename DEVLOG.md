@@ -36,6 +36,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan project manifests (`character_assets.json`, `character_asset_versions.json`, `prop_asset_versions.json`, and `shot_list.json`) directly as read-only memory artifacts, completing selected-file recognition for the 12 current top-level Loulan manifest JSON files without directory scanning, provider calls, promotion, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-PROJECT-MANIFESTS-DIRECT-001.md`.
 
+2026-06-01: Memory Workbench now summarizes a selected Loulan manifest set as a project-level no-call cockpit when the full package is not selected, surfacing 12-manifest real-project coverage, 85 assets, 3 eligible refs, 82 blocked refs, 5 pending B01 decisions, 38 Image2 requests, 38 Kling I2V requests, and B02 blocked status without scanning directories, calling providers, promoting assets, or writing durable Memory; see `docs/handoff/AFS-LOULAN-WEB-MANIFEST-SET-SUMMARY-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:
