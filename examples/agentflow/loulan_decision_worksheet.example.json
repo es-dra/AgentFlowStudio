@@ -1,0 +1,190 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_loulan_decision_worksheet",
+  "decision_review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_decision_review_pack_v0",
+  "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+  "worksheet_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_decision_review_pack_v0_worksheet_v0",
+  "created_at": "2026-06-01T16:30:00+08:00",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "human_acceptance_recorded": false,
+  "worksheet_status": "awaiting_manual_decisions",
+  "decision_summary": {
+    "required_decisions": 2,
+    "decision_slots": 2,
+    "pending_count": 2,
+    "missing_slot_count": 0,
+    "invalid_count": 0,
+    "ready_count": 0
+  },
+  "worksheet_groups": [
+    {
+      "target_type": "character",
+      "count": 1,
+      "pending_count": 1,
+      "missing_count": 0,
+      "invalid_count": 0,
+      "ready_count": 0
+    },
+    {
+      "target_type": "shot",
+      "count": 1,
+      "pending_count": 1,
+      "missing_count": 0,
+      "invalid_count": 0,
+      "ready_count": 0
+    }
+  ],
+  "decision_rows": [
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_shot_b01_s01_decision",
+      "target_ref": "shot:B01-S01",
+      "target_type": "shot",
+      "status": "needs_human_input",
+      "current_decision": "pending_human_review",
+      "allowed_decisions": [
+        "approve_anchor",
+        "reject",
+        "request_repair"
+      ],
+      "suggested_evidence_refs": [
+        "B01-S01-h1",
+        "asset_library/director_notes/B01-S01_h1_feedback.md"
+      ],
+      "required_fields": [
+        "decision",
+        "decided_by",
+        "evidence_refs",
+        "review_note"
+      ],
+      "manual_fill_required": true,
+      "decision_to_fill": "",
+      "decided_by_to_fill": "",
+      "evidence_refs_to_fill": [],
+      "review_note_to_fill": "",
+      "copy_target_json": {
+        "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_shot_b01_s01_decision",
+        "target_ref": "shot:B01-S01",
+        "decision": "",
+        "allowed_decisions": [
+          "approve_anchor",
+          "reject",
+          "request_repair"
+        ],
+        "decided_by": "",
+        "evidence_refs": [],
+        "suggested_evidence_refs": [
+          "B01-S01-h1",
+          "asset_library/director_notes/B01-S01_h1_feedback.md"
+        ],
+        "review_note": ""
+      }
+    },
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_character_guan_pingping_v2_decision",
+      "target_ref": "character:guan_pingping_v2",
+      "target_type": "character",
+      "status": "needs_human_input",
+      "current_decision": "pending_human_review",
+      "allowed_decisions": [
+        "promoted",
+        "merged",
+        "rejected",
+        "expired"
+      ],
+      "suggested_evidence_refs": [
+        "character:guan_pingping_v2",
+        "guan_pingping_v2"
+      ],
+      "required_fields": [
+        "decision",
+        "decided_by",
+        "evidence_refs",
+        "review_note"
+      ],
+      "manual_fill_required": true,
+      "decision_to_fill": "",
+      "decided_by_to_fill": "",
+      "evidence_refs_to_fill": [],
+      "review_note_to_fill": "",
+      "copy_target_json": {
+        "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_character_guan_pingping_v2_decision",
+        "target_ref": "character:guan_pingping_v2",
+        "decision": "",
+        "allowed_decisions": [
+          "promoted",
+          "merged",
+          "rejected",
+          "expired"
+        ],
+        "decided_by": "",
+        "evidence_refs": [],
+        "suggested_evidence_refs": [
+          "character:guan_pingping_v2",
+          "guan_pingping_v2"
+        ],
+        "review_note": ""
+      }
+    }
+  ],
+  "manual_transfer_template": {
+    "schema_version": "0.1.0",
+    "artifact_type": "agentflow_loulan_promotion_decisions",
+    "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+    "created_at": "2026-06-01T16:30:00+08:00",
+    "template_status": "pending_human_input",
+    "provider_calls_started": false,
+    "writes_long_term_memory": false,
+    "human_acceptance_recorded": false,
+    "instructions": "Copy rows, then fill decision, decided_by=human, evidence_refs, and review_note.",
+    "decisions": [
+      {
+        "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_shot_b01_s01_decision",
+        "target_ref": "shot:B01-S01",
+        "decision": "",
+        "allowed_decisions": [
+          "approve_anchor",
+          "reject",
+          "request_repair"
+        ],
+        "decided_by": "",
+        "evidence_refs": [],
+        "suggested_evidence_refs": [
+          "B01-S01-h1",
+          "asset_library/director_notes/B01-S01_h1_feedback.md"
+        ],
+        "review_note": ""
+      },
+      {
+        "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_character_guan_pingping_v2_decision",
+        "target_ref": "character:guan_pingping_v2",
+        "decision": "",
+        "allowed_decisions": [
+          "promoted",
+          "merged",
+          "rejected",
+          "expired"
+        ],
+        "decided_by": "",
+        "evidence_refs": [],
+        "suggested_evidence_refs": [
+          "character:guan_pingping_v2",
+          "guan_pingping_v2"
+        ],
+        "review_note": ""
+      }
+    ]
+  },
+  "next_action": "copy_fill_decisions_then_run_loulan_context_bundle",
+  "claim_boundaries": {
+    "structure_verification": "decision_worksheet_only",
+    "runtime_verification": "not_run",
+    "provider_smoke": "not_run",
+    "human_acceptance": "not_recorded",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "metadata": {
+    "example": true
+  }
+}
