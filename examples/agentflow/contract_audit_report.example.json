@@ -285,8 +285,8 @@
     { "check_id": "loulan_decision_template_pending_only", "status": "passed", "note": "Loulan decision templates remain pending human input and cannot approve context." },
     { "check_id": "loulan_decision_review_no_approval", "status": "passed", "note": "Loulan decision review packs summarize required decision gaps without approving, calling providers, or writing durable memory." },
     { "check_id": "loulan_decision_worksheet_manual_fill_only", "status": "passed", "note": "Loulan decision worksheets keep manual-fill decision fields empty and do not approve, call providers, or write durable memory." },
-    { "check_id": "loulan_decision_intake_before_context_bundle", "status": "passed", "note": "Loulan decision intake reports validate manual decisions before context projection without approval, provider calls, or durable memory writes." },
-    { "check_id": "loulan_context_bundle_decisions_only", "status": "passed", "note": "Loulan context bundle projections consume explicit human decisions only and do not promote draft review items by inference." },
+    { "check_id": "loulan_decision_intake_before_context_bundle", "status": "passed", "note": "Loulan decision intake reports validate manual decisions before context projection and can gate context commands without approval, provider calls, or durable memory writes." },
+    { "check_id": "loulan_context_bundle_decisions_only", "status": "passed", "note": "Loulan context bundle projections consume explicit human decisions only; supplied intake reports must be ready and match those decisions." },
     {
       "check_id": "intermediate_asset_has_evidence",
       "status": "passed",

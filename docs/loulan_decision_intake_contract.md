@@ -40,6 +40,11 @@ Ready means the decision file is structurally fit for `loulan-context-bundle`;
 it does not mean human acceptance, business validation, provider smoke, or
 durable Memory runtime promotion.
 
+`loulan-context-bundle` can consume the report with
+`--decision-intake-report`. When supplied, the report must be ready and must
+match the submitted decisions; otherwise context projection stops before
+writing artifacts.
+
 ## Boundaries
 
 The report must not include private absolute paths, generated media refs,

@@ -266,11 +266,11 @@
     },
     {
       "rule_id": "loulan_decision_intake_before_context_bundle",
-      "description": "Loulan decision intake reports validate manual decisions before context bundle projection without calling providers or writing durable memory."
+      "description": "Loulan decision intake reports validate manual decisions before context bundle projection and can gate context commands without calling providers or writing durable memory."
     },
     {
       "rule_id": "loulan_context_bundle_decisions_only",
-      "description": "Loulan context bundle projections consume explicit human decisions only and must not promote draft review items by inference."
+      "description": "Loulan context bundle projections consume explicit human decisions only; supplied intake reports must be ready and match the decisions."
     },
     {
       "rule_id": "asset_reuse_decision_only",

@@ -12,6 +12,7 @@ from agentflow.memory.loulan_human_review_support import SCHEMA_VERSION, reject_
 PROJECTION_TYPE = "agentflow_loulan_context_bundle_projection"
 REVIEW_PACK_TYPE = "agentflow_loulan_human_review_pack"
 DECISIONS_TYPE = "agentflow_loulan_promotion_decisions"
+DECISION_INTAKE_REPORT_TYPE = "agentflow_loulan_decision_intake_report"
 ASSET_REUSE_DECISIONS = frozenset({"promoted", "merged"})
 ASSET_BLOCK_DECISIONS = frozenset({"rejected", "expired"})
 SHOT_REUSE_DECISIONS = frozenset({"approve_anchor"})
@@ -23,10 +24,12 @@ def build_loulan_context_bundle_projection(
     decisions: dict[str, Any],
     *,
     created_at: str,
+    decision_intake_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project explicit human decisions into a no-call next context bundle."""
     _validate_review_pack(review_pack)
     _validate_decisions(decisions, review_pack)
+    intake_gate = _decision_intake_gate(review_pack, decisions, decision_intake_report)
     audit = _decision_audit(review_pack, decisions)
     bundle = _context_bundle(review_pack, decisions, audit, created_at)
     projection = {
@@ -37,6 +40,7 @@ def build_loulan_context_bundle_projection(
         "review_pack_id": review_pack["review_pack_id"],
         "provider_calls_started": False,
         "writes_long_term_memory": False,
+        "decision_intake_gate": intake_gate,
         "decision_audit": audit,
         "context_bundle": bundle,
         "next_prompt_draft": _next_prompt_draft(bundle, audit, created_at),
@@ -102,6 +106,58 @@ def _validate_decisions(decisions: dict[str, Any], review_pack: dict[str, Any]) 
         raise ValueError("Loulan decisions review_pack_id must match review pack")
     if decisions.get("writes_long_term_memory") is not False:
         raise ValueError("Loulan decisions must not write long-term memory")
+
+
+def _decision_intake_gate(
+    review_pack: dict[str, Any],
+    decisions: dict[str, Any],
+    report: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if report is None:
+        return {
+            "status": "not_supplied",
+            "intake_report_id": "",
+            "context_bundle_command_ready": False,
+        }
+    if report.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("decision intake report must use schema_version 0.1.0")
+    if report.get("artifact_type") != DECISION_INTAKE_REPORT_TYPE:
+        raise ValueError(f"decision intake report artifact_type must be {DECISION_INTAKE_REPORT_TYPE}")
+    if report.get("review_pack_id") != review_pack.get("review_pack_id"):
+        raise ValueError("decision intake report review_pack_id must match review pack")
+    if report.get("provider_calls_started") is not False:
+        raise ValueError("decision intake report must not have provider calls started")
+    if report.get("writes_long_term_memory") is not False:
+        raise ValueError("decision intake report must not write long-term memory")
+    if report.get("human_acceptance_recorded") is not False:
+        raise ValueError("decision intake report must not record human acceptance")
+    if report.get("intake_status") != "ready_for_context_bundle" or report.get("context_bundle_command_ready") is not True:
+        raise ValueError("decision intake report must be ready_for_context_bundle")
+    if _decision_signature_from_report(report) != _decision_signature_from_decisions(decisions):
+        raise ValueError("decision intake report must match decisions")
+    return {
+        "status": "ready_for_context_bundle",
+        "intake_report_id": str(report.get("intake_report_id") or ""),
+        "context_bundle_command_ready": True,
+    }
+
+
+def _decision_signature_from_report(report: dict[str, Any]) -> list[tuple[str, str, str, str, tuple[str, ...]]]:
+    return sorted(_decision_signature(row) for row in report.get("decision_rows") or [])
+
+
+def _decision_signature_from_decisions(decisions: dict[str, Any]) -> list[tuple[str, str, str, str, tuple[str, ...]]]:
+    return sorted(_decision_signature(item) for item in decisions.get("decisions") or [])
+
+
+def _decision_signature(item: dict[str, Any]) -> tuple[str, str, str, str, tuple[str, ...]]:
+    return (
+        str(item.get("decision_id") or ""),
+        str(item.get("target_ref") or ""),
+        str(item.get("decision") or ""),
+        str(item.get("decided_by") or ""),
+        tuple(str(ref) for ref in item.get("evidence_refs") or []),
+    )
 
 
 def _decision_audit(review_pack: dict[str, Any], decisions: dict[str, Any]) -> dict[str, Any]:

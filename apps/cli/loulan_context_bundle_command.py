@@ -30,6 +30,15 @@ def loulan_context_bundle_command(
         readable=True,
         help="Explicit human decision JSON for the Loulan review pack.",
     ),
+    decision_intake_report_path: Path | None = typer.Option(
+        None,
+        "--decision-intake-report",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional Loulan decision intake report gate. When supplied, it must be ready for context bundle.",
+    ),
     created_at: str = typer.Option(
         ...,
         "--created-at",
@@ -46,9 +55,15 @@ def loulan_context_bundle_command(
     try:
         review_pack = json.loads(review_pack_path.read_text(encoding="utf-8-sig"))
         decisions = json.loads(decisions_path.read_text(encoding="utf-8-sig"))
+        decision_intake_report = (
+            json.loads(decision_intake_report_path.read_text(encoding="utf-8-sig"))
+            if decision_intake_report_path
+            else None
+        )
         projection = build_loulan_context_bundle_projection(
             review_pack,
             decisions,
+            decision_intake_report=decision_intake_report,
             created_at=created_at,
         )
         paths = write_loulan_context_bundle_projection(projection, output_dir)

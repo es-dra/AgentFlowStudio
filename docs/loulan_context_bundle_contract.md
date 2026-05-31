@@ -10,9 +10,17 @@ or not marked as decided by a human, the projection blocks.
 
 - `agentflow_loulan_human_review_pack`
 - `agentflow_loulan_promotion_decisions`
+- optional `agentflow_loulan_decision_intake_report`
 
 The decisions artifact must target the review pack id and keep
 `writes_long_term_memory: false`.
+
+When supplied, the decision intake report is a hard pre-context gate. It must
+target the same review pack and report `intake_status:
+ready_for_context_bundle` with `context_bundle_command_ready: true`; otherwise
+the projection command exits before writing context artifacts.
+The report's decision rows must also match the submitted decisions by
+decision id, target ref, decision value, human marker, and evidence refs.
 
 ## Decision Semantics
 
@@ -40,6 +48,11 @@ All decisions must use `decided_by: human` and include `evidence_refs`.
 The projection may be `ready`, `partial_ready`, or blocked. A `partial_ready`
 projection means some refs can be reused, while rejected or repair-requested
 refs remain blocked.
+
+`decision_intake_gate` records whether the optional intake gate was supplied
+and ready. `not_supplied` preserves the original direct-decisions mode; a
+blocked or stale supplied report is rejected rather than converted into
+context.
 
 ## Boundaries
 

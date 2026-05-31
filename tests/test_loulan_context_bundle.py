@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from apps.cli.main import app
@@ -11,6 +12,9 @@ from agentflow.memory.loulan_context_bundle import (
     build_loulan_context_bundle_projection,
     write_loulan_context_bundle_projection,
 )
+from agentflow.memory.loulan_decision_intake import build_loulan_decision_intake_report
+from agentflow.memory.loulan_decision_review_pack import build_loulan_decision_review_pack
+from agentflow.memory.loulan_decision_worksheet import build_loulan_decision_worksheet
 from agentflow.memory.loulan_human_review_pack import build_loulan_human_review_pack
 from agentflow.memory.loulan_package import build_loulan_memory_package
 from tests.test_loulan_human_review_pack import _loulan_review_fixture
@@ -50,6 +54,54 @@ def test_loulan_context_bundle_projection_blocks_missing_decisions(tmp_path: Pat
     assert projection["decision_audit"]["status"] == "blocked_missing_decisions"
     assert projection["context_bundle"]["status"] == "blocked"
     assert projection["decision_audit"]["missing_decision_refs"] == ["character:guan_pingping_v2"]
+
+
+def test_loulan_context_bundle_projection_requires_ready_decision_intake_report(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    decisions = _decisions(review_pack, omit_last=False)
+    blocked_intake = _decision_intake_report(review_pack, decisions, filled=False)
+
+    with pytest.raises(ValueError, match="decision intake report must be ready_for_context_bundle"):
+        build_loulan_context_bundle_projection(
+            review_pack,
+            decisions,
+            decision_intake_report=blocked_intake,
+            created_at="2026-06-01T12:00:00+08:00",
+        )
+
+
+def test_loulan_context_bundle_projection_records_ready_decision_intake_gate(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    decisions = _decisions_with_review_notes(review_pack)
+    ready_intake = _decision_intake_report(review_pack, decisions, filled=True)
+
+    projection = build_loulan_context_bundle_projection(
+        review_pack,
+        decisions,
+        decision_intake_report=ready_intake,
+        created_at="2026-06-01T12:00:00+08:00",
+    )
+
+    assert projection["decision_intake_gate"] == {
+        "status": "ready_for_context_bundle",
+        "intake_report_id": ready_intake["intake_report_id"],
+        "context_bundle_command_ready": True,
+    }
+
+
+def test_loulan_context_bundle_projection_rejects_stale_intake_report(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    validated_decisions = _decisions_with_review_notes(review_pack)
+    ready_intake = _decision_intake_report(review_pack, validated_decisions, filled=True)
+    stale_decisions = _decisions(review_pack, omit_last=True)
+
+    with pytest.raises(ValueError, match="decision intake report must match decisions"):
+        build_loulan_context_bundle_projection(
+            review_pack,
+            stale_decisions,
+            decision_intake_report=ready_intake,
+            created_at="2026-06-01T12:00:00+08:00",
+        )
 
 
 def test_loulan_context_bundle_projection_supports_asset_refs(tmp_path: Path) -> None:
@@ -119,12 +171,47 @@ def test_loulan_context_bundle_cli_writes_projection_artifacts(tmp_path: Path) -
         assert (output / name).is_file()
 
 
+def test_loulan_context_bundle_cli_rejects_blocked_decision_intake_report(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    decisions = _decisions(review_pack, omit_last=False)
+    blocked_intake = _decision_intake_report(review_pack, decisions, filled=False)
+    review_path = tmp_path / "review_pack.json"
+    decisions_path = tmp_path / "decisions.json"
+    intake_path = tmp_path / "decision_intake_report.json"
+    review_path.write_text(json.dumps(review_pack, ensure_ascii=False, indent=2), encoding="utf-8")
+    decisions_path.write_text(json.dumps(decisions, ensure_ascii=False, indent=2), encoding="utf-8")
+    intake_path.write_text(json.dumps(blocked_intake, ensure_ascii=False, indent=2), encoding="utf-8")
+    output = tmp_path / "context_bundle"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "loulan-context-bundle",
+            "--review-pack",
+            str(review_path),
+            "--decisions",
+            str(decisions_path),
+            "--decision-intake-report",
+            str(intake_path),
+            "--created-at",
+            "2026-06-01T12:00:00+08:00",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "decision intake report must be ready_for_context_bundle" in result.output
+    assert not (output / "loulan_context_bundle_projection.json").exists()
+
+
 def test_loulan_context_bundle_contract_example_is_registered() -> None:
     payload = json.loads(Path("examples/agentflow/loulan_context_bundle_projection.example.json").read_text(encoding="utf-8"))
     registry = json.loads(Path("examples/agentflow/contract_registry.example.json").read_text(encoding="utf-8"))
 
     assert payload["artifact_type"] == "agentflow_loulan_context_bundle_projection"
     assert payload["writes_long_term_memory"] is False
+    assert payload["decision_intake_gate"]["status"] == "not_supplied"
     assert payload["context_bundle"]["writes_long_term_memory"] is False
     assert "agentflow_loulan_context_bundle_projection" in {contract["artifact_type"] for contract in registry["contracts"]}
     assert "loulan_context_bundle_decisions_only" in {rule["rule_id"] for rule in registry["validation_rules"]}
@@ -176,3 +263,28 @@ def _decisions(review_pack: dict, *, omit_last: bool) -> dict:
         "decisions": decisions,
         "writes_long_term_memory": False,
     }
+
+
+def _decisions_with_review_notes(review_pack: dict) -> dict:
+    decisions = _decisions(review_pack, omit_last=False)
+    for item in decisions["decisions"]:
+        item["review_note"] = f"human reviewed {item['target_ref']}"
+    return decisions
+
+
+def _decision_intake_report(review_pack: dict, decisions: dict, *, filled: bool) -> dict:
+    decision_review_pack = build_loulan_decision_review_pack(
+        review_pack,
+        decisions,
+        created_at="2026-06-01T16:00:00+08:00",
+    )
+    worksheet = build_loulan_decision_worksheet(
+        decision_review_pack,
+        created_at="2026-06-01T16:30:00+08:00",
+    )
+    intake_decisions = decisions if filled else worksheet["manual_transfer_template"]
+    return build_loulan_decision_intake_report(
+        worksheet,
+        intake_decisions,
+        created_at="2026-06-01T18:00:00+08:00",
+    )
