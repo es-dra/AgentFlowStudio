@@ -83,7 +83,7 @@ Result:
 # 60 passed
 
 .\.venv\Scripts\python.exe -B -m pytest --assert=plain -q
-# 730 passed
+# 731 passed
 
 .\.venv\Scripts\python.exe -B -m apps.cli.main loulan-decision-intake --help
 # passed

@@ -71,6 +71,7 @@ export function loulanTimeline(
   decisionTemplate = null,
   decisionReview = null,
   decisionWorksheet = null,
+  decisionIntake = null,
   contextProjection = null,
 ) {
   const nodes = (payload.canvas_nodes || []).map((node) => ({
@@ -111,6 +112,13 @@ export function loulanTimeline(
       label: "Decision Worksheet",
       status: decisionWorksheet.worksheet_status || "awaiting_manual_decisions",
       detail: `${decisionWorksheet.decision_rows?.length || 0} manual-fill rows`,
+    });
+  }
+  if (decisionIntake) {
+    nodes.push({
+      label: "Decision Intake",
+      status: decisionIntake.intake_status || "blocked",
+      detail: `context ready: ${String(decisionIntake.context_bundle_command_ready)}`,
     });
   }
   if (contextProjection) {

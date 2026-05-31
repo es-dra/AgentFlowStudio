@@ -64,6 +64,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return "memory video pipeline human observation";
   if (type === "agentflow_memory_video_pipeline_presentation_package") return "memory video pipeline presentation package";
   if (type === "agentflow_loulan_decision_worksheet") return "Loulan manual decision worksheet";
+  if (type === "agentflow_loulan_decision_intake_report") return "Loulan decision intake report";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";

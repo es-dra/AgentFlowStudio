@@ -8,7 +8,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Loulan memory pilot package, API workbench dry-run, B01 human review pack, decision template, context bundle projection, optional asset registry gate, and Web decision/context rendering contracts, CLIs, Web projections, examples, tracker rows, task briefs, and handoffs added; see `docs/handoff/AFS-LOULAN-PILOT-001.md`, `docs/handoff/AFS-LOULAN-API-WORKBENCH-001.md`, `docs/handoff/AFS-LOULAN-HUMAN-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-DECISION-TEMPLATE-001.md`, `docs/handoff/AFS-LOULAN-CONTEXT-BUNDLE-001.md`, `docs/handoff/AFS-LOULAN-ASSET-REGISTRY-001.md`, and `docs/handoff/AFS-LOULAN-WEB-CONTEXT-001.md`.
 
-2026-06-01: Loulan API workbench accepts optional context bundle projections from explicit human decisions and blocks fallback when supplied projections are not ready; the real no-call context probe confirms 47 pending decisions, the decision review pack groups them as 5 shots plus 42 assets, the worksheet exports empty manual-fill rows, Web renders the worksheet as selected-file evidence, and decision intake now blocks unfilled manual transfers before context projection; see `docs/handoff/AFS-LOULAN-API-CONTEXT-001.md`, `docs/handoff/AFS-LOULAN-CONTEXT-PROBE-001.md`, `docs/handoff/AFS-LOULAN-DECISION-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-WEB-DECISION-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-DECISION-WORKSHEET-001.md`, `docs/handoff/AFS-LOULAN-WEB-DECISION-WORKSHEET-001.md`, and `docs/handoff/AFS-LOULAN-DECISION-INTAKE-001.md`.
+2026-06-01: Loulan API workbench accepts optional context bundle projections from explicit human decisions and blocks fallback when supplied projections are not ready; the real no-call context probe confirms 47 pending decisions, the decision review pack groups them as 5 shots plus 42 assets, the worksheet exports empty manual-fill rows, Web renders the worksheet as selected-file evidence, decision intake blocks unfilled manual transfers before context projection, and Web renders the intake gate as selected-file evidence; see `docs/handoff/AFS-LOULAN-API-CONTEXT-001.md`, `docs/handoff/AFS-LOULAN-CONTEXT-PROBE-001.md`, `docs/handoff/AFS-LOULAN-DECISION-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-WEB-DECISION-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-DECISION-WORKSHEET-001.md`, `docs/handoff/AFS-LOULAN-WEB-DECISION-WORKSHEET-001.md`, `docs/handoff/AFS-LOULAN-DECISION-INTAKE-001.md`, and `docs/handoff/AFS-LOULAN-WEB-DECISION-INTAKE-001.md`.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 
@@ -207,121 +207,16 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
   - `git diff --check` -> no whitespace errors; CRLF normalization warnings
     only.
 
-## 2026-05-31 - Workflow Engine Shared Helper Consolidation
+## 2026-05-31 - Module And Provider Slimming Summary
 
-- Continued the workflow-engine cleanup under the updated project operating
-  rules: task mode `Deep`, no subagent, write scope limited to shared
-  workflow-engine node helpers and project records.
-- Remote-provider policy: no remote provider calls. Verification used local
-  tests only.
-- Extended `narratocut/workflow_engine/node_artifacts.py` with the shared
-  `load_json_object` helper.
-- Reused `node_artifacts.require_input`, `require_output`, and
-  `load_json_object` from focused node modules instead of keeping duplicate
-  local helper definitions in assembly, BGM, subtitle burn, cover, package,
-  transcription, highlight, OCR, NarratoStudio, and PosterFlow nodes.
-- Kept node function names, registry wiring, workflow definitions, provider
-  gates, and artifact schemas unchanged. Imports use local aliases where that
-  keeps the existing node bodies stable.
-- Boundary kept: internal helper consolidation only. No workflow execution
-  order, harness gate, provider behavior, generated artifact format, human
-  acceptance, business validation, or durable Memory behavior changed.
-- Verification:
-  - `python -m py_compile` on the touched workflow-engine modules -> passed.
-  - focused workflow/helper surface:
-    `pytest tests/test_workflow_runner.py tests/test_workflow_registry.py tests/test_workflow_full_mock_pipeline.py tests/test_highlight_workflow_nodes.py tests/test_highlight_workflows.py tests/test_video_to_transcript_workflow.py tests/test_video_to_transcript_real_asr_workflow.py tests/test_video_to_highlight_clip_plan_workflow.py tests/test_video_to_highlight_clip_plan_real_asr_workflow.py tests/test_ocr_fusion_workflows.py tests/test_video_assembly_workflow.py tests/test_subtitle_burn_workflow.py tests/test_bgm_mix_workflow.py tests/test_bgm_verified_metadata.py tests/test_cover_export_workflow.py tests/test_finished_package_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_workflow.py tests/test_product_golden_path_workflows.py -q`
-    -> 81 passed.
-  - `pytest -q` -> 662 passed.
-  - `git diff --check` -> no whitespace errors; CRLF normalization warnings
-    only.
-  - Line counts: largest workflow-engine files remain under 300 lines:
-    `highlight_nodes.py` 289, `posterflow_nodes.py` 261, `nodes.py` 260,
-    `node_artifacts.py` 139.
-
-## 2026-05-31 - Workflow Engine Node Helper Slimming
-
-- Continued the workflow-engine cleanup under the updated project operating
-  rules: task mode `Deep`, no subagent, write scope limited to the
-  `narratocut.workflow_engine` base node/helper layer and project records.
-- Remote-provider policy: no remote provider calls. Verification used local
-  tests only.
-- Split artifact JSON loading, schema validation, and workflow state fallback
-  helpers out of `narratocut/workflow_engine/nodes.py` into
-  `narratocut/workflow_engine/node_artifacts.py`.
-- Kept `nodes.py` as the base node orchestration and registry entry point:
-  `default_node_registry`, `probe_video_metadata`, and
-  `check_ffmpeg_available` remain available from the same module path for
-  existing imports and tests.
-- Boundary kept: this was an internal module-size and responsibility split
-  only. No workflow contract, execution order, provider gate, harness quality
-  check, artifact schema, human acceptance, business validation, or durable
-  Memory behavior changed.
-- Verification:
-  - `python -m py_compile narratocut/workflow_engine/nodes.py narratocut/workflow_engine/node_artifacts.py`
-    -> passed.
-  - `pytest tests/test_workflow_runner.py tests/test_workflow_full_mock_pipeline.py tests/test_video_to_real_clips_workflow.py tests/test_clip_plan_to_real_clips_workflow.py tests/test_product_golden_path_workflows.py tests/test_workflow_registry.py -q`
-    -> 15 passed.
-  - `pytest -q` -> 662 passed.
-  - Line counts: `nodes.py` 260, `node_artifacts.py` 128.
-
-## 2026-05-31 - MiniMax Provider Smoke Slimming
-
-- Continued the provider cleanup under the updated project operating rules:
-  task mode `Deep`, no subagent, write scope limited to MiniMax provider smoke
-  implementation/tests and project records.
-- Remote-provider policy: no remote provider calls. Verification used mocked
-  MiniMax `urlopen` paths and local tests only.
-- Split request planning and safe provider-config resolution into
-  `narratocut/model_gateway/minimax_image_plan.py`.
-- Split runtime subject-reference validation, prompt-pack construction, and
-  image-output summaries into
-  `narratocut/model_gateway/minimax_image_runtime.py`.
-- Kept public compatibility through
-  `narratocut/model_gateway/minimax_image_smoke.py`:
-  `build_minimax_image_request_plan` and `run_minimax_image_smoke` remain
-  importable from the original module.
-- Boundary kept: MiniMax smoke remains a gated legacy evidence/operator path,
-  not the visible product path, human acceptance, business validation, or a
-  durable Memory runtime.
-- Verification:
-  - `pytest tests/test_minimax_image_smoke.py tests/test_memory_advantage_demo_012.py tests/test_posterflow_provider.py -q`
-    -> 32 passed.
-  - `python -m py_compile narratocut/model_gateway/minimax_image_smoke.py narratocut/model_gateway/minimax_image_plan.py narratocut/model_gateway/minimax_image_runtime.py`
-    -> passed.
-  - Line counts: `minimax_image_smoke.py` 97,
-    `minimax_image_plan.py` 151, `minimax_image_runtime.py` 61.
-
-## 2026-05-31 - Kling Provider Smoke Slimming
-
-- Applied the updated project operating rules before continuing the provider
-  cleanup: classified the slice as `Deep` because it touches provider/media
-  smoke code, architecture boundaries, and evidence claims.
-- Kept the work in the current checkout instead of opening a subagent lane:
-  the write scope was single-purpose and already in the dirty slimming branch
-  context. No subagent was needed.
-- Remote-provider policy: no remote provider calls. Verification used mocked
-  HTTP/curl paths only.
-- Split Kling video runtime concerns out of
-  `narratocut/model_gateway/kling_video_smoke.py` into
-  `narratocut/model_gateway/kling_video_runtime.py`.
-- Split the oversized Kling smoke test surface into focused I2V, T2V, curl,
-  request-plan, and task-recovery tests with shared safe fixtures in
-  `tests/kling_video_smoke_helpers.py`.
-- Kept public smoke entrypoints stable:
-  `run_kling_i2v_smoke`, `run_kling_t2v_smoke`, and
-  `resume_kling_video_task`.
-- Boundary kept: direct Kling smoke remains a legacy evidence/operator path,
-  not the visible product path, human acceptance, business validation, or a
-  durable Memory runtime.
-- Verification:
-  - `pytest tests/test_kling_video_smoke.py tests/test_kling_video_t2v_smoke.py tests/test_kling_video_curl_smoke.py tests/test_kling_video_request_plan.py tests/test_kling_video_task_recovery.py -q`
-    -> 16 passed.
-  - `python -m py_compile narratocut/model_gateway/kling_video_smoke.py narratocut/model_gateway/kling_video_runtime.py tests/test_kling_video_smoke.py tests/test_kling_video_t2v_smoke.py tests/test_kling_video_curl_smoke.py tests/test_kling_video_task_recovery.py tests/test_kling_video_request_plan.py tests/kling_video_smoke_helpers.py`
-    -> passed.
-  - Line counts: `kling_video_smoke.py` 267,
-    `kling_video_runtime.py` 176, largest touched test 181.
-  - `python -m apps.cli.main --help` still surfaces
-    `memory-video-pipeline-*` and does not surface direct Kling provider smoke.
+- Workflow-engine shared helper consolidation, workflow node helper splitting,
+  MiniMax smoke slimming, and Kling smoke slimming are treated as completed
+  2026-05-31 maintenance slices.
+- Evidence and detailed verification are tracked in `TASK_TRACKER.md` and the
+  historical index `docs/archive/devlog_history_2026_05.md`.
+- Boundary kept: provider smoke remains hidden, explicitly gated evidence; it
+  is not the visible product surface, human acceptance, business validation, or
+  durable Memory runtime proof.
 
 
 ## Archive Policy
