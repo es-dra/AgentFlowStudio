@@ -65,6 +65,78 @@ console.log(JSON.stringify({
     assert "Context Bundle" in payload["timelineLabels"]
 
 
+def test_web_memory_workbench_surfaces_loulan_b01_decision_import_summary() -> None:
+    script = """
+import { readFile } from "node:fs/promises";
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView } from "./apps/web/memory-workbench-controller.js";
+
+const importedDecisions = {
+  schema_version: "0.1.0",
+  artifact_type: "agentflow_loulan_promotion_decisions",
+  review_pack_id: "loulan_b01_review_pack_v0",
+  created_at: "2026-06-01T20:40:00+08:00",
+  template_status: "partially_imported_pending_human_input",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  human_acceptance_recorded: false,
+  source_decision_artifact_type: "loulan_b01_human_review_decision_template",
+  source_block_id: "B01",
+  import_summary: {
+    required_decisions: 7,
+    imported_ready_decisions: 0,
+    pending_decisions: 7,
+    skipped_local_items: 0
+  },
+  decisions: []
+};
+
+const files = [
+  {
+    name: "loulan_memory_package.example.json",
+    text: async () => readFile("examples/agentflow/loulan_memory_package.example.json", "utf8"),
+  },
+  {
+    name: "loulan_b01_decisions.imported.json",
+    text: async () => JSON.stringify(importedDecisions),
+  },
+];
+const workspace = normalizeWorkspace(await parseFiles(files));
+const view = buildMemoryWorkbenchView(workspace, "selected_files");
+
+console.log(JSON.stringify({
+  bundle: view.bundle_summary,
+  controls: view.protocol_summary.controls,
+  nextPass: view.next_pass,
+  inspectorFacts: Object.fromEntries(
+    view.artifact_inspector
+      .find((item) => item.artifact_type === "agentflow_loulan_promotion_decisions")
+      .facts.map((fact) => [fact.label, fact.value])
+  ),
+  timelineLabels: view.timeline.map((node) => node.label),
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert any(item["title"] == "B01 decision import" for item in payload["bundle"])
+    assert any("0 imported ready; 7 pending" in item["detail"] for item in payload["bundle"])
+    assert any(item["label"] == "B01 decision import" for item in payload["controls"])
+    assert payload["nextPass"]["status"] == "partially_imported_pending_human_input"
+    assert "Decision import: partially_imported_pending_human_input" in payload["nextPass"]["action"]
+    assert payload["inspectorFacts"]["source_block_id"] == "B01"
+    assert payload["inspectorFacts"]["imported_ready"] == "0"
+    assert payload["inspectorFacts"]["pending"] == "7"
+    assert payload["inspectorFacts"]["human_acceptance_recorded"] == "false"
+    assert "B01 Decision Import" in payload["timelineLabels"]
+
+
 def test_web_memory_workbench_renders_loulan_decision_review_pack() -> None:
     script = """
 import { readFile } from "node:fs/promises";

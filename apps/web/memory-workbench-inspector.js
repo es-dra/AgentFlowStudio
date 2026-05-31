@@ -105,12 +105,24 @@ function loulanHumanReviewFacts(payload) {
 }
 
 function loulanDecisionFacts(payload) {
-  return [
+  const facts = [
     fact("template_status", payload.template_status || "unknown"),
     fact("decisions", arrayValue(payload.decisions).length),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
+  const summary = objectValue(payload.import_summary);
+  if (Object.keys(summary).length) {
+    facts.splice(
+      1,
+      0,
+      fact("source_block_id", payload.source_block_id || "unknown"),
+      fact("imported_ready", summary.imported_ready_decisions ?? "unknown"),
+      fact("pending", summary.pending_decisions ?? "unknown"),
+      fact("skipped_local_items", summary.skipped_local_items ?? "unknown"),
+    );
+  }
+  return facts;
 }
 
 function loulanDecisionReviewFacts(payload) {

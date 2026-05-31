@@ -12,6 +12,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Loulan B01 decision import bridge added as a no-call local handoff from the Loulan `b01_human_review_decision_template.json` into AFS `agentflow_loulan_promotion_decisions`; the real probe imports 0 ready decisions and leaves 7 pending, so B01 still blocks context projection until human decisions are filled; see `docs/handoff/AFS-LOULAN-B01-DECISION-IMPORT-001.md`.
 
+2026-06-01: Loulan Web workbench now distinguishes B01 imported decision files from plain promotion-decision templates, surfacing imported-ready, pending, skipped, and source block facts while keeping the selected-file UI read-only and non-acceptance; see `docs/handoff/AFS-LOULAN-WEB-B01-DECISION-IMPORT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

@@ -70,7 +70,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
     },
     feedback_draft: loulanFeedbackDraft(payload, reviewPack),
     next_pass: {
-      status: loulanNextPassStatus(payload, reviewPack, decisionReview, decisionWorksheet, decisionIntake, contextProjection),
+      status: loulanNextPassStatus(payload, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection),
       action: loulanNextPassAction(eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection),
     },
     artifact_inspector: loulanInspector(payload, apiPlan, reviewPack, decisionTemplate, decisionWorksheet, contextProjection),
@@ -116,9 +116,9 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
   if (decisionTemplate) {
     items.push({
       id: "decision-template",
-      title: "Decision template",
+      title: isDecisionImport(decisionTemplate) ? "B01 decision import" : "Decision template",
       status: decisionTemplate.template_status || "pending_human_input",
-      detail: `${decisionTemplate.decisions?.length || 0} slots; acceptance not recorded`,
+      detail: decisionTemplateDetail(decisionTemplate),
     });
   }
   if (decisionReview) {
@@ -192,7 +192,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "api context intake gate", status: apiPlan?.context_projection?.decision_intake_gate?.status || "not_recorded", detail: apiPlan ? `context ready: ${String(apiPlan.context_projection?.decision_intake_gate?.context_bundle_command_ready === true)}` : "not prepared" },
       { label: "QA gate", status: apiPlan?.qa_gate?.status || "planned", detail: apiPlan?.promotion_gate?.status || "waiting for API workbench plan" },
       { label: "human review", status: reviewPack?.review_scope?.evidence_status || "planned", detail: reviewPack?.review_scope?.status || "not prepared" },
-      { label: "decision template", status: decisionTemplate?.template_status || "planned", detail: decisionTemplate ? `${decisionTemplate.decisions?.length || 0} slots; no acceptance` : "not prepared" },
+      { label: isDecisionImport(decisionTemplate) ? "B01 decision import" : "decision template", status: decisionTemplate?.template_status || "planned", detail: decisionTemplate ? `${decisionTemplateDetail(decisionTemplate)}; no acceptance` : "not prepared" },
       { label: "decision review", status: decisionReview?.review_status || "planned", detail: decisionReview ? `${decisionReview.decision_summary?.pending_count || 0} pending; no acceptance` : "not prepared" },
       { label: "decision worksheet", status: decisionWorksheet?.worksheet_status || "planned", detail: decisionWorksheet ? `${decisionWorksheet.decision_rows?.length || 0} manual-fill rows; no acceptance` : "not prepared" },
       { label: "decision intake", status: decisionIntake?.intake_status || "planned", detail: decisionIntake ? `context ready: ${String(decisionIntake.context_bundle_command_ready)}` : "not prepared" },
@@ -206,11 +206,12 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
   };
 }
 
-function loulanNextPassStatus(payload, reviewPack, decisionReview, decisionWorksheet, decisionIntake, contextProjection) {
+function loulanNextPassStatus(payload, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection) {
   return contextProjection?.context_bundle?.status
     || decisionIntake?.intake_status
     || decisionWorksheet?.worksheet_status
     || decisionReview?.review_status
+    || decisionTemplate?.template_status
     || reviewPack?.next_pass_readiness?.status
     || (payload.promotion_gates?.overall_status === "ready" ? "promotion decision ready" : "blocked");
 }
@@ -218,7 +219,7 @@ function loulanNextPassStatus(payload, reviewPack, decisionReview, decisionWorks
 function loulanNextPassAction(eligibleRefs, blockedRefs, apiPlan, reviewPack = null, decisionTemplate = null, decisionReview = null, decisionWorksheet = null, decisionIntake = null, contextProjection = null) {
   const requestCount = apiPlan?.request_manifest?.requests?.length || 0;
   const reviewStatus = reviewPack?.next_pass_readiness?.status || "human review not prepared";
-  const decisionStatus = decisionTemplate?.template_status ? `Decision template: ${decisionTemplate.template_status}; ` : "";
+  const decisionStatus = decisionTemplate?.template_status ? `${isDecisionImport(decisionTemplate) ? "Decision import" : "Decision template"}: ${decisionTemplate.template_status}; ` : "";
   const decisionReviewStatus = decisionReview?.review_status ? `Decision review: ${decisionReview.review_status}; ` : "";
   const decisionWorksheetStatus = decisionWorksheet?.worksheet_status ? `Decision worksheet: ${decisionWorksheet.worksheet_status}; ` : "";
   const decisionIntakeStatus = decisionIntake?.intake_status ? `Decision intake: ${decisionIntake.intake_status}; ` : "";
@@ -245,4 +246,16 @@ function loulanFeedbackDraft(payload, reviewPack = null) {
     json_text: JSON.stringify(event, null, 2),
     copy_enabled: true,
   };
+}
+
+function isDecisionImport(decisionTemplate = null) {
+  return Boolean(decisionTemplate?.import_summary);
+}
+
+function decisionTemplateDetail(decisionTemplate) {
+  if (isDecisionImport(decisionTemplate)) {
+    const summary = decisionTemplate.import_summary || {};
+    return `${summary.imported_ready_decisions || 0} imported ready; ${summary.pending_decisions || 0} pending; ${summary.skipped_local_items || 0} skipped`;
+  }
+  return `${decisionTemplate.decisions?.length || 0} slots; acceptance not recorded`;
 }

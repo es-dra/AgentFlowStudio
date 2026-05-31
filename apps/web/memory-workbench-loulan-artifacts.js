@@ -95,9 +95,11 @@ export function loulanTimeline(
   }
   if (decisionTemplate) {
     nodes.push({
-      label: "Decision Template",
+      label: decisionTemplate.import_summary ? "B01 Decision Import" : "Decision Template",
       status: decisionTemplate.template_status || "pending_human_input",
-      detail: `${decisionTemplate.decisions?.length || 0} human decision slots`,
+      detail: decisionTemplate.import_summary
+        ? `${decisionTemplate.import_summary.imported_ready_decisions || 0} imported ready; ${decisionTemplate.import_summary.pending_decisions || 0} pending`
+        : `${decisionTemplate.decisions?.length || 0} human decision slots`,
     });
   }
   if (decisionReview) {
