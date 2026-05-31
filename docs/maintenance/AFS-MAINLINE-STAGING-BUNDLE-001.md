@@ -1,7 +1,7 @@
 # AFS-MAINLINE-STAGING-BUNDLE-001 - Mainline Staging Bundle
 
-Status: committed on `codex-mainline-slimming-staging` as `fce21bd`
-(`feat(agentflow): add memory pipeline mainline bundle`); not pushed.
+Status: pushed as draft PR #72 on `codex-mainline-slimming-staging`;
+depends on draft PR #73 for the Local Alpha 0.4 mainline base.
 
 This bundle converts the current dirty checkout into a coherent integration
 plan. It keeps the product surface centered on `memory-video-pipeline-*` and
@@ -187,6 +187,15 @@ git diff --cached --check
 git commit -m "feat(agentflow): add memory pipeline mainline bundle"
 # fce21bd
 ```
+
+Remote review chain on 2026-05-31:
+
+- PR #73: `codex-local-alpha-0-4-mainline-sync` -> `master`.
+  This publishes the local `master` base that was 14 commits ahead of
+  `origin/master`.
+- PR #72: `codex-mainline-slimming-staging` ->
+  `codex-local-alpha-0-4-mainline-sync`. This keeps the slimming bundle review
+  scoped to the 2 bundle commits on top of the Local Alpha 0.4 base.
 
 ## Commit Boundary
 
