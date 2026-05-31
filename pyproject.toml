@@ -13,6 +13,7 @@ dependencies = [
     "typer",
     "pyyaml",
     "python-dotenv",
+    "httpx",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,144 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_video_pipeline_review",
+  "protocol_id": "memory_video_pipeline_neon_rain_turnback_v1",
+  "provider_calls_started_by_review": false,
+  "writes_long_term_memory": false,
+  "review_inputs": {
+    "artifact_manifest_type": "agentflow_memory_video_pipeline_artifact_manifest",
+    "run_ids": [
+      "recording_016_run_1",
+      "recording_016_run_2"
+    ],
+    "artifact_count": 4
+  },
+  "lane_parity": {
+    "same_user_task": true,
+    "same_source_assets": true,
+    "same_provider_route": true,
+    "same_duration": true,
+    "same_script": true,
+    "only_memory_context_differs": true,
+    "expected_lanes_present": true,
+    "same_source_image_sha256": true,
+    "all_manifests_succeeded": true
+  },
+  "video_artifacts": [
+    {
+      "run_id": "recording_016_run_1",
+      "lane_id": "baseline",
+      "status": "succeeded",
+      "task_status": "succeed",
+      "provider": "kling",
+      "api_family": "i2v",
+      "model": "kling-v3",
+      "source_image_sha256": "source_keyframe_sha256_placeholder",
+      "output": {
+        "candidate_id": "candidate_001",
+        "video_ref": "candidate_001_video_artifact_ref",
+        "byte_count": 30000000,
+        "sha256": "baseline_run_1_video_sha256_placeholder",
+        "content_type": "video/mp4"
+      }
+    },
+    {
+      "run_id": "recording_016_run_1",
+      "lane_id": "memory_backed",
+      "status": "succeeded",
+      "task_status": "succeed",
+      "provider": "kling",
+      "api_family": "i2v",
+      "model": "kling-v3",
+      "source_image_sha256": "source_keyframe_sha256_placeholder",
+      "output": {
+        "candidate_id": "candidate_001",
+        "video_ref": "candidate_001_video_artifact_ref",
+        "byte_count": 32000000,
+        "sha256": "memory_run_1_video_sha256_placeholder",
+        "content_type": "video/mp4"
+      }
+    },
+    {
+      "run_id": "recording_016_run_2",
+      "lane_id": "baseline",
+      "status": "succeeded",
+      "task_status": "succeed",
+      "provider": "kling",
+      "api_family": "i2v",
+      "model": "kling-v3",
+      "source_image_sha256": "source_keyframe_sha256_placeholder",
+      "output": {
+        "candidate_id": "candidate_001",
+        "video_ref": "candidate_001_video_artifact_ref",
+        "byte_count": 30000000,
+        "sha256": "baseline_run_2_video_sha256_placeholder",
+        "content_type": "video/mp4"
+      }
+    },
+    {
+      "run_id": "recording_016_run_2",
+      "lane_id": "memory_backed",
+      "status": "succeeded",
+      "task_status": "succeed",
+      "provider": "kling",
+      "api_family": "i2v",
+      "model": "kling-v3",
+      "source_image_sha256": "source_keyframe_sha256_placeholder",
+      "output": {
+        "candidate_id": "candidate_001",
+        "video_ref": "candidate_001_video_artifact_ref",
+        "byte_count": 31000000,
+        "sha256": "memory_run_2_video_sha256_placeholder",
+        "content_type": "video/mp4"
+      }
+    }
+  ],
+  "review_rubric": {
+    "criteria": [
+      "identity_retention",
+      "wardrobe_retention",
+      "scene_anchor_retention",
+      "motion_physics",
+      "occlusion_recovery",
+      "cross_run_stability"
+    ]
+  },
+  "storyboard": {
+    "scene_id": "neon_rain_turnback",
+    "shot_checkpoints": [
+      "0-3s front three-quarter readable character",
+      "3-6s walking through neon rain",
+      "6-10s light sweep and rain partially obscure face and torso",
+      "10-13s turn back toward camera",
+      "13-15s stop under flickering abstract neon sign"
+    ]
+  },
+  "cross_run_stability": {
+    "status": "ready_for_human_visual_review",
+    "run_count": 2,
+    "lane_repeat_counts": {
+      "baseline": 2,
+      "memory_backed": 2
+    },
+    "review_fields": [
+      "shot_structure_consistency",
+      "identity_anchor_retention",
+      "wardrobe_anchor_retention",
+      "scene_anchor_retention",
+      "occlusion_recovery_repeatability",
+      "motion_physics_repeatability"
+    ],
+    "machine_judgement": "not_performed"
+  },
+  "claim_boundaries": {
+    "structure_verification": "review_artifact_built",
+    "runtime_verification": "manifest_status_only",
+    "human_acceptance": "not_reviewed",
+    "business_validation": "not_validated",
+    "quality_improvement_claim": "not_claimed",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "metadata": {
+    "example": true
+  }
+}

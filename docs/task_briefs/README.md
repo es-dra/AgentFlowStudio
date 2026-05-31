@@ -11,14 +11,15 @@ Current queue state:
   have been executed and integrated on `master`; the accepted 0.3 evidence is
   recorded in
   [`../local_alpha_0_3_validation_goals.md`](../local_alpha_0_3_validation_goals.md).
-- Local Alpha 0.4 is the next product-loop queue. Start from
+- Local Alpha 0.4 has completed its first runtime/Web/memory structural loop.
+  Start from
   [`../local_alpha_0_4_product_loop_goals.md`](../local_alpha_0_4_product_loop_goals.md).
 - `AFS-PROD-LOOP-001` has produced the concrete scenario package at
   [`../local_alpha_0_4_scenario_package.md`](../local_alpha_0_4_scenario_package.md).
-  Share that package before opening `AFS-RUN-PACKAGE-001` or
-  `AFS-WEB-OPERATOR-002`.
+  The acceptance reconciliation is recorded at
+  [`../local_alpha_0_4_acceptance_reconciliation.md`](../local_alpha_0_4_acceptance_reconciliation.md).
 
-Planned Local Alpha 0.4 queue:
+Local Alpha 0.4 queue state:
 
 | ID | Brief | Purpose |
 |---|---|---|
@@ -27,6 +28,24 @@ Planned Local Alpha 0.4 queue:
 | AFS-WEB-OPERATOR-002 | [AFS-WEB-OPERATOR-002.md](AFS-WEB-OPERATOR-002.md) | Web operator path for the 0.4 scenario |
 | AFS-MEMORY-QUALITY-002 | [AFS-MEMORY-QUALITY-002.md](AFS-MEMORY-QUALITY-002.md) | Traceable evidence reuse evaluation |
 | AFS-POSTER-LIVE-002 | [AFS-POSTER-LIVE-002.md](AFS-POSTER-LIVE-002.md) | Optional live image smoke or blocked evidence |
+
+Do not reopen `AFS-MEMORY-QUALITY-002` just to repeat the structural review.
+Use a new brief for memory-review CLI, Web evidence summary, real second-pass
+run, or human acceptance feedback.
+
+Post-retro stabilization queue:
+
+The current productization direction is summarized in
+[`../handoff/AFS-POST-DEMO-PRODUCTIZATION-ROADMAP.md`](../handoff/AFS-POST-DEMO-PRODUCTIZATION-ROADMAP.md).
+The memory workbench design is recorded in
+[`../workbench/AFS-WORKBENCH-REDESIGN-001.md`](../workbench/AFS-WORKBENCH-REDESIGN-001.md).
+
+| ID | Brief | Purpose |
+|---|---|---|
+| AFS-MAINTENANCE-RESET-001 | [AFS-MAINTENANCE-RESET-001.md](AFS-MAINTENANCE-RESET-001.md) | Classify and reduce dirty worktree sprawl before more implementation |
+| AFS-MEMORY-PIPELINE-MVP-001 | [AFS-MEMORY-PIPELINE-MVP-001.md](AFS-MEMORY-PIPELINE-MVP-001.md) | Replace numbered demo execution with one protocol-driven memory video pipeline |
+| AFS-WORKBENCH-REDESIGN-001 | [AFS-WORKBENCH-REDESIGN-001.md](AFS-WORKBENCH-REDESIGN-001.md) | Design the memory production workbench before Web implementation |
+| AFS-WORKBENCH-IMPLEMENTATION-001 | [AFS-WORKBENCH-IMPLEMENTATION-001.md](AFS-WORKBENCH-IMPLEMENTATION-001.md) | Implement the static memory workbench first screen from a safe package fixture |
 
 Completed Local Alpha 0.2 queue:
 

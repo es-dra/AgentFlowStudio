@@ -19,6 +19,10 @@ from narratocut.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import (
+    require_input as _require_input,
+    require_output as _require_output,
+)
 
 
 DEFAULT_MAX_HIGHLIGHTS = 5
@@ -156,18 +160,6 @@ def write_clip_plan_node(step: WorkflowStepDefinition, context: WorkflowContext)
     write_json(context.output_path(output_ref), value)
     context.artifacts["clip_plan"] = output_ref
     return [output_ref]
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
-
-
-def _require_output(step: WorkflowStepDefinition, name: str) -> str:
-    if name not in step.outputs:
-        raise ValueError(f"Step {step.id} missing required output: {name}")
-    return step.outputs[name]
 
 
 def _optional_raw_input(step: WorkflowStepDefinition, name: str) -> object | None:

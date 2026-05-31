@@ -5,6 +5,10 @@ from pathlib import Path
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import (
+    require_input as _require_input,
+    require_output as _require_output,
+)
 from narratocut.workflow_engine.registry import NodeRegistry
 from narratostudio.io import (
     load_creative_brief,
@@ -142,15 +146,3 @@ def _write_auxiliary_artifacts(context: WorkflowContext, brief: object, bible: o
     context.artifacts["memory_candidates"] = "memory_candidates.json"
     context.artifacts["cost_quality_trace"] = "cost_quality_trace.json"
     context.artifacts["feedback_signal_log"] = "feedback_signal_log.json"
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
-
-
-def _require_output(step: WorkflowStepDefinition, name: str) -> str:
-    if name not in step.outputs:
-        raise ValueError(f"Step {step.id} missing required output: {name}")
-    return step.outputs[name]

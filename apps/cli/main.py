@@ -5,19 +5,10 @@ from typing import Optional
 
 import typer
 
-from apps.cli.alpha_commands import alpha_smoke_command
 from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
-from apps.cli.media_commands import ffmpeg_check_command
+from apps.cli.command_registry import register_commands
 from apps.cli.plan_commands import write_draft_plan_from_cli
-from apps.cli.report_commands import (
-    delivery_readiness_command,
-    inspect_run_output,
-    package_report_command,
-    review_run_output,
-)
-from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.workflow_commands import run_workflow_from_cli
-from apps.web_bridge.server import serve as serve_web_bridge
 from narratocut import __version__
 from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
@@ -231,70 +222,7 @@ def mock_slice_command(
     typer.echo(f"Wrote {manifest['clip_count']} mock clips to {output_dir}")
 
 
-app.command(name="slice-real")(slice_real_command)
-app.command(name="ffmpeg-check")(ffmpeg_check_command)
-
-
-@app.command(name="inspect-run")
-def inspect_run_command(
-    run_dir: Path = typer.Option(
-        ...,
-        "--run-dir",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        readable=True,
-        help="Workflow run directory to inspect.",
-    ),
-) -> None:
-    """Inspect a workflow run directory and write quality_report.json."""
-    inspection, lines = inspect_run_output(run_dir)
-    for line in lines:
-        typer.echo(line)
-    if inspection["status"] != "pass":
-        raise typer.Exit(code=1)
-
-
-@app.command(name="review-run")
-def review_run_command(
-    run_dir: Path = typer.Option(
-        ...,
-        "--run-dir",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        readable=True,
-        help="Workflow run directory to review.",
-    ),
-) -> None:
-    """Write an agent-readable review_report.json for a workflow run."""
-    report, lines = review_run_output(run_dir)
-    for line in lines:
-        typer.echo(line)
-    if report["status"] == "failed":
-        raise typer.Exit(code=1)
-
-
-app.command(name="package-report")(package_report_command)
-app.command(name="delivery-readiness")(delivery_readiness_command)
-app.command(name="alpha-smoke")(alpha_smoke_command)
-
-
-@app.command(name="web-bridge")
-def web_bridge_command(
-    host: str = typer.Option(
-        "127.0.0.1",
-        "--host",
-        help="Host for the local Web UI bridge.",
-    ),
-    port: int = typer.Option(
-        8787,
-        "--port",
-        help="Port for the local Web UI bridge.",
-    ),
-) -> None:
-    """Run the local Web UI bridge for supervised Production Mode."""
-    serve_web_bridge(host=host, port=port)
+register_commands(app)
 
 
 def _display_ref(path: Path) -> str:

@@ -49,6 +49,14 @@
       "doc_path_exists": true
     },
     {
+      "artifact_type": "agentflow_memory_evidence_reuse_review",
+      "example_path": "examples/agentflow/memory_evidence_reuse_review.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -135,6 +143,46 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_protocol",
+      "example_path": "examples/agentflow/memory_video_pipeline_protocol.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_review",
+      "example_path": "examples/agentflow/memory_video_pipeline_review.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_human_observation",
+      "example_path": "examples/agentflow/memory_video_pipeline_human_observation.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_presentation_package",
+      "example_path": "examples/agentflow/memory_video_pipeline_presentation_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_package",
+      "example_path": "examples/agentflow/memory_video_pipeline_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
@@ -187,6 +235,26 @@
       "check_id": "context_reuse_does_not_write_memory",
       "status": "passed",
       "note": "Context reuse artifacts remain review inputs and do not claim durable long-term memory writes."
+    },
+    {
+      "check_id": "evidence_reuse_traceability_first",
+      "status": "passed",
+      "note": "Evidence reuse reviews validate source-to-context traceability before claiming quality improvement."
+    },
+    {
+      "check_id": "memory_video_review_no_provider_call",
+      "status": "passed",
+      "note": "Memory video pipeline reviews summarize explicit artifacts and do not start provider calls."
+    },
+    {
+      "check_id": "memory_video_observation_not_acceptance",
+      "status": "passed",
+      "note": "Human visual observations record bounded signals without claiming acceptance, business validation, or definitive quality improvement."
+    },
+    {
+      "check_id": "memory_video_presentation_no_media_copy",
+      "status": "passed",
+      "note": "Presentation packages summarize protocol, review, and observation evidence without copying generated media or claiming final proof."
     },
     {
       "check_id": "intermediate_asset_has_evidence",

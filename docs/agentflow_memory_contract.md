@@ -179,6 +179,150 @@ It must keep `writes_long_term_memory: false`. A next-round prompt may reuse
 accepted evidence, but it must not claim that a durable project preference was
 written.
 
+## Evidence Reuse Quality Review
+
+`agentflow_memory_evidence_reuse_review` validates whether a run's evidence can
+be traced into the next context pass.
+
+For Local Alpha 0.4 it checks this chain:
+
+```text
+runtime evidence
+-> operator feedback source
+-> memory candidate
+-> promotion decision
+-> context bundle
+-> second-pass prompt
+```
+
+This review is traceability-first. It may say that the evidence chain is
+structurally complete, but it must not claim human acceptance, business
+validation, or quality improvement unless separate comparison evidence exists.
+
+Required boundaries:
+
+- `runtime_status: not_implemented`
+- `does_not_execute: true`
+- `writes_long_term_memory: false`
+- no private local paths, generated media paths, provider credentials, or
+  signed URLs
+- machine verification, human acceptance, business validation, and quality
+  improvement claims remain separate labels
+
+See [`../examples/agentflow/memory_evidence_reuse_review.example.json`](../examples/agentflow/memory_evidence_reuse_review.example.json).
+
+## Memory Video Pipeline Protocol
+
+`agentflow_memory_video_pipeline_protocol` is the first generic protocol file
+for the memory-advantage video demo path.
+
+It replaces one-off numbered demo modules as the planning surface for:
+
+```text
+project brief
++ source assets
++ provider route
++ baseline lane
++ memory-backed lane
++ reviewed memory cards
++ storyboard checkpoints
++ review rubric
++ claim boundaries
+-> no-call request/review/run plan
+```
+
+Required boundaries:
+
+- provider calls are not started during plan generation;
+- generated media remains under ignored local run directories;
+- baseline and memory-backed lanes must share the same task, source assets,
+  provider route, duration, and script;
+- the intended difference between lanes is memory context only;
+- only `promoted` or `merged` memory cards may enter context;
+- memory cards must keep `writes_long_term_memory: false`;
+- human acceptance, business validation, quality-improvement claims, and
+  durable Memory runtime remain separate labels.
+
+CLI boundary:
+
+- `memory-video-pipeline-*` commands are the visible product-facing CLI surface
+  for this path;
+- numbered memory-advantage demo commands are legacy evidence/operator entries,
+  not the planning surface for new work;
+- direct provider smoke commands remain gated compatibility tools and should
+  not be used to imply product validation.
+
+See
+[`../examples/agentflow/memory_video_pipeline_protocol.example.json`](../examples/agentflow/memory_video_pipeline_protocol.example.json).
+
+`agentflow_memory_video_pipeline_review` is the matching side-effect-free
+review artifact for existing run evidence. It consumes the protocol plus an
+explicit artifact manifest of I2V manifest paths.
+
+Required boundaries:
+
+- review generation must not scan run directories automatically;
+- review generation must not start provider calls;
+- every expected lane must be present for each listed run;
+- provider URLs, signed URLs, data URLs, bearer headers, provider key fragments,
+  and absolute local media paths must not be persisted;
+- review output may record status, hashes, byte counts, lane repeat counts,
+  storyboard checkpoints, and review rubric;
+- cross-run stability fields are inputs for human visual review, not a machine
+  quality verdict.
+
+`agentflow_memory_video_pipeline_human_observation` records bounded human
+visual notes on top of a review artifact.
+
+Required boundaries:
+
+- observation generation must not start provider calls;
+- observation output must not copy generated media paths, provider URLs,
+  signed URLs, credentials, or local absolute paths;
+- observations must cover the review fields declared by the source review;
+- supported verdicts are bounded labels such as `memory_backed_stronger`,
+  `baseline_stronger`, `mixed`, and `no_clear_difference`;
+- a visual observation is not human product acceptance, business validation, or
+  definitive quality-improvement proof.
+
+`agentflow_memory_video_pipeline_presentation_package` is the presentation-facing
+summary built from the protocol, review, and observation artifacts.
+
+Required boundaries:
+
+- package generation must not start provider calls;
+- package output must not copy generated media, provider URLs, signed URLs,
+  credentials, data URLs, or local absolute paths;
+- the package may summarize the user task, lane parity, storyboard checkpoints,
+  memory cards, observation table, and claim boundaries;
+- Slidev insert text may be Chinese-facing, but tests must validate the actual
+  UTF-8 content rather than relying on PowerShell console rendering;
+- a presentation package is competition material evidence, not human product
+  acceptance, business validation, final creative-quality proof, or durable
+  Memory runtime.
+
+`agentflow_memory_video_pipeline_package` is the no-call product package summary
+that links the current protocol-driven chain:
+
+```text
+plan
+-> review
+-> observation
+-> presentation package
+-> feedback-event draft
+```
+
+Required boundaries:
+
+- package generation must not start provider calls;
+- package output must not write durable Memory runtime;
+- the feedback event remains a draft until a human explicitly persists it to
+  the feedback source of truth;
+- the package must not copy generated media, provider URLs, signed URLs,
+  credentials, data URLs, or local absolute paths;
+- the package is a workflow/review artifact, not human product acceptance or
+  business validation.
+
 ## Reusable Asset Profile
 
 `agentflow_reusable_asset_profile` records a promoted, evidence-backed asset

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +13,10 @@ from narratocut.subtitle_burn_sop import (
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import (
+    load_json_object as _load_json_object,
+    require_input as _require_input,
+)
 
 
 def burn_subtitles_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -106,24 +109,6 @@ def _failed_manifest(source_video: Path, subtitles_path: Path, output_video: str
         "warnings": [],
         "manifest_path": SUBTITLE_BURN_MANIFEST,
     }
-
-
-def _load_json_object(path: Path, label: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"{label} not found: {path}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"{label} is not valid JSON: {path}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"{label} must contain a JSON object: {path}")
-    return payload
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
 
 
 def _display_ref(value: str | Path) -> str:

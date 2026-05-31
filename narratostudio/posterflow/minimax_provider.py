@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import mimetypes
 import os
 import time
 import urllib.error
@@ -64,12 +65,23 @@ class MiniMaxImageProvider:
         output_dir: str | Path,
         *,
         candidate_count: int,
+        subject_reference_image_path: str | Path | None = None,
+        seed: int | None = None,
     ) -> tuple[PosterCandidatesManifest, PosterModelInvocations]:
         ensure_remote_image_calls_allowed()
         _ensure_candidate_count(candidate_count)
         api_key = self._resolve_api_key()
         started = time.perf_counter()
         payload = self._request_payload(prompt_pack, candidate_count)
+        if seed is not None:
+            payload["seed"] = seed
+        if subject_reference_image_path is not None:
+            payload["subject_reference"] = [
+                {
+                    "type": "character",
+                    "image_file": _subject_reference_data_url(Path(subject_reference_image_path)),
+                }
+            ]
         response = self._send_request(payload, api_key)
         _ensure_success_response(response)
         candidates = self._write_candidates(response, prompt_pack, Path(output_dir), candidate_count)
@@ -159,11 +171,11 @@ class MiniMaxImageProvider:
         response_id = str(response.get("id") or "")
         for index, encoded in enumerate(images[:candidate_count], start=1):
             candidate_id = f"candidate_{index:03d}"
-            relative_path = f"image_candidates/{candidate_id}.png"
             try:
                 image_bytes = base64.b64decode(encoded)
             except ValueError as exc:
                 raise ModelProviderError("MiniMax image_base64 entry is invalid") from exc
+            relative_path = f"image_candidates/{candidate_id}{_image_extension(image_bytes)}"
             (output_dir / relative_path).write_bytes(image_bytes)
             candidates.append(
                 PosterCandidate(
@@ -230,14 +242,48 @@ def _image_generation_url(base_url: str) -> str:
 
 
 def _safe_params(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
+    params = {
         "n": payload.get("n"),
         "aspect_ratio": payload.get("aspect_ratio"),
         "response_format": payload.get("response_format"),
         "prompt_optimizer": payload.get("prompt_optimizer"),
     }
+    if "subject_reference" in payload:
+        params["subject_reference_count"] = len(payload.get("subject_reference") or [])
+        params["subject_reference_image_file_persisted"] = False
+    if "seed" in payload:
+        params["seed"] = payload.get("seed")
+    return params
 
 
 def _hash_value(value: str) -> str:
     encoded = value.encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _image_extension(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return ".jpg"
+    raise ModelProviderError("MiniMax image_base64 entry is not a PNG or JPEG image")
+
+
+def _subject_reference_data_url(image_path: Path) -> str:
+    if not image_path.is_file():
+        raise ModelProviderError(f"MiniMax subject reference image not found: {image_path}")
+    mime_type = _image_mime_type(image_path)
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
+def _image_mime_type(image_path: Path) -> str:
+    suffix = image_path.suffix.lower()
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".png":
+        return "image/png"
+    guessed = mimetypes.guess_type(str(image_path))[0]
+    if guessed in {"image/png", "image/jpeg"}:
+        return guessed
+    raise ModelProviderError("MiniMax subject reference image must be JPG, JPEG, or PNG")

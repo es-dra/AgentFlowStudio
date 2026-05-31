@@ -1,0 +1,181 @@
+const TYPE_LABELS = {
+  agentflow_memory_video_pipeline_package: "Pipeline package",
+  agentflow_memory_video_pipeline_protocol: "Pipeline protocol",
+  agentflow_memory_video_pipeline_review: "Review artifact",
+  agentflow_memory_video_pipeline_human_observation: "Human observation",
+  agentflow_memory_video_pipeline_presentation_package: "Presentation package",
+  agentflow_feedback_event: "Feedback draft",
+};
+
+export function buildMemoryArtifactInspector(workspace, fallback = []) {
+  const artifacts = Array.isArray(workspace?.memoryBundle) ? workspace.memoryBundle : [];
+  if (!artifacts.length) return fallback.length ? fallback : emptyInspector();
+  return artifacts.map((artifact) => summarizeArtifact(artifact));
+}
+
+function summarizeArtifact(artifact) {
+  const payload = objectValue(artifact.payload);
+  const type = artifact.artifactType || payload.artifact_type || "unknown";
+  return {
+    id: artifact.fileName,
+    artifact_type: type,
+    focus_targets: focusTargetsFor(type),
+    title: TYPE_LABELS[type] || type,
+    status: statusFor(type, payload),
+    detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
+    facts: factsFor(type, payload),
+  };
+}
+
+function focusTargetsFor(type) {
+  if (type === "agentflow_memory_video_pipeline_protocol") return ["project", "assets", "memory-loaded"];
+  if (type === "agentflow_memory_video_pipeline_package") return ["project", "next-pass"];
+  if (type === "agentflow_memory_video_pipeline_review") return ["baseline-run", "memory-backed-run", "review"];
+  if (type === "agentflow_memory_video_pipeline_human_observation") return ["assets", "review"];
+  if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
+  if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
+  return [];
+}
+
+function factsFor(type, payload) {
+  if (type === "agentflow_memory_video_pipeline_package") return packageFacts(payload);
+  if (type === "agentflow_memory_video_pipeline_protocol") return protocolFacts(payload);
+  if (type === "agentflow_memory_video_pipeline_review") return reviewFacts(payload);
+  if (type === "agentflow_memory_video_pipeline_human_observation") return observationFacts(payload);
+  if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
+  if (type === "agentflow_feedback_event") return feedbackFacts(payload);
+  return [
+    fact("artifact_type", payload.artifact_type || "unknown"),
+    fact("schema_version", payload.schema_version || "unknown"),
+  ];
+}
+
+function packageFacts(payload) {
+  const refs = ["plan_ref", "review_ref", "observation_ref", "presentation_ref", "feedback_event_draft_ref"].filter((key) => payload[key]);
+  return [
+    fact("refs", `${refs.length} linked refs`),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("claim_boundary", claimBoundary(payload.claim_boundaries)),
+  ];
+}
+
+function protocolFacts(payload) {
+  const cards = arrayValue(payload.memory_context?.cards);
+  const lanes = arrayValue(payload.lanes);
+  const checkpoints = arrayValue(payload.storyboard?.shot_checkpoints);
+  return [
+    fact("memory_cards", String(cards.length)),
+    fact("lanes", lanes.map((lane) => lane.lane_id).filter(Boolean).join(" / ") || "none"),
+    fact("checkpoints", String(checkpoints.length)),
+    fact("provider_route", payload.provider_route?.video_service_id || "not selected"),
+  ];
+}
+
+function reviewFacts(payload) {
+  const artifacts = arrayValue(payload.video_artifacts);
+  const checkpoints = arrayValue(payload.storyboard?.shot_checkpoints);
+  const parity = objectValue(payload.lane_parity);
+  const parityPass = Object.values(parity).filter((value) => value === true).length;
+  return [
+    fact("video_artifacts", String(artifacts.length)),
+    fact("lane_parity", `${parityPass}/${Object.keys(parity).length} true`),
+    fact("storyboard", `${payload.storyboard?.scene_id || "storyboard"} | ${checkpoints.length} checkpoints`),
+    fact("machine_judgement", payload.cross_run_stability?.machine_judgement || "not_performed"),
+  ];
+}
+
+function observationFacts(payload) {
+  const observations = arrayValue(payload.observations);
+  return [
+    fact("observations", String(observations.length)),
+    fact("verdicts", verdictCounts(observations)),
+    fact("signal", signalSummary(payload.observed_signal_summary)),
+    fact("claim_boundary", claimBoundary(payload.claim_boundaries)),
+  ];
+}
+
+function presentationFacts(payload) {
+  const setup = objectValue(payload.experiment_setup);
+  const result = objectValue(payload.result_summary);
+  return [
+    fact("takeaway", payload.one_sentence_takeaway || "not provided"),
+    fact("same_for_both_lanes", arrayValue(setup.same_for_both_lanes).length),
+    fact("run_count", result.run_count ?? "unknown"),
+    fact("residual_risk", result.residual_risk || "unknown"),
+  ];
+}
+
+function feedbackFacts(payload) {
+  return [
+    fact("decision", payload.decision || "unknown"),
+    fact("draft_status", payload.draft_status || "unknown"),
+    fact("reason_tags", arrayValue(payload.reason_tags).join(", ") || "none"),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+  ];
+}
+
+function statusFor(type, payload) {
+  if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
+  if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
+  if (payload.writes_long_term_memory === true) return "blocked";
+  return "review ready";
+}
+
+function verdictCounts(observations) {
+  const counts = {};
+  for (const item of observations) {
+    const verdict = item?.verdict || "unknown";
+    counts[verdict] = (counts[verdict] || 0) + 1;
+  }
+  return Object.entries(counts).map(([verdict, count]) => `${verdict}: ${count}`).join(", ") || "none";
+}
+
+function signalSummary(signal) {
+  const data = objectValue(signal);
+  return Object.entries(data)
+    .map(([key, value]) => `${key}: ${String(value)}`)
+    .join(", ") || "not recorded";
+}
+
+function claimBoundary(boundaries) {
+  const data = objectValue(boundaries);
+  return [
+    data.human_acceptance || "not_acceptance",
+    data.business_validation || "not_validated",
+    data.durable_memory_runtime || "not_implemented",
+  ].join(" / ");
+}
+
+function fact(label, value) {
+  return { label, value: String(value) };
+}
+
+function yesNo(value) {
+  return value === true ? "true" : "false";
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function arrayValue(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function emptyInspector() {
+  return [
+    {
+      id: "no_memory_artifacts",
+      artifact_type: "fixture",
+      focus_targets: ["project", "assets", "memory-loaded", "baseline-run", "memory-backed-run", "review", "feedback", "next-pass"],
+      title: "No selected memory artifacts",
+      status: "planned",
+      detail: "Select memory package, review, observation, presentation, protocol, or feedback JSON to inspect structure.",
+      facts: [
+        fact("scope", "explicit selected files only"),
+        fact("auto_follow_refs", "false"),
+      ],
+    },
+  ];
+}

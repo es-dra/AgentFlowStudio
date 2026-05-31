@@ -22,6 +22,7 @@ def test_agentflow_contract_helpers_list_committed_examples() -> None:
         "agentflow_feedback_event",
         "agentflow_memory_candidate",
         "agentflow_memory_promotion_decision",
+        "agentflow_memory_evidence_reuse_review",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",

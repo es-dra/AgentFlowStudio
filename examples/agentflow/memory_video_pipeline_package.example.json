@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_video_pipeline_package",
+  "protocol_id": "memory_video_pipeline_neon_rain_turnback_v1",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "plan_ref": "plan/run_plan.json",
+  "review_ref": "review/memory_video_pipeline_review.json",
+  "observation_ref": "observation/memory_video_pipeline_human_observation.json",
+  "presentation_ref": "presentation/memory_video_pipeline_presentation_package.json",
+  "feedback_event_draft_ref": "feedback/memory_video_pipeline_feedback_event_draft.json",
+  "claim_boundaries": {
+    "runtime_verification": "manifest_status_only",
+    "human_acceptance": "not_acceptance",
+    "business_validation": "not_validated",
+    "quality_improvement_claim": "bounded_visual_signal_only",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "metadata": {
+    "example": true
+  }
+}

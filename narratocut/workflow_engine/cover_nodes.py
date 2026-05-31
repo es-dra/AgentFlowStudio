@@ -8,6 +8,7 @@ from narratocut.slicing_sop import check_ffmpeg_available, resolve_media_tool_pa
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import require_input as _require_input
 
 
 def export_cover_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -82,12 +83,6 @@ def _cover_time_sec(context: WorkflowContext) -> float:
         return float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError("cover_time_sec must be a number.") from exc
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
 
 
 def _display_ref(value: str | Path) -> str:

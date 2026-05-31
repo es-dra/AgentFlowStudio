@@ -13,6 +13,21 @@ from agentflow.contracts.examples import (
 from narratostudio import CreativeBrief
 
 
+FORBIDDEN_PRIVATE_OR_GENERATED_FRAGMENTS = [
+    "D:\\",
+    "C:\\",
+    "data/processed/runs",
+    "data/raw/",
+    ".mp4",
+    ".mov",
+    "api_key",
+    "token",
+    "secret",
+    "cookie",
+    "signed_url",
+]
+
+
 def test_project_manifest_example_has_schema_version() -> None:
     payload = json.loads(Path("examples/contracts/project_manifest.example.json").read_text(encoding="utf-8"))
 
@@ -265,43 +280,15 @@ def test_agentflow_narratostudio_asset_reuse_dry_run_plan_is_plan_only() -> None
 
 
 def test_agentflow_skill_router_examples_do_not_include_private_or_generated_paths() -> None:
-    forbidden_fragments = [
-        "D:\\",
-        "C:\\",
-        "data/processed/runs",
-        "data/raw/",
-        ".mp4",
-        ".mov",
-        "api_key",
-        "token",
-        "secret",
-        "cookie",
-        "signed_url",
-    ]
-
     for path in AGENTFLOW_SKILL_ROUTER_EXAMPLES:
         raw_text = path.read_text(encoding="utf-8").lower()
-        assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)
+        assert not any(fragment.lower() in raw_text for fragment in FORBIDDEN_PRIVATE_OR_GENERATED_FRAGMENTS)
 
 
 def test_agentflow_asset_examples_do_not_include_private_or_generated_paths() -> None:
-    forbidden_fragments = [
-        "D:\\",
-        "C:\\",
-        "data/processed/runs",
-        "data/raw/",
-        ".mp4",
-        ".mov",
-        "api_key",
-        "token",
-        "secret",
-        "cookie",
-        "signed_url",
-    ]
-
     for path in AGENTFLOW_ASSET_EXAMPLES:
         raw_text = path.read_text(encoding="utf-8").lower()
-        assert not any(fragment.lower() in raw_text for fragment in forbidden_fragments)
+        assert not any(fragment.lower() in raw_text for fragment in FORBIDDEN_PRIVATE_OR_GENERATED_FRAGMENTS)
 
 
 def test_agentflow_contract_registry_example_indexes_current_contracts() -> None:
@@ -320,6 +307,12 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_feedback_event",
         "agentflow_memory_candidate",
         "agentflow_memory_promotion_decision",
+        "agentflow_memory_evidence_reuse_review",
+        "agentflow_memory_video_pipeline_protocol",
+        "agentflow_memory_video_pipeline_review",
+        "agentflow_memory_video_pipeline_human_observation",
+        "agentflow_memory_video_pipeline_presentation_package",
+        "agentflow_memory_video_pipeline_package",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",
@@ -370,6 +363,11 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
         "candidate_memory_only",
         "promotion_decision_required_for_context_reuse",
         "context_reuse_no_durable_write",
+        "evidence_reuse_traceability_first",
+        "memory_video_review_no_provider_call",
+        "memory_video_observation_not_acceptance",
+        "memory_video_presentation_no_media_copy",
+        "memory_video_package_no_call_feedback_draft",
     } <= rule_ids
     assert "execute_workflow" not in rule_ids
     assert "call_remote_provider" not in rule_ids

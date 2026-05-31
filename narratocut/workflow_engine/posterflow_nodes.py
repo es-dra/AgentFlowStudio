@@ -8,6 +8,10 @@ from typing import Any
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import (
+    require_input as _require_input,
+    require_output as _require_output,
+)
 from narratocut.workflow_engine.registry import NodeRegistry
 from narratostudio.posterflow.provider import create_image_provider_from_env
 from narratostudio.posterflow.report import render_poster_preview, render_poster_report
@@ -269,18 +273,6 @@ def write_poster_report_node(step: WorkflowStepDefinition, context: WorkflowCont
     context.artifacts["poster_report"] = report_ref
     context.artifacts["poster_preview"] = preview_ref
     return [report_ref, preview_ref]
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
-
-
-def _require_output(step: WorkflowStepDefinition, name: str) -> str:
-    if name not in step.outputs:
-        raise ValueError(f"Step {step.id} missing required output: {name}")
-    return step.outputs[name]
 
 
 def _write_jsonl(path: Path, rows: list[Any]) -> Path:

@@ -16,6 +16,10 @@ from narratocut.schemas import Transcript
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import (
+    require_input as _require_input,
+    require_output as _require_output,
+)
 
 
 def load_video_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -127,18 +131,6 @@ def write_transcript_node(step: WorkflowStepDefinition, context: WorkflowContext
     write_json(context.output_path(output_ref), transcript)
     context.artifacts["transcript"] = output_ref
     return [output_ref]
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
-
-
-def _require_output(step: WorkflowStepDefinition, name: str) -> str:
-    if name not in step.outputs:
-        raise ValueError(f"Step {step.id} missing required output: {name}")
-    return step.outputs[name]
 
 
 def _output_ref(step: WorkflowStepDefinition, name: str, default: str) -> str:

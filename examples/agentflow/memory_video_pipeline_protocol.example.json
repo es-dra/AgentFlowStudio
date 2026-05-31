@@ -1,0 +1,121 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_video_pipeline_protocol",
+  "protocol_id": "memory_video_pipeline_neon_rain_turnback_v1",
+  "project_brief": {
+    "project_id": "memory_advantage_recording_016",
+    "title": "Neon rain turnback I2V memory advantage",
+    "user_task": "Create a 15 second vertical 3D anime cinematic video where the same young woman crosses a neon rain street, turns back to camera, and stops under a flickering neon sign.",
+    "target_format": "vertical_9_16",
+    "style": "3D anime cinematic"
+  },
+  "source_assets": [
+    {
+      "asset_id": "source_keyframe_yiqi_neon_rain",
+      "asset_kind": "image_keyframe",
+      "role": "same_source_keyframe_for_all_lanes",
+      "display_ref": "demo_012_memory_neon_rain_candidate_001.jpg",
+      "path_persisted": false
+    }
+  ],
+  "provider_route": {
+    "image_service_id": "minimax_image",
+    "video_service_id": "kling_i2v",
+    "image_model": "image-01",
+    "video_model": "kling-v3",
+    "duration_sec": 15,
+    "mode": "pro",
+    "aspect_ratio": "9:16"
+  },
+  "memory_context": {
+    "cards": [
+      {
+        "memory_id": "character_card_yiqi_v1",
+        "memory_type": "character",
+        "promotion_status": "promoted",
+        "summary": "same face shape, high ponytail, white T-shirt, blue jeans, white sneakers",
+        "source_refs": [
+          "DEMO-012:accepted_character_asset"
+        ],
+        "writes_long_term_memory": false
+      },
+      {
+        "memory_id": "scene_card_neon_rain_v1",
+        "memory_type": "scene",
+        "promotion_status": "merged",
+        "summary": "neon rain street, wet asphalt reflections, blue-magenta signage glow",
+        "source_refs": [
+          "RECORDING-016:run_1",
+          "RECORDING-016:run_2"
+        ],
+        "writes_long_term_memory": false
+      },
+      {
+        "memory_id": "feedback_patch_occlusion_recovery_v1",
+        "memory_type": "feedback_patch",
+        "promotion_status": "promoted",
+        "summary": "recover same face and outfit after rain or light occlusion",
+        "source_refs": [
+          "DEMO-015:review_notes"
+        ],
+        "writes_long_term_memory": false
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "lane_id": "baseline",
+      "production_mode": "stateless_generation",
+      "user_task": "{project_brief.user_task}",
+      "provider_route": "{provider_route}",
+      "source_asset_refs": [
+        "source_keyframe_yiqi_neon_rain"
+      ],
+      "memory_refs": [],
+      "prompt_instructions": "Use the current task and source keyframe only."
+    },
+    {
+      "lane_id": "memory_backed",
+      "production_mode": "memory_backed_generation",
+      "user_task": "{project_brief.user_task}",
+      "provider_route": "{provider_route}",
+      "source_asset_refs": [
+        "source_keyframe_yiqi_neon_rain"
+      ],
+      "memory_refs": [
+        "character_card_yiqi_v1",
+        "scene_card_neon_rain_v1",
+        "feedback_patch_occlusion_recovery_v1"
+      ],
+      "prompt_instructions": "Project selected memory cards into the provider prompt."
+    }
+  ],
+  "storyboard": {
+    "scene_id": "neon_rain_turnback",
+    "shot_checkpoints": [
+      "0-3s front three-quarter readable character",
+      "3-6s walking through neon rain",
+      "6-10s light sweep and rain partially obscure face and torso",
+      "10-13s turn back toward camera",
+      "13-15s stop under flickering abstract neon sign"
+    ]
+  },
+  "review_rubric": {
+    "criteria": [
+      "identity_retention",
+      "wardrobe_retention",
+      "scene_anchor_retention",
+      "motion_physics",
+      "occlusion_recovery",
+      "cross_run_stability"
+    ]
+  },
+  "claim_boundaries": {
+    "structure_verification": "protocol_plan_only",
+    "runtime_verification": "not_run",
+    "human_acceptance": "not_reviewed",
+    "business_validation": "not_validated",
+    "quality_improvement_claim": "not_claimed",
+    "durable_memory_runtime": "not_implemented"
+  }
+}

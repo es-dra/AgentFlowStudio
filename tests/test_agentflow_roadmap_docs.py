@@ -9,7 +9,10 @@ PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 LOCAL_ALPHA_0_3_GOALS = Path("docs/local_alpha_0_3_validation_goals.md")
 LOCAL_ALPHA_0_4_GOALS = Path("docs/local_alpha_0_4_product_loop_goals.md")
 LOCAL_ALPHA_0_4_SCENARIO = Path("docs/local_alpha_0_4_scenario_package.md")
+LOCAL_ALPHA_0_4_ACCEPTANCE = Path("docs/local_alpha_0_4_acceptance_reconciliation.md")
 TASK_BRIEFS_INDEX = Path("docs/task_briefs/README.md")
+WORKBENCH_REDESIGN = Path("docs/workbench/AFS-WORKBENCH-REDESIGN-001.md")
+WORKBENCH_IMPLEMENTATION = Path("docs/task_briefs/AFS-WORKBENCH-IMPLEMENTATION-001.md")
 
 
 def _text(path: Path) -> str:
@@ -146,6 +149,27 @@ def test_local_alpha_0_4_scenario_package_is_discoverable() -> None:
     assert "AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 may run in parallel" in scenario
 
 
+def test_local_alpha_0_4_acceptance_reconciliation_is_discoverable() -> None:
+    docs_index = _text(DOCS_INDEX)
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    acceptance = _text(LOCAL_ALPHA_0_4_ACCEPTANCE)
+
+    assert LOCAL_ALPHA_0_4_ACCEPTANCE.exists()
+    assert "local_alpha_0_4_acceptance_reconciliation.md" in docs_index
+    assert "local_alpha_0_4_acceptance_reconciliation.md" in task_briefs_index
+    for label in [
+        "Structure verification",
+        "runtime verification",
+        "human acceptance",
+        "business validation",
+        "provider smoke",
+        "durable Memory runtime",
+        "Real second-pass run",
+    ]:
+        assert label in acceptance
+    assert "not human-accepted and\nnot business-validated" in acceptance
+
+
 def test_local_alpha_0_4_task_briefs_exist() -> None:
     for brief in [
         "AFS-PROD-LOOP-001.md",
@@ -155,3 +179,88 @@ def test_local_alpha_0_4_task_briefs_exist() -> None:
         "AFS-POSTER-LIVE-002.md",
     ]:
         assert (Path("docs/task_briefs") / brief).exists()
+
+
+def test_memory_workbench_redesign_is_discoverable_and_loop_focused() -> None:
+    docs_index = _text(DOCS_INDEX)
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    design = _text(WORKBENCH_REDESIGN)
+
+    assert WORKBENCH_REDESIGN.exists()
+    assert "workbench/AFS-WORKBENCH-REDESIGN-001.md" in docs_index
+    assert "../workbench/AFS-WORKBENCH-REDESIGN-001.md" in task_briefs_index
+    for label in [
+        "Project",
+        "Assets",
+        "Memory Loaded",
+        "Baseline Run",
+        "Memory-backed Run",
+        "Review",
+        "Feedback",
+        "Next Pass",
+    ]:
+        assert label in design
+    for state in [
+        "no plan",
+        "planned",
+        "generating",
+        "review ready",
+        "feedback captured",
+        "memory candidate drafted",
+        "promotion decision ready",
+        "blocked",
+    ]:
+        assert state in design
+    for boundary in [
+        "no SaaS",
+        "no provider calls",
+        "no automatic directory scanning",
+        "no durable Memory runtime",
+        "no browser persistence",
+    ]:
+        assert boundary in design
+    for provenance in [
+        "what memory was loaded",
+        "why it was eligible",
+        "which prompt/request projection it produced",
+        "what feedback will change next time",
+    ]:
+        assert provenance in design
+    assert "generic dashboard" not in design.lower()
+
+
+def test_memory_workbench_implementation_brief_scopes_static_first_screen() -> None:
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+    brief = _text(WORKBENCH_IMPLEMENTATION)
+
+    assert WORKBENCH_IMPLEMENTATION.exists()
+    assert "AFS-WORKBENCH-IMPLEMENTATION-001.md" in task_briefs_index
+    for phrase in [
+        "agentflow_memory_video_pipeline_package",
+        "static first-screen view",
+        "Project",
+        "Assets",
+        "Memory Loaded",
+        "Baseline Run",
+        "Memory-backed Run",
+        "Review",
+        "Feedback",
+        "Next Pass",
+        "no plan",
+        "planned",
+        "generating",
+        "review ready",
+        "feedback captured",
+        "memory candidate drafted",
+        "promotion decision ready",
+        "blocked",
+        "memory provenance panel",
+        "no provider calls",
+        "no apps/web_bridge",
+        "no automatic directory scanning",
+        "no browser persistence",
+        "Browser screenshot",
+    ]:
+        assert phrase in brief
+    assert "NARRATOCUT_ALLOW_REMOTE_IMAGE=true" not in brief
+    assert "NARRATOCUT_ALLOW_REMOTE_VIDEO=true" not in brief

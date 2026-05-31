@@ -7,6 +7,7 @@ from pathlib import Path
 from agentflow.memory.assets import validate_asset_memory_contract_set
 from agentflow.memory.promotion import (
     PROMOTION_DECISION_STATUSES,
+    validate_evidence_reuse_review,
     validate_memory_promotion_review,
 )
 
@@ -16,6 +17,7 @@ REUSABLE_ASSET_PROFILE_EXAMPLE = Path("examples/agentflow/reusable_asset_profile
 ASSET_REUSE_DECISION_EXAMPLE = Path("examples/agentflow/asset_reuse_decision.example.json")
 MEMORY_CANDIDATE_EXAMPLE = Path("examples/agentflow/memory_candidate.example.json")
 MEMORY_PROMOTION_DECISION_EXAMPLE = Path("examples/agentflow/memory_promotion_decision.example.json")
+EVIDENCE_REUSE_REVIEW_EXAMPLE = Path("examples/agentflow/memory_evidence_reuse_review.example.json")
 
 
 def _json(path: Path) -> dict:
@@ -133,6 +135,64 @@ def test_asset_memory_validator_rejects_durable_memory_claim_refs() -> None:
 
     assert validation["overall_status"] == "failed"
     assert _failed_check_ids(validation) >= {"promotion_decision_no_durable_memory_claims"}
+
+
+def test_evidence_reuse_review_accepts_local_alpha_0_4_chain_example() -> None:
+    review = validate_evidence_reuse_review(
+        evidence_reuse_review=_json(EVIDENCE_REUSE_REVIEW_EXAMPLE),
+        memory_candidate=_json(MEMORY_CANDIDATE_EXAMPLE),
+        memory_promotion_decision=_json(MEMORY_PROMOTION_DECISION_EXAMPLE),
+    )
+
+    assert review["artifact_type"] == "agentflow_memory_evidence_reuse_review_validation"
+    assert review["review_scope"] == "local_alpha_0_4_evidence_reuse"
+    assert review["runtime_status"] == "not_implemented"
+    assert review["does_not_execute"] is True
+    assert review["writes_long_term_memory"] is False
+    assert review["overall_status"] == "passed"
+    assert all(check["status"] == "passed" for check in review["checks"])
+
+
+def test_evidence_reuse_review_fails_when_second_pass_loses_promotion_decision_refs() -> None:
+    payload = _json(EVIDENCE_REUSE_REVIEW_EXAMPLE)
+    payload["second_pass_prompt"]["promotion_decision_refs"] = []
+
+    review = validate_evidence_reuse_review(
+        evidence_reuse_review=payload,
+        memory_candidate=_json(MEMORY_CANDIDATE_EXAMPLE),
+        memory_promotion_decision=_json(MEMORY_PROMOTION_DECISION_EXAMPLE),
+    )
+
+    assert review["overall_status"] == "failed"
+    assert _failed_check_ids(review) >= {"second_pass_prompt_refs_promotion_decision"}
+
+
+def test_evidence_reuse_review_fails_when_promotion_decision_rejects_reuse() -> None:
+    decision = _json(MEMORY_PROMOTION_DECISION_EXAMPLE)
+    decision["decision"] = "rejected"
+
+    review = validate_evidence_reuse_review(
+        evidence_reuse_review=_json(EVIDENCE_REUSE_REVIEW_EXAMPLE),
+        memory_candidate=_json(MEMORY_CANDIDATE_EXAMPLE),
+        memory_promotion_decision=decision,
+    )
+
+    assert review["overall_status"] == "failed"
+    assert _failed_check_ids(review) >= {"promotion_decision_allows_context_reuse"}
+
+
+def test_evidence_reuse_review_fails_when_context_writes_long_term_memory() -> None:
+    payload = _json(EVIDENCE_REUSE_REVIEW_EXAMPLE)
+    payload["context_bundle"]["writes_long_term_memory"] = True
+
+    review = validate_evidence_reuse_review(
+        evidence_reuse_review=payload,
+        memory_candidate=_json(MEMORY_CANDIDATE_EXAMPLE),
+        memory_promotion_decision=_json(MEMORY_PROMOTION_DECISION_EXAMPLE),
+    )
+
+    assert review["overall_status"] == "failed"
+    assert _failed_check_ids(review) >= {"context_reuse_no_long_term_write"}
 
 
 def test_asset_memory_validator_requires_asset_promotion_chain() -> None:

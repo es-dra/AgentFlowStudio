@@ -37,6 +37,42 @@
       "contract_surface": "memory_promotion_review"
     },
     {
+      "artifact_type": "agentflow_memory_evidence_reuse_review",
+      "example_path": "examples/agentflow/memory_evidence_reuse_review.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_evidence_reuse_review"
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_protocol",
+      "example_path": "examples/agentflow/memory_video_pipeline_protocol.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_video_pipeline_protocol"
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_review",
+      "example_path": "examples/agentflow/memory_video_pipeline_review.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_video_pipeline_review"
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_human_observation",
+      "example_path": "examples/agentflow/memory_video_pipeline_human_observation.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_video_pipeline_human_observation"
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_presentation_package",
+      "example_path": "examples/agentflow/memory_video_pipeline_presentation_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_video_pipeline_presentation_package"
+    },
+    {
+      "artifact_type": "agentflow_memory_video_pipeline_package",
+      "example_path": "examples/agentflow/memory_video_pipeline_package.example.json",
+      "doc_path": "docs/agentflow_memory_contract.md",
+      "contract_surface": "memory_video_pipeline_package"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -135,6 +171,26 @@
     {
       "rule_id": "context_reuse_no_durable_write",
       "description": "Context reuse artifacts are review inputs and must keep writes_long_term_memory false."
+    },
+    {
+      "rule_id": "evidence_reuse_traceability_first",
+      "description": "Evidence reuse reviews validate source-to-context traceability before claiming quality improvement."
+    },
+    {
+      "rule_id": "memory_video_review_no_provider_call",
+      "description": "Memory video pipeline reviews summarize explicit artifacts and must not start provider calls or claim quality improvement."
+    },
+    {
+      "rule_id": "memory_video_observation_not_acceptance",
+      "description": "Human visual observations record bounded visual signals and must not claim acceptance, business validation, or definitive quality improvement."
+    },
+    {
+      "rule_id": "memory_video_presentation_no_media_copy",
+      "description": "Presentation packages summarize protocol, review, and observation evidence without copying generated media or claiming final proof."
+    },
+    {
+      "rule_id": "memory_video_package_no_call_feedback_draft",
+      "description": "Memory video pipeline packages link plan, review, observation, presentation, and a feedback-event draft without provider calls or durable memory writes."
     },
     {
       "rule_id": "asset_reuse_decision_only",

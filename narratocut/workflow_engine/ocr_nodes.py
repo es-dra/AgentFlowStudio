@@ -15,6 +15,7 @@ from narratocut.schemas import Transcript
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import require_input as _require_input
 
 
 def build_ocr_transcript_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -94,12 +95,6 @@ def _load_ocr_frames(path: Path) -> list[dict[str, Any]]:
     if not isinstance(frames, list) or not all(isinstance(item, dict) for item in frames):
         raise ValueError("ocr_frames must be a JSON array or an object with a frames array")
     return frames
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
 
 
 def _optional_text_input(step: WorkflowStepDefinition, context: WorkflowContext, name: str) -> str | None:

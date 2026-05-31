@@ -2,14 +2,17 @@
 
 Date: 2026-05-27
 
-Status: controller scenario package for `AFS-PROD-LOOP-001`.
+Status: scenario package plus first runtime/Web evidence loop and
+side-effect-free memory reuse review.
 
 This package fixes the shared scenario before runtime and Web implementation
-work begins. It is the common input for `AFS-RUN-PACKAGE-001`,
-`AFS-WEB-OPERATOR-002`, and the later `AFS-MEMORY-QUALITY-002` evidence pass.
+work begins. It is now also the common evidence index for completed
+`AFS-RUN-PACKAGE-001`, integrated `AFS-WEB-OPERATOR-002`, and the next
+`AFS-MEMORY-QUALITY-002` evidence pass.
 
-AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 may run in parallel after this
-package is integrated to `master`.
+AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 have completed their first
+controller-side loop. AFS-MEMORY-QUALITY-002 now has a trace-only review
+contract for the feedback-to-context path.
 
 ## Scenario
 
@@ -158,6 +161,18 @@ The Web lane may reference these paths in operator feedback, but it must not
 persist browser state, upload files, scan directories automatically, or store
 provider configuration.
 
+Observed first real run evidence on this workstation:
+
+```text
+data/processed/runs/local_alpha_0_4_product_loop
+```
+
+The first real run reached workflow `success`; `inspect-run` passed with
+`8 passed / 0 failed / 0 warnings`; `review-run` passed with
+`42 passed / 0 failed / 0 warnings`; `package-report` wrote
+`package_report.md`; and the final BGM video was 720x1280 at about 18.58
+seconds. These artifacts remain ignored and must not be committed.
+
 ## Blocked-State Rules
 
 If any required ignored input or local media tool is missing,
@@ -189,18 +204,18 @@ local setup blocker.
 
 ## Acceptance Checklist
 
-- [ ] The local input bundle exists only under ignored `data/processed/`.
-- [ ] The source video, BGM, ASR model cache, and generated run outputs remain
+- [x] The local input bundle exists only under ignored `data/processed/`.
+- [x] The source video, BGM, ASR model cache, and generated run outputs remain
       ignored and unstaged.
-- [ ] The selected workflow is
+- [x] The selected workflow is
       `workflows/video_script_to_finished_package_local_asr.yaml`.
-- [ ] The terminal run either produces package evidence or records an
+- [x] The terminal run either produces package evidence or records an
       actionable local-input blocker.
-- [ ] `inspect-run`, `review-run`, and `package-report` evidence is linked from
+- [x] `inspect-run`, `review-run`, and `package-report` evidence is linked from
       the runtime handoff when available.
-- [ ] The Web operator path can point to the scenario, show the next action,
+- [x] The Web operator path can point to the scenario, show the next action,
       refresh review/package evidence, and capture feedback.
-- [ ] Feedback, memory candidate, promotion decision, context bundle, and
+- [x] Feedback, memory candidate, promotion decision, context bundle, and
       second-pass prompt remain auditable and side-effect-free.
 - [ ] Verification, human acceptance, business validation, provider smoke, and
       memory promotion are reported as separate states.
@@ -213,23 +228,29 @@ local setup blocker.
 | Runtime package | Terminal run or actionable blocker | `docs/handoff/AFS-RUN-PACKAGE-001.md` |
 | Web operator | Local operator path and browser-smoke notes | `docs/handoff/AFS-WEB-OPERATOR-002.md` |
 | Memory quality | Evidence reuse trace or blocker | `docs/handoff/AFS-MEMORY-QUALITY-002.md` |
+| Acceptance reconciliation | Pass/block/non-claim ledger | `docs/local_alpha_0_4_acceptance_reconciliation.md` |
 | Tracker | Integration state and branch hygiene | `TASK_TRACKER.md` |
 
 ## Parallel Dispatch
 
-After this package lands on `master`, dispatch:
+Initial parallel dispatch rule:
 
-- `AFS-RUN-PACKAGE-001` in `codex/afs-run-package-loop`.
-- `AFS-WEB-OPERATOR-002` in `codex/afs-web-operator-loop`.
+AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 may run in parallel because their
+write scopes are separate.
 
-These two lanes can run in parallel because their write scopes are separate.
-`AFS-RUN-PACKAGE-001` owns runtime evidence and local-input blockers.
-`AFS-WEB-OPERATOR-002` owns Web workbench behavior and browser smoke. Both may
-read this scenario package. Either lane may make narrow corrections to this
-runbook if real execution reveals a mismatch, but broader scenario changes
-should stop parallel work and return to controller review.
+Initial parallel dispatch outcome:
 
-Open `AFS-MEMORY-QUALITY-002` only after the runtime evidence shape is known.
+- `AFS-RUN-PACKAGE-001`: completed after ignored local inputs were supplied.
+- `AFS-WEB-OPERATOR-002`: integrated, with a follow-up fix so passed bridge
+  input-check evidence overrides stale static setup blockers.
+
+`AFS-RUN-PACKAGE-001` owned runtime evidence and local-input blockers.
+`AFS-WEB-OPERATOR-002` owned Web workbench behavior and browser smoke. The
+controller then reconciled their evidence in this package, the handoffs,
+DEVLOG, and `TASK_TRACKER.md`.
+
+Use `AFS-MEMORY-QUALITY-002` as the structural gate before any real second-pass
+generation work. It proves traceability, not product quality improvement.
 Keep `AFS-POSTER-LIVE-002` optional and blocked unless local image-provider
 environment is intentionally configured.
 

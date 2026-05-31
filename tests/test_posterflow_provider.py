@@ -18,6 +18,8 @@ PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
 PNG_B64 = base64.b64encode(PNG_BYTES).decode("ascii")
+JPEG_BYTES = b"\xff\xd8\xff\xd9"
+JPEG_B64 = base64.b64encode(JPEG_BYTES).decode("ascii")
 
 
 class FakeResponse:
@@ -191,6 +193,29 @@ def test_minimax_image_provider_writes_base64_images_without_secrets(monkeypatch
     serialized_invocations = json.dumps(invocations.model_dump(mode="json"), ensure_ascii=False)
     assert "secret-key" not in serialized_invocations
     assert "api.minimax.io" not in serialized_invocations
+
+
+def test_minimax_image_provider_uses_jpg_extension_for_jpeg_base64(monkeypatch, tmp_path) -> None:
+    def fake_urlopen(request, timeout):
+        return FakeResponse(
+            {
+                "data": {"image_base64": [JPEG_B64]},
+                "base_resp": {"status_code": 0, "status_msg": "success"},
+            }
+        )
+
+    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    provider = MiniMaxImageProvider(
+        base_url="https://api.minimax.io",
+        api_key="secret-key",
+        model="image-01",
+    )
+
+    manifest, _invocations = provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
+
+    assert manifest.candidates[0].image_path == "image_candidates/candidate_001.jpg"
+    assert (tmp_path / "image_candidates" / "candidate_001.jpg").read_bytes() == JPEG_BYTES
 
 
 def test_minimax_image_provider_accepts_v1_base_url_without_double_v1(monkeypatch, tmp_path) -> None:

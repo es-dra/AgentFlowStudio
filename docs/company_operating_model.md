@@ -95,6 +95,33 @@ The goal is to reduce routing overhead. Do not reread every Company document
 for routine implementation after the relevant source rule has already been
 projected here.
 
+## Task Difficulty And Dispatch
+
+Every new AgentFlow Studio development conversation should classify the task
+before choosing an execution shape:
+
+| Mode | Use when | Execution shape | Subagent policy |
+|---|---|---|---|
+| Light | read-only analysis, tiny docs, narrow mechanical edits | main checkout is acceptable after scan | no subagent |
+| Standard | normal feature, local bug, focused CLI/schema/docs work | one task line; worktree if dirty, multi-file, or risky | optional Reviewer or QA |
+| Deep | cross-module work, Memory OS, provider/media, Web UI, architecture, experiments | split into bounded lanes with explicit integration order | role-specific Explorer/Worker/Reviewer/QA/Librarian |
+| Strategic | company rules, product direction, business validation, memory promotion | human keeps final judgment; agents prepare evidence and candidates | no final judgment by agent |
+
+Do not start parallel work just because it is available. Parallel work is
+justified only when each lane has:
+
+- independent write scope or explicitly read-only scope;
+- known verification command or artifact check;
+- branch/worktree owner;
+- integration order;
+- close condition.
+
+Subagents are dynamically started and closed. They are not persistent staff.
+An agent that has returned its artifact, become blocked outside its control,
+lost recoverable ID state, or drifted outside its brief must be closed or
+marked inactive. Useful output should be converted into a verified artifact,
+handoff, backlog item, or memory candidate before the lane is closed.
+
 ## Worktree Policy
 
 Keep the main checkout stable for scan, sync, and integration.
@@ -193,8 +220,12 @@ For Memory OS work, keep these boundaries explicit:
 Mainline is the stable integration surface. Local Alpha 0.2 is integrated and
 cleaned up. Local Alpha 0.3 engineering acceptance is integrated on `master`
 for the planning boundary, Web operator loop, and Memory runtime contract.
-PosterFlow live image smoke remains intentionally blocked until a local
-image-provider environment is configured.
+Local Alpha 0.4 has now produced real local runtime evidence, Web operator
+evidence, and a structural memory reuse review on this workstation. The
+acceptance reconciliation is recorded in
+`docs/local_alpha_0_4_acceptance_reconciliation.md`. PosterFlow live image
+smoke remains intentionally blocked until a local image-provider environment is
+configured.
 
 The next milestone is:
 
@@ -224,19 +255,39 @@ Use `docs/local_alpha_0_4_product_loop_goals.md` as the milestone boundary,
 `docs/local_alpha_0_4_scenario_package.md` as the shared scenario package, and
 `TASK_TRACKER.md` as the live project ledger.
 
-Local Alpha 0.4 planned queue:
+Local Alpha 0.4 queue state:
 
 | ID | Purpose | Suggested branch | Status |
 |---|---|---|---|
 | AFS-PROD-LOOP-001 | Define the 0.4 scenario package and runbook | `codex/afs-prod-loop-brief` | complete after integration |
-| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | ready after scenario package integration |
-| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | ready after scenario package integration |
-| AFS-MEMORY-QUALITY-002 | Evaluate traceable evidence reuse in a second pass | `codex/afs-memory-quality-loop` | depends on runtime evidence shape |
+| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | completed after local inputs were supplied |
+| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | integrated with follow-up readiness fix |
+| AFS-MEMORY-QUALITY-002 | Evaluate traceable evidence reuse in a second pass | `codex/afs-memory-quality-loop` | complete as structural review |
+| AFS-ALPHA-0-4-ACCEPTANCE | Reconcile 0.4 evidence into pass/block/non-claim states | main checkout | current docs-only lane |
 | AFS-POSTER-LIVE-002 | Optional live image smoke or blocked evidence | `codex/afs-poster-live-002` | optional; blocked by missing local provider env |
 
-Open 0.4 implementation worktrees only after a fresh brief records write scope,
-verification, provider policy, evidence path, and integration order. Treat
-`docs/task_briefs/` as the copy-paste source for delegated workers.
+The next executable 0.4 lanes should be narrow follow-ups, not another repeat
+of `AFS-MEMORY-QUALITY-002`: a read-only memory review CLI, a Web evidence
+summary, a real second-pass run, or a human acceptance feedback lane. They may
+reference ignored runtime evidence under
+`data/processed/runs/local_alpha_0_4_product_loop`, but should commit only
+contracts, docs, tests, and non-secret examples. Treat `docs/task_briefs/` as
+the copy-paste source for delegated workers.
+
+For the post-demo slimming phase, the visible CLI product surface should favor
+the generic memory video pipeline:
+
+```text
+memory-video-pipeline-plan
+memory-video-pipeline-review
+memory-video-pipeline-observe
+memory-video-pipeline-present
+memory-video-pipeline-package
+```
+
+Numbered memory-advantage demo commands and direct provider smoke commands are
+legacy evidence/operator paths. Keep them gated and directly invocable only for
+existing runbooks, but do not present them as the default product path.
 
 ## Promotion Back To Company
 

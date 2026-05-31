@@ -1,5 +1,5 @@
-import { ARTIFACT_CLASSES } from "./artifact-contracts.js";
-import { asList, asObject, asText, describeValue, firstText, normalizeStatus } from "./artifact-values.js";
+import { ARTIFACT_CLASSES } from "./artifact-contracts.js?v=m4-memory-canvas-tools";
+import { asList, asObject, asText, describeValue, firstText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 
 export function normalizeEvidenceMap(summaryArtifacts, run) {
   const selected = summaryArtifacts

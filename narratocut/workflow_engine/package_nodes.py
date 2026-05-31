@@ -11,6 +11,7 @@ from narratocut.package_sop import (
 from narratocut.utils import write_json
 from narratocut.workflow_engine.context import WorkflowContext
 from narratocut.workflow_engine.definitions import WorkflowStepDefinition
+from narratocut.workflow_engine.node_artifacts import require_input as _require_input
 
 
 def write_finished_package_node(step: WorkflowStepDefinition, context: WorkflowContext) -> list[str]:
@@ -48,12 +49,6 @@ def write_package_report_node(step: WorkflowStepDefinition, context: WorkflowCon
     write_package_report(context.output_dir, report_ref)
     context.artifacts["package_report"] = report_ref
     return [report_ref]
-
-
-def _require_input(step: WorkflowStepDefinition, name: str) -> object:
-    if name not in step.inputs:
-        raise ValueError(f"Step {step.id} missing required input: {name}")
-    return step.inputs[name]
 
 
 def _optional_resolved_asset(

@@ -1,6 +1,6 @@
 # AFS-WEB-OPERATOR-002 - Local Alpha 0.4 Web Operator Path
 
-Status: READY FOR INTEGRATION
+Status: INTEGRATED_WITH_FOLLOWUP_FIX
 Date: 2026-05-27
 Branch: `codex/afs-web-operator-loop`
 Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop`
@@ -23,6 +23,12 @@ data/processed/runs/local_alpha_0_4_product_loop
 
 The operator UI also surfaces the scenario runbook and local setup blockers
 instead of silently falling back to the older example input.
+
+2026-05-27 controller follow-up: after the real runtime package succeeded and
+the Web bridge input check passed, a stale-readiness bug was found and fixed in
+the main checkout. Production Mode now prefers the bridge `input_check`
+summary/next action over static `local_setup_blockers` once plan evidence
+exists.
 
 ## Local Setup Blockers Surfaced
 
@@ -86,6 +92,14 @@ Results:
 - `compileall`: passed.
 - `git diff --check`: passed with Windows LF/CRLF warnings only.
 
+Controller follow-up verification after the stale-readiness fix:
+
+```powershell
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_production_mode_static.py::test_web_readiness_uses_input_check_after_plan_passes tests/test_web_production_mode_static.py::test_web_production_mode_defaults_match_preferred_workflow
+```
+
+Result: `2 passed`.
+
 ## Browser Smoke
 
 Ran against the branch worktree with the static page on `127.0.0.1:8768` and
@@ -113,6 +127,17 @@ Observed checks:
 - Page console errors from the local app: none. The browser automation runtime
   emitted an unrelated external telemetry timeout while trying to contact
   `ab.chatgpt.com`; this was not from the local page.
+
+Controller follow-up smoke after the stale-readiness fix:
+
+- A fresh tab at `http://127.0.0.1:8768/index.html?fresh=041` showed the
+  passed input check and next action instead of stale setup blockers.
+- Observed overview: `阻塞项暂无阻塞6 个输入引用可用`.
+- Observed readiness: `输入诊断输入引用可用可生成计划并运行。下一步动作运行 workflow可生成计划并运行。`
+- Local page console errors: none.
+- The already-open tab kept an older ESM module until a fresh URL/server
+  response was used. Future Web smokes after JS edits should use a fresh tab or
+  cache-busting URL.
 
 ## Boundaries Kept
 

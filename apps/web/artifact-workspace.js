@@ -1,8 +1,8 @@
-import { ARTIFACT_ALIASES, ARTIFACT_CLASSES, RECOMMENDED_ARTIFACTS, VIDEO_EXTENSIONS, sourceRoleFor } from "./artifact-contracts.js";
-import { normalizeAssetLedger, normalizeEvidenceMap, normalizeRiskLedger } from "./artifact-ledgers.js";
-import { asList, asObject, asText, collectChecks, normalizeStatus } from "./artifact-values.js";
+import { ARTIFACT_ALIASES, ARTIFACT_CLASSES, RECOMMENDED_ARTIFACTS, VIDEO_EXTENSIONS, sourceRoleFor } from "./artifact-contracts.js?v=m4-memory-canvas-tools";
+import { normalizeAssetLedger, normalizeEvidenceMap, normalizeRiskLedger } from "./artifact-ledgers.js?v=m4-memory-canvas-tools";
+import { asList, asObject, asText, collectChecks, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 
-export { asText, normalizeStatus } from "./artifact-values.js";
+export { asText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 
 export async function parseFiles(files) {
   const artifacts = [];
@@ -88,6 +88,8 @@ export function normalizeWorkspace(artifacts) {
 
   const run = normalizeRun(byType("run_manifest"));
   const packageSummary = normalizePackage(byType("package_manifest"));
+  const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
+  const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
   const workspaceParts = {
     warnings,
     errors,
@@ -97,6 +99,8 @@ export function normalizeWorkspace(artifacts) {
     artifacts,
     run,
     package: packageSummary,
+    memoryPackage,
+    memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),
     readiness: normalizeReadiness(byType("delivery_readiness")),
@@ -142,6 +146,7 @@ function detectArtifactType(fileName, payload) {
     if (aliases.includes(normalizedName)) return type;
   }
   if (payload && payload.artifact_index && payload.workflow) return "run_manifest";
+  if (payload && typeof payload.artifact_type === "string" && payload.artifact_type.startsWith("agentflow_")) return payload.artifact_type;
   if (payload && payload.assets && payload.package_id) return "package_manifest";
   if (payload && payload.sections && payload.summary) return "review_report";
   if (payload && payload.runs && payload.summary) return "delivery_readiness";

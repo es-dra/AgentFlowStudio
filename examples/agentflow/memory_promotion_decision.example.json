@@ -4,7 +4,7 @@
   "decision_id": "af_memory_promotion_decision_001",
   "project_id": "agentflow_demo_project",
   "source_candidate_id": "af_memory_candidate_001",
-  "decision": "rejected",
+  "decision": "promoted",
   "promotion_mode": "human_reviewed",
   "writes_long_term_memory": false,
   "evidence_refs": [
@@ -13,10 +13,10 @@
     "story_bible.json"
   ],
   "reason_tags": [
-    "single_run_signal",
-    "insufficient_repetition"
+    "human_reviewed_reuse_allowed",
+    "single_run_context_reuse_only"
   ],
-  "review_note": "The candidate is useful for this run, but one feedback event is not enough to create durable project memory.",
+  "review_note": "The candidate is allowed to feed downstream review artifacts for this run, but it is not written into durable project memory.",
   "decided_by": "human",
   "decided_at": "2026-05-21T11:00:00+08:00",
   "metadata": {

@@ -22,8 +22,9 @@ import {
   workflowLocalSetupBlockers,
   workflowRequires,
 } from "./production-workflows.js";
+import { BRIDGE_BASE_URL, bridgeGet, bridgePost } from "./production-bridge-client.js";
+import { renderProductionButtons } from "./production-mode-buttons.js";
 
-const BRIDGE_BASE_URL = "http://127.0.0.1:8787";
 const RUN_POLL_INTERVAL_MS = 1500;
 let runPollTimer = null;
 
@@ -145,15 +146,8 @@ export function renderProductionState(elements, copy, workspace = null) {
   renderArtifactTimeline(elements, productionState.run?.files || [], productionState.plan?.artifacts?.expected || workflow?.outputs || []);
   renderProductionVideoReview(elements, productionState, workspace, copy);
   renderSupervision(elements, productionState, copy);
-  renderProductionButtons(elements);
+  renderProductionButtons(elements, productionState.run);
   elements.productionLog.textContent = productionState.log.slice(-16).join("\n");
-}
-
-function renderProductionButtons(elements) {
-  const running = ["pending", "running"].includes(productionState.run?.status || "");
-  elements.runWorkflowButton.disabled = running;
-  elements.createPlanButton.disabled = running;
-  elements.refreshReviewButton.disabled = running;
 }
 
 function activeOperatorStepIndex() {
@@ -174,26 +168,6 @@ function applyWorkflowDefaults(elements, { force }) {
   const currentOutput = elements.workflowOutputDir.value.trim();
   const shouldReplaceOutput = force || !currentOutput || currentOutput.startsWith("data/processed/runs/web_bridge/");
   if (shouldReplaceOutput) elements.workflowOutputDir.value = defaultOutput;
-}
-
-async function bridgeGet(path) {
-  const response = await fetch(`${BRIDGE_BASE_URL}${path}`);
-  return readBridgeResponse(response);
-}
-
-async function bridgePost(path, payload) {
-  const response = await fetch(`${BRIDGE_BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return readBridgeResponse(response);
-}
-
-async function readBridgeResponse(response) {
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
-  return payload;
 }
 
 function selectedWorkflowPath(elements) {

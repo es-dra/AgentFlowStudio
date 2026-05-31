@@ -48,7 +48,7 @@ def test_web_bridge_cli_command_starts_local_bridge(monkeypatch) -> None:
     def fake_serve(*, host: str, port: int) -> None:
         calls.append({"host": host, "port": port})
 
-    monkeypatch.setattr("apps.cli.main.serve_web_bridge", fake_serve)
+    monkeypatch.setattr("apps.cli.command_registry.serve_web_bridge", fake_serve)
 
     result = CliRunner().invoke(app, ["web-bridge", "--host", "127.0.0.1", "--port", "8799"])
 

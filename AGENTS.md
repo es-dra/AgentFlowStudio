@@ -27,6 +27,12 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 - Use the company AI-native workflow hierarchy when planning substantial work:
   Company source rules -> global workflow skills -> project `AGENTS.md` ->
   task tracker / branch handoff.
+- At the start of every new development conversation in this repository,
+  classify the task as `Light`, `Standard`, `Deep`, or `Strategic` before
+  deciding whether to edit in-place, open a worktree, or dispatch subagents.
+- For normal or substantial work, read `docs/company_operating_model.md` and
+  `TASK_TRACKER.md` after this file. For parallel or delegated work, also read
+  `docs/agent_operating_roster.md` and `docs/agent_task_brief_template.md`.
 - Do not copy confidential company strategy, private retrospectives, real costs,
   provider secrets, customer details, or unpublished business assumptions from
   `Company/` into this repository.
@@ -49,6 +55,9 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
   Close them after their artifact, review, or QA result has been collected.
   If the agent manager reports an old ID as `not found`, treat it as inactive
   history rather than an open execution lane.
+- Start subagents dynamically only when they have an independent scope,
+  verifiable artifact, and close condition. Do not keep idle, blocked, stale, or
+  unverifiable subagents open as planning context.
 - Remote-provider policy must name the capability being authorized: LLM, ASR,
   image, video, or external download. One provider gate does not imply another.
 - Do not migrate code from `D:\Projects\AVP` unless the user explicitly asks.

@@ -1,10 +1,11 @@
 # AgentFlow Studio Task Tracker
 
-Last updated: 2026-05-27 by Codex
+Last updated: 2026-05-31 by Codex
 
-This tracker records multi-session AgentFlow Studio work under the local
-AI-native company operating model. A task is complete only when acceptance
-criteria are checked and relevant verification evidence is recorded.
+This tracker is the live AgentFlow Studio work ledger. It should contain only
+active, next, and blocked work plus short links to current evidence. Historical
+completed rows from the pre-reset tracker were moved to
+`docs/archive/task_history_2026_05.md`.
 
 Company source knowledge base:
 
@@ -18,864 +19,100 @@ Project-facing operating model:
 docs/company_operating_model.md
 ```
 
-## Active Tracks
+## Current Operating Rule
 
-| ID | Branch / worktree | Owner role | Scope | Status | Verification | Evidence / notes |
-|---|---|---|---|---|---|---|
-| AFS-OPS-001 | `codex/company-os-projection` | Orchestrator | Project-facing projection of Company rules into `AGENTS.md`, `docs/company_operating_model.md`, and `TASK_TRACKER.md` | completed | `git diff --check`; targeted doc review | Completed in main checkout per user request |
-| AFS-MEM-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add source-of-truth feedback and memory review loop for PosterFlow / Memory OS MVP | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Added raw feedback JSONL, candidate JSONL, memory review JSONL |
-| AFS-CTX-001 | `codex/memory-os-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop` | Worker + reviewer | Add minimal `context_bundle.json` and `context_assembly_trace.json` artifacts | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Integrated together with AFS-MEM-001 because both slices share schema/workflow/quality surfaces |
-| AFS-QLT-001 | `codex/quality-feedback-signals` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals` | Worker + QA | Split PosterFlow quality harness and add candidate quality feedback signals for failed checks | integrated to `master` | `python -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py` -> 15 passed; `python -m pytest` -> 488 passed; `git diff --check`; CLI help/version | Remote/local branch and worktree deleted after integration |
-| AFS-DEMO-001 | `codex/posterflow-two-round-demo` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo` | Worker + QA + human reviewer | Build a true two-round PosterFlow Memory OS demo with comparison report | integrated to `master` | `python -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py` -> 16 passed; `python -m pytest` -> 489 passed; `git diff --check`; CLI help/version | Integrated at `ff77b30`; local and remote branch/worktree deleted after verification |
-| AFS-PROV-001 | `codex/posterflow-minimax-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase` | Worker + QA | Replay MiniMax PosterFlow provider support on fresh `master` without merging stale branch state | integrated to `master` | `python -m pytest tests/test_posterflow_provider.py` -> 12 passed; `python -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 22 passed; `python -m pytest` -> 495 passed; `git diff --check`; CLI help/version | Integrated at `649d736`; superseded stale MiniMax branch and both provider branches were deleted |
-| AFS-ALPHA-001 | `codex/alpha-readiness-rebase` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\alpha-readiness-rebase` | Worker + QA | Replay Alpha readiness evidence from old stacked branch onto clean `master` | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_agentflow_roadmap_docs.py tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py` -> 35 passed; `python -m pytest` -> 496 passed; `git diff --check`; CLI help/version | Integrated at `ac2254e`; old stacked alpha branch and replacement branch/worktree deleted |
-| AFS-WEB-001 | `codex/narratocut-web-ui` / archived | Worker + QA | Preserve and classify the independent NarratoCut Web UI line after repository rename | archived and superseded | Web UI targeted tests -> 41 passed; branch full `pytest` -> 374 passed; CLI help/version; JS syntax checks; `compileall`; `git diff --check` | Archived at tag `archive/narratocut-web-ui-de8ca8e`; useful work replayed by `AFS-WEB-REPLAY`; branch/worktree deleted |
-| AFS-OPS-002 | main checkout | Orchestrator + Docs Projection Agent | Add project execution entry points for agent roster, task brief, provider gates, and Company feedback | completed | `git diff --check`; `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 8 passed; CLI help/version | Documents-only operating-system pass; no runtime code or provider calls |
-| AFS-PROD-001 | `codex/afs-prod-alpha-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-alpha-smoke` | Workflow Engineer | Add read-only Alpha smoke/status CLI for current engineering readiness | integrated to `master` | `python -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py` -> 25 passed; `alpha-smoke --json`; `git diff --check` | Integrated at `5c88d21`; writes no run artifacts and calls no providers |
-| AFS-QA-001 | `codex/afs-quality-evidence-summary` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-quality-evidence-summary` | Harness / QA Reviewer | Add shared evidence summary vocabulary for quality and review reports | integrated to `master` | `python -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 26 passed; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `17c72e5`; additive report field only, no provider calls |
-| AFS-MEM-002 | `codex/afs-memory-promotion-review` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-promotion-review` | Memory / Evidence Steward | Validate memory promotion review decisions without durable memory writes | integrated to `master` | `python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py` -> 57 passed; `compileall agentflow\memory agentflow\harness`; CLI help/version; `alpha-smoke --json`; `git diff --check` | Integrated at `8fd9fe4`; no DB, RAG, provider calls, or durable Memory runtime |
-| AFS-WEB-REPLAY | `codex/afs-web-ui-replay` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ui-replay` | Web UI Agent + Release Integrator | Replay local Review/Production Web UI workbench on current mainline | integrated to `master` | Web targeted tests -> 60 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; CLI help/version/web-bridge help; browser smoke: local bridge + static UI + mock workflow + review refresh | Integrated at `5d0392f`; local-only, no provider calls, no browser persistence |
-| AFS-OPS-003 | main checkout | Orchestrator | Align operating docs with the Local Alpha 0.2 product queue and create task briefs | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `python -m apps.cli.main alpha-smoke --json`; `git diff --check` | Updates only project execution docs; no runtime code or provider calls |
-| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | completed | `python -m apps.cli.main alpha-smoke --json`; `python -m pytest tests/test_agentflow_roadmap_docs.py`; `git diff --check` | Evidence: `docs/local_alpha_0_2_acceptance.md`; no runtime code or provider calls |
-| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | completed | Web targeted tests -> 42 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; `git diff --check`; browser smoke local bridge + static UI + mock workflow + review refresh | Evidence: `docs/handoff/AFS-WEB-UX-001.md`; temp smoke screenshot outside repo at `C:\Users\chenzy\AppData\Local\Temp\afs-web-ux-pass-smoke-main.png`; fixed small-screen sticky topbar click coverage; no provider calls or browser persistence |
-| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | completed | PosterFlow workflow/quality/provider tests -> 23 passed; `alpha-smoke --json` -> blocked as expected because remote image provider is disabled; `git diff --check` -> passed | Added explicit `poster_round_comparison.json.evidence_chain` and review checks; handoff: `docs/handoff/AFS-MEMORY-DEMO-001.md`; integrated into current merge batch |
-| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | blocked checklist integrated | `alpha-smoke --json` -> blocked because image provider env is unset; PosterFlow provider/workflow/quality tests -> 22 passed; `git diff --check` -> passed | Evidence: `docs/handoff/AFS-POSTER-LIVE-001.md`; no live provider call, no provider config, no secrets |
-| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | Define Local Alpha 0.3 validation goals and next task briefs before opening a new queue | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 10 passed; `python -m apps.cli.main alpha-smoke --json` -> blocked as expected because image provider env is unset; `git diff --check` -> passed | Evidence: `docs/local_alpha_0_3_validation_goals.md` and four Local Alpha 0.3 task briefs; no runtime code or provider calls |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | Local Alpha 0.3 operator plan/run/review/feedback Web path | integrated to `master` | Web targeted tests -> 44 passed; JS `node --check`; compileall; desktop and 390x844 browser smoke; mainline integration tests -> 102 passed | Integrated at `6e3fbab`; handoff: `docs/handoff/AFS-WEB-REVIEW-001.md`; controller fixed review refs after polling overwrite; no provider calls |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable memory writes | integrated to `master` | focused memory/posterflow tests -> 65 passed; mainline integration tests -> 102 passed; `alpha-smoke --json` -> blocked as expected; compileall; `git diff --check` | Integrated at `6853fc1`; handoff: `docs/handoff/AFS-MEMORY-RUNTIME-001.md`; no durable Memory runtime, DB, RAG, or provider calls |
-| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | blocked by missing local env | `alpha-smoke --json` -> blocked because image provider env is unset | No live provider call; open only after local image env is intentionally configured or for a blocked-evidence-only pass |
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | complete after integration | Roadmap docs tests; `alpha-smoke --json`; `git diff --check` | Evidence: `docs/local_alpha_0_4_scenario_package.md`; no runtime code, provider calls, generated artifacts, local media, or private Company content |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package evidence or actionable local-input blocker | blocked by missing local inputs | `alpha-smoke --json` -> blocked as expected; focused runtime tests -> 7 passed | Evidence: `docs/handoff/AFS-RUN-PACKAGE-001.md`; missing source video, BGM, local ASR model cache, and ignored 0.4 input bundle; FFmpeg/FFprobe available; no provider calls or runtime artifacts |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | integrated to `master` | Web targeted tests -> 45 passed; JS `node --check`; compileall; browser smoke; `git diff --check` | Evidence: `docs/handoff/AFS-WEB-OPERATOR-002.md`; defaults to Local Alpha 0.4 input/output and surfaces local setup blockers; no provider calls |
-| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation for a second pass | planned | Pending | Start after runtime evidence shape is known |
+- Do not open another numbered memory-advantage demo module; use the
+  protocol-driven memory video pipeline path instead.
+- Keep `memory-video-pipeline-*` as the visible CLI product surface. Numbered
+  memory-advantage demo commands and direct provider smoke commands are legacy
+  evidence/operator entries and should stay hidden from default help unless a
+  task explicitly needs them.
+- Do not treat provider smoke, machine tests, generated demos, or contact
+  sheets as human acceptance or business validation.
+- Do not commit secrets, provider keys, signed URLs, cookies, local media,
+  model caches, or generated runtime artifacts.
+- Keep remote provider calls gated by capability and explicit task approval.
+- At the start of new development conversations, classify the task as
+  `Light`, `Standard`, `Deep`, or `Strategic` before choosing main checkout,
+  worktree, or subagent execution.
+- Start subagents only for bounded roles with independent scope, verifiable
+  artifacts, integration order, and close conditions; close or mark inactive
+  any idle, stale, blocked, or unverifiable lane.
 
-## Integration Gate
+## Active Work
 
-Current gate:
-
-- `AFS-MEM-001`, `AFS-CTX-001`, and `AFS-QLT-001` are integrated to `master`.
-- `AFS-DEMO-001` is integrated to `master` at `ff77b30`.
-- `AFS-PROV-001` is integrated to `master` at `649d736`.
-- `AFS-ALPHA-001` is integrated to `master` at `ac2254e`.
-- `AFS-PROD-001` is integrated to `master` at `5c88d21`.
-- `AFS-QA-001` is integrated to `master` at `17c72e5`.
-- `AFS-MEM-002` is integrated to `master` at `8fd9fe4`.
-- `AFS-WEB-REPLAY` is integrated to `master` at `5d0392f`.
-- The old preserved Web UI branch `origin/codex/narratocut-web-ui` at
-  `de8ca8e` is archived by tag `archive/narratocut-web-ui-de8ca8e` and deleted.
-- All four lanes from the previous dispatch batch are integrated. Mainline full
-  verification passed with 548 tests. The four replay/integration worktrees and
-  local branches were removed after merge.
-- The Local Alpha 0.2 dispatch batch is integrated to `master` at `7f2dec4`:
-  `AFS-ALPHA-PKG-001`, `AFS-WEB-UX-001`, `AFS-MEMORY-DEMO-001`, and
-  `AFS-POSTER-LIVE-001`.
-- Mainline targeted verification passed with 73 tests, JS syntax checks,
-  compileall, `git diff --check`, and `alpha-smoke --json` reporting the
-  expected PosterFlow image-provider `blocked` state.
-- The four Local Alpha 0.2 worktrees, local branches, and remote branches were
-  removed after integration. Main checkout is the only remaining worktree.
-- The Local Alpha 0.3 engineering queue is integrated to `master` through
-  `6853fc1` and `6e3fbab`: `AFS-PROD-NEXT-001`, `AFS-MEMORY-RUNTIME-001`, and
-  `AFS-WEB-REVIEW-001` are complete; `AFS-POSTER-LIVE-002` remains blocked by
-  missing local image-provider env.
-- Mainline Local Alpha 0.3 verification passed with 102 targeted tests, Web JS
-  syntax checks, compileall, `git diff --check`, and `alpha-smoke --json`
-  reporting the expected image-provider `blocked` state.
-- Local Alpha 0.4 scenario package is defined by `AFS-PROD-LOOP-001` in
-  `docs/local_alpha_0_4_scenario_package.md`. After this branch is integrated,
-  `AFS-RUN-PACKAGE-001` and `AFS-WEB-OPERATOR-002` may open in parallel.
-
-## Operating Entry Points
-
-Use this minimum entry set:
-
-- Small local doc edits: `AGENTS.md` plus the touched file.
-- Normal AFS work: `AGENTS.md`, `docs/company_operating_model.md`, and this
-  tracker.
-- Parallel or delegated work: also use `docs/agent_operating_roster.md` and
-  `docs/agent_task_brief_template.md`.
-
-Subagents are ephemeral. A visible old agent card is not an active lane unless
-the agent manager can still resume or close that ID. If a close attempt returns
-`not found`, record the agent as inactive history.
-
-## Local Alpha 0.3 Queue Outcome
-
-The Local Alpha 0.3 engineering queue is integrated/blocked. Web and Memory
-lanes are merged into `master`; Poster live remains blocked until local
-image-provider env is intentionally configured.
-
-Local Alpha 0.3 queue outcome:
-
-| ID | Branch / worktree | Owner role | Primary write scope | Outcome verification |
+| ID | Owner role | Scope | Status | Verification / evidence |
 |---|---|---|---|---|
-| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | integrated; roadmap docs tests -> 10 passed; `alpha-smoke --json` -> blocked as expected; `git diff --check` |
-| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, Web docs/handoff | integrated; Web targeted tests -> 44 passed; JS checks; browser smoke desktop/narrow |
-| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow memory/context contracts, focused tests/docs | integrated; focused tests -> 65 passed; `alpha-smoke --json` -> blocked as expected; compileall; diff check |
-| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | blocked by missing local image-provider env; no live provider call |
+| AFS-MAINTENANCE-RESET-001 | Release Integrator + Orchestrator | Classify the dirty worktree, repair/split tracker scope, and record promote/archive/remove decisions before more implementation | classification complete | Evidence: `docs/maintenance/AFS-MAINTENANCE-RESET-001.md`; raw pre-reset tracker bytes preserved under ignored `data/processed/maintenance_backups/AFS-MAINTENANCE-RESET-001/` |
+| AFS-MEMORY-PIPELINE-MVP-001 | Workflow Engineer + Memory / Evidence Steward | Replace bespoke numbered demo execution with one protocol-driven memory video pipeline | no-call package command and feedback-event draft complete; live provider execution not implemented | Evidence: `memory-video-pipeline-package`, `examples/agentflow/memory_video_pipeline_package.example.json`, `agentflow/memory/video_pipeline_workflow.py`, `agentflow/memory/video_pipeline_feedback.py`, `docs/handoff/AFS-MEMORY-PIPELINE-MVP-001.md`; provider execution remains optional/gated |
+| AFS-POST-DEMO-PRODUCTIZATION | Orchestrator + Product Lead | Convert Local Alpha 0.4 and memory-advantage demo evidence into the next productization queue | roadmap recorded; execute through MVP/workbench lanes | Evidence: `docs/handoff/AFS-POST-DEMO-PRODUCTIZATION-ROADMAP.md`; keeps architecture completeness, runnable image/video demo, workbench usability, Company knowledge feedback, provider gateway, and durable Memory runtime boundaries separated |
 
-Integration rule remains unchanged: open separate `codex/*` worktrees for
-implementation lanes, keep `master` as the integration surface, and delete
-temporary branches/worktrees after verified merge.
+## Next Queue
 
-## Local Alpha 0.4 Planned Queue
+These lanes remain queued behind the current memory-pipeline first slice.
 
-Local Alpha 0.4 moves from engineering-loop proof to one real local product
-loop. The first lane must define the scenario package before implementation
-worktrees are opened.
+| ID | Owner role | Scope | Entry condition |
+|---|---|---|---|
+| AFS-WORKBENCH-REDESIGN-001 | Product Lead + Web UI Agent | Design the memory production workbench before further Web implementation | Design brief complete; implementation not started |
+| AFS-WORKBENCH-IMPLEMENTATION-001 | Web UI Agent + QA Reviewer | Implement static memory workbench first screen from package fixture | static first screen, explicit package loading, bundle summaries, evidence-bundle gap visibility, read-only artifact inspector, canvas-to-inspector focus, read-only workflow action strip, browser-local feedback draft preview, one-click sample bundle, source-status display, canvas view/focus tools, experiment protocol panel, demo evidence summary, Studio Canvas polish, demo-ready checklist, and readiness cockpit implemented |
+| AFS-MEMORY-REVIEW-CLI-001 | Memory / Evidence Steward | Expose evidence reuse validator as a read-only CLI/review command | implemented as stdout-first CLI with explicit optional validation JSON output; no durable writes or provider calls |
+| AFS-WEB-EVIDENCE-SUMMARY-001 | Web UI Agent + QA Reviewer | Show memory reuse review summary in Web without promotion or scanning | Optional narrow follow-up after reset |
+| AFS-SECOND-PASS-001 | Workflow Engineer + Harness / QA Reviewer | Run a real second pass from accepted context evidence | Requires explicit run plan and artifact boundaries |
+| AFS-ACCEPTANCE-FEEDBACK-001 | Orchestrator + Product Lead | Capture human acceptance feedback separately from machine review | Requires selected demo artifacts and human review protocol |
 
-Local Alpha 0.4 planned queue:
+## Blocked / Optional
 
-| ID | Branch / worktree | Owner role | Primary write scope | Dependency |
-|---|---|---|---|---|
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | complete after integration |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | local workflow runbook, handoff, focused tests if needed | blocked by missing local inputs |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests/docs | integrated to `master`; 0.4 defaults and blocker display implemented |
-| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | memory/context contracts, examples, focused tests/docs | after runtime evidence shape is known |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | optional; blocked by missing image-provider env |
+| ID | Owner role | Scope | Blocker |
+|---|---|---|---|
+| AFS-POSTER-LIVE-002 | Provider Adapter Agent + Security / Secret Audit Agent | Optional PosterFlow live image smoke | Blocked unless local image-provider env is configured and `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` is explicitly set for the task |
+| Durable Memory runtime | Memory / Evidence Steward | Persistent Memory runtime, DB/vector store/RAG, or automatic company memory writes | Not part of the current demo proof; needs a separate design and approval |
+| Business validation | Product Lead | External market/user validation | Not performed in Local Alpha 0.4 or the current memory-advantage demos |
 
-Integration order:
+## Recent Evidence Index
 
-```text
-AFS-PROD-LOOP-001
-  -> AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 in parallel
-  -> AFS-MEMORY-QUALITY-002 after runtime evidence shape is stable
-  -> AFS-POSTER-LIVE-002 only if local image-provider env is configured
-  -> controller-side verification, branch cleanup, and memory promotion review
-```
-
-After `AFS-PROD-LOOP-001` is integrated, dispatch `AFS-RUN-PACKAGE-001` and
-`AFS-WEB-OPERATOR-002` as separate worktrees with non-overlapping write scopes.
-
-## Remote Branch Hygiene
-
-Current branch classification as of 2026-05-26:
-
-| Branch | Classification | Next action |
+| Area | Status | Evidence / boundary |
 |---|---|---|
-| `origin/codex/memory-os-loop` | integrated to `master` | Deleted after fast-forward merge and verification. |
-| `origin/codex/quality-feedback-signals` | integrated to `master` | Deleted after fast-forward merge and verification. |
-| `origin/codex/posterflow-memory-demo` | patch-equivalent stale pre-merge PosterFlow demo branch | Deleted after `git cherry -v master codex/posterflow-memory-demo` showed the branch patch is already in `master`. |
-| `origin/codex/posterflow-minimax-provider-tests` | stale provider reference branch | Deleted after `AFS-PROV-001` replaced it on current `master`. |
-| `origin/codex/posterflow-minimax-rebase` | integrated replacement provider branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/alpha-readiness-evidence` | stale stacked alpha evidence branch | Deleted after `AFS-ALPHA-001` replayed the evidence on current `master`. |
-| `origin/codex/alpha-readiness-rebase` | integrated replacement alpha evidence branch | Deleted after fast-forward integration and verification. |
-| `origin/codex/narratocut-web-ui` | superseded independent Web UI line | Deleted after pushing current `master` and archive tag `archive/narratocut-web-ui-de8ca8e`. The replay branch integrated the useful Web UI surface and the old branch would now regress `apps/cli/main.py`, `apps/web_bridge/bridge.py`, Web bridge tests, and handoff docs. |
-
-Current local cleanup as of 2026-05-27:
-
-- Removed integrated worktrees:
-  `afs-prod-alpha-smoke`, `afs-quality-evidence-summary`,
-  `afs-memory-promotion-review`, and `afs-web-ui-replay`.
-- Deleted integrated local branches:
-  `codex/afs-prod-alpha-smoke`, `codex/afs-quality-evidence-summary`,
-  `codex/afs-memory-promotion-review`, and `codex/afs-web-ui-replay`.
-- Pushed `master` and archive tag `archive/narratocut-web-ui-de8ca8e`, then
-  deleted remote `origin/codex/narratocut-web-ui`.
-- Removed the old local `narratocut-web-ui` worktree and local branch after
-  confirming the archive tag points to the same commit.
-- Integrated and removed the Local Alpha 0.2 batch worktrees and branches:
-  `afs-alpha-package`, `afs-web-ux-pass`, `afs-memory-demo-hardening`, and
-  `afs-poster-live-smoke`.
-- Deleted remote branches:
-  `origin/codex/afs-alpha-package`, `origin/codex/afs-web-ux-pass`,
-  `origin/codex/afs-memory-demo-hardening`, and
-  `origin/codex/afs-poster-live-smoke`.
-- Stopped the local Web bridge/static smoke servers on ports `8787` and `8769`.
-
-## Current Task Detail
-
-### AFS-OPS-001: Company OS Projection
-
-Goal:
-
-- Keep `Company/` as the source knowledge base while giving this repository a
-  concise execution-facing projection.
-
-Acceptance criteria:
-
-- [x] `AGENTS.md` names the Company source boundary and AI-native workflow
-      hierarchy.
-- [x] `docs/company_operating_model.md` explains how Company rules, global
-      workflow skills, project rules, and task trackers relate.
-- [x] `TASK_TRACKER.md` records the initial parallel tracks and completion
-      policy.
-- [x] No confidential Company strategy, secrets, real costs, customer details,
-      or private retrospectives are copied into this repository.
-- [x] `git diff --check` passes for the repository.
-
-Status:
-
-- completed
-
-### AFS-MEM-001: PosterFlow Memory OS Loop
-
-Goal:
-
-- Add a minimal evidence-backed feedback-to-memory-review loop to PosterFlow
-  without adding durable Memory runtime or changing remote provider behavior.
-
-Acceptance criteria:
-
-- [x] `poster_feedback.jsonl` is written as the raw feedback source of truth.
-- [x] `poster_feedback_signal_log.json` remains derived and points to
-      `poster_feedback.jsonl`.
-- [x] `poster_memory_candidates.jsonl` is candidate-only and matches the
-      existing `poster_memory_candidates.json` candidate IDs.
-- [x] `poster_memory_review.jsonl` records explicit review decisions and does
-      not write long-term memory.
-- [x] PosterFlow inspect/review fails when raw feedback is missing or memory
-      review claims durable writes.
-- [x] Full test suite passes in the implementation worktree.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
-# 14 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
-# 487 passed
-
-git diff --check
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
-# 0.1.0
-```
-
-Status:
-
-- integrated to `master` with AFS-CTX-001
-
-Evidence:
-
-- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop`
-- Branch: `codex/memory-os-loop`
-- Project record: `DEVLOG.md` in the implementation worktree
-- Company memory update: `Company/60-assets-and-memory/02-失败归因与反模式�?md`
-
-### AFS-OPS-002: Agent Operating Entry Points
-
-Goal:
-
-- Convert the Company operating rules and recent AFS lessons into concrete
-  project entry points for parallel development.
-
-Acceptance criteria:
-
-- [x] `AGENTS.md` points substantial work to the agent roster and task brief.
-- [x] `docs/company_operating_model.md` records fast entry points,
-      capability-specific provider gates, and next parallel lanes.
-- [x] `docs/agent_operating_roster.md` defines standing roles, temporary
-      roles, dispatch triggers, lifecycle, and next queue.
-- [x] `docs/agent_task_brief_template.md` provides the AFS task template.
-- [x] `TASK_TRACKER.md` fixes stale integrated-task status and records the next
-      parallel queue.
-- [x] Reusable lessons are promoted to Company source rules and anti-patterns.
-
-Verification:
-
-```powershell
-git diff --check
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_roadmap_docs.py
-# 8 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
-# 0.1.0
-```
-
-Status:
-
-- completed
-
-Evidence:
-
-- Project docs: `docs/agent_operating_roster.md`,
-  `docs/agent_task_brief_template.md`, `docs/company_operating_model.md`
-- Company rule updates:
-  `D:\Learning materials\Learning_notes\Company\30-engineering\01-分支-worktree-子智能体协作规范.md`
-  and
-  `D:\Learning materials\Learning_notes\Company\60-assets-and-memory\02-失败归因与反模式�?md`
-
-### AFS-OPS-003: Local Alpha 0.2 Product Queue
-
-Goal:
-
-- Align project execution docs with the real post-cleanup branch state and
-  create executable task briefs for the first formal product push.
-
-Acceptance criteria:
-
-- [x] `docs/company_operating_model.md` names Local Alpha 0.2 as the current
-      product milestone.
-- [x] `docs/agent_operating_roster.md` removes stale preserved Web branch
-      language and lists the next product queue.
-- [x] `TASK_TRACKER.md` records the current queue, integration order, and branch
-      hygiene state.
-- [x] `docs/task_briefs/` contains direct briefs for the next four lanes.
-- [x] No runtime code, generated artifacts, provider config, or Company private
-      content is copied.
-
-Verification:
-
-```powershell
-python -m pytest tests/test_agentflow_roadmap_docs.py
-# 8 passed
-
-python -m apps.cli.main alpha-smoke --json
-# status: blocked because remote image provider is not enabled
-
-git diff --check
-# passed with Windows line-ending warnings only
-```
-
-Status:
-
-- completed
-
-Evidence:
-
-- `docs/company_operating_model.md`
-- `docs/agent_operating_roster.md`
-- `docs/task_briefs/`
-
-### AFS-ALPHA-PKG-001: Local Alpha 0.2 Acceptance Package
-
-Goal:
-
-- Turn current engineering evidence into a repeatable local Alpha acceptance
-  flow for future agents and human review.
-
-Acceptance criteria:
-
-- [x] A Local Alpha 0.2 acceptance package doc exists under `docs/`.
-- [x] The package defines current demoable capabilities, blockers, non-claims,
-      rerun commands, and acceptance checklist.
-- [x] The package links the Web workbench, NarratoStudio, NarratoCut, and
-      PosterFlow evidence paths.
-- [x] `TASK_TRACKER.md` records lane status and evidence.
-- [x] No confidential Company content or provider secrets are copied.
-
-Verification:
-
-```powershell
-python -m apps.cli.main alpha-smoke --json
-# status: blocked because remote image provider is not enabled
-
-python -m pytest tests/test_agentflow_roadmap_docs.py
-# 8 passed
-
-git diff --check
-# passed with Windows line-ending warnings only
-```
-
-Status:
-
-- completed
-
-Evidence:
-
-- `docs/local_alpha_0_2_acceptance.md`
-- `docs/task_briefs/AFS-ALPHA-PKG-001.md`
-
-### AFS-PROD-001: Alpha Smoke Status CLI
-
-Goal:
-
-- Add a read-only Alpha smoke/status entry that summarizes current engineering
-  readiness without running workflows, writing run artifacts, or calling
-  providers.
-
-Acceptance criteria:
-
-- [x] CLI exposes `alpha-smoke`.
-- [x] `alpha-smoke` prints human-readable status for NarratoStudio handoff,
-      NarratoCut finished package, and PosterFlow provider readiness.
-- [x] `alpha-smoke --json` prints machine-readable JSON.
-- [x] With no image-provider environment, PosterFlow is `blocked`, not
-      `pass`.
-- [x] The command does not call remote providers and does not write runtime
-      artifacts.
-- [x] Documentation links the command from the alpha readiness report and docs
-      index.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_video_to_finished_package_local_asr_workflow.py tests/test_narratostudio_workflow.py tests/test_posterflow_provider.py tests/test_alpha_smoke_cli.py
-# 25 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
-# status: blocked; no providers called
-
-git diff --check
-# passed with Windows line-ending warnings only
-```
-
-Status:
-
-- integrated to `master` at `5c88d21`
-
-Evidence:
-
-- `apps/cli/alpha_commands.py`
-- `tests/test_alpha_smoke_cli.py`
-- `docs/handoff/AFS-PROD-001.md`
-
-### AFS-QA-001: Evidence Summary Adapter
-
-Goal:
-
-- Add a compact shared evidence summary vocabulary that report consumers can
-  use without inferring acceptance or business validation from raw test status.
-
-Acceptance criteria:
-
-- [x] `agentflow.harness.evidence_summary` exposes builders for quality and
-      review surfaces.
-- [x] `build_quality_report()` adds `evidence_summary` without changing
-      existing report fields.
-- [x] `review_run()` adds `evidence_summary` without changing existing report
-      fields.
-- [x] Pass/fail/warning variants are normalized to the shared AgentFlow
-      status constants.
-- [x] Decision boundaries distinguish machine verification, human acceptance,
-      business validation, and memory promotion.
-- [x] The change does not call providers, run workflows, or write durable
-      memory.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py
-# 26 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
-# status: blocked because remote image provider is not enabled
-
-git diff --check
-# passed
-```
-
-Status:
-
-- integrated to `master` at `17c72e5`
-
-Evidence:
-
-- `agentflow/harness/evidence_summary.py`
-- `tests/test_evidence_summary.py`
-- `docs/handoff/AFS-QA-001.md`
-
-### AFS-MEM-002: Memory Promotion Review Decisions
-
-Goal:
-
-- Validate candidate memory promotion decisions as review artifacts without
-  writing durable memory or implying a Memory runtime exists.
-
-Acceptance criteria:
-
-- [x] `agentflow.memory.promotion` validates promotion review decisions as a
-      side-effect-free contract surface.
-- [x] Supported decisions are limited to `promoted`, `rejected`, `merged`, and
-      `expired`.
-- [x] Promotion decisions must link exactly one source candidate.
-- [x] Promotion decisions must keep non-empty `evidence_refs` and preserve the
-      candidate evidence refs.
-- [x] Durable memory claim fields such as `durable_memory_ref` and
-      `persisted_memory_id` are rejected.
-- [x] Outputs keep `runtime_status: not_implemented`,
-      `does_not_execute: true`, and `writes_long_term_memory: false`.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py tests/test_evidence_summary.py tests/test_alpha_smoke_cli.py
-# 57 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness
-# passed
-
-git diff --check
-# passed
-```
-
-Status:
-
-- integrated to `master` at `8fd9fe4`
-
-Evidence:
-
-- `agentflow/memory/promotion.py`
-- `docs/agentflow_memory_contract.md`
-- `examples/agentflow/memory_promotion_decision.example.json`
-- `tests/test_agentflow_asset_memory_validator.py`
-- `docs/handoff/AFS-MEM-002.md`
-
-### AFS-WEB-REPLAY: Local Web UI Workbench
-
-Goal:
-
-- Replay the preserved Web UI line onto current `master` without bringing back
-  stale backend/module changes from the old branch.
-
-Acceptance criteria:
-
-- [x] Only Web-facing code, Web bridge code, Web fixtures, and Web tests are
-      integrated from the replay lane.
-- [x] Review Mode remains local-only and reads only explicitly selected files.
-- [x] Production Mode connects only to the local bridge at `127.0.0.1`.
-- [x] `python -m apps.cli.main web-bridge` starts the local bridge entrypoint
-      used by the README.
-- [x] Production Mode can generate a plan, run a demo workflow, poll status,
-      list artifacts, and refresh review reports.
-- [x] Browser state remains non-persistent: no `localStorage`, IndexedDB,
-      cookies, uploads, provider config, SaaS, or cloud backend.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py tests/test_alpha_smoke_cli.py tests/test_evidence_summary.py tests/test_agentflow_asset_memory_validator.py
-# 60 passed
-
-node --check apps/web/app.js
-node --check apps/web/app-elements.js
-node --check apps/web/feedback-wiring.js
-node --check apps/web/feedback-event.js
-node --check apps/web/production-mode.js
-node --check apps/web/production-render.js
-node --check apps/web/production-workflows.js
-node --check apps/web/artifact-values.js
-node --check apps/web/video-preview.js
-node --check apps/web/artifact-contracts.js
-node --check apps/web/artifact-ledgers.js
-node --check apps/web/artifact-workspace.js
-node --check apps/web/render-helpers.js
-node --check apps/web/ui-copy.js
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli tests
-# passed
-```
-
-Browser smoke:
-
-- Started `python -m apps.cli.main web-bridge --host 127.0.0.1 --port 8787`.
-- Started `python -m http.server 8769 -d apps/web --bind 127.0.0.1`.
-- Opened `http://127.0.0.1:8769/index.html`.
-- Confirmed Review Mode rendered with no browser error logs.
-- Confirmed Production Mode bridge health showed `bridge ready`.
-- Selected `mock_text_to_slices`, generated `workflow_plan.json`, ran workflow
-  to `success`, saw all four steps pass, and refreshed review to `passed`.
-
-Status:
-
-- integrated to `master` at `5d0392f`
-
-Evidence:
-
-- `apps/web/`
-- `apps/web_bridge/`
-- `apps/cli/main.py`
-- `tests/test_web_static_artifact_viewer.py`
-- `tests/test_web_production_mode_static.py`
-- `tests/test_web_production_bridge.py`
-- `docs/handoff/AFS-WEB-REPLAY.md`
-
-### AFS-CTX-001: PosterFlow Context Runtime Trace
-
-Goal:
-
-- Add a minimal, auditable context assembly path after project prefix and
-  preference profile generation.
-
-Acceptance criteria:
-
-- [x] `context_bundle.json` records hot/warm/cold/policy context layers.
-- [x] `context_assembly_trace.json` records why context was included or
-      excluded.
-- [x] `next_round_prompt.json` references `context_bundle.json` and the cache
-      key.
-- [x] PosterFlow inspect/review fails when the context trace no longer points
-      to the generated bundle.
-- [x] No RAG, prefix-cache service, Router runtime, database, or provider
-      orchestration is added.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
-# 15 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
-# 488 passed
-
-git diff --check
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
-# 0.1.0
-```
-
-Status:
-
-- integrated to `master` with AFS-MEM-001
-
-Evidence:
-
-- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\memory-os-loop`
-- Project record: `DEVLOG.md` in the implementation worktree
-
-Follow-up:
-
-- AFS-QLT-001 started after this integration and handles the quality harness
-  split plus candidate quality feedback signals.
-
-### AFS-QLT-001: PosterFlow Quality Feedback Signals
-
-Goal:
-
-- Split the PosterFlow quality harness so future checks do not expand one large
-  file, then add a minimal quality-failure feedback signal path for Memory OS
-  learning.
-
-Acceptance criteria:
-
-- [x] `narratocut/harness/posterflow_quality.py` is reduced below 300 lines.
-- [x] JSON/JSONL reading and schema checks are moved into a focused module.
-- [x] Cross-artifact reference checks are moved into a focused module.
-- [x] Failed PosterFlow quality checks produce candidate feedback signals in
-      `quality_report.json`.
-- [x] Passing PosterFlow runs produce zero quality feedback signals.
-- [x] Quality feedback signals are candidate-only and set
-      `writes_long_term_memory: false`.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_quality.py tests/test_posterflow_workflow.py tests/test_posterflow_provider.py
-# 15 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
-# 488 passed
-
-git diff --check
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
-# 0.1.0
-```
-
-Status:
-
-- integrated to `master`
-
-Evidence:
-
-- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\quality-feedback-signals`
-- Branch: `codex/quality-feedback-signals`
-- Integration commit: `34dd51b feat(posterflow): add quality feedback signals`
-- Remote/local branch and worktree were deleted after integration.
-
-### AFS-DEMO-001: PosterFlow Two-Round Memory Demo
-
-Goal:
-
-- Turn the single-run PosterFlow memory demo into a true two-round workflow:
-  round 1 generates candidates and memory-context artifacts; round 2 uses the
-  next-round prompt to generate new candidates and writes an auditable
-  comparison report.
-
-Acceptance criteria:
-
-- [x] `next_round_prompt.json` is converted into a second-round prompt pack.
-- [x] Round 2 writes its own prompt pack, candidate manifest, model invocation
-      log, and image candidates under `round_2/`.
-- [x] Round 2 uses the existing remote-image provider gate; no new provider
-      policy or automatic remote call path is added.
-- [x] `poster_round_comparison.json` records round 1 vs round 2, reused memory
-      refs, cache key, and `writes_long_term_memory: false`.
-- [x] `poster_two_round_report.md` gives an agent-readable summary.
-- [x] Inspect/review fails when the round-2 comparison no longer matches the
-      round-2 candidate manifest.
-- [x] New and touched code files remain below the 300-line target.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
-# 16 passed
-```
-
-Status:
-
-- integrated to `master` at `ff77b30`
-
-Evidence:
-
-- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-two-round-demo`
-- Branch: `codex/posterflow-two-round-demo`
-- Main implementation module: `narratostudio/posterflow/two_round.py`
-- Full verification in the worktree: 489 tests passed, CLI help/version
-  passed, and `git diff --check` passed with Windows line-ending warnings only.
-- Branch and worktree were deleted after integration and remote cleanup.
-
-### AFS-PROV-001: PosterFlow MiniMax Provider Replay
-
-Goal:
-
-- Add native MiniMax image provider support to PosterFlow without directly
-  merging the stale old MiniMax branch or changing default provider behavior.
-
-Acceptance criteria:
-
-- [x] `NARRATOCUT_IMAGE_PROVIDER=openai_compatible` remains the default.
-- [x] `NARRATOCUT_IMAGE_PROVIDER=minimax` selects a native MiniMax provider via
-      `create_image_provider_from_env()`.
-- [x] MiniMax requests use `/v1/image_generation`,
-      `response_format=base64`, `image-01` by default, and support base URLs
-      with or without a trailing `/v1`.
-- [x] MiniMax candidate count is validated in-process before any remote call.
-- [x] Provider invocation logs do not include API keys, provider base URLs, raw
-      response ids, or response error bodies.
-- [x] PosterFlow round 1 and round 2 generation nodes use the provider factory
-      and keep the existing remote-image opt-in gate.
-- [x] New and touched code files remain below the 300-line target.
-
-Verification:
-
-```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_provider.py
-# 12 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_posterflow_provider.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py
-# 22 passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest
-# 495 passed
-
-git diff --check
-# passed with Windows line-ending warnings only
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
-# passed
-
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
-# 0.1.0
-```
-
-Status:
-
-- integrated to `master` at `649d736`
-
-Evidence:
-
-- Worktree: `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\posterflow-minimax-rebase`
-- Branch: `codex/posterflow-minimax-rebase`
-- Main implementation modules:
-  `narratostudio/posterflow/minimax_provider.py` and
-  `narratostudio/posterflow/provider_common.py`
-- Reference branch deliberately not merged:
-  `origin/codex/posterflow-minimax-provider-tests`
-- Local worktree and both remote provider branches were deleted after
-  integration.
-
-### AFS-WEB-001: Web UI Parallel Lane Repair
-
-Goal:
-
-- Preserve the independent NarratoCut Web UI line without letting stale
-  branch/worktree state block future parallel development.
-
-Acceptance criteria:
-
-- [x] Broken worktree metadata from the old `D:\Projects\NarratoCut` path is
-      repaired.
-- [x] The worktree is moved under the AgentFlowStudio global worktree root.
-- [x] Uncommitted Web UI M3.1 production workbench changes are committed and
-      pushed to `origin/codex/narratocut-web-ui`.
-- [x] The branch is explicitly classified as preserved but not merge-ready.
-- [x] Verification evidence is recorded before the branch is treated as
-      backed up.
-
-Verification:
-
-```powershell
-python -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py
-# 41 passed
-
-python -m pytest
-# 374 passed
-
-python -m apps.cli.main --help
-# passed
-
-python -m apps.cli.main version
-# 0.1.0
-
-node --check apps/web/app.js
-node --check apps/web/app-elements.js
-node --check apps/web/feedback-wiring.js
-node --check apps/web/feedback-event.js
-node --check apps/web/production-mode.js
-node --check apps/web/production-render.js
-node --check apps/web/production-workflows.js
-node --check apps/web/artifact-values.js
-node --check apps/web/video-preview.js
-# passed
-
-python -m compileall apps/web_bridge apps/cli narratocut/workflow_engine tests
-# passed
-
-git diff --check
-# passed
-```
-
-Status:
-
-- archived at tag `archive/narratocut-web-ui-de8ca8e`; useful work replayed by
-  `AFS-WEB-REPLAY`; local and remote branches deleted
-
-Evidence:
-
-- Archive tag: `archive/narratocut-web-ui-de8ca8e`
-- Replay integration: `AFS-WEB-REPLAY` at `5d0392f`
-- Old worktree, local branch, and remote branch were deleted after replay and
-  final verification.
-
-## Planned Worktree Layout
-
-Use global worktrees for implementation tracks:
-
-```text
-C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\<branch-slug>
-```
-
-The main checkout should stay stable for scan, sync, and final integration.
-
-## Completion Rules
-
-Do not mark a task complete unless:
-
-- implementation or documentation change is done;
-- acceptance criteria are checked;
-- verification command results are recorded;
-- generated artifacts or evidence paths are listed when relevant;
-- follow-up work is moved into this tracker or backlog;
-- reusable experience is considered for Company memory promotion.
+| Local Alpha 0.4 runtime | passed runtime verification on this workstation | `docs/handoff/AFS-RUN-PACKAGE-001.md`; ignored run artifacts under `data/processed/runs/local_alpha_0_4_product_loop` |
+| Local Alpha 0.4 Web operator | passed after stale readiness blocker fix | `docs/handoff/AFS-WEB-OPERATOR-002.md`; no provider call or generated artifact committed |
+| Local Alpha 0.4 memory-quality review | passed as structural traceability only | `docs/handoff/AFS-MEMORY-QUALITY-002.md`; no durable Memory runtime and no real second-pass execution |
+| Local Alpha 0.4 acceptance reconciliation | completed as pass/block/non-claim ledger | `docs/local_alpha_0_4_acceptance_reconciliation.md` |
+| Kling/MiniMax provider clients | useful provider smoke/client code exists but needs promotion decision | gated adapters under `narratocut/model_gateway/` and CLI commands; no secrets should be committed |
+| Mainline slimming boundary | boundary ledger drafted; first cleanup applied | `docs/maintenance/AFS-SLIMMING-BOUNDARY-001.md` classifies memory-video-pipeline and Web Workbench as mainline, DEMO-012 through RECORDING-016 as evidence to preserve, direct Kling/MiniMax smoke and numbered demo commands as hidden legacy/operator paths, and old bytecode/DEVLOG/demo modules as staged removal candidates; ignored bytecode cache cleanup deleted 35 ignored local `__pycache__` directories after path and `git check-ignore` gates; focused boundary tests passed (`32 passed`); no provider calls |
+| Ignored bytecode cache cleanup | applied locally | Deleted ignored `__pycache__` directories only under `apps/`, `agentflow/`, `narratocut/`, `narratostudio/`, and `tests/`; 35 targets were inside the repo and ignored by Git, 0 unsafe targets, 0 remaining after `python -B` CLI/test verification; no tracked code/evidence/provider/Company files touched |
+| DEVLOG historical compression | applied | Root `DEVLOG.md` is now an active short log under the 300-line target; older 2026-05 sections are indexed in `docs/archive/devlog_history_2026_05.md`, and full pre-slimming raw text is preserved only under ignored `data/processed/maintenance_backups/AFS-SLIMMING-DEVLOG-001/`; docs/boundary tests passed (`48 passed`); no code/provider/evidence runbook/Company files touched |
+| Pre-staging candidate ledger | drafted | `docs/maintenance/AFS-STAGING-CANDIDATE-001.md` classifies the dirty checkout before staging: 51 modified tracked files, 120 untracked files, and ignored `data/processed/` runtime/backup roots; provider/operator files are quarantined from mainline staging; the local Company `.secrets` default in `company_secrets.py` has been removed and provider config now requires explicit `--provider-config` or `NARRATOCUT_PROVIDER_CONFIG`; docs/boundary tests passed (`48 passed`) |
+| Provider config bridge hardening | applied | `narratocut/model_gateway/company_secrets.py` no longer commits a machine-local Company `.secrets` default; hidden provider/operator CLI commands default provider config to `None` and rely on explicit path or `NARRATOCUT_PROVIDER_CONFIG`; focused provider/operator tests passed (`29 passed`); default CLI and hidden command help checked; hardcoded local `.secrets` path scan clean; no provider calls |
+| Provider/operator staging review | drafted | `docs/maintenance/AFS-PROVIDER-OPERATOR-STAGING-REVIEW-001.md` classifies direct Kling/MiniMax commands, provider adapters, RECORDING-016 script, and mocked tests as a separate hidden support slice; live recording script now requires explicit provider config as well as the video gate; provider/operator suite passed (`44 passed`); docs test passed (`16 passed`); no provider calls |
+| Mainline staging bundle | staged on `codex-mainline-slimming-staging`; not committed | `docs/maintenance/AFS-MAINLINE-STAGING-BUNDLE-001.md` defines the current integration bundle as product mainline plus reviewed hidden support/evidence; CLI registration is split between product `command_registry.py` and hidden `support_command_registry.py`; 182 files are staged from the reviewed bundle; staged diff check, staging preflight, docs/preflight tests, and full suite verification passed (`675 passed` before final tracker-only record update); no provider calls |
+| Oversized file slimming | applied | DEMO-012 HTML rendering, DEMO-012 test manifest helpers, and memory-video-pipeline contract example checks were split into focused files; current changed/untracked code/docs effective-line scan reports no files over 300 lines; focused DEMO-012 and contract example tests passed (`39 passed`); no provider calls |
+| Staging preflight guard | applied | `tools/staging_preflight.py` turns the staging boundary into a local no-side-effect check over `git status --short`; it fails local-only paths, oversized effective files, and hardcoded Company `.secrets` paths; preflight unit tests passed (`5 passed`) and current dirty tree preflight passed; no staging yet |
+| Workflow engine node slimming | focused split applied | `narratocut/workflow_engine/nodes.py` now keeps base node orchestration and registry under 300 lines, while `narratocut/workflow_engine/node_artifacts.py` owns artifact JSON loading, schema validation, state fallback, and shared node input/output helpers; duplicate helper definitions were removed from focused node modules; focused workflow/helper tests passed (`81 passed`) and full suite passed (`662 passed`); no provider calls |
+| Kling provider smoke slimming | focused split applied | `narratocut/model_gateway/kling_video_smoke.py` now keeps public smoke orchestration under 300 lines, `narratocut/model_gateway/kling_video_runtime.py` owns HTTP/curl runtime parsing, and focused Kling tests passed (`16 passed`); no provider calls |
+| MiniMax provider smoke slimming | focused split applied | `narratocut/model_gateway/minimax_image_smoke.py` now keeps public smoke entrypoints under 300 lines, `narratocut/model_gateway/minimax_image_plan.py` owns request planning/config resolution, and `narratocut/model_gateway/minimax_image_runtime.py` owns runtime image helpers; focused MiniMax/provider tests passed (`32 passed`); no provider calls |
+| Memory video pipeline protocol | no-call plan, review, and observation slices complete | `memory-video-pipeline-plan` writes sanitized plan artifacts; `memory-video-pipeline-review` reads explicit I2V manifest refs; `memory-video-pipeline-observe` records bounded human visual notes under ignored `data/processed/` |
+| Memory video package command | no-call product package complete | `memory-video-pipeline-package` links plan, explicit-artifact review, bounded observation, presentation material, and an `agentflow_feedback_event` draft; no provider calls, media copy, durable memory write, human acceptance, or business validation |
+| CLI product surface | first slimming slice applied | Default `python -m apps.cli.main --help` now promotes `memory-video-pipeline-*` and hides numbered memory-advantage demo/provider smoke commands; legacy commands remain directly invocable for existing evidence runbooks |
+| CLI module split | command registry extracted | `apps/cli/main.py` now stays under the 300-line project target; extension command imports and Typer registration live in `apps/cli/command_registry.py` |
+| Web static test slimming | focused test split applied | Oversized Web static suites were split by responsibility: production mode, memory workbench structure/feedback/canvas/sample, artifact viewer structure, artifact workspace normalization, and read-only boundaries; focused Web static suite passed (`50 passed`) and full suite passed (`662 passed`) |
+| Web runtime module slimming | focused JS split applied | `apps/web/app.js`, `apps/web/production-mode.js`, and `apps/web/memory-workbench-package.js` now stay under the 300-line target by moving Review rendering, local bridge transport/buttons, and package-ref constants into focused modules; focused Web static suite passed (`50 passed`), full suite passed (`662 passed`), and Edge headless loaded `#memory` without detected module/syntax error markers |
+| Web CSS module slimming | focused CSS split applied | `apps/web/styles.css` and `apps/web/memory-workbench.css` are import-only entries with base/layout/control/responsive rules moved into focused files under 300 lines; focused Web static suite passed (`50 passed`), full suite passed (`662 passed`), and Edge headless loaded `#memory` without detected module/CSS load or syntax error markers |
+| Web shell template slimming | focused HTML shell split applied | `apps/web/index.html` is now a 17-line static root that mounts local Review, Production, and Memory shell template modules before element collection; shell template files stay under 300 lines; focused Web static suite passed (`50 passed`), full suite passed (`662 passed`), and Edge headless rendered `#memory` without detected template/module error markers |
+| Web README slimming | focused docs split applied | `apps/web/README.md` is now a short operator entry point under 300 lines; detailed Web workbench milestones and reference material live in `docs/workbench/web_workbench_milestones.md` and `docs/workbench/web_workbench_reference.md`; focused Web static suite passed (`50 passed`) and full suite passed (`662 passed`) |
+| Numbered demo cleanup | DEMO-002 and DEMO-008 through DEMO-011 retired from active code | Bespoke early demo modules, focused tests, CLI registrations, and DEMO-006 through DEMO-011 handoff drafts removed; `docs/archive/task_history_2026_05.md` keeps compressed history; `memory_advantage_demo_011_content.py` remains only as shared asset-card data for DEMO-012/015 |
+| Memory advantage demo evidence | compelling but bounded demo evidence exists | strongest current signal is RECORDING-016: repeated same-keyframe I2V where baseline varied more and memory-backed outputs were more consistent |
+| RECORDING-016 operator recording | ready for explicit-gate live recording | `tools/run_memory_advantage_recording_016.ps1` supports dry-run and requires `-AllowRemoteVideo` or `NARRATOCUT_ALLOW_REMOTE_VIDEO=true` for Kling I2V; runbook: `docs/handoff/AFS-MEMORY-ADVANTAGE-RECORDING-016.md` |
+| Competition demo narration | ready for rehearsal | `docs/handoff/AFS-COMPETITION-DEMO-TALK-TRACK.md` provides a 60-second live talk track, a 3-minute recording script, claim boundaries, and judge Q&A |
+| Competition demo run sheet | machine rehearsal passed; ready for human rehearsal | `docs/handoff/AFS-COMPETITION-DEMO-RUN-SHEET.md` lists preflight, Slidev commands, optional live I2V recording, fallbacks, safe wording, human rehearsal checklist, and feedback capture template |
+| Post-demo productization roadmap | ready for next-lane execution | `docs/handoff/AFS-POST-DEMO-PRODUCTIZATION-ROADMAP.md` turns the demo evidence into the next queue: protocol-driven memory pipeline, workbench design, human feedback capture, read-only review CLI, Web evidence summary, and later provider gateway |
+| Memory production workbench design | ready for implementation planning | `docs/workbench/AFS-WORKBENCH-REDESIGN-001.md` defines the operator workflow, first screen, states, memory provenance display, local-only boundaries, and browser verification plan; no Web implementation or provider call |
+| Memory workbench implementation slice | focused Web verification passed | `apps/web/memory-workbench-controller.js`, `apps/web/memory-workbench-package.js`, `apps/web/memory-workbench-inspector.js`, `apps/web/memory-workbench-feedback.js`, `apps/web/memory-workbench-sample.js`, `apps/web/memory-workbench-render.js`, `apps/web/memory-workbench-demo-summary.js`, `apps/web/memory-workbench-demo-render.js`, `apps/web/memory-workbench-demo-checklist.js`, `apps/web/memory-workbench-demo-checklist-render.js`, and `apps/web/memory-workbench-studio.css` let user-selected protocol/package/review/observation/presentation/feedback JSON refresh and inspect the canvas from explicit artifacts, including referenced-but-not-selected bundle gaps, read-only node-to-card focus, navigation-only workflow actions, copy-only `agentflow_feedback_event` draft preview, a sanitized in-memory `Load sample bundle` path, source-status display, Flow/Compare/Review focus tools, an Experiment Protocol panel for lane parity plus non-claim boundaries, a Demo Evidence Summary talk-track panel, a grouped demo-ready checklist, a dynamic `Can present / Evidence gaps / Do not claim` readiness cockpit, a Studio Canvas first-screen header, and hash-based `#memory` demo entry; focused Web static tests passed (`66 passed`); no bridge edits, provider calls, directory scanning, browser persistence, ref auto-open, raw JSON editing, workflow execution, artifact write, project-file auto-read, or durable Memory runtime |
+| Memory evidence reuse CLI | focused memory/contract verification passed | `memory-evidence-reuse-review` reads explicit review/candidate/decision JSON, validates `runtime evidence -> feedback source -> memory candidate -> promotion decision -> context bundle -> second-pass prompt`, fails broken refs and rejected reuse, writes no file by default, and writes validation JSON only when `--output` is explicit; focused tests passed (`57 passed`); no provider calls, runtime artifact writes, durable memory write, second-pass execution, human acceptance, or business validation |
+
+## Archive
+
+- Pre-reset tracker history: `docs/archive/task_history_2026_05.md`.
+- Raw pre-reset tracker bytes, including the invalid UTF-8 source file, are
+  preserved outside Git under
+  `data/processed/maintenance_backups/AFS-MAINTENANCE-RESET-001/`.
+- Long dated narrative belongs in `DEVLOG.md` only as short pointers to
+  detailed docs, not as another full historical tracker.

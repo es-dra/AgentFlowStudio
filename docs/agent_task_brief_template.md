@@ -14,6 +14,17 @@ brief. Keep private Company strategy and secrets out of this file.
 
 Choose one primary role from `docs/agent_operating_roster.md`.
 
+## Task Difficulty / Dispatch Mode
+
+Choose one before assigning work:
+
+```text
+Mode: Light | Standard | Deep | Strategic
+Why this mode:
+Subagent needed: yes | no
+Close condition:
+```
+
 ## Branch / Worktree
 
 ```text
@@ -80,6 +91,12 @@ Where the worker should write or reference evidence:
 ```text
 
 ```
+
+## Integration Order
+
+State how this task should be integrated relative to other active lanes:
+
+- TODO
 
 ## Return Format
 

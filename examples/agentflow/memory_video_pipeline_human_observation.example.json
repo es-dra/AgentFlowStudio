@@ -1,0 +1,85 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_memory_video_pipeline_human_observation",
+  "protocol_id": "memory_video_pipeline_neon_rain_turnback_v1",
+  "source_review_artifact_type": "agentflow_memory_video_pipeline_review",
+  "provider_calls_started_by_observation": false,
+  "writes_long_term_memory": false,
+  "observation_status": "visual_observation_recorded",
+  "reviewer": "operator_visual_review",
+  "review_inputs": {
+    "artifact_manifest_type": "agentflow_memory_video_pipeline_artifact_manifest",
+    "run_ids": [
+      "recording_016_run_1",
+      "recording_016_run_2"
+    ],
+    "artifact_count": 4
+  },
+  "lane_parity": {
+    "same_user_task": true,
+    "same_source_assets": true,
+    "same_provider_route": true,
+    "same_duration": true,
+    "same_script": true,
+    "only_memory_context_differs": true,
+    "expected_lanes_present": true,
+    "same_source_image_sha256": true,
+    "all_manifests_succeeded": true
+  },
+  "storyboard": {
+    "scene_id": "neon_rain_turnback",
+    "shot_checkpoints": [
+      "0-3s front three-quarter readable character",
+      "3-6s walking through neon rain",
+      "6-10s light sweep and rain partially obscure face and torso",
+      "10-13s turn back toward camera",
+      "13-15s stop under flickering abstract neon sign"
+    ]
+  },
+  "observations": [
+    {
+      "criterion": "shot_structure_consistency",
+      "verdict": "memory_backed_stronger",
+      "note": "Baseline repeats varied more in camera path; memory-backed repeats kept the five checkpoints closer."
+    },
+    {
+      "criterion": "identity_anchor_retention",
+      "verdict": "memory_backed_stronger",
+      "note": "Memory-backed repeats recovered the same face and high ponytail more consistently after motion."
+    },
+    {
+      "criterion": "wardrobe_anchor_retention",
+      "verdict": "memory_backed_stronger",
+      "note": "Memory-backed repeats retained white top, blue jeans, and white sneakers with less drift."
+    },
+    {
+      "criterion": "scene_anchor_retention",
+      "verdict": "mixed",
+      "note": "Both lanes kept neon rain, but memory-backed repeats aligned reflections and sign-light timing more closely."
+    },
+    {
+      "criterion": "occlusion_recovery_repeatability",
+      "verdict": "memory_backed_stronger",
+      "note": "After rain and light sweep occlusion, memory-backed repeats returned to a more similar readable character."
+    },
+    {
+      "criterion": "motion_physics_repeatability",
+      "verdict": "mixed",
+      "note": "Both lanes have model drift; memory-backed repeats were steadier, but this remains subjective visual evidence."
+    }
+  ],
+  "observed_signal_summary": {
+    "baseline_more_variable": true,
+    "memory_backed_more_stable": true,
+    "residual_risk": "subjective_visual_review"
+  },
+  "claim_boundaries": {
+    "human_acceptance": "not_acceptance",
+    "business_validation": "not_validated",
+    "quality_improvement_claim": "bounded_visual_signal_only",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "metadata": {
+    "example": true
+  }
+}

@@ -78,15 +78,17 @@ export function renderReadinessWizard(elements, state, workflow, readiness) {
   const inputCheck = state.run?.input_check || state.plan?.input_check;
   const profile = workflow?.web_profile || {};
   const localSetupBlockers = workflowLocalSetupBlockers(workflow);
-  const setupDetail = localSetupBlockers.length
+  const setupDetail = inputCheck?.next_action
+    || (localSetupBlockers.length
     ? `Local Alpha 0.4 local_setup_blockers: ${localSetupBlockers.join("; ")}`
-    : inputCheck?.next_action || "先生成 workflow_plan.json";
+    : "先生成 workflow_plan.json");
+  const nextDetail = readiness.blocker || inputCheck?.next_action || profile.next_step_hint || "检查输入后再继续";
 
   elements.readinessChecklist.append(
     metricCard("生产目标", workflowDisplayName(workflow), profile.kind === "demo" ? "本机演示，可用于验证链路" : "完整成品包，需要本地依赖和素材"),
     metricCard("本机环境", bridgeStatus, environmentDetail(state.bridge, workflow)),
     metricCard("输入诊断", inputCheck?.summary || "尚未生成计划，等待检查 input bundle", setupDetail),
-    metricCard("下一步动作", readiness.nextAction, readiness.blocker || profile.next_step_hint || "检查输入后再继续"),
+    metricCard("下一步动作", readiness.nextAction, nextDetail),
   );
 }
 

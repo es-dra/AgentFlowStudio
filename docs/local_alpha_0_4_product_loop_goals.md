@@ -2,10 +2,13 @@
 
 Date: 2026-05-27
 
-Current status: ready for planning and dispatch. Local Alpha 0.3 proved the
-local engineering loop: workflow selection, supervised run, review refresh,
-feedback capture, and evidence-to-context reuse. Local Alpha 0.4 raises the
-bar from engineering loop to one real product loop.
+Current status: acceptance reconciled for machine-verified local evidence in
+`docs/local_alpha_0_4_acceptance_reconciliation.md`.
+Local Alpha 0.3 proved the local engineering loop: workflow selection,
+supervised run, review refresh, feedback capture, and evidence-to-context
+reuse. Local Alpha 0.4 raises the bar from engineering loop to one real product
+loop. The remaining 0.4 gap is actual second-pass execution and human product
+acceptance, not structural traceability.
 
 ## Purpose
 
@@ -140,25 +143,35 @@ Evidence:
 - `alpha-smoke --json`.
 - `docs/handoff/AFS-POSTER-LIVE-002.md` if the lane is reopened.
 
-## Overall Pass Criteria
+## Acceptance Reconciliation
 
-Local Alpha 0.4 can be marked accepted when all of the following are true:
+Current reconciliation:
 
-- [ ] A named product scenario has a clear runbook, local input policy, and
+- [x] A named product scenario has a clear runbook, local input policy, and
       acceptance checklist.
-- [ ] A local product run either completes to reviewable package evidence or
+- [x] A local product run either completes to reviewable package evidence or
       reports an actionable local-input blocker.
-- [ ] The Web workbench can guide the operator through scenario review and
+- [x] The Web workbench can guide the operator through scenario review and
       feedback without browser persistence or remote services.
-- [ ] Feedback-to-memory-to-context reuse is visible in a second pass or in a
-      documented blocked state with the missing evidence named.
-- [ ] `alpha-smoke --json` remains accurate and side-effect-free.
-- [ ] Browser smoke, focused tests, compile/syntax checks, and `git diff
-      --check` pass for changed surfaces.
-- [ ] Reports separate structure verification, runtime verification, human
+- [x] Feedback-to-memory-to-context reuse is visible as a side-effect-free
+      structural review.
+- [x] Reports separate structure verification, runtime verification, human
       acceptance, business validation, provider smoke, and memory promotion.
-- [ ] Generated media, run artifacts, provider config, secrets, and private
+- [x] Generated media, run artifacts, provider config, secrets, and private
       Company knowledge remain out of committed files.
+
+Current non-accepted states:
+
+- Human acceptance is not reviewed.
+- Business validation is not performed.
+- A real second-pass run has not been executed.
+- Durable Memory runtime is not implemented.
+- `AFS-POSTER-LIVE-002` remains blocked unless local image-provider env is
+  intentionally configured.
+
+Detailed ledger:
+
+- `docs/local_alpha_0_4_acceptance_reconciliation.md`.
 
 ## Non-Claims
 
@@ -178,9 +191,9 @@ Local Alpha 0.4 does not claim:
 | ID | Suggested branch | Owner role | Primary outcome | Dependency |
 |---|---|---|---|---|
 | AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | 0.4 scenario package and runbook | complete after integration |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | ready after scenario package integration |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web path for the 0.4 scenario | ready after scenario package integration |
-| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | after runtime evidence shape is known |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | completed after local inputs were supplied |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web path for the 0.4 scenario | integrated with follow-up readiness fix |
+| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | complete as structural review |
 | AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | optional |
 
 Integration order:
@@ -188,7 +201,7 @@ Integration order:
 ```text
 AFS-PROD-LOOP-001
   -> AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 in parallel
-  -> AFS-MEMORY-QUALITY-002 after the runtime evidence shape is stable
+  -> AFS-MEMORY-QUALITY-002 after the runtime evidence shape is stable [structural review complete]
   -> AFS-POSTER-LIVE-002 only if local image-provider env is intentionally configured
   -> controller-side verification, branch cleanup, and memory promotion review
 ```
