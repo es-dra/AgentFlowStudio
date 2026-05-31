@@ -1,8 +1,7 @@
 # AFS-MAINLINE-STAGING-BUNDLE-001 - Mainline Staging Bundle
 
 Status: pushed as draft PR #72 on `codex-mainline-slimming-staging`;
-depends on PR #73, which is ready for review, for the Local Alpha 0.4
-mainline base.
+PR #73 has merged the Local Alpha 0.4 mainline base into `master`.
 
 This bundle converts the current dirty checkout into a coherent integration
 plan. It keeps the product surface centered on `memory-video-pipeline-*` and
@@ -192,11 +191,11 @@ git commit -m "feat(agentflow): add memory pipeline mainline bundle"
 Remote review chain on 2026-05-31:
 
 - PR #73: `codex-local-alpha-0-4-mainline-sync` -> `master`.
-  This publishes the local `master` base that was 14 commits ahead of
-  `origin/master`.
+  This published the local `master` base that was ahead of `origin/master` and
+  merged as `94401afe`.
 - PR #72: `codex-mainline-slimming-staging` ->
-  `codex-local-alpha-0-4-mainline-sync`. This keeps the slimming bundle review
-  scoped to the bundle commit series on top of the Local Alpha 0.4 base.
+  `master`. After #73 merged, this keeps the slimming bundle review scoped to
+  the bundle commit series on top of the Local Alpha 0.4 base now in `master`.
 
 Remote readiness follow-up on 2026-05-31:
 
@@ -211,6 +210,8 @@ Remote readiness follow-up on 2026-05-31:
 - After the #73 branch was cleaned and repushed at `35bba58`, PR #72 was
   rebased on top of that updated base and pushed with `--force-with-lease`.
   GitHub then reported PR #72 as draft and `mergeable=true` at head `5962a2a`.
+- PR #73 was merged to `master` as `94401afe`; PR #72 was then rebased on top
+  of `origin/master` and is being prepared for retargeting to `master`.
 
 ## Commit Boundary
 
