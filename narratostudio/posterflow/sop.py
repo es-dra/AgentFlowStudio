@@ -198,6 +198,9 @@ def build_preference_profile(
     decisions: PosterMemoryDecisions,
 ) -> PosterPreferenceProfile:
     accepted_ids = {decision.memory_candidate_id for decision in decisions.decisions if decision.decision == "accepted"}
+    accepted_decision_ids = [
+        decision.decision_id for decision in decisions.decisions if decision.decision == "accepted"
+    ]
     accepted = [candidate for candidate in memory.candidates if candidate.memory_candidate_id in accepted_ids]
     positive = [candidate.claim for candidate in accepted if candidate.memory_type == "visual_style_preference"]
     negative = [candidate.claim for candidate in accepted if candidate.memory_type == "negative_visual_preference"]
@@ -212,6 +215,7 @@ def build_preference_profile(
             "Negative prompt should preserve rejected visual tags from accepted memory candidates.",
         ],
         source_memory_candidates=[candidate.memory_candidate_id for candidate in accepted],
+        source_promotion_decisions=accepted_decision_ids,
     )
 
 
@@ -249,6 +253,7 @@ def build_next_round_prompt(
             "preference_profile_path": "poster_preference_profile.json",
             "context_bundle_path": "context_bundle.json" if context_bundle else None,
             "memory_refs": profile.source_memory_candidates,
+            "promotion_decision_refs": profile.source_promotion_decisions,
             "rag_refs": [],
             "cache_key": context_bundle.cache_plan["cache_key"] if context_bundle else None,
         },

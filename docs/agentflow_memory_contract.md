@@ -16,6 +16,9 @@ raw feedback event
 -> memory candidate
 -> promotion decision
 -> accepted / rejected / merged / expired memory
+-> preference profile
+-> context bundle
+-> next-round prompt
 ```
 
 Each step must keep evidence references so future agents can explain why a
@@ -70,6 +73,12 @@ It may summarize:
 It must not be used as the primary feedback store. `feedback.jsonl` remains the
 source of truth even when a derived signal is easier for an Agent to read.
 
+Role boundary:
+
+- Raw feedback is source evidence.
+- Derived feedback signal is an interpretation for one run.
+- A derived signal must point back to raw feedback and must not replace it.
+
 ## Memory Candidate
 
 `memory_candidates.json` is a candidate store.
@@ -119,6 +128,56 @@ be used when the candidate is no longer actionable, stale, or superseded by
 newer evidence.
 
 See [`../examples/agentflow/memory_promotion_decision.example.json`](../examples/agentflow/memory_promotion_decision.example.json).
+
+## Preference Profile
+
+`poster_preference_profile.json` is a demo-only review artifact that turns
+accepted memory candidates into prompt-facing preferences.
+
+It must include:
+
+- `source_memory_candidates`: accepted candidate ids.
+- `source_promotion_decisions`: explicit promotion or review decision ids.
+- `writes_long_term_memory: false`.
+
+A preference profile is not durable memory. It is a bounded context input for a
+future prompt, and must remain auditably linked to the review decision that
+allowed candidate reuse.
+
+## Context Bundle
+
+`context_bundle.json` packages prompt-facing context layers for the next round.
+
+For the PosterFlow memory demo it records:
+
+- hot context: project prefix and prompt rules.
+- warm context: preference profile, memory refs, and promotion decision refs.
+- cold context: retrieval disabled with `not_configured` status.
+- policy context: quality profile and provider gate boundary.
+
+The bundle must reference the profile, raw candidate source, memory review, and
+promotion decisions. `context_assembly_trace.json` must point to the bundle,
+reuse the cache key, and keep `writes_long_term_memory: false`.
+
+This is not RAG, a prefix-cache service, or a Memory runtime. It is a
+side-effect-free context artifact.
+
+## Next-Round Prompt
+
+`next_round_prompt.json` is the prompt handoff for the next local run.
+
+It must reference:
+
+- `project_prefix_path`
+- `preference_profile_path`
+- `context_bundle_path`
+- `memory_refs`
+- `promotion_decision_refs`
+- `cache_key`
+
+It must keep `writes_long_term_memory: false`. A next-round prompt may reuse
+accepted evidence, but it must not claim that a durable project preference was
+written.
 
 ## Reusable Asset Profile
 

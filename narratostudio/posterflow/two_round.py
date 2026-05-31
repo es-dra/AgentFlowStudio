@@ -18,6 +18,7 @@ def build_round_2_prompt_pack(
     next_prompt: NextRoundPrompt,
 ) -> PosterPromptPack:
     memory_refs = list(next_prompt.memory_context.get("memory_refs", []))
+    promotion_decision_refs = list(next_prompt.memory_context.get("promotion_decision_refs", []))
     return PosterPromptPack(
         project_id=next_prompt.project_id,
         run_id=next_prompt.new_run_id,
@@ -37,6 +38,7 @@ def build_round_2_prompt_pack(
             "preference_profile_used": True,
             "context_bundle_used": bool(next_prompt.memory_context.get("context_bundle_path")),
             "memory_refs": memory_refs,
+            "promotion_decision_refs": promotion_decision_refs,
             "context_bundle_path": next_prompt.memory_context.get("context_bundle_path"),
             "cache_key": next_prompt.memory_context.get("cache_key"),
         },
@@ -102,6 +104,7 @@ def build_round_comparison(
             "context_bundle_path": next_prompt.memory_context.get("context_bundle_path"),
             "cache_key": next_prompt.memory_context.get("cache_key"),
             "memory_refs": list(profile.source_memory_candidates),
+            "promotion_decision_refs": list(profile.source_promotion_decisions),
             "memory_candidate_count": len(memory.candidates),
             "writes_long_term_memory": False,
         },
@@ -195,6 +198,7 @@ def _evidence_chain(
             "artifact_refs": ["poster_preference_profile.json", "project_prefix.md", "context_bundle.json"],
             "source_refs": {
                 "memory_review": "poster_memory_review.jsonl",
+                "promotion_decision_refs": _joined(profile.source_promotion_decisions),
                 "profile_memory_refs": ", ".join(profile.source_memory_candidates),
             },
             "summary": "Reviewed candidates feed a demo-only profile and context bundle.",
@@ -205,6 +209,7 @@ def _evidence_chain(
             "artifact_refs": ["next_round_prompt.json", "round_2/poster_prompt_pack.json"],
             "source_refs": {
                 "context_bundle": next_prompt.memory_context.get("context_bundle_path") or "",
+                "promotion_decision_refs": _joined(profile.source_promotion_decisions),
                 "cache_key": str(next_prompt.memory_context.get("cache_key") or ""),
             },
             "summary": "Round 2 prompt pack reuses context refs from the next-round prompt.",
@@ -218,3 +223,7 @@ def _evidence_chain(
             "writes_long_term_memory": False,
         },
     ]
+
+
+def _joined(values: list[str]) -> str:
+    return ", ".join(sorted(values))

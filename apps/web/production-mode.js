@@ -19,6 +19,7 @@ import {
   workflowByName,
   workflowDefaultInput,
   workflowDefaultOutput,
+  workflowLocalSetupBlockers,
   workflowRequires,
 } from "./production-workflows.js";
 
@@ -33,6 +34,7 @@ export const productionState = {
   plan: null,
   run: null,
   review: null,
+  feedbackCaptured: false,
   log: ["Production Mode 只连接本机 bridge，不上传媒体或调用远程服务。"],
   supervisionEvents: [],
 };
@@ -80,6 +82,7 @@ export async function createPlan(elements, copy) {
       output_dir: `${elements.workflowOutputDir.value}_plan`,
     });
     productionState.plan = plan;
+    productionState.feedbackCaptured = false;
     appendLog(`已生成 workflow_plan.json: ${plan.plan_path}`);
   } catch (error) {
     appendLog(`生成计划失败: ${error.message}`);
@@ -96,6 +99,7 @@ export async function runSelectedWorkflow(elements, copy) {
       output_dir: elements.workflowOutputDir.value,
     });
     productionState.run = run;
+    productionState.feedbackCaptured = false;
     appendLog(`Workflow ${run.status}: ${run.run_dir}`);
     startRunPolling(elements, copy);
   } catch (error) {
@@ -113,6 +117,11 @@ export async function refreshReview(elements, copy) {
   try {
     const review = await bridgePost(`/runs/${encodeURIComponent(elements.workflowOutputDir.value)}/review`, {});
     productionState.review = review;
+    if (productionState.run) {
+      productionState.run.review_status = review.status || review.review?.status || null;
+      productionState.run.review_artifacts = review.artifacts || {};
+    }
+    productionState.feedbackCaptured = false;
     appendLog(`验收报告已刷新: ${review.status}`);
   } catch (error) {
     appendLog(`刷新验收报告失败: ${error.message}`);
@@ -122,7 +131,7 @@ export async function refreshReview(elements, copy) {
 
 export function renderProductionState(elements, copy, workspace = null) {
   const workflow = selectedWorkflow();
-  const activePathIndex = !productionState.plan ? 1 : !productionState.run ? 2 : !productionState.review ? 3 : 4;
+  const activePathIndex = activeOperatorStepIndex();
   const readiness = productionReadiness(workflow);
   renderBridgeHealth(elements, productionState.bridge);
   renderWorkflowProfile(elements, workflow, copy);
@@ -145,6 +154,14 @@ function renderProductionButtons(elements) {
   elements.runWorkflowButton.disabled = running;
   elements.createPlanButton.disabled = running;
   elements.refreshReviewButton.disabled = running;
+}
+
+function activeOperatorStepIndex() {
+  if (!productionState.plan) return 1;
+  if (!productionState.run) return 2;
+  if (!productionState.run.files?.length) return 3;
+  if (!productionState.review) return 4;
+  return 5;
 }
 
 function applyWorkflowDefaults(elements, { force }) {
@@ -192,8 +209,10 @@ function nextAction() {
   if (!productionState.plan) return "生成 workflow_plan.json";
   if (["pending", "running"].includes(productionState.run?.status || "")) return "观察步骤执行";
   if (!productionState.run) return "运行 workflow";
+  if (!productionState.run.files?.length) return "检查 artifacts";
   if (!productionState.review) return "刷新验收报告";
-  return "进入 Review Mode 审片";
+  if (!productionState.feedbackCaptured) return "完成 feedback capture";
+  return "回到 Review Mode 复核";
 }
 
 function productionReadiness(workflow) {
@@ -206,8 +225,10 @@ function productionReadiness(workflow) {
   }
   if (!productionState.plan) return { status: "ready", nextAction: "生成 workflow_plan.json", blocker: "" };
   if (!productionState.run) return { status: "ready", nextAction: "运行 workflow", blocker: "" };
+  if (!productionState.run.files?.length) return { status: "ready", nextAction: "检查 artifacts", blocker: "" };
   if (!productionState.review) return { status: "ready", nextAction: "刷新验收报告", blocker: "" };
-  return { status: "ready", nextAction: "进入 Review Mode 审片", blocker: "" };
+  if (!productionState.feedbackCaptured) return { status: "ready", nextAction: "完成 feedback capture", blocker: "" };
+  return { status: "ready", nextAction: "回到 Review Mode 复核", blocker: "" };
 }
 
 function blockerText() {
@@ -215,6 +236,10 @@ function blockerText() {
   const inputCheck = productionState.run?.input_check || productionState.plan?.input_check;
   if (inputCheck?.status === "fail") return inputCheck.warnings?.join("; ") || "输入文件引用缺失";
   if (productionState.run?.status === "failed") return (productionState.run.errors || []).join("; ") || "workflow failed";
+  const localSetupBlockers = workflowLocalSetupBlockers(selectedWorkflow());
+  if (!productionState.plan && localSetupBlockers.length) {
+    return `Local Alpha 0.4 setup: ${localSetupBlockers.join("; ")}`;
+  }
   if (
     workflowRequires(selectedWorkflow(), "local_asr") &&
     productionState.bridge.local_asr?.status === "missing_optional_dependency"
@@ -238,6 +263,7 @@ export function selectWorkflowByName(name, elements, copy) {
   productionState.plan = null;
   productionState.run = null;
   productionState.review = null;
+  productionState.feedbackCaptured = false;
   productionState.selectedWorkflowPath = renderWorkflowSelect(
     elements,
     productionState.workflows,
@@ -284,6 +310,12 @@ function stopRunPolling() {
 export function recordSupervisionIntent(intent, elements, copy) {
   productionState.supervisionEvents.push(`${new Date().toLocaleTimeString()} ${intent}`);
   appendLog(`监督意图: ${intent}`);
+  renderProductionState(elements, copy);
+}
+
+export function recordRunFeedbackCaptured(elements, copy) {
+  productionState.feedbackCaptured = true;
+  appendLog("feedback capture: run_feedback_event JSON 已生成，仅用于复制。");
   renderProductionState(elements, copy);
 }
 

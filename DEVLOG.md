@@ -1,5 +1,186 @@
 # DEVLOG
 
+## 2026-05-27 - AFS-RUN-PACKAGE-001 Local Alpha 0.4 Runtime Blocker
+
+- Checked the Local Alpha 0.4 runtime package inputs for
+  `workflows/video_script_to_finished_package_local_asr.yaml`.
+- Recorded `docs/handoff/AFS-RUN-PACKAGE-001.md` with `BLOCKED` status because
+  the ignored local source video, BGM audio, faster-whisper model cache, and
+  0.4 input bundle are not present.
+- Verified FFmpeg and FFprobe are available at
+  `C:\ProgramData\chocolatey\bin\ffmpeg.exe` and
+  `C:\ProgramData\chocolatey\bin\ffprobe.exe`, so the current blocker is local
+  inputs rather than media tooling.
+- Boundary kept: no remote providers called, no runtime package command run
+  without required inputs, no generated media or `data/processed/` artifacts
+  committed, and no Web UI or Memory runtime code changed.
+
+## 2026-05-27 - AFS-WEB-OPERATOR-002 Local Alpha 0.4 Web Operator Path
+
+- Updated the Web operator path to default to
+  `workflows/video_script_to_finished_package_local_asr.yaml` for the Local
+  Alpha 0.4 scenario.
+- Changed the Web default input and output to the ignored local 0.4 paths:
+  `data/processed/local_alpha_0_4/video_script_local_asr_input.json` and
+  `data/processed/runs/local_alpha_0_4_product_loop`.
+- Extended workflow web profiles with `scenario_id`, `runbook`,
+  `recommended_output`, and `local_setup_blockers`, so the operator sees the
+  0.4 runbook and the four required local setup paths before attempting a run.
+- Kept the browser honest: the setup blockers are displayed as preflight
+  guidance, while the bridge remains responsible for the actual input check
+  during plan/run creation.
+- Added `docs/handoff/AFS-WEB-OPERATOR-002.md`.
+- TDD evidence:
+  - red: new Web/bridge tests failed because `scenario_id` and the 0.4 default
+    input path were missing.
+  - green: focused tests passed after adding the 0.4 profile/default/render
+    updates.
+- Verification:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py`: 45 passed.
+  - JS `node --check` for the Web modules: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli tests`: passed.
+  - `git diff --check`: passed with Windows LF/CRLF warnings only.
+- Browser smoke:
+  - Started the branch Web bridge on `127.0.0.1:8787` and static page on
+    `127.0.0.1:8768`.
+  - Confirmed `Local Alpha 0.4 operator loop`, selected
+    `workflows/video_script_to_finished_package_local_asr.yaml`, 0.4 input and
+    output defaults, `docs/local_alpha_0_4_scenario_package.md`, the four local
+    setup blockers, and `bridge ready`.
+  - Local page console errors: none. An unrelated browser automation telemetry
+    timeout to `ab.chatgpt.com` appeared outside the local app.
+- Boundary kept: no provider calls, generated media, runtime package artifacts,
+  browser persistence, automatic directory scanning, local media/model cache,
+  provider config, secrets, or private Company knowledge changed.
+
+## 2026-05-27 - AFS-PROD-LOOP-001 Local Alpha 0.4 Scenario Package
+
+- Added `docs/local_alpha_0_4_scenario_package.md` as the shared execution
+  package for the next Local Alpha 0.4 push.
+- Fixed the first real 0.4 scenario to the existing local-first workflow
+  `workflows/video_script_to_finished_package_local_asr.yaml`: local source
+  video, local script, local ASR transcript, script-aligned highlight
+  selection, real slicing, BGM package, inspect/review/package report, Web
+  operator feedback, and later evidence-to-context reuse.
+- Kept all required operator inputs local and ignored:
+  `data/raw/demo_real_video/input.mp4`, `data/raw/demo_bgm/bgm.wav`,
+  `data/models/faster-whisper/`, and
+  `data/processed/local_alpha_0_4/video_script_local_asr_input.json`.
+- Updated docs discovery, task briefs, operating model, roster, and tracker so
+  `AFS-RUN-PACKAGE-001` and `AFS-WEB-OPERATOR-002` can open as parallel
+  worktrees after this scenario package is integrated.
+- Added roadmap-doc tests that assert the scenario package is discoverable and
+  names the selected workflow and ignored input bundle.
+- Boundary kept: documentation, tests, and task tracking only. No runtime code,
+  provider calls, generated artifacts, local media, secrets, or private Company
+  content were changed.
+
+## 2026-05-27 - Local Alpha 0.4 Product Loop Planning Baseline
+
+- Added `docs/local_alpha_0_4_product_loop_goals.md` to define the next
+  milestone before opening new parallel implementation worktrees.
+- Reframed the next push from an engineering-loop proof to one concrete local
+  product loop: local project brief and ignored media, local finished package,
+  inspect/review/package report, Web operator review, feedback capture, memory
+  candidate, promotion decision, and second-pass context reuse.
+- Added four new Local Alpha 0.4 task briefs:
+  - `AFS-PROD-LOOP-001`: scenario package and runbook.
+  - `AFS-RUN-PACKAGE-001`: local runtime package or actionable local-input
+    blocker.
+  - `AFS-WEB-OPERATOR-002`: Web operator path for the 0.4 scenario.
+  - `AFS-MEMORY-QUALITY-002`: traceable evidence reuse evaluation.
+- Kept `AFS-POSTER-LIVE-002` optional and blocked by default until local image
+  provider env is intentionally configured.
+- Updated the docs index, task brief index, company operating projection,
+  agent roster, and task tracker so the next queue is discoverable and does not
+  conflict with the completed Local Alpha 0.3 evidence.
+- Boundary kept: documentation and task planning only. No runtime code,
+  provider calls, generated artifacts, local media, secrets, or private Company
+  content were changed.
+
+## 2026-05-27 - Local Alpha 0.3 Web And Memory Integration
+
+- Integrated the two Local Alpha 0.3 implementation lanes into `master`:
+  - `AFS-MEMORY-RUNTIME-001` from `codex/afs-memory-runtime-contract`,
+    commit `7d19b5a`, merge commit `6853fc1`.
+  - `AFS-WEB-REVIEW-001` from `codex/afs-web-review-loop`, commit
+    `4e63bf7`, merge commit `6e3fbab`.
+- Web lane result:
+  - Production Mode now exposes a repeatable local operator loop from workflow
+    selection through plan, supervised run, artifact inspection, review
+    refresh, and feedback capture.
+  - `run_feedback_event` now includes `review_status`, `review_report`, and
+    `quality_report` after review refresh.
+  - Controller-side browser smoke caught a real state-flow gap: run polling can
+    refresh `productionState.run` after review refresh, so feedback capture must
+    fall back to `productionState.review` instead of trusting only the run
+    object.
+- Memory lane result:
+  - PosterFlow promotion decisions, context bundles, next-round prompts, and
+    comparison reports now keep raw feedback, derived signals, candidate
+    memory, promotion decisions, context reuse, and quality feedback as
+    separate auditable roles.
+  - Added contract/audit examples and docs for Local Alpha 0.3 memory runtime
+    boundaries without claiming durable Memory runtime writes.
+- Controller-side verification after both merges:
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_static_artifact_viewer.py tests/test_web_production_mode_static.py tests/test_web_production_bridge.py tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_contract_audit.py tests/test_contract_examples.py tests/test_posterflow_quality.py tests/test_posterflow_workflow.py`: 102 passed.
+  - Web JavaScript `node --check` commands: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall apps\web_bridge apps\cli agentflow\memory agentflow\harness narratostudio\posterflow narratocut\harness tests`: passed.
+  - `D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json`: `status: blocked`, expected because image-provider env is unset; no providers called and no runtime artifacts written.
+  - `git diff --check`: passed.
+- Browser smoke evidence:
+  - Desktop and 390 x 844 narrow Production Mode operator loops both reached
+    feedback capture with `review_status=passed`, `review_report`, and
+    `quality_report`.
+  - No browser console errors and no narrow horizontal overflow were observed.
+- Company memory feedback:
+  - Added the anti-pattern that worker/subagent reports are not final evidence;
+    the controller must reproduce browser/provider/secret-sensitive claims on
+    the real integration path.
+- Boundary kept: no remote provider call, no provider config, no generated
+  media, no secrets, no private Company content, no durable Memory runtime, no
+  RAG/vector store, no SaaS backend, and no browser persistence was added.
+
+## 2026-05-27 - Local Alpha 0.3 Parallel Queue Launch
+
+- Committed the Local Alpha 0.3 planning baseline as
+  `348b34d docs: define local alpha 0.3 queue`.
+- Created two implementation worktrees from that baseline:
+  - `codex/afs-web-review-loop` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop`
+  - `codex/afs-memory-runtime-contract` at
+    `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract`
+- Verified clean baselines before dispatch:
+  - Web worktree targeted tests: 42 passed.
+  - Memory/runtime worktree targeted tests: 60 passed.
+- Dispatched two worker subagents:
+  - `Nash` / `019e65da-9878-74f2-9ee8-cf9ecebff6a2` for
+    `AFS-WEB-REVIEW-001`.
+  - `Zeno` / `019e65da-ac65-7b81-a634-74b0e2ab63c1` for
+    `AFS-MEMORY-RUNTIME-001`.
+- Kept `AFS-POSTER-LIVE-002` closed because the current image-provider
+  environment is unset and `alpha-smoke --json` reports the expected blocked
+  state.
+- Boundary kept: no remote providers were called; main checkout remains the
+  integration surface.
+
+## 2026-05-27 - AFS-PROD-NEXT-001 Local Alpha 0.3 Validation Boundary
+
+- Added `docs/local_alpha_0_3_validation_goals.md` to define the next milestone
+  before opening a new parallel queue.
+- Framed Local Alpha 0.3 around a repeatable local operator loop:
+  workflow selection, plan, supervised run, artifact inspection, review,
+  feedback event, memory candidate, explicit promotion decision, and
+  next-round context reuse.
+- Updated the docs index, task brief index, company operating projection, and
+  agent roster so they no longer advertise the completed Local Alpha 0.2 lanes
+  as ready to open.
+- Added `docs/task_briefs/AFS-PROD-NEXT-001.md` as the first 0.3 planning
+  packet. Implementation lanes remain blocked until fresh 0.3 briefs exist.
+- Boundary kept: documentation and task planning only. No runtime code,
+  provider calls, generated artifacts, secrets, or private Company content were
+  changed.
+
 ## 2026-05-27 - AFS-WEB-REPLAY Local Web UI Workbench
 
 - Reviewed and integrated `codex/afs-web-ui-replay`.

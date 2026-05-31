@@ -40,6 +40,14 @@ docs/company_operating_model.md
 | AFS-WEB-UX-001 | `codex/afs-web-ux-pass` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability pass | completed | Web targeted tests -> 42 passed; JS `node --check`; `compileall apps\web_bridge apps\cli tests`; `git diff --check`; browser smoke local bridge + static UI + mock workflow + review refresh | Evidence: `docs/handoff/AFS-WEB-UX-001.md`; temp smoke screenshot outside repo at `C:\Users\chenzy\AppData\Local\Temp\afs-web-ux-pass-smoke-main.png`; fixed small-screen sticky topbar click coverage; no provider calls or browser persistence |
 | AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo hardening | completed | PosterFlow workflow/quality/provider tests -> 23 passed; `alpha-smoke --json` -> blocked as expected because remote image provider is disabled; `git diff --check` -> passed | Added explicit `poster_round_comparison.json.evidence_chain` and review checks; handoff: `docs/handoff/AFS-MEMORY-DEMO-001.md`; integrated into current merge batch |
 | AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or run evidence | blocked checklist integrated | `alpha-smoke --json` -> blocked because image provider env is unset; PosterFlow provider/workflow/quality tests -> 22 passed; `git diff --check` -> passed | Evidence: `docs/handoff/AFS-POSTER-LIVE-001.md`; no live provider call, no provider config, no secrets |
+| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | Define Local Alpha 0.3 validation goals and next task briefs before opening a new queue | completed | `python -m pytest tests/test_agentflow_roadmap_docs.py` -> 10 passed; `python -m apps.cli.main alpha-smoke --json` -> blocked as expected because image provider env is unset; `git diff --check` -> passed | Evidence: `docs/local_alpha_0_3_validation_goals.md` and four Local Alpha 0.3 task briefs; no runtime code or provider calls |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | Local Alpha 0.3 operator plan/run/review/feedback Web path | integrated to `master` | Web targeted tests -> 44 passed; JS `node --check`; compileall; desktop and 390x844 browser smoke; mainline integration tests -> 102 passed | Integrated at `6e3fbab`; handoff: `docs/handoff/AFS-WEB-REVIEW-001.md`; controller fixed review refs after polling overwrite; no provider calls |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | Candidate promotion and context reuse contract without durable memory writes | integrated to `master` | focused memory/posterflow tests -> 65 passed; mainline integration tests -> 102 passed; `alpha-smoke --json` -> blocked as expected; compileall; `git diff --check` | Integrated at `6853fc1`; handoff: `docs/handoff/AFS-MEMORY-RUNTIME-001.md`; no durable Memory runtime, DB, RAG, or provider calls |
+| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | Explicit PosterFlow live-smoke run or blocked evidence | blocked by missing local env | `alpha-smoke --json` -> blocked because image provider env is unset | No live provider call; open only after local image env is intentionally configured or for a blocked-evidence-only pass |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | complete after integration | Roadmap docs tests; `alpha-smoke --json`; `git diff --check` | Evidence: `docs/local_alpha_0_4_scenario_package.md`; no runtime code, provider calls, generated artifacts, local media, or private Company content |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package evidence or actionable local-input blocker | blocked by missing local inputs | `alpha-smoke --json` -> blocked as expected; focused runtime tests -> 7 passed | Evidence: `docs/handoff/AFS-RUN-PACKAGE-001.md`; missing source video, BGM, local ASR model cache, and ignored 0.4 input bundle; FFmpeg/FFprobe available; no provider calls or runtime artifacts |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | integrated to `master` | Web targeted tests -> 45 passed; JS `node --check`; compileall; browser smoke; `git diff --check` | Evidence: `docs/handoff/AFS-WEB-OPERATOR-002.md`; defaults to Local Alpha 0.4 input/output and surfaces local setup blockers; no provider calls |
+| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation for a second pass | planned | Pending | Start after runtime evidence shape is known |
 
 ## Integration Gate
 
@@ -66,6 +74,16 @@ Current gate:
   expected PosterFlow image-provider `blocked` state.
 - The four Local Alpha 0.2 worktrees, local branches, and remote branches were
   removed after integration. Main checkout is the only remaining worktree.
+- The Local Alpha 0.3 engineering queue is integrated to `master` through
+  `6853fc1` and `6e3fbab`: `AFS-PROD-NEXT-001`, `AFS-MEMORY-RUNTIME-001`, and
+  `AFS-WEB-REVIEW-001` are complete; `AFS-POSTER-LIVE-002` remains blocked by
+  missing local image-provider env.
+- Mainline Local Alpha 0.3 verification passed with 102 targeted tests, Web JS
+  syntax checks, compileall, `git diff --check`, and `alpha-smoke --json`
+  reporting the expected image-provider `blocked` state.
+- Local Alpha 0.4 scenario package is defined by `AFS-PROD-LOOP-001` in
+  `docs/local_alpha_0_4_scenario_package.md`. After this branch is integrated,
+  `AFS-RUN-PACKAGE-001` and `AFS-WEB-OPERATOR-002` may open in parallel.
 
 ## Operating Entry Points
 
@@ -81,24 +99,53 @@ Subagents are ephemeral. A visible old agent card is not an active lane unless
 the agent manager can still resume or close that ID. If a close attempt returns
 `not found`, record the agent as inactive history.
 
-## Next Parallel Queue
+## Local Alpha 0.3 Queue Outcome
 
-Current queue is empty after the Local Alpha 0.2 dispatch batch. Start the next
-parallel queue only after defining the next product milestone and writing fresh
-task briefs.
+The Local Alpha 0.3 engineering queue is integrated/blocked. Web and Memory
+lanes are merged into `master`; Poster live remains blocked until local
+image-provider env is intentionally configured.
 
-Recommended next queue candidates:
+Local Alpha 0.3 queue outcome:
 
-| ID | Suggested branch / worktree | Owner role | Primary write scope | Initial verification |
+| ID | Branch / worktree | Owner role | Primary write scope | Outcome verification |
 |---|---|---|---|---|
-| AFS-PROD-NEXT-001 | `codex/afs-product-next-briefs` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-product-next-briefs` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | `python -m pytest tests/test_agentflow_roadmap_docs.py`; `alpha-smoke --json`; `git diff --check` |
-| AFS-WEB-REVIEW-001 | TBD after milestone definition | Web UI Agent + QA Reviewer | Web review/product acceptance polish | Web targeted tests; JS `node --check`; browser smoke |
-| AFS-MEMORY-RUNTIME-001 | TBD after milestone definition | Memory / Evidence Steward | Candidate promotion/runtime contract slice | focused memory/posterflow tests; `alpha-smoke --json`; `git diff --check` |
-| AFS-POSTER-LIVE-002 | TBD after local provider env is configured | Provider Adapter Agent + Security / Secret Audit Agent | ignored local live-smoke evidence plus docs-only summary | provider env check; no-secret scan; PosterFlow tests; explicit live smoke only with local env |
+| AFS-PROD-NEXT-001 | main checkout | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | integrated; roadmap docs tests -> 10 passed; `alpha-smoke --json` -> blocked as expected; `git diff --check` |
+| AFS-WEB-REVIEW-001 | `codex/afs-web-review-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-review-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests, Web docs/handoff | integrated; Web targeted tests -> 44 passed; JS checks; browser smoke desktop/narrow |
+| AFS-MEMORY-RUNTIME-001 | `codex/afs-memory-runtime-contract` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-runtime-contract` | Memory / Evidence Steward | `agentflow/memory/`, PosterFlow memory/context contracts, focused tests/docs | integrated; focused tests -> 65 passed; `alpha-smoke --json` -> blocked as expected; compileall; diff check |
+| AFS-POSTER-LIVE-002 | not opened | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | blocked by missing local image-provider env; no live provider call |
 
 Integration rule remains unchanged: open separate `codex/*` worktrees for
 implementation lanes, keep `master` as the integration surface, and delete
 temporary branches/worktrees after verified merge.
+
+## Local Alpha 0.4 Planned Queue
+
+Local Alpha 0.4 moves from engineering-loop proof to one real local product
+loop. The first lane must define the scenario package before implementation
+worktrees are opened.
+
+Local Alpha 0.4 planned queue:
+
+| ID | Branch / worktree | Owner role | Primary write scope | Dependency |
+|---|---|---|---|---|
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-prod-loop-brief` | Orchestrator + Product Lead | `docs/`, `TASK_TRACKER.md`, task briefs only | complete after integration |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | local workflow runbook, handoff, focused tests if needed | blocked by missing local inputs |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-web-operator-loop` | Web UI Agent + QA Reviewer | `apps/web/`, `apps/web_bridge/`, Web tests/docs | integrated to `master`; 0.4 defaults and blocker display implemented |
+| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-memory-quality-loop` | Memory / Evidence Steward | memory/context contracts, examples, focused tests/docs | after runtime evidence shape is known |
+| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` / `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | live-smoke handoff/status docs, provider safety tests only if needed | optional; blocked by missing image-provider env |
+
+Integration order:
+
+```text
+AFS-PROD-LOOP-001
+  -> AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 in parallel
+  -> AFS-MEMORY-QUALITY-002 after runtime evidence shape is stable
+  -> AFS-POSTER-LIVE-002 only if local image-provider env is configured
+  -> controller-side verification, branch cleanup, and memory promotion review
+```
+
+After `AFS-PROD-LOOP-001` is integrated, dispatch `AFS-RUN-PACKAGE-001` and
+`AFS-WEB-OPERATOR-002` as separate worktrees with non-overlapping write scopes.
 
 ## Remote Branch Hygiene
 

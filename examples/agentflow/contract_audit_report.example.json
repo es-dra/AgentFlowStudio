@@ -179,6 +179,16 @@
       "note": "Reusable asset profiles require explicit promotion decision references."
     },
     {
+      "check_id": "context_reuse_requires_promotion_decision",
+      "status": "passed",
+      "note": "Preference profiles, context bundles, and next-round prompts reuse memory only through explicit promotion decision references."
+    },
+    {
+      "check_id": "context_reuse_does_not_write_memory",
+      "status": "passed",
+      "note": "Context reuse artifacts remain review inputs and do not claim durable long-term memory writes."
+    },
+    {
       "check_id": "intermediate_asset_has_evidence",
       "status": "passed",
       "note": "Intermediate assets keep source artifact and evidence references."

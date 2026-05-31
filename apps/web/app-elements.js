@@ -45,6 +45,7 @@ export function collectAppElements() {
     readinessChecklist: document.querySelector("#readiness-checklist"),
     productionNextAction: document.querySelector("#production-next-action"),
     acceptancePathDetail: document.querySelector("#acceptance-path-detail"),
+    operatorLoopStatus: document.querySelector("#operator-loop-status"),
     stepTimeline: document.querySelector("#step-timeline"),
     productionArtifacts: document.querySelector("#production-artifacts"),
     productionVideoPreview: document.querySelector("#production-video-preview"),

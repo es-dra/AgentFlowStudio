@@ -96,15 +96,16 @@ Keep work local when:
 Do not keep generic subagents open just because the project is agent-native.
 Idle agents create stale context, not capacity.
 
-## Next Parallel Queue
+## Current Parallel Queue Status
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-ALPHA-PKG-001 | `codex/afs-alpha-package` | Orchestrator + Release Integrator | Local Alpha 0.2 acceptance package and demo script | Start first; informs the other lanes |
-| AFS-WEB-UX-001 | `codex/afs-web-ux-pass` | Web UI Agent + QA Reviewer | Web workbench usability, copy, and browser smoke evidence | Can run after the Alpha package target is clear |
-| AFS-MEMORY-DEMO-001 | `codex/afs-memory-demo-hardening` | Memory / Evidence Steward | Two-round Memory OS demo evidence and context reuse explanation | Can run in parallel with Web UX |
-| AFS-POSTER-LIVE-001 | `codex/afs-poster-live-smoke` | Provider Adapter Agent + Security / Secret Audit Agent | Gated PosterFlow live-smoke checklist or local run evidence | Run last unless image env is already configured |
+| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | Complete after integration |
+| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | Ready after scenario package integration |
+| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | Ready after scenario package integration |
+| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | After runtime evidence shape is known |
+| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | Optional; blocked until local image env is intentionally configured |
 
-Open these as separate worktrees only if their write scopes remain disjoint.
+Open the next queue as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign
 one Contract Engineer owner first.
