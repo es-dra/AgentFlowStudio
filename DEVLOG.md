@@ -18,6 +18,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes a directly selected `loulan_afs_b01_feedback_loop_gate` / `afs_b01_feedback_loop_gate.json` as a read-only memory artifact, so operators can inspect the blocked B01 gate without regenerating the full Loulan package; see `docs/handoff/AFS-LOULAN-WEB-B01-GATE-DIRECT-001.md`.
 
+2026-06-01: Loulan memory package now reads the optional B01 decision crosswalk and Web surfaces the 5-shot local gate, 7-slot AFS import gate, and 47-slot broader decision-review gate as separate blocked layers; see `docs/handoff/AFS-LOULAN-PACKAGE-B01-CROSSWALK-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

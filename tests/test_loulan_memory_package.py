@@ -31,6 +31,13 @@ def test_loulan_memory_package_blocks_candidates_and_builtin_image_route(tmp_pat
     assert package["feedback_loop_gates"]["b01"]["pending_decisions"] == 5
     assert package["feedback_loop_gates"]["b01"]["context_projection_ready"] is False
     assert package["feedback_loop_gates"]["b01"]["source_ref"] == "manifests/afs_b01_feedback_loop_gate.json"
+    crosswalk = package["feedback_loop_gates"]["b01_decision_crosswalk"]
+    assert crosswalk["status"] == "blocked_pending_human_review"
+    assert crosswalk["local_shot_gate"]["decision_count"] == 5
+    assert crosswalk["afs_b01_import_gate"]["decision_count"] == 7
+    assert crosswalk["afs_broader_decision_review_gate"]["decision_count"] == 47
+    assert crosswalk["afs_broader_decision_review_gate"]["target_ref_count"] == 47
+    assert crosswalk["source_ref"] == "manifests/afs_b01_decision_crosswalk.json"
     assert package["promotion_gates"]["overall_status"] == "blocked"
     assert package["next_context_bundle_draft"]["eligible_memory_refs"] == ["character:zhou_tong_school_v1"]
     assert {
@@ -101,6 +108,7 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["promotion_gates"]["overall_status"] in {"ready", "blocked"}
     assert payload["api_workbench_skeleton"]["live_provider_calls"] == "blocked_by_default"
     assert payload["feedback_loop_gates"]["b01"]["provider_calls_started"] is False
+    assert payload["feedback_loop_gates"]["b01_decision_crosswalk"]["afs_b01_import_gate"]["pending_count"] == 7
     assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "D:\\" not in serialized
@@ -159,6 +167,42 @@ def _loulan_fixture(tmp_path: Path) -> Path:
                 "durable_memory_runtime": "not_implemented",
                 "provider_smoke": "not_run",
             },
+        },
+    )
+    _write_json(
+        root / "manifests" / "afs_b01_decision_crosswalk.json",
+        {
+            "schema_version": "0.1.0",
+            "artifact_type": "loulan_afs_b01_decision_crosswalk",
+            "status": "blocked_pending_human_review",
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "human_acceptance_recorded": False,
+            "media_generation_started": False,
+            "decision_layers": [
+                {
+                    "layer_id": "loulan_local_b01_shot_gate",
+                    "decision_count": 5,
+                    "pending_count": 5,
+                    "target_refs": ["shot:B01-S01", "shot:B01-S02", "shot:B01-S03", "shot:B01-S04", "shot:B01-S05"],
+                    "current_blocker": "all five decisions are pending_human_review",
+                },
+                {
+                    "layer_id": "afs_b01_import_gate",
+                    "decision_count": 7,
+                    "pending_count": 7,
+                    "target_refs": ["shot:B01-S01", "shot:B01-S02", "shot:B01-S03", "shot:B01-S04", "shot:B01-S05", "character:zhou_tong_school_v1", "character:zhou_tong_qipao_front_v1"],
+                    "current_blocker": "two Zhou Tong character slots still need explicit disposition",
+                },
+                {
+                    "layer_id": "afs_broader_decision_review_gate",
+                    "decision_count": 47,
+                    "pending_count": 47,
+                    "target_refs_summary": {"shot_slots": 5, "asset_slots": 42},
+                    "current_blocker": "full review pack covers broad asset governance",
+                },
+            ],
+            "next_step": "Human operator fills the five local B01 shot decisions first.",
         },
     )
     _write_json(

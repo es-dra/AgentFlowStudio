@@ -18,6 +18,7 @@ from agentflow.memory.loulan_assets import (
     registry_asset_summary,
     registry_file,
 )
+from agentflow.memory.loulan_feedback_gates import feedback_loop_gates
 
 
 SCHEMA_VERSION = "0.1.0"
@@ -58,7 +59,7 @@ def build_loulan_memory_package(project_root: str | Path, *, created_at: str) ->
         "asset_summary": asset_summary,
         "memory_collections": _memory_collections(root),
         "provider_route_safety": _provider_route_safety(root, manifest),
-        "feedback_loop_gates": _feedback_loop_gates(root),
+        "feedback_loop_gates": feedback_loop_gates(root),
         "promotion_gates": promotion_gates(asset_entries, rejected_refs, registry_mode=registry_mode),
         "next_context_bundle_draft": next_context_bundle(asset_entries, rejected_refs, registry_mode=registry_mode),
         "canvas_nodes": _canvas_nodes(asset_entries, rejected_refs),
@@ -92,6 +93,7 @@ def render_loulan_memory_package_report(package: dict[str, Any]) -> str:
             f"- Image route: `{safety['image_generation']}`",
             f"- Promotion gate: `{gates['overall_status']}`",
             f"- B01 feedback loop gate: `{package['feedback_loop_gates']['b01']['status']}`",
+            f"- B01 decision crosswalk: `{package['feedback_loop_gates']['b01_decision_crosswalk']['status']}`",
             f"- Eligible memory refs: {len(package['next_context_bundle_draft']['eligible_memory_refs'])}",
             f"- Blocked memory refs: {len(package['next_context_bundle_draft']['blocked_memory_refs'])}",
             "",
@@ -192,61 +194,6 @@ def _provider_route_safety(root: Path, manifest: dict[str, Any]) -> dict[str, An
         "request_preview_only": True,
         "capability_gates_required": ["image", "video"],
     }
-
-
-def _feedback_loop_gates(root: Path) -> dict[str, Any]:
-    gate_path = root / "manifests" / "afs_b01_feedback_loop_gate.json"
-    if not gate_path.exists():
-        return {
-            "b01": {
-                "status": "not_supplied",
-                "source_ref": "manifests/afs_b01_feedback_loop_gate.json",
-                "provider_calls_started": False,
-                "writes_long_term_memory": False,
-                "human_acceptance_recorded": False,
-                "media_generation_started": False,
-                "pending_decisions": 0,
-                "context_projection_ready": False,
-            }
-        }
-    gate = _read_json(gate_path)
-    _validate_feedback_loop_gate(gate)
-    summary = gate.get("current_gate_summary") or {}
-    return {
-        "b01": {
-            "status": str(gate.get("status") or "unknown"),
-            "source_ref": "manifests/afs_b01_feedback_loop_gate.json",
-            "provider_calls_started": False,
-            "writes_long_term_memory": False,
-            "human_acceptance_recorded": False,
-            "media_generation_started": False,
-            "decision_items": int(summary.get("b01_decision_items") or 0),
-            "pending_decisions": int(summary.get("pending_decisions") or 0),
-            "approved_decisions": int(summary.get("approved_decisions") or 0),
-            "repair_requested": int(summary.get("repair_requested") or 0),
-            "rejected_decisions": int(summary.get("rejected_decisions") or 0),
-            "validation_status": str(summary.get("validation_status") or "unknown"),
-            "apply_status": str(summary.get("apply_status") or "unknown"),
-            "afs_import_ready": summary.get("afs_import_ready") is True,
-            "context_projection_ready": summary.get("context_projection_ready") is True,
-            "next_step": str(gate.get("next_step") or ""),
-        }
-    }
-
-
-def _validate_feedback_loop_gate(gate: dict[str, Any]) -> None:
-    if gate.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError("Loulan feedback loop gate requires schema_version 0.1.0")
-    if gate.get("artifact_type") != "loulan_afs_b01_feedback_loop_gate":
-        raise ValueError("Loulan feedback loop gate has unexpected artifact_type")
-    if gate.get("provider_calls_started") is not False:
-        raise ValueError("Loulan feedback loop gate must not have provider calls started")
-    if gate.get("writes_long_term_memory") is not False:
-        raise ValueError("Loulan feedback loop gate must not write long-term memory")
-    if gate.get("human_acceptance_recorded") is not False:
-        raise ValueError("Loulan feedback loop gate must not record human acceptance")
-    if gate.get("media_generation_started") is not False:
-        raise ValueError("Loulan feedback loop gate must not start media generation")
 
 
 def _canvas_nodes(entries: list[dict[str, Any]], rejected_refs: list[str]) -> list[dict[str, str]]:

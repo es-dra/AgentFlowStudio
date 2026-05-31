@@ -94,6 +94,14 @@ export function loulanTimeline(
       detail: `${b01Gate.pending_decisions || 0} pending decisions; context ready: ${String(b01Gate.context_projection_ready === true)}`,
     });
   }
+  const b01Crosswalk = payload.feedback_loop_gates?.b01_decision_crosswalk || null;
+  if (b01Crosswalk) {
+    nodes.push({
+      label: "B01 Decision Crosswalk",
+      status: b01Crosswalk.status || "unknown",
+      detail: `${b01Crosswalk.local_shot_gate?.decision_count || 0} local decisions; ${b01Crosswalk.afs_b01_import_gate?.decision_count || 0} AFS import slots`,
+    });
+  }
   if (reviewPack) {
     nodes.push({
       label: "Human Review",
