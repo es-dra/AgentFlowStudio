@@ -1,7 +1,8 @@
 # AFS-MAINLINE-STAGING-BUNDLE-001 - Mainline Staging Bundle
 
-Status: pushed as draft PR #72 on `codex-mainline-slimming-staging`;
-PR #73 has merged the Local Alpha 0.4 mainline base into `master`.
+Status: pushed as ready PR #72 on `codex-mainline-slimming-staging`;
+PR #73 has merged the Local Alpha 0.4 mainline base into `master`, and PR #72
+is now retargeted to `master`.
 
 This bundle converts the current dirty checkout into a coherent integration
 plan. It keeps the product surface centered on `memory-video-pipeline-*` and
@@ -199,19 +200,20 @@ Remote review chain on 2026-05-31:
 
 Remote readiness follow-up on 2026-05-31:
 
-- GitHub read checks returned PR #73 and PR #72 as open, draft, and
+- Initial GitHub read checks returned PR #73 and PR #72 as open, draft, and
   `mergeable=true`.
 - Commit status and workflow-run lookups returned no status/check evidence for
   either PR head, so this is not a remote-CI-passed claim.
 - A #73 readiness comment was added with the local verification and
   non-claim boundaries.
-- PR #73 was marked ready for review after a retry. PR #72 remains draft and
-  should stay dependent until PR #73 is reviewed or merged.
+- PR #73 was marked ready for review after a retry. At that point, PR #72
+  remained draft and dependent until PR #73 was reviewed or merged.
 - After the #73 branch was cleaned and repushed at `35bba58`, PR #72 was
   rebased on top of that updated base and pushed with `--force-with-lease`.
   GitHub then reported PR #72 as draft and `mergeable=true` at head `5962a2a`.
 - PR #73 was merged to `master` as `94401afe`; PR #72 was then rebased on top
-  of `origin/master` and is being prepared for retargeting to `master`.
+  of `origin/master`, retargeted to `master`, and marked ready for review at
+  head `61e4892` after a readiness comment was added.
 
 ## Commit Boundary
 
