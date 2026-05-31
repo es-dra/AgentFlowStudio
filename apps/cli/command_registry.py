@@ -7,6 +7,7 @@ import typer
 from apps.cli.alpha_commands import alpha_smoke_command
 from apps.cli.loulan_api_workbench_command import loulan_api_workbench_plan_command
 from apps.cli.loulan_context_bundle_command import loulan_context_bundle_command
+from apps.cli.loulan_decision_intake_command import loulan_decision_intake_command
 from apps.cli.loulan_decision_review_command import loulan_decision_review_pack_command
 from apps.cli.loulan_decision_template_command import loulan_decision_template_command
 from apps.cli.loulan_decision_worksheet_command import loulan_decision_worksheet_command
@@ -59,6 +60,7 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="loulan-decision-template")(loulan_decision_template_command)
     app.command(name="loulan-decision-review-pack")(loulan_decision_review_pack_command)
     app.command(name="loulan-decision-worksheet")(loulan_decision_worksheet_command)
+    app.command(name="loulan-decision-intake")(loulan_decision_intake_command)
     app.command(name="loulan-context-bundle")(loulan_context_bundle_command)
     app.command(name="web-bridge")(web_bridge_command)
 

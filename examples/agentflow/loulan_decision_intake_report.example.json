@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_loulan_decision_intake_report",
+  "intake_report_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_decision_review_pack_v0_worksheet_v0_intake_report_v0",
+  "worksheet_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_decision_review_pack_v0_worksheet_v0",
+  "decision_review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_decision_review_pack_v0",
+  "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+  "created_at": "2026-06-01T18:00:00+08:00",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "human_acceptance_recorded": false,
+  "intake_status": "blocked_pending_manual_decisions",
+  "context_bundle_command_ready": false,
+  "intake_summary": {
+    "required_decisions": 2,
+    "submitted_decisions": 2,
+    "ready_count": 0,
+    "pending_count": 2,
+    "missing_count": 0,
+    "invalid_count": 0,
+    "unexpected_count": 0,
+    "reusable_count": 0,
+    "blocked_count": 0
+  },
+  "unexpected_decision_refs": [],
+  "decision_rows": [
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_shot_b01_s01_decision",
+      "target_ref": "shot:B01-S01",
+      "target_type": "shot",
+      "decision": "",
+      "allowed_decisions": [
+        "approve_anchor",
+        "reject",
+        "request_repair"
+      ],
+      "decided_by": "",
+      "evidence_refs": [],
+      "review_note_present": false,
+      "intake_status": "pending_manual_decision",
+      "reason": "pending_manual_decision",
+      "reusable_for_context": false,
+      "blocked_for_context": false
+    },
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_character_guan_pingping_v2_decision",
+      "target_ref": "character:guan_pingping_v2",
+      "target_type": "character",
+      "decision": "",
+      "allowed_decisions": [
+        "promoted",
+        "merged",
+        "rejected",
+        "expired"
+      ],
+      "decided_by": "",
+      "evidence_refs": [],
+      "review_note_present": false,
+      "intake_status": "pending_manual_decision",
+      "reason": "pending_manual_decision",
+      "reusable_for_context": false,
+      "blocked_for_context": false
+    }
+  ],
+  "next_action": "fix_manual_decisions_before_context_bundle",
+  "claim_boundaries": {
+    "structure_verification": "decision_intake_report_only",
+    "runtime_verification": "not_run",
+    "provider_smoke": "not_run",
+    "human_acceptance": "decision_file_validated_not_product_acceptance",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "metadata": {
+    "example": true
+  }
+}

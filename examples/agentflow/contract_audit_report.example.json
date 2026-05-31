@@ -197,6 +197,7 @@
     { "artifact_type": "agentflow_loulan_promotion_decisions", "example_path": "examples/agentflow/loulan_promotion_decisions_template.example.json", "doc_path": "docs/loulan_decision_template_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true },
     { "artifact_type": "agentflow_loulan_decision_review_pack", "example_path": "examples/agentflow/loulan_decision_review_pack.example.json", "doc_path": "docs/loulan_decision_review_pack_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true },
     { "artifact_type": "agentflow_loulan_decision_worksheet", "example_path": "examples/agentflow/loulan_decision_worksheet.example.json", "doc_path": "docs/loulan_decision_worksheet_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true },
+    { "artifact_type": "agentflow_loulan_decision_intake_report", "example_path": "examples/agentflow/loulan_decision_intake_report.example.json", "doc_path": "docs/loulan_decision_intake_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true },
     { "artifact_type": "agentflow_loulan_context_bundle_projection", "example_path": "examples/agentflow/loulan_context_bundle_projection.example.json", "doc_path": "docs/loulan_context_bundle_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true }
   ],
   "boundary_checks": [
@@ -284,6 +285,7 @@
     { "check_id": "loulan_decision_template_pending_only", "status": "passed", "note": "Loulan decision templates remain pending human input and cannot approve context." },
     { "check_id": "loulan_decision_review_no_approval", "status": "passed", "note": "Loulan decision review packs summarize required decision gaps without approving, calling providers, or writing durable memory." },
     { "check_id": "loulan_decision_worksheet_manual_fill_only", "status": "passed", "note": "Loulan decision worksheets keep manual-fill decision fields empty and do not approve, call providers, or write durable memory." },
+    { "check_id": "loulan_decision_intake_before_context_bundle", "status": "passed", "note": "Loulan decision intake reports validate manual decisions before context projection without approval, provider calls, or durable memory writes." },
     { "check_id": "loulan_context_bundle_decisions_only", "status": "passed", "note": "Loulan context bundle projections consume explicit human decisions only and do not promote draft review items by inference." },
     {
       "check_id": "intermediate_asset_has_evidence",

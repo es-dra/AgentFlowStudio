@@ -109,6 +109,12 @@
       "contract_surface": "loulan_decision_worksheet"
     },
     {
+      "artifact_type": "agentflow_loulan_decision_intake_report",
+      "example_path": "examples/agentflow/loulan_decision_intake_report.example.json",
+      "doc_path": "docs/loulan_decision_intake_contract.md",
+      "contract_surface": "loulan_decision_intake"
+    },
+    {
       "artifact_type": "agentflow_loulan_context_bundle_projection",
       "example_path": "examples/agentflow/loulan_context_bundle_projection.example.json",
       "doc_path": "docs/loulan_context_bundle_contract.md",
@@ -257,6 +263,10 @@
     {
       "rule_id": "loulan_decision_worksheet_manual_fill_only",
       "description": "Loulan decision worksheets prepare empty manual-fill rows and must not approve, call providers, or write durable memory."
+    },
+    {
+      "rule_id": "loulan_decision_intake_before_context_bundle",
+      "description": "Loulan decision intake reports validate manual decisions before context bundle projection without calling providers or writing durable memory."
     },
     {
       "rule_id": "loulan_context_bundle_decisions_only",
