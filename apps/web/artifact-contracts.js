@@ -28,6 +28,8 @@ export const ARTIFACT_ALIASES = {
   loulan_b01_decision_apply_result: ["b01_decision_apply_result.json"],
   loulan_unified_asset_registry: ["asset_registry.json"],
   loulan_next_generation_context_bundle_draft: ["next_context_bundle_draft.json"],
+  loulan_image2_request_manifest: ["image2_requests.json"],
+  loulan_kling_i2v_request_manifest: ["kling_i2v_requests.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -56,6 +58,8 @@ const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
   "loulan_b01_decision_apply_result",
   "loulan_unified_asset_registry",
   "loulan_next_generation_context_bundle_draft",
+  "loulan_image2_request_manifest",
+  "loulan_kling_i2v_request_manifest",
 ]);
 
 export function isMemoryArtifactType(type) {
@@ -95,6 +99,8 @@ export function sourceRoleFor(type, fileName) {
   if (type === "loulan_b01_decision_apply_result") return "Loulan B01 decision apply result";
   if (type === "loulan_unified_asset_registry") return "Loulan unified asset registry";
   if (type === "loulan_next_generation_context_bundle_draft") return "Loulan next context bundle draft";
+  if (type === "loulan_image2_request_manifest") return "Loulan Image2 request manifest";
+  if (type === "loulan_kling_i2v_request_manifest") return "Loulan Kling I2V request manifest";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";

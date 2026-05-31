@@ -1,6 +1,7 @@
 import { isLoulanB01Artifact, loulanB01Facts, loulanB01FocusTargets, loulanB01Status, loulanB01TypeLabel } from "./memory-workbench-loulan-b01-inspector.js";
 import { isLoulanContextDraftArtifact, loulanContextDraftFacts, loulanContextDraftFocusTargets, loulanContextDraftStatus, loulanContextDraftTypeLabel } from "./memory-workbench-loulan-context-draft-inspector.js";
 import { isLoulanRegistryArtifact, loulanRegistryFacts, loulanRegistryFocusTargets, loulanRegistryStatus, loulanRegistryTypeLabel } from "./memory-workbench-loulan-registry-inspector.js";
+import { isLoulanRequestManifest, loulanRequestManifestFacts, loulanRequestManifestFocusTargets, loulanRequestManifestStatus, loulanRequestManifestTypeLabel } from "./memory-workbench-loulan-request-manifest-inspector.js";
 
 const TYPE_LABELS = {
   agentflow_memory_video_pipeline_package: "Pipeline package",
@@ -32,7 +33,7 @@ function summarizeArtifact(artifact) {
     id: artifact.fileName,
     artifact_type: type,
     focus_targets: focusTargetsFor(type),
-    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || loulanContextDraftTypeLabel(type) || loulanRegistryTypeLabel(type) || type,
+    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || loulanContextDraftTypeLabel(type) || loulanRegistryTypeLabel(type) || loulanRequestManifestTypeLabel(type) || type,
     status: statusFor(type, payload),
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
@@ -57,6 +58,7 @@ function focusTargetsFor(type) {
   if (isLoulanB01Artifact(type)) return loulanB01FocusTargets(type);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftFocusTargets(type);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryFocusTargets(type);
+  if (isLoulanRequestManifest(type)) return loulanRequestManifestFocusTargets(type);
   return [];
 }
 
@@ -77,6 +79,7 @@ function factsFor(type, payload) {
   if (isLoulanB01Artifact(type)) return loulanB01Facts(type, payload);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftFacts(payload);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryFacts(payload);
+  if (isLoulanRequestManifest(type)) return loulanRequestManifestFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -254,6 +257,7 @@ function statusFor(type, payload) {
   if (isLoulanB01Artifact(type)) return loulanB01Status(type, payload);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftStatus(payload);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryStatus(payload);
+  if (isLoulanRequestManifest(type)) return loulanRequestManifestStatus(payload);
   if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
   if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
   if (payload.writes_long_term_memory === true) return "blocked";

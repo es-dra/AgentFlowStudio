@@ -32,6 +32,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan `b01_decision_apply_plan_draft.json` directly as a read-only memory artifact, showing why B01 apply is still blocked without mutating registry, shot list, context draft, provider state, or durable Memory; see `docs/handoff/AFS-LOULAN-WEB-B01-APPLY-PLAN-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan generation request manifests (`image2_requests.json` and `kling_i2v_requests.json`) directly as read-only memory artifacts, surfacing 38-request Image2/Kling planning summaries without starting any provider call; see `docs/handoff/AFS-LOULAN-WEB-REQUEST-MANIFESTS-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:
