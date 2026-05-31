@@ -95,7 +95,7 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["provider_route_safety"]["image_generation"] == "blocked_until_api_workbench"
     assert payload["promotion_gates"]["overall_status"] in {"ready", "blocked"}
     assert payload["api_workbench_skeleton"]["live_provider_calls"] == "blocked_by_default"
-    assert "character:zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
+    assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "D:\\" not in serialized
     assert ".mp4" not in serialized

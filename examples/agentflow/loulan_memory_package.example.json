@@ -6,6 +6,15 @@
   "provider_calls_started": false,
   "writes_long_term_memory": false,
   "reads_company_knowledge": false,
+  "project_summary": {
+    "project_id": "loulan_scene_assets",
+    "title": "Loulan time-control scene asset project",
+    "source_root_label": "LoulanSceneAssets",
+    "target_format": "horizontal_16_9",
+    "current_phase": "keyframe_only_horizontal_16_9",
+    "claim_level": "horizontal_keyframe_candidates_pending_human_review",
+    "video_generation_status": "deferred_until_keyframe_approval"
+  },
   "project": {
     "project_id": "loulan_scene_assets",
     "title": "Loulan time-control scene asset project",
@@ -16,11 +25,10 @@
     "video_generation_status": "deferred_until_keyframe_approval"
   },
   "shot_summary": {
-    "total_shots": 38,
+    "total_shots": 2,
     "status_counts": {
       "approved_keyframe": 1,
-      "keyframe_candidate_pending_review": 4,
-      "planned": 33
+      "keyframe_candidate_pending_review": 1
     },
     "sample_shots": [
       {
@@ -37,39 +45,117 @@
       }
     ]
   },
-  "asset_summary": {
-    "total_assets": 2,
-    "status_counts": {
-      "approved": 1,
-      "candidate_pending_human_review": 1
+  "asset_inventory": {
+    "source_registry_ref": "manifests/asset_registry.json",
+    "registry_type": "loulan_unified_asset_registry",
+    "total_assets": 3,
+    "type_counts": {
+      "character": 1,
+      "keyframe": 1,
+      "run_evidence": 1
     },
-    "missing_sha256_count": 1,
-    "rejected_asset_count": 1,
-    "assets": [
+    "status_counts": {
+      "approved_anchor": 1,
+      "candidate": 1,
+      "route_failed": 1
+    },
+    "missing_sha256_count": 2,
+    "missing_ref_count": 0,
+    "eligible_assets": [
       {
-        "memory_ref": "character:zhou_tong_school_v1",
-        "asset_id": "zhou_tong_school_v1",
-        "label": "Zhou Tong school anchor",
-        "character": "Zhou Tong",
-        "phase": "school_anchor",
-        "status": "approved",
+        "memory_ref": "asset:character_zhou_tong_school_v1",
+        "asset_id": "character_zhou_tong_school_v1",
+        "asset_type": "character",
+        "label": "Zhou Tong approved school-phase anchor",
+        "status": "approved_anchor",
+        "sha256": "sha-approved",
         "sha256_present": true,
         "output_ref": "human/zhou_tong_school_v1.png",
-        "asset_card_ref": "asset_library/characters/zhou_tong_school_v1.md",
-        "review_card_ref": "reviews/zhou_tong_school_v1/refinement_card.md",
+        "eligible_for_context": true
+      }
+    ],
+    "blocked_assets": [
+      {
+        "memory_ref": "asset:keyframe_b01_s01_h1",
+        "asset_type": "keyframe",
+        "status": "candidate",
+        "reason": "candidate"
+      },
+      {
+        "memory_ref": "asset:run_image2_route_failure",
+        "asset_type": "run_evidence",
+        "status": "route_failed",
+        "reason": "route_failed"
+      }
+    ],
+    "assets": [
+      {
+        "memory_ref": "asset:character_zhou_tong_school_v1",
+        "asset_id": "character_zhou_tong_school_v1",
+        "asset_type": "character",
+        "role": "Zhou Tong approved school-phase anchor",
+        "label": "Zhou Tong approved school-phase anchor",
+        "status": "approved_anchor",
+        "current_ref": "human/zhou_tong_school_v1.png",
+        "output_ref": "human/zhou_tong_school_v1.png",
+        "source_refs": [
+          "human/zhou_tong_school_v1.png"
+        ],
+        "evidence_refs": [],
+        "review_refs": [],
+        "asset_card_ref": "human/zhou_tong_school_v1.png",
+        "review_card_ref": "",
+        "sha256": "sha-approved",
+        "sha256_present": true,
+        "promotion_state": "eligible_for_context",
         "eligible_for_context": true
       },
       {
-        "memory_ref": "character:guan_pingping_v2",
-        "asset_id": "guan_pingping_v2",
-        "label": "Guan Pingping candidate",
-        "character": "Guan Pingping",
-        "phase": "school_candidate",
-        "status": "candidate_pending_human_review",
+        "memory_ref": "asset:keyframe_b01_s01_h1",
+        "asset_id": "keyframe_b01_s01_h1",
+        "asset_type": "keyframe",
+        "role": "B01 horizontal keyframe pending human review",
+        "label": "B01 horizontal keyframe pending human review",
+        "status": "candidate",
+        "current_ref": "assets/images/B01-S01-h1.png",
+        "output_ref": "assets/images/B01-S01-h1.png",
+        "sha256": "",
         "sha256_present": false,
-        "output_ref": "human/guan_pingping_v2.png",
-        "asset_card_ref": "asset_library/characters/guan_pingping_v2.md",
-        "review_card_ref": "reviews/guan_pingping_v2/refinement_card.md",
+        "promotion_state": "blocked",
+        "eligible_for_context": false
+      }
+    ]
+  },
+  "asset_summary": {
+    "total_assets": 3,
+    "source_registry_ref": "manifests/asset_registry.json",
+    "status_counts": {
+      "approved_anchor": 1,
+      "candidate": 1,
+      "route_failed": 1
+    },
+    "missing_sha256_count": 2,
+    "rejected_asset_count": 1,
+    "assets": [
+      {
+        "memory_ref": "asset:character_zhou_tong_school_v1",
+        "asset_id": "character_zhou_tong_school_v1",
+        "asset_type": "character",
+        "label": "Zhou Tong approved school-phase anchor",
+        "status": "approved_anchor",
+        "sha256": "sha-approved",
+        "sha256_present": true,
+        "output_ref": "human/zhou_tong_school_v1.png",
+        "eligible_for_context": true
+      },
+      {
+        "memory_ref": "asset:keyframe_b01_s01_h1",
+        "asset_id": "keyframe_b01_s01_h1",
+        "asset_type": "keyframe",
+        "label": "B01 horizontal keyframe pending human review",
+        "status": "candidate",
+        "sha256_present": false,
+        "output_ref": "assets/images/B01-S01-h1.png",
         "eligible_for_context": false
       }
     ],
@@ -84,15 +170,6 @@
       "status": "available",
       "sample_refs": [
         "asset_library/characters/zhou_tong_school_v1.md"
-      ],
-      "auto_promotes_memory": false
-    },
-    {
-      "collection_id": "director_feedback",
-      "label": "director feedback",
-      "status": "available",
-      "sample_refs": [
-        "asset_library/director_notes/B01-S01_feedback.md"
       ],
       "auto_promotes_memory": false
     }
@@ -111,13 +188,29 @@
     "overall_status": "blocked",
     "blocking_refs": [
       {
-        "memory_ref": "character:guan_pingping_v2",
-        "reason": "missing_sha256"
+        "memory_ref": "asset:keyframe_b01_s01_h1",
+        "reason": "candidate"
+      },
+      {
+        "memory_ref": "asset:run_image2_route_failure",
+        "reason": "route_failed"
       },
       {
         "memory_ref": "human/rejected/guan_pingping_v1.png",
         "reason": "rejected_asset"
       }
+    ],
+    "eligible_statuses": [
+      "approved_anchor",
+      "promoted_reusable"
+    ],
+    "blocked_statuses": [
+      "candidate",
+      "needs_repair",
+      "rejected",
+      "route_failed",
+      "source_reference",
+      "superseded"
     ],
     "promotion_modes": [
       "promote",
@@ -131,61 +224,35 @@
   "next_context_bundle_draft": {
     "status": "promotion_decision_required",
     "eligible_memory_refs": [
-      "character:zhou_tong_school_v1"
+      "asset:character_zhou_tong_school_v1"
     ],
     "blocked_memory_refs": [
-      "character:guan_pingping_v2",
+      "asset:keyframe_b01_s01_h1",
+      "asset:run_image2_route_failure",
       "human/rejected/guan_pingping_v1.png"
     ],
+    "blocked_refs_by_reason": {
+      "candidate": [
+        "asset:keyframe_b01_s01_h1"
+      ],
+      "route_failed": [
+        "asset:run_image2_route_failure"
+      ]
+    },
+    "context_rule": "only approved_anchor or promoted_reusable assets may enter context",
     "projection_mode": "file_protocol_only",
     "writes_long_term_memory": false
   },
   "canvas_nodes": [
-    {
-      "id": "project",
-      "label": "Project",
-      "status": "planned"
-    },
-    {
-      "id": "shots",
-      "label": "Shots",
-      "status": "review ready"
-    },
-    {
-      "id": "assets",
-      "label": "Assets",
-      "status": "blocked"
-    },
-    {
-      "id": "memory-loaded",
-      "label": "Memory Loaded",
-      "status": "promotion decision required"
-    },
-    {
-      "id": "baseline-plan",
-      "label": "Baseline Plan",
-      "status": "planned"
-    },
-    {
-      "id": "memory-backed-plan",
-      "label": "Memory-backed Plan",
-      "status": "planned"
-    },
-    {
-      "id": "review",
-      "label": "Review",
-      "status": "planned"
-    },
-    {
-      "id": "feedback",
-      "label": "Feedback",
-      "status": "planned"
-    },
-    {
-      "id": "next-pass",
-      "label": "Next Pass",
-      "status": "blocked"
-    }
+    { "id": "project", "label": "Project", "status": "planned" },
+    { "id": "shots", "label": "Shots", "status": "review ready" },
+    { "id": "assets", "label": "Assets", "status": "blocked" },
+    { "id": "memory-loaded", "label": "Memory Loaded", "status": "promotion decision required" },
+    { "id": "baseline-plan", "label": "Baseline Plan", "status": "planned" },
+    { "id": "memory-backed-plan", "label": "Memory-backed Plan", "status": "planned" },
+    { "id": "review", "label": "Review", "status": "planned" },
+    { "id": "feedback", "label": "Feedback", "status": "planned" },
+    { "id": "next-pass", "label": "Next Pass", "status": "blocked" }
   ],
   "api_workbench_skeleton": {
     "asset_resolver": "planned",

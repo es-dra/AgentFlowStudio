@@ -22,11 +22,11 @@
     "status": "ready",
     "references": [
       {
-        "memory_ref": "character:zhou_tong_school_v1",
-        "asset_id": "zhou_tong_school_v1",
-        "label": "Zhou Tong school anchor",
+        "memory_ref": "asset:character_zhou_tong_school_v1",
+        "asset_id": "character_zhou_tong_school_v1",
+        "label": "Zhou Tong approved school-phase anchor",
         "sha256": "sha-approved",
-        "source_status": "approved"
+        "source_status": "approved_anchor"
       }
     ],
     "runtime_image_loading": "deferred",
@@ -35,7 +35,7 @@
   "prompt_compiler": {
     "status": "ready",
     "compiler_mode": "preview_only",
-    "compiled_prompt_preview": "Loulan project: Loulan time-control scene asset project. Target format: horizontal_16_9. Use approved memory refs only: character:zhou_tong_school_v1 sha256=sha-approved.",
+    "compiled_prompt_preview": "Loulan project: Loulan time-control scene asset project. Target format: horizontal_16_9. Use approved memory refs only: asset:character_zhou_tong_school_v1 sha256=sha-approved.",
     "includes_candidate_refs": false
   },
   "request_manifest": {
@@ -52,7 +52,7 @@
           "prompt": "<compiled_prompt_preview>",
           "reference_images": [
             {
-              "memory_ref": "character:zhou_tong_school_v1",
+              "memory_ref": "asset:character_zhou_tong_school_v1",
               "sha256": "sha-approved",
               "runtime_image_loader": "deferred"
             }
@@ -81,7 +81,12 @@
   "promotion_gate": {
     "status": "blocked_until_human_review",
     "blocked_memory_refs": [
-      "character:guan_pingping_v2",
+      "asset:scene_loulan_ruins_sandstorm_v0",
+      "asset:vfx_blue_time_ripple_v0",
+      "asset:keyframe_b01_s01_h1",
+      "asset:prop_chitu_bag_v1_failed",
+      "asset:feedback_b01_director_summary",
+      "asset:run_image2_route_failure",
       "human/rejected/guan_pingping_v1.png"
     ],
     "writes_long_term_memory": false,

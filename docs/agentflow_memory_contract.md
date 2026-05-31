@@ -335,9 +335,10 @@ Required boundaries:
   Loulan, and does not start image, video, LLM, ASR, or download calls;
 - package output must not contain absolute paths, generated media refs,
   provider credentials, bearer headers, signed URLs, or data URLs;
-- `candidate`, `rejected`, `expired`, and missing-hash assets are blocked;
-- `approved`, `promoted`, or `merged` assets may become eligible refs, but still
-  require a reviewable promotion decision before durable memory use;
+- when `manifests/asset_registry.json` exists, registry-derived inventory,
+  gates, and context drafts allow only approved/promoted reusable anchors;
+- legacy `character_assets.json` keeps `approved`, `promoted`, or `merged`
+  compatibility, but still requires review before durable memory use;
 - unsafe built-in image routes must be blocked until the API workbench and
   provider ledger exist;
 - the Web projection is read-only/copy-only, not a scanner, executor, Company
