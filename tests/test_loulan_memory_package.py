@@ -27,6 +27,10 @@ def test_loulan_memory_package_blocks_candidates_and_builtin_image_route(tmp_pat
     assert package["asset_summary"]["rejected_asset_count"] == 1
     assert package["provider_route_safety"]["image_generation"] == "blocked_until_api_workbench"
     assert package["provider_route_safety"]["unsafe_builtin_image_route_detected"] is True
+    assert package["feedback_loop_gates"]["b01"]["status"] == "blocked_pending_human_review"
+    assert package["feedback_loop_gates"]["b01"]["pending_decisions"] == 5
+    assert package["feedback_loop_gates"]["b01"]["context_projection_ready"] is False
+    assert package["feedback_loop_gates"]["b01"]["source_ref"] == "manifests/afs_b01_feedback_loop_gate.json"
     assert package["promotion_gates"]["overall_status"] == "blocked"
     assert package["next_context_bundle_draft"]["eligible_memory_refs"] == ["character:zhou_tong_school_v1"]
     assert {
@@ -82,6 +86,7 @@ def test_loulan_memory_package_cli_writes_safe_dry_run_artifacts(tmp_path: Path)
     package = json.loads(package_path.read_text(encoding="utf-8"))
     assert package["artifact_type"] == "agentflow_loulan_memory_package"
     assert package["provider_route_safety"]["request_preview_only"] is True
+    assert package["feedback_loop_gates"]["b01"]["status"] == "blocked_pending_human_review"
     assert "durable Memory runtime: not implemented" in report_path.read_text(encoding="utf-8")
 
 
@@ -95,6 +100,7 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["provider_route_safety"]["image_generation"] == "blocked_until_api_workbench"
     assert payload["promotion_gates"]["overall_status"] in {"ready", "blocked"}
     assert payload["api_workbench_skeleton"]["live_provider_calls"] == "blocked_by_default"
+    assert payload["feedback_loop_gates"]["b01"]["provider_calls_started"] is False
     assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "D:\\" not in serialized
@@ -125,6 +131,34 @@ def _loulan_fixture(tmp_path: Path) -> Path:
             "current_phase": "keyframe_only_horizontal_16_9",
             "current_claim_level": "horizontal_keyframe_candidates_pending_human_review",
             "video_generation_status": "deferred_until_keyframe_approval",
+        },
+    )
+    _write_json(
+        root / "manifests" / "afs_b01_feedback_loop_gate.json",
+        {
+            "schema_version": "0.1.0",
+            "artifact_type": "loulan_afs_b01_feedback_loop_gate",
+            "status": "blocked_pending_human_review",
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "human_acceptance_recorded": False,
+            "media_generation_started": False,
+            "current_gate_summary": {
+                "b01_decision_items": 5,
+                "pending_decisions": 5,
+                "approved_decisions": 0,
+                "repair_requested": 0,
+                "rejected_decisions": 0,
+                "validation_status": "blocked_pending_human_review",
+                "apply_status": "blocked_validation_not_ready",
+                "afs_import_ready": False,
+                "context_projection_ready": False,
+            },
+            "claim_boundary": {
+                "human_acceptance": "not_recorded",
+                "durable_memory_runtime": "not_implemented",
+                "provider_smoke": "not_run",
+            },
         },
     )
     _write_json(

@@ -184,6 +184,26 @@
       "video"
     ]
   },
+  "feedback_loop_gates": {
+    "b01": {
+      "status": "blocked_pending_human_review",
+      "source_ref": "manifests/afs_b01_feedback_loop_gate.json",
+      "provider_calls_started": false,
+      "writes_long_term_memory": false,
+      "human_acceptance_recorded": false,
+      "media_generation_started": false,
+      "decision_items": 5,
+      "pending_decisions": 5,
+      "approved_decisions": 0,
+      "repair_requested": 0,
+      "rejected_decisions": 0,
+      "validation_status": "blocked_pending_human_review",
+      "apply_status": "blocked_validation_not_ready",
+      "afs_import_ready": false,
+      "context_projection_ready": false,
+      "next_step": "Human operator must fill B01 decisions before Loulan apply or AFS context projection can proceed."
+    }
+  },
   "promotion_gates": {
     "overall_status": "blocked",
     "blocking_refs": [

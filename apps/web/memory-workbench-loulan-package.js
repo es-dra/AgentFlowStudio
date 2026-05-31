@@ -19,6 +19,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
   const contextProjection = workspace?.loulanContextBundleProjection?.payload || null;
   const project = payload.project || {};
   const safety = payload.provider_route_safety || {};
+  const b01FeedbackGate = payload.feedback_loop_gates?.b01 || null;
   const nextContext = payload.next_context_bundle_draft || {};
   const inventory = payload.asset_inventory || {};
   const assets = loulanDisplayAssets(payload).slice(0, 10);
@@ -40,7 +41,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
       detail: `${asset.asset_type || "asset"}; ${asset.status}; ${asset.current_ref || asset.output_ref || "no output ref"}`,
       status: asset.eligible_for_context ? "approved" : "blocked",
     })),
-    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection),
+    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate),
     memory_loaded: loulanMemoryLoaded(eligibleRefs, blockedRefs),
     lanes: [
       {
@@ -58,7 +59,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
         output: eligibleRefs.length ? `${eligibleRefs.length} eligible refs can seed next context` : "blocked until promotion decision",
       },
     ],
-    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection),
+    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate),
     review: {
       storyboard_adherence: reviewPack ? `${reviewPack.review_scope?.shot_count || 0} ${reviewPack.review_scope?.block_id || "Loulan"} shots queued for human review.` : `${payload.shot_summary?.total_shots || 0} Loulan shots indexed for review.`,
       visual_consistency: reviewPack ? `${reviewPack.asset_review?.candidate_memory_refs?.length || 0} candidate memory refs need decisions; ${reviewPack.asset_review?.approved_or_promoted_memory_refs?.length || 0} refs already reusable.` : `${inventory.total_assets || payload.asset_summary?.total_assets || 0} assets; ${blockedRefs.length} refs blocked.`,
@@ -96,7 +97,7 @@ function loulanDisplayAssets(payload) {
   return assets;
 }
 
-function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection) {
+function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate = null) {
   const requestCount = apiPlan?.request_manifest?.requests?.length || 0;
   const inventory = payload.asset_inventory || {};
   const items = [
@@ -111,6 +112,14 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
       title: "Human review pack",
       status: reviewPack.review_scope?.evidence_status === "blocked" ? "blocked" : "review ready",
       detail: `${reviewPack.review_scope?.shot_count || 0} shots; acceptance not recorded`,
+    });
+  }
+  if (b01FeedbackGate) {
+    items.push({
+      id: "b01-feedback-loop-gate",
+      title: "B01 feedback loop gate",
+      status: b01FeedbackGate.status || "unknown",
+      detail: `${b01FeedbackGate.pending_decisions || 0} pending decisions; context ready: ${String(b01FeedbackGate.context_projection_ready === true)}`,
     });
   }
   if (decisionTemplate) {
@@ -179,7 +188,7 @@ function loulanMemoryLoaded(eligibleRefs, blockedRefs) {
   return [...eligible, ...blocked];
 }
 
-function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPack = null, decisionTemplate = null, decisionReview = null, decisionWorksheet = null, decisionIntake = null, contextProjection = null) {
+function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPack = null, decisionTemplate = null, decisionReview = null, decisionWorksheet = null, decisionIntake = null, contextProjection = null, b01FeedbackGate = null) {
   return {
     title: "Loulan memory production protocol",
     status: contextProjection?.context_bundle?.status || (safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned"),
@@ -191,6 +200,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "API adapter", status: apiPlan ? "review ready" : "planned", detail: apiPlan?.provider_adapter?.adapter_id || "not selected" },
       { label: "api context intake gate", status: apiPlan?.context_projection?.decision_intake_gate?.status || "not_recorded", detail: apiPlan ? `context ready: ${String(apiPlan.context_projection?.decision_intake_gate?.context_bundle_command_ready === true)}` : "not prepared" },
       { label: "QA gate", status: apiPlan?.qa_gate?.status || "planned", detail: apiPlan?.promotion_gate?.status || "waiting for API workbench plan" },
+      { label: "B01 feedback loop", status: b01FeedbackGate?.status || "not_supplied", detail: b01FeedbackGate ? `${b01FeedbackGate.pending_decisions || 0} pending; context ready: ${String(b01FeedbackGate.context_projection_ready === true)}` : "not supplied" },
       { label: "human review", status: reviewPack?.review_scope?.evidence_status || "planned", detail: reviewPack?.review_scope?.status || "not prepared" },
       { label: isDecisionImport(decisionTemplate) ? "B01 decision import" : "decision template", status: decisionTemplate?.template_status || "planned", detail: decisionTemplate ? `${decisionTemplateDetail(decisionTemplate)}; no acceptance` : "not prepared" },
       { label: "decision review", status: decisionReview?.review_status || "planned", detail: decisionReview ? `${decisionReview.decision_summary?.pending_count || 0} pending; no acceptance` : "not prepared" },

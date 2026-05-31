@@ -79,7 +79,10 @@ console.log(JSON.stringify({
   source: nodes.memorySourceStatus.textContent,
   project: nodes.memoryProjectSummary.textContent,
   assets: nodes.memoryAssetSummary.textContent,
+  bundle: nodes.memoryBundleSummary.textContent,
+  inspector: nodes.memoryArtifactInspector.textContent,
   lanes: nodes.memoryLaneGrid.textContent,
+  timeline: nodes.memoryRunTimeline.textContent,
   provenance: nodes.memoryProvenancePanel.textContent,
   feedback: nodes.memoryFeedbackOutput.value,
   protocol: nodes.memoryProtocolSummary.textContent,
@@ -99,10 +102,16 @@ console.log(JSON.stringify({
     assert "horizontal_16_9" in payload["project"]
     assert "Zhou Tong approved school-phase anchor" in payload["assets"]
     assert "approved" in payload["assets"]
+    assert "B01 feedback loop gate" in payload["bundle"]
+    assert "5 pending decisions" in payload["bundle"]
     assert "Baseline Plan" in payload["lanes"]
     assert "Memory-backed Plan" in payload["lanes"]
     assert "asset:character_zhou_tong_school_v1" in payload["provenance"]
     assert "blocked_until_api_workbench" in payload["protocol"]
+    assert "B01 feedback loop" in payload["protocol"]
+    assert "blocked_pending_human_review" in payload["protocol"]
+    assert "feedback_gate_b01: blocked_pending_human_review" in payload["inspector"]
+    assert "B01 Feedback Gate" in payload["timeline"]
     assert '"artifact_type": "agentflow_feedback_event"' in payload["feedback"]
     assert '"writes_long_term_memory": false' in payload["feedback"]
 

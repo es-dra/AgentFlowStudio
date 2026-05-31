@@ -75,10 +75,13 @@ function factsFor(type, payload) {
 }
 
 function loulanPackageFacts(payload) {
+  const b01Gate = objectValue(payload.feedback_loop_gates?.b01);
   return [
     fact("shots", payload.shot_summary?.total_shots ?? "unknown"),
     fact("eligible_refs", arrayValue(payload.next_context_bundle_draft?.eligible_memory_refs).length),
     fact("blocked_refs", arrayValue(payload.next_context_bundle_draft?.blocked_memory_refs).length),
+    fact("feedback_gate_b01", b01Gate.status || "not_supplied"),
+    fact("b01_pending_decisions", b01Gate.pending_decisions ?? "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }

@@ -86,6 +86,14 @@ export function loulanTimeline(
       detail: `${apiPlan.request_manifest?.requests?.length || 0} request previews`,
     });
   }
+  const b01Gate = payload.feedback_loop_gates?.b01 || null;
+  if (b01Gate) {
+    nodes.push({
+      label: "B01 Feedback Gate",
+      status: b01Gate.status || "unknown",
+      detail: `${b01Gate.pending_decisions || 0} pending decisions; context ready: ${String(b01Gate.context_projection_ready === true)}`,
+    });
+  }
   if (reviewPack) {
     nodes.push({
       label: "Human Review",
