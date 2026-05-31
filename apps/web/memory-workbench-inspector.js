@@ -84,9 +84,11 @@ function loulanPackageFacts(payload) {
 }
 
 function loulanApiWorkbenchFacts(payload) {
+  const intakeGate = objectValue(payload.context_projection?.decision_intake_gate);
   return [
     fact("adapter", payload.provider_adapter?.adapter_id || "unknown"),
     fact("context_projection", payload.context_projection?.status || "not_provided"),
+    fact("context_intake_gate", intakeGate.status || "not_recorded"),
     fact("requests", arrayValue(payload.request_manifest?.requests).length),
     fact("response_ledger", payload.response_ledger?.status || "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),

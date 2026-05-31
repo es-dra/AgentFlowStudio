@@ -173,10 +173,19 @@ function elements() {
 }
 
 const packageText = await readFile("examples/agentflow/loulan_memory_package.example.json", "utf8");
-const apiPlanText = await readFile("examples/agentflow/loulan_api_workbench_plan.example.json", "utf8");
+const apiPlan = JSON.parse(await readFile("examples/agentflow/loulan_api_workbench_plan.example.json", "utf8"));
+apiPlan.context_projection = {
+  status: "partial_ready",
+  projection_id: "context_projection_with_gate",
+  decision_intake_gate: {
+    status: "not_supplied",
+    context_bundle_command_ready: false,
+    intake_report_id: "",
+  },
+};
 const workspace = normalizeWorkspace(await parseFiles([
   { name: "loulan_memory_package.example.json", text: async () => packageText },
-  { name: "loulan_api_workbench_plan.example.json", text: async () => apiPlanText },
+  { name: "loulan_api_workbench_plan.example.json", text: async () => JSON.stringify(apiPlan) },
 ]));
 const view = buildMemoryWorkbenchView(workspace, "selected_files");
 const nodes = elements();
@@ -201,6 +210,9 @@ console.log(JSON.stringify({
     assert "1 request previews" in payload["bundle"]
     assert "openai_compatible_image" in payload["protocol"]
     assert "pending_response" in payload["protocol"]
+    assert "api context intake gate" in payload["protocol"]
+    assert "not_supplied" in payload["protocol"]
     assert "Loulan API workbench plan" in payload["inspector"]
+    assert "context_intake_gate: not_supplied" in payload["inspector"]
     assert "provider_calls_started: false" in payload["inspector"]
     assert "API Workbench" in payload["timeline"]

@@ -189,6 +189,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "video route", status: "planned", detail: safety.video_generation || "dry_run_only" },
       { label: "request preview", status: "planned", detail: String(Boolean(safety.request_preview_only)) },
       { label: "API adapter", status: apiPlan ? "review ready" : "planned", detail: apiPlan?.provider_adapter?.adapter_id || "not selected" },
+      { label: "api context intake gate", status: apiPlan?.context_projection?.decision_intake_gate?.status || "not_recorded", detail: apiPlan ? `context ready: ${String(apiPlan.context_projection?.decision_intake_gate?.context_bundle_command_ready === true)}` : "not prepared" },
       { label: "QA gate", status: apiPlan?.qa_gate?.status || "planned", detail: apiPlan?.promotion_gate?.status || "waiting for API workbench plan" },
       { label: "human review", status: reviewPack?.review_scope?.evidence_status || "planned", detail: reviewPack?.review_scope?.status || "not prepared" },
       { label: "decision template", status: decisionTemplate?.template_status || "planned", detail: decisionTemplate ? `${decisionTemplate.decisions?.length || 0} slots; no acceptance` : "not prepared" },
