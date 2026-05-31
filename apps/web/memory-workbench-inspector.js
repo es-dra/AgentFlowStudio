@@ -77,6 +77,7 @@ function loulanPackageFacts(payload) {
 function loulanApiWorkbenchFacts(payload) {
   return [
     fact("adapter", payload.provider_adapter?.adapter_id || "unknown"),
+    fact("context_projection", payload.context_projection?.status || "not_provided"),
     fact("requests", arrayValue(payload.request_manifest?.requests).length),
     fact("response_ledger", payload.response_ledger?.status || "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),

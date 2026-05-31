@@ -2,13 +2,13 @@
 
 Status: active short development log. Long historical narrative has been compressed into archive indexes so this file stays usable during project maintenance.
 
-Current references:
-
-- Live work ledger: `TASK_TRACKER.md`.
-- Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
-- Pre-reset task history: `docs/archive/task_history_2026_05.md`.
+Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
+`docs/archive/devlog_history_2026_05.md`; pre-reset task history
+`docs/archive/task_history_2026_05.md`.
 
 2026-06-01: Loulan memory pilot package, API workbench dry-run, B01 human review pack, decision template, context bundle projection, optional asset registry gate, and Web decision/context rendering contracts, CLIs, Web projections, examples, tracker rows, task briefs, and handoffs added; see `docs/handoff/AFS-LOULAN-PILOT-001.md`, `docs/handoff/AFS-LOULAN-API-WORKBENCH-001.md`, `docs/handoff/AFS-LOULAN-HUMAN-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-DECISION-TEMPLATE-001.md`, `docs/handoff/AFS-LOULAN-CONTEXT-BUNDLE-001.md`, `docs/handoff/AFS-LOULAN-ASSET-REGISTRY-001.md`, and `docs/handoff/AFS-LOULAN-WEB-CONTEXT-001.md`.
+
+2026-06-01: Loulan API workbench now accepts optional context bundle projections from explicit human decisions and blocks fallback when supplied projections are not ready; see `docs/handoff/AFS-LOULAN-API-CONTEXT-001.md`.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 

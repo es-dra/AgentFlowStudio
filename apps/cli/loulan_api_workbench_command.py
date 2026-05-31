@@ -21,6 +21,15 @@ def loulan_api_workbench_plan_command(
         readable=True,
         help="Loulan memory package JSON produced by loulan-memory-package.",
     ),
+    context_projection_path: Path | None = typer.Option(
+        None,
+        "--context-projection",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional Loulan context bundle projection produced by loulan-context-bundle.",
+    ),
     created_at: str = typer.Option(
         ...,
         "--created-at",
@@ -41,10 +50,16 @@ def loulan_api_workbench_plan_command(
     """Write a no-call Loulan API workbench request preview from a package."""
     try:
         package = json.loads(package_path.read_text(encoding="utf-8-sig"))
+        context_projection = (
+            json.loads(context_projection_path.read_text(encoding="utf-8-sig"))
+            if context_projection_path is not None
+            else None
+        )
         plan = build_loulan_api_workbench_plan(
             package,
             created_at=created_at,
             provider_adapter_id=provider_adapter_id,
+            context_projection=context_projection,
         )
         paths = write_loulan_api_workbench_plan(plan, output_dir)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -52,6 +67,7 @@ def loulan_api_workbench_plan_command(
         raise typer.Exit(code=1) from exc
     typer.echo("Loulan API workbench plan")
     typer.echo(f"Package: {plan['package_id']}")
+    typer.echo(f"Context projection: {plan['context_projection']['status']}")
     typer.echo(f"Reference pack: {plan['reference_pack']['status']}")
     typer.echo(f"Requests previewed: {len(plan['request_manifest']['requests'])}")
     typer.echo("Provider calls: not started")

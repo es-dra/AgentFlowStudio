@@ -6,6 +6,14 @@ from typing import Any
 
 from narratocut.utils import write_json
 
+from agentflow.memory.loulan_api_context import (
+    context_blocking_reasons,
+    context_projection_id,
+    context_projection_summary,
+    context_reference_pack_entries,
+    validate_context_projection,
+)
+
 
 SCHEMA_VERSION = "0.1.0"
 PLAN_TYPE = "agentflow_loulan_api_workbench_plan"
@@ -32,10 +40,13 @@ def build_loulan_api_workbench_plan(
     *,
     created_at: str,
     provider_adapter_id: str = DEFAULT_PROVIDER_ADAPTER,
+    context_projection: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a no-call Loulan image API workbench plan from a memory package."""
     _validate_package(package)
-    references = _reference_pack_entries(package)
+    if context_projection is not None:
+        validate_context_projection(context_projection, schema_version=SCHEMA_VERSION)
+    references = _reference_pack_entries(package, context_projection)
     request_ready = bool(references)
     request_id = f"{package['package_id']}_image_request_preview_001"
     plan = {
@@ -44,17 +55,25 @@ def build_loulan_api_workbench_plan(
         "created_at": created_at,
         "package_id": package["package_id"],
         "project_id": package.get("project", {}).get("project_id"),
+        "source_context_projection_id": context_projection_id(context_projection),
         "dry_run_only": True,
         "provider_calls_started": False,
         "writes_long_term_memory": False,
+        "context_projection": context_projection_summary(context_projection),
         "provider_adapter": _provider_adapter(provider_adapter_id, package),
         "reference_pack": _reference_pack(package, references),
         "prompt_compiler": _prompt_compiler(package, references),
-        "request_manifest": _request_manifest(package, references, request_id, provider_adapter_id),
+        "request_manifest": _request_manifest(
+            package,
+            references,
+            request_id,
+            provider_adapter_id,
+            context_projection,
+        ),
         "response_ledger": _response_ledger(request_id, request_ready),
         "qa_gate": _qa_gate(request_ready),
-        "promotion_gate": _promotion_gate(package, request_ready),
-        "blocking_reasons": [] if request_ready else ["no_approved_reference_hashes"],
+        "promotion_gate": _promotion_gate(package, request_ready, context_projection),
+        "blocking_reasons": context_blocking_reasons(references, context_projection),
         "claim_boundaries": _claim_boundaries(),
     }
     _reject_unsafe_output(plan)
@@ -87,6 +106,7 @@ def render_loulan_api_workbench_plan_report(plan: dict[str, Any]) -> str:
             "# Loulan API Workbench Plan",
             "",
             f"- Package: `{plan['package_id']}`",
+            f"- Context projection: `{plan['context_projection']['status']}`",
             f"- Provider adapter: `{plan['provider_adapter']['adapter_id']}`",
             "- Provider calls: not started",
             "- Request mode: dry-run preview only",
@@ -127,7 +147,12 @@ def _provider_adapter(provider_adapter_id: str, package: dict[str, Any]) -> dict
     }
 
 
-def _reference_pack_entries(package: dict[str, Any]) -> list[dict[str, str]]:
+def _reference_pack_entries(
+    package: dict[str, Any],
+    context_projection: dict[str, Any] | None,
+) -> list[dict[str, str]]:
+    if context_projection is not None:
+        return context_reference_pack_entries(_package_assets(package), context_projection)
     eligible = set(package.get("next_context_bundle_draft", {}).get("eligible_memory_refs") or [])
     entries = []
     for asset in _package_assets(package):
@@ -193,6 +218,7 @@ def _request_manifest(
     references: list[dict[str, str]],
     request_id: str,
     provider_adapter_id: str,
+    context_projection: dict[str, Any] | None,
 ) -> dict[str, Any]:
     if not references:
         return {"status": "blocked", "requests": []}
@@ -205,6 +231,7 @@ def _request_manifest(
                 "provider_adapter_id": provider_adapter_id,
                 "live_call_authorized": False,
                 "source_package_id": package["package_id"],
+                "source_context_projection_id": context_projection_id(context_projection),
                 "body_preview": {
                     "model": "<runtime_model_from_provider_config>",
                     "prompt": "<compiled_prompt_preview>",
@@ -245,8 +272,15 @@ def _qa_gate(request_ready: bool) -> dict[str, Any]:
     }
 
 
-def _promotion_gate(package: dict[str, Any], request_ready: bool) -> dict[str, Any]:
-    blocked_refs = package.get("next_context_bundle_draft", {}).get("blocked_memory_refs") or []
+def _promotion_gate(
+    package: dict[str, Any],
+    request_ready: bool,
+    context_projection: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if context_projection is None:
+        blocked_refs = package.get("next_context_bundle_draft", {}).get("blocked_memory_refs") or []
+    else:
+        blocked_refs = context_projection.get("context_bundle", {}).get("blocked_refs") or []
     return {
         "status": "blocked_until_human_review" if request_ready else "blocked_until_reference_pack_ready",
         "blocked_memory_refs": blocked_refs,
