@@ -12,7 +12,7 @@ PLAN_TYPE = "agentflow_loulan_api_workbench_plan"
 LOULAN_PACKAGE_TYPE = "agentflow_loulan_memory_package"
 DEFAULT_PROVIDER_ADAPTER = "openai_compatible_image"
 IMAGE_GATE = "NARRATOCUT_ALLOW_REMOTE_IMAGE"
-REUSABLE_STATUSES = frozenset({"approved", "promoted", "merged"})
+REUSABLE_STATUSES = frozenset({"approved", "promoted", "merged", "approved_anchor", "promoted_reusable"})
 UNSAFE_OUTPUT_FRAGMENTS = (
     "D:\\",
     "C:\\",
@@ -130,7 +130,7 @@ def _provider_adapter(provider_adapter_id: str, package: dict[str, Any]) -> dict
 def _reference_pack_entries(package: dict[str, Any]) -> list[dict[str, str]]:
     eligible = set(package.get("next_context_bundle_draft", {}).get("eligible_memory_refs") or [])
     entries = []
-    for asset in package.get("asset_summary", {}).get("assets") or []:
+    for asset in _package_assets(package):
         memory_ref = str(asset.get("memory_ref") or "")
         sha = str(asset.get("sha256") or "")
         if memory_ref in eligible and asset.get("status") in REUSABLE_STATUSES and sha:
@@ -144,6 +144,22 @@ def _reference_pack_entries(package: dict[str, Any]) -> list[dict[str, str]]:
                 }
             )
     return entries
+
+
+def _package_assets(package: dict[str, Any]) -> list[dict[str, Any]]:
+    seen = set()
+    assets = []
+    for source in (
+        package.get("asset_inventory", {}).get("eligible_assets") or [],
+        package.get("asset_inventory", {}).get("assets") or [],
+        package.get("asset_summary", {}).get("assets") or [],
+    ):
+        for asset in source:
+            memory_ref = str(asset.get("memory_ref") or "")
+            if memory_ref and memory_ref not in seen:
+                seen.add(memory_ref)
+                assets.append(asset)
+    return assets
 
 
 def _reference_pack(package: dict[str, Any], references: list[dict[str, str]]) -> dict[str, Any]:

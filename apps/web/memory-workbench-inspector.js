@@ -7,6 +7,8 @@ const TYPE_LABELS = {
   agentflow_loulan_memory_package: "Loulan memory package",
   agentflow_loulan_api_workbench_plan: "Loulan API workbench plan",
   agentflow_loulan_human_review_pack: "Loulan human review pack",
+  agentflow_loulan_promotion_decisions: "Loulan decision template",
+  agentflow_loulan_context_bundle_projection: "Loulan context bundle projection",
   agentflow_feedback_event: "Feedback draft",
 };
 
@@ -40,6 +42,8 @@ function focusTargetsFor(type) {
   if (type === "agentflow_loulan_memory_package") return ["project", "assets", "memory-loaded", "next-pass"];
   if (type === "agentflow_loulan_api_workbench_plan") return ["baseline-run", "memory-backed-run", "review", "next-pass"];
   if (type === "agentflow_loulan_human_review_pack") return ["review", "feedback", "next-pass"];
+  if (type === "agentflow_loulan_promotion_decisions") return ["feedback", "next-pass"];
+  if (type === "agentflow_loulan_context_bundle_projection") return ["memory-loaded", "next-pass"];
   return [];
 }
 
@@ -52,6 +56,8 @@ function factsFor(type, payload) {
   if (type === "agentflow_loulan_memory_package") return loulanPackageFacts(payload);
   if (type === "agentflow_loulan_api_workbench_plan") return loulanApiWorkbenchFacts(payload);
   if (type === "agentflow_loulan_human_review_pack") return loulanHumanReviewFacts(payload);
+  if (type === "agentflow_loulan_promotion_decisions") return loulanDecisionFacts(payload);
+  if (type === "agentflow_loulan_context_bundle_projection") return loulanContextBundleFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -83,6 +89,25 @@ function loulanHumanReviewFacts(payload) {
     fact("shots", payload.review_scope?.shot_count ?? "unknown"),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("next_pass", payload.next_pass_readiness?.status || "unknown"),
+  ];
+}
+
+function loulanDecisionFacts(payload) {
+  return [
+    fact("template_status", payload.template_status || "unknown"),
+    fact("decisions", arrayValue(payload.decisions).length),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function loulanContextBundleFacts(payload) {
+  const bundle = objectValue(payload.context_bundle);
+  return [
+    fact("decision_audit", payload.decision_audit?.status || "unknown"),
+    fact("context_bundle", bundle.status || "unknown"),
+    fact("memory_refs", arrayValue(bundle.memory_refs).length),
+    fact("blocked_refs", arrayValue(bundle.blocked_refs).length),
   ];
 }
 

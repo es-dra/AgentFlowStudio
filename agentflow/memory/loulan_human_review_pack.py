@@ -17,8 +17,8 @@ from agentflow.memory.loulan_human_review_support import (
 )
 
 
-REVIEWABLE_ASSET_STATUSES = frozenset({"candidate", "candidate_pending_human_review", "needs_repair"})
-REUSABLE_ASSET_STATUSES = frozenset({"approved", "promoted", "merged"})
+REVIEWABLE_ASSET_STATUSES = frozenset({"candidate", "candidate_pending_human_review", "needs_repair", "source_reference"})
+REUSABLE_ASSET_STATUSES = frozenset({"approved", "promoted", "merged", "approved_anchor", "promoted_reusable"})
 
 
 def build_loulan_human_review_pack(
@@ -174,7 +174,7 @@ def _asset_review(package: dict[str, Any]) -> dict[str, Any]:
     candidate_refs = []
     reusable_refs = []
     cards = []
-    for asset in package.get("asset_summary", {}).get("assets") or []:
+    for asset in _package_assets(package):
         memory_ref = str(asset.get("memory_ref") or "")
         status = str(asset.get("status") or "")
         if status in REVIEWABLE_ASSET_STATUSES:
@@ -195,9 +195,33 @@ def _asset_review(package: dict[str, Any]) -> dict[str, Any]:
         "status": "pending_human_review" if candidate_refs else "no_candidate_assets",
         "candidate_memory_refs": candidate_refs,
         "approved_or_promoted_memory_refs": reusable_refs,
-        "rejected_memory_refs": package.get("asset_summary", {}).get("rejected_asset_refs") or [],
+        "rejected_memory_refs": _rejected_asset_refs(package),
         "cards": cards,
     }
+
+
+def _package_assets(package: dict[str, Any]) -> list[dict[str, Any]]:
+    seen = set()
+    assets = []
+    for source in (
+        package.get("asset_inventory", {}).get("eligible_assets") or [],
+        package.get("asset_inventory", {}).get("assets") or [],
+        package.get("asset_summary", {}).get("assets") or [],
+    ):
+        for asset in source:
+            memory_ref = str(asset.get("memory_ref") or "")
+            if memory_ref and memory_ref not in seen:
+                seen.add(memory_ref)
+                assets.append(asset)
+    return assets
+
+
+def _rejected_asset_refs(package: dict[str, Any]) -> list[str]:
+    refs = list(package.get("asset_summary", {}).get("rejected_asset_refs") or [])
+    for asset in _package_assets(package):
+        if str(asset.get("status") or "") == "rejected":
+            refs.append(str(asset.get("memory_ref") or ""))
+    return sorted({ref for ref in refs if ref})
 
 
 def _promotion_decision_drafts(

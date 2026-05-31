@@ -93,6 +93,8 @@ export function normalizeWorkspace(artifacts) {
   const loulanPackage = byType("agentflow_loulan_memory_package") || null;
   const loulanApiWorkbenchPlan = byType("agentflow_loulan_api_workbench_plan") || null;
   const loulanHumanReviewPack = byType("agentflow_loulan_human_review_pack") || null;
+  const loulanDecisionTemplate = byType("agentflow_loulan_promotion_decisions") || null;
+  const loulanContextBundleProjection = byType("agentflow_loulan_context_bundle_projection") || null;
   const workspaceParts = {
     warnings,
     errors,
@@ -106,6 +108,8 @@ export function normalizeWorkspace(artifacts) {
     loulanPackage,
     loulanApiWorkbenchPlan,
     loulanHumanReviewPack,
+    loulanDecisionTemplate,
+    loulanContextBundleProjection,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),

@@ -12,6 +12,7 @@ from agentflow.memory.loulan_api_workbench import (
 )
 from agentflow.memory.loulan_package import build_loulan_memory_package
 from tests.test_loulan_memory_package import _loulan_fixture
+from tests.test_loulan_memory_package_registry import _loulan_registry_fixture
 
 
 def test_loulan_api_workbench_plan_builds_dry_run_request_preview(tmp_path: Path) -> None:
@@ -55,6 +56,25 @@ def test_loulan_api_workbench_plan_builds_dry_run_request_preview(tmp_path: Path
     serialized = json.dumps(plan, ensure_ascii=False)
     for forbidden in ["D:\\", "C:\\", "file://", ".mp4", ".mov", "api_key", "secret_key", "Bearer ", "signed_url"]:
         assert forbidden not in serialized
+
+
+def test_loulan_api_workbench_plan_uses_registry_approved_anchors(tmp_path: Path) -> None:
+    package = build_loulan_memory_package(_loulan_registry_fixture(tmp_path), created_at="2026-06-01T09:00:00+08:00")
+
+    plan = build_loulan_api_workbench_plan(package, created_at="2026-06-01T10:00:00+08:00")
+
+    assert plan["reference_pack"]["status"] == "ready"
+    assert plan["reference_pack"]["references"] == [
+        {
+            "memory_ref": "asset:character_zhou_tong_school_v1",
+            "asset_id": "character_zhou_tong_school_v1",
+            "label": "Zhou Tong approved school-phase anchor",
+            "sha256": "sha-approved",
+            "source_status": "approved_anchor",
+        }
+    ]
+    assert "asset:keyframe_b01_s01_h1" in plan["promotion_gate"]["blocked_memory_refs"]
+    assert "asset:prop_chitu_bag_v1_failed" in plan["promotion_gate"]["blocked_memory_refs"]
 
 
 def test_loulan_api_workbench_plan_blocks_without_approved_reference(tmp_path: Path) -> None:

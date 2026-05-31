@@ -7,11 +7,21 @@ from typing import Any
 
 from narratocut.utils import write_json
 
+from agentflow.memory.loulan_assets import (
+    asset_inventory,
+    has_asset_registry,
+    legacy_asset_summary,
+    legacy_character_entries,
+    next_context_bundle,
+    promotion_gates,
+    registry_asset_entries,
+    registry_asset_summary,
+    registry_file,
+)
+
 
 SCHEMA_VERSION = "0.1.0"
 LOULAN_PACKAGE_TYPE = "agentflow_loulan_memory_package"
-ELIGIBLE_STATUSES = frozenset({"approved", "promoted", "merged"})
-BLOCKED_STATUSES = frozenset({"candidate", "candidate_pending_human_review", "needs_repair", "rejected", "expired"})
 UNSAFE_OUTPUT_FRAGMENTS = ("D:\\", "C:\\", "file://", "Bearer ", "signed_url", "token=", "api_key", "secret_key", ".mp4", ".mov")
 
 
@@ -20,9 +30,19 @@ def build_loulan_memory_package(project_root: str | Path, *, created_at: str) ->
     root = Path(project_root)
     manifest = _read_json(root / "project_manifest.json")
     shots = _read_json(root / "manifests" / "shot_list.json").get("shots") or []
-    character_assets = _read_json(root / "manifests" / "character_assets.json").get("assets") or []
-    asset_entries = [_asset_entry(asset) for asset in character_assets]
     rejected_refs = _relative_files(root, root / "human" / "rejected", limit=12)
+    registry_mode = has_asset_registry(root)
+    if registry_mode:
+        registry_payload = _read_json(registry_file(root))
+        asset_entries = registry_asset_entries(registry_payload)
+        asset_summary = registry_asset_summary(asset_entries, rejected_refs)
+        inventory = asset_inventory(asset_entries)
+    else:
+        character_assets = _read_json(root / "manifests" / "character_assets.json").get("assets") or []
+        asset_entries = legacy_character_entries(character_assets)
+        asset_summary = legacy_asset_summary(asset_entries, rejected_refs)
+        inventory = _legacy_asset_inventory(asset_entries, asset_summary)
+    project_summary = _project_summary(root, manifest)
     package = {
         "schema_version": SCHEMA_VERSION,
         "artifact_type": LOULAN_PACKAGE_TYPE,
@@ -31,13 +51,15 @@ def build_loulan_memory_package(project_root: str | Path, *, created_at: str) ->
         "provider_calls_started": False,
         "writes_long_term_memory": False,
         "reads_company_knowledge": False,
-        "project": _project_summary(root, manifest),
+        "project_summary": project_summary,
+        "project": project_summary,
         "shot_summary": _shot_summary(shots),
-        "asset_summary": _asset_summary(asset_entries, rejected_refs),
+        "asset_inventory": inventory,
+        "asset_summary": asset_summary,
         "memory_collections": _memory_collections(root),
         "provider_route_safety": _provider_route_safety(root, manifest),
-        "promotion_gates": _promotion_gates(asset_entries, rejected_refs),
-        "next_context_bundle_draft": _next_context_bundle_draft(asset_entries, rejected_refs),
+        "promotion_gates": promotion_gates(asset_entries, rejected_refs, registry_mode=registry_mode),
+        "next_context_bundle_draft": next_context_bundle(asset_entries, rejected_refs, registry_mode=registry_mode),
         "canvas_nodes": _canvas_nodes(asset_entries, rejected_refs),
         "api_workbench_skeleton": _api_workbench_skeleton(),
         "claim_boundaries": _claim_boundaries(),
@@ -111,41 +133,27 @@ def _shot_summary(shots: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _asset_entry(asset: dict[str, Any]) -> dict[str, Any]:
-    status = _normalize_status(asset.get("status"))
-    sha = str(asset.get("sha256") or "")
-    ref = f"character:{asset.get('asset_id') or 'unknown'}"
+def _legacy_asset_inventory(entries: list[dict[str, Any]], summary: dict[str, Any]) -> dict[str, Any]:
     return {
-        "memory_ref": ref,
-        "asset_id": str(asset.get("asset_id") or ""),
-        "label": _asset_label(asset),
-        "character": str(asset.get("character") or ""),
-        "phase": str(asset.get("phase") or ""),
-        "status": status,
-        "sha256": sha,
-        "sha256_present": bool(sha),
-        "output_ref": _safe_relative_text(asset.get("output_path")),
-        "asset_card_ref": _safe_relative_text(asset.get("asset_card")),
-        "review_card_ref": _safe_relative_text(asset.get("review_card")),
-        "eligible_for_context": status in ELIGIBLE_STATUSES and bool(sha),
-    }
-
-
-def _asset_label(asset: dict[str, Any]) -> str:
-    character = str(asset.get("character") or asset.get("asset_id") or "asset")
-    phase = str(asset.get("phase") or "").replace("_", " ")
-    return f"{character} {phase}".strip()
-
-
-def _asset_summary(entries: list[dict[str, Any]], rejected_refs: list[str]) -> dict[str, Any]:
-    statuses = Counter(entry["status"] for entry in entries)
-    return {
-        "total_assets": len(entries),
-        "status_counts": dict(sorted(statuses.items())),
-        "missing_sha256_count": sum(1 for entry in entries if not entry["sha256_present"]),
-        "rejected_asset_count": len(rejected_refs),
-        "assets": entries[:16],
-        "rejected_asset_refs": rejected_refs,
+        "source_registry_ref": "manifests/character_assets.json",
+        "registry_type": "loulan_character_asset_manifest",
+        "total_assets": summary["total_assets"],
+        "type_counts": {"character": summary["total_assets"]},
+        "status_counts": summary["status_counts"],
+        "missing_sha256_count": summary["missing_sha256_count"],
+        "missing_ref_count": 0,
+        "eligible_assets": [entry for entry in entries if entry["eligible_for_context"]][:24],
+        "blocked_assets": [
+            {
+                "memory_ref": entry["memory_ref"],
+                "asset_type": entry.get("asset_type", "character"),
+                "status": entry["status"],
+                "reason": "missing_sha256" if not entry["sha256_present"] else entry["status"],
+            }
+            for entry in entries
+            if not entry["eligible_for_context"]
+        ][:48],
+        "assets": entries[:48],
     }
 
 
@@ -181,35 +189,6 @@ def _provider_route_safety(root: Path, manifest: dict[str, Any]) -> dict[str, An
         "unsafe_builtin_image_route_detected": unsafe_builtin,
         "request_preview_only": True,
         "capability_gates_required": ["image", "video"],
-    }
-
-
-def _promotion_gates(entries: list[dict[str, Any]], rejected_refs: list[str]) -> dict[str, Any]:
-    blocking = []
-    for entry in entries:
-        if entry["status"] in BLOCKED_STATUSES or not entry["sha256_present"]:
-            reason = "missing_sha256" if not entry["sha256_present"] else entry["status"]
-            blocking.append({"memory_ref": entry["memory_ref"], "reason": reason})
-    blocking.extend({"memory_ref": ref, "reason": "rejected_asset"} for ref in rejected_refs)
-    return {
-        "overall_status": "blocked" if blocking else "ready",
-        "blocking_refs": blocking,
-        "promotion_modes": ["promote", "merge", "reject", "expire"],
-        "requires_human_review": True,
-        "writes_long_term_memory": False,
-    }
-
-
-def _next_context_bundle_draft(entries: list[dict[str, Any]], rejected_refs: list[str]) -> dict[str, Any]:
-    eligible = [entry["memory_ref"] for entry in entries if entry["eligible_for_context"]]
-    blocked = [entry["memory_ref"] for entry in entries if not entry["eligible_for_context"]]
-    blocked.extend(rejected_refs)
-    return {
-        "status": "promotion_decision_required",
-        "eligible_memory_refs": eligible,
-        "blocked_memory_refs": blocked,
-        "projection_mode": "file_protocol_only",
-        "writes_long_term_memory": False,
     }
 
 
@@ -263,16 +242,6 @@ def _relative_files(root: Path, directory: Path, *, limit: int) -> list[str]:
         if len(refs) >= limit:
             break
     return refs
-
-
-def _normalize_status(value: Any) -> str:
-    status = str(value or "candidate").strip().lower()
-    return status or "candidate"
-
-
-def _safe_relative_text(value: Any) -> str:
-    text = str(value or "")
-    return "" if text.startswith(("D:\\", "C:\\", "file://")) else text.replace("\\", "/")
 
 
 def _reject_unsafe_output(package: dict[str, Any]) -> None:
