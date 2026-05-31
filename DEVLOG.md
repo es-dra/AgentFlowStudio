@@ -24,6 +24,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the local Loulan `loulan_b01_human_review_decision_template` / `b01_human_review_decision_template.json` directly as a read-only memory artifact, showing the five pending B01 shot decisions without importing or approving them; see `docs/handoff/AFS-LOULAN-WEB-B01-LOCAL-DECISION-TEMPLATE-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan B01 validation/apply status outputs (`loulan_b01_decision_validation_report` and `loulan_b01_decision_apply_result`) directly as read-only memory artifacts so operators can inspect the current gate result without running context projection or provider preview; see `docs/handoff/AFS-LOULAN-WEB-B01-STATUS-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:
