@@ -1,0 +1,51 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_loulan_promotion_decisions",
+  "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+  "created_at": "2026-06-01T12:30:00+08:00",
+  "template_status": "pending_human_input",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "human_acceptance_recorded": false,
+  "instructions": "Fill decision, decided_by=human, evidence_refs, and review_note before context projection.",
+  "decisions": [
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_shot_b01_s01_decision",
+      "target_ref": "shot:B01-S01",
+      "decision": "pending_human_review",
+      "allowed_decisions": [
+        "approve_anchor",
+        "reject",
+        "request_repair"
+      ],
+      "decided_by": "",
+      "evidence_refs": [],
+      "suggested_evidence_refs": [
+        "B01-S01-h1",
+        "asset_library/director_notes/B01-S01_h1_feedback.md"
+      ],
+      "review_note": ""
+    },
+    {
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0_character_guan_pingping_v2_decision",
+      "target_ref": "character:guan_pingping_v2",
+      "decision": "pending_human_review",
+      "allowed_decisions": [
+        "promoted",
+        "merged",
+        "rejected",
+        "expired"
+      ],
+      "decided_by": "",
+      "evidence_refs": [],
+      "suggested_evidence_refs": [
+        "character:guan_pingping_v2",
+        "guan_pingping_v2"
+      ],
+      "review_note": ""
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

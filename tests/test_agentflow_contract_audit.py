@@ -72,6 +72,7 @@ def test_agentflow_contract_audit_report_records_boundary_checks() -> None:
         "reusable_asset_requires_promotion",
         "context_reuse_requires_promotion_decision",
         "context_reuse_does_not_write_memory",
+        "loulan_decision_template_pending_only",
         "intermediate_asset_has_evidence",
     } <= check_ids
     assert all(check["status"] == "passed" for check in report["boundary_checks"])

@@ -91,6 +91,12 @@
       "contract_surface": "loulan_human_review_pack"
     },
     {
+      "artifact_type": "agentflow_loulan_promotion_decisions",
+      "example_path": "examples/agentflow/loulan_promotion_decisions_template.example.json",
+      "doc_path": "docs/loulan_decision_template_contract.md",
+      "contract_surface": "loulan_decision_template"
+    },
+    {
       "artifact_type": "agentflow_loulan_context_bundle_projection",
       "example_path": "examples/agentflow/loulan_context_bundle_projection.example.json",
       "doc_path": "docs/loulan_context_bundle_contract.md",
@@ -227,6 +233,10 @@
     {
       "rule_id": "loulan_human_review_pack_no_acceptance",
       "description": "Loulan human review packs prepare pending review decisions and must not record acceptance, call providers, or write durable memory."
+    },
+    {
+      "rule_id": "loulan_decision_template_pending_only",
+      "description": "Loulan decision templates are pending human input and must not be treated as approval."
     },
     {
       "rule_id": "loulan_context_bundle_decisions_only",
