@@ -197,6 +197,18 @@ Remote review chain on 2026-05-31:
   `codex-local-alpha-0-4-mainline-sync`. This keeps the slimming bundle review
   scoped to the 2 bundle commits on top of the Local Alpha 0.4 base.
 
+Remote readiness follow-up on 2026-05-31:
+
+- GitHub read checks returned PR #73 and PR #72 as open, draft, and
+  `mergeable=true`.
+- Commit status and workflow-run lookups returned no status/check evidence for
+  either PR head, so this is not a remote-CI-passed claim.
+- The intended next non-merge action is to mark PR #73 ready for review and
+  keep PR #72 as draft until PR #73 is reviewed or merged.
+- GitHub connector write attempts for adding a #73 readiness comment and
+  marking #73 ready for review failed with transport errors. No remote PR state
+  change was confirmed in this follow-up.
+
 ## Commit Boundary
 
 This bundle can become one integration commit only if final verification still
