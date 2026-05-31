@@ -1,4 +1,5 @@
 import { isLoulanB01Artifact, loulanB01Facts, loulanB01FocusTargets, loulanB01Status, loulanB01TypeLabel } from "./memory-workbench-loulan-b01-inspector.js";
+import { isLoulanRegistryArtifact, loulanRegistryFacts, loulanRegistryFocusTargets, loulanRegistryStatus, loulanRegistryTypeLabel } from "./memory-workbench-loulan-registry-inspector.js";
 
 const TYPE_LABELS = {
   agentflow_memory_video_pipeline_package: "Pipeline package",
@@ -30,7 +31,7 @@ function summarizeArtifact(artifact) {
     id: artifact.fileName,
     artifact_type: type,
     focus_targets: focusTargetsFor(type),
-    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || type,
+    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || loulanRegistryTypeLabel(type) || type,
     status: statusFor(type, payload),
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
@@ -53,6 +54,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_loulan_decision_intake_report") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_context_bundle_projection") return ["memory-loaded", "next-pass"];
   if (isLoulanB01Artifact(type)) return loulanB01FocusTargets(type);
+  if (isLoulanRegistryArtifact(type)) return loulanRegistryFocusTargets(type);
   return [];
 }
 
@@ -71,6 +73,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_loulan_decision_intake_report") return loulanDecisionIntakeFacts(payload);
   if (type === "agentflow_loulan_context_bundle_projection") return loulanContextBundleFacts(payload);
   if (isLoulanB01Artifact(type)) return loulanB01Facts(type, payload);
+  if (isLoulanRegistryArtifact(type)) return loulanRegistryFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -246,6 +249,7 @@ function feedbackFacts(payload) {
 
 function statusFor(type, payload) {
   if (isLoulanB01Artifact(type)) return loulanB01Status(type, payload);
+  if (isLoulanRegistryArtifact(type)) return loulanRegistryStatus(payload);
   if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
   if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
   if (payload.writes_long_term_memory === true) return "blocked";

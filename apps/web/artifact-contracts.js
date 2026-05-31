@@ -25,6 +25,7 @@ export const ARTIFACT_ALIASES = {
   loulan_b01_human_review_decision_template: ["b01_human_review_decision_template.json"],
   loulan_b01_decision_validation_report: ["human_review_decision_validation_report.json", "b01_decision_validation_report.json"],
   loulan_b01_decision_apply_result: ["b01_decision_apply_result.json"],
+  loulan_unified_asset_registry: ["asset_registry.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -50,6 +51,7 @@ const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
   "loulan_b01_human_review_decision_template",
   "loulan_b01_decision_validation_report",
   "loulan_b01_decision_apply_result",
+  "loulan_unified_asset_registry",
 ]);
 
 export function isMemoryArtifactType(type) {
@@ -86,6 +88,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "loulan_b01_human_review_decision_template") return "Loulan B01 human decision template";
   if (type === "loulan_b01_decision_validation_report") return "Loulan B01 decision validation report";
   if (type === "loulan_b01_decision_apply_result") return "Loulan B01 decision apply result";
+  if (type === "loulan_unified_asset_registry") return "Loulan unified asset registry";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
