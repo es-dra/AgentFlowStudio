@@ -2,6 +2,7 @@ const LOULAN_B01_LABELS = {
   loulan_afs_b01_feedback_loop_gate: "Loulan B01 feedback loop gate",
   loulan_afs_b01_decision_crosswalk: "Loulan B01 decision crosswalk",
   loulan_b01_human_review_decision_template: "Loulan B01 human decision template",
+  loulan_b01_decision_apply_plan_draft: "Loulan B01 decision apply plan draft",
   loulan_b01_decision_validation_report: "Loulan B01 decision validation report",
   loulan_b01_decision_apply_result: "Loulan B01 decision apply result",
 };
@@ -26,6 +27,7 @@ export function loulanB01Facts(type, payload) {
   if (type === "loulan_afs_b01_feedback_loop_gate") return feedbackGateFacts(payload);
   if (type === "loulan_afs_b01_decision_crosswalk") return decisionCrosswalkFacts(payload);
   if (type === "loulan_b01_human_review_decision_template") return localDecisionTemplateFacts(payload);
+  if (type === "loulan_b01_decision_apply_plan_draft") return decisionApplyPlanFacts(payload);
   if (type === "loulan_b01_decision_validation_report") return decisionValidationFacts(payload);
   if (type === "loulan_b01_decision_apply_result") return decisionApplyFacts(payload);
   return [];
@@ -74,6 +76,23 @@ function localDecisionTemplateFacts(payload) {
     fact("target_shots", listText(targetShots)),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function decisionApplyPlanFacts(payload) {
+  const boundary = objectValue(payload.claim_boundary);
+  const mutations = arrayValue(payload.planned_mutations);
+  const blockedMutations = mutations.filter((item) => objectValue(item).mutation_status !== "ready_to_apply").length;
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("block_id", payload.block_id || "unknown"),
+    fact("preconditions", arrayValue(payload.preconditions).length),
+    fact("planned_mutations", mutations.length),
+    fact("blocked_mutations", blockedMutations),
+    fact("dry_run_plan_only", yesNo(boundary.dry_run_plan_only)),
+    fact("applies_status_changes", yesNo(boundary.applies_status_changes)),
+    fact("provider_calls_started", yesNo(boundary.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(boundary.writes_long_term_memory)),
   ];
 }
 

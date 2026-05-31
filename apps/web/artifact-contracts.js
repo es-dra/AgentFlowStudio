@@ -23,6 +23,7 @@ export const ARTIFACT_ALIASES = {
   loulan_afs_b01_feedback_loop_gate: ["afs_b01_feedback_loop_gate.json"],
   loulan_afs_b01_decision_crosswalk: ["afs_b01_decision_crosswalk.json"],
   loulan_b01_human_review_decision_template: ["b01_human_review_decision_template.json"],
+  loulan_b01_decision_apply_plan_draft: ["b01_decision_apply_plan_draft.json"],
   loulan_b01_decision_validation_report: ["human_review_decision_validation_report.json", "b01_decision_validation_report.json"],
   loulan_b01_decision_apply_result: ["b01_decision_apply_result.json"],
   loulan_unified_asset_registry: ["asset_registry.json"],
@@ -50,6 +51,7 @@ const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
   "loulan_afs_b01_feedback_loop_gate",
   "loulan_afs_b01_decision_crosswalk",
   "loulan_b01_human_review_decision_template",
+  "loulan_b01_decision_apply_plan_draft",
   "loulan_b01_decision_validation_report",
   "loulan_b01_decision_apply_result",
   "loulan_unified_asset_registry",
@@ -88,6 +90,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "loulan_afs_b01_feedback_loop_gate") return "Loulan B01 feedback loop gate";
   if (type === "loulan_afs_b01_decision_crosswalk") return "Loulan B01 decision crosswalk";
   if (type === "loulan_b01_human_review_decision_template") return "Loulan B01 human decision template";
+  if (type === "loulan_b01_decision_apply_plan_draft") return "Loulan B01 decision apply plan draft";
   if (type === "loulan_b01_decision_validation_report") return "Loulan B01 decision validation report";
   if (type === "loulan_b01_decision_apply_result") return "Loulan B01 decision apply result";
   if (type === "loulan_unified_asset_registry") return "Loulan unified asset registry";
