@@ -22,6 +22,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
   loulan_afs_b01_feedback_loop_gate: ["afs_b01_feedback_loop_gate.json"],
   loulan_afs_b01_decision_crosswalk: ["afs_b01_decision_crosswalk.json"],
+  loulan_b01_human_review_decision_template: ["b01_human_review_decision_template.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -41,9 +42,14 @@ export const ARTIFACT_CLASSES = {
 };
 
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov"]);
+const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
+  "loulan_afs_b01_feedback_loop_gate",
+  "loulan_afs_b01_decision_crosswalk",
+  "loulan_b01_human_review_decision_template",
+]);
 
 export function isMemoryArtifactType(type) {
-  return typeof type === "string" && (type.startsWith("agentflow_") || type === "loulan_afs_b01_feedback_loop_gate" || type === "loulan_afs_b01_decision_crosswalk");
+  return typeof type === "string" && (type.startsWith("agentflow_") || LOULAN_MEMORY_ARTIFACT_TYPES.has(type));
 }
 
 export function sourceRoleFor(type, fileName) {
@@ -73,6 +79,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_loulan_decision_intake_report") return "Loulan decision intake report";
   if (type === "loulan_afs_b01_feedback_loop_gate") return "Loulan B01 feedback loop gate";
   if (type === "loulan_afs_b01_decision_crosswalk") return "Loulan B01 decision crosswalk";
+  if (type === "loulan_b01_human_review_decision_template") return "Loulan B01 human decision template";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";

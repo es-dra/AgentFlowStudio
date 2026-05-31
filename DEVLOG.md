@@ -22,6 +22,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes a directly selected `loulan_afs_b01_decision_crosswalk` / `afs_b01_decision_crosswalk.json` as a read-only memory artifact and keeps B01-specific inspector facts in a separate module; see `docs/handoff/AFS-LOULAN-WEB-B01-CROSSWALK-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes the local Loulan `loulan_b01_human_review_decision_template` / `b01_human_review_decision_template.json` directly as a read-only memory artifact, showing the five pending B01 shot decisions without importing or approving them; see `docs/handoff/AFS-LOULAN-WEB-B01-LOCAL-DECISION-TEMPLATE-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

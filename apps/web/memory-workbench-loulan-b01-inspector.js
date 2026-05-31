@@ -1,6 +1,7 @@
 const LOULAN_B01_LABELS = {
   loulan_afs_b01_feedback_loop_gate: "Loulan B01 feedback loop gate",
   loulan_afs_b01_decision_crosswalk: "Loulan B01 decision crosswalk",
+  loulan_b01_human_review_decision_template: "Loulan B01 human decision template",
 };
 
 export function isLoulanB01Artifact(type) {
@@ -22,6 +23,7 @@ export function loulanB01Status(type, payload) {
 export function loulanB01Facts(type, payload) {
   if (type === "loulan_afs_b01_feedback_loop_gate") return feedbackGateFacts(payload);
   if (type === "loulan_afs_b01_decision_crosswalk") return decisionCrosswalkFacts(payload);
+  if (type === "loulan_b01_human_review_decision_template") return localDecisionTemplateFacts(payload);
   return [];
 }
 
@@ -56,6 +58,21 @@ function decisionCrosswalkFacts(payload) {
   ];
 }
 
+function localDecisionTemplateFacts(payload) {
+  const items = arrayValue(payload.decision_items);
+  const pendingCount = items.filter((item) => objectValue(item).decision === "pending_human_review").length;
+  const targetShots = items.map((item) => objectValue(item).target_shot_id).filter(Boolean);
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("decision_items", items.length),
+    fact("pending_decisions", pendingCount),
+    fact("allowed_decisions", listText(payload.allowed_decisions)),
+    fact("target_shots", listText(targetShots)),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 function fact(label, value) {
   return { label, value: String(value) };
 }
@@ -70,4 +87,9 @@ function objectValue(value) {
 
 function arrayValue(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function listText(value) {
+  const values = arrayValue(value).filter(Boolean);
+  return values.length > 0 ? values.join(", ") : "unknown";
 }

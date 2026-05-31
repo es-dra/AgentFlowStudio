@@ -260,3 +260,63 @@ console.log(JSON.stringify({
     assert facts["broader_review_decisions"] == "47"
     assert facts["human_acceptance_recorded"] == "false"
     assert facts["provider_calls_started"] == "false"
+
+
+def test_static_viewer_recognizes_loulan_local_b01_decision_template() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
+
+const template = {
+  schema_version: "0.1.0",
+  artifact_type: "loulan_b01_human_review_decision_template",
+  status: "pending_human_review",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  human_acceptance_recorded: false,
+  allowed_decisions: ["approve_anchor", "request_repair", "reject"],
+  decision_items: [
+    { target_shot_id: "B01-S01", decision: "pending_human_review" },
+    { target_shot_id: "B01-S02", decision: "pending_human_review" },
+    { target_shot_id: "B01-S03", decision: "pending_human_review" },
+    { target_shot_id: "B01-S04", decision: "pending_human_review" },
+    { target_shot_id: "B01-S05", decision: "pending_human_review" }
+  ]
+};
+const artifacts = await parseFiles([
+  { name: "b01_human_review_decision_template.json", text: async () => JSON.stringify(template) },
+]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
+
+console.log(JSON.stringify({
+  artifactType: artifacts[0].artifactType,
+  artifactClass: artifacts[0].artifactClass,
+  sourceRole: artifacts[0].sourceRole,
+  memoryBundleCount: workspace.memoryBundle.length,
+  sourceStatus: view.source_status,
+  inspector: view.artifact_inspector[0],
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["artifactType"] == "loulan_b01_human_review_decision_template"
+    assert payload["artifactClass"] == "known_contract"
+    assert payload["sourceRole"] == "Loulan B01 human decision template"
+    assert payload["memoryBundleCount"] == 1
+    assert payload["sourceStatus"]["label"] == "Selected files"
+    assert payload["inspector"]["title"] == "Loulan B01 human decision template"
+    assert payload["inspector"]["status"] == "pending_human_review"
+    facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
+    assert facts["decision_items"] == "5"
+    assert facts["pending_decisions"] == "5"
+    assert facts["allowed_decisions"] == "approve_anchor, request_repair, reject"
+    assert facts["target_shots"] == "B01-S01, B01-S02, B01-S03, B01-S04, B01-S05"
+    assert facts["human_acceptance_recorded"] == "false"
+    assert facts["provider_calls_started"] == "false"
