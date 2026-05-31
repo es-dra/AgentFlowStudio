@@ -1,7 +1,8 @@
 # AFS-MAINLINE-STAGING-BUNDLE-001 - Mainline Staging Bundle
 
 Status: pushed as draft PR #72 on `codex-mainline-slimming-staging`;
-depends on draft PR #73 for the Local Alpha 0.4 mainline base.
+depends on PR #73, which is ready for review, for the Local Alpha 0.4
+mainline base.
 
 This bundle converts the current dirty checkout into a coherent integration
 plan. It keeps the product surface centered on `memory-video-pipeline-*` and
@@ -203,11 +204,10 @@ Remote readiness follow-up on 2026-05-31:
   `mergeable=true`.
 - Commit status and workflow-run lookups returned no status/check evidence for
   either PR head, so this is not a remote-CI-passed claim.
-- The intended next non-merge action is to mark PR #73 ready for review and
-  keep PR #72 as draft until PR #73 is reviewed or merged.
-- GitHub connector write attempts for adding a #73 readiness comment and
-  marking #73 ready for review failed with transport errors. No remote PR state
-  change was confirmed in this follow-up.
+- A #73 readiness comment was added with the local verification and
+  non-claim boundaries.
+- PR #73 was marked ready for review after a retry. PR #72 remains draft and
+  should stay dependent until PR #73 is reviewed or merged.
 
 ## Commit Boundary
 
