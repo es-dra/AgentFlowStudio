@@ -226,9 +226,13 @@ def test_loulan_api_workbench_cli_accepts_context_projection(tmp_path: Path) -> 
 
     assert result.exit_code == 0, result.output
     assert "Context projection: partial_ready" in result.output
+    assert "Context intake gate: not_supplied" in result.output
     written = json.loads((output / "loulan_api_workbench_plan.json").read_text(encoding="utf-8"))
     assert written["source_context_projection_id"] == projection["projection_id"]
+    assert written["context_projection"]["decision_intake_gate"]["status"] == "not_supplied"
     assert written["reference_pack"]["references"][0]["memory_ref"] == "character:guan_pingping_v2"
+    report = (output / "loulan_api_workbench_plan.md").read_text(encoding="utf-8")
+    assert "Context intake gate: `not_supplied`" in report
 
 
 def test_loulan_api_workbench_write_returns_artifacts(tmp_path: Path) -> None:

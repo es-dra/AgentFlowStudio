@@ -107,6 +107,7 @@ def render_loulan_api_workbench_plan_report(plan: dict[str, Any]) -> str:
             "",
             f"- Package: `{plan['package_id']}`",
             f"- Context projection: `{plan['context_projection']['status']}`",
+            f"- Context intake gate: `{plan['context_projection'].get('decision_intake_gate', {}).get('status', 'not_recorded')}`",
             f"- Provider adapter: `{plan['provider_adapter']['adapter_id']}`",
             "- Provider calls: not started",
             "- Request mode: dry-run preview only",

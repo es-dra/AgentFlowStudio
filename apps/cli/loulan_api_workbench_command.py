@@ -68,6 +68,7 @@ def loulan_api_workbench_plan_command(
     typer.echo("Loulan API workbench plan")
     typer.echo(f"Package: {plan['package_id']}")
     typer.echo(f"Context projection: {plan['context_projection']['status']}")
+    typer.echo(f"Context intake gate: {plan['context_projection'].get('decision_intake_gate', {}).get('status', 'not_recorded')}")
     typer.echo(f"Reference pack: {plan['reference_pack']['status']}")
     typer.echo(f"Requests previewed: {len(plan['request_manifest']['requests'])}")
     typer.echo("Provider calls: not started")
