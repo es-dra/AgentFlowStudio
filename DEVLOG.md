@@ -34,6 +34,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan generation request manifests (`image2_requests.json` and `kling_i2v_requests.json`) directly as read-only memory artifacts, surfacing 38-request Image2/Kling planning summaries without starting any provider call; see `docs/handoff/AFS-LOULAN-WEB-REQUEST-MANIFESTS-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan project manifests (`character_assets.json`, `character_asset_versions.json`, `prop_asset_versions.json`, and `shot_list.json`) directly as read-only memory artifacts, completing selected-file recognition for the 12 current top-level Loulan manifest JSON files without directory scanning, provider calls, promotion, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-PROJECT-MANIFESTS-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

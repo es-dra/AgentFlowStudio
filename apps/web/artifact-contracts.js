@@ -30,6 +30,10 @@ export const ARTIFACT_ALIASES = {
   loulan_next_generation_context_bundle_draft: ["next_context_bundle_draft.json"],
   loulan_image2_request_manifest: ["image2_requests.json"],
   loulan_kling_i2v_request_manifest: ["kling_i2v_requests.json"],
+  loulan_character_asset_manifest: ["character_assets.json"],
+  loulan_character_asset_versions: ["character_asset_versions.json"],
+  loulan_prop_asset_versions: ["prop_asset_versions.json"],
+  loulan_shot_list_manifest: ["shot_list.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -60,6 +64,10 @@ const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
   "loulan_next_generation_context_bundle_draft",
   "loulan_image2_request_manifest",
   "loulan_kling_i2v_request_manifest",
+  "loulan_character_asset_manifest",
+  "loulan_character_asset_versions",
+  "loulan_prop_asset_versions",
+  "loulan_shot_list_manifest",
 ]);
 
 export function isMemoryArtifactType(type) {
@@ -101,6 +109,10 @@ export function sourceRoleFor(type, fileName) {
   if (type === "loulan_next_generation_context_bundle_draft") return "Loulan next context bundle draft";
   if (type === "loulan_image2_request_manifest") return "Loulan Image2 request manifest";
   if (type === "loulan_kling_i2v_request_manifest") return "Loulan Kling I2V request manifest";
+  if (type === "loulan_character_asset_manifest") return "Loulan character asset manifest";
+  if (type === "loulan_character_asset_versions") return "Loulan character asset versions";
+  if (type === "loulan_prop_asset_versions") return "Loulan prop asset versions";
+  if (type === "loulan_shot_list_manifest") return "Loulan shot list manifest";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
