@@ -30,6 +30,11 @@ console.log(JSON.stringify({
   controls: view.protocol_summary.controls,
   nextPass: view.next_pass,
   inspectorTitles: view.artifact_inspector.map((item) => item.title),
+  inspectorFacts: Object.fromEntries(
+    view.artifact_inspector
+      .find((item) => item.title === "Loulan context bundle projection")
+      .facts.map((fact) => [fact.label, fact.value])
+  ),
   timelineLabels: view.timeline.map((node) => node.label),
 }));
 """
@@ -46,12 +51,16 @@ console.log(JSON.stringify({
     assert payload["contextProjection"] == "agentflow_loulan_context_bundle_projection"
     assert any(item["title"] == "Decision template" for item in payload["bundle"])
     assert any(item["title"] == "Context bundle projection" for item in payload["bundle"])
+    assert any("intake gate: not_supplied" in item["detail"] for item in payload["bundle"] if item["title"] == "Context bundle projection")
     assert any(item["label"] == "decision template" for item in payload["controls"])
     assert any(item["label"] == "context bundle" for item in payload["controls"])
+    assert any("intake gate: not_supplied" in item["detail"] for item in payload["controls"] if item["label"] == "context bundle")
     assert payload["nextPass"]["status"] == "partial_ready"
     assert "Decision audit: partial_ready" in payload["nextPass"]["action"]
     assert "Loulan decision template" in payload["inspectorTitles"]
     assert "Loulan context bundle projection" in payload["inspectorTitles"]
+    assert payload["inspectorFacts"]["decision_intake_gate"] == "not_supplied"
+    assert payload["inspectorFacts"]["context_bundle_ready"] == "false"
     assert "Decision Template" in payload["timelineLabels"]
     assert "Context Bundle" in payload["timelineLabels"]
 

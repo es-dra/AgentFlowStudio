@@ -125,7 +125,7 @@ export function loulanTimeline(
     nodes.push({
       label: "Context Bundle",
       status: contextProjection.context_bundle?.status || contextProjection.decision_audit?.status || "blocked",
-      detail: contextProjection.decision_audit?.status || "decision audit not run",
+      detail: `${contextProjection.decision_audit?.status || "decision audit not run"}; intake gate: ${contextProjection.decision_intake_gate?.status || "not_supplied"}`,
     });
   }
   return nodes;

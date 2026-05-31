@@ -147,7 +147,10 @@ function loulanDecisionIntakeFacts(payload) {
 
 function loulanContextBundleFacts(payload) {
   const bundle = objectValue(payload.context_bundle);
+  const intakeGate = objectValue(payload.decision_intake_gate);
   return [
+    fact("decision_intake_gate", intakeGate.status || "not_supplied"),
+    fact("context_bundle_ready", yesNo(intakeGate.context_bundle_command_ready)),
     fact("decision_audit", payload.decision_audit?.status || "unknown"),
     fact("context_bundle", bundle.status || "unknown"),
     fact("memory_refs", arrayValue(bundle.memory_refs).length),

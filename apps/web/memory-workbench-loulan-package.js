@@ -146,11 +146,12 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
     });
   }
   if (contextProjection) {
+    const intakeGate = contextProjection.decision_intake_gate?.status || "not_supplied";
     items.push({
       id: "context-bundle",
       title: "Context bundle projection",
       status: contextProjection.context_bundle?.status || contextProjection.decision_audit?.status || "blocked",
-      detail: `${contextProjection.context_bundle?.memory_refs?.length || 0} memory refs; ${contextProjection.context_bundle?.blocked_refs?.length || 0} blocked`,
+      detail: `${contextProjection.context_bundle?.memory_refs?.length || 0} memory refs; ${contextProjection.context_bundle?.blocked_refs?.length || 0} blocked; intake gate: ${intakeGate}`,
     });
   }
   return items;
@@ -194,7 +195,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "decision review", status: decisionReview?.review_status || "planned", detail: decisionReview ? `${decisionReview.decision_summary?.pending_count || 0} pending; no acceptance` : "not prepared" },
       { label: "decision worksheet", status: decisionWorksheet?.worksheet_status || "planned", detail: decisionWorksheet ? `${decisionWorksheet.decision_rows?.length || 0} manual-fill rows; no acceptance` : "not prepared" },
       { label: "decision intake", status: decisionIntake?.intake_status || "planned", detail: decisionIntake ? `context ready: ${String(decisionIntake.context_bundle_command_ready)}` : "not prepared" },
-      { label: "context bundle", status: contextProjection?.context_bundle?.status || "planned", detail: contextProjection?.decision_audit?.status || "waiting for human decisions" },
+      { label: "context bundle", status: contextProjection?.context_bundle?.status || "planned", detail: contextProjection ? `${contextProjection.decision_audit?.status || "decision audit not run"}; intake gate: ${contextProjection.decision_intake_gate?.status || "not_supplied"}` : "waiting for human decisions" },
     ],
     boundaries: [
       { label: "human acceptance", status: "blocked", detail: boundaries.human_acceptance || "not_acceptance" },
