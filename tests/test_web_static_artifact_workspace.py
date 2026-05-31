@@ -139,3 +139,67 @@ console.log(JSON.stringify({
     assert "final_video" in payload["assetRoles"]
     assert "subtitle" in payload["assetRoles"]
     assert "cover" in payload["assetRoles"]
+
+
+def test_static_viewer_recognizes_loulan_b01_feedback_loop_gate() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
+
+const gate = {
+  schema_version: "0.1.0",
+  artifact_type: "loulan_afs_b01_feedback_loop_gate",
+  status: "blocked_pending_human_review",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  human_acceptance_recorded: false,
+  media_generation_started: false,
+  current_gate_summary: {
+    b01_decision_items: 5,
+    pending_decisions: 5,
+    approved_decisions: 0,
+    repair_requested: 0,
+    rejected_decisions: 0,
+    validation_status: "blocked_pending_human_review",
+    apply_status: "blocked_validation_not_ready",
+    afs_import_ready: false,
+    context_projection_ready: false
+  }
+};
+const artifacts = await parseFiles([
+  { name: "afs_b01_feedback_loop_gate.json", text: async () => JSON.stringify(gate) },
+]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
+
+console.log(JSON.stringify({
+  artifactType: artifacts[0].artifactType,
+  artifactClass: artifacts[0].artifactClass,
+  sourceRole: artifacts[0].sourceRole,
+  memoryBundleCount: workspace.memoryBundle.length,
+  sourceStatus: view.source_status,
+  inspector: view.artifact_inspector[0],
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["artifactType"] == "loulan_afs_b01_feedback_loop_gate"
+    assert payload["artifactClass"] == "known_contract"
+    assert payload["sourceRole"] == "Loulan B01 feedback loop gate"
+    assert payload["memoryBundleCount"] == 1
+    assert payload["sourceStatus"]["label"] == "Selected files"
+    assert payload["inspector"]["title"] == "Loulan B01 feedback loop gate"
+    assert payload["inspector"]["status"] == "blocked_pending_human_review"
+    facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
+    assert facts["pending_decisions"] == "5"
+    assert facts["validation_status"] == "blocked_pending_human_review"
+    assert facts["apply_status"] == "blocked_validation_not_ready"
+    assert facts["context_projection_ready"] == "false"
+    assert facts["human_acceptance_recorded"] == "false"
+    assert facts["provider_calls_started"] == "false"

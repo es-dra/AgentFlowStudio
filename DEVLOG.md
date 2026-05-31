@@ -16,6 +16,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Loulan memory package now reads the optional local B01 feedback-loop gate and Web surfaces the blocked B01 status in package summary, protocol, inspector, and timeline; real no-call probe over `D:\Projects\LoulanSceneAssets` reports 5 pending B01 decisions and no unsafe output refs; see `docs/handoff/AFS-LOULAN-PACKAGE-B01-FEEDBACK-GATE-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes a directly selected `loulan_afs_b01_feedback_loop_gate` / `afs_b01_feedback_loop_gate.json` as a read-only memory artifact, so operators can inspect the blocked B01 gate without regenerating the full Loulan package; see `docs/handoff/AFS-LOULAN-WEB-B01-GATE-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

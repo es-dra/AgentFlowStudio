@@ -1,4 +1,5 @@
 import { normalizeWorkspace, parseFiles } from "./artifact-workspace.js?v=m4-memory-canvas-tools";
+import { isMemoryArtifactType } from "./artifact-contracts.js?v=m4-memory-canvas-tools";
 import { buildDemoReadyChecklist } from "./memory-workbench-demo-checklist.js";
 import { buildDemoEvidenceSummary } from "./memory-workbench-demo-summary.js";
 import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
@@ -17,7 +18,7 @@ export function attachMemoryWorkbenchHandlers(elements, { onWorkspaceLoaded, set
 }
 
 export function memorySourceForArtifacts(artifacts) {
-  return artifacts.some((artifact) => artifact.artifactType.startsWith("agentflow_")) ? "selected_files" : "fixture";
+  return artifacts.some((artifact) => isMemoryArtifactType(artifact.artifactType)) ? "selected_files" : "fixture";
 }
 
 export function buildMemoryWorkbenchView(workspace, source) {
