@@ -4,6 +4,8 @@ const TYPE_LABELS = {
   agentflow_memory_video_pipeline_review: "Review artifact",
   agentflow_memory_video_pipeline_human_observation: "Human observation",
   agentflow_memory_video_pipeline_presentation_package: "Presentation package",
+  agentflow_loulan_memory_package: "Loulan memory package",
+  agentflow_loulan_api_workbench_plan: "Loulan API workbench plan",
   agentflow_feedback_event: "Feedback draft",
 };
 
@@ -34,6 +36,8 @@ function focusTargetsFor(type) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return ["assets", "review"];
   if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
+  if (type === "agentflow_loulan_memory_package") return ["project", "assets", "memory-loaded", "next-pass"];
+  if (type === "agentflow_loulan_api_workbench_plan") return ["baseline-run", "memory-backed-run", "review", "next-pass"];
   return [];
 }
 
@@ -43,10 +47,30 @@ function factsFor(type, payload) {
   if (type === "agentflow_memory_video_pipeline_review") return reviewFacts(payload);
   if (type === "agentflow_memory_video_pipeline_human_observation") return observationFacts(payload);
   if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
+  if (type === "agentflow_loulan_memory_package") return loulanPackageFacts(payload);
+  if (type === "agentflow_loulan_api_workbench_plan") return loulanApiWorkbenchFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
     fact("schema_version", payload.schema_version || "unknown"),
+  ];
+}
+
+function loulanPackageFacts(payload) {
+  return [
+    fact("shots", payload.shot_summary?.total_shots ?? "unknown"),
+    fact("eligible_refs", arrayValue(payload.next_context_bundle_draft?.eligible_memory_refs).length),
+    fact("blocked_refs", arrayValue(payload.next_context_bundle_draft?.blocked_memory_refs).length),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function loulanApiWorkbenchFacts(payload) {
+  return [
+    fact("adapter", payload.provider_adapter?.adapter_id || "unknown"),
+    fact("requests", arrayValue(payload.request_manifest?.requests).length),
+    fact("response_ledger", payload.response_ledger?.status || "unknown"),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }
 

@@ -79,6 +79,12 @@
       "contract_surface": "loulan_memory_package"
     },
     {
+      "artifact_type": "agentflow_loulan_api_workbench_plan",
+      "example_path": "examples/agentflow/loulan_api_workbench_plan.example.json",
+      "doc_path": "docs/loulan_api_workbench_contract.md",
+      "contract_surface": "loulan_api_workbench_plan"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -201,6 +207,10 @@
     {
       "rule_id": "loulan_package_no_call_pilot",
       "description": "Loulan pilot packages summarize explicit local manifests, block unsafe provider routes, and must not copy generated media or write durable memory."
+    },
+    {
+      "rule_id": "loulan_api_workbench_dry_run_only",
+      "description": "Loulan API workbench plans preview provider requests with reference hashes and do not submit calls, persist secrets, or promote memory."
     },
     {
       "rule_id": "asset_reuse_decision_only",

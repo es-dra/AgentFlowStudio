@@ -8,7 +8,7 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
-2026-06-01: Loulan memory pilot package contract, CLI, Web projection, example, tracker row, task brief, and handoff added; see `docs/handoff/AFS-LOULAN-PILOT-001.md`.
+2026-06-01: Loulan memory pilot package and API workbench dry-run contracts, CLIs, Web projections, examples, tracker rows, task briefs, and handoffs added; see `docs/handoff/AFS-LOULAN-PILOT-001.md` and `docs/handoff/AFS-LOULAN-API-WORKBENCH-001.md`.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 

@@ -8,6 +8,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
   const artifact = workspace?.loulanPackage;
   if (!isLoulanMemoryPackageArtifact(artifact)) return fallback;
   const payload = artifact.payload;
+  const apiPlan = workspace?.loulanApiWorkbenchPlan?.payload || null;
   const project = payload.project || {};
   const safety = payload.provider_route_safety || {};
   const nextContext = payload.next_context_bundle_draft || {};
@@ -30,7 +31,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
       detail: `${asset.status}; ${asset.output_ref || "no output ref"}`,
       status: asset.eligible_for_context ? "approved" : "blocked",
     })),
-    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs),
+    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan),
     memory_loaded: loulanMemoryLoaded(eligibleRefs, blockedRefs),
     lanes: [
       {
@@ -48,7 +49,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
         output: eligibleRefs.length ? `${eligibleRefs.length} eligible refs can seed next context` : "blocked until promotion decision",
       },
     ],
-    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries),
+    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries, apiPlan),
     review: {
       storyboard_adherence: `${payload.shot_summary?.total_shots || 0} Loulan shots indexed for review.`,
       visual_consistency: `${payload.asset_summary?.total_assets || 0} character assets; ${payload.asset_summary?.rejected_asset_count || 0} rejected refs blocked.`,
@@ -61,19 +62,20 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
     feedback_draft: loulanFeedbackDraft(payload),
     next_pass: {
       status: payload.promotion_gates?.overall_status === "ready" ? "promotion decision ready" : "blocked",
-      action: `${eligibleRefs.length} eligible refs, ${blockedRefs.length} blocked refs; durable Memory runtime is not implemented.`,
+      action: loulanNextPassAction(eligibleRefs, blockedRefs, apiPlan),
     },
-    artifact_inspector: loulanInspector(payload),
-    timeline: loulanTimeline(payload),
+    artifact_inspector: loulanInspector(payload, apiPlan),
+    timeline: loulanTimeline(payload, apiPlan),
   };
 }
 
-function loulanBundleSummary(payload, eligibleRefs, blockedRefs) {
+function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan) {
+  const requestCount = apiPlan?.request_manifest?.requests?.length || 0;
   return [
     { id: "project", title: "Loulan pilot package", status: "review ready", detail: payload.project?.source_root_label || "selected package" },
     { id: "shots", title: "Shot manifest", status: "review ready", detail: `${payload.shot_summary?.total_shots || 0} shots indexed` },
     { id: "assets", title: "Asset memory", status: blockedRefs.length ? "blocked" : "review ready", detail: `${eligibleRefs.length} eligible, ${blockedRefs.length} blocked` },
-    { id: "api", title: "API workbench skeleton", status: "planned", detail: "request preview only; live provider calls blocked by default" },
+    { id: "api", title: "API workbench skeleton", status: apiPlan ? "review ready" : "planned", detail: apiPlan ? `${requestCount} request previews; live calls blocked` : "request preview only; live provider calls blocked by default" },
   ];
 }
 
@@ -99,7 +101,7 @@ function loulanMemoryLoaded(eligibleRefs, blockedRefs) {
   return [...eligible, ...blocked];
 }
 
-function loulanProtocolSummary(safety, boundaries = {}) {
+function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null) {
   return {
     title: "Loulan memory production protocol",
     status: safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned",
@@ -108,6 +110,8 @@ function loulanProtocolSummary(safety, boundaries = {}) {
       { label: "image route", status: safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned", detail: safety.image_generation || "unknown" },
       { label: "video route", status: "planned", detail: safety.video_generation || "dry_run_only" },
       { label: "request preview", status: "planned", detail: String(Boolean(safety.request_preview_only)) },
+      { label: "API adapter", status: apiPlan ? "review ready" : "planned", detail: apiPlan?.provider_adapter?.adapter_id || "not selected" },
+      { label: "QA gate", status: apiPlan?.qa_gate?.status || "planned", detail: apiPlan?.promotion_gate?.status || "waiting for API workbench plan" },
     ],
     boundaries: [
       { label: "human acceptance", status: "blocked", detail: boundaries.human_acceptance || "not_acceptance" },
@@ -115,6 +119,11 @@ function loulanProtocolSummary(safety, boundaries = {}) {
       { label: "durable memory runtime", status: "blocked", detail: boundaries.durable_memory_runtime || "not_implemented" },
     ],
   };
+}
+
+function loulanNextPassAction(eligibleRefs, blockedRefs, apiPlan) {
+  const requestCount = apiPlan?.request_manifest?.requests?.length || 0;
+  return `${eligibleRefs.length} eligible refs, ${blockedRefs.length} blocked refs, ${requestCount} request previews; durable Memory runtime is not implemented.`;
 }
 
 function loulanFeedbackDraft(payload) {
@@ -138,8 +147,8 @@ function loulanFeedbackDraft(payload) {
   };
 }
 
-function loulanInspector(payload) {
-  return [
+function loulanInspector(payload, apiPlan = null) {
+  const items = [
     {
       id: "loulan_package",
       title: "Loulan package",
@@ -152,12 +161,35 @@ function loulanInspector(payload) {
       ],
     },
   ];
+  if (apiPlan) {
+    items.push({
+      id: "loulan_api_workbench_plan",
+      title: "Loulan API workbench plan",
+      status: apiPlan.request_manifest?.status || "planned",
+      focus_targets: ["baseline-run", "memory-backed-run", "review", "next-pass"],
+      detail: `${apiPlan.provider_adapter?.adapter_id || "adapter"}; ${apiPlan.response_ledger?.status || "not_submitted"}`,
+      facts: [
+        { label: "dry_run_only", value: String(apiPlan.dry_run_only) },
+        { label: "provider_calls_started", value: String(apiPlan.provider_calls_started) },
+        { label: "requests", value: String(apiPlan.request_manifest?.requests?.length || 0) },
+      ],
+    });
+  }
+  return items;
 }
 
-function loulanTimeline(payload) {
-  return (payload.canvas_nodes || []).map((node) => ({
+function loulanTimeline(payload, apiPlan = null) {
+  const nodes = (payload.canvas_nodes || []).map((node) => ({
     label: node.label,
     status: node.status,
     detail: node.id,
   }));
+  if (apiPlan) {
+    nodes.push({
+      label: "API Workbench",
+      status: apiPlan.request_manifest?.status || "planned",
+      detail: `${apiPlan.request_manifest?.requests?.length || 0} request previews`,
+    });
+  }
+  return nodes;
 }

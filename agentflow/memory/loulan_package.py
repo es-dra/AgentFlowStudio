@@ -122,6 +122,7 @@ def _asset_entry(asset: dict[str, Any]) -> dict[str, Any]:
         "character": str(asset.get("character") or ""),
         "phase": str(asset.get("phase") or ""),
         "status": status,
+        "sha256": sha,
         "sha256_present": bool(sha),
         "output_ref": _safe_relative_text(asset.get("output_path")),
         "asset_card_ref": _safe_relative_text(asset.get("asset_card")),

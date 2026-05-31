@@ -191,6 +191,14 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_loulan_api_workbench_plan",
+      "example_path": "examples/agentflow/loulan_api_workbench_plan.example.json",
+      "doc_path": "docs/loulan_api_workbench_contract.md",
+      "schema_version": "0.1.0",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
@@ -268,6 +276,11 @@
       "check_id": "loulan_package_no_call_pilot",
       "status": "passed",
       "note": "Loulan pilot packages read explicit manifests, block unsafe provider routes, and do not write durable memory."
+    },
+    {
+      "check_id": "loulan_api_workbench_dry_run_only",
+      "status": "passed",
+      "note": "Loulan API workbench plans preview requests with reference hashes and do not persist secrets or submit calls."
     },
     {
       "check_id": "intermediate_asset_has_evidence",
