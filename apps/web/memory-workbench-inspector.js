@@ -8,6 +8,7 @@ const TYPE_LABELS = {
   agentflow_loulan_api_workbench_plan: "Loulan API workbench plan",
   agentflow_loulan_human_review_pack: "Loulan human review pack",
   agentflow_loulan_promotion_decisions: "Loulan decision template",
+  agentflow_loulan_decision_review_pack: "Loulan decision review pack",
   agentflow_loulan_context_bundle_projection: "Loulan context bundle projection",
   agentflow_feedback_event: "Feedback draft",
 };
@@ -43,6 +44,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_loulan_api_workbench_plan") return ["baseline-run", "memory-backed-run", "review", "next-pass"];
   if (type === "agentflow_loulan_human_review_pack") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_promotion_decisions") return ["feedback", "next-pass"];
+  if (type === "agentflow_loulan_decision_review_pack") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_context_bundle_projection") return ["memory-loaded", "next-pass"];
   return [];
 }
@@ -57,6 +59,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_loulan_api_workbench_plan") return loulanApiWorkbenchFacts(payload);
   if (type === "agentflow_loulan_human_review_pack") return loulanHumanReviewFacts(payload);
   if (type === "agentflow_loulan_promotion_decisions") return loulanDecisionFacts(payload);
+  if (type === "agentflow_loulan_decision_review_pack") return loulanDecisionReviewFacts(payload);
   if (type === "agentflow_loulan_context_bundle_projection") return loulanContextBundleFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
@@ -97,6 +100,18 @@ function loulanDecisionFacts(payload) {
   return [
     fact("template_status", payload.template_status || "unknown"),
     fact("decisions", arrayValue(payload.decisions).length),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function loulanDecisionReviewFacts(payload) {
+  const summary = objectValue(payload.decision_summary);
+  return [
+    fact("review_status", payload.review_status || "unknown"),
+    fact("pending", summary.pending_count ?? "unknown"),
+    fact("ready", summary.ready_count ?? "unknown"),
+    fact("missing", summary.missing_slot_count ?? "unknown"),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];

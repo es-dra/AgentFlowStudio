@@ -54,3 +54,56 @@ console.log(JSON.stringify({
     assert "Loulan context bundle projection" in payload["inspectorTitles"]
     assert "Decision Template" in payload["timelineLabels"]
     assert "Context Bundle" in payload["timelineLabels"]
+
+
+def test_web_memory_workbench_renders_loulan_decision_review_pack() -> None:
+    script = """
+import { readFile } from "node:fs/promises";
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView } from "./apps/web/memory-workbench-controller.js";
+
+const files = await Promise.all([
+  "loulan_memory_package.example.json",
+  "loulan_api_workbench_plan.example.json",
+  "loulan_human_review_pack.example.json",
+  "loulan_promotion_decisions_template.example.json",
+  "loulan_decision_review_pack.example.json",
+].map(async (name) => ({
+  name,
+  text: async () => readFile(`examples/agentflow/${name}`, "utf8"),
+})));
+const workspace = normalizeWorkspace(await parseFiles(files));
+const view = buildMemoryWorkbenchView(workspace, "selected_files");
+
+console.log(JSON.stringify({
+  decisionReview: workspace.loulanDecisionReviewPack?.payload?.artifact_type,
+  bundle: view.bundle_summary,
+  controls: view.protocol_summary.controls,
+  nextPass: view.next_pass,
+  inspectorTitles: view.artifact_inspector.map((item) => item.title),
+  inspectorFacts: Object.fromEntries(
+    view.artifact_inspector
+      .find((item) => item.title === "Loulan decision review pack")
+      .facts.map((fact) => [fact.label, fact.value])
+  ),
+  timelineLabels: view.timeline.map((node) => node.label),
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["decisionReview"] == "agentflow_loulan_decision_review_pack"
+    assert any(item["title"] == "Decision review pack" for item in payload["bundle"])
+    assert any(item["label"] == "decision review" for item in payload["controls"])
+    assert payload["nextPass"]["status"] == "blocked_pending_human_input"
+    assert "Decision review: blocked_pending_human_input" in payload["nextPass"]["action"]
+    assert "Loulan decision review pack" in payload["inspectorTitles"]
+    assert payload["inspectorFacts"]["pending"] == "2"
+    assert payload["inspectorFacts"]["human_acceptance_recorded"] == "false"
+    assert "Decision Review" in payload["timelineLabels"]
