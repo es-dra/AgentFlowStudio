@@ -158,4 +158,3 @@ docs/handoff/AFS-WEB-OPERATOR-002.md
 5. Risks and unfinished work.
 6. Memory candidates for `Company/` or project docs.
 7. Whether the subagent or worktree should be closed, preserved, or continued.
-
