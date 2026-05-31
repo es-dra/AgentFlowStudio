@@ -142,7 +142,7 @@ def _invalid_decision(item: dict[str, Any]) -> dict[str, str] | None:
         return {"target_ref": target, "reason": "decision_not_human"}
     if target.startswith("shot:") and decision not in SHOT_REUSE_DECISIONS | SHOT_BLOCK_DECISIONS:
         return {"target_ref": target, "reason": "invalid_shot_decision"}
-    if target.startswith("character:") and decision not in ASSET_REUSE_DECISIONS | ASSET_BLOCK_DECISIONS:
+    if _is_asset_target(target) and decision not in ASSET_REUSE_DECISIONS | ASSET_BLOCK_DECISIONS:
         return {"target_ref": target, "reason": "invalid_asset_decision"}
     if not item.get("evidence_refs"):
         return {"target_ref": target, "reason": "missing_evidence_refs"}
@@ -153,7 +153,7 @@ def _reusable_refs(by_ref: dict[str, dict[str, Any]]) -> list[str]:
     refs = []
     for target, item in by_ref.items():
         decision = str(item.get("decision") or "")
-        if target.startswith("character:") and decision in ASSET_REUSE_DECISIONS:
+        if _is_asset_target(target) and decision in ASSET_REUSE_DECISIONS:
             refs.append(target)
         if target.startswith("shot:") and decision in SHOT_REUSE_DECISIONS:
             refs.append(target)
@@ -164,7 +164,7 @@ def _blocked_refs(by_ref: dict[str, dict[str, Any]]) -> list[str]:
     refs = []
     for target, item in by_ref.items():
         decision = str(item.get("decision") or "")
-        if target.startswith("character:") and decision in ASSET_BLOCK_DECISIONS:
+        if _is_asset_target(target) and decision in ASSET_BLOCK_DECISIONS:
             refs.append(target)
         if target.startswith("shot:") and decision in SHOT_BLOCK_DECISIONS:
             refs.append(target)
@@ -184,7 +184,7 @@ def _context_bundle(
         "created_at": created_at,
         "source_review_pack_id": review_pack["review_pack_id"],
         "source_decision_ids": [str(item.get("decision_id")) for item in decisions.get("decisions") or []],
-        "memory_refs": [ref for ref in reusable if ref.startswith("character:")],
+        "memory_refs": [ref for ref in reusable if _is_asset_target(ref)],
         "shot_anchor_refs": [ref for ref in reusable if ref.startswith("shot:")],
         "blocked_refs": audit["blocked_refs"],
         "writes_long_term_memory": False,
@@ -213,3 +213,7 @@ def _claim_boundaries() -> dict[str, str]:
         "business_validation": "not_validated",
         "durable_memory_runtime": "not_implemented",
     }
+
+
+def _is_asset_target(target_ref: str) -> bool:
+    return target_ref.startswith(("character:", "asset:"))

@@ -52,6 +52,36 @@ def test_loulan_context_bundle_projection_blocks_missing_decisions(tmp_path: Pat
     assert projection["decision_audit"]["missing_decision_refs"] == ["character:guan_pingping_v2"]
 
 
+def test_loulan_context_bundle_projection_supports_asset_refs(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    review_pack["next_pass_readiness"]["required_decisions"] = ["asset:character_guan_pingping_target"]
+    decisions = {
+        "schema_version": "0.1.0",
+        "artifact_type": "agentflow_loulan_promotion_decisions",
+        "review_pack_id": review_pack["review_pack_id"],
+        "decisions": [
+            {
+                "decision_id": "loulan_decision_asset_guan_pingping_target",
+                "target_ref": "asset:character_guan_pingping_target",
+                "decision": "promoted",
+                "decided_by": "human",
+                "evidence_refs": ["asset:character_guan_pingping_target"],
+            }
+        ],
+        "writes_long_term_memory": False,
+    }
+
+    projection = build_loulan_context_bundle_projection(
+        review_pack,
+        decisions,
+        created_at="2026-06-01T12:00:00+08:00",
+    )
+
+    assert projection["decision_audit"]["status"] == "ready"
+    assert projection["context_bundle"]["memory_refs"] == ["asset:character_guan_pingping_target"]
+    assert projection["context_bundle"]["shot_anchor_refs"] == []
+
+
 def test_loulan_context_bundle_cli_writes_projection_artifacts(tmp_path: Path) -> None:
     review_pack = _review_pack(tmp_path)
     decisions = _decisions(review_pack, omit_last=False)

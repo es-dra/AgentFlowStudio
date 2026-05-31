@@ -22,7 +22,7 @@ Shot decisions:
 - `reject`: block the shot from next-pass reuse.
 - `request_repair`: block the shot and carry it as a repair target.
 
-Character memory decisions:
+Asset memory decisions:
 
 - `promoted` or `merged`: include the memory ref in the next context bundle.
 - `rejected` or `expired`: block the memory ref from reuse.

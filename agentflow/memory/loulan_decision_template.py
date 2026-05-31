@@ -95,7 +95,7 @@ def _allowed_decisions(target_ref: str, review_pack: dict[str, Any]) -> list[str
             if card.get("shot_id") == shot_id:
                 return list(card.get("allowed_decisions") or ["approve_anchor", "reject", "request_repair"])
         return ["approve_anchor", "reject", "request_repair"]
-    if target_ref.startswith("character:"):
+    if _is_asset_target(target_ref):
         for card in review_pack.get("asset_review", {}).get("cards") or []:
             if card.get("memory_ref") == target_ref:
                 return list(card.get("allowed_decisions") or ["promoted", "merged", "rejected", "expired"])
@@ -109,8 +109,12 @@ def _suggested_evidence_refs(target_ref: str, review_pack: dict[str, Any]) -> li
         for card in review_pack.get("shot_review_cards") or []:
             if card.get("shot_id") == shot_id:
                 return [card["candidate_id"], *card.get("evidence_refs", []), *card.get("rejected_evidence_refs", [])]
-    if target_ref.startswith("character:"):
+    if _is_asset_target(target_ref):
         for card in review_pack.get("asset_review", {}).get("cards") or []:
             if card.get("memory_ref") == target_ref:
                 return [card["memory_ref"], card.get("asset_id", "")]
     return []
+
+
+def _is_asset_target(target_ref: str) -> bool:
+    return target_ref.startswith(("character:", "asset:"))

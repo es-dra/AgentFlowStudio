@@ -48,6 +48,28 @@ def test_loulan_decision_template_lists_required_human_decisions(tmp_path: Path)
     assert projection["context_bundle"]["status"] == "blocked"
 
 
+def test_loulan_decision_template_supports_asset_refs(tmp_path: Path) -> None:
+    review_pack = _review_pack(tmp_path)
+    review_pack["next_pass_readiness"]["required_decisions"].append("asset:character_guan_pingping_target")
+    review_pack["asset_review"]["cards"].append(
+        {
+            "memory_ref": "asset:character_guan_pingping_target",
+            "asset_id": "character_guan_pingping_target",
+            "allowed_decisions": ["promoted", "merged", "rejected", "expired"],
+        }
+    )
+
+    template = build_loulan_decision_template(review_pack, created_at="2026-06-01T12:30:00+08:00")
+
+    asset_slot = template["decisions"][-1]
+    assert asset_slot["target_ref"] == "asset:character_guan_pingping_target"
+    assert asset_slot["allowed_decisions"] == ["promoted", "merged", "rejected", "expired"]
+    assert asset_slot["suggested_evidence_refs"] == [
+        "asset:character_guan_pingping_target",
+        "character_guan_pingping_target",
+    ]
+
+
 def test_loulan_decision_template_cli_writes_template_artifacts(tmp_path: Path) -> None:
     review_pack = _review_pack(tmp_path)
     review_path = tmp_path / "review_pack.json"

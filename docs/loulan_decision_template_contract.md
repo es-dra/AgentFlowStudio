@@ -1,7 +1,7 @@
 # Loulan Decision Template Contract
 
 `agentflow_loulan_promotion_decisions` templates turn a Loulan human review pack
-into fillable decision slots for shots and candidate character memory.
+into fillable decision slots for shots and candidate asset memory.
 
 The template is not an approval record. Every generated decision starts as
 `pending_human_review`, with empty `decided_by`, empty `evidence_refs`, and:
