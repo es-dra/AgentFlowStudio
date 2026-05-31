@@ -13,6 +13,9 @@ Required boundaries:
   partial-ready human-approved `context_bundle.memory_refs`;
 - if a context projection is blocked, request preview remains blocked and the
   workbench must not fall back to package-level eligible refs;
+- if a context projection includes `decision_intake_gate`, the gate must be
+  either `not_supplied` or `ready_for_context_bundle` with
+  `context_bundle_command_ready: true`; blocked supplied gates are rejected;
 - output is request preview only and must keep `dry_run_only: true`;
 - no provider call, download, generated media write, or Company memory write is
   performed;

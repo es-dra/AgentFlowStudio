@@ -246,7 +246,7 @@
     },
     {
       "rule_id": "loulan_api_workbench_dry_run_only",
-      "description": "Loulan API workbench plans preview provider requests with reference hashes and do not submit calls, persist secrets, or promote memory."
+      "description": "Loulan API workbench plans preview provider requests with reference hashes, reject blocked supplied intake gates, and do not submit calls, persist secrets, or promote memory."
     },
     {
       "rule_id": "loulan_human_review_pack_no_acceptance",

@@ -106,6 +106,11 @@ def test_loulan_api_workbench_plan_uses_context_projection_decisions(tmp_path: P
 
     assert plan["source_context_projection_id"] == projection["projection_id"]
     assert plan["context_projection"]["status"] == "partial_ready"
+    assert plan["context_projection"]["decision_intake_gate"] == {
+        "status": "not_supplied",
+        "context_bundle_command_ready": False,
+        "intake_report_id": "",
+    }
     assert plan["reference_pack"]["references"] == [
         {
             "memory_ref": "character:guan_pingping_v2",
@@ -135,6 +140,26 @@ def test_loulan_api_workbench_plan_blocks_on_unready_context_projection(tmp_path
     assert plan["request_manifest"]["requests"] == []
     assert "context_projection_not_ready" in plan["blocking_reasons"]
     assert "character:zhou_tong_school_v1" not in json.dumps(plan, ensure_ascii=False)
+
+
+def test_loulan_api_workbench_plan_rejects_blocked_context_projection_intake_gate(tmp_path: Path) -> None:
+    package, projection = _package_with_context_projection(tmp_path)
+    projection["decision_intake_gate"] = {
+        "status": "blocked_pending_manual_decisions",
+        "context_bundle_command_ready": False,
+        "intake_report_id": "blocked_intake_report",
+    }
+
+    try:
+        build_loulan_api_workbench_plan(
+            package,
+            context_projection=projection,
+            created_at="2026-06-01T13:00:00+08:00",
+        )
+    except ValueError as exc:
+        assert "Loulan context projection decision intake gate must be ready or not_supplied" in str(exc)
+    else:
+        raise AssertionError("expected blocked context projection intake gate to be rejected")
 
 
 def test_loulan_api_workbench_cli_writes_preview_artifacts(tmp_path: Path) -> None:

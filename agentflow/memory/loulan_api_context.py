@@ -18,6 +18,7 @@ def validate_context_projection(context_projection: dict[str, Any], *, schema_ve
         raise ValueError("Loulan context projection must not write long-term memory")
     if context_projection.get("context_bundle", {}).get("writes_long_term_memory") is not False:
         raise ValueError("Loulan context bundle must not write long-term memory")
+    _validate_decision_intake_gate(context_projection)
 
 
 def context_reference_pack_entries(
@@ -55,6 +56,7 @@ def context_projection_summary(context_projection: dict[str, Any] | None) -> dic
         "status": str(audit.get("status") or bundle.get("status") or ""),
         "context_bundle_status": str(bundle.get("status") or ""),
         "projection_id": context_projection_id(context_projection),
+        "decision_intake_gate": decision_intake_gate_summary(context_projection),
         "memory_refs": list(bundle.get("memory_refs") or []),
         "shot_anchor_refs": list(bundle.get("shot_anchor_refs") or []),
         "blocked_refs": list(bundle.get("blocked_refs") or []),
@@ -70,6 +72,26 @@ def context_projection_id(context_projection: dict[str, Any] | None) -> str | No
 def context_projection_ready(context_projection: dict[str, Any]) -> bool:
     status = str(context_projection.get("context_bundle", {}).get("status") or "")
     return status in READY_CONTEXT_STATUSES
+
+
+def decision_intake_gate_summary(context_projection: dict[str, Any] | None) -> dict[str, Any]:
+    gate = (context_projection or {}).get("decision_intake_gate") or {}
+    return {
+        "status": str(gate.get("status") or "not_recorded"),
+        "context_bundle_command_ready": gate.get("context_bundle_command_ready") is True,
+        "intake_report_id": str(gate.get("intake_report_id") or ""),
+    }
+
+
+def _validate_decision_intake_gate(context_projection: dict[str, Any]) -> None:
+    if "decision_intake_gate" not in context_projection:
+        return
+    gate = decision_intake_gate_summary(context_projection)
+    if gate["status"] == "not_supplied":
+        return
+    if gate["status"] == "ready_for_context_bundle" and gate["context_bundle_command_ready"] is True:
+        return
+    raise ValueError("Loulan context projection decision intake gate must be ready or not_supplied")
 
 
 def context_blocking_reasons(

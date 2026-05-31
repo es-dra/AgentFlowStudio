@@ -279,7 +279,7 @@
     {
       "check_id": "loulan_api_workbench_dry_run_only",
       "status": "passed",
-      "note": "Loulan API workbench plans preview requests with reference hashes and do not persist secrets or submit calls."
+      "note": "Loulan API workbench plans preview requests with reference hashes, reject blocked supplied intake gates, and do not persist secrets or submit calls."
     },
     { "check_id": "loulan_human_review_pack_no_acceptance", "status": "passed", "note": "Loulan human review packs prepare pending review decisions without recording acceptance, calling providers, or writing durable memory." },
     { "check_id": "loulan_decision_template_pending_only", "status": "passed", "note": "Loulan decision templates remain pending human input and cannot approve context." },
