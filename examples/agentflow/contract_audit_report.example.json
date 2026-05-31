@@ -199,7 +199,8 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
-    }
+    },
+    { "artifact_type": "agentflow_loulan_human_review_pack", "example_path": "examples/agentflow/loulan_human_review_pack.example.json", "doc_path": "docs/loulan_human_review_pack_contract.md", "schema_version": "0.1.0", "example_path_exists": true, "doc_path_exists": true }
   ],
   "boundary_checks": [
     {
@@ -282,6 +283,7 @@
       "status": "passed",
       "note": "Loulan API workbench plans preview requests with reference hashes and do not persist secrets or submit calls."
     },
+    { "check_id": "loulan_human_review_pack_no_acceptance", "status": "passed", "note": "Loulan human review packs prepare pending review decisions without recording acceptance, calling providers, or writing durable memory." },
     {
       "check_id": "intermediate_asset_has_evidence",
       "status": "passed",

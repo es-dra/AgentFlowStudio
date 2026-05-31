@@ -92,6 +92,7 @@ export function normalizeWorkspace(artifacts) {
   const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
   const loulanPackage = byType("agentflow_loulan_memory_package") || null;
   const loulanApiWorkbenchPlan = byType("agentflow_loulan_api_workbench_plan") || null;
+  const loulanHumanReviewPack = byType("agentflow_loulan_human_review_pack") || null;
   const workspaceParts = {
     warnings,
     errors,
@@ -104,6 +105,7 @@ export function normalizeWorkspace(artifacts) {
     memoryPackage,
     loulanPackage,
     loulanApiWorkbenchPlan,
+    loulanHumanReviewPack,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),

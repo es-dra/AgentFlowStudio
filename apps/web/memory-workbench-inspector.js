@@ -6,6 +6,7 @@ const TYPE_LABELS = {
   agentflow_memory_video_pipeline_presentation_package: "Presentation package",
   agentflow_loulan_memory_package: "Loulan memory package",
   agentflow_loulan_api_workbench_plan: "Loulan API workbench plan",
+  agentflow_loulan_human_review_pack: "Loulan human review pack",
   agentflow_feedback_event: "Feedback draft",
 };
 
@@ -38,6 +39,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
   if (type === "agentflow_loulan_memory_package") return ["project", "assets", "memory-loaded", "next-pass"];
   if (type === "agentflow_loulan_api_workbench_plan") return ["baseline-run", "memory-backed-run", "review", "next-pass"];
+  if (type === "agentflow_loulan_human_review_pack") return ["review", "feedback", "next-pass"];
   return [];
 }
 
@@ -49,6 +51,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
   if (type === "agentflow_loulan_memory_package") return loulanPackageFacts(payload);
   if (type === "agentflow_loulan_api_workbench_plan") return loulanApiWorkbenchFacts(payload);
+  if (type === "agentflow_loulan_human_review_pack") return loulanHumanReviewFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -71,6 +74,15 @@ function loulanApiWorkbenchFacts(payload) {
     fact("requests", arrayValue(payload.request_manifest?.requests).length),
     fact("response_ledger", payload.response_ledger?.status || "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function loulanHumanReviewFacts(payload) {
+  return [
+    fact("block", payload.review_scope?.block_id || "unknown"),
+    fact("shots", payload.review_scope?.shot_count ?? "unknown"),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("next_pass", payload.next_pass_readiness?.status || "unknown"),
   ];
 }
 

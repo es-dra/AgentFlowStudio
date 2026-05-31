@@ -1,0 +1,163 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_loulan_human_review_pack",
+  "review_pack_id": "loulan_scene_assets_memory_production_package_v0_b01_human_review_pack_v0",
+  "created_at": "2026-06-01T11:00:00+08:00",
+  "package_id": "loulan_scene_assets_memory_production_package_v0",
+  "project_id": "loulan_scene_assets",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "human_acceptance_recorded": false,
+  "review_scope": {
+    "block_id": "B01",
+    "status": "pending_human_review",
+    "shot_count": 2,
+    "evidence_status": "blocked",
+    "blocked_shot_ids": [
+      "B01-S02"
+    ],
+    "auto_accepts_assets": false
+  },
+  "shot_review_cards": [
+    {
+      "shot_id": "B01-S01",
+      "candidate_id": "B01-S01-h1",
+      "status": "horizontal_keyframe_candidate_pending_review",
+      "review_status": "pending_human_review",
+      "image_size": "1920x1080",
+      "image_sha256": "sha-b01-s01-h1",
+      "evidence_refs": [
+        "asset_library/director_notes/B01-S01_h1_feedback.md",
+        "asset_library/motion_intent/B01-S01_h1_motion_intent.md"
+      ],
+      "evidence_status": "ready_for_human_review",
+      "blocking_reasons": [],
+      "rejected_evidence_refs": [],
+      "allowed_decisions": [
+        "approve_anchor",
+        "reject",
+        "request_repair"
+      ],
+      "auto_promotes_memory": false
+    },
+    {
+      "shot_id": "B01-S02",
+      "candidate_id": "B01-S02-h1",
+      "status": "horizontal_keyframe_candidate_pending_review",
+      "review_status": "pending_human_review",
+      "image_size": "1920x1080",
+      "image_sha256": "sha-b01-s02-h1",
+      "evidence_refs": [
+        "reviews/B01-S02-h1/director_art_card.md",
+        "asset_library/director_notes/B01-S02_h1_feedback.md"
+      ],
+      "evidence_status": "blocked",
+      "blocking_reasons": [
+        "has_rejected_previous_asset"
+      ],
+      "rejected_evidence_refs": [
+        "assets/images/B01-S02-h1-rejected-character-turnaround.png"
+      ],
+      "allowed_decisions": [
+        "approve_anchor",
+        "reject",
+        "request_repair"
+      ],
+      "auto_promotes_memory": false
+    }
+  ],
+  "asset_review": {
+    "status": "pending_human_review",
+    "candidate_memory_refs": [
+      "character:guan_pingping_v2"
+    ],
+    "approved_or_promoted_memory_refs": [
+      "character:zhou_tong_school_v1"
+    ],
+    "rejected_memory_refs": [
+      "human/rejected/guan_pingping_v1.png"
+    ],
+    "cards": [
+      {
+        "memory_ref": "character:guan_pingping_v2",
+        "asset_id": "guan_pingping_v2",
+        "status": "candidate_pending_human_review",
+        "sha256_present": true,
+        "review_status": "pending_human_review",
+        "allowed_decisions": [
+          "promoted",
+          "merged",
+          "rejected",
+          "expired"
+        ]
+      }
+    ]
+  },
+  "api_workbench_status": {
+    "artifact_type": "agentflow_loulan_api_workbench_plan",
+    "reference_pack_status": "blocked",
+    "request_manifest_status": "blocked",
+    "provider_calls_started": false,
+    "blocking_reasons": [
+      "no_approved_reference_hashes"
+    ]
+  },
+  "promotion_decision_drafts": [
+    {
+      "schema_version": "0.1.0",
+      "artifact_type": "agentflow_memory_promotion_decision",
+      "decision_id": "loulan_scene_assets_memory_production_package_v0_character_guan_pingping_v2_decision_draft",
+      "source_memory_ref": "character:guan_pingping_v2",
+      "draft_status": "pending_human_review",
+      "allowed_decisions": [
+        "promoted",
+        "merged",
+        "rejected",
+        "expired"
+      ],
+      "writes_long_term_memory": false,
+      "created_at": "2026-06-01T11:00:00+08:00"
+    }
+  ],
+  "feedback_event_draft": {
+    "schema_version": "0.1.0",
+    "artifact_type": "agentflow_feedback_event",
+    "feedback_id": "loulan_scene_assets_memory_production_package_v0_b01_review_feedback_draft",
+    "source": "human_review_pending_draft",
+    "target_type": "package",
+    "target_id": "loulan_scene_assets_memory_production_package_v0",
+    "decision": "note",
+    "reason_tags": [
+      "has_rejected_previous_asset",
+      "pending_human_review"
+    ],
+    "user_note": "Draft only: review B01 keyframe sequence and character anchors before next-pass reuse.",
+    "created_at": "2026-06-01T11:00:00+08:00",
+    "draft_status": "draft_not_persisted",
+    "writes_long_term_memory": false
+  },
+  "next_pass_readiness": {
+    "status": "blocked_until_human_review",
+    "required_decisions": [
+      "shot:B01-S01",
+      "shot:B01-S02",
+      "character:guan_pingping_v2"
+    ],
+    "blocked_refs": [
+      "shot:B01-S02",
+      "character:guan_pingping_v2"
+    ],
+    "ready_memory_refs": [
+      "character:zhou_tong_school_v1"
+    ],
+    "writes_long_term_memory": false
+  },
+  "claim_boundaries": {
+    "structure_verification": "human_review_pack_contract_only",
+    "runtime_verification": "not_run",
+    "provider_smoke": "not_run",
+    "human_acceptance": "not_recorded",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_implemented"
+  }
+}
