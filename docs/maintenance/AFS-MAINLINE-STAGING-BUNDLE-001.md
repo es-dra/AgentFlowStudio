@@ -1,7 +1,7 @@
 # AFS-MAINLINE-STAGING-BUNDLE-001 - Mainline Staging Bundle
 
-Status: staged on `codex-mainline-slimming-staging` as a reviewed integration
-bundle; not committed.
+Status: committed on `codex-mainline-slimming-staging` as `fce21bd`
+(`feat(agentflow): add memory pipeline mainline bundle`); not pushed.
 
 This bundle converts the current dirty checkout into a coherent integration
 plan. It keeps the product surface centered on `memory-video-pipeline-*` and
@@ -183,6 +183,9 @@ git diff --cached --check
 
 .\.venv\Scripts\python.exe -B -m pytest --assert=plain -p no:cacheprovider --basetemp data\processed\pytest-basetemp\full-staged
 # 675 passed
+
+git commit -m "feat(agentflow): add memory pipeline mainline bundle"
+# fce21bd
 ```
 
 ## Commit Boundary
