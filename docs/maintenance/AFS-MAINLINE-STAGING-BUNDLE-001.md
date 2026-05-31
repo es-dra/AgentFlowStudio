@@ -196,7 +196,7 @@ Remote review chain on 2026-05-31:
   `origin/master`.
 - PR #72: `codex-mainline-slimming-staging` ->
   `codex-local-alpha-0-4-mainline-sync`. This keeps the slimming bundle review
-  scoped to the 2 bundle commits on top of the Local Alpha 0.4 base.
+  scoped to the bundle commit series on top of the Local Alpha 0.4 base.
 
 Remote readiness follow-up on 2026-05-31:
 
@@ -208,6 +208,9 @@ Remote readiness follow-up on 2026-05-31:
   non-claim boundaries.
 - PR #73 was marked ready for review after a retry. PR #72 remains draft and
   should stay dependent until PR #73 is reviewed or merged.
+- After the #73 branch was cleaned and repushed at `35bba58`, PR #72 was
+  rebased on top of that updated base and pushed with `--force-with-lease`.
+  GitHub then reported PR #72 as draft and `mergeable=true` at head `5962a2a`.
 
 ## Commit Boundary
 
