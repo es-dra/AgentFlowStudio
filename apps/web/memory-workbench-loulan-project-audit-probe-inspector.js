@@ -20,6 +20,8 @@ export function loulanProjectAuditProbeFacts(payload) {
   const packageProbe = objectValue(payload.afs_package_probe);
   const summarySync = objectValue(payload.afs_package_audit_summary_sync);
   const cliProbe = objectValue(payload.afs_package_audit_summary_cli_probe);
+  const packageGateFacts = objectValue(payload.afs_package_gate_facts_web_direct_probe);
+  const rootGateFacts = objectValue(payload.afs_root_gate_facts_web_direct_probe);
   const audits = objectValue(packageProbe.project_audits);
   const manifestReference = objectValue(audits.manifest_reference);
   const textEncoding = objectValue(audits.text_encoding);
@@ -69,6 +71,27 @@ export function loulanProjectAuditProbeFacts(payload) {
       fact("package_cli_blocked_refs", cliProbe.blocked_memory_refs ?? "unknown"),
       fact("package_cli_provider_calls_started", yesNo(cliProbe.provider_calls_started)),
       fact("package_cli_writes_long_term_memory", yesNo(cliProbe.writes_long_term_memory)),
+    );
+  }
+  if (Object.keys(packageGateFacts).length) {
+    const gateInspectorFacts = objectValue(packageGateFacts.inspector_facts);
+    facts.push(
+      fact("package_gate_facts", packageGateFacts.status || payload.status || "unknown"),
+      fact("package_gate_next_context", gateInspectorFacts.next_context_status || "unknown"),
+      fact("package_gate_b01_apply", gateInspectorFacts.b01_apply_status || "unknown"),
+      fact("package_gate_b01_operator_next_context", gateInspectorFacts.b01_operator_next_context || "unknown"),
+      fact("package_gate_provider_calls_started", yesNo(packageGateFacts.provider_calls_started)),
+      fact("package_gate_writes_long_term_memory", yesNo(packageGateFacts.writes_long_term_memory)),
+    );
+  }
+  if (Object.keys(rootGateFacts).length) {
+    const rootInspectorFacts = objectValue(rootGateFacts.inspector_facts);
+    facts.push(
+      fact("root_gate_facts", rootGateFacts.status || rootInspectorFacts.package_gate_facts || "unknown"),
+      fact("root_gate_b01_validation", rootInspectorFacts.b01_validation || "unknown"),
+      fact("root_gate_next_context", rootInspectorFacts.next_context || "unknown"),
+      fact("root_gate_provider_calls_started", yesNo(rootGateFacts.provider_calls_started)),
+      fact("root_gate_writes_long_term_memory", yesNo(rootGateFacts.writes_long_term_memory)),
     );
   }
   return facts;

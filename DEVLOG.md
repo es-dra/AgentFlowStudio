@@ -6,6 +6,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 `docs/archive/devlog_history_2026_05.md`; pre-reset task history
 `docs/archive/task_history_2026_05.md`.
 
+2026-06-01: Loulan project audit probe selected-file inspector now surfaces package/root gate-facts sync objects, including package B01 apply blocker and root next-context blocker; see `docs/handoff/AFS-LOULAN-WEB-PROJECT-AUDIT-GATE-FACTS-DIRECT-001.md`.
+
 2026-06-01: Loulan root `project_manifest.json` selected-file inspector now surfaces the package gate-facts probe status (`package_gate_facts = pass_b01_still_blocked`) so the project entry point shows the latest package-level B01/apply/context blocker; see `docs/handoff/AFS-LOULAN-WEB-ROOT-GATE-FACTS-DIRECT-001.md`.
 
 2026-06-01: Loulan package selected-file inspector now surfaces the full gate chain as direct facts, including promotion gate, next-context status, context rule, B01 validation/apply status, context readiness, human/media/no-call boundaries, and operator next-context blocker; see `docs/handoff/AFS-LOULAN-WEB-PACKAGE-GATE-FACTS-001.md`.

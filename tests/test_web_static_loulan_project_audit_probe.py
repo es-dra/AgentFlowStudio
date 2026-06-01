@@ -73,6 +73,31 @@ const probe = {
     provider_calls_started: false,
     writes_long_term_memory: false
   },
+  afs_package_gate_facts_web_direct_probe: {
+    status: "pass_b01_still_blocked",
+    artifact_type: "agentflow_loulan_memory_package",
+    inspector_status: "review ready",
+    inspector_facts: {
+      promotion_gate: "blocked",
+      next_context_status: "promotion_decision_required",
+      b01_apply_status: "blocked_validation_not_ready",
+      b01_operator_next_context: "blocked_until_b01_human_review"
+    },
+    provider_calls_started: false,
+    writes_long_term_memory: false
+  },
+  afs_root_gate_facts_web_direct_probe: {
+    status: "blocked_until_b01_human_review",
+    artifact_type: "loulan_root_project_manifest",
+    inspector_status: "blocked_until_b01_human_review",
+    inspector_facts: {
+      package_gate_facts: "pass_b01_still_blocked",
+      b01_validation: "blocked_pending_human_review",
+      next_context: "blocked_until_b01_human_review"
+    },
+    provider_calls_started: false,
+    writes_long_term_memory: false
+  },
   claim_boundary: {
     human_acceptance: "not_recorded",
     business_validation: "not_validated",
@@ -144,3 +169,14 @@ console.log(JSON.stringify({
     assert facts["package_cli_blocked_refs"] == "90"
     assert facts["package_cli_provider_calls_started"] == "false"
     assert facts["package_cli_writes_long_term_memory"] == "false"
+    assert facts["package_gate_facts"] == "pass_b01_still_blocked"
+    assert facts["package_gate_next_context"] == "promotion_decision_required"
+    assert facts["package_gate_b01_apply"] == "blocked_validation_not_ready"
+    assert facts["package_gate_b01_operator_next_context"] == "blocked_until_b01_human_review"
+    assert facts["package_gate_provider_calls_started"] == "false"
+    assert facts["package_gate_writes_long_term_memory"] == "false"
+    assert facts["root_gate_facts"] == "blocked_until_b01_human_review"
+    assert facts["root_gate_b01_validation"] == "blocked_pending_human_review"
+    assert facts["root_gate_next_context"] == "blocked_until_b01_human_review"
+    assert facts["root_gate_provider_calls_started"] == "false"
+    assert facts["root_gate_writes_long_term_memory"] == "false"
