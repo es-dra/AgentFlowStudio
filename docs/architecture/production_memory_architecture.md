@@ -325,6 +325,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_next_pass_promotion_decision`
 - `agentflow_production_memory_next_pass_promotion_overlay`
 - `agentflow_production_memory_operator_feedback_event`
+- `agentflow_production_memory_operator_feedback_candidate_packet`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
@@ -372,6 +373,12 @@ canvas with the target manifest node, operator decision, evidence-only status,
 memory-boundary controls, and non-claim boundaries. They do not create memory
 candidates, create promotion decisions, claim human acceptance, execute
 workflows, write Company KB, or write durable memory.
+
+Operator feedback candidate packet artifacts render as a read-only candidate
+review canvas with the source feedback event, memory candidate, pending
+promotion template, no-provider controls, and non-claim boundaries. They do not
+promote memory, execute workflow actions, follow refs, write Company KB, or
+write durable memory.
 
 It does not:
 
