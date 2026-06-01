@@ -135,6 +135,9 @@ def test_loulan_memory_package_cli_writes_safe_dry_run_artifacts(tmp_path: Path)
     assert "Loulan memory package" in result.output
     assert "Provider calls: not started" in result.output
     assert "Overall gate: blocked" in result.output
+    assert "Manifest audit: pass; errors 0; invalid asset types 0; invalid statuses 0" in result.output
+    assert "Text encoding audit: pass; errors 0" in result.output
+    assert "Phase gate audit: blocked_until_b01_human_review; failures 0; pending B01 5" in result.output
     assert str(root) not in result.output
 
     package_path = output / "loulan_memory_package.json"

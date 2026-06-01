@@ -21,6 +21,8 @@ and Web Memory Workbench package review path.
   blocks, failures, registry context counts, and pending B01 decisions.
 - Package Markdown now includes manifest errors, invalid asset/status counts,
   text encoding errors, and phase gate failures.
+- CLI stdout now includes the same manifest/text/phase audit summary line items
+  for quick operator review.
 - Memory Workbench package review shows those counts in the Project audits
   bundle card, protocol controls, and inspector facts.
 
@@ -55,6 +57,7 @@ The current no-call probe over the Loulan asset project produced:
 
 ```powershell
 .venv\Scripts\python.exe -B -m pytest --assert=plain tests\test_loulan_memory_package.py tests\test_web_memory_loulan_package_static.py -q
+.venv\Scripts\python.exe -B -m apps.cli.main loulan-memory-package --project-root D:\Projects\LoulanSceneAssets --created-at "2026-06-02T01:10:00+08:00" --output data\processed\runs\loulan_memory_package\local_probe_cli_audit_summary
 .venv\Scripts\python.exe -B -m pytest --assert=plain tests\test_loulan_memory_package.py tests\test_web_memory_loulan_package_static.py tests\test_web_static_loulan_project_audit_probe.py tests\test_web_static_loulan_governance_audits.py -q
 .venv\Scripts\python.exe -B -m pytest --assert=plain -q
 .venv\Scripts\python.exe -B tools\staging_preflight.py --repo-root .
@@ -64,6 +67,9 @@ git diff --check
 Results:
 
 - Focused package/Web tests: `5 passed`.
+- CLI real probe: package stdout shows manifest errors `0`, invalid asset
+  types `0`, invalid statuses `0`, text errors `0`, phase failures `0`, and
+  pending B01 `5`.
 - Related Loulan package/audit tests: `8 passed`.
 - Package fixture/API/human-review reuse tests: `19 passed`.
 - Contract/example tests: `34 passed`.

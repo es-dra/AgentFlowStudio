@@ -41,6 +41,24 @@ def loulan_memory_package_command(
     typer.echo(f"Project: {package['project']['project_id']}")
     typer.echo(f"Shots: {package['shot_summary']['total_shots']}")
     typer.echo(f"Overall gate: {package['promotion_gates']['overall_status']}")
+    audits = package["project_audits"]
+    manifest_summary = audits["manifest_reference"].get("summary", {})
+    text_summary = audits["text_encoding"].get("summary", {})
+    phase_summary = audits["phase_gate"].get("summary", {})
+    typer.echo(
+        "Manifest audit: "
+        f"{audits['manifest_reference']['status']}; "
+        f"errors {manifest_summary.get('errors', 'unknown')}; "
+        f"invalid asset types {manifest_summary.get('invalid_asset_types', 'unknown')}; "
+        f"invalid statuses {manifest_summary.get('invalid_statuses', 'unknown')}"
+    )
+    typer.echo(f"Text encoding audit: {audits['text_encoding']['status']}; errors {text_summary.get('errors', 'unknown')}")
+    typer.echo(
+        "Phase gate audit: "
+        f"{audits['phase_gate']['status']}; "
+        f"failures {phase_summary.get('failures', 'unknown')}; "
+        f"pending B01 {phase_summary.get('pending_b01_decisions', 'unknown')}"
+    )
     typer.echo("Provider calls: not started")
     for path in paths:
         typer.echo(f"- {path.relative_to(output_dir).as_posix()}")
