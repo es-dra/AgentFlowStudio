@@ -1,5 +1,6 @@
 import { isLoulanB01Artifact, loulanB01Facts, loulanB01FocusTargets, loulanB01Status, loulanB01TypeLabel } from "./memory-workbench-loulan-b01-inspector.js";
 import { isLoulanContextDraftArtifact, loulanContextDraftFacts, loulanContextDraftFocusTargets, loulanContextDraftStatus, loulanContextDraftTypeLabel } from "./memory-workbench-loulan-context-draft-inspector.js";
+import { isLoulanProjectAuditProbe, loulanProjectAuditProbeFacts, loulanProjectAuditProbeFocusTargets, loulanProjectAuditProbeStatus, loulanProjectAuditProbeTypeLabel } from "./memory-workbench-loulan-project-audit-probe-inspector.js";
 import { isLoulanProjectManifest, loulanProjectManifestFacts, loulanProjectManifestFocusTargets, loulanProjectManifestStatus, loulanProjectManifestTypeLabel } from "./memory-workbench-loulan-project-manifest-inspector.js";
 import { loulanApiWorkbenchFacts, loulanContextBundleFacts, loulanDecisionFacts, loulanDecisionIntakeFacts, loulanDecisionReviewFacts, loulanDecisionWorksheetFacts, loulanHumanReviewFacts, loulanPackageFacts } from "./memory-workbench-loulan-package-inspector.js";
 import { isLoulanRegistryArtifact, loulanRegistryFacts, loulanRegistryFocusTargets, loulanRegistryStatus, loulanRegistryTypeLabel } from "./memory-workbench-loulan-registry-inspector.js";
@@ -35,7 +36,15 @@ function summarizeArtifact(artifact) {
     id: artifact.fileName,
     artifact_type: type,
     focus_targets: focusTargetsFor(type),
-    title: TYPE_LABELS[type] || loulanB01TypeLabel(type) || loulanContextDraftTypeLabel(type) || loulanRegistryTypeLabel(type) || loulanRequestManifestTypeLabel(type) || loulanProjectManifestTypeLabel(type) || type,
+    title:
+      TYPE_LABELS[type] ||
+      loulanProjectAuditProbeTypeLabel(type) ||
+      loulanB01TypeLabel(type) ||
+      loulanContextDraftTypeLabel(type) ||
+      loulanRegistryTypeLabel(type) ||
+      loulanRequestManifestTypeLabel(type) ||
+      loulanProjectManifestTypeLabel(type) ||
+      type,
     status: statusFor(type, payload),
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
@@ -57,6 +66,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_loulan_decision_worksheet") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_decision_intake_report") return ["review", "feedback", "next-pass"];
   if (type === "agentflow_loulan_context_bundle_projection") return ["memory-loaded", "next-pass"];
+  if (isLoulanProjectAuditProbe(type)) return loulanProjectAuditProbeFocusTargets(type);
   if (isLoulanB01Artifact(type)) return loulanB01FocusTargets(type);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftFocusTargets(type);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryFocusTargets(type);
@@ -79,6 +89,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_loulan_decision_worksheet") return loulanDecisionWorksheetFacts(payload);
   if (type === "agentflow_loulan_decision_intake_report") return loulanDecisionIntakeFacts(payload);
   if (type === "agentflow_loulan_context_bundle_projection") return loulanContextBundleFacts(payload);
+  if (isLoulanProjectAuditProbe(type)) return loulanProjectAuditProbeFacts(payload);
   if (isLoulanB01Artifact(type)) return loulanB01Facts(type, payload);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftFacts(payload);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryFacts(payload);
@@ -157,6 +168,7 @@ function feedbackFacts(payload) {
 }
 
 function statusFor(type, payload) {
+  if (isLoulanProjectAuditProbe(type)) return loulanProjectAuditProbeStatus(payload);
   if (isLoulanB01Artifact(type)) return loulanB01Status(type, payload);
   if (isLoulanContextDraftArtifact(type)) return loulanContextDraftStatus(payload);
   if (isLoulanRegistryArtifact(type)) return loulanRegistryStatus(payload);
