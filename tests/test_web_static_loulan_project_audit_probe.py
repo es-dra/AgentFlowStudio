@@ -20,7 +20,7 @@ const probe = {
     },
     promotion_gate: "blocked",
     eligible_memory_refs: 3,
-    blocked_memory_refs: 88,
+    blocked_memory_refs: 89,
     b01_feedback_loop_gate: "blocked_pending_human_review",
     b01_pending_decisions: 5,
     provider_calls_started: false,
@@ -70,6 +70,6 @@ console.log(JSON.stringify({
     assert facts["b01_feedback_loop_gate"] == "blocked_pending_human_review"
     assert facts["b01_pending_decisions"] == "5"
     assert facts["eligible_refs"] == "3"
-    assert facts["blocked_refs"] == "88"
+    assert facts["blocked_refs"] == "89"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"

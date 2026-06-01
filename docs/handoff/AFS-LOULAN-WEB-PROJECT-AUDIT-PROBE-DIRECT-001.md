@@ -80,7 +80,7 @@ Observed direct Web projection:
     "b01_feedback_loop_gate": "blocked_pending_human_review",
     "b01_pending_decisions": "5",
     "eligible_refs": "3",
-    "blocked_refs": "88",
+    "blocked_refs": "89",
     "provider_calls_started": "false",
     "writes_long_term_memory": "false"
   }

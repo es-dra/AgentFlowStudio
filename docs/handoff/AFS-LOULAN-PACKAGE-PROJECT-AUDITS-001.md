@@ -45,7 +45,7 @@ Observed state:
 - `project_audits.text_encoding.status`: `pass`
 - Promotion gate: `blocked`
 - Eligible refs: `3`
-- Blocked refs: `88`
+- Blocked refs: `89`
 - B01 feedback loop gate: `blocked_pending_human_review`
 - Provider calls: not started
 - Durable Memory write: false
@@ -67,6 +67,8 @@ Additional checks:
   `manifest reference audit`, and `text encoding audit`.
 - Output safety scan over the real package probe found no `D:\`, `C:\`,
   provider URL, token, signed URL, API key, `.mp4`, or `.mov`.
+- Current Loulan registry includes the project-audit probe itself as blocked
+  review evidence, so the live package now reports 89 blocked refs.
 - Modified/new code files are under 300 effective lines.
 
 ## Boundaries
