@@ -25,6 +25,7 @@ project_input
   -> pass_readiness
   -> next_pass_bundle
   -> next_context_handoff
+  -> next_task_packet
   -> session_report
   -> company_kb_feedback_candidate_packet
   -> operator_loop_run_manifest
@@ -62,6 +63,10 @@ The required root identifiers are:
 - `next_context_handoff`: no-provider operator handoff for the next AI task.
   It lists next-context refs separately from blocked refs, includes a bounded
   task prompt, and repeats non-claim boundaries for the next operator.
+- `next_task_packet`: no-provider task entry packet built from a ready
+  next-context handoff. It exposes only allowed context refs to the next AI
+  task, keeps blocked refs visible but excluded, and repeats the non-claim
+  boundaries.
 - `session_report`: read-only operator audit artifact that summarizes the run,
   included refs, blocked refs, optional feedback capture, optional promotion
   decision, next operator action, and non-claim boundaries.
@@ -92,6 +97,7 @@ All derived artifacts declare:
 - No-provider mode does not require remote provider access.
 - The context bundle always lists included refs and blocked refs separately.
 - The next pass bundle is planned-only and must not execute a provider call.
+- The next task packet consumes a handoff only; it does not execute a next pass.
 
 ## CLI Surface
 
@@ -103,6 +109,7 @@ python -m apps.cli.main production-memory-loop-review-promotion data/processed/r
 python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T01:00:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/operator_loop
 python -m apps.cli.main production-memory-loop-next-context-handoff data/processed/runs/production_memory_loop/no_provider/production_memory_loop_run.json --generated-at 2026-06-02T01:40:00+08:00 --output data/processed/runs/production_memory_loop/next_context_handoff
+python -m apps.cli.main production-memory-loop-next-task-packet data/processed/runs/production_memory_loop/next_context_handoff/next_context_handoff.json --generated-at 2026-06-02T03:12:00+08:00 --output data/processed/runs/production_memory_loop/next_task_packet
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 ```
@@ -148,13 +155,18 @@ The next context handoff command writes:
 - `next_context_handoff.json`
 - `next_context_handoff.md`
 
+The next task packet command writes:
+
+- `next_task_packet.json`
+- `next_task_packet.md`
+
 The Company KB feedback candidate command writes:
 
 - `company_kb_feedback_candidate_packet.json`
 - `company_kb_feedback_candidate_packet.md`
 
 The operator-loop command writes the existing no-provider run, session report,
-next context handoff, Company KB candidate packet, and:
+next context handoff, next task packet, Company KB candidate packet, and:
 
 - `production_memory_operator_loop_run.json`
 
@@ -168,6 +180,10 @@ content, promote company memory, or validate provider output.
 The next context handoff is a task handoff for a future AI pass. It does not
 execute that pass, follow refs, call a provider, claim human acceptance, or
 convert candidates into durable memory.
+
+The next task packet is the handoff-consumption surface for a future AI task.
+It does not run that task, call a provider, write memory, write Company KB, or
+turn candidates into promoted memory.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as

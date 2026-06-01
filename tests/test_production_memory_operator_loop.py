@@ -43,6 +43,7 @@ def test_operator_loop_run_manifest_covers_all_no_provider_nodes() -> None:
         "pass_readiness",
         "next_pass_bundle",
         "next_context_handoff",
+        "next_task_packet",
         "session_report",
         "company_kb_feedback_candidate_packet",
     }
@@ -53,8 +54,11 @@ def test_operator_loop_run_manifest_covers_all_no_provider_nodes() -> None:
     assert manifest["context_summary"]["blocked_ref_count"] == 3
     assert manifest["next_context_handoff"]["handoff_status"] == "ready"
     assert manifest["next_context_handoff"]["next_context_ref_count"] == 3
+    assert manifest["next_task_packet"]["packet_status"] == "ready"
+    assert manifest["next_task_packet"]["allowed_ref_count"] == 3
     assert result["session_report"]["kind"] == "agentflow_production_memory_session_report"
     assert result["company_kb_feedback_candidate_packet"]["promotion_status"] == "candidate_only"
+    assert result["next_task_packet"]["kind"] == "agentflow_production_memory_next_task_packet"
 
 
 def test_operator_loop_cli_writes_auditable_artifact_chain(tmp_path: Path) -> None:
@@ -88,6 +92,8 @@ def test_operator_loop_cli_writes_auditable_artifact_chain(tmp_path: Path) -> No
     assert (output_dir / "run" / "next_pass_bundle.json").exists()
     assert (output_dir / "next_context_handoff" / "next_context_handoff.json").exists()
     assert (output_dir / "next_context_handoff" / "next_context_handoff.md").exists()
+    assert (output_dir / "next_task_packet" / "next_task_packet.json").exists()
+    assert (output_dir / "next_task_packet" / "next_task_packet.md").exists()
     assert (output_dir / "session_report" / "production_memory_session_report.json").exists()
     assert (output_dir / "company_kb_candidates" / "company_kb_feedback_candidate_packet.json").exists()
 
@@ -99,6 +105,8 @@ def test_operator_loop_cli_writes_auditable_artifact_chain(tmp_path: Path) -> No
     assert "run/next_pass_bundle.json" in artifact_paths
     assert "next_context_handoff/next_context_handoff.json" in artifact_paths
     assert "next_context_handoff/next_context_handoff.md" in artifact_paths
+    assert "next_task_packet/next_task_packet.json" in artifact_paths
+    assert "next_task_packet/next_task_packet.md" in artifact_paths
     assert "session_report/production_memory_session_report.json" in artifact_paths
     assert "session_report/production_memory_session_report.md" in artifact_paths
     assert "company_kb_candidates/company_kb_feedback_candidate_packet.json" in artifact_paths

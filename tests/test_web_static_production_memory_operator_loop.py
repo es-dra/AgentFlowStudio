@@ -81,6 +81,7 @@ console.log(JSON.stringify({{
     assert "Company KB feedback" in payload["bundleTitles"]
     assert "context_bundle" in payload["memoryIds"]
     assert "next_context_handoff" in payload["memoryIds"]
+    assert "next_task_packet" in payload["memoryIds"]
     assert "company_kb_feedback_candidate_packet" in payload["memoryIds"]
     assert payload["nextPassStatus"] == "ready"
     assert payload["nextPassAction"] == "inspect_generated_artifacts_before_next_pass"
@@ -89,8 +90,8 @@ console.log(JSON.stringify({{
     assert "durable memory write disabled:review ready" in payload["protocolControls"]
     assert "agentflow_production_memory_operator_loop_run" in payload["inspectorTypes"]
     assert "chain_status:ready" in payload["inspectorFacts"]
-    assert "operator_nodes:11" in payload["inspectorFacts"]
-    assert "output_artifacts:11" in payload["inspectorFacts"]
+    assert "operator_nodes:12" in payload["inspectorFacts"]
+    assert "output_artifacts:13" in payload["inspectorFacts"]
     assert "writes_company_kb:false" in payload["inspectorFacts"]
     assert "provider_calls_started:false" in payload["inspectorFacts"]
     assert payload["sourceLabel"] == "Selected files"

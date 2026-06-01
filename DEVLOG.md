@@ -9,6 +9,33 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Task Packet 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-task-packet-001`, based on the verified
+  next-context handoff Web slice.
+- Added `agentflow/memory/production_next_task.py` and
+  `production-memory-loop-next-task-packet`.
+- The packet consumes a ready `next_context_handoff.json` and writes
+  `next_task_packet.json` and `.md` as a no-provider entry packet for the next
+  AI task. It exposes `allowed_context_refs` separately from `blocked_refs` and
+  repeats feedback/candidate/promotion boundaries.
+- Integrated the packet into `production-memory-loop-run-operator-no-provider`
+  so one local operator run now emits run/context/readiness/next pass,
+  next-context handoff, next-task packet, session report, Company KB candidate
+  packet, and operator manifest.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no human acceptance, and no business
+  validation claim.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_task_packet.py -q` -> 4 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py -q` -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_task_packet.py tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q` -> 35 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help` -> passed; `production-memory-loop-next-task-packet` is visible.
+  - CLI smoke wrote ignored next-task packet JSON/Markdown outputs through the operator-loop command.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 726 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Next Context Handoff Web 001
 
 - Continued the generic Production Memory Architecture path on

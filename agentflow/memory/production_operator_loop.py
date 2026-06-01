@@ -23,6 +23,11 @@ from agentflow.memory.production_next_context import (
     write_next_context_handoff,
 )
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND
+from agentflow.memory.production_next_task import (
+    NEXT_TASK_PACKET_KIND,
+    build_next_task_packet,
+    write_next_task_packet,
+)
 from agentflow.memory.production_session import (
     SESSION_REPORT_KIND,
     build_production_memory_session_report,
@@ -44,17 +49,19 @@ def build_production_memory_operator_loop_run(
         raise ValueError("generated_at is required")
     run = build_production_memory_loop_run(loop)
     handoff = build_next_context_handoff(run, generated_at=generated_at)
+    next_task_packet = build_next_task_packet(handoff, generated_at=generated_at)
     report = build_production_memory_session_report(run, generated_at=generated_at)
     packet = build_company_kb_feedback_candidate_packet(
         report,
         generated_at=generated_at,
         source_kb_status=source_kb_status,
     )
-    manifest = _build_manifest(loop, run, handoff, report, packet, generated_at=generated_at)
+    manifest = _build_manifest(loop, run, handoff, next_task_packet, report, packet, generated_at=generated_at)
     return {
         "manifest": manifest,
         "run": run,
         "next_context_handoff": handoff,
+        "next_task_packet": next_task_packet,
         "session_report": report,
         "company_kb_feedback_candidate_packet": packet,
     }
@@ -65,6 +72,7 @@ def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir
     written_paths: list[Path] = []
     written_paths.extend(write_production_memory_loop_run(result["run"], output_root / "run"))
     written_paths.extend(write_next_context_handoff(result["next_context_handoff"], output_root / "next_context_handoff"))
+    written_paths.extend(write_next_task_packet(result["next_task_packet"], output_root / "next_task_packet"))
     written_paths.extend(write_production_memory_session_report(result["session_report"], output_root / "session_report"))
     written_paths.extend(
         write_company_kb_feedback_candidate_packet(
@@ -85,6 +93,7 @@ def _build_manifest(
     loop: dict[str, Any],
     run: dict[str, Any],
     handoff: dict[str, Any],
+    next_task_packet: dict[str, Any],
     report: dict[str, Any],
     packet: dict[str, Any],
     *,
@@ -92,7 +101,11 @@ def _build_manifest(
 ) -> dict[str, Any]:
     readiness = run["pass_readiness"]
     context = run["context_bundle"]
-    ready = readiness.get("ready") is True and report.get("session_status") == "ready"
+    ready = (
+        readiness.get("ready") is True
+        and next_task_packet.get("packet_status") == "ready"
+        and report.get("session_status") == "ready"
+    )
     return {
         "kind": OPERATOR_LOOP_KIND,
         "artifact_type": OPERATOR_LOOP_KIND,
@@ -105,7 +118,7 @@ def _build_manifest(
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "chain_status": "ready" if ready else "blocked",
-        "operator_loop_nodes": _operator_loop_nodes(loop, run, report, packet),
+        "operator_loop_nodes": _operator_loop_nodes(loop, run, next_task_packet, report, packet),
         "context_summary": {
             "context_bundle_id": context.get("bundle_id", "unknown"),
             "included_ref_count": len(context.get("included_refs", [])),
@@ -121,6 +134,12 @@ def _build_manifest(
             "handoff_status": handoff.get("handoff_status", "unknown"),
             "next_context_ref_count": len(handoff.get("next_context_refs", [])),
             "blocked_ref_count": len(handoff.get("blocked_refs", [])),
+        },
+        "next_task_packet": {
+            "task_packet_id": next_task_packet.get("task_packet_id", "unknown"),
+            "packet_status": next_task_packet.get("packet_status", "unknown"),
+            "allowed_ref_count": len(next_task_packet.get("allowed_context_refs", [])),
+            "blocked_ref_count": len(next_task_packet.get("blocked_refs", [])),
         },
         "company_kb_feedback": {
             "packet_id": packet.get("packet_id", "unknown"),
@@ -138,6 +157,7 @@ def _build_manifest(
 def _operator_loop_nodes(
     loop: dict[str, Any],
     run: dict[str, Any],
+    next_task_packet: dict[str, Any],
     report: dict[str, Any],
     packet: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -153,6 +173,12 @@ def _operator_loop_nodes(
         _node("pass_readiness", "ready" if readiness.get("ready") else "blocked", readiness.get("overall_status", FAILED), PASS_READINESS_KIND),
         _node("next_pass_bundle", "planned", "no-provider execution remains planned", NEXT_PASS_BUNDLE_KIND),
         _node("next_context_handoff", "ready", "next AI task context handoff", NEXT_CONTEXT_HANDOFF_KIND),
+        _node(
+            "next_task_packet",
+            next_task_packet.get("packet_status", "unknown"),
+            "next AI task packet",
+            NEXT_TASK_PACKET_KIND,
+        ),
         _node("session_report", report.get("session_status", "unknown"), report.get("session_id", "unknown"), SESSION_REPORT_KIND),
         _node(
             "company_kb_feedback_candidate_packet",
@@ -182,6 +208,8 @@ def _output_artifacts() -> list[dict[str, Any]]:
         _artifact(NEXT_PASS_BUNDLE_KIND, "run/next_pass_bundle.json"),
         _artifact(NEXT_CONTEXT_HANDOFF_KIND, "next_context_handoff/next_context_handoff.json"),
         _artifact("markdown_report", "next_context_handoff/next_context_handoff.md"),
+        _artifact(NEXT_TASK_PACKET_KIND, "next_task_packet/next_task_packet.json"),
+        _artifact("markdown_report", "next_task_packet/next_task_packet.md"),
         _artifact(SESSION_REPORT_KIND, "session_report/production_memory_session_report.json"),
         _artifact("markdown_report", "session_report/production_memory_session_report.md"),
         _artifact(COMPANY_KB_FEEDBACK_PACKET_KIND, "company_kb_candidates/company_kb_feedback_candidate_packet.json"),
