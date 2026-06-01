@@ -133,6 +133,8 @@ const manifest = {
   afs_package_gate_facts_web_direct_probe_status: "pass_b01_still_blocked",
   afs_project_audit_gate_facts_web_direct_probe_status: "pass_b01_still_blocked",
   afs_root_project_audit_gate_facts_web_direct_probe_status: "blocked_until_b01_human_review",
+  afs_latest_gate_facts_web_direct_probe_status: "stale_root_latest_gate",
+  afs_project_audit_latest_gate_facts_web_direct_probe_status: "blocked_until_b01_human_review",
   b01_human_review_validation_status: "blocked_pending_human_review",
   next_context_status: "blocked_until_b01_human_review"
 };

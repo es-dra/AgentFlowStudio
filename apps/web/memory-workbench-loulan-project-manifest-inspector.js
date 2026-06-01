@@ -58,7 +58,8 @@ function rootProjectFacts(payload) {
 
 function latestGateFactsStatus(payload) {
   return (
-    payload.afs_latest_gate_facts_web_direct_probe_status
+    payload.afs_project_audit_latest_gate_facts_web_direct_probe_status
+    || payload.afs_latest_gate_facts_web_direct_probe_status
     || payload.afs_root_project_audit_gate_facts_web_direct_probe_status
     || payload.afs_project_audit_gate_facts_web_direct_probe_status
     || payload.afs_root_gate_facts_web_direct_probe_status
