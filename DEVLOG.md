@@ -9,6 +9,50 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Feedback Candidate Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-operator-feedback-candidate-overlay-001` on
+  `codex/afs-production-memory-operator-loop-feedback-candidate-overlay-001`.
+- Extended `production-memory-loop-run-operator-no-provider` so a generic
+  operator-loop manifest can optionally include an explicit
+  `operator_feedback_candidate_packet.json` plus
+  `operator_feedback_candidate_promotion_decision.json`.
+- The command now writes the explicit operator feedback candidate decision
+  copy plus a derived reviewed-feedback loop/run/context/readiness/next-pass
+  bundle and `operator_feedback_candidate_promotion_overlay.json` under the
+  operator-loop output directory.
+- Added a focused manifest helper module so
+  `production_operator_manifest.py` stays under the 300-line target after this
+  overlay extension.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Web behavior change, no Loulan-specific
+  behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - Red focused test failed because the builder lacked
+    `operator_feedback_candidate_packet` and the CLI lacked
+    `--operator-feedback-candidate-packet`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop_feedback_candidate_overlay.py -q`
+    -> 5 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow/memory/production_operator_loop.py agentflow/memory/production_operator_manifest.py agentflow/memory/production_operator_outputs.py agentflow/memory/production_operator_feedback_candidate_manifest.py apps/cli/production_memory_operator_command.py tests/test_production_memory_operator_loop_feedback_candidate_overlay.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_production_memory_operator_feedback.py tests/test_production_memory_operator_feedback_candidate.py tests/test_production_memory_operator_feedback_candidate_promotion.py tests/test_production_memory_operator_feedback_candidate_overlay.py tests/test_production_memory_operator_loop_feedback_candidate_overlay.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 59 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_feedback_candidate.py tests/test_web_static_production_memory_operator_feedback.py -q`
+    -> 7 passed.
+  - CLI smoke wrote an ignored operator-loop seed, evidence-only operator
+    feedback, candidate-only packet, explicit promoted decision, and operator
+    loop with embedded feedback-candidate overlay under
+    `data/processed/runs/production_memory_loop/operator_loop_feedback_candidate_overlay_smoke/`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 778 passed on Python 3.12.12.
+  - Code file line counts remain under the 300-line target: operator loop 227
+    lines, operator manifest 293 lines, operator outputs 102 lines, feedback
+    candidate manifest helper 95 lines, operator CLI 147 lines, focused test
+    166 lines.
+
 ## 2026-06-02 - Production Memory Operator Feedback Candidate Overlay 001
 
 - Continued from

@@ -15,12 +15,19 @@ from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
 from agentflow.memory.production_session import SESSION_REPORT_KIND
 
 OPERATOR_LOOP_KIND = "agentflow_production_memory_operator_loop_run"
+OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND = (
+    "agentflow_production_memory_operator_feedback_candidate_promotion_decision"
+)
+OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
+    "agentflow_production_memory_operator_feedback_candidate_promotion_overlay"
+)
 
 
 def operator_output_artifacts(
     *,
     include_next_pass_review: bool = False,
     include_next_pass_promotion: bool = False,
+    include_operator_feedback_candidate_promotion: bool = False,
 ) -> list[dict[str, Any]]:
     artifacts = [
         _artifact(RUN_KIND, "run/production_memory_loop_run.json"),
@@ -49,6 +56,31 @@ def operator_output_artifacts(
                 _artifact(PASS_READINESS_KIND, "next_pass_reviewed_feedback/pass_readiness.json"),
                 _artifact(NEXT_PASS_BUNDLE_KIND, "next_pass_reviewed_feedback/next_pass_bundle.json"),
                 _artifact(NEXT_PASS_PROMOTION_OVERLAY_KIND, "next_pass_reviewed_feedback/next_pass_promotion_overlay.json"),
+            ]
+        )
+    if include_operator_feedback_candidate_promotion:
+        artifacts.extend(
+            [
+                _artifact(
+                    OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND,
+                    "operator_feedback_candidate_promotion_decision/operator_feedback_candidate_promotion_decision.json",
+                ),
+                _artifact(
+                    "markdown_report",
+                    "operator_feedback_candidate_promotion_decision/operator_feedback_candidate_promotion_decision.md",
+                ),
+                _artifact(
+                    "agentflow_production_memory_loop",
+                    "operator_feedback_candidate_reviewed_feedback/derived_production_memory_loop.json",
+                ),
+                _artifact(RUN_KIND, "operator_feedback_candidate_reviewed_feedback/production_memory_loop_run.json"),
+                _artifact(CONTEXT_BUNDLE_KIND, "operator_feedback_candidate_reviewed_feedback/context_bundle.json"),
+                _artifact(PASS_READINESS_KIND, "operator_feedback_candidate_reviewed_feedback/pass_readiness.json"),
+                _artifact(NEXT_PASS_BUNDLE_KIND, "operator_feedback_candidate_reviewed_feedback/next_pass_bundle.json"),
+                _artifact(
+                    OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND,
+                    "operator_feedback_candidate_reviewed_feedback/operator_feedback_candidate_promotion_overlay.json",
+                ),
             ]
         )
     artifacts.extend(

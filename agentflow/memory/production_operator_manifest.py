@@ -13,6 +13,12 @@ from agentflow.memory.production_next_pass_promotion import (
 )
 from agentflow.memory.production_next_pass_review import NEXT_PASS_REVIEW_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
+from agentflow.memory.production_operator_feedback_candidate_manifest import (
+    operator_feedback_candidate_promotion_controls,
+    operator_feedback_candidate_promotion_nodes,
+    operator_feedback_candidate_promotion_ready,
+    operator_feedback_candidate_promotion_summary,
+)
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_session import SESSION_REPORT_KIND
 
@@ -24,6 +30,7 @@ def build_operator_manifest(
     next_task_packet: dict[str, Any],
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
+    operator_feedback_candidate_promotion: dict[str, Any] | None,
     report: dict[str, Any],
     packet: dict[str, Any],
     *,
@@ -36,6 +43,7 @@ def build_operator_manifest(
         and next_task_packet.get("packet_status") == "ready"
         and _next_pass_review_ready(next_pass_review)
         and _next_pass_promotion_ready(next_pass_promotion)
+        and operator_feedback_candidate_promotion_ready(operator_feedback_candidate_promotion)
         and report.get("session_status") == "ready"
     )
     manifest = {
@@ -56,6 +64,7 @@ def build_operator_manifest(
             next_task_packet,
             next_pass_review,
             next_pass_promotion,
+            operator_feedback_candidate_promotion,
             report,
             packet,
         ),
@@ -68,17 +77,22 @@ def build_operator_manifest(
         "next_context_handoff": _handoff_summary(handoff),
         "next_task_packet": _next_task_packet_summary(next_task_packet),
         "company_kb_feedback": _company_kb_summary(packet),
-        "controls": _controls(run, packet, next_pass_promotion),
+        "controls": _controls(run, packet, next_pass_promotion, operator_feedback_candidate_promotion),
         "non_claim_boundaries": report.get("claim_boundaries", {}),
         "output_artifacts": operator_output_artifacts(
             include_next_pass_review=next_pass_review is not None,
             include_next_pass_promotion=next_pass_promotion is not None,
+            include_operator_feedback_candidate_promotion=operator_feedback_candidate_promotion is not None,
         ),
     }
     if next_pass_review is not None:
         manifest["next_pass_review"] = _next_pass_review_summary(next_pass_review)
     if next_pass_promotion is not None:
         manifest["next_pass_promotion"] = _next_pass_promotion_summary(next_pass_promotion)
+    if operator_feedback_candidate_promotion is not None:
+        manifest["operator_feedback_candidate_promotion"] = operator_feedback_candidate_promotion_summary(
+            operator_feedback_candidate_promotion
+        )
     return manifest
 
 
@@ -88,6 +102,7 @@ def _operator_loop_nodes(
     next_task_packet: dict[str, Any],
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
+    operator_feedback_candidate_promotion: dict[str, Any] | None,
     report: dict[str, Any],
     packet: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -143,6 +158,8 @@ def _operator_loop_nodes(
                 ),
             ]
         )
+    if operator_feedback_candidate_promotion is not None:
+        nodes.extend(operator_feedback_candidate_promotion_nodes(operator_feedback_candidate_promotion))
     nodes.extend(
         [
             _node("session_report", report.get("session_status", "unknown"), report.get("session_id", "unknown"), SESSION_REPORT_KIND),
@@ -157,7 +174,12 @@ def _operator_loop_nodes(
     return nodes
 
 
-def _controls(run: dict[str, Any], packet: dict[str, Any], next_pass_promotion: dict[str, Any] | None) -> list[dict[str, str]]:
+def _controls(
+    run: dict[str, Any],
+    packet: dict[str, Any],
+    next_pass_promotion: dict[str, Any] | None,
+    operator_feedback_candidate_promotion: dict[str, Any] | None,
+) -> list[dict[str, str]]:
     controls = [
         _control("no_provider_mode", run.get("provider_mode") == "no-provider"),
         _control("provider_calls_not_started", run.get("provider_calls_started") is False),
@@ -176,6 +198,8 @@ def _controls(run: dict[str, Any], packet: dict[str, Any], next_pass_promotion: 
                 _control("next_pass_promotion_company_kb_write_disabled", overlay.get("writes_company_kb") is False),
             ]
         )
+    if operator_feedback_candidate_promotion is not None:
+        controls.extend(operator_feedback_candidate_promotion_controls(operator_feedback_candidate_promotion))
     return controls
 
 

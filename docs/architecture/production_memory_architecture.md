@@ -483,3 +483,39 @@ because the decision must be validated against the generated
 The operator manifest includes separate `next_pass_promotion_decision` and
 `next_pass_promotion_overlay` nodes so an operator can audit the explicit
 promotion decision separately from the derived follow-up context.
+
+## Operator Loop Feedback Candidate Overlay Integration
+
+`production-memory-loop-run-operator-no-provider` can also optionally include
+an explicit operator feedback candidate packet and promotion decision in the
+same local operator run. This connects the operator feedback loop back into the
+generic production-memory operator manifest without creating durable memory or
+writing Company KB.
+
+Additional command shape:
+
+```powershell
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T10:40:00+08:00 --source-kb-status restructuring_or_unknown --operator-feedback-candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --operator-feedback-candidate-promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_loop_with_feedback_candidate_overlay
+```
+
+The operator feedback candidate packet and promotion decision must be supplied
+together. A pending promotion template cannot drive this overlay. When supplied,
+the operator-loop output includes:
+
+- `operator_feedback_candidate_promotion_decision/operator_feedback_candidate_promotion_decision.json`
+- `operator_feedback_candidate_promotion_decision/operator_feedback_candidate_promotion_decision.md`
+- `operator_feedback_candidate_reviewed_feedback/derived_production_memory_loop.json`
+- `operator_feedback_candidate_reviewed_feedback/production_memory_loop_run.json`
+- `operator_feedback_candidate_reviewed_feedback/context_bundle.json`
+- `operator_feedback_candidate_reviewed_feedback/pass_readiness.json`
+- `operator_feedback_candidate_reviewed_feedback/next_pass_bundle.json`
+- `operator_feedback_candidate_reviewed_feedback/operator_feedback_candidate_promotion_overlay.json`
+
+The operator manifest includes separate
+`operator_feedback_candidate_promotion_decision` and
+`operator_feedback_candidate_promotion_overlay` nodes. The overlay can show that
+a promoted or merged candidate entered the derived context bundle, or that a
+rejected, expired, or blocked candidate stayed blocked. This remains a
+no-provider, read-only evidence orchestration path: no next pass is executed,
+no providers are called, no durable memory is written, no Company KB is written,
+and no human acceptance or business validation is claimed.

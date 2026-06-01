@@ -6,6 +6,12 @@ from pathlib import Path
 import typer
 
 from agentflow.memory.production_loop import load_production_memory_loop
+from agentflow.memory.production_operator_feedback_candidate_overlay import (
+    load_operator_feedback_candidate_promotion_decision,
+)
+from agentflow.memory.production_operator_feedback_candidate_promotion import (
+    load_operator_feedback_candidate_packet,
+)
 from agentflow.memory.production_operator_loop import (
     build_production_memory_operator_loop_run,
     write_production_memory_operator_loop_run,
@@ -45,6 +51,24 @@ def production_memory_loop_run_operator_no_provider_command(
         readable=True,
         help="Optional explicit next-pass promotion decision JSON to include in the operator loop.",
     ),
+    operator_feedback_candidate_packet_path: Path | None = typer.Option(
+        None,
+        "--operator-feedback-candidate-packet",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional operator feedback candidate packet JSON to include in the operator loop.",
+    ),
+    operator_feedback_candidate_promotion_decision_path: Path | None = typer.Option(
+        None,
+        "--operator-feedback-candidate-promotion-decision",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional explicit operator feedback candidate promotion decision JSON.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -61,12 +85,24 @@ def production_memory_loop_run_operator_no_provider_command(
             if next_pass_promotion_decision_path
             else None
         )
+        operator_feedback_candidate_packet = (
+            load_operator_feedback_candidate_packet(operator_feedback_candidate_packet_path)
+            if operator_feedback_candidate_packet_path
+            else None
+        )
+        operator_feedback_candidate_promotion_decision = (
+            load_operator_feedback_candidate_promotion_decision(operator_feedback_candidate_promotion_decision_path)
+            if operator_feedback_candidate_promotion_decision_path
+            else None
+        )
         result = build_production_memory_operator_loop_run(
             loop,
             generated_at=generated_at,
             source_kb_status=source_kb_status,
             next_pass_result=next_pass_result,
             next_pass_promotion_decision=next_pass_promotion_decision,
+            operator_feedback_candidate_packet=operator_feedback_candidate_packet,
+            operator_feedback_candidate_promotion_decision=operator_feedback_candidate_promotion_decision,
         )
         written_paths = write_production_memory_operator_loop_run(result, output_dir)
     except ValueError as exc:
@@ -84,6 +120,11 @@ def production_memory_loop_run_operator_no_provider_command(
         typer.echo(f"Next pass review: {manifest['next_pass_review']['review_status']}")
     if "next_pass_promotion" in manifest:
         typer.echo(f"Next pass promotion: {manifest['next_pass_promotion']['decision_effect']}")
+    if "operator_feedback_candidate_promotion" in manifest:
+        typer.echo(
+            "Operator feedback candidate promotion: "
+            f"{manifest['operator_feedback_candidate_promotion']['decision_effect']}"
+        )
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
