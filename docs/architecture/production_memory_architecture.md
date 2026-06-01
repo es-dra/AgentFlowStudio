@@ -35,6 +35,7 @@ project_input
   -> operator_loop_run_manifest
   -> operator_feedback_event
   -> operator_feedback_candidate_packet
+  -> explicit operator_feedback_candidate_promotion_decision
 ```
 
 The committed example lives at:
@@ -99,6 +100,12 @@ The required root identifiers are:
   evidence-only operator feedback event. It includes one memory candidate and a
   pending promotion decision template, but it writes no long-term memory, writes
   no Company KB, and does not make the candidate promoted memory.
+- `operator_feedback_candidate_promotion_decision`: explicit operator decision
+  for one operator feedback memory candidate. Promoted or merged decisions make
+  the candidate eligible for a later next-context overlay, while rejected,
+  expired, and blocked decisions keep reuse blocked. The decision itself still
+  writes no long-term memory, writes no Company KB, does not execute a next
+  pass, and does not claim human acceptance.
 
 All derived artifacts declare:
 
@@ -136,6 +143,11 @@ All derived artifacts declare:
   promotion templates cannot enter next context as reviewed decisions.
 - A rejected operator feedback decision can produce only a blocked candidate,
   never a reusable next-context ref.
+- Operator feedback candidate reuse requires an explicit
+  `operator_feedback_candidate_promotion_decision`; the pending template is
+  never sufficient.
+- Blocked operator feedback candidates cannot be promoted or merged. They can
+  only receive a rejected, expired, or blocked decision.
 
 ## CLI Surface
 
@@ -156,6 +168,7 @@ python -m apps.cli.main production-memory-loop-session-report data/processed/run
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 python -m apps.cli.main production-memory-loop-capture-operator-feedback data/processed/runs/production_memory_loop/operator_loop/production_memory_operator_loop_run.json --target-node company_kb_feedback_candidate_packet --decision accepted --summary "Operator reviewed the candidate packet shape for the next loop." --reviewed-at 2026-06-02T07:10:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback
 python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback/operator_feedback_event.json --generated-at 2026-06-02T08:20:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate
+python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -251,6 +264,11 @@ The operator feedback candidate command writes:
 - `promotion_decision_template.json`
 - `operator_feedback_candidate_packet.md`
 
+The operator feedback candidate promotion command writes:
+
+- `operator_feedback_candidate_promotion_decision.json`
+- `operator_feedback_candidate_promotion_decision.md`
+
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
@@ -298,6 +316,14 @@ The operator feedback candidate packet is the explicit bridge from feedback
 evidence to a candidate-only memory review packet. It may draft a candidate for
 later operator review, but it keeps `candidate_is_promoted_memory: false` and
 emits only a `pending` promotion decision template.
+
+The operator feedback candidate promotion decision is the explicit review
+surface for that candidate packet. It records the source packet, source
+feedback event, source pending template, candidate id, decision, rationale,
+reviewer role, and whether future candidate reuse is allowed. It does not write
+durable memory, write Company KB, execute a next pass, or claim human
+acceptance. A promoted or merged decision is only eligibility for a later
+next-context overlay, not a Company memory promotion.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as

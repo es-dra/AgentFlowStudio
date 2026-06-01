@@ -9,6 +9,47 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Feedback Candidate Promotion 001
+
+- Continued from
+  `codex/afs-production-memory-operator-feedback-candidate-web-001` on
+  `codex/afs-production-memory-operator-feedback-candidate-promotion-001`.
+- Added an explicit no-provider operator decision surface for
+  `agentflow_production_memory_operator_feedback_candidate_packet` artifacts
+  through `production-memory-loop-review-operator-feedback-candidate`.
+- The decision artifact writes
+  `operator_feedback_candidate_promotion_decision.json` and `.md`; it records
+  the source packet, source feedback event, source pending template id,
+  candidate id, rationale, reviewer role, and whether future reuse is allowed.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Web behavior, no Loulan-specific behavior,
+  no human acceptance, and no business validation claim.
+- Verification:
+  - Red CLI test failed before command registration, as expected.
+  - Red contract test failed before the decision artifact recorded the source
+    pending template id, as expected.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback_candidate_promotion.py -q`
+    -> 7 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow/memory/production_operator_feedback_candidate_promotion.py apps/cli/production_memory_operator_feedback_candidate_promotion_command.py apps/cli/command_registry.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback_candidate_promotion.py tests/test_production_memory_operator_feedback_candidate.py tests/test_production_memory_operator_feedback.py tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_production_memory_next_pass_promotion.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 54 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed and listed
+    `production-memory-loop-review-operator-feedback-candidate`.
+  - CLI smoke wrote an ignored operator loop, evidence-only operator feedback,
+    candidate-only packet, and explicit promoted decision under
+    `data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion_smoke/`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 768 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+  - Added-diff/new-file sensitive scan produced no hits for Company source path
+    copies, configured credential markers, key shapes, customer markers,
+    cookies, or signed-link markers.
+  - Code file line counts remain under the 300-line target: promotion module
+    233 lines, CLI command 68 lines, command registry 163 lines, focused test
+    166 lines.
+
 ## 2026-06-02 - Production Memory Operator Feedback Candidate Web 001
 
 - Continued from `codex/afs-production-memory-operator-feedback-candidate-001`
