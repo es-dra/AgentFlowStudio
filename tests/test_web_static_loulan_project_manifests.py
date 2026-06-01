@@ -132,6 +132,7 @@ const manifest = {
   afs_package_audit_summary_cli_direct_probe_status: "pass_b01_still_blocked",
   afs_package_gate_facts_web_direct_probe_status: "pass_b01_still_blocked",
   afs_project_audit_gate_facts_web_direct_probe_status: "pass_b01_still_blocked",
+  afs_root_project_audit_gate_facts_web_direct_probe_status: "blocked_until_b01_human_review",
   b01_human_review_validation_status: "blocked_pending_human_review",
   next_context_status: "blocked_until_b01_human_review"
 };
@@ -182,5 +183,6 @@ console.log(JSON.stringify({
     assert payload["facts"]["package_audit_summary_cli_direct"] == "pass_b01_still_blocked"
     assert payload["facts"]["package_gate_facts"] == "pass_b01_still_blocked"
     assert payload["facts"]["project_audit_gate_facts"] == "pass_b01_still_blocked"
+    assert payload["facts"]["latest_gate_facts"] == "blocked_until_b01_human_review"
     assert payload["facts"]["b01_validation"] == "blocked_pending_human_review"
     assert payload["facts"]["next_context"] == "blocked_until_b01_human_review"
