@@ -9,6 +9,31 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Pass Review 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-pass-review-001`, based on the verified
+  next-task packet Web slice.
+- Added `agentflow/memory/production_next_pass_review.py`,
+  `agentflow/memory/production_next_pass_review_render.py`, and
+  `production-memory-loop-review-next-pass`.
+- The review consumes a selected `next_task_packet.json` plus an explicit
+  no-provider next-pass result JSON, verifies that output artifacts used only
+  allowed context refs, records blocked/unknown refs, and writes
+  `next_pass_review.json` and `.md`.
+- Feedback derived from the next-pass result remains candidate-only and emits
+  only pending promotion-decision templates; it is not durable memory and is
+  not Company KB promotion.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Web scan/persistence, no Loulan-specific
+  behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_review.py -q` -> 5 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_review.py tests/test_production_memory_next_task_packet.py tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q` -> 40 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help` -> passed; `production-memory-loop-review-next-pass` is visible.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 733 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Next Task Packet Web 001
 
 - Continued the generic Production Memory Architecture path on

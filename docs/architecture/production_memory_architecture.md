@@ -26,6 +26,8 @@ project_input
   -> next_pass_bundle
   -> next_context_handoff
   -> next_task_packet
+  -> explicit next_pass_result input
+  -> next_pass_review
   -> session_report
   -> company_kb_feedback_candidate_packet
   -> operator_loop_run_manifest
@@ -67,6 +69,10 @@ The required root identifiers are:
   next-context handoff. It exposes only allowed context refs to the next AI
   task, keeps blocked refs visible but excluded, and repeats the non-claim
   boundaries.
+- `next_pass_review`: no-provider review artifact for an explicitly supplied
+  next-pass result. It checks that result outputs used only
+  `allowed_context_refs`, records blocked or unknown refs, and derives
+  candidate-only feedback plus pending promotion-decision templates.
 - `session_report`: read-only operator audit artifact that summarizes the run,
   included refs, blocked refs, optional feedback capture, optional promotion
   decision, next operator action, and non-claim boundaries.
@@ -98,6 +104,10 @@ All derived artifacts declare:
 - The context bundle always lists included refs and blocked refs separately.
 - The next pass bundle is planned-only and must not execute a provider call.
 - The next task packet consumes a handoff only; it does not execute a next pass.
+- The next pass review consumes explicit result records only; it does not
+  execute the task and blocks any use of blocked or unknown context refs.
+- Next-pass review feedback candidates are not promoted memory; they require
+  explicit promotion decisions before reuse.
 
 ## CLI Surface
 
@@ -110,6 +120,7 @@ python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T01:00:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/operator_loop
 python -m apps.cli.main production-memory-loop-next-context-handoff data/processed/runs/production_memory_loop/no_provider/production_memory_loop_run.json --generated-at 2026-06-02T01:40:00+08:00 --output data/processed/runs/production_memory_loop/next_context_handoff
 python -m apps.cli.main production-memory-loop-next-task-packet data/processed/runs/production_memory_loop/next_context_handoff/next_context_handoff.json --generated-at 2026-06-02T03:12:00+08:00 --output data/processed/runs/production_memory_loop/next_task_packet
+python -m apps.cli.main production-memory-loop-review-next-pass data/processed/runs/production_memory_loop/next_task_packet/next_task_packet.json next_pass_result.json --reviewed-at 2026-06-02T03:30:00+08:00 --output data/processed/runs/production_memory_loop/next_pass_review
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 ```
@@ -160,6 +171,18 @@ The next task packet command writes:
 - `next_task_packet.json`
 - `next_task_packet.md`
 
+The next pass review command reads a selected `next_task_packet.json` and an
+explicit operator-supplied next-pass result JSON. It writes:
+
+- `next_pass_review.json`
+- `next_pass_review.md`
+
+The next-pass result input must be a local JSON record with
+`kind: agentflow_production_memory_next_pass_result`. It lists output artifacts
+and their `used_context_refs`. The review blocks blocked/unknown context refs,
+keeps feedback candidates candidate-only, and emits only pending promotion
+templates.
+
 The Company KB feedback candidate command writes:
 
 - `company_kb_feedback_candidate_packet.json`
@@ -184,6 +207,10 @@ convert candidates into durable memory.
 The next task packet is the handoff-consumption surface for a future AI task.
 It does not run that task, call a provider, write memory, write Company KB, or
 turn candidates into promoted memory.
+
+The next pass review is the intake surface after a future AI task has produced
+explicit result records. It does not run the task, call a provider, write memory,
+write Company KB, claim acceptance, or promote any candidate.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
