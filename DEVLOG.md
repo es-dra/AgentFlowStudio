@@ -96,6 +96,32 @@ Current references:
   - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 706 passed on Python 3.12.12.
   - `git diff --check` -> exit 0; CRLF normalization warnings only.
 
+## 2026-06-02 - Company KB Feedback Candidate Packet 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-company-kb-feedback-packet-001`, based on the verified session
+  report branch.
+- Added a candidate-only Company KB feedback packet:
+  `agentflow/memory/company_kb_feedback.py` and
+  `production-memory-loop-company-kb-candidates`.
+- Added the committed example
+  `examples/agentflow/company_kb_feedback_candidate_packet.example.json` and
+  registered it in the AgentFlow contract registry.
+- The packet is generated from a production-memory session report and records
+  reusable project lessons as candidates only. It keeps
+  `writes_company_kb: false`, `writes_long_term_memory: false`,
+  `promotion_status: candidate_only`, and `requires_human_review: true`.
+- Added candidate-only records under `docs/company-kb-feedback-candidates/`;
+  no Company source knowledge-base write.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_company_kb_feedback_packet.py -q` -> 5 passed on Python 3.12.12.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_contract_examples.py -q` -> 24 passed on Python 3.12.12.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help` -> passed; `production-memory-loop-company-kb-candidates` is visible.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates` -> candidate_only; wrote JSON and Markdown report under ignored runtime output.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_company_kb_feedback_packet.py tests/test_contract_examples.py tests/test_agentflow_contract_audit.py tests/test_production_memory_session_report.py tests/test_production_memory_loop.py tests/test_cli_command_registry_boundaries.py -q` -> 52 passed on Python 3.12.12.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 711 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

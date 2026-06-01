@@ -19,8 +19,11 @@ from apps.cli.production_memory_loop_command import (
     production_memory_loop_review_promotion_command,
     production_memory_loop_run_no_provider_command,
     production_memory_loop_run_reviewed_feedback_no_provider_command,
-    production_memory_loop_session_report_command,
     production_memory_loop_validate_command,
+)
+from apps.cli.production_memory_session_command import (
+    production_memory_loop_company_kb_candidates_command,
+    production_memory_loop_session_report_command,
 )
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.report_commands import (
@@ -62,6 +65,7 @@ def register_product_commands(app: typer.Typer) -> None:
         production_memory_loop_run_reviewed_feedback_no_provider_command
     )
     app.command(name="production-memory-loop-session-report")(production_memory_loop_session_report_command)
+    app.command(name="production-memory-loop-company-kb-candidates")(production_memory_loop_company_kb_candidates_command)
     app.command(name="web-bridge")(web_bridge_command)
 
 

@@ -12,3 +12,6 @@ Rules:
   details, or unpublished business judgment.
 - Promotion requires explicit human review in the source Company knowledge-base
   process, especially while that knowledge base is being restructured.
+- Generated packets such as
+  `agentflow_company_kb_feedback_candidate_packet` are transport artifacts for
+  review. They do not mutate the source Company knowledge base.

@@ -79,6 +79,12 @@
       "contract_surface": "production_memory_loop"
     },
     {
+      "artifact_type": "agentflow_company_kb_feedback_candidate_packet",
+      "example_path": "examples/agentflow/company_kb_feedback_candidate_packet.example.json",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
+      "contract_surface": "company_kb_feedback_candidates"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -201,6 +207,10 @@
     {
       "rule_id": "production_memory_loop_no_provider_context_bundle",
       "description": "Production-memory loops build next-context bundles from validated source records without provider calls or durable memory writes."
+    },
+    {
+      "rule_id": "company_kb_feedback_candidates_not_written",
+      "description": "Company KB feedback candidate packets summarize project lessons without writing source Company knowledge or promoting company memory."
     },
     {
       "rule_id": "asset_reuse_decision_only",

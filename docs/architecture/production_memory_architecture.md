@@ -25,6 +25,7 @@ project_input
   -> pass_readiness
   -> next_pass_bundle
   -> session_report
+  -> company_kb_feedback_candidate_packet
 ```
 
 The committed example lives at:
@@ -59,6 +60,9 @@ The required root identifiers are:
 - `session_report`: read-only operator audit artifact that summarizes the run,
   included refs, blocked refs, optional feedback capture, optional promotion
   decision, next operator action, and non-claim boundaries.
+- `company_kb_feedback_candidate_packet`: candidate-only project-to-Company
+  feedback packet generated from a session report. It is not a Company KB
+  write, not durable memory, and not a promotion decision.
 
 All derived artifacts declare:
 
@@ -90,6 +94,7 @@ python -m apps.cli.main production-memory-loop-draft-feedback examples/agentflow
 python -m apps.cli.main production-memory-loop-review-promotion data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --decision promoted --rationale "Candidate is traceable to reviewed feedback." --decided-at 2026-06-02T00:05:00+08:00 --output data/processed/runs/production_memory_loop/promotion_decision
 python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
+python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -128,12 +133,23 @@ The session report command writes:
 - `production_memory_session_report.json`
 - `production_memory_session_report.md`
 
+The Company KB feedback candidate command writes:
+
+- `company_kb_feedback_candidate_packet.json`
+- `company_kb_feedback_candidate_packet.md`
+
 The source loop and draft feedback capture are not mutated. A promoted or
 merged reviewed decision may include the new candidate in the next context; a
 rejected, blocked, or expired decision keeps it in `blocked_refs`.
 
 The session report is an audit surface for the operator. It does not approve
 content, promote company memory, or validate provider output.
+
+The Company KB feedback candidate packet is a source-to-candidate bridge for
+the local Company knowledge-base workflow. It records reusable lessons as
+candidate items with `requires_human_review: true`,
+`writes_company_kb: false`, and `promotion_status: candidate_only`, so it can
+survive source-KB restructuring without silently becoming company memory.
 
 The default output path is ignored runtime space. Generated run artifacts should
 not be committed.
