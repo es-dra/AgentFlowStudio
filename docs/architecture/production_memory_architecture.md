@@ -189,6 +189,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_session_report`
 - `agentflow_company_kb_feedback_candidate_packet`
 - `agentflow_production_memory_operator_loop_run`
+- `agentflow_production_memory_next_context_handoff`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
@@ -203,6 +204,11 @@ Operator-loop manifests render as a read-only chain canvas with operator nodes,
 generated artifact refs, Company KB feedback candidate boundaries, provider
 controls, and non-claim boundaries. They are review manifests only; they do not
 follow artifact refs, execute workflows, or promote memory.
+
+Next-context handoff artifacts render as a read-only task handoff canvas with
+included refs, blocked refs, no-provider controls, and non-claim boundaries for
+the next AI pass. They do not execute that pass, follow refs, call providers,
+write Company KB, or promote durable memory.
 
 It does not:
 

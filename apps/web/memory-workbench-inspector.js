@@ -8,6 +8,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_loop: "Production memory loop",
   agentflow_production_memory_session_report: "Production memory session",
   agentflow_production_memory_operator_loop_run: "Production memory operator loop",
+  agentflow_production_memory_next_context_handoff: "Production memory next context handoff",
   agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
 };
 
@@ -41,6 +42,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_operator_loop_run") return ["project", "assets", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_next_context_handoff") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
@@ -55,6 +57,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
   if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
   if (type === "agentflow_production_memory_operator_loop_run") return productionOperatorLoopFacts(payload);
+  if (type === "agentflow_production_memory_next_context_handoff") return productionNextContextHandoffFacts(payload);
   if (type === "agentflow_company_kb_feedback_candidate_packet") return companyKbFeedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -69,6 +72,16 @@ function companyKbFeedbackFacts(payload) {
     fact("source_kb_status", payload.source_kb_status || "unknown"),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("requires_human_review", yesNo(payload.requires_human_review)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function productionNextContextHandoffFacts(payload) {
+  return [
+    fact("handoff_status", payload.handoff_status || "unknown"),
+    fact("next_context_refs", String(arrayValue(payload.next_context_refs).length)),
+    fact("blocked_refs", String(arrayValue(payload.blocked_refs).length)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }
