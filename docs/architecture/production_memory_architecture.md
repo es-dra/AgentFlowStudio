@@ -24,6 +24,7 @@ project_input
   -> context_bundle
   -> pass_readiness
   -> next_pass_bundle
+  -> session_report
 ```
 
 The committed example lives at:
@@ -55,6 +56,9 @@ The required root identifiers are:
 - `pass_readiness`: states whether a no-provider next pass can be prepared.
 - `next_pass_bundle`: no-provider planning artifact that uses only
   `context_bundle.included_refs` and keeps blocked refs out of the next pass.
+- `session_report`: read-only operator audit artifact that summarizes the run,
+  included refs, blocked refs, optional feedback capture, optional promotion
+  decision, next operator action, and non-claim boundaries.
 
 All derived artifacts declare:
 
@@ -85,6 +89,7 @@ python -m apps.cli.main production-memory-loop-run-no-provider examples/agentflo
 python -m apps.cli.main production-memory-loop-draft-feedback examples/agentflow/production_memory_loop.example.json --target-ref artifact:approved_storyboard:v1 --decision accepted --summary "Carry the reviewed storyboard structure into the next pass." --created-at 2026-06-02T00:00:00+08:00 --output data/processed/runs/production_memory_loop/feedback_capture
 python -m apps.cli.main production-memory-loop-review-promotion data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --decision promoted --rationale "Candidate is traceable to reviewed feedback." --decided-at 2026-06-02T00:05:00+08:00 --output data/processed/runs/production_memory_loop/promotion_decision
 python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback
+python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -118,9 +123,17 @@ The reviewed feedback run command writes:
 - `pass_readiness.json`
 - `next_pass_bundle.json`
 
+The session report command writes:
+
+- `production_memory_session_report.json`
+- `production_memory_session_report.md`
+
 The source loop and draft feedback capture are not mutated. A promoted or
 merged reviewed decision may include the new candidate in the next context; a
 rejected, blocked, or expired decision keeps it in `blocked_refs`.
+
+The session report is an audit surface for the operator. It does not approve
+content, promote company memory, or validate provider output.
 
 The default output path is ignored runtime space. Generated run artifacts should
 not be committed.

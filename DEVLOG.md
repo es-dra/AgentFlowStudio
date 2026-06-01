@@ -58,6 +58,26 @@ Current references:
   validation remains blocked because image/video/provider config gates are
   unset.
 
+## 2026-06-02 - Production Memory Session Report 001
+
+- Continued the generic AFS Production Memory Architecture path on
+  `codex/afs-production-memory-session-report-001`, based on the verified
+  `AFS-PRODUCTION-MEMORY-LOOP-001` commit.
+- Added a read-only no-provider operator session report:
+  `agentflow/memory/production_session.py` and
+  `production-memory-loop-session-report`.
+- The report summarizes included refs, blocked refs, optional feedback capture,
+  optional reviewed promotion decision, next operator action, and non-claim
+  boundaries. It does not mutate source loops, scan directories, call
+  providers, write durable memory, or claim human acceptance.
+- Added focused tests in `tests/test_production_memory_session_report.py`.
+- Verification so far:
+  - `python -m pytest tests/test_production_memory_session_report.py -q` -> 6 passed.
+  - `python -m pytest tests/test_production_memory_session_report.py tests/test_production_memory_promotion_overlay.py tests/test_production_memory_feedback_capture.py tests/test_production_memory_loop.py tests/test_cli_command_registry_boundaries.py -q` -> 27 passed.
+  - `python -m apps.cli.main --help` -> passed; `production-memory-loop-session-report` is visible.
+  - `python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report` -> ready; wrote JSON and Markdown report under ignored runtime output.
+  - `python -m pytest` -> 704 passed.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

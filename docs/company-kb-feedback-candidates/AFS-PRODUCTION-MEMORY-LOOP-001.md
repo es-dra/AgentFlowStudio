@@ -14,6 +14,7 @@ Source slice: `AFS-PRODUCTION-MEMORY-LOOP-001`
 | Keep Web memory canvas read-only for this slice. | Reduces risk of accidental provider calls, browser persistence, or hidden writes while the loop contract is still forming. | Candidate only; future write actions need a separate approval model. |
 | Treat project feedback to Company KB as a candidate queue, not an automatic memory write. | Supports a positive feedback loop while the local Company KB is being restructured. | Candidate only; do not write Company source files from AFS without explicit user approval. |
 | Review promotion decisions as an overlay before rebuilding next context. | Lets the operator test a promoted or rejected feedback-derived candidate in the next-pass bundle without mutating the source loop. | Candidate only; needs more project loops before it becomes a company-wide memory workflow rule. |
+| Generate a read-only session report after context assembly. | Gives the operator one auditable place to see included refs, blocked refs, promotion state, next action, and non-claim boundaries. | Candidate only; this is an AFS project lesson, not a Company memory rule until reviewed. |
 
 ## Explicit Non-Promotions
 
