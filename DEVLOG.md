@@ -9,6 +9,32 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Context Handoff 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-context-handoff-001`, based on the
+  verified operator-loop Web slice.
+- Added `agentflow/memory/production_next_context.py` and
+  `production-memory-loop-next-context-handoff`.
+- The handoff converts a no-provider `production_memory_loop_run.json` into
+  `next_context_handoff.json` and `.md` for the next AI task. It lists
+  `next_context_refs` separately from `blocked_refs`, includes a bounded task
+  prompt, and repeats non-claim boundaries.
+- Integrated the handoff into `production-memory-loop-run-operator-no-provider`
+  so one local operator run now emits run/context/readiness/next pass,
+  next-context handoff, session report, Company KB candidate packet, and
+  operator manifest.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no human acceptance, and no business
+  validation claim.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_context_handoff.py -q` -> 3 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_loop.py -q` -> 7 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_production_memory_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py tests/test_web_static_production_memory_operator_loop.py -q` -> 43 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help` -> passed; `production-memory-loop-next-context-handoff` is visible.
+  - CLI smoke wrote ignored `next_context_handoff.json` and `.md` from a no-provider run and from the one-command operator loop.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 720 passed on Python 3.12.12.
+
 ## 2026-06-02 - Production Memory Operator Loop Web 001
 
 - Continued the generic Production Memory Architecture path on

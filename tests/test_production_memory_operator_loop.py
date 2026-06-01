@@ -42,6 +42,7 @@ def test_operator_loop_run_manifest_covers_all_no_provider_nodes() -> None:
         "context_bundle",
         "pass_readiness",
         "next_pass_bundle",
+        "next_context_handoff",
         "session_report",
         "company_kb_feedback_candidate_packet",
     }
@@ -50,6 +51,8 @@ def test_operator_loop_run_manifest_covers_all_no_provider_nodes() -> None:
     assert controls["company_feedback_candidate_only"] == "passed"
     assert manifest["context_summary"]["included_ref_count"] == 3
     assert manifest["context_summary"]["blocked_ref_count"] == 3
+    assert manifest["next_context_handoff"]["handoff_status"] == "ready"
+    assert manifest["next_context_handoff"]["next_context_ref_count"] == 3
     assert result["session_report"]["kind"] == "agentflow_production_memory_session_report"
     assert result["company_kb_feedback_candidate_packet"]["promotion_status"] == "candidate_only"
 
@@ -83,6 +86,8 @@ def test_operator_loop_cli_writes_auditable_artifact_chain(tmp_path: Path) -> No
     assert (output_dir / "run" / "context_bundle.json").exists()
     assert (output_dir / "run" / "pass_readiness.json").exists()
     assert (output_dir / "run" / "next_pass_bundle.json").exists()
+    assert (output_dir / "next_context_handoff" / "next_context_handoff.json").exists()
+    assert (output_dir / "next_context_handoff" / "next_context_handoff.md").exists()
     assert (output_dir / "session_report" / "production_memory_session_report.json").exists()
     assert (output_dir / "company_kb_candidates" / "company_kb_feedback_candidate_packet.json").exists()
 
@@ -92,6 +97,8 @@ def test_operator_loop_cli_writes_auditable_artifact_chain(tmp_path: Path) -> No
     assert manifest["chain_status"] == "ready"
     assert manifest["writes_company_kb"] is False
     assert "run/next_pass_bundle.json" in artifact_paths
+    assert "next_context_handoff/next_context_handoff.json" in artifact_paths
+    assert "next_context_handoff/next_context_handoff.md" in artifact_paths
     assert "session_report/production_memory_session_report.json" in artifact_paths
     assert "session_report/production_memory_session_report.md" in artifact_paths
     assert "company_kb_candidates/company_kb_feedback_candidate_packet.json" in artifact_paths
