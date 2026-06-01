@@ -27,19 +27,31 @@ export function loulanRegistryStatus(payload) {
 export function loulanRegistryFacts(payload) {
   const summary = objectValue(payload.summary);
   const boundary = objectValue(payload.claim_boundary);
+  const statusCounts = objectValue(summary.status_counts);
   return [
     fact("project_id", payload.project_id || "unknown"),
     fact("total_assets", summary.total_assets ?? arrayValue(payload.assets).length),
     fact("type_counts", countText(summary.type_counts)),
     fact("status_counts", countText(summary.status_counts)),
-    fact("eligible_refs", summary.eligible_reusable_refs ?? "unknown"),
-    fact("blocked_refs", summary.blocked_refs ?? "unknown"),
+    fact("eligible_refs", summary.eligible_reusable_refs ?? derivedEligible(statusCounts)),
+    fact("blocked_refs", summary.blocked_refs ?? derivedBlocked(statusCounts)),
     fact("missing_sha256", summary.missing_sha256_count ?? "unknown"),
     fact("missing_refs", summary.missing_ref_count ?? "unknown"),
     fact("source_quality_issues", summary.source_quality_issue_count ?? "unknown"),
     fact("provider_calls_started", yesNo(boundary.provider_calls_started)),
     fact("writes_long_term_memory", yesNo(boundary.writes_long_term_memory)),
   ];
+}
+
+function derivedEligible(statusCounts) {
+  return Number(statusCounts.approved_anchor || 0) + Number(statusCounts.promoted_reusable || 0);
+}
+
+function derivedBlocked(statusCounts) {
+  return ["candidate", "needs_repair", "rejected", "route_failed", "source_reference", "superseded"].reduce(
+    (total, status) => total + Number(statusCounts[status] || 0),
+    0,
+  );
 }
 
 function countText(value) {

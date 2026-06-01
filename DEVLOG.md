@@ -26,7 +26,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan B01 validation/apply status outputs (`loulan_b01_decision_validation_report` and `loulan_b01_decision_apply_result`) directly as read-only memory artifacts so operators can inspect the current gate result without running context projection or provider preview; see `docs/handoff/AFS-LOULAN-WEB-B01-STATUS-DIRECT-001.md`.
 
-2026-06-01: Web Artifact Workspace now recognizes the Loulan unified `asset_registry.json` directly as a read-only memory artifact, surfacing 85-asset health counts and blocked promotion state without regenerating a package or promoting candidates; see `docs/handoff/AFS-LOULAN-WEB-ASSET-REGISTRY-DIRECT-001.md`.
+2026-06-01: Web Artifact Workspace now recognizes the Loulan unified `asset_registry.json` directly as a read-only memory artifact, surfacing 87 assets, 3 derived eligible refs, 84 blocked refs, and blocked promotion state without regenerating a package or promoting candidates; see `docs/handoff/AFS-LOULAN-WEB-ASSET-REGISTRY-DIRECT-001.md`.
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan `next_context_bundle_draft.json` directly as a read-only memory artifact, surfacing the B02 target, eligible/blocked refs, review evidence refs, and B01/provider gates while keeping context projection and generation blocked; see `docs/handoff/AFS-LOULAN-WEB-CONTEXT-DRAFT-DIRECT-001.md`.
 
@@ -50,7 +50,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan root `project_manifest.json` directly as `loulan_root_project_manifest`, showing 38 shots, 16:9 target format, package/governance audit statuses, and B01/next-context blockers without package regeneration, provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ROOT-PROJECT-MANIFEST-DIRECT-001.md`.
 
-2026-06-01: Web Artifact Workspace now recognizes Loulan `asset_registry_health_report.json` directly as `loulan_asset_registry_health_report`; real selected-file probe shows 86 assets, 3 eligible refs, 83 blocked refs, 0 missing hashes, 0 missing refs, and 0 source-quality issues without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ASSET-HEALTH-DIRECT-001.md`.
+2026-06-01: Web Artifact Workspace now recognizes Loulan `asset_registry_health_report.json` directly as `loulan_asset_registry_health_report`; real selected-file probe shows 87 assets, 3 eligible refs, 84 blocked refs, 0 missing hashes, 0 missing refs, and 0 source-quality issues without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ASSET-HEALTH-DIRECT-001.md`.
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan B01 AI pre-review files (`ai_director_pre_review.json` and `ai_suggested_decision_starting_point.json`) directly as read-only recommendation evidence; real selected-file probes show 5 suggestion rows, 3 approve-anchor suggestions, 1 repair suggestion, 1 approve-with-note suggestion, and all operator decisions still pending without provider calls, decision apply, human acceptance, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-B01-AI-REVIEW-DIRECT-001.md`.
 

@@ -29,9 +29,9 @@ Observed selected-file state:
 - Source role: `Loulan asset registry health report`
 - Memory bundle count: `1`
 - Status: `blocked_pending_human_review`
-- Total assets: `86`
+- Total assets: `87`
 - Eligible refs: `3`
-- Blocked refs: `83`
+- Blocked refs: `84`
 - Missing sha256: `0`
 - Missing refs: `0`
 - Source quality issues: `0`

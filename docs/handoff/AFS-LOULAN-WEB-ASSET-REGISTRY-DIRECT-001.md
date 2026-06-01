@@ -28,7 +28,7 @@ as a known memory-review artifact.
 | Artifact classification | `known_contract` |
 | Source role | `Loulan unified asset registry` |
 | Memory source status | `Selected files` |
-| Artifact inspector | shows total assets, type counts, status counts, missing hash/ref counts, source-quality issue count, and no-call boundary flags |
+| Artifact inspector | shows total assets, type counts, status counts, derived eligible/blocked refs, missing hash/ref counts, source-quality issue count, and no-call boundary flags |
 
 ## Boundary Evidence
 
@@ -55,12 +55,14 @@ Observed facts:
   "memoryBundleCount": 1,
   "sourceStatus": "Selected files",
   "status": "blocked",
-  "total_assets": "85",
-  "type_counts": "character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 28, scene: 1, vfx: 2",
-  "status_counts": "approved_anchor: 3, candidate: 60, needs_repair: 14, route_failed: 4, superseded: 4",
-  "missing_sha256": "1",
-  "missing_refs": "7",
-  "source_quality_issues": "10",
+  "total_assets": "87",
+  "type_counts": "character: 26, feedback: 21, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2",
+  "status_counts": "approved_anchor: 3, candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4",
+  "eligible_refs": "3",
+  "blocked_refs": "84",
+  "missing_sha256": "0",
+  "missing_refs": "0",
+  "source_quality_issues": "0",
   "provider_calls_started": "false",
   "writes_long_term_memory": "false"
 }
@@ -70,7 +72,7 @@ Observed facts:
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m pytest --assert=plain tests\test_web_static_loulan_asset_registry.py -q
-# 1 passed
+# 2 passed
 
 .\.venv\Scripts\python.exe -B -m pytest --assert=plain tests\test_web_static_loulan_asset_registry.py tests\test_web_static_loulan_b01_status_artifacts.py tests\test_web_static_artifact_workspace.py tests\test_web_memory_loulan_decision_context_static.py tests\test_web_memory_loulan_package_static.py tests\test_loulan_memory_package_registry.py tests\test_loulan_memory_package.py -q
 # 19 passed

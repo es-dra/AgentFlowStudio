@@ -23,12 +23,12 @@ const registry = {
     blocked_from_next_context: ["candidate", "needs_repair", "rejected", "route_failed", "source_reference", "superseded"]
   },
   summary: {
-    total_assets: 85,
-    type_counts: { character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 28, scene: 1, vfx: 2 },
-    status_counts: { approved_anchor: 3, candidate: 60, needs_repair: 14, route_failed: 4, superseded: 4 },
-    missing_sha256_count: 1,
-    missing_ref_count: 7,
-    source_quality_issue_count: 10
+    total_assets: 87,
+    type_counts: { character: 26, feedback: 21, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2 },
+    status_counts: { approved_anchor: 3, candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4 },
+    missing_sha256_count: 0,
+    missing_ref_count: 0,
+    source_quality_issue_count: 0
   },
   assets: [
     { asset_id: "character_zhou_tong_school_v1", asset_type: "character", status: "approved_anchor" },
@@ -66,11 +66,13 @@ console.log(JSON.stringify({
     assert payload["inspector"]["title"] == "Loulan unified asset registry"
     assert payload["inspector"]["status"] == "blocked"
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
-    assert facts["total_assets"] == "85"
-    assert facts["type_counts"] == "character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 28, scene: 1, vfx: 2"
-    assert facts["status_counts"] == "approved_anchor: 3, candidate: 60, needs_repair: 14, route_failed: 4, superseded: 4"
-    assert facts["missing_sha256"] == "1"
-    assert facts["missing_refs"] == "7"
+    assert facts["total_assets"] == "87"
+    assert facts["type_counts"] == "character: 26, feedback: 21, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2"
+    assert facts["status_counts"] == "approved_anchor: 3, candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4"
+    assert facts["eligible_refs"] == "3"
+    assert facts["blocked_refs"] == "84"
+    assert facts["missing_sha256"] == "0"
+    assert facts["missing_refs"] == "0"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
 
@@ -89,11 +91,11 @@ const report = {
   writes_long_term_memory: false,
   new_media_generated: false,
   summary: {
-    total_assets: 86,
-    type_counts: { character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2 },
-    status_counts: { approved_anchor: 3, candidate: 61, needs_repair: 14, route_failed: 4, superseded: 4 },
+    total_assets: 87,
+    type_counts: { character: 26, feedback: 21, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2 },
+    status_counts: { approved_anchor: 3, candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4 },
     eligible_reusable_refs: 3,
-    blocked_refs: 83,
+    blocked_refs: 84,
     missing_sha256_count: 0,
     missing_ref_count: 0,
     source_quality_issue_count: 0,
@@ -129,11 +131,11 @@ console.log(JSON.stringify({
     assert payload["inspector"]["title"] == "Loulan asset registry health report"
     assert payload["inspector"]["status"] == "blocked_pending_human_review"
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
-    assert facts["total_assets"] == "86"
-    assert facts["type_counts"] == "character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2"
-    assert facts["status_counts"] == "approved_anchor: 3, candidate: 61, needs_repair: 14, route_failed: 4, superseded: 4"
+    assert facts["total_assets"] == "87"
+    assert facts["type_counts"] == "character: 26, feedback: 21, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2"
+    assert facts["status_counts"] == "approved_anchor: 3, candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4"
     assert facts["eligible_refs"] == "3"
-    assert facts["blocked_refs"] == "83"
+    assert facts["blocked_refs"] == "84"
     assert facts["missing_sha256"] == "0"
     assert facts["missing_refs"] == "0"
     assert facts["source_quality_issues"] == "0"
