@@ -9,6 +9,27 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Next Pass Review 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-loop-next-pass-review-001`, based on
+  the verified next-pass review CLI and Web slices.
+- Added optional `--next-pass-result` support to
+  `production-memory-loop-run-operator-no-provider`.
+- When an explicit local `agentflow_production_memory_next_pass_result` JSON is
+  supplied, the operator loop now writes `next_pass_review.json` and `.md`,
+  includes a `next_pass_review` node in the manifest, and records the review in
+  `output_artifacts`.
+- Default operator-loop behavior is unchanged when no result JSON is supplied.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Web scan/persistence, no Loulan-specific
+  behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py -q` -> 4 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py tests/test_production_memory_next_pass_review.py tests/test_production_memory_next_task_packet.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_next_pass_review.py -q` -> 43 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 737 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Next Pass Review Web 001
 
 - Continued the generic Production Memory Architecture path on
