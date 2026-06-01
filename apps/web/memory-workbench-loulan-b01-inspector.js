@@ -2,6 +2,8 @@ const LOULAN_B01_LABELS = {
   loulan_afs_b01_feedback_loop_gate: "Loulan B01 feedback loop gate",
   loulan_afs_b01_decision_crosswalk: "Loulan B01 decision crosswalk",
   loulan_b01_human_review_decision_template: "Loulan B01 human decision template",
+  loulan_b01_ai_director_pre_review: "Loulan B01 AI director pre-review",
+  loulan_b01_ai_suggested_decision_starting_point: "Loulan B01 AI suggestion starting point",
   loulan_b01_decision_apply_plan_draft: "Loulan B01 decision apply plan draft",
   loulan_b01_decision_validation_report: "Loulan B01 decision validation report",
   loulan_b01_decision_apply_result: "Loulan B01 decision apply result",
@@ -27,6 +29,8 @@ export function loulanB01Facts(type, payload) {
   if (type === "loulan_afs_b01_feedback_loop_gate") return feedbackGateFacts(payload);
   if (type === "loulan_afs_b01_decision_crosswalk") return decisionCrosswalkFacts(payload);
   if (type === "loulan_b01_human_review_decision_template") return localDecisionTemplateFacts(payload);
+  if (type === "loulan_b01_ai_director_pre_review") return aiDirectorPreReviewFacts(payload);
+  if (type === "loulan_b01_ai_suggested_decision_starting_point") return aiSuggestedDecisionFacts(payload);
   if (type === "loulan_b01_decision_apply_plan_draft") return decisionApplyPlanFacts(payload);
   if (type === "loulan_b01_decision_validation_report") return decisionValidationFacts(payload);
   if (type === "loulan_b01_decision_apply_result") return decisionApplyFacts(payload);
@@ -76,6 +80,41 @@ function localDecisionTemplateFacts(payload) {
     fact("target_shots", listText(targetShots)),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function aiDirectorPreReviewFacts(payload) {
+  const recommendations = arrayValue(payload.recommendations);
+  const counts = countBy(recommendations, "suggested_decision");
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("block_id", payload.block_id || "unknown"),
+    fact("recommendations", recommendations.length),
+    fact("approve_anchor", counts.approve_anchor || 0),
+    fact("request_repair", counts.request_repair || 0),
+    fact("approve_anchor_with_note", counts.approve_anchor_with_note || 0),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+  ];
+}
+
+function aiSuggestedDecisionFacts(payload) {
+  const items = arrayValue(payload.items);
+  const counts = countBy(items, "suggested_decision");
+  const pendingOperatorDecisions = items.filter(
+    (item) => objectValue(item).operator_final_decision === "pending_human_review",
+  ).length;
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("items", items.length),
+    fact("pending_operator_decisions", pendingOperatorDecisions),
+    fact("approve_anchor", counts.approve_anchor || 0),
+    fact("request_repair", counts.request_repair || 0),
+    fact("approve_anchor_with_note", counts.approve_anchor_with_note || 0),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
 }
 
@@ -137,6 +176,14 @@ function objectValue(value) {
 
 function arrayValue(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function countBy(items, field) {
+  return arrayValue(items).reduce((counts, item) => {
+    const key = objectValue(item)[field];
+    if (key) counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
 }
 
 function listText(value) {

@@ -52,6 +52,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan `asset_registry_health_report.json` directly as `loulan_asset_registry_health_report`; real selected-file probe shows 86 assets, 3 eligible refs, 83 blocked refs, 0 missing hashes, 0 missing refs, and 0 source-quality issues without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ASSET-HEALTH-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan B01 AI pre-review files (`ai_director_pre_review.json` and `ai_suggested_decision_starting_point.json`) directly as read-only recommendation evidence; real selected-file probes show 5 suggestion rows, 3 approve-anchor suggestions, 1 repair suggestion, 1 approve-with-note suggestion, and all operator decisions still pending without provider calls, decision apply, human acceptance, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-B01-AI-REVIEW-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:
