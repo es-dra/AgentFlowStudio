@@ -56,7 +56,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan `b01_operator_entrypoint.json` directly as a read-only B01 operator entrypoint; real selected-file probe shows 5 decision items, 5 pending decisions, blocked validation/apply/context states, 6 operator steps, 4 blocker conditions, and no provider calls, decision apply, human acceptance, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-B01-OPERATOR-ENTRYPOINT-DIRECT-001.md`.
 
-2026-06-01: Loulan memory package now reads the optional `b01_operator_entrypoint.json` and Web package review surfaces it in bundle, protocol, and inspector views as a blocked operator entrypoint; package and Web tests plus full AFS regression passed while provider calls, media generation, decision apply, context projection, human acceptance, and durable Memory remain off; see `docs/handoff/AFS-LOULAN-PACKAGE-B01-OPERATOR-ENTRYPOINT-001.md`.
+2026-06-01: Loulan memory package now reads the optional `b01_operator_entrypoint.json` and Web package review surfaces it in bundle, protocol, inspector, and timeline views as a blocked operator entrypoint; package and Web tests plus full AFS regression passed while provider calls, media generation, decision apply, context projection, human acceptance, and durable Memory remain off; see `docs/handoff/AFS-LOULAN-PACKAGE-B01-OPERATOR-ENTRYPOINT-001.md`.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 

@@ -102,6 +102,14 @@ export function loulanTimeline(
       detail: `${b01Crosswalk.local_shot_gate?.decision_count || 0} local decisions; ${b01Crosswalk.afs_b01_import_gate?.decision_count || 0} AFS import slots`,
     });
   }
+  const b01Operator = payload.feedback_loop_gates?.b01_operator_entrypoint || null;
+  if (b01Operator) {
+    nodes.push({
+      label: "B01 Operator Entrypoint",
+      status: b01Operator.status || "unknown",
+      detail: `${b01Operator.pending_decisions || 0} pending decisions; ${b01Operator.operator_steps || 0} operator steps`,
+    });
+  }
   if (reviewPack) {
     nodes.push({
       label: "Human Review",

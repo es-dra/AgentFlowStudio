@@ -128,6 +128,7 @@ console.log(JSON.stringify({
     assert "phase_gate_audit: blocked_until_b01_human_review" in payload["inspector"]
     assert "B01 Feedback Gate" in payload["timeline"]
     assert "B01 Decision Crosswalk" in payload["timeline"]
+    assert "B01 Operator Entrypoint" in payload["timeline"]
     assert '"artifact_type": "agentflow_feedback_event"' in payload["feedback"]
     assert '"writes_long_term_memory": false' in payload["feedback"]
 

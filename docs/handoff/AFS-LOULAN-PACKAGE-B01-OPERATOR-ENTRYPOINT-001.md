@@ -42,6 +42,7 @@ decisions, project context, or promote memory.
 | Bundle summary | shows `B01 operator entrypoint` with pending decision and operator-step counts |
 | Protocol controls | shows the entrypoint blocked status and operator-step count |
 | Inspector | shows `b01_operator_entrypoint: blocked_pending_human_review` |
+| Timeline | shows `B01 Operator Entrypoint` with pending decision and operator-step counts |
 
 ## Boundaries
 
