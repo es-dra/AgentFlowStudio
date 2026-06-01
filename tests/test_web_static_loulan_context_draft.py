@@ -26,12 +26,12 @@ const draft = {
     { memory_ref: "asset:character_zhou_tong_school_v1" }
   ],
   blocked_context_refs_by_status: {
-    candidate: Array.from({ length: 60 }, (_, i) => `asset:candidate_${i}`),
+    candidate: Array.from({ length: 62 }, (_, i) => `asset:candidate_${i}`),
     needs_repair: Array.from({ length: 14 }, (_, i) => `asset:repair_${i}`),
     route_failed: Array.from({ length: 4 }, (_, i) => `asset:route_${i}`),
     superseded: Array.from({ length: 4 }, (_, i) => `asset:superseded_${i}`)
   },
-  review_evidence_refs: Array.from({ length: 28 }, (_, i) => ({ memory_ref: `asset:review_${i}` })),
+  review_evidence_refs: Array.from({ length: 30 }, (_, i) => ({ memory_ref: `asset:review_${i}` })),
   gates: {
     b01_keyframe_human_review: "blocked",
     provider_image_gate: "blocked_not_authorized",
@@ -74,8 +74,8 @@ console.log(JSON.stringify({
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
     assert facts["target_next_block"] == "B02"
     assert facts["eligible_context_refs"] == "3"
-    assert facts["blocked_refs_by_status"] == "candidate: 60, needs_repair: 14, route_failed: 4, superseded: 4"
-    assert facts["review_evidence_refs"] == "28"
+    assert facts["blocked_refs_by_status"] == "candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4"
+    assert facts["review_evidence_refs"] == "30"
     assert facts["b01_keyframe_human_review"] == "blocked"
     assert facts["provider_image_gate"] == "blocked_not_authorized"
     assert facts["provider_video_gate"] == "blocked_not_authorized"

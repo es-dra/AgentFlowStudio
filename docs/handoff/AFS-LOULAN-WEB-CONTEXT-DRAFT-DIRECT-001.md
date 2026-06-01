@@ -58,8 +58,8 @@ Observed facts:
   "status": "blocked_until_b01_human_review",
   "target_next_block": "B02",
   "eligible_context_refs": "3",
-  "blocked_refs_by_status": "candidate: 60, needs_repair: 14, route_failed: 4, superseded: 4",
-  "review_evidence_refs": "28",
+  "blocked_refs_by_status": "candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4",
+  "review_evidence_refs": "30",
   "b01_keyframe_human_review": "blocked",
   "provider_image_gate": "blocked_not_authorized",
   "provider_video_gate": "blocked_not_authorized",
@@ -88,6 +88,14 @@ Observed facts:
 git diff --check
 # passed; CRLF warnings only
 ```
+
+Refresh checks after current Loulan context-draft count sync:
+
+- Real selected-file probe over `D:\Projects\LoulanSceneAssets\manifests\next_context_bundle_draft.json`: `candidate: 62, needs_repair: 14, route_failed: 4, superseded: 4`, 30 review evidence refs, provider calls `false`, durable Memory write `false`.
+- Related direct/context tests: `4 passed`.
+- Full AFS suite: `763 passed`.
+- Staging preflight: pass.
+- `git diff --check`: no whitespace errors; CRLF touch warnings only.
 
 ## Next Work
 

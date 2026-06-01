@@ -28,7 +28,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan unified `asset_registry.json` directly as a read-only memory artifact, surfacing 87 assets, 3 derived eligible refs, 84 blocked refs, and blocked promotion state without regenerating a package or promoting candidates; see `docs/handoff/AFS-LOULAN-WEB-ASSET-REGISTRY-DIRECT-001.md`.
 
-2026-06-01: Web Artifact Workspace now recognizes the Loulan `next_context_bundle_draft.json` directly as a read-only memory artifact, surfacing the B02 target, eligible/blocked refs, review evidence refs, and B01/provider gates while keeping context projection and generation blocked; see `docs/handoff/AFS-LOULAN-WEB-CONTEXT-DRAFT-DIRECT-001.md`.
+2026-06-01: Web Artifact Workspace now recognizes the Loulan `next_context_bundle_draft.json` directly as a read-only memory artifact, surfacing the B02 target, 3 eligible refs, blocked refs by status `62/14/4/4`, 30 review evidence refs, and B01/provider gates while keeping context projection and generation blocked; see `docs/handoff/AFS-LOULAN-WEB-CONTEXT-DRAFT-DIRECT-001.md`.
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan `b01_decision_apply_plan_draft.json` directly as a read-only memory artifact, showing why B01 apply is still blocked without mutating registry, shot list, context draft, provider state, or durable Memory; see `docs/handoff/AFS-LOULAN-WEB-B01-APPLY-PLAN-DIRECT-001.md`.
 
