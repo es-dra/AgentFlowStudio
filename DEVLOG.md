@@ -9,6 +9,32 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Promotion Web 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-loop-promotion-web-001`, based on the
+  verified operator-loop promotion overlay CLI slice.
+- Updated the read-only operator-loop Web canvas so a selected
+  `agentflow_production_memory_operator_loop_run` manifest with embedded
+  `next_pass_promotion` now exposes a Next pass promotion card, lane, controls,
+  and next-pass action.
+- Updated the generic artifact inspector facts for operator-loop manifests to
+  show `next_pass_promotion_decision` and `next_pass_promotion_effect` when the
+  manifest includes them.
+- Boundary kept: selected local JSON only; no provider call, no Company KB
+  write, no durable memory write, no next-pass execution, no Web scan or
+  browser persistence, no Loulan-specific behavior, no human acceptance, and no
+  business validation claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py -q`
+    -> 3 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_next_pass_promotion.py tests/test_web_static_production_memory_next_pass_review.py tests/test_web_static_production_memory_next_task_packet.py tests/test_web_static_production_memory_next_context_handoff.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q`
+    -> 34 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 748 passed on Python 3.12.12.
+  - Browser-level smoke not completed: `tool_search` did not expose Browser
+    control tools in this turn.
+
 ## 2026-06-02 - Production Memory Operator Loop Promotion Overlay 001
 
 - Continued the generic Production Memory Architecture path on

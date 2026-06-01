@@ -130,10 +130,13 @@ function productionNextPassPromotionFacts(payload) {
 }
 
 function productionOperatorLoopFacts(payload) {
+  const promotion = objectValue(payload.next_pass_promotion);
   return [
     fact("chain_status", payload.chain_status || "unknown"),
     fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
     fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
+    ...(promotion.decision ? [fact("next_pass_promotion_decision", promotion.decision)] : []),
+    ...(promotion.decision_effect ? [fact("next_pass_promotion_effect", promotion.decision_effect)] : []),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];

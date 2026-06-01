@@ -8,6 +8,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const nodes = arrayValue(payload.operator_loop_nodes);
   const outputs = arrayValue(payload.output_artifacts);
   const company = payload.company_kb_feedback || {};
+  const promotion = payload.next_pass_promotion || null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
     ...fallback,
@@ -21,6 +22,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     workflow_actions: [
       action("inspect_operator_loop", "Inspect operator loop", "review ready", "project"),
       action("inspect_generated_artifacts", "Inspect artifacts", outputs.length ? "ready" : "missing", "assets"),
+      action("inspect_next_pass_promotion", "Inspect promotion", promotion ? "review ready" : "missing", "next-pass"),
       action("review_company_candidates", "Review candidates", company.requires_human_review ? "blocked" : "review ready", "review"),
       action("prepare_next_pass", "Prepare next pass", ready ? "ready" : "blocked", "next-pass"),
     ],
@@ -33,6 +35,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     bundle_summary: [
       card("operator_nodes", "Operator nodes", nodes.length ? "review ready" : "missing", `${nodes.length} chain nodes`),
       card("output_artifacts", "Output artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} generated artifact refs`),
+      ...(promotion ? [card("next_pass_promotion", "Next pass promotion", promotion.decision || "unknown", promotion.decision_effect || "unknown")] : []),
       card("company_kb_feedback", "Company KB feedback", company.promotion_status || "unknown", companyBoundary(company)),
     ],
     memory_loaded: nodes.map((node) => ({
@@ -48,6 +51,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
       lane("generated-artifacts", "Generated artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} outputs`, "explicit artifact refs"),
+      ...(promotion ? [lane("next-pass-promotion", "Next pass promotion", promotion.decision || "unknown", promotion.candidate_id || "candidate", promotion.decision_effect || "unknown")] : []),
       lane("company-kb-feedback", "Company KB feedback", company.promotion_status || "unknown", `${company.candidate_item_count ?? 0} candidates`, companyBoundary(company)),
     ],
     protocol_summary: {
@@ -58,6 +62,10 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         control("provider calls not started", payload.provider_calls_started === false),
         control("durable memory write disabled", payload.writes_long_term_memory === false),
         control("Company KB write disabled", payload.writes_company_kb === false),
+        ...(promotion ? [
+          control("next-pass promotion no-provider mode", hasPassedControl(payload, "next_pass_promotion_no_provider_mode")),
+          control("next-pass promotion memory write disabled", hasPassedControl(payload, "next_pass_promotion_long_term_memory_write_disabled")),
+        ] : []),
         control("Company feedback candidate only", company.promotion_status === "candidate_only"),
         control("Human review required for Company feedback", company.requires_human_review === true, "blocked"),
       ],
@@ -74,7 +82,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     },
     next_pass: {
       status: ready ? "ready" : "blocked",
-      action: ready ? "inspect_generated_artifacts_before_next_pass" : "resolve_operator_loop_blockers",
+      action: ready && promotion ? "inspect_next_pass_promotion_overlay_before_followup_context" : ready ? "inspect_generated_artifacts_before_next_pass" : "resolve_operator_loop_blockers",
     },
     timeline: nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
   };
@@ -108,6 +116,10 @@ function boundaryItems(boundaries = {}) {
     { label: "durable memory runtime", status: "blocked", detail: boundaries.durable_memory_runtime || "not_implemented" },
     { label: "provider success", status: "blocked", detail: boundaries.provider_success || "not_attempted" },
   ];
+}
+
+function hasPassedControl(payload, controlId) {
+  return arrayValue(payload.controls).some((item) => item?.control_id === controlId && item?.status === "passed");
 }
 
 function step(label, status, detail) {

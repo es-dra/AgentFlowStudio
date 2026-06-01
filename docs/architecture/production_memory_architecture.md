@@ -299,6 +299,11 @@ generated artifact refs, Company KB feedback candidate boundaries, provider
 controls, and non-claim boundaries. They are review manifests only; they do not
 follow artifact refs, execute workflows, or promote memory.
 
+When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
+also surfaces a Next pass promotion card, lane, controls, inspector facts, and
+next-pass action. This is a read-only view of the explicit decision and derived
+overlay effect, not a promotion action or workflow execution.
+
 Next-context handoff artifacts render as a read-only task handoff canvas with
 included refs, blocked refs, no-provider controls, and non-claim boundaries for
 the next AI pass. They do not execute that pass, follow refs, call providers,
