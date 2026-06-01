@@ -28,6 +28,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_production_memory_next_pass_review: ["next_pass_review.json"],
   agentflow_production_memory_next_pass_promotion_decision: ["next_pass_promotion_decision.json"],
   agentflow_production_memory_next_pass_promotion_overlay: ["next_pass_promotion_overlay.json"],
+  agentflow_production_memory_operator_feedback_event: ["operator_feedback_event.json"],
   agentflow_company_kb_feedback_candidate_packet: [
     "company_kb_feedback_candidate_packet.json",
     "company_kb_feedback_candidate_packet.example.json",
@@ -84,6 +85,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_production_memory_next_pass_review") return "production memory next pass review";
   if (type === "agentflow_production_memory_next_pass_promotion_decision") return "production memory next pass promotion decision";
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return "production memory next pass promotion overlay";
+  if (type === "agentflow_production_memory_operator_feedback_event") return "production memory operator feedback event";
   if (type === "agentflow_company_kb_feedback_candidate_packet") return "Company KB feedback candidate packet";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
