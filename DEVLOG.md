@@ -9,6 +9,50 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Pass Result Scaffold 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-feedback-candidate-web-001`
+  on `codex/afs-production-memory-next-pass-result-scaffold-001`.
+- Added a generic no-provider next-pass result scaffold so a ready
+  `next_task_packet.json` can become an auditable
+  `agentflow_production_memory_next_pass_result` envelope before the existing
+  review command runs.
+- The scaffold includes only allowed context refs, rejects blocked or unknown
+  refs, writes no long-term memory, writes no Company KB, starts no provider
+  calls, and does not auto-create feedback events or memory candidates.
+- Added `production-memory-loop-draft-next-pass-result-no-provider` for local
+  JSON/Markdown output under ignored runtime directories.
+- Boundary kept: no LLM/image/video/ASR provider call, no generated content
+  claim, no next-pass execution claim, no Company KB write, no durable memory
+  write, no Loulan-specific behavior, no human acceptance, and no business
+  validation claim.
+- Verification:
+  - Red test failed on missing
+    `agentflow.memory.production_next_pass_result`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_result.py -q`
+    -> 4 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_result.py tests/test_production_memory_next_pass_review.py tests/test_production_memory_next_task_packet.py tests/test_production_memory_operator_loop.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 19 passed.
+  - Runtime CLI smoke generated an ignored local chain under
+    `data/processed/runs/production_memory_loop/next_pass_result_scaffold_smoke/`:
+    no-provider run -> next-context handoff -> next-task packet -> next-pass
+    result scaffold -> next-pass review. Review status was
+    `ready_for_operator_review`, provider calls stayed false, and feedback
+    candidates stayed `0`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_result.py tests/test_production_memory_next_pass_review.py tests/test_production_memory_next_task_packet.py tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_production_memory_operator_loop_feedback_candidate_overlay.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 51 passed.
+  - Touched code/test files remain under the 300-line target:
+    next-pass result 174 lines, CLI command 76 lines, next-pass review 215
+    lines, command registry 160 lines, test file 106 lines.
+  - `git diff --check` -> exit 0 with CRLF warnings only.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 783 passed on Python 3.12.12.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow\memory\production_next_pass_result.py agentflow\memory\production_next_pass_review.py apps\cli\production_memory_next_pass_result_command.py apps\cli\command_registry.py`
+    -> passed.
+  - CLI help includes
+    `production-memory-loop-draft-next-pass-result-no-provider`.
+
 ## 2026-06-02 - Production Memory Operator Loop Feedback Candidate Web 001
 
 - Continued from

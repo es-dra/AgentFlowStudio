@@ -26,6 +26,7 @@ project_input
   -> next_pass_bundle
   -> next_context_handoff
   -> next_task_packet
+  -> next_pass_result_scaffold
   -> explicit next_pass_result input
   -> next_pass_review
   -> explicit next_pass_promotion_decision
@@ -75,6 +76,10 @@ The required root identifiers are:
   next-context handoff. It exposes only allowed context refs to the next AI
   task, keeps blocked refs visible but excluded, and repeats the non-claim
   boundaries.
+- `next_pass_result_scaffold`: no-provider local envelope for an
+  operator-supplied next-pass result. It can prefill allowed context refs from
+  a ready next-task packet, but it does not execute a model, generate content,
+  capture feedback, or claim acceptance.
 - `next_pass_review`: no-provider review artifact for an explicitly supplied
   next-pass result. It checks that result outputs used only
   `allowed_context_refs`, records blocked or unknown refs, and derives
@@ -134,6 +139,8 @@ All derived artifacts declare:
 - The context bundle always lists included refs and blocked refs separately.
 - The next pass bundle is planned-only and must not execute a provider call.
 - The next task packet consumes a handoff only; it does not execute a next pass.
+- A next-pass result scaffold is only a local envelope. It is not generated
+  content, not next-pass execution, and it does not auto-create feedback.
 - The next pass review consumes explicit result records only; it does not
   execute the task and blocks any use of blocked or unknown context refs.
 - Next-pass review feedback candidates are not promoted memory; they require
@@ -171,6 +178,7 @@ python -m apps.cli.main production-memory-loop-run-operator-no-provider examples
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T04:00:00+08:00 --source-kb-status restructuring_or_unknown --next-pass-result next_pass_result.json --output data/processed/runs/production_memory_loop/operator_loop_with_review
 python -m apps.cli.main production-memory-loop-next-context-handoff data/processed/runs/production_memory_loop/no_provider/production_memory_loop_run.json --generated-at 2026-06-02T01:40:00+08:00 --output data/processed/runs/production_memory_loop/next_context_handoff
 python -m apps.cli.main production-memory-loop-next-task-packet data/processed/runs/production_memory_loop/next_context_handoff/next_context_handoff.json --generated-at 2026-06-02T03:12:00+08:00 --output data/processed/runs/production_memory_loop/next_task_packet
+python -m apps.cli.main production-memory-loop-draft-next-pass-result-no-provider data/processed/runs/production_memory_loop/next_task_packet/next_task_packet.json --generated-at 2026-06-02T11:00:00+08:00 --output-ref next-pass:artifact:operator-draft-001 --title "Second pass operator draft" --summary "Operator-supplied scaffold for the second pass." --output data/processed/runs/production_memory_loop/next_pass_result
 python -m apps.cli.main production-memory-loop-review-next-pass data/processed/runs/production_memory_loop/next_task_packet/next_task_packet.json next_pass_result.json --reviewed-at 2026-06-02T03:30:00+08:00 --output data/processed/runs/production_memory_loop/next_pass_review
 python -m apps.cli.main production-memory-loop-review-next-pass-promotion data/processed/runs/production_memory_loop/next_pass_review/next_pass_review.json --candidate-id memory-candidate-feedback-next-pass-001 --decision promoted --rationale "Traceable next-pass feedback selected by the operator." --decided-at 2026-06-02T05:10:00+08:00 --output data/processed/runs/production_memory_loop/next_pass_promotion_decision
 python -m apps.cli.main production-memory-loop-run-next-pass-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --next-pass-review data/processed/runs/production_memory_loop/next_pass_review/next_pass_review.json --promotion-decision data/processed/runs/production_memory_loop/next_pass_promotion_decision/next_pass_promotion_decision.json --output data/processed/runs/production_memory_loop/next_pass_reviewed_feedback
@@ -227,6 +235,16 @@ The next task packet command writes:
 
 - `next_task_packet.json`
 - `next_task_packet.md`
+
+The next-pass result scaffold command writes:
+
+- `next_pass_result.json`
+- `next_pass_result.md`
+
+The scaffold reads a ready `next_task_packet.json`, includes only
+`allowed_context_refs` by default, and rejects blocked or unknown refs if the
+operator supplies an explicit `--used-context-ref` subset. It keeps
+`feedback_events` empty until feedback is explicitly captured after review.
 
 The next pass review command reads a selected `next_task_packet.json` and an
 explicit operator-supplied next-pass result JSON. It writes:
