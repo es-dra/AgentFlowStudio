@@ -55,6 +55,11 @@ def test_loulan_memory_package_blocks_candidates_and_builtin_image_route(tmp_pat
     assert crosswalk["afs_broader_decision_review_gate"]["decision_count"] == 47
     assert crosswalk["afs_broader_decision_review_gate"]["target_ref_count"] == 47
     assert crosswalk["source_ref"] == "manifests/afs_b01_decision_crosswalk.json"
+    entrypoint = package["feedback_loop_gates"]["b01_operator_entrypoint"]
+    assert entrypoint["status"] == "blocked_pending_human_review"
+    assert entrypoint["source_ref"] == "manifests/b01_operator_entrypoint.json"
+    assert (entrypoint["pending_decisions"], entrypoint["operator_steps"], entrypoint["blocked_until_count"]) == (5, 6, 4)
+    assert (entrypoint["recommendations"], entrypoint["pending_operator_decisions"]) == (5, 5)
     assert package["promotion_gates"]["overall_status"] == "blocked"
     assert package["next_context_bundle_draft"]["eligible_memory_refs"] == ["character:zhou_tong_school_v1"]
     assert {
@@ -129,6 +134,7 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["project_audits"]["phase_gate"]["status"] == "blocked_until_b01_human_review"
     assert payload["feedback_loop_gates"]["b01"]["provider_calls_started"] is False
     assert payload["feedback_loop_gates"]["b01_decision_crosswalk"]["afs_b01_import_gate"]["pending_count"] == 7
+    assert payload["feedback_loop_gates"]["b01_operator_entrypoint"]["pending_operator_decisions"] == 5
     assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
     serialized = json.dumps(payload, ensure_ascii=False)
     assert "D:\\" not in serialized
@@ -232,6 +238,22 @@ def _loulan_fixture(tmp_path: Path) -> Path:
                 },
             ],
             "next_step": "Human operator fills the five local B01 shot decisions first.",
+        },
+    )
+    _write_json(
+        root / "manifests" / "b01_operator_entrypoint.json",
+        {
+            "schema_version": "0.1.0",
+            "artifact_type": "loulan_b01_operator_entrypoint",
+            "status": "blocked_pending_human_review",
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "human_acceptance_recorded": False,
+            "media_generation_started": False,
+            "current_gate_summary": {"decision_items": 5, "pending_decisions": 5, "validation_status": "blocked_pending_human_review", "apply_status": "blocked_validation_not_ready", "next_context_status": "blocked_until_b01_human_review"},
+            "ai_recommendation_summary": {"recommendations": 5, "operator_decisions_still_pending": 5},
+            "operator_sequence": [{"step_id": "open_review_packet"}, {"step_id": "compare_ai_suggestions"}, {"step_id": "fill_decision_template"}, {"step_id": "validate_decisions"}, {"step_id": "dry_run_apply"}, {"step_id": "apply_after_ready"}],
+            "blocked_until": ["all five B01 decision_items are filled by the human operator", "Loulan validation returns ready_for_apply", "Loulan apply dry-run returns ready_dry_run", "operator explicitly requests apply"],
         },
     )
     _write_json(

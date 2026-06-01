@@ -202,7 +202,8 @@
       "afs_b01_import_gate": { "decision_count": 7, "pending_count": 7, "target_ref_count": 7, "target_refs_sample": ["shot:B01-S01", "shot:B01-S02", "shot:B01-S03", "shot:B01-S04", "shot:B01-S05", "character:zhou_tong_school_v1", "character:zhou_tong_qipao_front_v1"], "current_blocker": "two Zhou Tong character slots still need explicit disposition" },
       "afs_broader_decision_review_gate": { "decision_count": 47, "pending_count": 47, "target_ref_count": 47, "target_refs_sample": [], "current_blocker": "full review pack covers broad asset governance" },
       "next_step": "Human operator fills the five local B01 shot decisions first; do not treat that as broad AFS asset approval."
-    }
+    },
+    "b01_operator_entrypoint": { "status": "blocked_pending_human_review", "source_ref": "manifests/b01_operator_entrypoint.json", "provider_calls_started": false, "writes_long_term_memory": false, "human_acceptance_recorded": false, "media_generation_started": false, "decision_items": 5, "pending_decisions": 5, "validation_status": "blocked_pending_human_review", "apply_status": "blocked_validation_not_ready", "next_context_status": "blocked_until_b01_human_review", "operator_steps": 6, "blocked_until_count": 4, "recommendations": 5, "pending_operator_decisions": 5, "next_step": "Human operator fills the five B01 decisions before applying or projecting context." }
   },
   "promotion_gates": {
     "overall_status": "blocked",

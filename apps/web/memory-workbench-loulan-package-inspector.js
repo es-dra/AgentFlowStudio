@@ -1,5 +1,6 @@
 export function loulanPackageFacts(payload) {
   const b01Gate = objectValue(payload.feedback_loop_gates?.b01);
+  const b01Operator = objectValue(payload.feedback_loop_gates?.b01_operator_entrypoint);
   const audits = objectValue(payload.project_audits);
   const manifestAudit = objectValue(audits.manifest_reference);
   const textAudit = objectValue(audits.text_encoding);
@@ -12,6 +13,7 @@ export function loulanPackageFacts(payload) {
     fact("text_encoding_audit", textAudit.status || "not_provided"),
     fact("phase_gate_audit", phaseGate.status || "not_provided"),
     fact("feedback_gate_b01", b01Gate.status || "not_supplied"),
+    fact("b01_operator_entrypoint", b01Operator.status || "not_supplied"),
     fact("b01_pending_decisions", b01Gate.pending_decisions ?? "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];

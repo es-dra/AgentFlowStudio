@@ -12,6 +12,7 @@ def feedback_loop_gates(root: Path) -> dict[str, Any]:
     return {
         "b01": _b01_feedback_loop_gate(root),
         "b01_decision_crosswalk": _b01_decision_crosswalk(root),
+        "b01_operator_entrypoint": _b01_operator_entrypoint(root),
     }
 
 
@@ -75,6 +76,38 @@ def _b01_decision_crosswalk(root: Path) -> dict[str, Any]:
     }
 
 
+def _b01_operator_entrypoint(root: Path) -> dict[str, Any]:
+    entrypoint_path = root / "manifests" / "b01_operator_entrypoint.json"
+    if not entrypoint_path.exists():
+        return _not_supplied_gate("manifests/b01_operator_entrypoint.json")
+    entrypoint = _read_json(entrypoint_path)
+    _validate_safe_gate(
+        entrypoint,
+        artifact_type="loulan_b01_operator_entrypoint",
+        label="Loulan B01 operator entrypoint",
+    )
+    summary = entrypoint.get("current_gate_summary") or {}
+    ai_summary = entrypoint.get("ai_recommendation_summary") or {}
+    return {
+        "status": str(entrypoint.get("status") or "unknown"),
+        "source_ref": "manifests/b01_operator_entrypoint.json",
+        "provider_calls_started": False,
+        "writes_long_term_memory": False,
+        "human_acceptance_recorded": False,
+        "media_generation_started": False,
+        "decision_items": _int(summary.get("decision_items")),
+        "pending_decisions": _int(summary.get("pending_decisions")),
+        "validation_status": str(summary.get("validation_status") or "unknown"),
+        "apply_status": str(summary.get("apply_status") or "unknown"),
+        "next_context_status": str(summary.get("next_context_status") or "unknown"),
+        "operator_steps": len(entrypoint.get("operator_sequence") or []),
+        "blocked_until_count": len(entrypoint.get("blocked_until") or []),
+        "recommendations": _int(ai_summary.get("recommendations")),
+        "pending_operator_decisions": _int(ai_summary.get("operator_decisions_still_pending")),
+        "next_step": str(entrypoint.get("next_step") or ""),
+    }
+
+
 def _decision_layer(layer: dict[str, Any] | None) -> dict[str, Any]:
     if not layer:
         return {
@@ -120,8 +153,10 @@ def _validate_safe_gate(payload: dict[str, Any], *, artifact_type: str, label: s
         raise ValueError(f"{label} must not write long-term memory")
     if payload.get("human_acceptance_recorded") is not False:
         raise ValueError(f"{label} must not record human acceptance")
-    if payload.get("media_generation_started") is not False:
+    if payload.get("media_generation_started", False) is not False:
         raise ValueError(f"{label} must not start media generation")
+    if payload.get("new_media_generated", False) is not False:
+        raise ValueError(f"{label} must not generate media")
 
 
 def _read_json(path: Path) -> dict[str, Any]:

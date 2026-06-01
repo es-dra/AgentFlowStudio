@@ -21,6 +21,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
   const safety = payload.provider_route_safety || {};
   const b01FeedbackGate = payload.feedback_loop_gates?.b01 || null;
   const b01DecisionCrosswalk = payload.feedback_loop_gates?.b01_decision_crosswalk || null;
+  const b01OperatorEntrypoint = payload.feedback_loop_gates?.b01_operator_entrypoint || null;
   const nextContext = payload.next_context_bundle_draft || {};
   const inventory = payload.asset_inventory || {};
   const projectAudits = payload.project_audits || {};
@@ -43,7 +44,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
       detail: `${asset.asset_type || "asset"}; ${asset.status}; ${asset.current_ref || asset.output_ref || "no output ref"}`,
       status: asset.eligible_for_context ? "approved" : "blocked",
     })),
-    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate, b01DecisionCrosswalk, projectAudits),
+    bundle_summary: loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate, b01DecisionCrosswalk, b01OperatorEntrypoint, projectAudits),
     memory_loaded: loulanMemoryLoaded(eligibleRefs, blockedRefs),
     lanes: [
       {
@@ -61,7 +62,7 @@ export function buildLoulanWorkbenchPackageView(workspace, fallback) {
         output: eligibleRefs.length ? `${eligibleRefs.length} eligible refs can seed next context` : "blocked until promotion decision",
       },
     ],
-    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate, b01DecisionCrosswalk, projectAudits),
+    protocol_summary: loulanProtocolSummary(safety, payload.claim_boundaries, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate, b01DecisionCrosswalk, b01OperatorEntrypoint, projectAudits),
     review: {
       storyboard_adherence: reviewPack ? `${reviewPack.review_scope?.shot_count || 0} ${reviewPack.review_scope?.block_id || "Loulan"} shots queued for human review.` : `${payload.shot_summary?.total_shots || 0} Loulan shots indexed for review.`,
       visual_consistency: reviewPack ? `${reviewPack.asset_review?.candidate_memory_refs?.length || 0} candidate memory refs need decisions; ${reviewPack.asset_review?.approved_or_promoted_memory_refs?.length || 0} refs already reusable.` : `${inventory.total_assets || payload.asset_summary?.total_assets || 0} assets; ${blockedRefs.length} refs blocked.`,
@@ -99,7 +100,7 @@ function loulanDisplayAssets(payload) {
   return assets;
 }
 
-function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate = null, b01DecisionCrosswalk = null, projectAudits = {}) {
+function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection, b01FeedbackGate = null, b01DecisionCrosswalk = null, b01OperatorEntrypoint = null, projectAudits = {}) {
   const requestCount = apiPlan?.request_manifest?.requests?.length || 0;
   const inventory = payload.asset_inventory || {};
   const items = [
@@ -135,6 +136,7 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
       detail: `${localGate.decision_count || 0} local shot decisions; ${importGate.decision_count || 0} AFS import slots`,
     });
   }
+  if (b01OperatorEntrypoint) items.push({ id: "b01-operator-entrypoint", title: "B01 operator entrypoint", status: b01OperatorEntrypoint.status || "unknown", detail: `${b01OperatorEntrypoint.pending_decisions || 0} pending decisions; ${b01OperatorEntrypoint.operator_steps || 0} operator steps` });
   if (decisionTemplate) {
     items.push({
       id: "decision-template",
@@ -201,7 +203,7 @@ function loulanMemoryLoaded(eligibleRefs, blockedRefs) {
   return [...eligible, ...blocked];
 }
 
-function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPack = null, decisionTemplate = null, decisionReview = null, decisionWorksheet = null, decisionIntake = null, contextProjection = null, b01FeedbackGate = null, b01DecisionCrosswalk = null, projectAudits = {}) {
+function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPack = null, decisionTemplate = null, decisionReview = null, decisionWorksheet = null, decisionIntake = null, contextProjection = null, b01FeedbackGate = null, b01DecisionCrosswalk = null, b01OperatorEntrypoint = null, projectAudits = {}) {
   return {
     title: "Loulan memory production protocol",
     status: contextProjection?.context_bundle?.status || (safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned"),
@@ -218,6 +220,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "QA gate", status: apiPlan?.qa_gate?.status || "planned", detail: apiPlan?.promotion_gate?.status || "waiting for API workbench plan" },
       { label: "B01 feedback loop", status: b01FeedbackGate?.status || "not_supplied", detail: b01FeedbackGate ? `${b01FeedbackGate.pending_decisions || 0} pending; context ready: ${String(b01FeedbackGate.context_projection_ready === true)}` : "not supplied" },
       { label: "B01 decision crosswalk", status: b01DecisionCrosswalk?.status || "not_supplied", detail: b01DecisionCrosswalk ? `${b01DecisionCrosswalk.local_shot_gate?.decision_count || 0} local shot decisions; ${b01DecisionCrosswalk.afs_b01_import_gate?.decision_count || 0} AFS import slots` : "not supplied" },
+      { label: "B01 operator entrypoint", status: b01OperatorEntrypoint?.status || "not_supplied", detail: b01OperatorEntrypoint ? `${b01OperatorEntrypoint.pending_decisions || 0} pending; ${b01OperatorEntrypoint.operator_steps || 0} operator steps` : "not supplied" },
       { label: "human review", status: reviewPack?.review_scope?.evidence_status || "planned", detail: reviewPack?.review_scope?.status || "not prepared" },
       { label: isDecisionImport(decisionTemplate) ? "B01 decision import" : "decision template", status: decisionTemplate?.template_status || "planned", detail: decisionTemplate ? `${decisionTemplateDetail(decisionTemplate)}; no acceptance` : "not prepared" },
       { label: "decision review", status: decisionReview?.review_status || "planned", detail: decisionReview ? `${decisionReview.decision_summary?.pending_count || 0} pending; no acceptance` : "not prepared" },
@@ -233,14 +236,9 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
   };
 }
 
-function auditStatus(projectAudits, key) {
-  return projectAudits?.[key]?.status || "not_provided";
-}
+function auditStatus(projectAudits, key) { return projectAudits?.[key]?.status || "not_provided"; }
 
-function auditRef(projectAudits, key) {
-  const audit = projectAudits?.[key] || {};
-  return audit.report_ref || audit.artifact_ref || "not provided";
-}
+function auditRef(projectAudits, key) { const audit = projectAudits?.[key] || {}; return audit.report_ref || audit.artifact_ref || "not provided"; }
 
 function loulanNextPassStatus(payload, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection) {
   return contextProjection?.context_bundle?.status

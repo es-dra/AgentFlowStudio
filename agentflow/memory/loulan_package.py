@@ -98,6 +98,7 @@ def render_loulan_memory_package_report(package: dict[str, Any]) -> str:
             f"- Promotion gate: `{gates['overall_status']}`",
             f"- B01 feedback loop gate: `{package['feedback_loop_gates']['b01']['status']}`",
             f"- B01 decision crosswalk: `{package['feedback_loop_gates']['b01_decision_crosswalk']['status']}`",
+            f"- B01 operator entrypoint: `{package['feedback_loop_gates']['b01_operator_entrypoint']['status']}`",
             f"- Eligible memory refs: {len(package['next_context_bundle_draft']['eligible_memory_refs'])}",
             f"- Blocked memory refs: {len(package['next_context_bundle_draft']['blocked_memory_refs'])}",
             "",
