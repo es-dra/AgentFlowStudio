@@ -54,6 +54,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan B01 AI pre-review files (`ai_director_pre_review.json` and `ai_suggested_decision_starting_point.json`) directly as read-only recommendation evidence; real selected-file probes show 5 suggestion rows, 3 approve-anchor suggestions, 1 repair suggestion, 1 approve-with-note suggestion, and all operator decisions still pending without provider calls, decision apply, human acceptance, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-B01-AI-REVIEW-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan `b01_operator_entrypoint.json` directly as a read-only B01 operator entrypoint; real selected-file probe shows 5 decision items, 5 pending decisions, blocked validation/apply/context states, 6 operator steps, 4 blocker conditions, and no provider calls, decision apply, human acceptance, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-B01-OPERATOR-ENTRYPOINT-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

@@ -2,6 +2,7 @@ const LOULAN_B01_LABELS = {
   loulan_afs_b01_feedback_loop_gate: "Loulan B01 feedback loop gate",
   loulan_afs_b01_decision_crosswalk: "Loulan B01 decision crosswalk",
   loulan_b01_human_review_decision_template: "Loulan B01 human decision template",
+  loulan_b01_operator_entrypoint: "Loulan B01 operator entrypoint",
   loulan_b01_ai_director_pre_review: "Loulan B01 AI director pre-review",
   loulan_b01_ai_suggested_decision_starting_point: "Loulan B01 AI suggestion starting point",
   loulan_b01_decision_apply_plan_draft: "Loulan B01 decision apply plan draft",
@@ -29,6 +30,7 @@ export function loulanB01Facts(type, payload) {
   if (type === "loulan_afs_b01_feedback_loop_gate") return feedbackGateFacts(payload);
   if (type === "loulan_afs_b01_decision_crosswalk") return decisionCrosswalkFacts(payload);
   if (type === "loulan_b01_human_review_decision_template") return localDecisionTemplateFacts(payload);
+  if (type === "loulan_b01_operator_entrypoint") return operatorEntrypointFacts(payload);
   if (type === "loulan_b01_ai_director_pre_review") return aiDirectorPreReviewFacts(payload);
   if (type === "loulan_b01_ai_suggested_decision_starting_point") return aiSuggestedDecisionFacts(payload);
   if (type === "loulan_b01_decision_apply_plan_draft") return decisionApplyPlanFacts(payload);
@@ -80,6 +82,27 @@ function localDecisionTemplateFacts(payload) {
     fact("target_shots", listText(targetShots)),
     fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function operatorEntrypointFacts(payload) {
+  const gate = objectValue(payload.current_gate_summary);
+  const ai = objectValue(payload.ai_recommendation_summary);
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("block_id", payload.block_id || "unknown"),
+    fact("decision_items", gate.decision_items ?? "unknown"),
+    fact("pending_decisions", gate.pending_decisions ?? "unknown"),
+    fact("validation_status", gate.validation_status || "unknown"),
+    fact("apply_status", gate.apply_status || "unknown"),
+    fact("next_context_status", gate.next_context_status || "unknown"),
+    fact("operator_steps", arrayValue(payload.operator_sequence).length),
+    fact("blocked_until", arrayValue(payload.blocked_until).length),
+    fact("recommendations", ai.recommendations ?? "unknown"),
+    fact("pending_operator_decisions", ai.operator_decisions_still_pending ?? "unknown"),
+    fact("human_acceptance_recorded", yesNo(payload.human_acceptance_recorded)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
 }
 
