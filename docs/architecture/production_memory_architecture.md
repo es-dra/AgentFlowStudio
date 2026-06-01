@@ -33,6 +33,7 @@ project_input
   -> session_report
   -> company_kb_feedback_candidate_packet
   -> operator_loop_run_manifest
+  -> operator_feedback_event
 ```
 
 The committed example lives at:
@@ -90,6 +91,9 @@ The required root identifiers are:
 - `operator_loop_run_manifest`: an auditable no-provider orchestration manifest
   that records all operator-loop nodes, generated artifact refs, controls, and
   non-claim boundaries for one local run.
+- `operator_feedback_event`: evidence-only feedback captured against a selected
+  operator-loop manifest node. It is not human acceptance, not memory, not a
+  memory candidate, and not a promotion decision.
 
 All derived artifacts declare:
 
@@ -121,6 +125,8 @@ All derived artifacts declare:
   after an explicit next-pass promotion decision.
 - Rejected, expired, or blocked next-pass feedback remains visible in
   `blocked_refs` when requested for follow-up context.
+- Operator feedback about a loop node remains evidence-only until a later
+  explicit memory-candidate and promotion path is created.
 
 ## CLI Surface
 
@@ -139,6 +145,7 @@ python -m apps.cli.main production-memory-loop-review-next-pass-promotion data/p
 python -m apps.cli.main production-memory-loop-run-next-pass-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --next-pass-review data/processed/runs/production_memory_loop/next_pass_review/next_pass_review.json --promotion-decision data/processed/runs/production_memory_loop/next_pass_promotion_decision/next_pass_promotion_decision.json --output data/processed/runs/production_memory_loop/next_pass_reviewed_feedback
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
+python -m apps.cli.main production-memory-loop-capture-operator-feedback data/processed/runs/production_memory_loop/operator_loop/production_memory_operator_loop_run.json --target-node company_kb_feedback_candidate_packet --decision accepted --summary "Operator reviewed the candidate packet shape for the next loop." --reviewed-at 2026-06-02T07:10:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -222,6 +229,11 @@ The Company KB feedback candidate command writes:
 - `company_kb_feedback_candidate_packet.json`
 - `company_kb_feedback_candidate_packet.md`
 
+The operator feedback capture command writes:
+
+- `operator_feedback_event.json`
+- `operator_feedback_event.md`
+
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
@@ -258,6 +270,12 @@ The next-pass promotion overlay is the explicit-decision surface after result
 intake. It converts reviewed next-pass feedback into normal source records for a
 derived no-provider loop, but it still does not write durable memory, write
 Company KB, call providers, or claim acceptance.
+
+The operator feedback event is the explicit feedback surface after an operator
+inspects a manifest node. Even when its decision is `accepted`, it records only
+`status: evidence_only` with `feedback_is_memory: false`,
+`creates_memory_candidate: false`, `creates_promotion_decision: false`, and
+`human_acceptance: not_claimed`.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as

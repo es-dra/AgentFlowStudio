@@ -9,6 +9,43 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Feedback 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-feedback-001`, based on the verified
+  operator-loop manifest and next-pass promotion Web slices.
+- Added evidence-only operator feedback capture for a selected
+  `agentflow_production_memory_operator_loop_run` node through
+  `production-memory-loop-capture-operator-feedback`.
+- The captured artifact writes `operator_feedback_event.json` and
+  `operator_feedback_event.md`; it sets `feedback_is_memory: false`,
+  `creates_memory_candidate: false`, `creates_promotion_decision: false`,
+  `writes_long_term_memory: false`, `writes_company_kb: false`, and
+  `human_acceptance: not_claimed`.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no automatic memory candidate or promotion decision, no Loulan-specific
+  behavior, no human acceptance claim, and no business validation claim.
+- Verification:
+  - Red test on system Python 3.13 failed with missing
+    `agentflow.memory.production_operator_feedback`, as expected before
+    implementation.
+  - System Python focused test after implementation:
+    `python -m pytest tests/test_production_memory_operator_feedback.py -q`
+    -> 3 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback.py -q`
+    -> 3 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow/memory/production_operator_feedback.py apps/cli/production_memory_operator_feedback_command.py apps/cli/command_registry.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback.py tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_production_memory_feedback_capture.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 41 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed and listed `production-memory-loop-capture-operator-feedback`.
+  - CLI smoke generated an ignored operator-loop manifest and then captured
+    `operator_feedback_event.json` / `.md` as `evidence_only`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 751 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Operator Loop Promotion Web 001
 
 - Continued the generic Production Memory Architecture path on
