@@ -52,16 +52,16 @@ Observed:
 {
   "contract_type": "loulan_manifest_set",
   "state": "blocked_until_b01_human_review",
-  "project": "12 selected Loulan manifests; target B02; loulan_scene_assets",
-  "asset_registry": "85 assets; 3 eligible, 82 blocked",
+  "project": "9 selected Loulan manifests; target B02; loulan_scene_assets",
+  "asset_registry": "87 assets; 3 eligible, 84 blocked",
   "b01": "5 pending B01 decisions",
   "requests": "38 Image2 requests; 38 Kling I2V requests",
   "project_manifests": "38 shots; character assets selected: true; prop assets selected: true",
-  "next_pass": "B02 blocked: 3 eligible refs, 82 blocked refs",
+  "next_pass": "B02 blocked: 3 eligible refs, 84 blocked refs",
   "provider_calls_started": "false",
   "new_media_generated": "false",
   "durable_memory_write": "false",
-  "artifact_inspector_count": 12
+  "artifact_inspector_count": 9
 }
 ```
 
