@@ -20,6 +20,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_memory_video_pipeline_human_observation: ["memory_video_pipeline_human_observation.json", "memory_video_pipeline_human_observation.example.json"],
   agentflow_memory_video_pipeline_presentation_package: ["memory_video_pipeline_presentation_package.json", "memory_video_pipeline_presentation_package.example.json"],
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
+  agentflow_production_memory_loop: ["production_memory_loop.json", "production_memory_loop.example.json"],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -64,6 +65,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return "memory video pipeline human observation";
   if (type === "agentflow_memory_video_pipeline_presentation_package") return "memory video pipeline presentation package";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
+  if (type === "agentflow_production_memory_loop") return "production memory loop";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
   return "unclassified";

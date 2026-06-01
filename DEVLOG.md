@@ -9,6 +9,55 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Loop 001
+
+- Implemented `AFS-PRODUCTION-MEMORY-LOOP-001` as a generic AFS
+  Production Memory Architecture slice, not a project-specific content
+  production extension.
+- Added a no-provider contract and CLI path:
+  `agentflow/memory/production_loop.py`,
+  `agentflow/memory/production_next_pass.py`,
+  `agentflow/memory/production_feedback.py`,
+  `apps/cli/production_memory_loop_command.py`,
+  `production-memory-loop-validate`, and
+  `production-memory-loop-run-no-provider`.
+- Added `production-memory-loop-draft-feedback` to draft feedback, candidate
+  memory, and a pending promotion decision template without mutating the source
+  loop or promoting memory.
+- Added `production-memory-loop-review-promotion` and
+  `production-memory-loop-run-reviewed-feedback-no-provider` so a reviewed
+  operator decision can be overlaid into a derived no-provider loop without
+  mutating the source loop or writing durable memory.
+- Added the required example root identifiers:
+  `kind: agentflow_production_memory_loop` and
+  `schema_version: production-memory-loop/v1`.
+- Added Web read-only generic production-memory canvas support through
+  explicit selected JSON artifacts only. No directory scan, browser
+  persistence, provider execution, or project-specific inspector was added.
+- Added candidate-only Company KB feedback records under
+  `docs/company-kb-feedback-candidates/`; no Company source KB write.
+- Optional Image2/Kling validation was not attempted because it is outside the
+  core DoD and requires a separate gated provider environment.
+- Verification:
+  - `python -m pytest tests/test_production_memory_loop.py -q` -> 10 passed.
+  - `python -m pytest tests/test_production_memory_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q` -> 35 passed.
+  - `python -m pytest tests/test_production_memory_promotion_overlay.py tests/test_production_memory_feedback_capture.py tests/test_production_memory_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q` -> 45 passed.
+  - `python -m apps.cli.main --help` -> passed; new production-memory commands are visible.
+  - `python -m apps.cli.main production-memory-loop-validate examples/agentflow/production_memory_loop.example.json` -> passed.
+  - `python -m apps.cli.main production-memory-loop-run-no-provider examples/agentflow/production_memory_loop.example.json --output data/processed/runs/production_memory_loop/no_provider` -> ready; 3 included refs, 3 blocked refs, and `next_pass_bundle.json` written.
+  - `python -m apps.cli.main production-memory-loop-draft-feedback examples/agentflow/production_memory_loop.example.json --target-ref artifact:approved_storyboard:v1 --decision accepted --summary "Carry the reviewed storyboard structure into the next pass." --created-at 2026-06-02T00:00:00+08:00 --output data/processed/runs/production_memory_loop/feedback_capture` -> draft written; promotion decision remains pending.
+  - `python -m apps.cli.main production-memory-loop-review-promotion data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --decision promoted --rationale "Candidate is traceable to reviewed feedback." --decided-at 2026-06-02T00:05:00+08:00 --output data/processed/runs/production_memory_loop/promotion_decision` -> reviewed promotion decision written.
+  - `python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback` -> ready; 4 included refs and 3 blocked refs.
+  - Focused Web static suite -> 65 passed.
+  - Web static HTTP smoke at `http://127.0.0.1:8771/index.html#memory` -> passed; temporary server stopped.
+  - JS syntax checks for touched Web modules -> passed.
+  - `python -m pytest` -> 698 passed.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+- Follow-up boundary: browser-level DOM smoke remains blocked by no detected
+  Chrome/Edge executable and no local Playwright package; optional provider
+  validation remains blocked because image/video/provider config gates are
+  unset.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

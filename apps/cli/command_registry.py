@@ -14,6 +14,13 @@ from apps.cli.memory_video_pipeline_command import (
     memory_video_pipeline_present_command,
     memory_video_pipeline_review_command,
 )
+from apps.cli.production_memory_loop_command import (
+    production_memory_loop_draft_feedback_command,
+    production_memory_loop_review_promotion_command,
+    production_memory_loop_run_no_provider_command,
+    production_memory_loop_run_reviewed_feedback_no_provider_command,
+    production_memory_loop_validate_command,
+)
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.report_commands import (
     delivery_readiness_command,
@@ -46,6 +53,13 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="memory-video-pipeline-present")(memory_video_pipeline_present_command)
     app.command(name="memory-video-pipeline-package")(memory_video_pipeline_package_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
+    app.command(name="production-memory-loop-validate")(production_memory_loop_validate_command)
+    app.command(name="production-memory-loop-run-no-provider")(production_memory_loop_run_no_provider_command)
+    app.command(name="production-memory-loop-draft-feedback")(production_memory_loop_draft_feedback_command)
+    app.command(name="production-memory-loop-review-promotion")(production_memory_loop_review_promotion_command)
+    app.command(name="production-memory-loop-run-reviewed-feedback-no-provider")(
+        production_memory_loop_run_reviewed_feedback_no_provider_command
+    )
     app.command(name="web-bridge")(web_bridge_command)
 
 

@@ -90,6 +90,7 @@ export function normalizeWorkspace(artifacts) {
   const packageSummary = normalizePackage(byType("package_manifest"));
   const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
   const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
+  const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
   const workspaceParts = {
     warnings,
     errors,
@@ -100,6 +101,7 @@ export function normalizeWorkspace(artifacts) {
     run,
     package: packageSummary,
     memoryPackage,
+    productionMemoryLoop,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),
@@ -146,6 +148,7 @@ function detectArtifactType(fileName, payload) {
     if (aliases.includes(normalizedName)) return type;
   }
   if (payload && payload.artifact_index && payload.workflow) return "run_manifest";
+  if (payload && payload.kind === "agentflow_production_memory_loop") return "agentflow_production_memory_loop";
   if (payload && typeof payload.artifact_type === "string" && payload.artifact_type.startsWith("agentflow_")) return payload.artifact_type;
   if (payload && payload.assets && payload.package_id) return "package_manifest";
   if (payload && payload.sections && payload.summary) return "review_report";

@@ -5,6 +5,7 @@ const TYPE_LABELS = {
   agentflow_memory_video_pipeline_human_observation: "Human observation",
   agentflow_memory_video_pipeline_presentation_package: "Presentation package",
   agentflow_feedback_event: "Feedback draft",
+  agentflow_production_memory_loop: "Production memory loop",
 };
 
 export function buildMemoryArtifactInspector(workspace, fallback = []) {
@@ -34,6 +35,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return ["assets", "review"];
   if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
+  if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   return [];
 }
 
@@ -44,9 +46,21 @@ function factsFor(type, payload) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return observationFacts(payload);
   if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
+  if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
     fact("schema_version", payload.schema_version || "unknown"),
+  ];
+}
+
+function productionLoopFacts(payload) {
+  return [
+    fact("artifacts", String(arrayValue(payload.artifact_ledger).length)),
+    fact("feedback_events", String(arrayValue(payload.feedback_events).length)),
+    fact("memory_candidates", String(arrayValue(payload.memory_candidates).length)),
+    fact("promotion_decisions", String(arrayValue(payload.promotion_decisions).length)),
+    fact("provider_mode", payload.provider_mode || "unknown"),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
 }
 

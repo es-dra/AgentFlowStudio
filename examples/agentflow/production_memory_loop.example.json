@@ -1,0 +1,119 @@
+{
+  "kind": "agentflow_production_memory_loop",
+  "artifact_type": "agentflow_production_memory_loop",
+  "schema_version": "production-memory-loop/v1",
+  "loop_id": "generic_production_memory_loop_example",
+  "provider_mode": "no-provider",
+  "provider_calls_started": false,
+  "writes_long_term_memory": false,
+  "project_input": {
+    "project_id": "project:generic-content-loop",
+    "operator_goal": "Prepare a second production pass from reviewed local evidence.",
+    "input_refs": [
+      "artifact:brief:v1",
+      "artifact:approved_storyboard:v1"
+    ]
+  },
+  "artifact_ledger": [
+    {
+      "ref_id": "artifact:brief:v1",
+      "artifact_kind": "project_brief",
+      "title": "Generic project brief",
+      "status": "approved",
+      "eligible_for_next_context": true,
+      "summary": "Sanitized operator intent for the next production pass.",
+      "source_refs": []
+    },
+    {
+      "ref_id": "artifact:approved_storyboard:v1",
+      "artifact_kind": "storyboard",
+      "title": "Approved storyboard",
+      "status": "approved",
+      "eligible_for_next_context": true,
+      "summary": "Reviewed storyboard notes approved for a next pass.",
+      "source_refs": [
+        "artifact:brief:v1",
+        "feedback:storyboard_approval:v1"
+      ]
+    },
+    {
+      "ref_id": "artifact:draft_storyboard:v1",
+      "artifact_kind": "storyboard",
+      "title": "Rejected draft storyboard",
+      "status": "rejected",
+      "eligible_for_next_context": true,
+      "summary": "Rejected draft retained as evidence but blocked from context reuse.",
+      "source_refs": [
+        "artifact:brief:v1",
+        "feedback:storyboard_rejection:v1"
+      ]
+    }
+  ],
+  "feedback_events": [
+    {
+      "feedback_id": "feedback:storyboard_approval:v1",
+      "target_ref": "artifact:approved_storyboard:v1",
+      "decision": "accepted",
+      "reviewer_role": "operator",
+      "summary": "Carry forward the approved storyboard structure.",
+      "status": "reviewed"
+    },
+    {
+      "feedback_id": "feedback:storyboard_rejection:v1",
+      "target_ref": "artifact:draft_storyboard:v1",
+      "decision": "rejected",
+      "reviewer_role": "operator",
+      "summary": "Do not reuse the rejected draft storyboard.",
+      "status": "reviewed"
+    }
+  ],
+  "memory_candidates": [
+    {
+      "candidate_id": "memory:candidate:approved-style:v1",
+      "status": "candidate",
+      "scope": "project",
+      "source_feedback_ids": [
+        "feedback:storyboard_approval:v1"
+      ],
+      "statement": "Next pass should preserve the approved storyboard structure.",
+      "candidate_is_promoted_memory": false
+    },
+    {
+      "candidate_id": "memory:candidate:pending-tone:v1",
+      "status": "pending",
+      "scope": "project",
+      "source_feedback_ids": [
+        "feedback:storyboard_approval:v1"
+      ],
+      "statement": "Tone preference is still pending review and cannot enter context.",
+      "candidate_is_promoted_memory": false
+    }
+  ],
+  "promotion_decisions": [
+    {
+      "decision_id": "promotion:approved-style:v1",
+      "candidate_id": "memory:candidate:approved-style:v1",
+      "decision": "promoted",
+      "review_mode": "explicit_operator_decision",
+      "rationale": "The candidate is scoped, traceable, and safe for this project next pass.",
+      "writes_long_term_memory": false
+    }
+  ],
+  "next_pass_request": {
+    "task_id": "next-pass:generic-content-loop:v1",
+    "requested_refs": [
+      "artifact:brief:v1",
+      "artifact:approved_storyboard:v1",
+      "artifact:draft_storyboard:v1",
+      "feedback:storyboard_approval:v1",
+      "memory:candidate:approved-style:v1",
+      "memory:candidate:pending-tone:v1"
+    ]
+  },
+  "claim_boundaries": {
+    "human_acceptance": "not_reviewed",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_implemented",
+    "provider_success": "not_attempted"
+  }
+}

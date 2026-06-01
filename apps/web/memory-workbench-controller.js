@@ -5,6 +5,7 @@ import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
 import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
+import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
 export function attachMemoryWorkbenchHandlers(elements, { onWorkspaceLoaded, setMode }) {
@@ -20,7 +21,8 @@ export function memorySourceForArtifacts(artifacts) {
 }
 
 export function buildMemoryWorkbenchView(workspace, source) {
-  const memoryView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
+  const packageView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
+  const memoryView = buildProductionMemoryLoopView(workspace, packageView);
   memoryView.source_status = memorySourceStatus(source, workspace);
   memoryView.artifact_inspector = buildMemoryArtifactInspector(workspace, memoryView.artifact_inspector);
   memoryView.feedback_draft = buildMemoryFeedbackDraft(workspace);

@@ -36,6 +36,7 @@ AGENTFLOW_EXAMPLE_PATHS = (
     Path("examples/agentflow/memory_video_pipeline_human_observation.example.json"),
     Path("examples/agentflow/memory_video_pipeline_presentation_package.example.json"),
     Path("examples/agentflow/memory_video_pipeline_package.example.json"),
+    Path("examples/agentflow/production_memory_loop.example.json"),
     *AGENTFLOW_SKILL_ROUTER_EXAMPLES,
     *AGENTFLOW_ASSET_EXAMPLES,
 )
@@ -53,6 +54,7 @@ AGENTFLOW_EXAMPLE_TYPES = frozenset(
         "agentflow_memory_video_pipeline_human_observation",
         "agentflow_memory_video_pipeline_presentation_package",
         "agentflow_memory_video_pipeline_package",
+        "agentflow_production_memory_loop",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",

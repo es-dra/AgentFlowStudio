@@ -52,7 +52,7 @@ def test_agentflow_contract_audit_report_covers_registry_contracts() -> None:
     assert registry_types <= audited_types
     assert all(entry["example_path_exists"] for entry in report["audited_contracts"])
     assert all(entry["doc_path_exists"] for entry in report["audited_contracts"])
-    assert all(entry["schema_version"] == "0.1.0" for entry in report["audited_contracts"])
+    assert all(entry["schema_version"] in {"0.1.0", "production-memory-loop/v1"} for entry in report["audited_contracts"])
     assert all(Path(entry["example_path"]).exists() for entry in report["audited_contracts"])
     assert all(Path(entry["doc_path"]).exists() for entry in report["audited_contracts"])
 
@@ -72,6 +72,7 @@ def test_agentflow_contract_audit_report_records_boundary_checks() -> None:
         "reusable_asset_requires_promotion",
         "context_reuse_requires_promotion_decision",
         "context_reuse_does_not_write_memory",
+        "production_memory_loop_no_provider_context_bundle",
         "intermediate_asset_has_evidence",
     } <= check_ids
     assert all(check["status"] == "passed" for check in report["boundary_checks"])
