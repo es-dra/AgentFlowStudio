@@ -19,6 +19,7 @@ export function loulanProjectAuditProbeStatus(payload) {
 export function loulanProjectAuditProbeFacts(payload) {
   const packageProbe = objectValue(payload.afs_package_probe);
   const summarySync = objectValue(payload.afs_package_audit_summary_sync);
+  const cliProbe = objectValue(payload.afs_package_audit_summary_cli_probe);
   const audits = objectValue(packageProbe.project_audits);
   const manifestReference = objectValue(audits.manifest_reference);
   const textEncoding = objectValue(audits.text_encoding);
@@ -57,6 +58,17 @@ export function loulanProjectAuditProbeFacts(payload) {
       fact("package_summary_blocked_refs", summarySync.blocked_memory_refs ?? "unknown"),
       fact("package_summary_provider_calls_started", yesNo(summarySync.provider_calls_started)),
       fact("package_summary_writes_long_term_memory", yesNo(summarySync.writes_long_term_memory)),
+    );
+  }
+  if (Object.keys(cliProbe).length) {
+    const stdoutLines = Array.isArray(cliProbe.stdout_lines) ? cliProbe.stdout_lines : [];
+    facts.push(
+      fact("package_audit_summary_cli", cliProbe.status || "unknown"),
+      fact("package_cli_stdout_lines", stdoutLines.length),
+      fact("package_cli_eligible_refs", cliProbe.eligible_memory_refs ?? "unknown"),
+      fact("package_cli_blocked_refs", cliProbe.blocked_memory_refs ?? "unknown"),
+      fact("package_cli_provider_calls_started", yesNo(cliProbe.provider_calls_started)),
+      fact("package_cli_writes_long_term_memory", yesNo(cliProbe.writes_long_term_memory)),
     );
   }
   return facts;

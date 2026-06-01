@@ -31,6 +31,8 @@ afs_project_audit_package_probe.json
   through the new module.
 - The inspector now also surfaces package-audit summary sync facts when the
   probe includes `afs_package_audit_summary_sync`.
+- The inspector also surfaces CLI summary probe facts when the probe includes
+  `afs_package_audit_summary_cli_probe`.
 - Added a focused static Web test for direct selected-file recognition.
 
 ## Inspector Facts
@@ -63,6 +65,12 @@ The direct artifact view surfaces:
 - `package_summary_blocked_refs`
 - `package_summary_provider_calls_started`
 - `package_summary_writes_long_term_memory`
+- `package_audit_summary_cli`
+- `package_cli_stdout_lines`
+- `package_cli_eligible_refs`
+- `package_cli_blocked_refs`
+- `package_cli_provider_calls_started`
+- `package_cli_writes_long_term_memory`
 
 ## Boundary Evidence
 
@@ -115,6 +123,10 @@ Observed direct Web projection:
     "package_phase_pending_b01": "5",
     "package_summary_eligible_refs": "3",
     "package_summary_blocked_refs": "90",
+    "package_audit_summary_cli": "pass_b01_still_blocked",
+    "package_cli_stdout_lines": "3",
+    "package_cli_eligible_refs": "3",
+    "package_cli_blocked_refs": "90",
     "provider_calls_started": "false",
     "writes_long_term_memory": "false"
   }

@@ -60,6 +60,19 @@ const probe = {
     provider_calls_started: false,
     writes_long_term_memory: false
   },
+  afs_package_audit_summary_cli_probe: {
+    status: "pass_b01_still_blocked",
+    surface: "loulan_memory_package_cli_stdout",
+    stdout_lines: [
+      "Manifest audit: pass; errors 0; invalid asset types 0; invalid statuses 0",
+      "Text encoding audit: pass; errors 0",
+      "Phase gate audit: blocked_until_b01_human_review; failures 0; pending B01 5"
+    ],
+    eligible_memory_refs: 3,
+    blocked_memory_refs: 90,
+    provider_calls_started: false,
+    writes_long_term_memory: false
+  },
   claim_boundary: {
     human_acceptance: "not_recorded",
     business_validation: "not_validated",
@@ -125,3 +138,9 @@ console.log(JSON.stringify({
     assert facts["package_summary_blocked_refs"] == "90"
     assert facts["package_summary_provider_calls_started"] == "false"
     assert facts["package_summary_writes_long_term_memory"] == "false"
+    assert facts["package_audit_summary_cli"] == "pass_b01_still_blocked"
+    assert facts["package_cli_stdout_lines"] == "3"
+    assert facts["package_cli_eligible_refs"] == "3"
+    assert facts["package_cli_blocked_refs"] == "90"
+    assert facts["package_cli_provider_calls_started"] == "false"
+    assert facts["package_cli_writes_long_term_memory"] == "false"
