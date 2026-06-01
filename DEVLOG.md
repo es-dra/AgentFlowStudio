@@ -9,6 +9,45 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Feedback Candidate Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-feedback-candidate-overlay-001`
+  on `codex/afs-production-memory-operator-loop-feedback-candidate-web-001`.
+- Added read-only generic Web canvas support for embedded
+  `operator_feedback_candidate_promotion` data inside
+  `agentflow_production_memory_operator_loop_run` manifests.
+- The operator-loop Web canvas now surfaces an Operator feedback candidate
+  promotion card, lane, controls, next-pass action, output refs, and inspector
+  facts for the explicit decision and derived overlay effect.
+- Split production-memory inspector facts into
+  `memory-workbench-production-inspector-facts.js` and moved the new Web test
+  into a focused test file so touched JS/test files remain under the 300-line
+  target.
+- Boundary kept: selected local JSON only, read-only view, no provider call,
+  no Company KB write, no durable memory write, no workflow execution, no ref
+  following, no browser persistence, no directory scanning, no Loulan-specific
+  behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - Red Web static test failed because the operator-loop canvas did not include
+    an Operator feedback candidate promotion lane.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_loop_feedback_candidate.py -q`
+    -> 4 passed.
+  - `node --check apps\web\memory-workbench-production-operator-loop.js`,
+    `node --check apps\web\memory-workbench-inspector.js`, and
+    `node --check apps\web\memory-workbench-production-inspector-facts.js`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_loop_feedback_candidate.py tests/test_web_static_production_memory_operator_feedback_candidate.py tests/test_web_static_production_memory_operator_feedback.py tests/test_web_static_production_memory_next_pass_promotion.py tests/test_web_static_production_memory_next_pass_review.py tests/test_web_static_production_memory_next_task_packet.py tests/test_web_static_production_memory_next_context_handoff.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q`
+    -> 39 passed.
+  - Code/test file line counts remain under the 300-line target: operator-loop
+    Web 176 lines, inspector 231 lines, production inspector facts helper 131
+    lines, operator-loop Web test 241 lines, feedback-candidate Web test 110
+    lines.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 779 passed on Python 3.12.12.
+  - Browser-level verification not run: `tool_search` did not expose Browser
+    control tools in this turn.
+
 ## 2026-06-02 - Production Memory Operator Loop Feedback Candidate Overlay 001
 
 - Continued from

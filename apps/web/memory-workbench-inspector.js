@@ -1,3 +1,16 @@
+import {
+  companyKbFeedbackFacts,
+  productionLoopFacts,
+  productionNextContextHandoffFacts,
+  productionNextPassPromotionFacts,
+  productionNextPassReviewFacts,
+  productionNextTaskPacketFacts,
+  productionOperatorFeedbackCandidateFacts,
+  productionOperatorFeedbackFacts,
+  productionOperatorLoopFacts,
+  productionSessionFacts,
+} from "./memory-workbench-production-inspector-facts.js";
+
 const TYPE_LABELS = {
   agentflow_memory_video_pipeline_package: "Pipeline package",
   agentflow_memory_video_pipeline_protocol: "Pipeline protocol",
@@ -80,115 +93,6 @@ function factsFor(type, payload) {
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
     fact("schema_version", payload.schema_version || "unknown"),
-  ];
-}
-
-function companyKbFeedbackFacts(payload) {
-  return [
-    fact("promotion_status", payload.promotion_status || "unknown"),
-    fact("candidate_items", String(arrayValue(payload.candidate_items).length)),
-    fact("source_kb_status", payload.source_kb_status || "unknown"),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("requires_human_review", yesNo(payload.requires_human_review)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionNextContextHandoffFacts(payload) {
-  return [
-    fact("handoff_status", payload.handoff_status || "unknown"),
-    fact("next_context_refs", String(arrayValue(payload.next_context_refs).length)),
-    fact("blocked_refs", String(arrayValue(payload.blocked_refs).length)),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionNextTaskPacketFacts(payload) {
-  return [
-    fact("packet_status", payload.packet_status || "unknown"),
-    fact("allowed_context_refs", String(arrayValue(payload.allowed_context_refs).length)),
-    fact("blocked_refs", String(arrayValue(payload.blocked_refs).length)),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionNextPassReviewFacts(payload) {
-  return [
-    fact("review_status", payload.review_status || "unknown"),
-    fact("used_allowed_refs", String(arrayValue(payload.used_allowed_refs).length)),
-    fact("blocked_or_unknown_refs", String(arrayValue(payload.blocked_or_unknown_refs).length)),
-    fact("feedback_candidates", String(arrayValue(payload.feedback_candidates).length)),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionNextPassPromotionFacts(payload) {
-  return [
-    fact("decision", payload.decision || "unknown"),
-    ...(payload.decision_effect ? [fact("decision_effect", payload.decision_effect)] : []),
-    fact("candidate_id", payload.candidate_id || "unknown"),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionOperatorFeedbackFacts(payload) {
-  return [
-    fact("status", payload.status || "unknown"),
-    fact("decision", payload.decision || "unknown"),
-    fact("target_node", payload.target_node_id || "unknown"),
-    fact("human_acceptance", payload.claim_boundaries?.human_acceptance || "unknown"),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionOperatorFeedbackCandidateFacts(payload) {
-  return [
-    fact("candidate_generation_status", payload.candidate_generation_status || "unknown"),
-    fact("memory_candidate_status", payload.memory_candidate?.status || "unknown"),
-    fact("promotion_decision", payload.promotion_decision_template?.decision || "unknown"),
-    fact("candidate_is_promoted_memory", yesNo(payload.candidate_is_promoted_memory)),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionOperatorLoopFacts(payload) {
-  const promotion = objectValue(payload.next_pass_promotion);
-  return [
-    fact("chain_status", payload.chain_status || "unknown"),
-    fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
-    fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
-    ...(promotion.decision ? [fact("next_pass_promotion_decision", promotion.decision)] : []),
-    ...(promotion.decision_effect ? [fact("next_pass_promotion_effect", promotion.decision_effect)] : []),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-function productionSessionFacts(payload) {
-  return [
-    fact("session_status", payload.session_status || "unknown"),
-    fact("included_refs", String(payload.context_summary?.included_ref_count ?? 0)),
-    fact("blocked_refs", String(payload.context_summary?.blocked_ref_count ?? 0)),
-    fact("next_action", payload.next_operator_action?.action || "unknown"),
-    fact("provider_mode", payload.provider_mode || "unknown"),
-    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
-  ];
-}
-
-function productionLoopFacts(payload) {
-  return [
-    fact("artifacts", String(arrayValue(payload.artifact_ledger).length)),
-    fact("feedback_events", String(arrayValue(payload.feedback_events).length)),
-    fact("memory_candidates", String(arrayValue(payload.memory_candidates).length)),
-    fact("promotion_decisions", String(arrayValue(payload.promotion_decisions).length)),
-    fact("provider_mode", payload.provider_mode || "unknown"),
-    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
 }
 
