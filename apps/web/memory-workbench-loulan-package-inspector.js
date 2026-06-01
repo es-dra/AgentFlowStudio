@@ -5,13 +5,21 @@ export function loulanPackageFacts(payload) {
   const manifestAudit = objectValue(audits.manifest_reference);
   const textAudit = objectValue(audits.text_encoding);
   const phaseGate = objectValue(audits.phase_gate);
+  const manifestSummary = objectValue(manifestAudit.summary);
+  const textSummary = objectValue(textAudit.summary);
+  const phaseSummary = objectValue(phaseGate.summary);
   return [
     fact("shots", payload.shot_summary?.total_shots ?? "unknown"),
     fact("eligible_refs", arrayValue(payload.next_context_bundle_draft?.eligible_memory_refs).length),
     fact("blocked_refs", arrayValue(payload.next_context_bundle_draft?.blocked_memory_refs).length),
     fact("manifest_reference_audit", manifestAudit.status || "not_provided"),
+    fact("manifest_audit_errors", manifestSummary.errors ?? "unknown"),
+    fact("invalid_asset_types", manifestSummary.invalid_asset_types ?? "unknown"),
+    fact("invalid_statuses", manifestSummary.invalid_statuses ?? "unknown"),
     fact("text_encoding_audit", textAudit.status || "not_provided"),
+    fact("text_encoding_errors", textSummary.errors ?? "unknown"),
     fact("phase_gate_audit", phaseGate.status || "not_provided"),
+    fact("phase_gate_failures", phaseSummary.failures ?? "unknown"),
     fact("feedback_gate_b01", b01Gate.status || "not_supplied"),
     fact("b01_operator_entrypoint", b01Operator.status || "not_supplied"),
     fact("b01_pending_decisions", b01Gate.pending_decisions ?? "unknown"),

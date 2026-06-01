@@ -105,7 +105,7 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
   const inventory = payload.asset_inventory || {};
   const items = [
     { id: "project", title: "Loulan pilot package", status: "review ready", detail: payload.project?.source_root_label || "selected package" },
-    { id: "project-audits", title: "Project audits", status: auditStatus(projectAudits, "manifest_reference") === "pass" && auditStatus(projectAudits, "text_encoding") === "pass" ? "pass" : "review", detail: `manifest reference: ${auditStatus(projectAudits, "manifest_reference")}; text encoding: ${auditStatus(projectAudits, "text_encoding")}; phase gate: ${auditStatus(projectAudits, "phase_gate")}` },
+    { id: "project-audits", title: "Project audits", status: auditStatus(projectAudits, "manifest_reference") === "pass" && auditStatus(projectAudits, "text_encoding") === "pass" ? "pass" : "review", detail: auditBundleDetail(projectAudits) },
     { id: "shots", title: "Shot manifest", status: "review ready", detail: `${payload.shot_summary?.total_shots || 0} shots indexed` },
     { id: "assets", title: "Asset inventory", status: blockedRefs.length ? "blocked" : "review ready", detail: `${inventory.total_assets || payload.asset_summary?.total_assets || 0} assets; ${eligibleRefs.length} eligible, ${blockedRefs.length} blocked` },
     { id: "api", title: "API workbench skeleton", status: apiPlan ? "review ready" : "planned", detail: apiPlan ? `${requestCount} request previews; live calls blocked` : "request preview only; live provider calls blocked by default" },
@@ -209,9 +209,9 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
     status: contextProjection?.context_bundle?.status || (safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned"),
     controls: [
       { label: "source project package", status: "review ready", detail: "explicit selected JSON package only" },
-      { label: "manifest reference audit", status: auditStatus(projectAudits, "manifest_reference"), detail: auditRef(projectAudits, "manifest_reference") },
-      { label: "text encoding audit", status: auditStatus(projectAudits, "text_encoding"), detail: auditRef(projectAudits, "text_encoding") },
-      { label: "phase gate audit", status: auditStatus(projectAudits, "phase_gate"), detail: auditRef(projectAudits, "phase_gate") },
+      { label: "manifest reference audit", status: auditStatus(projectAudits, "manifest_reference"), detail: auditControlDetail(projectAudits, "manifest_reference", [["errors", "errors"], ["invalid asset types", "invalid_asset_types"], ["invalid statuses", "invalid_statuses"]]) },
+      { label: "text encoding audit", status: auditStatus(projectAudits, "text_encoding"), detail: auditControlDetail(projectAudits, "text_encoding", [["errors", "errors"]]) },
+      { label: "phase gate audit", status: auditStatus(projectAudits, "phase_gate"), detail: auditControlDetail(projectAudits, "phase_gate", [["failures", "failures"], ["pending B01", "pending_b01_decisions"]]) },
       { label: "image route", status: safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned", detail: safety.image_generation || "unknown" },
       { label: "video route", status: "planned", detail: safety.video_generation || "dry_run_only" },
       { label: "request preview", status: "planned", detail: String(Boolean(safety.request_preview_only)) },
@@ -239,6 +239,19 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
 function auditStatus(projectAudits, key) { return projectAudits?.[key]?.status || "not_provided"; }
 
 function auditRef(projectAudits, key) { const audit = projectAudits?.[key] || {}; return audit.report_ref || audit.artifact_ref || "not provided"; }
+
+function auditSummary(projectAudits, key) { const summary = projectAudits?.[key]?.summary; return summary && typeof summary === "object" && !Array.isArray(summary) ? summary : {}; }
+
+function auditSummaryValue(projectAudits, key, field) { const value = auditSummary(projectAudits, key)[field]; return value ?? "unknown"; }
+
+function auditBundleDetail(projectAudits) {
+  return `manifest reference: ${auditStatus(projectAudits, "manifest_reference")} (errors ${auditSummaryValue(projectAudits, "manifest_reference", "errors")}; invalid types ${auditSummaryValue(projectAudits, "manifest_reference", "invalid_asset_types")}; invalid statuses ${auditSummaryValue(projectAudits, "manifest_reference", "invalid_statuses")}); text encoding: ${auditStatus(projectAudits, "text_encoding")} (errors ${auditSummaryValue(projectAudits, "text_encoding", "errors")}); phase gate: ${auditStatus(projectAudits, "phase_gate")} (failures ${auditSummaryValue(projectAudits, "phase_gate", "failures")})`;
+}
+
+function auditControlDetail(projectAudits, key, fields) {
+  const details = fields.map(([label, field]) => `${label}: ${auditSummaryValue(projectAudits, key, field)}`);
+  return `${auditRef(projectAudits, key)}; ${details.join("; ")}`;
+}
 
 function loulanNextPassStatus(payload, reviewPack, decisionTemplate, decisionReview, decisionWorksheet, decisionIntake, contextProjection) {
   return contextProjection?.context_bundle?.status

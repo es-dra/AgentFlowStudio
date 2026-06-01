@@ -335,6 +335,7 @@ Required boundaries:
   Loulan, and does not start image, video, LLM, ASR, or download calls;
 - package output must not contain absolute paths, generated media refs,
   provider credentials, bearer headers, signed URLs, or data URLs;
+- project-audit summary counts may be copied only as whitelisted scalars; no raw audit bodies, absolute refs, media refs, provider URLs, or secret-like values;
 - when `manifests/asset_registry.json` exists, registry-derived inventory,
   gates, and context drafts allow only approved/promoted reusable anchors;
 - legacy `character_assets.json` keeps `approved`, `promoted`, or `merged`
