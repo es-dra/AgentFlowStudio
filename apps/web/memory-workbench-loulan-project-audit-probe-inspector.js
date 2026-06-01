@@ -21,9 +21,11 @@ export function loulanProjectAuditProbeFacts(payload) {
   const audits = objectValue(packageProbe.project_audits);
   const manifestReference = objectValue(audits.manifest_reference);
   const textEncoding = objectValue(audits.text_encoding);
+  const phaseGate = objectValue(audits.phase_gate);
   return [
     fact("manifest_reference_audit", manifestReference.status || "unknown"),
     fact("text_encoding_audit", textEncoding.status || "unknown"),
+    fact("phase_gate_audit", phaseGate.status || "unknown"),
     fact("promotion_gate", packageProbe.promotion_gate || "unknown"),
     fact("b01_feedback_loop_gate", packageProbe.b01_feedback_loop_gate || "unknown"),
     fact("b01_pending_decisions", packageProbe.b01_pending_decisions ?? "unknown"),

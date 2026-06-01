@@ -4,28 +4,28 @@ import json
 import subprocess
 
 
-def test_static_viewer_recognizes_loulan_project_audit_package_probe() -> None:
+def test_static_viewer_recognizes_loulan_asset_governance_phase_audit() -> None:
     script = """
 import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
 import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
 
-const probe = {
+const phaseAudit = {
   schema_version: "0.1.0",
-  artifact_type: "loulan_afs_project_audit_package_probe",
-  status: "pass_b01_still_blocked",
-  afs_package_probe: {
-    project_audits: {
-      manifest_reference: { status: "pass" },
-      text_encoding: { status: "pass" },
-      phase_gate: { status: "blocked_until_b01_human_review" }
-    },
-    promotion_gate: "blocked",
-    eligible_memory_refs: 3,
-    blocked_memory_refs: 89,
-    b01_feedback_loop_gate: "blocked_pending_human_review",
-    b01_pending_decisions: 5,
-    provider_calls_started: false,
-    writes_long_term_memory: false
+  artifact_type: "loulan_asset_governance_phase_audit",
+  project_id: "loulan_scene_assets",
+  status: "blocked_until_b01_human_review",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  new_media_generated: false,
+  summary: {
+    phases: 5,
+    passed: 4,
+    blocked_expected: 1,
+    failures: 0,
+    registry_assets: 86,
+    eligible_context_refs: 3,
+    blocked_context_refs: 83,
+    pending_b01_decisions: 5
   },
   claim_boundary: {
     human_acceptance: "not_recorded",
@@ -34,7 +34,7 @@ const probe = {
   }
 };
 const artifacts = await parseFiles([
-  { name: "afs_project_audit_package_probe.json", text: async () => JSON.stringify(probe) },
+  { name: "asset_governance_phase_audit.json", text: async () => JSON.stringify(phaseAudit) },
 ]);
 const workspace = normalizeWorkspace(artifacts);
 const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
@@ -56,22 +56,23 @@ console.log(JSON.stringify({
     )
     payload = json.loads(result.stdout)
 
-    assert payload["artifactType"] == "loulan_afs_project_audit_package_probe"
+    assert payload["artifactType"] == "loulan_asset_governance_phase_audit"
     assert payload["artifactClass"] == "known_contract"
-    assert payload["sourceRole"] == "Loulan AFS project audit package probe"
+    assert payload["sourceRole"] == "Loulan asset governance phase audit"
     assert payload["memoryBundleCount"] == 1
     assert payload["sourceStatus"]["label"] == "Selected files"
-    assert payload["inspector"]["title"] == "Loulan AFS project audit package probe"
-    assert payload["inspector"]["status"] == "pass_b01_still_blocked"
+    assert payload["inspector"]["title"] == "Loulan asset governance phase audit"
+    assert payload["inspector"]["status"] == "blocked_until_b01_human_review"
     assert payload["inspector"]["focus_targets"] == ["project", "review", "next-pass"]
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
-    assert facts["manifest_reference_audit"] == "pass"
-    assert facts["text_encoding_audit"] == "pass"
-    assert facts["phase_gate_audit"] == "blocked_until_b01_human_review"
-    assert facts["promotion_gate"] == "blocked"
-    assert facts["b01_feedback_loop_gate"] == "blocked_pending_human_review"
-    assert facts["b01_pending_decisions"] == "5"
-    assert facts["eligible_refs"] == "3"
-    assert facts["blocked_refs"] == "89"
+    assert facts["phases"] == "5"
+    assert facts["passed"] == "4"
+    assert facts["blocked_expected"] == "1"
+    assert facts["failures"] == "0"
+    assert facts["registry_assets"] == "86"
+    assert facts["eligible_context_refs"] == "3"
+    assert facts["blocked_context_refs"] == "83"
+    assert facts["pending_b01_decisions"] == "5"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
+    assert facts["new_media_generated"] == "false"
