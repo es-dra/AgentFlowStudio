@@ -30,7 +30,7 @@ D:\Projects\LoulanSceneAssets
 Output:
 
 ```text
-data/processed/runs/loulan_memory_package/local_probe_phase_gate_audit/
+data/processed/runs/loulan_memory_package/local_probe_package_blocked_count_sync/
 ```
 
 Observed state:
@@ -42,7 +42,7 @@ Observed state:
 - Text encoding audit: `pass`
 - Promotion gate: `blocked`
 - Eligible refs: `3`
-- Blocked refs: `89`
+- Blocked refs: `90`
 - Provider calls: not started
 - Durable Memory write: false
 
@@ -61,10 +61,16 @@ Results:
 - Focused package/Web tests: `5 passed`.
 - Related Loulan package/probe tests: `6 passed`.
 - Full suite: `755 passed`.
+- Refresh suite: `.venv\Scripts\python.exe -B -m pytest --assert=plain -q` ->
+  `763 passed`.
 - Staging preflight: pass.
 - `git diff --check`: no whitespace errors; CRLF touch warnings only.
 - Real package output safety scan found no `D:\`, `C:\`, `file://`,
   provider URL, token, signed URL, API key, `.mp4`, or `.mov`.
+- Refresh package output parsed as 3 eligible refs, 90 blocked refs, manifest
+  reference audit `pass`, text encoding audit `pass`, phase gate
+  `blocked_until_b01_human_review`, no provider calls, and no durable Memory
+  write.
 - Modified code files remain under 300 lines.
 
 ## Boundaries

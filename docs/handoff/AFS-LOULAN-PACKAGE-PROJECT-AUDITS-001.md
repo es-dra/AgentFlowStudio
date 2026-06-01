@@ -36,7 +36,7 @@ D:\Projects\LoulanSceneAssets
 Output:
 
 ```text
-data/processed/runs/loulan_memory_package/local_probe_project_audits/
+data/processed/runs/loulan_memory_package/local_probe_package_blocked_count_sync/
 ```
 
 Observed state:
@@ -45,7 +45,7 @@ Observed state:
 - `project_audits.text_encoding.status`: `pass`
 - Promotion gate: `blocked`
 - Eligible refs: `3`
-- Blocked refs: `89`
+- Blocked refs: `90`
 - B01 feedback loop gate: `blocked_pending_human_review`
 - Provider calls: not started
 - Durable Memory write: false
@@ -61,14 +61,20 @@ Result: `6 passed`.
 Additional checks:
 
 - Full suite: `pytest -q` -> `754 passed`.
+- Refresh suite: `.venv\Scripts\python.exe -B -m pytest --assert=plain -q` ->
+  `763 passed`.
 - Real `loulan-memory-package` probe over `D:\Projects\LoulanSceneAssets`
   passed.
 - Web view probe over the real package showed `Project audits`,
   `manifest reference audit`, and `text encoding audit`.
 - Output safety scan over the real package probe found no `D:\`, `C:\`,
   provider URL, token, signed URL, API key, `.mp4`, or `.mov`.
-- Current Loulan registry includes the project-audit probe itself as blocked
-  review evidence, so the live package now reports 89 blocked refs.
+- Current Loulan registry includes additional blocked review evidence after the
+  project-audit probe, so the live package now reports 90 blocked refs.
+- Refresh package output parsed as 3 eligible refs, 90 blocked refs, manifest
+  reference audit `pass`, text encoding audit `pass`, phase gate
+  `blocked_until_b01_human_review`, no provider calls, and no durable Memory
+  write.
 - Modified/new code files are under 300 effective lines.
 
 ## Boundaries
