@@ -98,6 +98,19 @@ const probe = {
     provider_calls_started: false,
     writes_long_term_memory: false
   },
+  afs_latest_gate_facts_web_direct_probe: {
+    artifact_type: "loulan_root_project_manifest",
+    inspector_status: "blocked_until_b01_human_review",
+    inspector_facts: {
+      latest_gate_facts: "blocked_until_b01_human_review",
+      package_gate_facts: "pass_b01_still_blocked",
+      project_audit_gate_facts: "pass_b01_still_blocked",
+      b01_validation: "blocked_pending_human_review",
+      next_context: "blocked_until_b01_human_review"
+    },
+    provider_calls_started: false,
+    writes_long_term_memory: false
+  },
   claim_boundary: {
     human_acceptance: "not_recorded",
     business_validation: "not_validated",
@@ -140,6 +153,7 @@ console.log(JSON.stringify({
     assert facts["text_encoding_audit"] == "pass"
     assert facts["phase_gate_audit"] == "blocked_until_b01_human_review"
     assert facts["promotion_gate"] == "blocked"
+    assert facts["latest_gate_facts"] == "blocked_until_b01_human_review"
     assert facts["b01_feedback_loop_gate"] == "blocked_pending_human_review"
     assert facts["b01_pending_decisions"] == "5"
     assert facts["b01_operator_entrypoint"] == "blocked_pending_human_review"

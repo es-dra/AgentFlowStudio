@@ -31,6 +31,7 @@ export function loulanProjectAuditProbeFacts(payload) {
     fact("text_encoding_audit", textEncoding.status || "unknown"),
     fact("phase_gate_audit", phaseGate.status || "unknown"),
     fact("promotion_gate", packageProbe.promotion_gate || "unknown"),
+    fact("latest_gate_facts", latestGateFactsStatus(payload)),
     fact("b01_feedback_loop_gate", packageProbe.b01_feedback_loop_gate || "unknown"),
     fact("b01_pending_decisions", packageProbe.b01_pending_decisions ?? "unknown"),
     fact("b01_operator_entrypoint", packageProbe.b01_operator_entrypoint || "unknown"),
@@ -95,6 +96,39 @@ export function loulanProjectAuditProbeFacts(payload) {
     );
   }
   return facts;
+}
+
+function latestGateFactsStatus(payload) {
+  const projectAuditLatestGateFacts = objectValue(payload.afs_project_audit_latest_gate_facts_web_direct_probe);
+  const rootLatestGateFacts = objectValue(payload.afs_latest_gate_facts_web_direct_probe);
+  const rootProjectAuditGateFacts = objectValue(payload.afs_root_project_audit_gate_facts_web_direct_probe);
+  const projectAuditGateFacts = objectValue(payload.afs_project_audit_gate_facts_web_direct_probe);
+  const rootGateFacts = objectValue(payload.afs_root_gate_facts_web_direct_probe);
+  const packageGateFacts = objectValue(payload.afs_package_gate_facts_web_direct_probe);
+
+  return (
+    objectStatus(projectAuditLatestGateFacts, "latest_gate_facts")
+    || objectStatus(rootLatestGateFacts, "latest_gate_facts")
+    || objectStatus(rootProjectAuditGateFacts, "latest_gate_facts")
+    || objectStatus(projectAuditGateFacts, "latest_gate_facts")
+    || objectStatus(rootGateFacts, "latest_gate_facts")
+    || objectStatus(packageGateFacts, "latest_gate_facts")
+    || "not_provided"
+  );
+}
+
+function objectStatus(value, preferredFact) {
+  const facts = objectValue(value.inspector_facts);
+  return (
+    facts[preferredFact]
+    || value.status
+    || facts.next_context
+    || facts.next_context_status
+    || facts.root_gate_next_context
+    || facts.package_gate_b01_operator_next_context
+    || value.inspector_status
+    || ""
+  );
 }
 
 function fact(label, value) {
