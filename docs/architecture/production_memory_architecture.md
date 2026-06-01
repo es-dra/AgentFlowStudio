@@ -26,6 +26,7 @@ project_input
   -> next_pass_bundle
   -> session_report
   -> company_kb_feedback_candidate_packet
+  -> operator_loop_run_manifest
 ```
 
 The committed example lives at:
@@ -63,6 +64,9 @@ The required root identifiers are:
 - `company_kb_feedback_candidate_packet`: candidate-only project-to-Company
   feedback packet generated from a session report. It is not a Company KB
   write, not durable memory, and not a promotion decision.
+- `operator_loop_run_manifest`: an auditable no-provider orchestration manifest
+  that records all operator-loop nodes, generated artifact refs, controls, and
+  non-claim boundaries for one local run.
 
 All derived artifacts declare:
 
@@ -93,6 +97,7 @@ python -m apps.cli.main production-memory-loop-run-no-provider examples/agentflo
 python -m apps.cli.main production-memory-loop-draft-feedback examples/agentflow/production_memory_loop.example.json --target-ref artifact:approved_storyboard:v1 --decision accepted --summary "Carry the reviewed storyboard structure into the next pass." --created-at 2026-06-02T00:00:00+08:00 --output data/processed/runs/production_memory_loop/feedback_capture
 python -m apps.cli.main production-memory-loop-review-promotion data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --decision promoted --rationale "Candidate is traceable to reviewed feedback." --decided-at 2026-06-02T00:05:00+08:00 --output data/processed/runs/production_memory_loop/promotion_decision
 python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T01:00:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/operator_loop
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 ```
@@ -137,6 +142,11 @@ The Company KB feedback candidate command writes:
 
 - `company_kb_feedback_candidate_packet.json`
 - `company_kb_feedback_candidate_packet.md`
+
+The operator-loop command writes the existing no-provider run, session report,
+Company KB candidate packet, and:
+
+- `production_memory_operator_loop_run.json`
 
 The source loop and draft feedback capture are not mutated. A promoted or
 merged reviewed decision may include the new candidate in the next context; a

@@ -9,6 +9,27 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-loop-001`, based on the verified
+  Company KB feedback Web slice.
+- Added `agentflow/memory/production_operator_loop.py` and
+  `production-memory-loop-run-operator-no-provider`.
+- The command runs the full no-provider operator chain from one
+  `agentflow_production_memory_loop` JSON through run/context/readiness/next
+  pass, session report, Company KB candidate packet, and an operator-loop
+  manifest.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution beyond no-provider artifact assembly, no human
+  acceptance claim, and no business validation claim.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py -q` -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help` -> passed; `production-memory-loop-run-operator-no-provider` is visible.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T01:00:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/operator_loop` -> ready; wrote run, session report, Company KB candidate packet, and operator manifest under ignored runtime output.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py tests/test_production_memory_loop.py tests/test_production_memory_session_report.py tests/test_company_kb_feedback_packet.py tests/test_agentflow_contract_audit.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q` -> 54 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 715 passed.
+
 ## 2026-06-02 - Company KB Feedback Web 001
 
 - Continued the generic Production Memory Architecture path on
