@@ -40,6 +40,12 @@ The direct artifact view surfaces:
 - `promotion_gate`
 - `b01_feedback_loop_gate`
 - `b01_pending_decisions`
+- `b01_operator_entrypoint`
+- `b01_operator_pending_decisions`
+- `b01_operator_steps`
+- `b01_operator_blocked_until_count`
+- `b01_operator_recommendations`
+- `b01_operator_pending_operator_decisions`
 - `eligible_refs`
 - `blocked_refs`
 - `provider_calls_started`
@@ -79,8 +85,14 @@ Observed direct Web projection:
     "promotion_gate": "blocked",
     "b01_feedback_loop_gate": "blocked_pending_human_review",
     "b01_pending_decisions": "5",
+    "b01_operator_entrypoint": "blocked_pending_human_review",
+    "b01_operator_pending_decisions": "5",
+    "b01_operator_steps": "6",
+    "b01_operator_blocked_until_count": "4",
+    "b01_operator_recommendations": "5",
+    "b01_operator_pending_operator_decisions": "5",
     "eligible_refs": "3",
-    "blocked_refs": "89",
+    "blocked_refs": "90",
     "provider_calls_started": "false",
     "writes_long_term_memory": "false"
   }

@@ -40,7 +40,7 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Loulan memory package now surfaces project-level audit gates from `project_manifest.json`, including manifest-reference and text-encoding audit status in package JSON, Markdown, Web bundle, protocol controls, and inspector facts; real no-call probe over `D:\Projects\LoulanSceneAssets` shows both audits passing while promotion and B01 remain blocked; see `docs/handoff/AFS-LOULAN-PACKAGE-PROJECT-AUDITS-001.md`.
 
-2026-06-01: Web Artifact Workspace now recognizes the Loulan `loulan_afs_project_audit_package_probe` / `afs_project_audit_package_probe.json` directly as a read-only memory artifact, surfacing project audit pass states while keeping B01, promotion, provider, media, and durable Memory gates blocked; see `docs/handoff/AFS-LOULAN-WEB-PROJECT-AUDIT-PROBE-DIRECT-001.md`.
+2026-06-01: Web Artifact Workspace now recognizes the Loulan `loulan_afs_project_audit_package_probe` / `afs_project_audit_package_probe.json` directly as a read-only memory artifact, surfacing project audit pass states plus the B01 operator entrypoint package-sync facts while keeping B01, promotion, provider, media, and durable Memory gates blocked; see `docs/handoff/AFS-LOULAN-WEB-PROJECT-AUDIT-PROBE-DIRECT-001.md`.
 
 2026-06-01: Loulan memory package now surfaces the asset-governance phase audit as `project_audits.phase_gate`, and Web package review shows it in the Project audits card, protocol controls, and inspector facts; real no-call probe over `D:\Projects\LoulanSceneAssets` reports `blocked_until_b01_human_review`, 3 eligible refs, 89 blocked refs, no provider calls, and a clean safety scan; see `docs/handoff/AFS-LOULAN-PACKAGE-PHASE-GATE-AUDIT-001.md`.
 

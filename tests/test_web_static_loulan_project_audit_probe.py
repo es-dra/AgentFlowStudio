@@ -21,9 +21,15 @@ const probe = {
     },
     promotion_gate: "blocked",
     eligible_memory_refs: 3,
-    blocked_memory_refs: 89,
+    blocked_memory_refs: 90,
     b01_feedback_loop_gate: "blocked_pending_human_review",
     b01_pending_decisions: 5,
+    b01_operator_entrypoint: "blocked_pending_human_review",
+    b01_operator_pending_decisions: 5,
+    b01_operator_steps: 6,
+    b01_operator_blocked_until_count: 4,
+    b01_operator_recommendations: 5,
+    b01_operator_pending_operator_decisions: 5,
     provider_calls_started: false,
     writes_long_term_memory: false
   },
@@ -71,7 +77,13 @@ console.log(JSON.stringify({
     assert facts["promotion_gate"] == "blocked"
     assert facts["b01_feedback_loop_gate"] == "blocked_pending_human_review"
     assert facts["b01_pending_decisions"] == "5"
+    assert facts["b01_operator_entrypoint"] == "blocked_pending_human_review"
+    assert facts["b01_operator_pending_decisions"] == "5"
+    assert facts["b01_operator_steps"] == "6"
+    assert facts["b01_operator_blocked_until_count"] == "4"
+    assert facts["b01_operator_recommendations"] == "5"
+    assert facts["b01_operator_pending_operator_decisions"] == "5"
     assert facts["eligible_refs"] == "3"
-    assert facts["blocked_refs"] == "89"
+    assert facts["blocked_refs"] == "90"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
