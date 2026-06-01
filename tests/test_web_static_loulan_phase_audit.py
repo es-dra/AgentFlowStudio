@@ -22,9 +22,9 @@ const phaseAudit = {
     passed: 4,
     blocked_expected: 1,
     failures: 0,
-    registry_assets: 86,
+    registry_assets: 87,
     eligible_context_refs: 3,
-    blocked_context_refs: 83,
+    blocked_context_refs: 84,
     pending_b01_decisions: 5
   },
   claim_boundary: {
@@ -69,9 +69,9 @@ console.log(JSON.stringify({
     assert facts["passed"] == "4"
     assert facts["blocked_expected"] == "1"
     assert facts["failures"] == "0"
-    assert facts["registry_assets"] == "86"
+    assert facts["registry_assets"] == "87"
     assert facts["eligible_context_refs"] == "3"
-    assert facts["blocked_context_refs"] == "83"
+    assert facts["blocked_context_refs"] == "84"
     assert facts["pending_b01_decisions"] == "5"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"

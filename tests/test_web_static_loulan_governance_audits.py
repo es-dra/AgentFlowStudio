@@ -15,8 +15,8 @@ def test_static_viewer_recognizes_loulan_manifest_reference_audit() -> None:
             "writes_long_term_memory": False,
             "new_media_generated": False,
             "summary": {
-                "json_files_checked": 13,
-                "registry_assets": 86,
+                "json_files_checked": 14,
+                "registry_assets": 87,
                 "errors": 0,
                 "missing_sha256": 0,
                 "missing_files": 0,
@@ -34,8 +34,8 @@ def test_static_viewer_recognizes_loulan_manifest_reference_audit() -> None:
     assert payload["inspector"]["status"] == "pass"
     assert payload["inspector"]["focus_targets"] == ["project", "review", "next-pass"]
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
-    assert facts["json_files_checked"] == "13"
-    assert facts["registry_assets"] == "86"
+    assert facts["json_files_checked"] == "14"
+    assert facts["registry_assets"] == "87"
     assert facts["errors"] == "0"
     assert facts["missing_sha256"] == "0"
     assert facts["missing_files"] == "0"
@@ -57,7 +57,7 @@ def test_static_viewer_recognizes_loulan_text_encoding_audit() -> None:
             "writes_long_term_memory": False,
             "new_media_generated": False,
             "summary": {
-                "text_files_checked": 265,
+                "text_files_checked": 268,
                 "decode_errors": 0,
                 "marker_hits": 0,
                 "errors": 0,
@@ -73,7 +73,7 @@ def test_static_viewer_recognizes_loulan_text_encoding_audit() -> None:
     assert payload["inspector"]["status"] == "pass"
     assert payload["inspector"]["focus_targets"] == ["project", "review", "next-pass"]
     facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
-    assert facts["text_files_checked"] == "265"
+    assert facts["text_files_checked"] == "268"
     assert facts["decode_errors"] == "0"
     assert facts["marker_hits"] == "0"
     assert facts["errors"] == "0"

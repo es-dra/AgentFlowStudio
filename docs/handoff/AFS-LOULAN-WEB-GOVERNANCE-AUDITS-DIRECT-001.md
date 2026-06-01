@@ -30,8 +30,8 @@ Observed selected-file state:
   - artifact class: `known_contract`
   - source role: `Loulan manifest reference audit`
   - status: `pass`
-  - JSON files checked: `13`
-  - registry assets: `86`
+  - JSON files checked: `14`
+  - registry assets: `87`
   - errors: `0`
   - missing sha256: `0`
   - missing files: `0`
@@ -42,7 +42,7 @@ Observed selected-file state:
   - artifact class: `known_contract`
   - source role: `Loulan text encoding audit`
   - status: `pass`
-  - text files checked: `265`
+  - text files checked: `268`
   - decode errors: `0`
   - marker hits: `0`
   - errors: `0`
@@ -61,6 +61,13 @@ Both direct probes show:
 ```
 
 Result: `3 passed`.
+
+Refresh checks after current Loulan count sync:
+
+- Related direct-probe tests: `4 passed`.
+- Full AFS suite: `763 passed`.
+- Staging preflight: pass.
+- `git diff --check`: no whitespace errors; CRLF touch warnings only.
 
 ## Boundaries
 

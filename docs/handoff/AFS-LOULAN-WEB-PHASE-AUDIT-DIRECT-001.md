@@ -36,9 +36,9 @@ Observed selected-file state:
   - passed: `4`
   - blocked expected: `1`
   - failures: `0`
-  - registry assets: `86`
+  - registry assets: `87`
   - eligible context refs: `3`
-  - blocked context refs: `83`
+  - blocked context refs: `84`
   - pending B01 decisions: `5`
   - provider calls started: `false`
   - writes long-term memory: `false`
@@ -51,6 +51,13 @@ Observed selected-file state:
 ```
 
 Result: `2 passed`.
+
+Refresh checks after current Loulan count sync:
+
+- Related direct-probe tests: `4 passed`.
+- Full AFS suite: `763 passed`.
+- Staging preflight: pass.
+- `git diff --check`: no whitespace errors; CRLF touch warnings only.
 
 ## Boundaries
 
