@@ -12,6 +12,8 @@ Workbench selected-file artifact.
 - Reused the Loulan project-manifest inspector with a root-manifest branch.
 - The inspector surfaces project-level status, audit gates, and B01/context
   blockers without reading any other file.
+- The root manifest inspector now also surfaces the package audit-summary
+  status chain recorded in `project_manifest.json`.
 
 ## Real Probe
 
@@ -38,6 +40,10 @@ Observed selected-file state:
   - manifest reference audit: `pass`
   - text encoding audit: `pass`
   - phase gate audit: `blocked_until_b01_human_review`
+  - package audit summary: `pass_b01_still_blocked`
+  - package audit summary direct: `pass_b01_still_blocked`
+  - package audit summary CLI: `pass_b01_still_blocked`
+  - package audit summary CLI direct: `pass_b01_still_blocked`
   - B01 validation: `blocked_pending_human_review`
   - next context: `blocked_until_b01_human_review`
 

@@ -126,6 +126,10 @@ const manifest = {
   text_encoding_audit_status: "pass",
   asset_governance_phase_audit_status: "blocked_until_b01_human_review",
   afs_feedback_loop_status: "project_phase_gate_visible_in_afs_no_call_package_b01_pending_review",
+  afs_package_audit_summary_status: "pass_b01_still_blocked",
+  afs_package_audit_summary_direct_probe_status: "pass_b01_still_blocked",
+  afs_package_audit_summary_cli_status: "pass_b01_still_blocked",
+  afs_package_audit_summary_cli_direct_probe_status: "pass_b01_still_blocked",
   b01_human_review_validation_status: "blocked_pending_human_review",
   next_context_status: "blocked_until_b01_human_review"
 };
@@ -170,5 +174,9 @@ console.log(JSON.stringify({
     assert payload["facts"]["manifest_reference_audit"] == "pass"
     assert payload["facts"]["text_encoding_audit"] == "pass"
     assert payload["facts"]["phase_gate_audit"] == "blocked_until_b01_human_review"
+    assert payload["facts"]["package_audit_summary"] == "pass_b01_still_blocked"
+    assert payload["facts"]["package_audit_summary_direct"] == "pass_b01_still_blocked"
+    assert payload["facts"]["package_audit_summary_cli"] == "pass_b01_still_blocked"
+    assert payload["facts"]["package_audit_summary_cli_direct"] == "pass_b01_still_blocked"
     assert payload["facts"]["b01_validation"] == "blocked_pending_human_review"
     assert payload["facts"]["next_context"] == "blocked_until_b01_human_review"

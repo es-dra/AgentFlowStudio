@@ -44,6 +44,10 @@ function rootProjectFacts(payload) {
     fact("manifest_reference_audit", payload.manifest_reference_audit_status || "not_provided"),
     fact("text_encoding_audit", payload.text_encoding_audit_status || "not_provided"),
     fact("phase_gate_audit", payload.asset_governance_phase_audit_status || "not_provided"),
+    fact("package_audit_summary", payload.afs_package_audit_summary_status || "not_provided"),
+    fact("package_audit_summary_direct", payload.afs_package_audit_summary_direct_probe_status || "not_provided"),
+    fact("package_audit_summary_cli", payload.afs_package_audit_summary_cli_status || "not_provided"),
+    fact("package_audit_summary_cli_direct", payload.afs_package_audit_summary_cli_direct_probe_status || "not_provided"),
     fact("b01_validation", payload.b01_human_review_validation_status || "not_provided"),
     fact("next_context", payload.next_context_status || "not_provided"),
   ];
