@@ -8,10 +8,14 @@ export function loulanPackageFacts(payload) {
   const manifestSummary = objectValue(manifestAudit.summary);
   const textSummary = objectValue(textAudit.summary);
   const phaseSummary = objectValue(phaseGate.summary);
+  const nextContext = objectValue(payload.next_context_bundle_draft);
   return [
     fact("shots", payload.shot_summary?.total_shots ?? "unknown"),
-    fact("eligible_refs", arrayValue(payload.next_context_bundle_draft?.eligible_memory_refs).length),
-    fact("blocked_refs", arrayValue(payload.next_context_bundle_draft?.blocked_memory_refs).length),
+    fact("eligible_refs", arrayValue(nextContext.eligible_memory_refs).length),
+    fact("blocked_refs", arrayValue(nextContext.blocked_memory_refs).length),
+    fact("promotion_gate", payload.promotion_gates?.overall_status || "unknown"),
+    fact("next_context_status", nextContext.status || "unknown"),
+    fact("context_rule", nextContext.context_rule || "unknown"),
     fact("manifest_reference_audit", manifestAudit.status || "not_provided"),
     fact("manifest_audit_errors", manifestSummary.errors ?? "unknown"),
     fact("invalid_asset_types", manifestSummary.invalid_asset_types ?? "unknown"),
@@ -23,6 +27,14 @@ export function loulanPackageFacts(payload) {
     fact("feedback_gate_b01", b01Gate.status || "not_supplied"),
     fact("b01_operator_entrypoint", b01Operator.status || "not_supplied"),
     fact("b01_pending_decisions", b01Gate.pending_decisions ?? "unknown"),
+    fact("b01_validation_status", b01Gate.validation_status || "unknown"),
+    fact("b01_apply_status", b01Gate.apply_status || "unknown"),
+    fact("b01_context_projection_ready", yesNo(b01Gate.context_projection_ready)),
+    fact("b01_human_acceptance_recorded", yesNo(b01Gate.human_acceptance_recorded)),
+    fact("b01_media_generation_started", yesNo(b01Gate.media_generation_started)),
+    fact("b01_operator_apply_status", b01Operator.apply_status || "unknown"),
+    fact("b01_operator_next_context", b01Operator.next_context_status || "unknown"),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }
