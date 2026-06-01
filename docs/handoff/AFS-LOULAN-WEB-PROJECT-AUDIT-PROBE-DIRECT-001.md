@@ -29,6 +29,8 @@ afs_project_audit_package_probe.json
 - Added a focused project-audit-probe inspector module.
 - Routed the Memory Workbench inspector title, status, facts, and focus targets
   through the new module.
+- The inspector now also surfaces package-audit summary sync facts when the
+  probe includes `afs_package_audit_summary_sync`.
 - Added a focused static Web test for direct selected-file recognition.
 
 ## Inspector Facts
@@ -50,6 +52,17 @@ The direct artifact view surfaces:
 - `blocked_refs`
 - `provider_calls_started`
 - `writes_long_term_memory`
+- `package_audit_summary_sync`
+- `package_manifest_errors`
+- `package_invalid_asset_types`
+- `package_invalid_statuses`
+- `package_text_errors`
+- `package_phase_failures`
+- `package_phase_pending_b01`
+- `package_summary_eligible_refs`
+- `package_summary_blocked_refs`
+- `package_summary_provider_calls_started`
+- `package_summary_writes_long_term_memory`
 
 ## Boundary Evidence
 
@@ -93,6 +106,15 @@ Observed direct Web projection:
     "b01_operator_pending_operator_decisions": "5",
     "eligible_refs": "3",
     "blocked_refs": "90",
+    "package_audit_summary_sync": "pass_b01_still_blocked",
+    "package_manifest_errors": "0",
+    "package_invalid_asset_types": "0",
+    "package_invalid_statuses": "0",
+    "package_text_errors": "0",
+    "package_phase_failures": "0",
+    "package_phase_pending_b01": "5",
+    "package_summary_eligible_refs": "3",
+    "package_summary_blocked_refs": "90",
     "provider_calls_started": "false",
     "writes_long_term_memory": "false"
   }

@@ -18,11 +18,12 @@ export function loulanProjectAuditProbeStatus(payload) {
 
 export function loulanProjectAuditProbeFacts(payload) {
   const packageProbe = objectValue(payload.afs_package_probe);
+  const summarySync = objectValue(payload.afs_package_audit_summary_sync);
   const audits = objectValue(packageProbe.project_audits);
   const manifestReference = objectValue(audits.manifest_reference);
   const textEncoding = objectValue(audits.text_encoding);
   const phaseGate = objectValue(audits.phase_gate);
-  return [
+  const facts = [
     fact("manifest_reference_audit", manifestReference.status || "unknown"),
     fact("text_encoding_audit", textEncoding.status || "unknown"),
     fact("phase_gate_audit", phaseGate.status || "unknown"),
@@ -40,6 +41,25 @@ export function loulanProjectAuditProbeFacts(payload) {
     fact("provider_calls_started", yesNo(packageProbe.provider_calls_started)),
     fact("writes_long_term_memory", yesNo(packageProbe.writes_long_term_memory)),
   ];
+  if (Object.keys(summarySync).length) {
+    const manifestSummary = objectValue(summarySync.manifest_reference_audit);
+    const textSummary = objectValue(summarySync.text_encoding_audit);
+    const phaseSummary = objectValue(summarySync.phase_gate_audit);
+    facts.push(
+      fact("package_audit_summary_sync", summarySync.status || "unknown"),
+      fact("package_manifest_errors", manifestSummary.errors ?? "unknown"),
+      fact("package_invalid_asset_types", manifestSummary.invalid_asset_types ?? "unknown"),
+      fact("package_invalid_statuses", manifestSummary.invalid_statuses ?? "unknown"),
+      fact("package_text_errors", textSummary.errors ?? "unknown"),
+      fact("package_phase_failures", phaseSummary.failures ?? "unknown"),
+      fact("package_phase_pending_b01", phaseSummary.pending_b01_decisions ?? "unknown"),
+      fact("package_summary_eligible_refs", summarySync.eligible_memory_refs ?? "unknown"),
+      fact("package_summary_blocked_refs", summarySync.blocked_memory_refs ?? "unknown"),
+      fact("package_summary_provider_calls_started", yesNo(summarySync.provider_calls_started)),
+      fact("package_summary_writes_long_term_memory", yesNo(summarySync.writes_long_term_memory)),
+    );
+  }
+  return facts;
 }
 
 function fact(label, value) {

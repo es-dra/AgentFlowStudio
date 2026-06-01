@@ -33,6 +33,33 @@ const probe = {
     provider_calls_started: false,
     writes_long_term_memory: false
   },
+  afs_package_audit_summary_sync: {
+    status: "pass_b01_still_blocked",
+    manifest_reference_audit: {
+      status: "pass",
+      errors: 0,
+      invalid_asset_types: 0,
+      invalid_statuses: 0,
+      registry_assets: 87,
+      json_files_checked: 14
+    },
+    text_encoding_audit: {
+      status: "pass",
+      errors: 0,
+      text_files_checked: 268
+    },
+    phase_gate_audit: {
+      status: "blocked_until_b01_human_review",
+      failures: 0,
+      pending_b01_decisions: 5,
+      eligible_context_refs: 3,
+      blocked_context_refs: 84
+    },
+    eligible_memory_refs: 3,
+    blocked_memory_refs: 90,
+    provider_calls_started: false,
+    writes_long_term_memory: false
+  },
   claim_boundary: {
     human_acceptance: "not_recorded",
     business_validation: "not_validated",
@@ -87,3 +114,14 @@ console.log(JSON.stringify({
     assert facts["blocked_refs"] == "90"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
+    assert facts["package_audit_summary_sync"] == "pass_b01_still_blocked"
+    assert facts["package_manifest_errors"] == "0"
+    assert facts["package_invalid_asset_types"] == "0"
+    assert facts["package_invalid_statuses"] == "0"
+    assert facts["package_text_errors"] == "0"
+    assert facts["package_phase_failures"] == "0"
+    assert facts["package_phase_pending_b01"] == "5"
+    assert facts["package_summary_eligible_refs"] == "3"
+    assert facts["package_summary_blocked_refs"] == "90"
+    assert facts["package_summary_provider_calls_started"] == "false"
+    assert facts["package_summary_writes_long_term_memory"] == "false"
