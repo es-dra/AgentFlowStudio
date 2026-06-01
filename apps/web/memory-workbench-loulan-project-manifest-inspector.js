@@ -49,6 +49,7 @@ function rootProjectFacts(payload) {
     fact("package_audit_summary_cli", payload.afs_package_audit_summary_cli_status || "not_provided"),
     fact("package_audit_summary_cli_direct", payload.afs_package_audit_summary_cli_direct_probe_status || "not_provided"),
     fact("package_gate_facts", payload.afs_package_gate_facts_web_direct_probe_status || "not_provided"),
+    fact("project_audit_gate_facts", payload.afs_project_audit_gate_facts_web_direct_probe_status || "not_provided"),
     fact("b01_validation", payload.b01_human_review_validation_status || "not_provided"),
     fact("next_context", payload.next_context_status || "not_provided"),
   ];
