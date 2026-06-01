@@ -22,6 +22,10 @@ from apps.cli.production_memory_loop_command import (
     production_memory_loop_validate_command,
 )
 from apps.cli.production_memory_next_context_command import production_memory_loop_next_context_handoff_command
+from apps.cli.production_memory_next_pass_promotion_command import (
+    production_memory_loop_review_next_pass_promotion_command,
+    production_memory_loop_run_next_pass_reviewed_feedback_no_provider_command,
+)
 from apps.cli.production_memory_next_pass_review_command import production_memory_loop_review_next_pass_command
 from apps.cli.production_memory_next_task_command import production_memory_loop_next_task_packet_command
 from apps.cli.production_memory_operator_command import production_memory_loop_run_operator_no_provider_command
@@ -76,6 +80,12 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-next-task-packet")(production_memory_loop_next_task_packet_command)
     app.command(name="production-memory-loop-review-next-pass")(production_memory_loop_review_next_pass_command)
+    app.command(name="production-memory-loop-review-next-pass-promotion")(
+        production_memory_loop_review_next_pass_promotion_command
+    )
+    app.command(name="production-memory-loop-run-next-pass-reviewed-feedback-no-provider")(
+        production_memory_loop_run_next_pass_reviewed_feedback_no_provider_command
+    )
     app.command(name="production-memory-loop-session-report")(production_memory_loop_session_report_command)
     app.command(name="production-memory-loop-company-kb-candidates")(production_memory_loop_company_kb_candidates_command)
     app.command(name="web-bridge")(web_bridge_command)

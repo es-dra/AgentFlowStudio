@@ -28,6 +28,8 @@ project_input
   -> next_task_packet
   -> explicit next_pass_result input
   -> next_pass_review
+  -> explicit next_pass_promotion_decision
+  -> next_pass_reviewed_feedback_overlay
   -> session_report
   -> company_kb_feedback_candidate_packet
   -> operator_loop_run_manifest
@@ -73,6 +75,12 @@ The required root identifiers are:
   next-pass result. It checks that result outputs used only
   `allowed_context_refs`, records blocked or unknown refs, and derives
   candidate-only feedback plus pending promotion-decision templates.
+- `next_pass_promotion_decision`: explicit operator decision for one
+  next-pass feedback candidate. It is still no-provider, writes no long-term
+  memory, writes no Company KB, and does not claim human acceptance.
+- `next_pass_reviewed_feedback_overlay`: no-provider audit artifact that shows
+  whether the explicitly reviewed next-pass feedback candidate was included in
+  or blocked from the next derived context bundle.
 - `session_report`: read-only operator audit artifact that summarizes the run,
   included refs, blocked refs, optional feedback capture, optional promotion
   decision, next operator action, and non-claim boundaries.
@@ -108,6 +116,11 @@ All derived artifacts declare:
   execute the task and blocks any use of blocked or unknown context refs.
 - Next-pass review feedback candidates are not promoted memory; they require
   explicit promotion decisions before reuse.
+- A pending next-pass promotion template cannot be used as a reviewed decision.
+- Promoted or merged next-pass feedback can enter a derived next context only
+  after an explicit next-pass promotion decision.
+- Rejected, expired, or blocked next-pass feedback remains visible in
+  `blocked_refs` when requested for follow-up context.
 
 ## CLI Surface
 
@@ -122,6 +135,8 @@ python -m apps.cli.main production-memory-loop-run-operator-no-provider examples
 python -m apps.cli.main production-memory-loop-next-context-handoff data/processed/runs/production_memory_loop/no_provider/production_memory_loop_run.json --generated-at 2026-06-02T01:40:00+08:00 --output data/processed/runs/production_memory_loop/next_context_handoff
 python -m apps.cli.main production-memory-loop-next-task-packet data/processed/runs/production_memory_loop/next_context_handoff/next_context_handoff.json --generated-at 2026-06-02T03:12:00+08:00 --output data/processed/runs/production_memory_loop/next_task_packet
 python -m apps.cli.main production-memory-loop-review-next-pass data/processed/runs/production_memory_loop/next_task_packet/next_task_packet.json next_pass_result.json --reviewed-at 2026-06-02T03:30:00+08:00 --output data/processed/runs/production_memory_loop/next_pass_review
+python -m apps.cli.main production-memory-loop-review-next-pass-promotion data/processed/runs/production_memory_loop/next_pass_review/next_pass_review.json --candidate-id memory-candidate-feedback-next-pass-001 --decision promoted --rationale "Traceable next-pass feedback selected by the operator." --decided-at 2026-06-02T05:10:00+08:00 --output data/processed/runs/production_memory_loop/next_pass_promotion_decision
+python -m apps.cli.main production-memory-loop-run-next-pass-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --next-pass-review data/processed/runs/production_memory_loop/next_pass_review/next_pass_review.json --promotion-decision data/processed/runs/production_memory_loop/next_pass_promotion_decision/next_pass_promotion_decision.json --output data/processed/runs/production_memory_loop/next_pass_reviewed_feedback
 python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report
 python -m apps.cli.main production-memory-loop-company-kb-candidates data/processed/runs/production_memory_loop/session_report/production_memory_session_report.json --generated-at 2026-06-02T00:20:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/company_kb_candidates
 ```
@@ -184,6 +199,24 @@ and their `used_context_refs`. The review blocks blocked/unknown context refs,
 keeps feedback candidates candidate-only, and emits only pending promotion
 templates.
 
+The next-pass promotion decision command writes:
+
+- `next_pass_promotion_decision.json`
+
+The next-pass reviewed feedback run command writes:
+
+- `derived_production_memory_loop.json`
+- `production_memory_loop_run.json`
+- `context_bundle.json`
+- `pass_readiness.json`
+- `next_pass_bundle.json`
+- `next_pass_promotion_overlay.json`
+
+The next-pass promotion decision must be explicit. A pending template from
+`next_pass_review.json` is rejected by the overlay command. Promoted or merged
+decisions allow the derived candidate to enter the next context bundle; rejected,
+expired, or blocked decisions keep it visible as a blocked ref.
+
 The Company KB feedback candidate command writes:
 
 - `company_kb_feedback_candidate_packet.json`
@@ -220,6 +253,11 @@ turn candidates into promoted memory.
 The next pass review is the intake surface after a future AI task has produced
 explicit result records. It does not run the task, call a provider, write memory,
 write Company KB, claim acceptance, or promote any candidate.
+
+The next-pass promotion overlay is the explicit-decision surface after result
+intake. It converts reviewed next-pass feedback into normal source records for a
+derived no-provider loop, but it still does not write durable memory, write
+Company KB, call providers, or claim acceptance.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as

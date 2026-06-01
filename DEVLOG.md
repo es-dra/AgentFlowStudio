@@ -9,6 +9,31 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Pass Promotion 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-pass-promotion-001`, based on the verified
+  next-pass review/operator-loop slices.
+- Added `agentflow/memory/production_next_pass_promotion.py` and
+  `agentflow/memory/production_next_pass_promotion_records.py`.
+- Added `production-memory-loop-review-next-pass-promotion` to create an
+  explicit operator decision for one next-pass feedback candidate.
+- Added `production-memory-loop-run-next-pass-reviewed-feedback-no-provider` to
+  derive a no-provider loop overlay from a selected next-pass review plus the
+  explicit decision, writing `next_pass_promotion_overlay.json`.
+- Boundary kept: feedback remains evidence, candidate feedback is not promoted
+  memory, pending templates are rejected as decisions, no provider call, no
+  Company KB write, no durable memory write, no Loulan behavior, no human
+  acceptance, and no business validation claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_promotion.py -q`
+    -> 5 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_promotion.py tests/test_production_memory_next_pass_review.py tests/test_production_memory_operator_loop.py tests/test_production_memory_next_task_packet.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 44 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 742 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Operator Loop Next Pass Review 001
 
 - Continued the generic Production Memory Architecture path on
