@@ -9,6 +9,46 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Feedback Candidate 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-feedback-candidate-001`, based on the
+  verified evidence-only operator feedback slice.
+- Added candidate-only operator feedback packet drafting through
+  `production-memory-loop-draft-operator-feedback-candidate`.
+- The packet writes `operator_feedback_candidate_packet.json`,
+  `memory_candidate.json`, `promotion_decision_template.json`, and
+  `operator_feedback_candidate_packet.md`; it keeps
+  `feedback_is_memory: false`, `candidate_is_promoted_memory: false`,
+  `writes_long_term_memory: false`, `writes_company_kb: false`, and
+  `human_acceptance: not_claimed`.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no automatic promotion decision, no next-context inclusion from a
+  pending template, no Loulan-specific behavior, no human acceptance, and no
+  business validation claim.
+- Verification:
+  - Red test failed at CLI invocation because
+    `production-memory-loop-draft-operator-feedback-candidate` was not yet
+    registered.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback_candidate.py -q`
+    -> 6 passed after implementation.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow/memory/production_operator_feedback_candidate.py apps/cli/production_memory_operator_feedback_candidate_command.py apps/cli/command_registry.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_feedback_candidate.py tests/test_production_memory_operator_feedback.py tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 42 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed and listed
+    `production-memory-loop-draft-operator-feedback-candidate`.
+  - CLI smoke wrote an ignored operator loop, evidence-only operator feedback,
+    and candidate-only feedback packet under
+    `data/processed/runs/production_memory_loop/operator_feedback_candidate_smoke/`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 759 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+  - Added-diff and new-file sensitive scan produced no hits for Company source
+    path copies, configured credential markers, key shapes, customer markers,
+    cookies, or signed-link markers.
+
 ## 2026-06-02 - Production Memory Operator Feedback Web 001
 
 - Continued from `codex/afs-production-memory-operator-feedback-001` on

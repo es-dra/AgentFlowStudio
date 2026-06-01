@@ -29,6 +29,9 @@ from apps.cli.production_memory_next_pass_promotion_command import (
 from apps.cli.production_memory_next_pass_review_command import production_memory_loop_review_next_pass_command
 from apps.cli.production_memory_next_task_command import production_memory_loop_next_task_packet_command
 from apps.cli.production_memory_operator_command import production_memory_loop_run_operator_no_provider_command
+from apps.cli.production_memory_operator_feedback_candidate_command import (
+    production_memory_loop_draft_operator_feedback_candidate_command,
+)
 from apps.cli.production_memory_operator_feedback_command import (
     production_memory_loop_capture_operator_feedback_command,
 )
@@ -80,6 +83,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-capture-operator-feedback")(
         production_memory_loop_capture_operator_feedback_command
+    )
+    app.command(name="production-memory-loop-draft-operator-feedback-candidate")(
+        production_memory_loop_draft_operator_feedback_candidate_command
     )
     app.command(name="production-memory-loop-next-context-handoff")(
         production_memory_loop_next_context_handoff_command
