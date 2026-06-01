@@ -92,6 +92,7 @@ export function normalizeWorkspace(artifacts) {
   const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
   const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
   const productionMemorySessionReport = byType("agentflow_production_memory_session_report") || null;
+  const productionMemoryOperatorLoopRun = byType("agentflow_production_memory_operator_loop_run") || null;
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
   const workspaceParts = {
     warnings,
@@ -105,6 +106,7 @@ export function normalizeWorkspace(artifacts) {
     memoryPackage,
     productionMemoryLoop,
     productionMemorySessionReport,
+    productionMemoryOperatorLoopRun,
     companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
@@ -153,6 +155,9 @@ function detectArtifactType(fileName, payload) {
   }
   if (payload && payload.artifact_index && payload.workflow) return "run_manifest";
   if (payload && payload.kind === "agentflow_production_memory_loop") return "agentflow_production_memory_loop";
+  if (payload && payload.kind === "agentflow_production_memory_operator_loop_run") {
+    return "agentflow_production_memory_operator_loop_run";
+  }
   if (payload && payload.kind === "agentflow_company_kb_feedback_candidate_packet") {
     return "agentflow_company_kb_feedback_candidate_packet";
   }

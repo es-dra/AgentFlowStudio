@@ -22,6 +22,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
   agentflow_production_memory_loop: ["production_memory_loop.json", "production_memory_loop.example.json"],
   agentflow_production_memory_session_report: ["production_memory_session_report.json"],
+  agentflow_production_memory_operator_loop_run: ["production_memory_operator_loop_run.json"],
   agentflow_company_kb_feedback_candidate_packet: [
     "company_kb_feedback_candidate_packet.json",
     "company_kb_feedback_candidate_packet.example.json",
@@ -72,6 +73,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
   if (type === "agentflow_production_memory_loop") return "production memory loop";
   if (type === "agentflow_production_memory_session_report") return "production memory session report";
+  if (type === "agentflow_production_memory_operator_loop_run") return "production memory operator loop run";
   if (type === "agentflow_company_kb_feedback_candidate_packet") return "Company KB feedback candidate packet";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";

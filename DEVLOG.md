@@ -9,6 +9,28 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Web 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-operator-loop-web-001`, based on the verified
+  operator-loop CLI slice.
+- Added read-only Web recognition for
+  `agentflow_production_memory_operator_loop_run` through
+  `apps/web/memory-workbench-production-operator-loop.js`.
+- The view renders operator-loop nodes, generated artifact refs, Company KB
+  feedback candidate-only boundary, no-provider controls, and non-claim
+  boundaries from explicitly selected local JSON only.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no directory scan, no browser persistence, no workflow execution from
+  Web, no Loulan-specific inspector, no human acceptance, and no business
+  validation claim.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py -q` -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q` -> 25 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py tests/test_company_kb_feedback_packet.py tests/test_agentflow_contract_audit.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py tests/test_web_static_production_memory_operator_loop.py -q` -> 40 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 717 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Operator Loop 001
 
 - Continued the generic Production Memory Architecture path on

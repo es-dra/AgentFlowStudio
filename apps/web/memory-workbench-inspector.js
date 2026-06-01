@@ -7,6 +7,7 @@ const TYPE_LABELS = {
   agentflow_feedback_event: "Feedback draft",
   agentflow_production_memory_loop: "Production memory loop",
   agentflow_production_memory_session_report: "Production memory session",
+  agentflow_production_memory_operator_loop_run: "Production memory operator loop",
   agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
 };
 
@@ -39,6 +40,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
   if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_operator_loop_run") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
@@ -52,6 +54,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
   if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
+  if (type === "agentflow_production_memory_operator_loop_run") return productionOperatorLoopFacts(payload);
   if (type === "agentflow_company_kb_feedback_candidate_packet") return companyKbFeedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -66,6 +69,16 @@ function companyKbFeedbackFacts(payload) {
     fact("source_kb_status", payload.source_kb_status || "unknown"),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("requires_human_review", yesNo(payload.requires_human_review)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function productionOperatorLoopFacts(payload) {
+  return [
+    fact("chain_status", payload.chain_status || "unknown"),
+    fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
+    fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }

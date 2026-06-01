@@ -174,6 +174,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_loop`
 - `agentflow_production_memory_session_report`
 - `agentflow_company_kb_feedback_candidate_packet`
+- `agentflow_production_memory_operator_loop_run`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
@@ -183,6 +184,11 @@ canvas with candidate items, explicit non-promotions, source KB restructuring
 status, human-review requirements, and write-disabled boundaries. They remain
 candidate-only transport artifacts and do not write Company KB or durable
 memory.
+
+Operator-loop manifests render as a read-only chain canvas with operator nodes,
+generated artifact refs, Company KB feedback candidate boundaries, provider
+controls, and non-claim boundaries. They are review manifests only; they do not
+follow artifact refs, execute workflows, or promote memory.
 
 It does not:
 

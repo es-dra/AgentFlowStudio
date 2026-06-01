@@ -7,6 +7,7 @@ import { buildCompanyKbFeedbackCandidatePacketView } from "./memory-workbench-co
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
+import { buildProductionMemoryOperatorLoopView } from "./memory-workbench-production-operator-loop.js";
 import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
@@ -27,12 +28,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const memoryView = buildProductionMemoryLoopView(workspace, packageView);
   const sessionView = buildProductionMemorySessionReportView(workspace, memoryView);
   const companyKbView = buildCompanyKbFeedbackCandidatePacketView(workspace, sessionView);
-  companyKbView.source_status = memorySourceStatus(source, workspace);
-  companyKbView.artifact_inspector = buildMemoryArtifactInspector(workspace, companyKbView.artifact_inspector);
-  companyKbView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  companyKbView.demo_summary = buildDemoEvidenceSummary(companyKbView);
-  companyKbView.demo_checklist = buildDemoReadyChecklist(companyKbView);
-  return companyKbView;
+  const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
+  operatorLoopView.source_status = memorySourceStatus(source, workspace);
+  operatorLoopView.artifact_inspector = buildMemoryArtifactInspector(workspace, operatorLoopView.artifact_inspector);
+  operatorLoopView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  operatorLoopView.demo_summary = buildDemoEvidenceSummary(operatorLoopView);
+  operatorLoopView.demo_checklist = buildDemoReadyChecklist(operatorLoopView);
+  return operatorLoopView;
 }
 
 function memorySourceStatus(source, workspace) {
