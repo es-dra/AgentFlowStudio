@@ -97,10 +97,7 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryNextTaskPacket = byType("agentflow_production_memory_next_task_packet") || null;
   const productionMemoryNextPassReview = byType("agentflow_production_memory_next_pass_review") || null;
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
-  const workspaceParts = {
-    warnings,
-    errors,
-  };
+  const workspaceParts = { warnings, errors };
 
   return {
     artifacts,
@@ -113,6 +110,8 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryNextContextHandoff,
     productionMemoryNextTaskPacket,
     productionMemoryNextPassReview,
+    productionMemoryNextPassPromotionDecision: byType("agentflow_production_memory_next_pass_promotion_decision") || null,
+    productionMemoryNextPassPromotionOverlay: byType("agentflow_production_memory_next_pass_promotion_overlay") || null,
     companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),

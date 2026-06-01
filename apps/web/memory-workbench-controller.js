@@ -8,6 +8,7 @@ import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
 import { buildProductionMemoryNextContextHandoffView } from "./memory-workbench-production-next-context.js";
+import { buildProductionMemoryNextPassPromotionView } from "./memory-workbench-production-next-pass-promotion.js";
 import { buildProductionMemoryNextPassReviewView } from "./memory-workbench-production-next-pass-review.js";
 import { buildProductionMemoryNextTaskPacketView } from "./memory-workbench-production-next-task.js";
 import { buildProductionMemoryOperatorLoopView } from "./memory-workbench-production-operator-loop.js";
@@ -35,12 +36,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const nextContextView = buildProductionMemoryNextContextHandoffView(workspace, operatorLoopView);
   const nextTaskView = buildProductionMemoryNextTaskPacketView(workspace, nextContextView);
   const nextPassReviewView = buildProductionMemoryNextPassReviewView(workspace, nextTaskView);
-  nextPassReviewView.source_status = memorySourceStatus(source, workspace);
-  nextPassReviewView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextPassReviewView.artifact_inspector);
-  nextPassReviewView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  nextPassReviewView.demo_summary = buildDemoEvidenceSummary(nextPassReviewView);
-  nextPassReviewView.demo_checklist = buildDemoReadyChecklist(nextPassReviewView);
-  return nextPassReviewView;
+  const nextPassPromotionView = buildProductionMemoryNextPassPromotionView(workspace, nextPassReviewView);
+  nextPassPromotionView.source_status = memorySourceStatus(source, workspace);
+  nextPassPromotionView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextPassPromotionView.artifact_inspector);
+  nextPassPromotionView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  nextPassPromotionView.demo_summary = buildDemoEvidenceSummary(nextPassPromotionView);
+  nextPassPromotionView.demo_checklist = buildDemoReadyChecklist(nextPassPromotionView);
+  return nextPassPromotionView;
 }
 
 function memorySourceStatus(source, workspace) {
