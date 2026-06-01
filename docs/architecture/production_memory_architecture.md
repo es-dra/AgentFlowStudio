@@ -206,6 +206,7 @@ The Web workbench recognizes both:
 - `agentflow_company_kb_feedback_candidate_packet`
 - `agentflow_production_memory_operator_loop_run`
 - `agentflow_production_memory_next_context_handoff`
+- `agentflow_production_memory_next_task_packet`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
@@ -225,6 +226,11 @@ Next-context handoff artifacts render as a read-only task handoff canvas with
 included refs, blocked refs, no-provider controls, and non-claim boundaries for
 the next AI pass. They do not execute that pass, follow refs, call providers,
 write Company KB, or promote durable memory.
+
+Next-task packet artifacts render as a read-only task entry canvas with allowed
+context refs, blocked refs, no-provider controls, and non-claim boundaries. They
+do not execute the next task, follow refs, call providers, write Company KB, or
+promote durable memory.
 
 It does not:
 

@@ -8,6 +8,7 @@ import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
 import { buildProductionMemoryNextContextHandoffView } from "./memory-workbench-production-next-context.js";
+import { buildProductionMemoryNextTaskPacketView } from "./memory-workbench-production-next-task.js";
 import { buildProductionMemoryOperatorLoopView } from "./memory-workbench-production-operator-loop.js";
 import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
@@ -31,12 +32,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const companyKbView = buildCompanyKbFeedbackCandidatePacketView(workspace, sessionView);
   const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
   const nextContextView = buildProductionMemoryNextContextHandoffView(workspace, operatorLoopView);
-  nextContextView.source_status = memorySourceStatus(source, workspace);
-  nextContextView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextContextView.artifact_inspector);
-  nextContextView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  nextContextView.demo_summary = buildDemoEvidenceSummary(nextContextView);
-  nextContextView.demo_checklist = buildDemoReadyChecklist(nextContextView);
-  return nextContextView;
+  const nextTaskView = buildProductionMemoryNextTaskPacketView(workspace, nextContextView);
+  nextTaskView.source_status = memorySourceStatus(source, workspace);
+  nextTaskView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextTaskView.artifact_inspector);
+  nextTaskView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  nextTaskView.demo_summary = buildDemoEvidenceSummary(nextTaskView);
+  nextTaskView.demo_checklist = buildDemoReadyChecklist(nextTaskView);
+  return nextTaskView;
 }
 
 function memorySourceStatus(source, workspace) {

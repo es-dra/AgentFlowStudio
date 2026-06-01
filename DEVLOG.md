@@ -9,6 +9,28 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Task Packet Web 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-task-packet-web-001`, based on the verified
+  next-task packet CLI/operator slice.
+- Added read-only Web recognition for
+  `agentflow_production_memory_next_task_packet` through
+  `apps/web/memory-workbench-production-next-task.js`.
+- The view renders selected local packet JSON as a next-task entry canvas with
+  allowed context refs, blocked refs, no-provider controls, and non-claim
+  boundaries.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no directory scan, no browser persistence, no workflow execution from
+  Web, no Loulan-specific inspector, no human acceptance, and no business
+  validation claim.
+- Verification so far:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_task_packet.py -q` -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_task_packet.py tests/test_web_static_production_memory_next_context_handoff.py tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q` -> 29 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_task_packet.py tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py tests/test_web_static_production_memory_next_task_packet.py -q` -> 37 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 728 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Next Task Packet 001
 
 - Continued the generic Production Memory Architecture path on

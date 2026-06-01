@@ -9,6 +9,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_session_report: "Production memory session",
   agentflow_production_memory_operator_loop_run: "Production memory operator loop",
   agentflow_production_memory_next_context_handoff: "Production memory next context handoff",
+  agentflow_production_memory_next_task_packet: "Production memory next task packet",
   agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
 };
 
@@ -43,6 +44,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_operator_loop_run") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_context_handoff") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_next_task_packet") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
@@ -58,6 +60,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
   if (type === "agentflow_production_memory_operator_loop_run") return productionOperatorLoopFacts(payload);
   if (type === "agentflow_production_memory_next_context_handoff") return productionNextContextHandoffFacts(payload);
+  if (type === "agentflow_production_memory_next_task_packet") return productionNextTaskPacketFacts(payload);
   if (type === "agentflow_company_kb_feedback_candidate_packet") return companyKbFeedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -80,6 +83,16 @@ function productionNextContextHandoffFacts(payload) {
   return [
     fact("handoff_status", payload.handoff_status || "unknown"),
     fact("next_context_refs", String(arrayValue(payload.next_context_refs).length)),
+    fact("blocked_refs", String(arrayValue(payload.blocked_refs).length)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
+function productionNextTaskPacketFacts(payload) {
+  return [
+    fact("packet_status", payload.packet_status || "unknown"),
+    fact("allowed_context_refs", String(arrayValue(payload.allowed_context_refs).length)),
     fact("blocked_refs", String(arrayValue(payload.blocked_refs).length)),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
