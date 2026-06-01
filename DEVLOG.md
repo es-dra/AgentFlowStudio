@@ -38,6 +38,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Memory Workbench now summarizes a selected Loulan manifest set as a project-level no-call cockpit when the full package is not selected, surfacing 12-manifest real-project coverage, 85 assets, 3 eligible refs, 82 blocked refs, 5 pending B01 decisions, 38 Image2 requests, 38 Kling I2V requests, and B02 blocked status without scanning directories, calling providers, promoting assets, or writing durable Memory; see `docs/handoff/AFS-LOULAN-WEB-MANIFEST-SET-SUMMARY-001.md`.
 
+2026-06-01: Loulan memory package now surfaces project-level audit gates from `project_manifest.json`, including manifest-reference and text-encoding audit status in package JSON, Markdown, Web bundle, protocol controls, and inspector facts; real no-call probe over `D:\Projects\LoulanSceneAssets` shows both audits passing while promotion and B01 remain blocked; see `docs/handoff/AFS-LOULAN-PACKAGE-PROJECT-AUDITS-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

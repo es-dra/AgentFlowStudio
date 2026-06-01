@@ -58,6 +58,7 @@ def build_loulan_memory_package(project_root: str | Path, *, created_at: str) ->
         "asset_inventory": inventory,
         "asset_summary": asset_summary,
         "memory_collections": _memory_collections(root),
+        "project_audits": _project_audits(manifest),
         "provider_route_safety": _provider_route_safety(root, manifest),
         "feedback_loop_gates": feedback_loop_gates(root),
         "promotion_gates": promotion_gates(asset_entries, rejected_refs, registry_mode=registry_mode),
@@ -91,6 +92,8 @@ def render_loulan_memory_package_report(package: dict[str, Any]) -> str:
             "- durable Memory runtime: not implemented",
             "- Company memory write: not performed",
             f"- Image route: `{safety['image_generation']}`",
+            f"- Manifest reference audit: `{package['project_audits']['manifest_reference']['status']}`",
+            f"- Text encoding audit: `{package['project_audits']['text_encoding']['status']}`",
             f"- Promotion gate: `{gates['overall_status']}`",
             f"- B01 feedback loop gate: `{package['feedback_loop_gates']['b01']['status']}`",
             f"- B01 decision crosswalk: `{package['feedback_loop_gates']['b01_decision_crosswalk']['status']}`",
@@ -135,6 +138,28 @@ def _shot_summary(shots: list[dict[str, Any]]) -> dict[str, Any]:
             for shot in shots[:8]
         ],
     }
+
+
+def _project_audits(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
+    return {
+        "manifest_reference": _project_audit(manifest, "manifest_reference_audit"),
+        "text_encoding": _project_audit(manifest, "text_encoding_audit"),
+    }
+
+
+def _project_audit(manifest: dict[str, Any], field: str) -> dict[str, str]:
+    return {
+        "status": str(manifest.get(f"{field}_status") or "not_provided"),
+        "artifact_ref": _safe_project_ref(manifest.get(field)),
+        "report_ref": _safe_project_ref(manifest.get(f"{field}_report")),
+    }
+
+
+def _safe_project_ref(value: Any) -> str:
+    text = str(value or "")
+    if text.startswith(("D:\\", "C:\\", "file://", "http://", "https://")):
+        return ""
+    return text.replace("\\", "/")
 
 
 def _legacy_asset_inventory(entries: list[dict[str, Any]], summary: dict[str, Any]) -> dict[str, Any]:

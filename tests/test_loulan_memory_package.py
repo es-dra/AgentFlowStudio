@@ -27,6 +27,18 @@ def test_loulan_memory_package_blocks_candidates_and_builtin_image_route(tmp_pat
     assert package["asset_summary"]["rejected_asset_count"] == 1
     assert package["provider_route_safety"]["image_generation"] == "blocked_until_api_workbench"
     assert package["provider_route_safety"]["unsafe_builtin_image_route_detected"] is True
+    assert package["project_audits"] == {
+        "manifest_reference": {
+            "status": "pass",
+            "artifact_ref": "reviews/manifest_reference_audit.json",
+            "report_ref": "reviews/manifest_reference_audit.md",
+        },
+        "text_encoding": {
+            "status": "pass",
+            "artifact_ref": "reviews/text_encoding_audit.json",
+            "report_ref": "reviews/text_encoding_audit.md",
+        },
+    }
     assert package["feedback_loop_gates"]["b01"]["status"] == "blocked_pending_human_review"
     assert package["feedback_loop_gates"]["b01"]["pending_decisions"] == 5
     assert package["feedback_loop_gates"]["b01"]["context_projection_ready"] is False
@@ -107,6 +119,8 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["provider_route_safety"]["image_generation"] == "blocked_until_api_workbench"
     assert payload["promotion_gates"]["overall_status"] in {"ready", "blocked"}
     assert payload["api_workbench_skeleton"]["live_provider_calls"] == "blocked_by_default"
+    assert payload["project_audits"]["manifest_reference"]["status"] == "pass"
+    assert payload["project_audits"]["text_encoding"]["status"] == "pass"
     assert payload["feedback_loop_gates"]["b01"]["provider_calls_started"] is False
     assert payload["feedback_loop_gates"]["b01_decision_crosswalk"]["afs_b01_import_gate"]["pending_count"] == 7
     assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
@@ -139,6 +153,12 @@ def _loulan_fixture(tmp_path: Path) -> Path:
             "current_phase": "keyframe_only_horizontal_16_9",
             "current_claim_level": "horizontal_keyframe_candidates_pending_human_review",
             "video_generation_status": "deferred_until_keyframe_approval",
+            "manifest_reference_audit": "reviews/manifest_reference_audit.json",
+            "manifest_reference_audit_report": "reviews/manifest_reference_audit.md",
+            "manifest_reference_audit_status": "pass",
+            "text_encoding_audit": "reviews/text_encoding_audit.json",
+            "text_encoding_audit_report": "reviews/text_encoding_audit.md",
+            "text_encoding_audit_status": "pass",
         },
     )
     _write_json(
