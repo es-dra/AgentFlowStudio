@@ -73,3 +73,69 @@ console.log(JSON.stringify({
     assert facts["missing_refs"] == "7"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
+
+
+def test_static_viewer_recognizes_loulan_asset_registry_health_report() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
+
+const report = {
+  schema_version: "0.1.0",
+  artifact_type: "loulan_asset_registry_health_report",
+  project_id: "loulan_scene_assets",
+  status: "blocked_pending_human_review",
+  provider_calls_started: false,
+  writes_long_term_memory: false,
+  new_media_generated: false,
+  summary: {
+    total_assets: 86,
+    type_counts: { character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2 },
+    status_counts: { approved_anchor: 3, candidate: 61, needs_repair: 14, route_failed: 4, superseded: 4 },
+    eligible_reusable_refs: 3,
+    blocked_refs: 83,
+    missing_sha256_count: 0,
+    missing_ref_count: 0,
+    source_quality_issue_count: 0,
+    video_refs_excluded_count: 0
+  }
+};
+const artifacts = await parseFiles([
+  { name: "asset_registry_health_report.json", text: async () => JSON.stringify(report) },
+]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
+
+console.log(JSON.stringify({
+  artifactType: artifacts[0].artifactType,
+  artifactClass: artifacts[0].artifactClass,
+  sourceRole: artifacts[0].sourceRole,
+  memoryBundleCount: workspace.memoryBundle.length,
+  inspector: view.artifact_inspector[0],
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["artifactType"] == "loulan_asset_registry_health_report"
+    assert payload["artifactClass"] == "known_contract"
+    assert payload["sourceRole"] == "Loulan asset registry health report"
+    assert payload["memoryBundleCount"] == 1
+    assert payload["inspector"]["title"] == "Loulan asset registry health report"
+    assert payload["inspector"]["status"] == "blocked_pending_human_review"
+    facts = {item["label"]: item["value"] for item in payload["inspector"]["facts"]}
+    assert facts["total_assets"] == "86"
+    assert facts["type_counts"] == "character: 26, feedback: 20, keyframe: 5, prop: 3, run_evidence: 29, scene: 1, vfx: 2"
+    assert facts["status_counts"] == "approved_anchor: 3, candidate: 61, needs_repair: 14, route_failed: 4, superseded: 4"
+    assert facts["eligible_refs"] == "3"
+    assert facts["blocked_refs"] == "83"
+    assert facts["missing_sha256"] == "0"
+    assert facts["missing_refs"] == "0"
+    assert facts["source_quality_issues"] == "0"
+    assert facts["provider_calls_started"] == "false"
+    assert facts["writes_long_term_memory"] == "false"

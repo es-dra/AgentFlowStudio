@@ -1,11 +1,14 @@
-const REGISTRY_TYPE = "loulan_unified_asset_registry";
+const REGISTRY_LABELS = {
+  loulan_unified_asset_registry: "Loulan unified asset registry",
+  loulan_asset_registry_health_report: "Loulan asset registry health report",
+};
 
 export function isLoulanRegistryArtifact(type) {
-  return type === REGISTRY_TYPE;
+  return Object.prototype.hasOwnProperty.call(REGISTRY_LABELS, type);
 }
 
 export function loulanRegistryTypeLabel(type) {
-  return isLoulanRegistryArtifact(type) ? "Loulan unified asset registry" : "";
+  return REGISTRY_LABELS[type] || "";
 }
 
 export function loulanRegistryFocusTargets() {
@@ -13,6 +16,7 @@ export function loulanRegistryFocusTargets() {
 }
 
 export function loulanRegistryStatus(payload) {
+  if (payload.status) return payload.status;
   const blockedCounts = objectValue(payload.summary?.status_counts);
   const blocked = ["candidate", "needs_repair", "rejected", "route_failed", "source_reference", "superseded"].some(
     (status) => Number(blockedCounts[status] || 0) > 0,
@@ -28,6 +32,8 @@ export function loulanRegistryFacts(payload) {
     fact("total_assets", summary.total_assets ?? arrayValue(payload.assets).length),
     fact("type_counts", countText(summary.type_counts)),
     fact("status_counts", countText(summary.status_counts)),
+    fact("eligible_refs", summary.eligible_reusable_refs ?? "unknown"),
+    fact("blocked_refs", summary.blocked_refs ?? "unknown"),
     fact("missing_sha256", summary.missing_sha256_count ?? "unknown"),
     fact("missing_refs", summary.missing_ref_count ?? "unknown"),
     fact("source_quality_issues", summary.source_quality_issue_count ?? "unknown"),

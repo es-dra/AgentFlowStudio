@@ -50,6 +50,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan root `project_manifest.json` directly as `loulan_root_project_manifest`, showing 38 shots, 16:9 target format, package/governance audit statuses, and B01/next-context blockers without package regeneration, provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ROOT-PROJECT-MANIFEST-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan `asset_registry_health_report.json` directly as `loulan_asset_registry_health_report`; real selected-file probe shows 86 assets, 3 eligible refs, 83 blocked refs, 0 missing hashes, 0 missing refs, and 0 source-quality issues without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ASSET-HEALTH-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

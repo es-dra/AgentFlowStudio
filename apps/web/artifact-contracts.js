@@ -32,6 +32,7 @@ export const ARTIFACT_ALIASES = {
   loulan_b01_decision_validation_report: ["human_review_decision_validation_report.json", "b01_decision_validation_report.json"],
   loulan_b01_decision_apply_result: ["b01_decision_apply_result.json"],
   loulan_unified_asset_registry: ["asset_registry.json"],
+  loulan_asset_registry_health_report: ["asset_registry_health_report.json"],
   loulan_next_generation_context_bundle_draft: ["next_context_bundle_draft.json"],
   loulan_image2_request_manifest: ["image2_requests.json"],
   loulan_kling_i2v_request_manifest: ["kling_i2v_requests.json"],
@@ -71,6 +72,7 @@ const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
   "loulan_b01_decision_validation_report",
   "loulan_b01_decision_apply_result",
   "loulan_unified_asset_registry",
+  "loulan_asset_registry_health_report",
   "loulan_next_generation_context_bundle_draft",
   "loulan_image2_request_manifest",
   "loulan_kling_i2v_request_manifest",
@@ -121,6 +123,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "loulan_b01_decision_validation_report") return "Loulan B01 decision validation report";
   if (type === "loulan_b01_decision_apply_result") return "Loulan B01 decision apply result";
   if (type === "loulan_unified_asset_registry") return "Loulan unified asset registry";
+  if (type === "loulan_asset_registry_health_report") return "Loulan asset registry health report";
   if (type === "loulan_next_generation_context_bundle_draft") return "Loulan next context bundle draft";
   if (type === "loulan_image2_request_manifest") return "Loulan Image2 request manifest";
   if (type === "loulan_kling_i2v_request_manifest") return "Loulan Kling I2V request manifest";
