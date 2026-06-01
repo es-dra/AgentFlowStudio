@@ -46,6 +46,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes the Loulan `loulan_asset_governance_phase_audit` / `asset_governance_phase_audit.json` directly as a read-only memory artifact, and the project-audit-probe inspector now surfaces `phase_gate_audit` when present; real selected-file probe shows 5 phases, 4 passed, 1 expected-blocked phase, 3 eligible refs, 83 registry-blocked refs, and 5 pending B01 decisions; see `docs/handoff/AFS-LOULAN-WEB-PHASE-AUDIT-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes Loulan governance audit source files `manifest_reference_audit.json` and `text_encoding_audit.json` directly as read-only memory artifacts; real selected-file probes show manifest audit `pass` with 13 JSON files / 86 registry assets / 0 issues and text audit `pass` with 265 text files / 0 issues, without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-GOVERNANCE-AUDITS-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:
