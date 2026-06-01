@@ -48,6 +48,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 
 2026-06-01: Web Artifact Workspace now recognizes Loulan governance audit source files `manifest_reference_audit.json` and `text_encoding_audit.json` directly as read-only memory artifacts; real selected-file probes show manifest audit `pass` with 13 JSON files / 86 registry assets / 0 issues and text audit `pass` with 265 text files / 0 issues, without provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-GOVERNANCE-AUDITS-DIRECT-001.md`.
 
+2026-06-01: Web Artifact Workspace now recognizes the Loulan root `project_manifest.json` directly as `loulan_root_project_manifest`, showing 38 shots, 16:9 target format, package/governance audit statuses, and B01/next-context blockers without package regeneration, provider calls, media writes, or durable Memory writes; see `docs/handoff/AFS-LOULAN-WEB-ROOT-PROJECT-MANIFEST-DIRECT-001.md`.
+
 ## 2026-05-31 - Oversized File Slimming Pass
 
 - Split the remaining current oversized files without changing behavior:

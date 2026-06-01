@@ -1,4 +1,5 @@
 const PROJECT_MANIFEST_LABELS = {
+  loulan_root_project_manifest: "Loulan root project manifest",
   loulan_character_asset_manifest: "Loulan character asset manifest",
   loulan_character_asset_versions: "Loulan character asset versions",
   loulan_prop_asset_versions: "Loulan prop asset versions",
@@ -18,6 +19,9 @@ export function loulanProjectManifestFocusTargets() {
 }
 
 export function loulanProjectManifestStatus(type, payload) {
+  if (type === "loulan_root_project_manifest") {
+    return payload.next_context_status || payload.b01_human_review_validation_status || payload.current_claim_level || "review ready";
+  }
   if (type === "loulan_shot_list_manifest") {
     return shotRows(payload).some((shot) => String(shot.quality_status || "").includes("pending")) ? "pending_human_review" : "review ready";
   }
@@ -25,8 +29,24 @@ export function loulanProjectManifestStatus(type, payload) {
 }
 
 export function loulanProjectManifestFacts(type, payload) {
+  if (type === "loulan_root_project_manifest") return rootProjectFacts(payload);
   if (type === "loulan_shot_list_manifest") return shotListFacts(payload);
   return assetManifestFacts(payload);
+}
+
+function rootProjectFacts(payload) {
+  return [
+    fact("project_id", payload.project_id || "unknown"),
+    fact("target_format", payload.target_format || "unknown"),
+    fact("shots", payload.shot_count ?? "unknown"),
+    fact("current_phase", payload.current_phase || "unknown"),
+    fact("claim_level", payload.current_claim_level || "unknown"),
+    fact("manifest_reference_audit", payload.manifest_reference_audit_status || "not_provided"),
+    fact("text_encoding_audit", payload.text_encoding_audit_status || "not_provided"),
+    fact("phase_gate_audit", payload.asset_governance_phase_audit_status || "not_provided"),
+    fact("b01_validation", payload.b01_human_review_validation_status || "not_provided"),
+    fact("next_context", payload.next_context_status || "not_provided"),
+  ];
 }
 
 function assetManifestFacts(payload) {

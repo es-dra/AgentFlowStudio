@@ -106,3 +106,69 @@ console.log(JSON.stringify({
     assert payload["shotFacts"]["blocks"] == "1, 2"
     assert payload["shotFacts"]["quality_status_counts"] == "horizontal_keyframe_candidate_pending_review: 1, planned: 1"
     assert payload["shotFacts"]["target_formats"] == "horizontal_16_9"
+
+
+def test_static_viewer_recognizes_loulan_root_project_manifest() -> None:
+    script = """
+import { parseFiles, normalizeWorkspace } from "./apps/web/artifact-workspace.js";
+import { buildMemoryWorkbenchView, memorySourceForArtifacts } from "./apps/web/memory-workbench-controller.js";
+
+const manifest = {
+  schema_version: "0.1.0",
+  project_id: "loulan_scene_assets",
+  title: "Loulan time-control scene asset project",
+  target_format: "horizontal_16_9",
+  shot_count: 38,
+  current_phase: "keyframe_only_horizontal_16_9",
+  current_claim_level: "asset_registry_ready_b01_keyframes_pending_human_review",
+  video_generation_status: "deferred_until_keyframe_approval",
+  manifest_reference_audit_status: "pass",
+  text_encoding_audit_status: "pass",
+  asset_governance_phase_audit_status: "blocked_until_b01_human_review",
+  afs_feedback_loop_status: "project_phase_gate_visible_in_afs_no_call_package_b01_pending_review",
+  b01_human_review_validation_status: "blocked_pending_human_review",
+  next_context_status: "blocked_until_b01_human_review"
+};
+const artifacts = await parseFiles([
+  { name: "project_manifest.json", text: async () => JSON.stringify(manifest) },
+]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, memorySourceForArtifacts(artifacts));
+const inspector = view.artifact_inspector[0];
+const facts = Object.fromEntries(inspector.facts.map((item) => [item.label, item.value]));
+
+console.log(JSON.stringify({
+  artifactType: artifacts[0].artifactType,
+  artifactClass: artifacts[0].artifactClass,
+  sourceRole: artifacts[0].sourceRole,
+  memoryBundleCount: workspace.memoryBundle.length,
+  sourceStatus: view.source_status,
+  inspector,
+  facts,
+}));
+"""
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["artifactType"] == "loulan_root_project_manifest"
+    assert payload["artifactClass"] == "known_contract"
+    assert payload["sourceRole"] == "Loulan root project manifest"
+    assert payload["memoryBundleCount"] == 1
+    assert payload["sourceStatus"]["label"] == "Selected files"
+    assert payload["inspector"]["title"] == "Loulan root project manifest"
+    assert payload["inspector"]["status"] == "blocked_until_b01_human_review"
+    assert payload["inspector"]["focus_targets"] == ["project", "assets", "review", "next-pass"]
+    assert payload["facts"]["project_id"] == "loulan_scene_assets"
+    assert payload["facts"]["target_format"] == "horizontal_16_9"
+    assert payload["facts"]["shots"] == "38"
+    assert payload["facts"]["current_phase"] == "keyframe_only_horizontal_16_9"
+    assert payload["facts"]["manifest_reference_audit"] == "pass"
+    assert payload["facts"]["text_encoding_audit"] == "pass"
+    assert payload["facts"]["phase_gate_audit"] == "blocked_until_b01_human_review"
+    assert payload["facts"]["b01_validation"] == "blocked_pending_human_review"
+    assert payload["facts"]["next_context"] == "blocked_until_b01_human_review"

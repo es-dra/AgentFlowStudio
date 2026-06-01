@@ -20,6 +20,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_memory_video_pipeline_human_observation: ["memory_video_pipeline_human_observation.json", "memory_video_pipeline_human_observation.example.json"],
   agentflow_memory_video_pipeline_presentation_package: ["memory_video_pipeline_presentation_package.json", "memory_video_pipeline_presentation_package.example.json"],
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
+  loulan_root_project_manifest: ["project_manifest.json"],
   loulan_afs_project_audit_package_probe: ["afs_project_audit_package_probe.json"],
   loulan_manifest_reference_audit: ["manifest_reference_audit.json"],
   loulan_text_encoding_audit: ["text_encoding_audit.json"],
@@ -58,6 +59,7 @@ export const ARTIFACT_CLASSES = {
 
 export const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov"]);
 const LOULAN_MEMORY_ARTIFACT_TYPES = new Set([
+  "loulan_root_project_manifest",
   "loulan_afs_project_audit_package_probe",
   "loulan_manifest_reference_audit",
   "loulan_text_encoding_audit",
@@ -107,6 +109,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_memory_video_pipeline_presentation_package") return "memory video pipeline presentation package";
   if (type === "agentflow_loulan_decision_worksheet") return "Loulan manual decision worksheet";
   if (type === "agentflow_loulan_decision_intake_report") return "Loulan decision intake report";
+  if (type === "loulan_root_project_manifest") return "Loulan root project manifest";
   if (type === "loulan_afs_project_audit_package_probe") return "Loulan AFS project audit package probe";
   if (type === "loulan_manifest_reference_audit") return "Loulan manifest reference audit";
   if (type === "loulan_text_encoding_audit") return "Loulan text encoding audit";
