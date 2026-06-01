@@ -338,3 +338,33 @@ This slice is structure and runtime verification only. It is not:
 - durable Memory OS;
 - provider success;
 - automatic Company knowledge-base promotion.
+
+## Operator Loop Promotion Overlay Integration
+
+`production-memory-loop-run-operator-no-provider` can now optionally include the
+explicit next-pass promotion decision layer in the same local operator run.
+This is still a no-provider orchestration path. It does not execute the next
+pass, call providers, write durable memory, write Company KB, or claim human
+acceptance.
+
+Additional command shape:
+
+```powershell
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T06:00:00+08:00 --source-kb-status restructuring_or_unknown --next-pass-result next_pass_result.json --next-pass-promotion-decision data/processed/runs/production_memory_loop/next_pass_promotion_decision/next_pass_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_loop_with_promotion
+```
+
+The promotion decision option is valid only together with `--next-pass-result`,
+because the decision must be validated against the generated
+`next_pass_review`. When supplied, the operator-loop output includes:
+
+- `next_pass_promotion_decision/next_pass_promotion_decision.json`
+- `next_pass_reviewed_feedback/derived_production_memory_loop.json`
+- `next_pass_reviewed_feedback/production_memory_loop_run.json`
+- `next_pass_reviewed_feedback/context_bundle.json`
+- `next_pass_reviewed_feedback/pass_readiness.json`
+- `next_pass_reviewed_feedback/next_pass_bundle.json`
+- `next_pass_reviewed_feedback/next_pass_promotion_overlay.json`
+
+The operator manifest includes separate `next_pass_promotion_decision` and
+`next_pass_promotion_overlay` nodes so an operator can audit the explicit
+promotion decision separately from the derived follow-up context.

@@ -6,13 +6,22 @@ from agentflow.memory.company_kb_feedback import COMPANY_KB_FEEDBACK_PACKET_KIND
 from agentflow.memory.production_loop import CONTEXT_BUNDLE_KIND, PASS_READINESS_KIND, RUN_KIND
 from agentflow.memory.production_next_context import NEXT_CONTEXT_HANDOFF_KIND
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND
+from agentflow.memory.production_next_pass_promotion import (
+    NEXT_PASS_PROMOTION_DECISION_KIND,
+    NEXT_PASS_PROMOTION_OVERLAY_KIND,
+)
 from agentflow.memory.production_next_pass_review import NEXT_PASS_REVIEW_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
 from agentflow.memory.production_session import SESSION_REPORT_KIND
 
 OPERATOR_LOOP_KIND = "agentflow_production_memory_operator_loop_run"
 
-def operator_output_artifacts(*, include_next_pass_review: bool = False) -> list[dict[str, Any]]:
+
+def operator_output_artifacts(
+    *,
+    include_next_pass_review: bool = False,
+    include_next_pass_promotion: bool = False,
+) -> list[dict[str, Any]]:
     artifacts = [
         _artifact(RUN_KIND, "run/production_memory_loop_run.json"),
         _artifact(CONTEXT_BUNDLE_KIND, "run/context_bundle.json"),
@@ -28,6 +37,18 @@ def operator_output_artifacts(*, include_next_pass_review: bool = False) -> list
             [
                 _artifact(NEXT_PASS_REVIEW_KIND, "next_pass_review/next_pass_review.json"),
                 _artifact("markdown_report", "next_pass_review/next_pass_review.md"),
+            ]
+        )
+    if include_next_pass_promotion:
+        artifacts.extend(
+            [
+                _artifact(NEXT_PASS_PROMOTION_DECISION_KIND, "next_pass_promotion_decision/next_pass_promotion_decision.json"),
+                _artifact("agentflow_production_memory_loop", "next_pass_reviewed_feedback/derived_production_memory_loop.json"),
+                _artifact(RUN_KIND, "next_pass_reviewed_feedback/production_memory_loop_run.json"),
+                _artifact(CONTEXT_BUNDLE_KIND, "next_pass_reviewed_feedback/context_bundle.json"),
+                _artifact(PASS_READINESS_KIND, "next_pass_reviewed_feedback/pass_readiness.json"),
+                _artifact(NEXT_PASS_BUNDLE_KIND, "next_pass_reviewed_feedback/next_pass_bundle.json"),
+                _artifact(NEXT_PASS_PROMOTION_OVERLAY_KIND, "next_pass_reviewed_feedback/next_pass_promotion_overlay.json"),
             ]
         )
     artifacts.extend(
@@ -46,4 +67,4 @@ def _artifact(artifact_type: str, path: str) -> dict[str, Any]:
     return {"artifact_type": artifact_type, "path": path, "required": True}
 
 
-__all__ = ("operator_output_artifacts",)
+__all__ = ("OPERATOR_LOOP_KIND", "operator_output_artifacts")

@@ -3,45 +3,26 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.company_kb_feedback import (
-    COMPANY_KB_FEEDBACK_PACKET_KIND,
     build_company_kb_feedback_candidate_packet,
     write_company_kb_feedback_candidate_packet,
 )
-from agentflow.memory.production_loop import (
-    CONTEXT_BUNDLE_KIND,
-    PASS_READINESS_KIND,
-    RUN_KIND,
-    SCHEMA_VERSION,
-    build_production_memory_loop_run,
-    write_production_memory_loop_run,
+from agentflow.memory.production_loop import build_production_memory_loop_run, write_production_memory_loop_run
+from agentflow.memory.production_next_context import build_next_context_handoff, write_next_context_handoff
+from agentflow.memory.production_next_pass_promotion import (
+    build_next_pass_reviewed_feedback_run,
+    write_next_pass_promotion_decision,
+    write_next_pass_reviewed_feedback_run,
 )
-from agentflow.memory.production_next_context import (
-    NEXT_CONTEXT_HANDOFF_KIND,
-    build_next_context_handoff,
-    write_next_context_handoff,
-)
-from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND
-from agentflow.memory.production_next_pass_review import (
-    NEXT_PASS_REVIEW_KIND,
-    build_next_pass_review,
-    write_next_pass_review,
-)
-from agentflow.memory.production_next_task import (
-    NEXT_TASK_PACKET_KIND,
-    build_next_task_packet,
-    write_next_task_packet,
-)
-from agentflow.memory.production_operator_outputs import operator_output_artifacts
+from agentflow.memory.production_next_pass_review import build_next_pass_review, write_next_pass_review
+from agentflow.memory.production_next_task import build_next_task_packet, write_next_task_packet
+from agentflow.memory.production_operator_manifest import build_operator_manifest
+from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_session import (
-    SESSION_REPORT_KIND,
     build_production_memory_session_report,
     write_production_memory_session_report,
 )
 from narratocut.utils import write_json
-
-OPERATOR_LOOP_KIND = "agentflow_production_memory_operator_loop_run"
 
 
 def build_production_memory_operator_loop_run(
@@ -50,10 +31,14 @@ def build_production_memory_operator_loop_run(
     generated_at: str,
     source_kb_status: str = "restructuring_or_unknown",
     next_pass_result: dict[str, Any] | None = None,
+    next_pass_promotion_decision: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build an auditable no-provider operator loop from source loop to feedback packet."""
     if not isinstance(generated_at, str) or not generated_at.strip():
         raise ValueError("generated_at is required")
+    if next_pass_promotion_decision is not None and next_pass_result is None:
+        raise ValueError("next_pass_promotion_decision requires next_pass_result")
+
     run = build_production_memory_loop_run(loop)
     handoff = build_next_context_handoff(run, generated_at=generated_at)
     next_task_packet = build_next_task_packet(handoff, generated_at=generated_at)
@@ -62,18 +47,20 @@ def build_production_memory_operator_loop_run(
         if next_pass_result is not None
         else None
     )
+    next_pass_promotion = _build_next_pass_promotion(loop, next_pass_review, next_pass_promotion_decision)
     report = build_production_memory_session_report(run, generated_at=generated_at)
     packet = build_company_kb_feedback_candidate_packet(
         report,
         generated_at=generated_at,
         source_kb_status=source_kb_status,
     )
-    manifest = _build_manifest(
+    manifest = build_operator_manifest(
         loop,
         run,
         handoff,
         next_task_packet,
         next_pass_review,
+        next_pass_promotion,
         report,
         packet,
         generated_at=generated_at,
@@ -88,17 +75,43 @@ def build_production_memory_operator_loop_run(
     }
     if next_pass_review is not None:
         result["next_pass_review"] = next_pass_review
+    if next_pass_promotion is not None:
+        result.update(
+            {
+                "next_pass_promotion_decision": next_pass_promotion["decision"],
+                "next_pass_reviewed_feedback_loop": next_pass_promotion["derived_loop"],
+                "next_pass_reviewed_feedback_run": next_pass_promotion["run"],
+                "next_pass_promotion_overlay": next_pass_promotion["overlay"],
+            }
+        )
     return result
 
 
 def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir: str | Path) -> list[Path]:
     output_root = Path(output_dir)
+    include_review = "next_pass_review" in result
+    include_promotion = "next_pass_promotion_overlay" in result
     written_paths: list[Path] = []
     written_paths.extend(write_production_memory_loop_run(result["run"], output_root / "run"))
     written_paths.extend(write_next_context_handoff(result["next_context_handoff"], output_root / "next_context_handoff"))
     written_paths.extend(write_next_task_packet(result["next_task_packet"], output_root / "next_task_packet"))
-    if "next_pass_review" in result:
+    if include_review:
         written_paths.extend(write_next_pass_review(result["next_pass_review"], output_root / "next_pass_review"))
+    if include_promotion:
+        written_paths.extend(
+            write_next_pass_promotion_decision(
+                result["next_pass_promotion_decision"],
+                output_root / "next_pass_promotion_decision",
+            )
+        )
+        written_paths.extend(
+            write_next_pass_reviewed_feedback_run(
+                result["next_pass_reviewed_feedback_loop"],
+                result["next_pass_reviewed_feedback_run"],
+                result["next_pass_promotion_overlay"],
+                output_root / "next_pass_reviewed_feedback",
+            )
+        )
     written_paths.extend(write_production_memory_session_report(result["session_report"], output_root / "session_report"))
     written_paths.extend(
         write_company_kb_feedback_candidate_packet(
@@ -108,163 +121,27 @@ def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir
     )
     manifest = {
         **result["manifest"],
-        "output_artifacts": operator_output_artifacts(include_next_pass_review="next_pass_review" in result),
+        "output_artifacts": operator_output_artifacts(
+            include_next_pass_review=include_review,
+            include_next_pass_promotion=include_promotion,
+        ),
     }
     written_paths.append(write_json(output_root / "production_memory_operator_loop_run.json", manifest))
     result["manifest"] = manifest
     return written_paths
 
 
-def _build_manifest(
+def _build_next_pass_promotion(
     loop: dict[str, Any],
-    run: dict[str, Any],
-    handoff: dict[str, Any],
-    next_task_packet: dict[str, Any],
     next_pass_review: dict[str, Any] | None,
-    report: dict[str, Any],
-    packet: dict[str, Any],
-    *,
-    generated_at: str,
-) -> dict[str, Any]:
-    readiness = run["pass_readiness"]
-    context = run["context_bundle"]
-    ready = (
-        readiness.get("ready") is True
-        and next_task_packet.get("packet_status") == "ready"
-        and _next_pass_review_ready(next_pass_review)
-        and report.get("session_status") == "ready"
-    )
-    manifest = {
-        "kind": OPERATOR_LOOP_KIND,
-        "artifact_type": OPERATOR_LOOP_KIND,
-        "schema_version": SCHEMA_VERSION,
-        "loop_id": run.get("loop_id", "unknown"),
-        "project_id": run.get("project_id", "unknown"),
-        "generated_at": generated_at,
-        "provider_mode": "no-provider",
-        "provider_calls_started": False,
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-        "chain_status": "ready" if ready else "blocked",
-        "operator_loop_nodes": _operator_loop_nodes(loop, run, next_task_packet, next_pass_review, report, packet),
-        "context_summary": {
-            "context_bundle_id": context.get("bundle_id", "unknown"),
-            "included_ref_count": len(context.get("included_refs", [])),
-            "blocked_ref_count": len(context.get("blocked_refs", [])),
-        },
-        "session_report": {
-            "session_id": report.get("session_id", "unknown"),
-            "session_status": report.get("session_status", "unknown"),
-            "next_operator_action": report.get("next_operator_action", {}).get("action", "unknown"),
-        },
-        "next_context_handoff": {
-            "handoff_id": handoff.get("handoff_id", "unknown"),
-            "handoff_status": handoff.get("handoff_status", "unknown"),
-            "next_context_ref_count": len(handoff.get("next_context_refs", [])),
-            "blocked_ref_count": len(handoff.get("blocked_refs", [])),
-        },
-        "next_task_packet": {
-            "task_packet_id": next_task_packet.get("task_packet_id", "unknown"),
-            "packet_status": next_task_packet.get("packet_status", "unknown"),
-            "allowed_ref_count": len(next_task_packet.get("allowed_context_refs", [])),
-            "blocked_ref_count": len(next_task_packet.get("blocked_refs", [])),
-        },
-        "company_kb_feedback": {
-            "packet_id": packet.get("packet_id", "unknown"),
-            "promotion_status": packet.get("promotion_status", "unknown"),
-            "candidate_item_count": len(packet.get("candidate_items", [])),
-            "requires_human_review": packet.get("requires_human_review") is True,
-            "writes_company_kb": packet.get("writes_company_kb") is True,
-        },
-        "controls": _controls(run, packet),
-        "non_claim_boundaries": report.get("claim_boundaries", {}),
-        "output_artifacts": operator_output_artifacts(include_next_pass_review=next_pass_review is not None),
-    }
-    if next_pass_review is not None:
-        manifest["next_pass_review"] = {
-            "review_id": next_pass_review.get("review_id", "unknown"),
-            "review_status": next_pass_review.get("review_status", "unknown"),
-            "used_allowed_ref_count": len(next_pass_review.get("used_allowed_refs", [])),
-            "blocked_or_unknown_ref_count": len(next_pass_review.get("blocked_or_unknown_refs", [])),
-            "feedback_candidate_count": len(next_pass_review.get("feedback_candidates", [])),
-        }
-    return manifest
-
-
-def _operator_loop_nodes(
-    loop: dict[str, Any],
-    run: dict[str, Any],
-    next_task_packet: dict[str, Any],
-    next_pass_review: dict[str, Any] | None,
-    report: dict[str, Any],
-    packet: dict[str, Any],
-) -> list[dict[str, Any]]:
-    context = run["context_bundle"]
-    readiness = run["pass_readiness"]
-    nodes = [
-        _node("project_input", "ready", loop.get("project_input", {}).get("project_id", "unknown")),
-        _node("artifact_ledger", "ready", f"{len(loop.get('artifact_ledger', []))} records"),
-        _node("feedback_events", "evidence_only", f"{len(loop.get('feedback_events', []))} events"),
-        _node("memory_candidates", "candidate_or_promoted", f"{len(loop.get('memory_candidates', []))} candidates"),
-        _node("promotion_decisions", "explicit_decisions", f"{len(loop.get('promotion_decisions', []))} decisions"),
-        _node("context_bundle", "ready", context.get("bundle_id", "unknown"), CONTEXT_BUNDLE_KIND),
-        _node("pass_readiness", "ready" if readiness.get("ready") else "blocked", readiness.get("overall_status", FAILED), PASS_READINESS_KIND),
-        _node("next_pass_bundle", "planned", "no-provider execution remains planned", NEXT_PASS_BUNDLE_KIND),
-        _node("next_context_handoff", "ready", "next AI task context handoff", NEXT_CONTEXT_HANDOFF_KIND),
-        _node(
-            "next_task_packet",
-            next_task_packet.get("packet_status", "unknown"),
-            "next AI task packet",
-            NEXT_TASK_PACKET_KIND,
-        ),
-    ]
-    if next_pass_review is not None:
-        nodes.append(
-            _node(
-                "next_pass_review",
-                next_pass_review.get("review_status", "unknown"),
-                "explicit next-pass result review",
-                NEXT_PASS_REVIEW_KIND,
-            )
-        )
-    nodes.extend(
-        [
-            _node("session_report", report.get("session_status", "unknown"), report.get("session_id", "unknown"), SESSION_REPORT_KIND),
-            _node(
-                "company_kb_feedback_candidate_packet",
-                packet.get("promotion_status", "unknown"),
-                packet.get("packet_id", "unknown"),
-                COMPANY_KB_FEEDBACK_PACKET_KIND,
-            ),
-        ]
-    )
-    return nodes
-
-
-def _controls(run: dict[str, Any], packet: dict[str, Any]) -> list[dict[str, str]]:
-    return [
-        _control("no_provider_mode", run.get("provider_mode") == "no-provider"),
-        _control("provider_calls_not_started", run.get("provider_calls_started") is False),
-        _control("long_term_memory_write_disabled", run.get("writes_long_term_memory") is False),
-        _control("company_kb_write_disabled", packet.get("writes_company_kb") is False),
-        _control("company_feedback_candidate_only", packet.get("promotion_status") == "candidate_only"),
-        _control("human_review_required_for_company_feedback", packet.get("requires_human_review") is True),
-    ]
-
-
-def _next_pass_review_ready(next_pass_review: dict[str, Any] | None) -> bool:
-    return next_pass_review is None or next_pass_review.get("review_status") == "ready_for_operator_review"
-
-
-def _node(node_id: str, status: str, detail: Any, artifact_type: str | None = None) -> dict[str, str]:
-    node = {"node_id": node_id, "status": str(status), "detail": str(detail)}
-    if artifact_type:
-        node["artifact_type"] = artifact_type
-    return node
-
-
-def _control(control_id: str, passed: bool) -> dict[str, str]:
-    return {"control_id": control_id, "status": PASSED if passed else FAILED}
+    decision: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if decision is None:
+        return None
+    if next_pass_review is None:
+        raise ValueError("next_pass_promotion_decision requires next_pass_result")
+    derived_loop, run, overlay = build_next_pass_reviewed_feedback_run(loop, next_pass_review, decision)
+    return {"decision": decision, "derived_loop": derived_loop, "run": run, "overlay": overlay}
 
 
 __all__ = (

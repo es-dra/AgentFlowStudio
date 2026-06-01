@@ -36,6 +36,15 @@ def production_memory_loop_run_operator_no_provider_command(
         readable=True,
         help="Optional explicit next-pass result JSON to review in the operator loop.",
     ),
+    next_pass_promotion_decision_path: Path | None = typer.Option(
+        None,
+        "--next-pass-promotion-decision",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional explicit next-pass promotion decision JSON to include in the operator loop.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -46,12 +55,18 @@ def production_memory_loop_run_operator_no_provider_command(
     """Run the generic production-memory operator loop without provider access."""
     try:
         loop = load_production_memory_loop(loop_path)
-        next_pass_result = _load_json_object(next_pass_result_path) if next_pass_result_path else None
+        next_pass_result = _load_json_object(next_pass_result_path, "next pass result") if next_pass_result_path else None
+        next_pass_promotion_decision = (
+            _load_json_object(next_pass_promotion_decision_path, "next pass promotion decision")
+            if next_pass_promotion_decision_path
+            else None
+        )
         result = build_production_memory_operator_loop_run(
             loop,
             generated_at=generated_at,
             source_kb_status=source_kb_status,
             next_pass_result=next_pass_result,
+            next_pass_promotion_decision=next_pass_promotion_decision,
         )
         written_paths = write_production_memory_operator_loop_run(result, output_dir)
     except ValueError as exc:
@@ -67,6 +82,8 @@ def production_memory_loop_run_operator_no_provider_command(
     typer.echo(f"Blocked refs: {manifest['context_summary']['blocked_ref_count']}")
     if "next_pass_review" in manifest:
         typer.echo(f"Next pass review: {manifest['next_pass_review']['review_status']}")
+    if "next_pass_promotion" in manifest:
+        typer.echo(f"Next pass promotion: {manifest['next_pass_promotion']['decision_effect']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
@@ -79,10 +96,10 @@ def _display_ref(path: Path) -> str:
     return str(path).replace("\\", "/")
 
 
-def _load_json_object(path: Path) -> dict:
+def _load_json_object(path: Path, label: str) -> dict:
     payload = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(payload, dict):
-        raise ValueError("next pass result must be a JSON object")
+        raise ValueError(f"{label} must be a JSON object")
     return payload
 
 
