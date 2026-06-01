@@ -22,6 +22,8 @@ def test_static_viewer_recognizes_loulan_manifest_reference_audit() -> None:
                 "missing_files": 0,
                 "absolute_refs": 0,
                 "secret_like_refs": 0,
+                "invalid_asset_types": 0,
+                "invalid_statuses": 0,
             },
         },
     )
@@ -41,6 +43,8 @@ def test_static_viewer_recognizes_loulan_manifest_reference_audit() -> None:
     assert facts["missing_files"] == "0"
     assert facts["absolute_refs"] == "0"
     assert facts["secret_like_refs"] == "0"
+    assert facts["invalid_asset_types"] == "0"
+    assert facts["invalid_statuses"] == "0"
     assert facts["provider_calls_started"] == "false"
     assert facts["writes_long_term_memory"] == "false"
     assert facts["new_media_generated"] == "false"

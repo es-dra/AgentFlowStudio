@@ -37,6 +37,8 @@ Observed selected-file state:
   - missing files: `0`
   - absolute refs: `0`
   - secret-like refs: `0`
+  - invalid asset types: `0`
+  - invalid statuses: `0`
 - Text encoding audit:
   - artifact type: `loulan_text_encoding_audit`
   - artifact class: `known_contract`
@@ -65,6 +67,15 @@ Result: `3 passed`.
 Refresh checks after current Loulan count sync:
 
 - Related direct-probe tests: `4 passed`.
+- Full AFS suite: `763 passed`.
+- Staging preflight: pass.
+- `git diff --check`: no whitespace errors; CRLF touch warnings only.
+
+Refresh checks after canonical registry type/status audit:
+
+- Manifest reference audit direct view now surfaces invalid asset types `0` and
+  invalid statuses `0`.
+- Related governance/phase/project-audit tests: `4 passed`.
 - Full AFS suite: `763 passed`.
 - Staging preflight: pass.
 - `git diff --check`: no whitespace errors; CRLF touch warnings only.

@@ -41,6 +41,8 @@ function manifestReferenceFacts(summary) {
     fact("missing_files", summary.missing_files ?? "unknown"),
     fact("absolute_refs", summary.absolute_refs ?? "unknown"),
     fact("secret_like_refs", summary.secret_like_refs ?? "unknown"),
+    fact("invalid_asset_types", summary.invalid_asset_types ?? "unknown"),
+    fact("invalid_statuses", summary.invalid_statuses ?? "unknown"),
   ];
 }
 
