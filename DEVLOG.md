@@ -6,6 +6,8 @@ Current references: live work ledger `TASK_TRACKER.md`; historical DEVLOG index
 `docs/archive/devlog_history_2026_05.md`; pre-reset task history
 `docs/archive/task_history_2026_05.md`.
 
+2026-06-01: Loulan root `project_manifest.json` selected-file inspector now surfaces the package gate-facts probe status (`package_gate_facts = pass_b01_still_blocked`) so the project entry point shows the latest package-level B01/apply/context blocker; see `docs/handoff/AFS-LOULAN-WEB-ROOT-GATE-FACTS-DIRECT-001.md`.
+
 2026-06-01: Loulan package selected-file inspector now surfaces the full gate chain as direct facts, including promotion gate, next-context status, context rule, B01 validation/apply status, context readiness, human/media/no-call boundaries, and operator next-context blocker; see `docs/handoff/AFS-LOULAN-WEB-PACKAGE-GATE-FACTS-001.md`.
 
 2026-06-01: Loulan memory pilot package, API workbench dry-run, B01 human review pack, decision template, context bundle projection, optional asset registry gate, and Web decision/context rendering contracts, CLIs, Web projections, examples, tracker rows, task briefs, and handoffs added; see `docs/handoff/AFS-LOULAN-PILOT-001.md`, `docs/handoff/AFS-LOULAN-API-WORKBENCH-001.md`, `docs/handoff/AFS-LOULAN-HUMAN-REVIEW-001.md`, `docs/handoff/AFS-LOULAN-DECISION-TEMPLATE-001.md`, `docs/handoff/AFS-LOULAN-CONTEXT-BUNDLE-001.md`, `docs/handoff/AFS-LOULAN-ASSET-REGISTRY-001.md`, and `docs/handoff/AFS-LOULAN-WEB-CONTEXT-001.md`.
