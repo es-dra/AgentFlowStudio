@@ -7,6 +7,7 @@ const TYPE_LABELS = {
   agentflow_feedback_event: "Feedback draft",
   agentflow_production_memory_loop: "Production memory loop",
   agentflow_production_memory_session_report: "Production memory session",
+  agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
 };
 
 export function buildMemoryArtifactInspector(workspace, fallback = []) {
@@ -38,6 +39,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
   if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
 
@@ -50,9 +52,21 @@ function factsFor(type, payload) {
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
   if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
+  if (type === "agentflow_company_kb_feedback_candidate_packet") return companyKbFeedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
     fact("schema_version", payload.schema_version || "unknown"),
+  ];
+}
+
+function companyKbFeedbackFacts(payload) {
+  return [
+    fact("promotion_status", payload.promotion_status || "unknown"),
+    fact("candidate_items", String(arrayValue(payload.candidate_items).length)),
+    fact("source_kb_status", payload.source_kb_status || "unknown"),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("requires_human_review", yesNo(payload.requires_human_review)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];
 }
 

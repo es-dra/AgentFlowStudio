@@ -15,3 +15,6 @@ Rules:
 - Generated packets such as
   `agentflow_company_kb_feedback_candidate_packet` are transport artifacts for
   review. They do not mutate the source Company knowledge base.
+- The Web workbench may render these packets from explicitly selected local
+  JSON. That view is read-only and does not promote, persist, or write
+  candidates back to Company memory.

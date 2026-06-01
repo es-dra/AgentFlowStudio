@@ -163,9 +163,16 @@ The Web workbench recognizes both:
 
 - `agentflow_production_memory_loop`
 - `agentflow_production_memory_session_report`
+- `agentflow_company_kb_feedback_candidate_packet`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
+
+Company KB feedback candidate packets render as a read-only candidate review
+canvas with candidate items, explicit non-promotions, source KB restructuring
+status, human-review requirements, and write-disabled boundaries. They remain
+candidate-only transport artifacts and do not write Company KB or durable
+memory.
 
 It does not:
 

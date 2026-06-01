@@ -3,6 +3,7 @@ import { buildDemoReadyChecklist } from "./memory-workbench-demo-checklist.js";
 import { buildDemoEvidenceSummary } from "./memory-workbench-demo-summary.js";
 import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
 import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
+import { buildCompanyKbFeedbackCandidatePacketView } from "./memory-workbench-company-kb-feedback.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
@@ -25,12 +26,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const packageView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
   const memoryView = buildProductionMemoryLoopView(workspace, packageView);
   const sessionView = buildProductionMemorySessionReportView(workspace, memoryView);
-  sessionView.source_status = memorySourceStatus(source, workspace);
-  sessionView.artifact_inspector = buildMemoryArtifactInspector(workspace, sessionView.artifact_inspector);
-  sessionView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  sessionView.demo_summary = buildDemoEvidenceSummary(sessionView);
-  sessionView.demo_checklist = buildDemoReadyChecklist(sessionView);
-  return sessionView;
+  const companyKbView = buildCompanyKbFeedbackCandidatePacketView(workspace, sessionView);
+  companyKbView.source_status = memorySourceStatus(source, workspace);
+  companyKbView.artifact_inspector = buildMemoryArtifactInspector(workspace, companyKbView.artifact_inspector);
+  companyKbView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  companyKbView.demo_summary = buildDemoEvidenceSummary(companyKbView);
+  companyKbView.demo_checklist = buildDemoReadyChecklist(companyKbView);
+  return companyKbView;
 }
 
 function memorySourceStatus(source, workspace) {
