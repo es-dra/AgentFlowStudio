@@ -104,7 +104,7 @@ function loulanBundleSummary(payload, eligibleRefs, blockedRefs, apiPlan, review
   const inventory = payload.asset_inventory || {};
   const items = [
     { id: "project", title: "Loulan pilot package", status: "review ready", detail: payload.project?.source_root_label || "selected package" },
-    { id: "project-audits", title: "Project audits", status: auditStatus(projectAudits, "manifest_reference") === "pass" && auditStatus(projectAudits, "text_encoding") === "pass" ? "pass" : "review", detail: `manifest reference: ${auditStatus(projectAudits, "manifest_reference")}; text encoding: ${auditStatus(projectAudits, "text_encoding")}` },
+    { id: "project-audits", title: "Project audits", status: auditStatus(projectAudits, "manifest_reference") === "pass" && auditStatus(projectAudits, "text_encoding") === "pass" ? "pass" : "review", detail: `manifest reference: ${auditStatus(projectAudits, "manifest_reference")}; text encoding: ${auditStatus(projectAudits, "text_encoding")}; phase gate: ${auditStatus(projectAudits, "phase_gate")}` },
     { id: "shots", title: "Shot manifest", status: "review ready", detail: `${payload.shot_summary?.total_shots || 0} shots indexed` },
     { id: "assets", title: "Asset inventory", status: blockedRefs.length ? "blocked" : "review ready", detail: `${inventory.total_assets || payload.asset_summary?.total_assets || 0} assets; ${eligibleRefs.length} eligible, ${blockedRefs.length} blocked` },
     { id: "api", title: "API workbench skeleton", status: apiPlan ? "review ready" : "planned", detail: apiPlan ? `${requestCount} request previews; live calls blocked` : "request preview only; live provider calls blocked by default" },
@@ -209,6 +209,7 @@ function loulanProtocolSummary(safety, boundaries = {}, apiPlan = null, reviewPa
       { label: "source project package", status: "review ready", detail: "explicit selected JSON package only" },
       { label: "manifest reference audit", status: auditStatus(projectAudits, "manifest_reference"), detail: auditRef(projectAudits, "manifest_reference") },
       { label: "text encoding audit", status: auditStatus(projectAudits, "text_encoding"), detail: auditRef(projectAudits, "text_encoding") },
+      { label: "phase gate audit", status: auditStatus(projectAudits, "phase_gate"), detail: auditRef(projectAudits, "phase_gate") },
       { label: "image route", status: safety.image_generation === "blocked_until_api_workbench" ? "blocked" : "planned", detail: safety.image_generation || "unknown" },
       { label: "video route", status: "planned", detail: safety.video_generation || "dry_run_only" },
       { label: "request preview", status: "planned", detail: String(Boolean(safety.request_preview_only)) },

@@ -3,12 +3,14 @@ export function loulanPackageFacts(payload) {
   const audits = objectValue(payload.project_audits);
   const manifestAudit = objectValue(audits.manifest_reference);
   const textAudit = objectValue(audits.text_encoding);
+  const phaseGate = objectValue(audits.phase_gate);
   return [
     fact("shots", payload.shot_summary?.total_shots ?? "unknown"),
     fact("eligible_refs", arrayValue(payload.next_context_bundle_draft?.eligible_memory_refs).length),
     fact("blocked_refs", arrayValue(payload.next_context_bundle_draft?.blocked_memory_refs).length),
     fact("manifest_reference_audit", manifestAudit.status || "not_provided"),
     fact("text_encoding_audit", textAudit.status || "not_provided"),
+    fact("phase_gate_audit", phaseGate.status || "not_provided"),
     fact("feedback_gate_b01", b01Gate.status || "not_supplied"),
     fact("b01_pending_decisions", b01Gate.pending_decisions ?? "unknown"),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),

@@ -38,6 +38,11 @@ def test_loulan_memory_package_blocks_candidates_and_builtin_image_route(tmp_pat
             "artifact_ref": "reviews/text_encoding_audit.json",
             "report_ref": "reviews/text_encoding_audit.md",
         },
+        "phase_gate": {
+            "status": "blocked_until_b01_human_review",
+            "artifact_ref": "reviews/asset_governance_phase_audit.json",
+            "report_ref": "reviews/asset_governance_phase_audit.md",
+        },
     }
     assert package["feedback_loop_gates"]["b01"]["status"] == "blocked_pending_human_review"
     assert package["feedback_loop_gates"]["b01"]["pending_decisions"] == 5
@@ -121,6 +126,7 @@ def test_loulan_memory_package_example_is_contract_safe() -> None:
     assert payload["api_workbench_skeleton"]["live_provider_calls"] == "blocked_by_default"
     assert payload["project_audits"]["manifest_reference"]["status"] == "pass"
     assert payload["project_audits"]["text_encoding"]["status"] == "pass"
+    assert payload["project_audits"]["phase_gate"]["status"] == "blocked_until_b01_human_review"
     assert payload["feedback_loop_gates"]["b01"]["provider_calls_started"] is False
     assert payload["feedback_loop_gates"]["b01_decision_crosswalk"]["afs_b01_import_gate"]["pending_count"] == 7
     assert "asset:character_zhou_tong_school_v1" in payload["next_context_bundle_draft"]["eligible_memory_refs"]
@@ -159,6 +165,9 @@ def _loulan_fixture(tmp_path: Path) -> Path:
             "text_encoding_audit": "reviews/text_encoding_audit.json",
             "text_encoding_audit_report": "reviews/text_encoding_audit.md",
             "text_encoding_audit_status": "pass",
+            "asset_governance_phase_audit": "reviews/asset_governance_phase_audit.json",
+            "asset_governance_phase_audit_report": "reviews/asset_governance_phase_audit.md",
+            "asset_governance_phase_audit_status": "blocked_until_b01_human_review",
         },
     )
     _write_json(

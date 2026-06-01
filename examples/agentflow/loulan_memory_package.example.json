@@ -176,7 +176,8 @@
   ],
   "project_audits": {
     "manifest_reference": { "status": "pass", "artifact_ref": "reviews/manifest_reference_audit.json", "report_ref": "reviews/manifest_reference_audit.md" },
-    "text_encoding": { "status": "pass", "artifact_ref": "reviews/text_encoding_audit.json", "report_ref": "reviews/text_encoding_audit.md" }
+    "text_encoding": { "status": "pass", "artifact_ref": "reviews/text_encoding_audit.json", "report_ref": "reviews/text_encoding_audit.md" },
+    "phase_gate": { "status": "blocked_until_b01_human_review", "artifact_ref": "reviews/asset_governance_phase_audit.json", "report_ref": "reviews/asset_governance_phase_audit.md" }
   },
   "provider_route_safety": {
     "image_generation": "blocked_until_api_workbench",

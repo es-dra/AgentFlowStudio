@@ -94,6 +94,7 @@ def render_loulan_memory_package_report(package: dict[str, Any]) -> str:
             f"- Image route: `{safety['image_generation']}`",
             f"- Manifest reference audit: `{package['project_audits']['manifest_reference']['status']}`",
             f"- Text encoding audit: `{package['project_audits']['text_encoding']['status']}`",
+            f"- Phase gate audit: `{package['project_audits']['phase_gate']['status']}`",
             f"- Promotion gate: `{gates['overall_status']}`",
             f"- B01 feedback loop gate: `{package['feedback_loop_gates']['b01']['status']}`",
             f"- B01 decision crosswalk: `{package['feedback_loop_gates']['b01_decision_crosswalk']['status']}`",
@@ -144,6 +145,7 @@ def _project_audits(manifest: dict[str, Any]) -> dict[str, dict[str, str]]:
     return {
         "manifest_reference": _project_audit(manifest, "manifest_reference_audit"),
         "text_encoding": _project_audit(manifest, "text_encoding_audit"),
+        "phase_gate": _project_audit(manifest, "asset_governance_phase_audit"),
     }
 
 
