@@ -66,6 +66,11 @@ Current references:
 - Added a read-only no-provider operator session report:
   `agentflow/memory/production_session.py` and
   `production-memory-loop-session-report`.
+- Added read-only Web recognition for
+  `agentflow_production_memory_session_report` through
+  `apps/web/memory-workbench-production-session.js`; it renders selected
+  session report JSON only and adds no directory scan, browser persistence,
+  provider execution, or project-specific inspector.
 - The report summarizes included refs, blocked refs, optional feedback capture,
   optional reviewed promotion decision, next operator action, and non-claim
   boundaries. It does not mutate source loops, scan directories, call
@@ -74,9 +79,22 @@ Current references:
 - Verification so far:
   - `python -m pytest tests/test_production_memory_session_report.py -q` -> 6 passed.
   - `python -m pytest tests/test_production_memory_session_report.py tests/test_production_memory_promotion_overlay.py tests/test_production_memory_feedback_capture.py tests/test_production_memory_loop.py tests/test_cli_command_registry_boundaries.py -q` -> 27 passed.
+  - `python -m pytest tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py -q` -> 21 passed.
   - `python -m apps.cli.main --help` -> passed; `production-memory-loop-session-report` is visible.
   - `python -m apps.cli.main production-memory-loop-session-report data/processed/runs/production_memory_loop/reviewed_feedback/production_memory_loop_run.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --generated-at 2026-06-02T00:10:00+08:00 --output data/processed/runs/production_memory_loop/session_report` -> ready; wrote JSON and Markdown report under ignored runtime output.
-  - `python -m pytest` -> 704 passed.
+  - `python -m pytest tests/test_web_static_production_memory_session_report.py -q` -> 2 passed.
+  - Python Playwright browser smoke loaded `apps/web/index.html#memory`,
+    imported the workbench modules in the browser context, parsed a generated
+    `agentflow_production_memory_session_report`, and returned
+    `projectFormat: agentflow_production_memory_session_report`,
+    `state: pass ready`, and `nextPassAction: prepare_next_pass`. Two
+    `ERR_CONNECTION_REFUSED` console errors were observed from the local bridge
+    not running; this was recorded as environment noise, not provider
+    execution.
+  - `python -m pytest` -> 706 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_session_report.py tests/test_production_memory_loop.py tests/test_production_memory_session_report.py tests/test_cli_command_registry_boundaries.py -q` -> 20 passed on Python 3.12.12.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 706 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
 
 ## 2026-05-31 - Oversized File Slimming Pass
 

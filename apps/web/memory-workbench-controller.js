@@ -6,6 +6,7 @@ import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
+import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
 export function attachMemoryWorkbenchHandlers(elements, { onWorkspaceLoaded, setMode }) {
@@ -23,12 +24,13 @@ export function memorySourceForArtifacts(artifacts) {
 export function buildMemoryWorkbenchView(workspace, source) {
   const packageView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
   const memoryView = buildProductionMemoryLoopView(workspace, packageView);
-  memoryView.source_status = memorySourceStatus(source, workspace);
-  memoryView.artifact_inspector = buildMemoryArtifactInspector(workspace, memoryView.artifact_inspector);
-  memoryView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  memoryView.demo_summary = buildDemoEvidenceSummary(memoryView);
-  memoryView.demo_checklist = buildDemoReadyChecklist(memoryView);
-  return memoryView;
+  const sessionView = buildProductionMemorySessionReportView(workspace, memoryView);
+  sessionView.source_status = memorySourceStatus(source, workspace);
+  sessionView.artifact_inspector = buildMemoryArtifactInspector(workspace, sessionView.artifact_inspector);
+  sessionView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  sessionView.demo_summary = buildDemoEvidenceSummary(sessionView);
+  sessionView.demo_checklist = buildDemoReadyChecklist(sessionView);
+  return sessionView;
 }
 
 function memorySourceStatus(source, workspace) {

@@ -6,6 +6,7 @@ const TYPE_LABELS = {
   agentflow_memory_video_pipeline_presentation_package: "Presentation package",
   agentflow_feedback_event: "Feedback draft",
   agentflow_production_memory_loop: "Production memory loop",
+  agentflow_production_memory_session_report: "Production memory session",
 };
 
 export function buildMemoryArtifactInspector(workspace, fallback = []) {
@@ -36,6 +37,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
   if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
+  if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
 
@@ -47,9 +49,21 @@ function factsFor(type, payload) {
   if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
+  if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
     fact("schema_version", payload.schema_version || "unknown"),
+  ];
+}
+
+function productionSessionFacts(payload) {
+  return [
+    fact("session_status", payload.session_status || "unknown"),
+    fact("included_refs", String(payload.context_summary?.included_ref_count ?? 0)),
+    fact("blocked_refs", String(payload.context_summary?.blocked_ref_count ?? 0)),
+    fact("next_action", payload.next_operator_action?.action || "unknown"),
+    fact("provider_mode", payload.provider_mode || "unknown"),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
 }
 

@@ -143,6 +143,14 @@ not be committed.
 The Web slice is a read-only generic production-memory canvas / ledger view. It
 reads only explicitly selected JSON artifacts in browser memory.
 
+The Web workbench recognizes both:
+
+- `agentflow_production_memory_loop`
+- `agentflow_production_memory_session_report`
+
+Session reports render as an operator audit canvas with included refs, blocked
+refs, next operator action, and non-claim boundaries.
+
 It does not:
 
 - scan directories;

@@ -91,6 +91,7 @@ export function normalizeWorkspace(artifacts) {
   const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
   const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
   const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
+  const productionMemorySessionReport = byType("agentflow_production_memory_session_report") || null;
   const workspaceParts = {
     warnings,
     errors,
@@ -102,6 +103,7 @@ export function normalizeWorkspace(artifacts) {
     package: packageSummary,
     memoryPackage,
     productionMemoryLoop,
+    productionMemorySessionReport,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),
