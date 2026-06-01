@@ -95,6 +95,7 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryOperatorLoopRun = byType("agentflow_production_memory_operator_loop_run") || null;
   const productionMemoryNextContextHandoff = byType("agentflow_production_memory_next_context_handoff") || null;
   const productionMemoryNextTaskPacket = byType("agentflow_production_memory_next_task_packet") || null;
+  const productionMemoryNextPassReview = byType("agentflow_production_memory_next_pass_review") || null;
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
   const workspaceParts = {
     warnings,
@@ -111,6 +112,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryOperatorLoopRun,
     productionMemoryNextContextHandoff,
     productionMemoryNextTaskPacket,
+    productionMemoryNextPassReview,
     companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
@@ -167,6 +169,9 @@ function detectArtifactType(fileName, payload) {
   }
   if (payload && payload.kind === "agentflow_production_memory_next_task_packet") {
     return "agentflow_production_memory_next_task_packet";
+  }
+  if (payload && payload.kind === "agentflow_production_memory_next_pass_review") {
+    return "agentflow_production_memory_next_pass_review";
   }
   if (payload && payload.kind === "agentflow_company_kb_feedback_candidate_packet") {
     return "agentflow_company_kb_feedback_candidate_packet";

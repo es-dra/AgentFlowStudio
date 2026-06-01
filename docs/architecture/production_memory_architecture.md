@@ -234,6 +234,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_loop_run`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
+- `agentflow_production_memory_next_pass_review`
 
 Session reports render as an operator audit canvas with included refs, blocked
 refs, next operator action, and non-claim boundaries.
@@ -257,6 +258,12 @@ write Company KB, or promote durable memory.
 Next-task packet artifacts render as a read-only task entry canvas with allowed
 context refs, blocked refs, no-provider controls, and non-claim boundaries. They
 do not execute the next task, follow refs, call providers, write Company KB, or
+promote durable memory.
+
+Next-pass review artifacts render as a read-only result-intake canvas with used
+allowed refs, blocked or unknown refs, candidate-only feedback, pending
+promotion templates, no-provider controls, and non-claim boundaries. They do
+not execute a next pass, follow refs, call providers, write Company KB, or
 promote durable memory.
 
 It does not:

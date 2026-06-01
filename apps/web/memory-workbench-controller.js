@@ -8,6 +8,7 @@ import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
 import { buildProductionMemoryNextContextHandoffView } from "./memory-workbench-production-next-context.js";
+import { buildProductionMemoryNextPassReviewView } from "./memory-workbench-production-next-pass-review.js";
 import { buildProductionMemoryNextTaskPacketView } from "./memory-workbench-production-next-task.js";
 import { buildProductionMemoryOperatorLoopView } from "./memory-workbench-production-operator-loop.js";
 import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
@@ -33,12 +34,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
   const nextContextView = buildProductionMemoryNextContextHandoffView(workspace, operatorLoopView);
   const nextTaskView = buildProductionMemoryNextTaskPacketView(workspace, nextContextView);
-  nextTaskView.source_status = memorySourceStatus(source, workspace);
-  nextTaskView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextTaskView.artifact_inspector);
-  nextTaskView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  nextTaskView.demo_summary = buildDemoEvidenceSummary(nextTaskView);
-  nextTaskView.demo_checklist = buildDemoReadyChecklist(nextTaskView);
-  return nextTaskView;
+  const nextPassReviewView = buildProductionMemoryNextPassReviewView(workspace, nextTaskView);
+  nextPassReviewView.source_status = memorySourceStatus(source, workspace);
+  nextPassReviewView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextPassReviewView.artifact_inspector);
+  nextPassReviewView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  nextPassReviewView.demo_summary = buildDemoEvidenceSummary(nextPassReviewView);
+  nextPassReviewView.demo_checklist = buildDemoReadyChecklist(nextPassReviewView);
+  return nextPassReviewView;
 }
 
 function memorySourceStatus(source, workspace) {

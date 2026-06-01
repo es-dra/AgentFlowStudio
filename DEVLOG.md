@@ -9,6 +9,28 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Pass Review Web 001
+
+- Continued the generic Production Memory Architecture path on
+  `codex/afs-production-memory-next-pass-review-web-001`, based on the
+  verified next-pass review CLI slice.
+- Added read-only Web recognition for
+  `agentflow_production_memory_next_pass_review` through
+  `apps/web/memory-workbench-production-next-pass-review.js`.
+- The view renders selected local review JSON as a next-pass result-intake
+  canvas with used allowed refs, blocked/unknown refs, candidate-only feedback,
+  pending promotion templates, no-provider controls, and non-claim boundaries.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no ref following, no Web scan/persistence, no
+  Loulan-specific behavior, no human acceptance, and no business validation
+  claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_pass_review.py -q` -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_pass_review.py tests/test_web_static_production_memory_next_task_packet.py tests/test_web_static_production_memory_next_context_handoff.py tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q` -> 31 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_review.py tests/test_production_memory_next_task_packet.py tests/test_production_memory_next_context_handoff.py tests/test_production_memory_operator_loop.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py tests/test_web_static_production_memory_next_pass_review.py -q` -> 42 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest` -> 735 passed on Python 3.12.12.
+  - `git diff --check` -> exit 0; CRLF normalization warnings only.
+
 ## 2026-06-02 - Production Memory Next Pass Review 001
 
 - Continued the generic Production Memory Architecture path on
