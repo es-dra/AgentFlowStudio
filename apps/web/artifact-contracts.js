@@ -20,6 +20,31 @@ export const ARTIFACT_ALIASES = {
   agentflow_memory_video_pipeline_human_observation: ["memory_video_pipeline_human_observation.json", "memory_video_pipeline_human_observation.example.json"],
   agentflow_memory_video_pipeline_presentation_package: ["memory_video_pipeline_presentation_package.json", "memory_video_pipeline_presentation_package.example.json"],
   agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
+  agentflow_production_memory_loop: ["production_memory_loop.json", "production_memory_loop.example.json"],
+  agentflow_production_memory_session_report: ["production_memory_session_report.json"],
+  agentflow_production_memory_operator_loop_run: ["production_memory_operator_loop_run.json"],
+  agentflow_production_memory_operator_manifest_check: ["operator_manifest_check.json"],
+  agentflow_production_memory_operator_handoff_packet: ["operator_handoff_packet.json"],
+  agentflow_production_memory_operator_run_package: ["operator_run_package.json"],
+  agentflow_production_memory_operator_run_package_check: ["operator_run_package_check.json"],
+  agentflow_production_memory_next_operator_start_packet: ["next_operator_start_packet.json"],
+  agentflow_production_memory_next_operator_start_event: ["next_operator_start_event.json"],
+  agentflow_production_memory_next_operator_action_result: ["next_operator_action_result.json"],
+  agentflow_production_memory_acceptance_feedback_event: ["acceptance_feedback_event.json"],
+  agentflow_production_memory_acceptance_feedback_candidate_packet: ["acceptance_feedback_candidate_packet.json"],
+  agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: ["acceptance_feedback_candidate_promotion_decision.json"],
+  agentflow_production_memory_next_context_handoff: ["next_context_handoff.json"],
+  agentflow_production_memory_next_task_packet: ["next_task_packet.json"],
+  agentflow_production_memory_next_pass_result: ["next_pass_result.json"],
+  agentflow_production_memory_next_pass_review: ["next_pass_review.json"],
+  agentflow_production_memory_next_pass_promotion_decision: ["next_pass_promotion_decision.json"],
+  agentflow_production_memory_next_pass_promotion_overlay: ["next_pass_promotion_overlay.json"],
+  agentflow_production_memory_operator_feedback_event: ["operator_feedback_event.json"],
+  agentflow_production_memory_operator_feedback_candidate_packet: ["operator_feedback_candidate_packet.json"],
+  agentflow_company_kb_feedback_candidate_packet: [
+    "company_kb_feedback_candidate_packet.json",
+    "company_kb_feedback_candidate_packet.example.json",
+  ],
 };
 
 export const RECOMMENDED_ARTIFACTS = [
@@ -64,6 +89,28 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_memory_video_pipeline_human_observation") return "memory video pipeline human observation";
   if (type === "agentflow_memory_video_pipeline_presentation_package") return "memory video pipeline presentation package";
   if (type === "agentflow_feedback_event") return "memory feedback event draft";
+  if (type === "agentflow_production_memory_loop") return "production memory loop";
+  if (type === "agentflow_production_memory_session_report") return "production memory session report";
+  if (type === "agentflow_production_memory_operator_loop_run") return "production memory operator loop run";
+  if (type === "agentflow_production_memory_operator_manifest_check") return "production memory operator manifest check";
+  if (type === "agentflow_production_memory_operator_handoff_packet") return "production memory operator handoff packet";
+  if (type === "agentflow_production_memory_operator_run_package") return "production memory operator run package";
+  if (type === "agentflow_production_memory_operator_run_package_check") return "production memory operator run package check";
+  if (type === "agentflow_production_memory_next_operator_start_packet") return "production memory next operator start packet";
+  if (type === "agentflow_production_memory_next_operator_start_event") return "production memory next operator start event";
+  if (type === "agentflow_production_memory_next_operator_action_result") return "production memory next operator action result";
+  if (type === "agentflow_production_memory_acceptance_feedback_event") return "production memory acceptance feedback event";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return "production memory acceptance feedback candidate packet";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return "production memory acceptance feedback candidate promotion decision";
+  if (type === "agentflow_production_memory_next_context_handoff") return "production memory next context handoff";
+  if (type === "agentflow_production_memory_next_task_packet") return "production memory next task packet";
+  if (type === "agentflow_production_memory_next_pass_result") return "production memory next pass result";
+  if (type === "agentflow_production_memory_next_pass_review") return "production memory next pass review";
+  if (type === "agentflow_production_memory_next_pass_promotion_decision") return "production memory next pass promotion decision";
+  if (type === "agentflow_production_memory_next_pass_promotion_overlay") return "production memory next pass promotion overlay";
+  if (type === "agentflow_production_memory_operator_feedback_event") return "production memory operator feedback event";
+  if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return "production memory operator feedback candidate packet";
+  if (type === "agentflow_company_kb_feedback_candidate_packet") return "Company KB feedback candidate packet";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
   return "unclassified";

@@ -1,0 +1,72 @@
+{
+  "kind": "agentflow_company_kb_feedback_candidate_packet",
+  "artifact_type": "agentflow_company_kb_feedback_candidate_packet",
+  "schema_version": "company-kb-feedback-candidate-packet/v1",
+  "packet_id": "company-kb-feedback:session:example-production-memory-loop:no-provider",
+  "generated_at": "2026-06-02T00:20:00+08:00",
+  "source_kb_status": "restructuring_or_unknown",
+  "promotion_status": "candidate_only",
+  "requires_human_review": true,
+  "writes_company_kb": false,
+  "writes_long_term_memory": false,
+  "provider_calls_started": false,
+  "source_report": {
+    "session_id": "session:example-production-memory-loop:no-provider",
+    "loop_id": "example-production-memory-loop",
+    "project_id": "example-memory-driven-content-workbench",
+    "session_status": "ready",
+    "generated_at": "2026-06-02T00:10:00+08:00"
+  },
+  "target": {
+    "system": "local_company_knowledge_base",
+    "write_status": "not_written",
+    "promotion_required": "explicit_human_review"
+  },
+  "context_signal": {
+    "context_bundle_id": "context:example-production-memory-loop:v1",
+    "included_ref_count": 4,
+    "blocked_ref_count": 3,
+    "next_operator_action": "prepare_next_pass"
+  },
+  "non_claim_boundaries": {
+    "human_acceptance": "not_reviewed",
+    "business_validation": "not_validated",
+    "provider_success": "not_attempted",
+    "durable_memory_runtime": "not_implemented"
+  },
+  "candidate_items": [
+    {
+      "candidate_id": "company-kb:candidate:context-bundle-audit:v1",
+      "status": "candidate",
+      "summary": "Keep included and blocked refs together when handing off next-context evidence.",
+      "promotion_boundary": "Candidate only until compared against other AFS production loops.",
+      "requires_human_review": true,
+      "writes_company_kb": false,
+      "source_session_id": "session:example-production-memory-loop:no-provider",
+      "source_refs": [
+        "session:session:example-production-memory-loop:no-provider",
+        "context_bundle:context:example-production-memory-loop:v1"
+      ]
+    },
+    {
+      "candidate_id": "company-kb:candidate:claim-boundary-discipline:v1",
+      "status": "candidate",
+      "summary": "Carry human acceptance, business validation, provider success, and durable memory as explicit non-claims.",
+      "promotion_boundary": "Candidate only; Company memory promotion requires human review.",
+      "requires_human_review": true,
+      "writes_company_kb": false,
+      "source_session_id": "session:example-production-memory-loop:no-provider",
+      "source_refs": [
+        "session:session:example-production-memory-loop:no-provider",
+        "context_bundle:context:example-production-memory-loop:v1"
+      ]
+    }
+  ],
+  "explicit_non_promotions": [
+    "does_not_write_company_kb",
+    "does_not_promote_company_memory",
+    "does_not_claim_human_acceptance",
+    "does_not_claim_business_validation",
+    "does_not_authorize_provider_calls"
+  ]
+}

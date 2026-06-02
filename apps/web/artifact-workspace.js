@@ -1,9 +1,8 @@
 import { ARTIFACT_ALIASES, ARTIFACT_CLASSES, RECOMMENDED_ARTIFACTS, VIDEO_EXTENSIONS, sourceRoleFor } from "./artifact-contracts.js?v=m4-memory-canvas-tools";
 import { normalizeAssetLedger, normalizeEvidenceMap, normalizeRiskLedger } from "./artifact-ledgers.js?v=m4-memory-canvas-tools";
 import { asList, asObject, asText, collectChecks, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
-
 export { asText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
-
+const AGENTFLOW_KIND_ARTIFACTS = new Set(Object.keys(ARTIFACT_ALIASES).filter((type) => type.startsWith("agentflow_")));
 export async function parseFiles(files) {
   const artifacts = [];
   for (const file of files) {
@@ -12,7 +11,6 @@ export async function parseFiles(files) {
       artifacts.push(buildArtifact({ file, rawText: "", payload: null, parseStatus: "valid", localFile: file }));
       continue;
     }
-
     const text = await file.text();
     if (extension === "md") {
       artifacts.push(buildArtifact({ file, rawText: text, payload: null, parseStatus: "valid" }));
@@ -56,7 +54,6 @@ export async function parseFiles(files) {
   }
   return artifacts;
 }
-
 export function normalizeWorkspace(artifacts) {
   const summaryArtifacts = artifacts.filter((artifact) => artifact.participatesInSummary);
   const byType = (type) => summaryArtifacts.find((artifact) => artifact.artifactType === type);
@@ -65,7 +62,6 @@ export function normalizeWorkspace(artifacts) {
   const errors = artifacts
     .filter((artifact) => artifact.artifactClass === ARTIFACT_CLASSES.INVALID)
     .map((artifact) => `${artifact.fileName}: ${artifact.message || "invalid artifact"}`);
-
   if (summaryArtifacts.length > 0) {
     for (const type of RECOMMENDED_ARTIFACTS) {
       if (!summaryArtifacts.some((artifact) => artifact.artifactType === type)) {
@@ -73,7 +69,6 @@ export function normalizeWorkspace(artifacts) {
       }
     }
   }
-
   for (const artifact of artifacts) {
     for (const schemaWarning of artifact.schemaWarnings) {
       warnings.push(`${artifact.fileName}: ${schemaWarning}`);
@@ -85,21 +80,53 @@ export function normalizeWorkspace(artifacts) {
       warnings.push(`${artifact.fileName}: unsupported_file; not included in summary.`);
     }
   }
-
   const run = normalizeRun(byType("run_manifest"));
   const packageSummary = normalizePackage(byType("package_manifest"));
   const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
   const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
-  const workspaceParts = {
-    warnings,
-    errors,
-  };
-
+  const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
+  const productionMemorySessionReport = byType("agentflow_production_memory_session_report") || null;
+  const productionMemoryOperatorLoopRun = byType("agentflow_production_memory_operator_loop_run") || null;
+  const productionMemoryOperatorManifestCheck = byType("agentflow_production_memory_operator_manifest_check") || null;
+  const productionMemoryOperatorHandoffPacket = byType("agentflow_production_memory_operator_handoff_packet") || null;
+  const productionMemoryOperatorRunPackage = byType("agentflow_production_memory_operator_run_package") || null;
+  const productionMemoryAcceptanceFeedbackEvent = byType("agentflow_production_memory_acceptance_feedback_event") || null;
+  const productionMemoryAcceptanceFeedbackCandidatePacket = byType("agentflow_production_memory_acceptance_feedback_candidate_packet") || null;
+  const productionMemoryAcceptanceFeedbackCandidatePromotionDecision = byType("agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") || null;
+  const productionMemoryNextContextHandoff = byType("agentflow_production_memory_next_context_handoff") || null;
+  const productionMemoryNextTaskPacket = byType("agentflow_production_memory_next_task_packet") || null;
+  const productionMemoryNextPassResult = byType("agentflow_production_memory_next_pass_result") || null;
+  const productionMemoryNextPassReview = byType("agentflow_production_memory_next_pass_review") || null;
+  const productionMemoryOperatorFeedbackEvent = byType("agentflow_production_memory_operator_feedback_event") || null;
+  const productionMemoryOperatorFeedbackCandidatePacket = byType("agentflow_production_memory_operator_feedback_candidate_packet") || null;
+  const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
+  const workspaceParts = { warnings, errors };
   return {
     artifacts,
     run,
     package: packageSummary,
     memoryPackage,
+    productionMemoryLoop,
+    productionMemorySessionReport,
+    productionMemoryOperatorLoopRun,
+    productionMemoryOperatorManifestCheck,
+    productionMemoryOperatorHandoffPacket,
+    productionMemoryOperatorRunPackage,
+    productionMemoryNextOperatorStartPacket: byType("agentflow_production_memory_next_operator_start_packet") || null,
+    productionMemoryNextOperatorStartEvent: byType("agentflow_production_memory_next_operator_start_event") || null,
+    productionMemoryNextOperatorActionResult: byType("agentflow_production_memory_next_operator_action_result") || null,
+    productionMemoryAcceptanceFeedbackEvent,
+    productionMemoryAcceptanceFeedbackCandidatePacket,
+    productionMemoryAcceptanceFeedbackCandidatePromotionDecision,
+    productionMemoryNextContextHandoff,
+    productionMemoryNextTaskPacket,
+    productionMemoryNextPassResult,
+    productionMemoryNextPassReview,
+    productionMemoryNextPassPromotionDecision: byType("agentflow_production_memory_next_pass_promotion_decision") || null,
+    productionMemoryNextPassPromotionOverlay: byType("agentflow_production_memory_next_pass_promotion_overlay") || null,
+    productionMemoryOperatorFeedbackEvent,
+    productionMemoryOperatorFeedbackCandidatePacket,
+    companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),
     review: normalizeReview(byType("review_report")),
@@ -146,6 +173,7 @@ function detectArtifactType(fileName, payload) {
     if (aliases.includes(normalizedName)) return type;
   }
   if (payload && payload.artifact_index && payload.workflow) return "run_manifest";
+  if (payload && AGENTFLOW_KIND_ARTIFACTS.has(payload.kind)) return payload.kind;
   if (payload && typeof payload.artifact_type === "string" && payload.artifact_type.startsWith("agentflow_")) return payload.artifact_type;
   if (payload && payload.assets && payload.package_id) return "package_manifest";
   if (payload && payload.sections && payload.summary) return "review_report";

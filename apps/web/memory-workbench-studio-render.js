@@ -68,6 +68,9 @@ export function renderToolbar(elements) {
 
 function studioStatusCards(fixture) {
   const checklist = fixture.demo_checklist || {};
+  if (Array.isArray(checklist.status_cards) && checklist.status_cards.length) {
+    return checklist.status_cards;
+  }
   const summary = checklist.summary || {};
   const groups = Array.isArray(checklist.groups) ? checklist.groups : [];
   const speakable = groups.find((item) => item.id === "speakable");

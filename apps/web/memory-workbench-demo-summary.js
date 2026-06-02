@@ -1,4 +1,8 @@
+import { nextOperatorBriefCards } from "./memory-workbench-production-next-operator-brief.js";
+
 export function buildDemoEvidenceSummary(view) {
+  if (isOperatorReadinessView(view)) return buildOperatorReadinessSummary(view);
+
   const protocol = view.protocol_summary || {};
   const controls = Array.isArray(protocol.controls) ? protocol.controls : [];
   const boundaries = Array.isArray(protocol.boundaries) ? protocol.boundaries : [];
@@ -50,4 +54,59 @@ export function buildDemoEvidenceSummary(view) {
       detail: item.detail,
     })),
   };
+}
+
+function buildOperatorReadinessSummary(view) {
+  const protocol = view.protocol_summary || {};
+  const controls = Array.isArray(protocol.controls) ? protocol.controls : [];
+  const boundaries = Array.isArray(protocol.boundaries) ? protocol.boundaries : [];
+  const brief = view.next_operator_brief || {};
+  const readyControls = controls.filter((item) => item.status === "review ready").length;
+  return {
+    title: "Operator Readiness Summary",
+    status: view.next_pass?.status === "ready" ? "review ready" : "blocked",
+    talk_track: [
+      "Start packet is ready for the recorded next operator action.",
+      `Next operator action: ${brief.action || view.next_pass?.action || "not recorded"}`,
+      brief.prompt_excerpt ? `Operator prompt: ${brief.prompt_excerpt}` : "Operator prompt is not embedded in the selected manifest.",
+      "Post-check artifacts are visible from the selected operator-loop manifest.",
+      "Provider calls, durable memory writes, and Company KB writes remain disabled.",
+    ],
+    evidence_cards: [
+      {
+        label: "Start packet",
+        status: view.next_pass?.status === "ready" ? "review ready" : "blocked",
+        detail: view.next_pass?.action || "next operator action not recorded",
+      },
+      {
+        label: "Readiness controls",
+        status: readyControls ? "review ready" : "planned",
+        detail: `${readyControls}/${controls.length} controls ready`,
+      },
+      {
+        label: "Claim boundaries",
+        status: "blocked",
+        detail: `${boundaries.length} boundaries remain visible`,
+      },
+      ...nextOperatorBriefCards(brief),
+    ],
+    comparison: [],
+    non_claims: boundaries.map((item) => ({
+      label: item.label,
+      status: item.status,
+      detail: item.detail,
+    })),
+  };
+}
+
+function isOperatorReadinessView(view) {
+  return Boolean(view?.next_operator_brief)
+    && (
+      view?.project?.format === "agentflow_production_memory_next_operator_start_packet"
+      || (
+        view?.project?.format === "agentflow_production_memory_operator_loop_run"
+        && Array.isArray(view?.bundle_summary)
+        && view.bundle_summary.some((item) => item.id === "next_operator_start_packet")
+      )
+    );
 }

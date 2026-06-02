@@ -3,8 +3,29 @@ import { buildDemoReadyChecklist } from "./memory-workbench-demo-checklist.js";
 import { buildDemoEvidenceSummary } from "./memory-workbench-demo-summary.js";
 import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
 import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
+import { buildCompanyKbFeedbackCandidatePacketView } from "./memory-workbench-company-kb-feedback.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
+import { buildProductionMemoryAcceptanceFeedbackCandidateView } from "./memory-workbench-production-acceptance-feedback-candidate.js";
+import { buildProductionMemoryAcceptanceFeedbackCandidatePromotionView } from "./memory-workbench-production-acceptance-feedback-candidate-promotion.js";
+import { buildProductionMemoryAcceptanceFeedbackView } from "./memory-workbench-production-acceptance-feedback.js";
+import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
+import { buildProductionMemoryNextContextHandoffView } from "./memory-workbench-production-next-context.js";
+import { buildProductionMemoryNextOperatorActionResultView } from "./memory-workbench-production-next-operator-action-result.js";
+import { buildProductionMemoryNextOperatorStartEventView } from "./memory-workbench-production-next-operator-start-event.js";
+import { buildProductionMemoryNextOperatorStartPacketView } from "./memory-workbench-production-next-operator-start.js";
+import { buildProductionMemoryNextPassPromotionView } from "./memory-workbench-production-next-pass-promotion.js";
+import { buildProductionMemoryNextPassResultView } from "./memory-workbench-production-next-pass-result.js";
+import { buildProductionMemoryNextPassReviewView } from "./memory-workbench-production-next-pass-review.js";
+import { buildProductionMemoryNextTaskPacketView } from "./memory-workbench-production-next-task.js";
+import { buildProductionMemoryOperatorFeedbackCandidateView } from "./memory-workbench-production-operator-feedback-candidate.js";
+import { buildProductionMemoryOperatorFeedbackView } from "./memory-workbench-production-operator-feedback.js";
+import { buildProductionMemoryOperatorHandoffView } from "./memory-workbench-production-operator-handoff.js";
+import { buildProductionMemoryOperatorLoopView } from "./memory-workbench-production-operator-loop.js";
+import { buildProductionMemoryOperatorManifestCheckView } from "./memory-workbench-production-operator-manifest-check.js";
+import { buildProductionMemoryOperatorRunPackageCheckView } from "./memory-workbench-production-operator-run-package-check.js";
+import { buildProductionMemoryOperatorRunPackageView } from "./memory-workbench-production-operator-run-package.js";
+import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
 import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
 export function attachMemoryWorkbenchHandlers(elements, { onWorkspaceLoaded, setMode }) {
@@ -20,13 +41,34 @@ export function memorySourceForArtifacts(artifacts) {
 }
 
 export function buildMemoryWorkbenchView(workspace, source) {
-  const memoryView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
-  memoryView.source_status = memorySourceStatus(source, workspace);
-  memoryView.artifact_inspector = buildMemoryArtifactInspector(workspace, memoryView.artifact_inspector);
-  memoryView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  memoryView.demo_summary = buildDemoEvidenceSummary(memoryView);
-  memoryView.demo_checklist = buildDemoReadyChecklist(memoryView);
-  return memoryView;
+  const packageView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
+  const memoryView = buildProductionMemoryLoopView(workspace, packageView);
+  const sessionView = buildProductionMemorySessionReportView(workspace, memoryView);
+  const companyKbView = buildCompanyKbFeedbackCandidatePacketView(workspace, sessionView);
+  const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
+  const nextContextView = buildProductionMemoryNextContextHandoffView(workspace, operatorLoopView);
+  const nextTaskView = buildProductionMemoryNextTaskPacketView(workspace, nextContextView);
+  const nextPassResultView = buildProductionMemoryNextPassResultView(workspace, nextTaskView);
+  const nextPassReviewView = buildProductionMemoryNextPassReviewView(workspace, nextPassResultView);
+  const nextPassPromotionView = buildProductionMemoryNextPassPromotionView(workspace, nextPassReviewView);
+  const operatorFeedbackView = buildProductionMemoryOperatorFeedbackView(workspace, nextPassPromotionView);
+  const operatorFeedbackCandidateView = buildProductionMemoryOperatorFeedbackCandidateView(workspace, operatorFeedbackView);
+  const operatorManifestCheckView = buildProductionMemoryOperatorManifestCheckView(workspace, operatorFeedbackCandidateView);
+  const operatorHandoffView = buildProductionMemoryOperatorHandoffView(workspace, operatorManifestCheckView);
+  const operatorRunPackageView = buildProductionMemoryOperatorRunPackageView(workspace, operatorHandoffView);
+  const operatorRunPackageCheckView = buildProductionMemoryOperatorRunPackageCheckView(workspace, operatorRunPackageView);
+  const acceptanceFeedbackView = buildProductionMemoryAcceptanceFeedbackView(workspace, operatorRunPackageCheckView);
+  const acceptanceFeedbackCandidateView = buildProductionMemoryAcceptanceFeedbackCandidateView(workspace, acceptanceFeedbackView);
+  const acceptanceFeedbackCandidatePromotionView = buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(workspace, acceptanceFeedbackCandidateView);
+  const nextOperatorStartPacketView = buildProductionMemoryNextOperatorStartPacketView(workspace, acceptanceFeedbackCandidatePromotionView);
+  const nextOperatorStartEventView = buildProductionMemoryNextOperatorStartEventView(workspace, nextOperatorStartPacketView);
+  const nextOperatorActionResultView = buildProductionMemoryNextOperatorActionResultView(workspace, nextOperatorStartEventView);
+  nextOperatorActionResultView.source_status = memorySourceStatus(source, workspace);
+  nextOperatorActionResultView.artifact_inspector = buildMemoryArtifactInspector(workspace, nextOperatorActionResultView.artifact_inspector);
+  nextOperatorActionResultView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  nextOperatorActionResultView.demo_summary = buildDemoEvidenceSummary(nextOperatorActionResultView);
+  nextOperatorActionResultView.demo_checklist = buildDemoReadyChecklist(nextOperatorActionResultView);
+  return nextOperatorActionResultView;
 }
 
 function memorySourceStatus(source, workspace) {

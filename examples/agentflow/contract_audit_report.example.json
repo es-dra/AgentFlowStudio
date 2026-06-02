@@ -183,6 +183,22 @@
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_production_memory_loop",
+      "example_path": "examples/agentflow/production_memory_loop.example.json",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
+      "schema_version": "production-memory-loop/v1",
+      "example_path_exists": true,
+      "doc_path_exists": true
+    },
+    {
+      "artifact_type": "agentflow_company_kb_feedback_candidate_packet",
+      "example_path": "examples/agentflow/company_kb_feedback_candidate_packet.example.json",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
+      "schema_version": "company-kb-feedback-candidate-packet/v1",
+      "example_path_exists": true,
+      "doc_path_exists": true
     }
   ],
   "boundary_checks": [
@@ -255,6 +271,16 @@
       "check_id": "memory_video_presentation_no_media_copy",
       "status": "passed",
       "note": "Presentation packages summarize protocol, review, and observation evidence without copying generated media or claiming final proof."
+    },
+    {
+      "check_id": "production_memory_loop_no_provider_context_bundle",
+      "status": "passed",
+      "note": "Production-memory loops build included and blocked next-context refs without provider calls or durable memory writes."
+    },
+    {
+      "check_id": "company_kb_feedback_candidates_not_written",
+      "status": "passed",
+      "note": "Company KB feedback packets remain candidate-only and do not write source Company knowledge."
     },
     {
       "check_id": "intermediate_asset_has_evidence",
