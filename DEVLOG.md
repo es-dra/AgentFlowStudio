@@ -9,6 +9,42 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Start Packet Output 001
+
+- Continued from
+  `codex/afs-production-memory-next-operator-start-packet-web-001` on
+  `codex/afs-production-memory-operator-loop-start-packet-output-001`.
+- Added `--write-next-operator-start-packet` to the no-provider operator-loop
+  command so an unattended run can write the final next-operator start packet
+  after `--write-run-package --write-run-package-check`.
+- Kept the start packet as a post-check artifact instead of adding it to
+  `output_artifacts`; this avoids a circular dependency where the run package
+  check would need to validate a file generated only after the check passes.
+- Split optional promotion builders and start-packet output writing out of
+  `production_operator_loop.py` so the operator orchestrator stays under the
+  project file-length target.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no workflow execution from Web, no ref
+  following beyond existing package/start-packet checks, no project-specific
+  behavior, no human acceptance, no business validation, and no memory
+  promotion.
+- Verification:
+  - Red focused test failed first because the CLI flag and writer parameter did
+    not exist.
+  - Focused start-packet output test passed (`2 passed`).
+  - Focused operator-loop/start-packet/run-package/CLI regression passed
+    (`38 passed`).
+  - `py_compile` passed for touched backend and CLI modules.
+  - CLI help lists `--write-next-operator-start-packet`.
+  - CLI smoke wrote ignored no-provider runtime artifacts under
+    `data/processed/runs/production_memory_loop/operator_loop_start_packet_output_smoke_20260602/`
+    and produced `next_operator_start_packet.json` / `.md` with status
+    `ready`.
+  - Full suite passed on Python 3.12.12 (`880 passed`).
+  - `git diff --check` exited 0 with CRLF normalization warnings only.
+  - Added-line sensitive scan and new-file project-specific term scan were
+    clean.
+
 ## 2026-06-02 - Production Memory Next Operator Start Packet Web 001
 
 - Continued from

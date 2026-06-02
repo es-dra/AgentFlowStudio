@@ -15,18 +15,11 @@ from agentflow.memory.production_acceptance_feedback_candidate_promotion import 
 )
 from agentflow.memory.production_loop import build_production_memory_loop_run, write_production_memory_loop_run
 from agentflow.memory.production_next_context import build_next_context_handoff, write_next_context_handoff
-from agentflow.memory.production_next_pass_promotion import (
-    build_next_pass_reviewed_feedback_run,
-    write_next_pass_promotion_decision,
-    write_next_pass_reviewed_feedback_run,
-)
+from agentflow.memory.production_next_pass_promotion import write_next_pass_promotion_decision, write_next_pass_reviewed_feedback_run
 from agentflow.memory.production_next_pass_result import build_next_pass_result_scaffold, write_next_pass_result_scaffold
 from agentflow.memory.production_next_pass_review import build_next_pass_review, write_next_pass_review
 from agentflow.memory.production_next_task import build_next_task_packet, write_next_task_packet
-from agentflow.memory.production_operator_candidate_promotions import (
-    build_acceptance_feedback_candidate_promotion,
-    build_operator_feedback_candidate_promotion,
-)
+from agentflow.memory.production_operator_candidate_promotions import build_acceptance_feedback_candidate_promotion
 from agentflow.memory.production_operator_feedback_candidate_overlay import write_operator_feedback_candidate_reviewed_run
 from agentflow.memory.production_operator_feedback_candidate_promotion import (
     write_operator_feedback_candidate_promotion_decision,
@@ -34,12 +27,17 @@ from agentflow.memory.production_operator_feedback_candidate_promotion import (
 from agentflow.memory.production_operator_handoff import build_operator_handoff_packet, write_operator_handoff_packet
 from agentflow.memory.production_operator_manifest import build_operator_manifest
 from agentflow.memory.production_operator_manifest_check import check_operator_manifest, write_operator_manifest_check
+from agentflow.memory.production_operator_optional_promotions import (
+    build_optional_next_pass_promotion,
+    build_optional_operator_feedback_candidate_promotion,
+)
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_operator_run_package import build_operator_run_package, write_operator_run_package
 from agentflow.memory.production_operator_run_package_check import (
     check_operator_run_package,
     write_operator_run_package_check_report,
 )
+from agentflow.memory.production_operator_start_packet_output import write_next_operator_start_packet_from_operator_loop
 from agentflow.memory.production_session import (
     build_production_memory_session_report,
     write_production_memory_session_report,
@@ -79,8 +77,8 @@ def build_production_memory_operator_loop_run(
         if next_pass_result is not None
         else None
     )
-    next_pass_promotion = _build_next_pass_promotion(loop, next_pass_review, next_pass_promotion_decision)
-    operator_feedback_candidate_promotion = _build_operator_feedback_candidate_promotion(
+    next_pass_promotion = build_optional_next_pass_promotion(loop, next_pass_review, next_pass_promotion_decision)
+    operator_feedback_candidate_promotion = build_optional_operator_feedback_candidate_promotion(
         loop,
         operator_feedback_candidate_packet,
         operator_feedback_candidate_promotion_decision,
@@ -160,9 +158,12 @@ def write_production_memory_operator_loop_run(
     write_handoff_packet: bool = False,
     write_run_package: bool = False,
     write_run_package_check: bool = False,
+    write_next_operator_start_packet: bool = False,
 ) -> list[Path]:
     if write_run_package_check and not write_run_package:
         raise ValueError("write_run_package_check requires write_run_package")
+    if write_next_operator_start_packet and not write_run_package_check:
+        raise ValueError("write_next_operator_start_packet requires write_run_package_check")
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
     include_review = "next_pass_review" in result
@@ -274,29 +275,15 @@ def write_production_memory_operator_loop_run(
         check = check_operator_run_package(output_root / "operator_run_package" / "operator_run_package.json")
         result["operator_run_package_check"] = check
         written_paths.extend(write_operator_run_package_check_report(check, output_root / "operator_run_package_check"))
+    if write_next_operator_start_packet:
+        written_paths.extend(
+            write_next_operator_start_packet_from_operator_loop(
+                result,
+                output_root,
+                generated_at=str(result["manifest"].get("generated_at", "")),
+            )
+        )
     return written_paths
-
-
-def _build_next_pass_promotion(
-    loop: dict[str, Any],
-    next_pass_review: dict[str, Any] | None,
-    decision: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    if decision is None:
-        return None
-    if next_pass_review is None:
-        raise ValueError("next_pass_promotion_decision requires next_pass_result")
-    derived_loop, run, overlay = build_next_pass_reviewed_feedback_run(loop, next_pass_review, decision)
-    return {"decision": decision, "derived_loop": derived_loop, "run": run, "overlay": overlay}
-
-
-def _build_operator_feedback_candidate_promotion(
-    loop: dict[str, Any],
-    packet: dict[str, Any] | None,
-    decision: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    return build_operator_feedback_candidate_promotion(loop, packet, decision)
-
 
 __all__ = (
     "OPERATOR_LOOP_KIND",
