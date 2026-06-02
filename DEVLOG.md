@@ -9,6 +9,39 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-03 - Production Memory Asset Context Projection 001
+
+- Merged PR #77 into `master` before opening this node, so context projection
+  starts from the integrated profile promotion/versioning baseline.
+- Created
+  `codex/afs-production-memory-asset-context-projection-001` from updated
+  `origin/master`.
+- Added `agentflow_production_memory_asset_profile_context_projection` as the
+  deterministic Node 4 artifact that turns explicit profile versions into
+  next-context `included_refs`, `blocked_refs`, and
+  `context_payload.asset_profile_refs`.
+- Added product CLI command
+  `production-memory-loop-asset-profile-context-projection`.
+- Boundary kept: profile version is the inclusion authority, promotion
+  decision is not enough by itself, superseded/stale/unusable/missing-decision
+  refs are blocked, and the projection writes no durable memory or Company KB.
+- TDD red state confirmed: focused test initially failed because
+  `agentflow.memory.production_asset_profile_context_projection` did not
+  exist.
+- Verification:
+  - Focused context projection tests passed (`6 passed`).
+  - Adjacent asset projection/promotion/update/feedback/readiness suite passed
+    (`44 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help exposes
+    `production-memory-loop-asset-profile-context-projection`.
+  - CLI no-provider smoke ran asset test package -> feedback -> update
+    candidate -> promotion/version -> context projection and wrote a ready
+    projection with one included ref and one superseded blocked ref.
+  - Changed Python files passed `python -m py_compile`.
+  - Full suite passed on Python 3.13.5 (`961 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+
 ## 2026-06-02 - Production Memory Asset Profile Promotion Versioning 001
 
 - Merged PR #76 into `master` with a merge commit before opening this node, so
