@@ -3,6 +3,7 @@ import {
   productionLoopFacts,
   productionNextContextHandoffFacts,
   productionNextPassPromotionFacts,
+  productionNextPassResultFacts,
   productionNextPassReviewFacts,
   productionNextTaskPacketFacts,
   productionOperatorFeedbackCandidateFacts,
@@ -23,6 +24,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_operator_loop_run: "Production memory operator loop",
   agentflow_production_memory_next_context_handoff: "Production memory next context handoff",
   agentflow_production_memory_next_task_packet: "Production memory next task packet",
+  agentflow_production_memory_next_pass_result: "Production memory next pass result",
   agentflow_production_memory_next_pass_review: "Production memory next pass review",
   agentflow_production_memory_next_pass_promotion_decision: "Production memory next pass promotion decision",
   agentflow_production_memory_next_pass_promotion_overlay: "Production memory next pass promotion overlay",
@@ -63,6 +65,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_operator_loop_run") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_context_handoff") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_task_packet") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_next_pass_result") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_next_pass_review") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_next_pass_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return ["project", "memory-loaded", "review", "next-pass"];
@@ -84,6 +87,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_operator_loop_run") return productionOperatorLoopFacts(payload);
   if (type === "agentflow_production_memory_next_context_handoff") return productionNextContextHandoffFacts(payload);
   if (type === "agentflow_production_memory_next_task_packet") return productionNextTaskPacketFacts(payload);
+  if (type === "agentflow_production_memory_next_pass_result") return productionNextPassResultFacts(payload);
   if (type === "agentflow_production_memory_next_pass_review") return productionNextPassReviewFacts(payload);
   if (type === "agentflow_production_memory_next_pass_promotion_decision") return productionNextPassPromotionFacts(payload);
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return productionNextPassPromotionFacts(payload);
@@ -164,6 +168,7 @@ function feedbackFacts(payload) {
 function statusFor(type, payload) {
   if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
   if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
+  if (type === "agentflow_production_memory_next_pass_result") return payload.result_status || "review ready";
   if (type === "agentflow_production_memory_next_pass_review") return payload.review_status || "review ready";
   if (type === "agentflow_production_memory_next_pass_promotion_overlay" || type === "agentflow_production_memory_next_pass_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
   if (type === "agentflow_production_memory_operator_feedback_event") return payload.status || "review ready";

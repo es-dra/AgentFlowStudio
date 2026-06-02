@@ -9,6 +9,7 @@ import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProductionMemoryLoopView } from "./memory-workbench-production-loop.js";
 import { buildProductionMemoryNextContextHandoffView } from "./memory-workbench-production-next-context.js";
 import { buildProductionMemoryNextPassPromotionView } from "./memory-workbench-production-next-pass-promotion.js";
+import { buildProductionMemoryNextPassResultView } from "./memory-workbench-production-next-pass-result.js";
 import { buildProductionMemoryNextPassReviewView } from "./memory-workbench-production-next-pass-review.js";
 import { buildProductionMemoryNextTaskPacketView } from "./memory-workbench-production-next-task.js";
 import { buildProductionMemoryOperatorFeedbackCandidateView } from "./memory-workbench-production-operator-feedback-candidate.js";
@@ -37,7 +38,8 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
   const nextContextView = buildProductionMemoryNextContextHandoffView(workspace, operatorLoopView);
   const nextTaskView = buildProductionMemoryNextTaskPacketView(workspace, nextContextView);
-  const nextPassReviewView = buildProductionMemoryNextPassReviewView(workspace, nextTaskView);
+  const nextPassResultView = buildProductionMemoryNextPassResultView(workspace, nextTaskView);
+  const nextPassReviewView = buildProductionMemoryNextPassReviewView(workspace, nextPassResultView);
   const nextPassPromotionView = buildProductionMemoryNextPassPromotionView(workspace, nextPassReviewView);
   const operatorFeedbackView = buildProductionMemoryOperatorFeedbackView(workspace, nextPassPromotionView);
   const operatorFeedbackCandidateView = buildProductionMemoryOperatorFeedbackCandidateView(workspace, operatorFeedbackView);

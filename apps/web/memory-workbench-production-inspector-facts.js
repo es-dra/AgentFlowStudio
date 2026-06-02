@@ -40,6 +40,17 @@ export function productionNextPassReviewFacts(payload) {
   ];
 }
 
+export function productionNextPassResultFacts(payload) {
+  return [
+    fact("result_status", payload.result_status || "unknown"),
+    fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
+    fact("used_context_refs", String(usedContextRefCount(payload.output_artifacts))),
+    fact("feedback_events", String(arrayValue(payload.feedback_events).length)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionNextPassPromotionFacts(payload) {
   return [
     fact("decision", payload.decision || "unknown"),
@@ -128,4 +139,9 @@ function objectValue(value) {
 
 function arrayValue(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function usedContextRefCount(outputArtifacts) {
+  const refs = arrayValue(outputArtifacts).flatMap((item) => arrayValue(item?.used_context_refs).map(String));
+  return new Set(refs).size;
 }

@@ -9,6 +9,42 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Pass Result Web 001
+
+- Continued from `codex/afs-production-memory-next-pass-result-scaffold-001`
+  on `codex/afs-production-memory-next-pass-result-web-001`.
+- Added read-only generic Web memory workbench support for selected
+  `agentflow_production_memory_next_pass_result` artifacts.
+- The Web view now surfaces next-pass result scaffold state, output artifacts,
+  used context refs, feedback-event absence/presence, no-provider controls,
+  non-claim boundaries, and inspector facts.
+- Boundary kept: selected local JSON only, no ref following, no provider call,
+  no next-pass execution, no generated-content claim, no feedback auto-capture,
+  no Company KB write, no durable memory write, no browser persistence, no
+  Loulan-specific behavior, no human acceptance, and no business validation
+  claim.
+- Verification:
+  - Red Web static test failed because source role / workspace slot / view
+    support did not exist for `agentflow_production_memory_next_pass_result`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_pass_result.py -q`
+    -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_next_pass_result.py tests/test_web_static_production_memory_next_task_packet.py tests/test_web_static_production_memory_next_pass_review.py tests/test_web_static_production_memory_next_pass_promotion.py tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_loop_feedback_candidate.py tests/test_web_static_production_memory_operator_feedback_candidate.py tests/test_web_static_production_memory_operator_feedback.py tests/test_web_static_production_memory_next_context_handoff.py tests/test_web_static_company_kb_feedback_packet.py tests/test_web_static_production_memory_session_report.py tests/test_web_static_production_memory_loop.py tests/test_web_static_artifact_workspace.py tests/test_web_static_artifact_boundaries.py tests/test_web_memory_static_structure.py tests/test_web_memory_canvas_static.py -q`
+    -> 41 passed.
+  - `node --check` passed for the new view, artifact workspace, controller,
+    inspector, and production inspector facts modules.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_next_pass_result.py tests/test_web_static_production_memory_next_pass_result.py tests/test_contract_examples.py tests/test_cli_command_registry_boundaries.py -q`
+    -> 32 passed.
+  - `git diff --check` -> exit 0 with CRLF warnings only.
+  - Added-diff sensitive scan clean.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 785 passed on Python 3.12.12.
+  - Touched code/test files remain under the 300-line target:
+    next-pass result Web 124 lines, artifact workspace 291 lines, controller
+    71 lines, inspector 216 lines, production inspector facts 132 lines, Web
+    test 124 lines.
+  - Browser-level verification not run: `tool_search` did not expose Browser
+    control tools in this turn.
+
 ## 2026-06-02 - Production Memory Next Pass Result Scaffold 001
 
 - Continued from

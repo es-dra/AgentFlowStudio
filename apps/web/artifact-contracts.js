@@ -25,6 +25,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_production_memory_operator_loop_run: ["production_memory_operator_loop_run.json"],
   agentflow_production_memory_next_context_handoff: ["next_context_handoff.json"],
   agentflow_production_memory_next_task_packet: ["next_task_packet.json"],
+  agentflow_production_memory_next_pass_result: ["next_pass_result.json"],
   agentflow_production_memory_next_pass_review: ["next_pass_review.json"],
   agentflow_production_memory_next_pass_promotion_decision: ["next_pass_promotion_decision.json"],
   agentflow_production_memory_next_pass_promotion_overlay: ["next_pass_promotion_overlay.json"],
@@ -83,6 +84,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_production_memory_operator_loop_run") return "production memory operator loop run";
   if (type === "agentflow_production_memory_next_context_handoff") return "production memory next context handoff";
   if (type === "agentflow_production_memory_next_task_packet") return "production memory next task packet";
+  if (type === "agentflow_production_memory_next_pass_result") return "production memory next pass result";
   if (type === "agentflow_production_memory_next_pass_review") return "production memory next pass review";
   if (type === "agentflow_production_memory_next_pass_promotion_decision") return "production memory next pass promotion decision";
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return "production memory next pass promotion overlay";
