@@ -212,6 +212,76 @@ console.log(JSON.stringify({{
     assert "next_pass_promotion_effect:included_in_context" in payload["inspectorFacts"]
 
 
+def test_web_static_operator_loop_renders_post_check_next_operator_start_packet(tmp_path: Path) -> None:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T10:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+    write_production_memory_operator_loop_run(
+        result,
+        tmp_path,
+        write_run_package=True,
+        write_run_package_check=True,
+        write_next_operator_start_packet=True,
+    )
+    manifest_path = tmp_path / "production_memory_operator_loop_run.json"
+    manifest_ref = json.dumps(str(manifest_path))
+
+    script = f"""
+import {{ parseFiles, normalizeWorkspace }} from "./apps/web/artifact-workspace.js";
+import {{ buildMemoryWorkbenchView }} from "./apps/web/memory-workbench-controller.js";
+import {{ readFile }} from "node:fs/promises";
+
+const path = {manifest_ref};
+const file = {{
+  name: "production_memory_operator_loop_run.json",
+  text: async () => await readFile(path, "utf8"),
+}};
+const artifacts = await parseFiles([file]);
+const workspace = normalizeWorkspace(artifacts);
+const view = buildMemoryWorkbenchView(workspace, "selected_files");
+
+console.log(JSON.stringify({{
+  state: view.state,
+  actionIds: view.workflow_actions.map((item) => item.id),
+  actionStatuses: view.workflow_actions.map((item) => `${{item.id}}:${{item.status}}`),
+  laneTitles: view.lanes.map((lane) => lane.title),
+  bundleCards: view.bundle_summary.map((item) => `${{item.title}}:${{item.status}}:${{item.detail}}`),
+  assetPaths: view.assets.map((item) => item.id),
+  assetStatuses: view.assets.map((item) => `${{item.id}}:${{item.status}}`),
+  memoryIds: view.memory_loaded.map((item) => item.id),
+  protocolControls: view.protocol_summary.controls.map((item) => `${{item.label}}:${{item.status}}`),
+  nextPassAction: view.next_pass.action,
+  timelineLabels: view.timeline.map((item) => item.label),
+}}));
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["state"] == "operator loop ready"
+    assert "inspect_next_operator_start_packet" in payload["actionIds"]
+    assert "inspect_next_operator_start_packet:review ready" in payload["actionStatuses"]
+    assert "Next operator start packet" in payload["laneTitles"]
+    assert "Post-check artifacts" in payload["laneTitles"]
+    assert any(card.startswith("Next operator start packet:ready:ready") for card in payload["bundleCards"])
+    assert any(card.startswith("Post-check artifacts:review ready:2 post-check refs") for card in payload["bundleCards"])
+    assert "next_operator_start_packet/next_operator_start_packet.json" in payload["assetPaths"]
+    assert "next_operator_start_packet/next_operator_start_packet.md" in payload["assetPaths"]
+    assert "next_operator_start_packet/next_operator_start_packet.json:post-check" in payload["assetStatuses"]
+    assert "next_operator_start_packet" in payload["memoryIds"]
+    assert "next operator start packet ready:review ready" in payload["protocolControls"]
+    assert payload["nextPassAction"] == "start_next_operator_action"
+    assert "Next operator start packet" in payload["timelineLabels"]
+
+
 def test_web_static_operator_loop_slice_adds_no_provider_scan_or_project_specific_behavior() -> None:
     files = [
         Path("apps/web/artifact-contracts.js"),

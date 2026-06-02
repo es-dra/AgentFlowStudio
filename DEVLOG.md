@@ -9,6 +9,36 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Start Packet Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-start-packet-output-001` on
+  `codex/afs-production-memory-operator-loop-start-packet-web-001`.
+- Updated the read-only generic Web operator-loop manifest canvas to surface
+  `next_operator_start_packet` and `post_check_artifacts` written by the
+  no-provider operator-loop command.
+- The operator-loop canvas now shows start-packet workflow action, summary
+  card, lane, asset refs, memory row, protocol controls, timeline step, and
+  inspector facts without requiring the operator to select the standalone
+  start packet first.
+- Boundary kept: selected local JSON only, no provider call, no Company KB
+  write, no durable memory write, no workflow execution from Web, no directory
+  scan, no browser persistence, no ref following, no project-specific behavior,
+  no human acceptance, no business validation, and no memory promotion.
+- Verification:
+  - Red Web static test failed first because the operator-loop view did not
+    expose `inspect_next_operator_start_packet`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_loop.py -q`
+    -> 4 passed.
+  - Focused Web/start-packet/operator-loop/CLI regression passed (`17 passed`).
+  - JS syntax checks passed for touched Web modules.
+  - Expanded Web/static memory suite passed (`82 passed, 799 deselected`).
+  - Full suite passed on Python 3.12.12 (`881 passed`).
+  - `git diff --check` exited 0 with CRLF normalization warnings only.
+  - Added-line sensitive scan and project-specific term scan were clean.
+  - Browser-level smoke was not run because Browser control tools were not
+    exposed in this thread.
+
 ## 2026-06-02 - Production Memory Operator Loop Start Packet Output 001
 
 - Continued from

@@ -7,11 +7,14 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const payload = artifact.payload;
   const nodes = arrayValue(payload.operator_loop_nodes);
   const outputs = arrayValue(payload.output_artifacts);
+  const postCheckArtifacts = arrayValue(payload.post_check_artifacts);
   const company = payload.company_kb_feedback || {};
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = payload.next_pass_promotion || null;
   const feedbackCandidatePromotion = payload.operator_feedback_candidate_promotion || null;
   const acceptanceCandidatePromotion = payload.acceptance_feedback_candidate_promotion || null;
+  const startPacket = objectValue(payload.next_operator_start_packet);
+  const startPacketReady = startPacket?.start_packet_status === "ready" && startPacket.ready_for_next_operator === true;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
     ...fallback,
@@ -39,18 +42,32 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         acceptanceCandidatePromotion ? "review ready" : "missing",
         "review",
       ),
+      ...(startPacket ? [
+        action("inspect_next_operator_start_packet", "Inspect start packet", startPacketReady ? "review ready" : "blocked", "next-pass"),
+      ] : []),
       action("review_company_candidates", "Review candidates", company.requires_human_review ? "blocked" : "review ready", "review"),
       action("prepare_next_pass", "Prepare next pass", ready ? "ready" : "blocked", "next-pass"),
     ],
-    assets: outputs.map((item) => ({
-      id: item.path || item.artifact_type,
-      label: item.artifact_type || item.path,
-      detail: item.path || "generated artifact",
-      status: item.required === false ? "optional" : "required",
-    })),
+    assets: [
+      ...outputs.map((item) => ({
+        id: item.path || item.artifact_type,
+        label: item.artifact_type || item.path,
+        detail: item.path || "generated artifact",
+        status: item.required === false ? "optional" : "required",
+      })),
+      ...postCheckArtifacts.map((item) => ({
+        id: item.path || item.artifact_type,
+        label: item.artifact_type || item.path,
+        detail: item.path || "post-check artifact",
+        status: "post-check",
+      })),
+    ],
     bundle_summary: [
       card("operator_nodes", "Operator nodes", nodes.length ? "review ready" : "missing", `${nodes.length} chain nodes`),
       card("output_artifacts", "Output artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} generated artifact refs`),
+      ...(postCheckArtifacts.length ? [
+        card("post_check_artifacts", "Post-check artifacts", "review ready", `${postCheckArtifacts.length} post-check refs`),
+      ] : []),
       ...(resultScaffold ? [
         card(
           "next_pass_result",
@@ -76,21 +93,46 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           acceptanceCandidatePromotion.decision_effect || "unknown",
         ),
       ] : []),
+      ...(startPacket ? [
+        card(
+          "next_operator_start_packet",
+          "Next operator start packet",
+          startPacket.start_packet_status || "unknown",
+          startPacketReady ? "ready" : "blocked",
+        ),
+      ] : []),
       card("company_kb_feedback", "Company KB feedback", company.promotion_status || "unknown", companyBoundary(company)),
     ],
-    memory_loaded: nodes.map((node) => ({
-      id: node.node_id,
-      title: node.node_id,
-      why_eligible: node.artifact_type ? `generated ${node.artifact_type}` : "operator chain source node",
-      source_evidence_refs: [node.artifact_type || node.status || "operator node"],
-      promotion_status: node.status || "unknown",
-      request_projection: node.detail || "operator loop node",
-      feedback_effect: "operator manifest only; no durable memory or Company KB write",
-      status: node.status || "unknown",
-    })),
+    memory_loaded: [
+      ...nodes.map((node) => ({
+        id: node.node_id,
+        title: node.node_id,
+        why_eligible: node.artifact_type ? `generated ${node.artifact_type}` : "operator chain source node",
+        source_evidence_refs: [node.artifact_type || node.status || "operator node"],
+        promotion_status: node.status || "unknown",
+        request_projection: node.detail || "operator loop node",
+        feedback_effect: "operator manifest only; no durable memory or Company KB write",
+        status: node.status || "unknown",
+      })),
+      ...(startPacket ? [
+        {
+          id: "next_operator_start_packet",
+          title: "Next operator start packet",
+          why_eligible: "post-check artifact generated after a passed operator run package check",
+          source_evidence_refs: [startPacket.path || "next_operator_start_packet/next_operator_start_packet.json"],
+          promotion_status: startPacket.start_packet_status || "unknown",
+          request_projection: startPacket.next_operator_action || "next operator action recorded",
+          feedback_effect: "start packet only; no durable memory or Company KB write",
+          status: startPacketReady ? "review ready" : "blocked",
+        },
+      ] : []),
+    ],
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
       lane("generated-artifacts", "Generated artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} outputs`, "explicit artifact refs"),
+      ...(postCheckArtifacts.length ? [
+        lane("post-check-artifacts", "Post-check artifacts", "review ready", `${postCheckArtifacts.length} refs`, "generated after final checks"),
+      ] : []),
       ...(resultScaffold ? [
         lane(
           "next-pass-result",
@@ -117,6 +159,15 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           acceptanceCandidatePromotion.decision || "unknown",
           acceptanceCandidatePromotion.candidate_id || "candidate",
           acceptanceCandidatePromotion.decision_effect || "unknown",
+        ),
+      ] : []),
+      ...(startPacket ? [
+        lane(
+          "next-operator-start-packet",
+          "Next operator start packet",
+          startPacketReady ? "ready" : "blocked",
+          startPacket.path || "next_operator_start_packet.json",
+          startPacket.start_packet_status || "unknown",
         ),
       ] : []),
       lane("company-kb-feedback", "Company KB feedback", company.promotion_status || "unknown", `${company.candidate_item_count ?? 0} candidates`, companyBoundary(company)),
@@ -160,6 +211,12 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
             hasPassedControl(payload, "acceptance_feedback_candidate_promotion_long_term_memory_write_disabled"),
           ),
         ] : []),
+        ...(startPacket ? [
+          control("next operator start packet ready", startPacketReady),
+          control("next operator start packet provider calls not started", startPacket.provider_calls_started === false),
+          control("next operator start packet memory write disabled", startPacket.writes_long_term_memory === false),
+          control("next operator start packet Company KB write disabled", startPacket.writes_company_kb === false),
+        ] : []),
         control("Company feedback candidate only", company.promotion_status === "candidate_only"),
         control("Human review required for Company feedback", company.requires_human_review === true, "blocked"),
       ],
@@ -175,15 +232,21 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       summary: `${company.candidate_item_count ?? 0} Company KB feedback candidates remain candidate-only`,
     },
     next_pass: {
-      status: ready ? "ready" : "blocked",
-      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion),
+      status: startPacket ? (startPacketReady ? "ready" : "blocked") : (ready ? "ready" : "blocked"),
+      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion, startPacket, startPacketReady),
     },
-    timeline: nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
+    timeline: [
+      ...nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
+      ...(startPacket ? [
+        step("Next operator start packet", startPacketReady ? "ready" : "blocked", startPacket.path || "not recorded"),
+      ] : []),
+    ],
   };
 }
 
-function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion) {
+function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion, startPacket, startPacketReady) {
   if (!ready) return "resolve_operator_loop_blockers";
+  if (startPacket) return startPacketReady ? "start_next_operator_action" : "resolve_next_operator_start_packet_blockers";
   if (acceptanceCandidatePromotion) return "inspect_acceptance_feedback_candidate_overlay_before_next_pass";
   if (feedbackCandidatePromotion) return "inspect_operator_feedback_candidate_overlay_before_next_pass";
   if (promotion) return "inspect_next_pass_promotion_overlay_before_followup_context";

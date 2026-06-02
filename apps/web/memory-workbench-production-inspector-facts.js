@@ -229,10 +229,12 @@ export function productionOperatorLoopFacts(payload) {
   const promotion = objectValue(payload.next_pass_promotion);
   const feedbackCandidatePromotion = objectValue(payload.operator_feedback_candidate_promotion);
   const acceptanceCandidatePromotion = objectValue(payload.acceptance_feedback_candidate_promotion);
+  const startPacket = objectValue(payload.next_operator_start_packet);
   return [
     fact("chain_status", payload.chain_status || "unknown"),
     fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
     fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
+    fact("post_check_artifacts", String(arrayValue(payload.post_check_artifacts).length)),
     ...(resultScaffold.result_status ? [fact("next_pass_result_status", resultScaffold.result_status)] : []),
     ...(resultScaffold.output_artifact_count !== undefined ? [
       fact("next_pass_result_output_artifacts", String(resultScaffold.output_artifact_count)),
@@ -250,6 +252,12 @@ export function productionOperatorLoopFacts(payload) {
     ] : []),
     ...(acceptanceCandidatePromotion.decision_effect ? [
       fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotion.decision_effect),
+    ] : []),
+    ...(startPacket.start_packet_status ? [
+      fact("next_operator_start_packet_status", startPacket.start_packet_status),
+    ] : []),
+    ...(startPacket.ready_for_next_operator !== undefined ? [
+      fact("ready_for_next_operator", yesNo(startPacket.ready_for_next_operator)),
     ] : []),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
