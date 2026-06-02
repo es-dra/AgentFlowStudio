@@ -25,6 +25,7 @@ from agentflow.memory.production_operator_feedback_candidate_promotion import (
     write_operator_feedback_candidate_promotion_decision,
 )
 from agentflow.memory.production_operator_manifest import build_operator_manifest
+from agentflow.memory.production_operator_manifest_check import check_operator_manifest, write_operator_manifest_check
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_session import (
     build_production_memory_session_report,
@@ -125,7 +126,12 @@ def build_production_memory_operator_loop_run(
     return result
 
 
-def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir: str | Path) -> list[Path]:
+def write_production_memory_operator_loop_run(
+    result: dict[str, Any],
+    output_dir: str | Path,
+    *,
+    write_manifest_check: bool = False,
+) -> list[Path]:
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
     include_review = "next_pass_review" in result
@@ -185,8 +191,18 @@ def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir
             include_operator_feedback_candidate_promotion=include_operator_feedback_candidate_promotion,
         ),
     }
-    written_paths.append(write_json(output_root / "production_memory_operator_loop_run.json", manifest))
+    manifest_path = write_json(output_root / "production_memory_operator_loop_run.json", manifest)
+    written_paths.append(manifest_path)
     result["manifest"] = manifest
+    if write_manifest_check:
+        check = check_operator_manifest(manifest_path)
+        result["operator_manifest_check"] = check
+        written_paths.append(
+            write_operator_manifest_check(
+                check,
+                output_root / "operator_manifest_check" / "operator_manifest_check.json",
+            )
+        )
     return written_paths
 
 

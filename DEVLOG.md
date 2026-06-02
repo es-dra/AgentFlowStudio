@@ -9,6 +9,40 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Manifest Check Output 001
+
+- Continued from `codex/afs-production-memory-operator-manifest-check-001`
+  on `codex/afs-production-memory-operator-loop-manifest-check-output-001`.
+- Added an explicit `--write-manifest-check` option to
+  `production-memory-loop-run-operator-no-provider`.
+- When enabled, the operator-loop command writes
+  `operator_manifest_check/operator_manifest_check.json` after generating the
+  no-provider artifact chain. Default behavior remains unchanged and does not
+  write the check report.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no Web behavior change, no Loulan behavior, no human acceptance, and
+  no business validation claim.
+- Verification:
+  - Red tests failed first because `write_production_memory_operator_loop_run`
+    did not accept `write_manifest_check` and the CLI did not recognize
+    `--write-manifest-check`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_loop.py -q`
+    -> 9 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_loop.py tests\test_production_memory_operator_loop_manifest_check.py tests\test_production_memory_operator_manifest_check.py tests\test_cli_command_registry_boundaries.py -q`
+    -> 16 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow\memory\production_operator_loop.py apps\cli\production_memory_operator_command.py tests\test_production_memory_operator_loop_manifest_check.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed.
+  - CLI smoke without `--write-manifest-check` did not write
+    `operator_manifest_check/operator_manifest_check.json`.
+  - CLI smoke with `--write-manifest-check` wrote the check report and printed
+    `Operator manifest check: passed`.
+  - Full suite passed on Python 3.12.12 (`797 passed`).
+  - Line counts after test split: operator loop 242 lines, operator CLI 153
+    lines, main operator-loop test 270 lines, manifest-check integration test
+    56 lines.
+
 ## 2026-06-02 - Production Memory Operator Manifest Check 001
 
 - Continued from `codex/afs-production-memory-operator-manifest-split-001`

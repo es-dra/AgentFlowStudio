@@ -74,6 +74,11 @@ def production_memory_loop_run_operator_no_provider_command(
         readable=True,
         help="Optional explicit operator feedback candidate promotion decision JSON.",
     ),
+    write_manifest_check: bool = typer.Option(
+        False,
+        "--write-manifest-check",
+        help="Write a read-only operator manifest consistency check report after generating artifacts.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -110,7 +115,11 @@ def production_memory_loop_run_operator_no_provider_command(
             operator_feedback_candidate_packet=operator_feedback_candidate_packet,
             operator_feedback_candidate_promotion_decision=operator_feedback_candidate_promotion_decision,
         )
-        written_paths = write_production_memory_operator_loop_run(result, output_dir)
+        written_paths = write_production_memory_operator_loop_run(
+            result,
+            output_dir,
+            write_manifest_check=write_manifest_check,
+        )
     except ValueError as exc:
         typer.echo(f"Production memory operator loop failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -133,6 +142,8 @@ def production_memory_loop_run_operator_no_provider_command(
             "Operator feedback candidate promotion: "
             f"{manifest['operator_feedback_candidate_promotion']['decision_effect']}"
         )
+    if "operator_manifest_check" in result:
+        typer.echo(f"Operator manifest check: {result['operator_manifest_check']['check_status']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
