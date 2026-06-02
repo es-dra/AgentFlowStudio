@@ -11,6 +11,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = payload.next_pass_promotion || null;
   const feedbackCandidatePromotion = payload.operator_feedback_candidate_promotion || null;
+  const acceptanceCandidatePromotion = payload.acceptance_feedback_candidate_promotion || null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
     ...fallback,
@@ -30,6 +31,12 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         "inspect_operator_feedback_candidate_promotion",
         "Inspect feedback candidate",
         feedbackCandidatePromotion ? "review ready" : "missing",
+        "review",
+      ),
+      action(
+        "inspect_acceptance_feedback_candidate_promotion",
+        "Inspect acceptance candidate",
+        acceptanceCandidatePromotion ? "review ready" : "missing",
         "review",
       ),
       action("review_company_candidates", "Review candidates", company.requires_human_review ? "blocked" : "review ready", "review"),
@@ -59,6 +66,14 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           "Operator feedback candidate promotion",
           feedbackCandidatePromotion.decision || "unknown",
           feedbackCandidatePromotion.decision_effect || "unknown",
+        ),
+      ] : []),
+      ...(acceptanceCandidatePromotion ? [
+        card(
+          "acceptance_feedback_candidate_promotion",
+          "Acceptance feedback candidate promotion",
+          acceptanceCandidatePromotion.decision || "unknown",
+          acceptanceCandidatePromotion.decision_effect || "unknown",
         ),
       ] : []),
       card("company_kb_feedback", "Company KB feedback", company.promotion_status || "unknown", companyBoundary(company)),
@@ -95,6 +110,15 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           feedbackCandidatePromotion.decision_effect || "unknown",
         ),
       ] : []),
+      ...(acceptanceCandidatePromotion ? [
+        lane(
+          "acceptance-feedback-candidate-promotion",
+          "Acceptance feedback candidate promotion",
+          acceptanceCandidatePromotion.decision || "unknown",
+          acceptanceCandidatePromotion.candidate_id || "candidate",
+          acceptanceCandidatePromotion.decision_effect || "unknown",
+        ),
+      ] : []),
       lane("company-kb-feedback", "Company KB feedback", company.promotion_status || "unknown", `${company.candidate_item_count ?? 0} candidates`, companyBoundary(company)),
     ],
     protocol_summary: {
@@ -126,6 +150,16 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
             hasPassedControl(payload, "operator_feedback_candidate_promotion_long_term_memory_write_disabled"),
           ),
         ] : []),
+        ...(acceptanceCandidatePromotion ? [
+          control(
+            "acceptance feedback candidate promotion no-provider mode",
+            hasPassedControl(payload, "acceptance_feedback_candidate_promotion_no_provider_mode"),
+          ),
+          control(
+            "acceptance feedback candidate promotion memory write disabled",
+            hasPassedControl(payload, "acceptance_feedback_candidate_promotion_long_term_memory_write_disabled"),
+          ),
+        ] : []),
         control("Company feedback candidate only", company.promotion_status === "candidate_only"),
         control("Human review required for Company feedback", company.requires_human_review === true, "blocked"),
       ],
@@ -142,14 +176,15 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     },
     next_pass: {
       status: ready ? "ready" : "blocked",
-      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion),
+      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion),
     },
     timeline: nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
   };
 }
 
-function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion) {
+function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion) {
   if (!ready) return "resolve_operator_loop_blockers";
+  if (acceptanceCandidatePromotion) return "inspect_acceptance_feedback_candidate_overlay_before_next_pass";
   if (feedbackCandidatePromotion) return "inspect_operator_feedback_candidate_overlay_before_next_pass";
   if (promotion) return "inspect_next_pass_promotion_overlay_before_followup_context";
   if (resultScaffold) return "inspect_next_pass_result_scaffold_before_review";

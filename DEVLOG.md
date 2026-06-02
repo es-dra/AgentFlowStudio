@@ -9,6 +9,45 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Acceptance Feedback Candidate Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-acceptance-feedback-overlay-001` on
+  `codex/afs-production-memory-operator-loop-acceptance-feedback-overlay-001`.
+- Added optional
+  `--acceptance-feedback-candidate-packet` plus
+  `--acceptance-feedback-candidate-promotion-decision` inputs to
+  `production-memory-loop-run-operator-no-provider`.
+- The generic operator-loop manifest can now embed an explicit acceptance
+  feedback candidate promotion decision and derived reviewed context overlay in
+  the same auditable no-provider run.
+- Added read-only generic Web operator-loop rendering for the embedded
+  acceptance feedback candidate promotion lane/card/controls/facts. No
+  directory scan, browser persistence, provider execution, or Loulan behavior
+  was added.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Loulan behavior, no new human acceptance,
+  no business validation, and no memory promotion.
+- Verification:
+  - Red focused test failed first because the builder rejected
+    `acceptance_feedback_candidate_packet` as an unexpected keyword and the
+    CLI rejected `--acceptance-feedback-candidate-packet`.
+  - Red Web static test failed before acceptance feedback candidate promotion
+    lane/card/control/fact support existed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_loop_acceptance_feedback_candidate_overlay.py -q`
+    -> 5 passed.
+  - Py compile for touched Python files passed.
+  - Focused production-memory/acceptance/operator/contract/CLI regression
+    passed (`65 passed`).
+  - Focused Web static regression passed (`15 passed`).
+  - CLI help passed.
+  - CLI smoke wrote ignored seed, acceptance feedback, candidate, explicit
+    decision, and final operator-loop-with-acceptance-overlay artifacts under
+    `data/processed/runs/production_memory_loop/ol_accept_overlay_smoke/`.
+    The final manifest reported `Acceptance feedback candidate promotion:
+    included_in_context`.
+  - Full suite passed on Python 3.12.12 (`861 passed`).
+
 ## 2026-06-02 - Production Memory Acceptance Feedback Overlay 001
 
 - Continued from

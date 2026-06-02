@@ -6,6 +6,12 @@ from pathlib import Path
 import typer
 
 from agentflow.memory.production_loop import load_production_memory_loop
+from agentflow.memory.production_acceptance_feedback_candidate_overlay import (
+    load_acceptance_feedback_candidate_promotion_decision,
+)
+from agentflow.memory.production_acceptance_feedback_candidate_promotion import (
+    load_acceptance_feedback_candidate_packet,
+)
 from agentflow.memory.production_operator_feedback_candidate_overlay import (
     load_operator_feedback_candidate_promotion_decision,
 )
@@ -74,6 +80,24 @@ def production_memory_loop_run_operator_no_provider_command(
         readable=True,
         help="Optional explicit operator feedback candidate promotion decision JSON.",
     ),
+    acceptance_feedback_candidate_packet_path: Path | None = typer.Option(
+        None,
+        "--acceptance-feedback-candidate-packet",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional acceptance feedback candidate packet JSON to include in the operator loop.",
+    ),
+    acceptance_feedback_candidate_promotion_decision_path: Path | None = typer.Option(
+        None,
+        "--acceptance-feedback-candidate-promotion-decision",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Optional explicit acceptance feedback candidate promotion decision JSON.",
+    ),
     write_manifest_check: bool = typer.Option(
         False,
         "--write-manifest-check",
@@ -120,6 +144,18 @@ def production_memory_loop_run_operator_no_provider_command(
             if operator_feedback_candidate_promotion_decision_path
             else None
         )
+        acceptance_feedback_candidate_packet = (
+            load_acceptance_feedback_candidate_packet(acceptance_feedback_candidate_packet_path)
+            if acceptance_feedback_candidate_packet_path
+            else None
+        )
+        acceptance_feedback_candidate_promotion_decision = (
+            load_acceptance_feedback_candidate_promotion_decision(
+                acceptance_feedback_candidate_promotion_decision_path
+            )
+            if acceptance_feedback_candidate_promotion_decision_path
+            else None
+        )
         result = build_production_memory_operator_loop_run(
             loop,
             generated_at=generated_at,
@@ -129,6 +165,8 @@ def production_memory_loop_run_operator_no_provider_command(
             next_pass_promotion_decision=next_pass_promotion_decision,
             operator_feedback_candidate_packet=operator_feedback_candidate_packet,
             operator_feedback_candidate_promotion_decision=operator_feedback_candidate_promotion_decision,
+            acceptance_feedback_candidate_packet=acceptance_feedback_candidate_packet,
+            acceptance_feedback_candidate_promotion_decision=acceptance_feedback_candidate_promotion_decision,
         )
         written_paths = write_production_memory_operator_loop_run(
             result,
@@ -159,6 +197,11 @@ def production_memory_loop_run_operator_no_provider_command(
         typer.echo(
             "Operator feedback candidate promotion: "
             f"{manifest['operator_feedback_candidate_promotion']['decision_effect']}"
+        )
+    if "acceptance_feedback_candidate_promotion" in manifest:
+        typer.echo(
+            "Acceptance feedback candidate promotion: "
+            f"{manifest['acceptance_feedback_candidate_promotion']['decision_effect']}"
         )
     if "operator_manifest_check" in result:
         typer.echo(f"Operator manifest check: {result['operator_manifest_check']['check_status']}")

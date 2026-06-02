@@ -8,6 +8,12 @@ from agentflow.memory.production_loop import CONTEXT_BUNDLE_KIND, PASS_READINESS
 from agentflow.memory.production_next_context import NEXT_CONTEXT_HANDOFF_KIND
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
+from agentflow.memory.production_operator_acceptance_feedback_candidate_manifest import (
+    acceptance_feedback_candidate_promotion_controls,
+    acceptance_feedback_candidate_promotion_nodes,
+    acceptance_feedback_candidate_promotion_ready,
+    acceptance_feedback_candidate_promotion_summary,
+)
 from agentflow.memory.production_operator_feedback_candidate_manifest import (
     operator_feedback_candidate_promotion_controls,
     operator_feedback_candidate_promotion_nodes,
@@ -37,6 +43,7 @@ def build_operator_manifest(
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
     operator_feedback_candidate_promotion: dict[str, Any] | None,
+    acceptance_feedback_candidate_promotion: dict[str, Any] | None,
     report: dict[str, Any],
     packet: dict[str, Any],
     *,
@@ -51,6 +58,7 @@ def build_operator_manifest(
         and next_pass_review_ready(next_pass_review)
         and next_pass_promotion_ready(next_pass_promotion)
         and operator_feedback_candidate_promotion_ready(operator_feedback_candidate_promotion)
+        and acceptance_feedback_candidate_promotion_ready(acceptance_feedback_candidate_promotion)
         and report.get("session_status") == "ready"
     )
     manifest = {
@@ -73,6 +81,7 @@ def build_operator_manifest(
             next_pass_review,
             next_pass_promotion,
             operator_feedback_candidate_promotion,
+            acceptance_feedback_candidate_promotion,
             report,
             packet,
         ),
@@ -85,13 +94,20 @@ def build_operator_manifest(
         "next_context_handoff": _handoff_summary(handoff),
         "next_task_packet": _next_task_packet_summary(next_task_packet),
         "company_kb_feedback": _company_kb_summary(packet),
-        "controls": _controls(run, packet, next_pass_promotion, operator_feedback_candidate_promotion),
+        "controls": _controls(
+            run,
+            packet,
+            next_pass_promotion,
+            operator_feedback_candidate_promotion,
+            acceptance_feedback_candidate_promotion,
+        ),
         "non_claim_boundaries": report.get("claim_boundaries", {}),
         "output_artifacts": operator_output_artifacts(
             include_next_pass_result=next_pass_result is not None,
             include_next_pass_review=next_pass_review is not None,
             include_next_pass_promotion=next_pass_promotion is not None,
             include_operator_feedback_candidate_promotion=operator_feedback_candidate_promotion is not None,
+            include_acceptance_feedback_candidate_promotion=acceptance_feedback_candidate_promotion is not None,
         ),
     }
     if next_pass_result is not None:
@@ -104,6 +120,10 @@ def build_operator_manifest(
         manifest["operator_feedback_candidate_promotion"] = operator_feedback_candidate_promotion_summary(
             operator_feedback_candidate_promotion
         )
+    if acceptance_feedback_candidate_promotion is not None:
+        manifest["acceptance_feedback_candidate_promotion"] = acceptance_feedback_candidate_promotion_summary(
+            acceptance_feedback_candidate_promotion
+        )
     return manifest
 
 
@@ -115,6 +135,7 @@ def _operator_loop_nodes(
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
     operator_feedback_candidate_promotion: dict[str, Any] | None,
+    acceptance_feedback_candidate_promotion: dict[str, Any] | None,
     report: dict[str, Any],
     packet: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -145,6 +166,8 @@ def _operator_loop_nodes(
     nodes.extend(next_pass_nodes(next_pass_result, next_pass_review, next_pass_promotion))
     if operator_feedback_candidate_promotion is not None:
         nodes.extend(operator_feedback_candidate_promotion_nodes(operator_feedback_candidate_promotion))
+    if acceptance_feedback_candidate_promotion is not None:
+        nodes.extend(acceptance_feedback_candidate_promotion_nodes(acceptance_feedback_candidate_promotion))
     nodes.extend(
         [
             _node("session_report", report.get("session_status", "unknown"), report.get("session_id", "unknown"), SESSION_REPORT_KIND),
@@ -164,6 +187,7 @@ def _controls(
     packet: dict[str, Any],
     next_pass_promotion: dict[str, Any] | None,
     operator_feedback_candidate_promotion: dict[str, Any] | None,
+    acceptance_feedback_candidate_promotion: dict[str, Any] | None,
 ) -> list[dict[str, str]]:
     controls = [
         _control("no_provider_mode", run.get("provider_mode") == "no-provider"),
@@ -177,6 +201,8 @@ def _controls(
         controls.extend(next_pass_promotion_controls(next_pass_promotion))
     if operator_feedback_candidate_promotion is not None:
         controls.extend(operator_feedback_candidate_promotion_controls(operator_feedback_candidate_promotion))
+    if acceptance_feedback_candidate_promotion is not None:
+        controls.extend(acceptance_feedback_candidate_promotion_controls(acceptance_feedback_candidate_promotion))
     return controls
 
 

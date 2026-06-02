@@ -22,6 +22,12 @@ OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND = (
 OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
     "agentflow_production_memory_operator_feedback_candidate_promotion_overlay"
 )
+ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND = (
+    "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision"
+)
+ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
+    "agentflow_production_memory_acceptance_feedback_candidate_promotion_overlay"
+)
 
 
 def operator_output_artifacts(
@@ -30,6 +36,7 @@ def operator_output_artifacts(
     include_next_pass_review: bool = False,
     include_next_pass_promotion: bool = False,
     include_operator_feedback_candidate_promotion: bool = False,
+    include_acceptance_feedback_candidate_promotion: bool = False,
 ) -> list[dict[str, Any]]:
     artifacts = [
         _artifact(RUN_KIND, "run/production_memory_loop_run.json"),
@@ -89,6 +96,31 @@ def operator_output_artifacts(
                 _artifact(
                     OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND,
                     "operator_feedback_candidate_reviewed_feedback/operator_feedback_candidate_promotion_overlay.json",
+                ),
+            ]
+        )
+    if include_acceptance_feedback_candidate_promotion:
+        artifacts.extend(
+            [
+                _artifact(
+                    ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND,
+                    "acceptance_feedback_candidate_promotion_decision/acceptance_feedback_candidate_promotion_decision.json",
+                ),
+                _artifact(
+                    "markdown_report",
+                    "acceptance_feedback_candidate_promotion_decision/acceptance_feedback_candidate_promotion_decision.md",
+                ),
+                _artifact(
+                    "agentflow_production_memory_loop",
+                    "acceptance_feedback_candidate_reviewed_feedback/derived_production_memory_loop.json",
+                ),
+                _artifact(RUN_KIND, "acceptance_feedback_candidate_reviewed_feedback/production_memory_loop_run.json"),
+                _artifact(CONTEXT_BUNDLE_KIND, "acceptance_feedback_candidate_reviewed_feedback/context_bundle.json"),
+                _artifact(PASS_READINESS_KIND, "acceptance_feedback_candidate_reviewed_feedback/pass_readiness.json"),
+                _artifact(NEXT_PASS_BUNDLE_KIND, "acceptance_feedback_candidate_reviewed_feedback/next_pass_bundle.json"),
+                _artifact(
+                    ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND,
+                    "acceptance_feedback_candidate_reviewed_feedback/acceptance_feedback_candidate_promotion_overlay.json",
                 ),
             ]
         )
