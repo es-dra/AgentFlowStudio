@@ -1,5 +1,6 @@
 import {
   companyKbFeedbackFacts,
+  productionAcceptanceFeedbackCandidatePromotionFacts,
   productionAcceptanceFeedbackCandidateFacts,
   productionAcceptanceFeedbackFacts,
   productionLoopFacts,
@@ -34,6 +35,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_operator_run_package_check: "Production memory operator run package check",
   agentflow_production_memory_acceptance_feedback_event: "Production memory acceptance feedback",
   agentflow_production_memory_acceptance_feedback_candidate_packet: "Production memory acceptance feedback candidate",
+  agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: "Production memory acceptance feedback candidate promotion",
   agentflow_production_memory_next_context_handoff: "Production memory next context handoff",
   agentflow_production_memory_next_task_packet: "Production memory next task packet",
   agentflow_production_memory_next_pass_result: "Production memory next pass result",
@@ -81,6 +83,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_operator_run_package_check") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_event") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_context_handoff") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_task_packet") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_pass_result") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
@@ -109,6 +112,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_operator_run_package_check") return productionOperatorRunPackageCheckFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_event") return productionAcceptanceFeedbackFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return productionAcceptanceFeedbackCandidateFacts(payload);
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return productionAcceptanceFeedbackCandidatePromotionFacts(payload);
   if (type === "agentflow_production_memory_next_context_handoff") return productionNextContextHandoffFacts(payload);
   if (type === "agentflow_production_memory_next_task_packet") return productionNextTaskPacketFacts(payload);
   if (type === "agentflow_production_memory_next_pass_result") return productionNextPassResultFacts(payload);
@@ -201,6 +205,7 @@ function statusFor(type, payload) {
   if (type === "agentflow_production_memory_operator_run_package_check") return payload.check_status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_event") return payload.status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
   if (type === "agentflow_production_memory_operator_feedback_event") return payload.status || "review ready";
   if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
   if (payload.writes_long_term_memory === true) return "blocked";

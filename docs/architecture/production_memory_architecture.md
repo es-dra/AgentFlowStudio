@@ -44,6 +44,7 @@ project_input
   -> operator_run_package_check
   -> explicit acceptance_feedback_event
   -> acceptance_feedback_candidate_packet
+  -> explicit acceptance_feedback_candidate_promotion_decision
 ```
 
 The committed example lives at:
@@ -149,6 +150,13 @@ The required root identifiers are:
   an explicit acceptance feedback event. It carries one memory candidate and a
   pending promotion decision template, but it writes no long-term memory,
   writes no Company KB, and does not make the candidate promoted memory.
+- `acceptance_feedback_candidate_promotion_decision`: explicit operator
+  decision for one acceptance feedback memory candidate. Promoted or merged
+  decisions make the candidate eligible for a later context overlay, while
+  rejected, expired, and blocked decisions keep reuse blocked. The decision
+  itself still writes no long-term memory, writes no Company KB, does not
+  execute a next pass, and does not claim new human acceptance or business
+  validation.
 
 All derived artifacts declare:
 
@@ -212,6 +220,14 @@ All derived artifacts declare:
 - Acceptance feedback candidate packets are still candidate-only. Their
   pending promotion templates cannot enter next context as reviewed decisions.
   Rejected or needs-revision source feedback produces a blocked candidate.
+- Acceptance feedback candidate reuse requires an explicit
+  `acceptance_feedback_candidate_promotion_decision`; the pending template is
+  never sufficient.
+- Blocked acceptance feedback candidates cannot be promoted or merged. They
+  can only receive a rejected, expired, or blocked decision.
+- Promoted or merged acceptance feedback candidates are only eligible for a
+  later context overlay. The decision is not durable memory, not a Company KB
+  promotion, and not business validation.
 
 ## CLI Surface
 
@@ -240,6 +256,7 @@ python -m apps.cli.main production-memory-loop-run-operator-no-provider examples
 python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --markdown-output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.md
 python -m apps.cli.main production-memory-loop-record-acceptance-feedback data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --decision accepted --summary "Human operator accepted the package for the next local iteration." --reviewed-at 2026-06-03T00:05:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback
 python -m apps.cli.main production-memory-loop-draft-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback/acceptance_feedback_event.json --generated-at 2026-06-03T01:10:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate
+python -m apps.cli.main production-memory-loop-review-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback_candidate/acceptance_feedback_candidate_packet.json --decision promoted --rationale "Traceable acceptance feedback selected for the next context overlay." --decided-at 2026-06-03T02:15:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate_promotion
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -371,6 +388,11 @@ The acceptance feedback candidate command writes:
 - `promotion_decision_template.json`
 - `acceptance_feedback_candidate_packet.md`
 
+The acceptance feedback candidate promotion command writes:
+
+- `acceptance_feedback_candidate_promotion_decision.json`
+- `acceptance_feedback_candidate_promotion_decision.md`
+
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
@@ -479,6 +501,15 @@ draft a candidate for later operator review, but it keeps
 `candidate_is_promoted_memory: false` and emits only a `pending` promotion
 decision template.
 
+The acceptance feedback candidate promotion decision is the explicit review
+surface for that candidate packet. It records the source packet, source
+acceptance feedback event, source pending template, candidate id, decision,
+rationale, reviewer role, and whether future candidate reuse is allowed. It
+does not write durable memory, write Company KB, execute a next pass, or claim
+new human acceptance or business validation. A promoted or merged decision is
+only eligibility for a later next-context overlay, not a Company memory
+promotion.
+
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
 candidate items with `requires_human_review: true`,
@@ -505,6 +536,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_run_package_check`
 - `agentflow_production_memory_acceptance_feedback_event`
 - `agentflow_production_memory_acceptance_feedback_candidate_packet`
+- `agentflow_production_memory_acceptance_feedback_candidate_promotion_decision`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
 - `agentflow_production_memory_next_pass_result`
@@ -563,6 +595,13 @@ review canvas with the source acceptance feedback, memory candidate, pending
 promotion template, no-provider controls, and non-claim boundaries. They do
 not promote memory, execute workflow actions, follow refs, write Company KB, or
 write durable memory.
+
+Acceptance feedback candidate promotion decision artifacts render as a
+read-only explicit-decision canvas with the source acceptance decision,
+candidate reuse status, decision effect, no-provider controls, and non-claim
+boundaries. They do not execute workflow actions, follow refs, call providers,
+write Company KB, write durable memory, or claim new human acceptance or
+business validation.
 
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and

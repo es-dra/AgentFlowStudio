@@ -9,6 +9,42 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Acceptance Feedback Promotion 001
+
+- Continued from
+  `codex/afs-production-memory-acceptance-feedback-candidate-001` on
+  `codex/afs-production-memory-acceptance-feedback-promotion-001`.
+- Added `production-memory-loop-review-acceptance-feedback-candidate` for
+  converting an acceptance feedback candidate packet into an explicit
+  no-provider operator decision artifact.
+- Added
+  `agentflow_production_memory_acceptance_feedback_candidate_promotion_decision`.
+  Promoted or merged decisions set candidate reuse eligibility for a later
+  context overlay; rejected, expired, or blocked decisions keep reuse blocked.
+- Added a read-only generic Web workbench canvas for selected acceptance
+  feedback candidate promotion decision JSON, including source acceptance
+  decision, candidate reuse status, decision effect, business-validation
+  boundary, and no-provider controls.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no Loulan behavior, no new human acceptance,
+  no business validation, no provider success claim, and no memory promotion.
+- Verification:
+  - Red test failed first because CLI registration was missing.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_acceptance_feedback_candidate_promotion.py tests\test_web_static_production_memory_acceptance_feedback_candidate_promotion.py -q`
+    -> 9 passed.
+  - Focused acceptance/Web/contract/CLI regression passed (`49 passed`).
+  - Py compile for touched Python files passed.
+  - CLI help for
+    `production-memory-loop-review-acceptance-feedback-candidate` passed.
+  - CLI smoke wrote ignored
+    `acceptance_feedback_candidate_promotion_decision.json` and
+    `acceptance_feedback_candidate_promotion_decision.md`; the JSON had
+    `decision=promoted`, `decision_effect=eligible_for_next_context_overlay`,
+    no provider call, no Company KB write, no durable memory write,
+    `human_acceptance=accepted`, and
+    `business_validation=not_validated`.
+  - Full suite passed on Python 3.12.12 (`850 passed`).
+
 ## 2026-06-02 - Production Memory Acceptance Feedback Candidate 001
 
 - Continued from

@@ -29,6 +29,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_production_memory_operator_run_package_check: ["operator_run_package_check.json"],
   agentflow_production_memory_acceptance_feedback_event: ["acceptance_feedback_event.json"],
   agentflow_production_memory_acceptance_feedback_candidate_packet: ["acceptance_feedback_candidate_packet.json"],
+  agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: ["acceptance_feedback_candidate_promotion_decision.json"],
   agentflow_production_memory_next_context_handoff: ["next_context_handoff.json"],
   agentflow_production_memory_next_task_packet: ["next_task_packet.json"],
   agentflow_production_memory_next_pass_result: ["next_pass_result.json"],
@@ -94,6 +95,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_production_memory_operator_run_package_check") return "production memory operator run package check";
   if (type === "agentflow_production_memory_acceptance_feedback_event") return "production memory acceptance feedback event";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return "production memory acceptance feedback candidate packet";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return "production memory acceptance feedback candidate promotion decision";
   if (type === "agentflow_production_memory_next_context_handoff") return "production memory next context handoff";
   if (type === "agentflow_production_memory_next_task_packet") return "production memory next task packet";
   if (type === "agentflow_production_memory_next_pass_result") return "production memory next pass result";

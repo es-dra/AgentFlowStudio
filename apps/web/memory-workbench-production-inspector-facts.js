@@ -97,6 +97,19 @@ export function productionAcceptanceFeedbackCandidateFacts(payload) {
   ];
 }
 
+export function productionAcceptanceFeedbackCandidatePromotionFacts(payload) {
+  return [
+    fact("decision", payload.decision || "unknown"),
+    fact("decision_effect", payload.decision_effect || "unknown"),
+    fact("candidate_id", payload.candidate_id || "unknown"),
+    fact("source_acceptance_decision", payload.source_acceptance_decision || "unknown"),
+    fact("candidate_reuse_allowed", yesNo(payload.candidate_reuse_allowed)),
+    fact("candidate_is_durable_memory", yesNo(payload.candidate_is_durable_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionOperatorFeedbackCandidateFacts(payload) {
   return [
     fact("candidate_generation_status", payload.candidate_generation_status || "unknown"),
