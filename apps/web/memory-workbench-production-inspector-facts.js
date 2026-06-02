@@ -136,12 +136,22 @@ export function productionOperatorManifestCheckFacts(payload) {
 }
 
 export function productionOperatorHandoffFacts(payload) {
+  const acceptanceCandidatePromotion = objectValue(payload.acceptance_feedback_candidate_promotion);
   return [
     fact("handoff_status", payload.handoff_status || "unknown"),
     fact("manifest_check_status", payload.manifest_check_status || "unknown"),
     fact("artifact_refs", String(arrayValue(payload.artifact_refs).length)),
     fact("blocked_items", String(arrayValue(payload.blocked_items).length)),
     fact("next_operator_action", payload.next_operator_action?.action || "unknown"),
+    ...(acceptanceCandidatePromotion.decision ? [
+      fact("acceptance_feedback_candidate_promotion_decision", acceptanceCandidatePromotion.decision),
+    ] : []),
+    ...(acceptanceCandidatePromotion.decision_effect ? [
+      fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotion.decision_effect),
+    ] : []),
+    ...(acceptanceCandidatePromotion.candidate_included_in_context !== undefined ? [
+      fact("acceptance_feedback_candidate_included", yesNo(acceptanceCandidatePromotion.candidate_included_in_context)),
+    ] : []),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
@@ -149,6 +159,7 @@ export function productionOperatorHandoffFacts(payload) {
 }
 
 export function productionOperatorRunPackageFacts(payload) {
+  const acceptanceCandidatePromotion = objectValue(payload.acceptance_feedback_candidate_promotion);
   return [
     fact("package_status", payload.package_status || "unknown"),
     fact("manifest_check_status", payload.manifest_check_status || "unknown"),
@@ -156,6 +167,15 @@ export function productionOperatorRunPackageFacts(payload) {
     fact("package_items", String(arrayValue(payload.package_items).length)),
     fact("blocked_items", String(arrayValue(payload.blocked_items).length)),
     fact("next_operator_action", payload.next_operator_action?.action || "unknown"),
+    ...(acceptanceCandidatePromotion.decision ? [
+      fact("acceptance_feedback_candidate_promotion_decision", acceptanceCandidatePromotion.decision),
+    ] : []),
+    ...(acceptanceCandidatePromotion.decision_effect ? [
+      fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotion.decision_effect),
+    ] : []),
+    ...(acceptanceCandidatePromotion.candidate_included_in_context !== undefined ? [
+      fact("acceptance_feedback_candidate_included", yesNo(acceptanceCandidatePromotion.candidate_included_in_context)),
+    ] : []),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),

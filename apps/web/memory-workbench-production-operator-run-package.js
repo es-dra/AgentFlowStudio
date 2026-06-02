@@ -1,3 +1,5 @@
+import { acceptanceFeedbackCandidatePromotionParts } from "./memory-workbench-production-acceptance-feedback-handoff.js";
+
 const OPERATOR_RUN_PACKAGE_TYPE = "agentflow_production_memory_operator_run_package";
 
 export function buildProductionMemoryOperatorRunPackageView(workspace, fallback) {
@@ -11,6 +13,7 @@ export function buildProductionMemoryOperatorRunPackageView(workspace, fallback)
   const nonClaims = arrayValue(payload.non_claims);
   const action = objectValue(payload.next_operator_action);
   const ready = payload.package_status === "ready" && blockedItems.length === 0;
+  const acceptancePromotion = acceptanceFeedbackCandidatePromotionParts(payload);
 
   return {
     ...fallback,
@@ -25,6 +28,7 @@ export function buildProductionMemoryOperatorRunPackageView(workspace, fallback)
       actionItem("inspect_run_package", "Inspect package", ready ? "review ready" : "blocked", "project"),
       actionItem("inspect_package_items", "Inspect items", packageItems.length ? "review ready" : "missing", "assets"),
       actionItem("inspect_blockers", "Inspect blockers", blockedItems.length ? "blocked" : "review ready", "review"),
+      ...acceptancePromotion.actions,
       actionItem("prepare_next_operator_action", "Prepare action", ready ? "ready" : "blocked", "next-pass"),
     ],
     assets: [
@@ -47,6 +51,7 @@ export function buildProductionMemoryOperatorRunPackageView(workspace, fallback)
       card("handoff_packet", "Handoff packet", payload.handoff_status === "ready" ? "review ready" : "blocked", payload.handoff_status || "unknown"),
       card("package_items", "Package items", packageItems.length ? "review ready" : "missing", `${packageItems.length} items indexed`),
       card("blocked_items", "Blocked items", blockedItems.length ? "blocked" : "review ready", `${blockedItems.length} blockers`),
+      ...acceptancePromotion.cards,
       card("non_claims", "Non-claims", nonClaims.length ? "blocked" : "review ready", `${nonClaims.length} boundaries retained`),
     ],
     memory_loaded: [
@@ -60,11 +65,13 @@ export function buildProductionMemoryOperatorRunPackageView(workspace, fallback)
         feedback_effect: "run package evidence only; no durable memory or Company KB write",
         status: ready ? "review ready" : "blocked",
       },
+      ...acceptancePromotion.memory,
     ],
     lanes: [
       lane("operator-run-package", "Operator run package", ready ? "ready" : "blocked", payload.source_operator_loop_id || "operator loop", payload.package_status || "unknown"),
       lane("package-items", "Package items", packageItems.length ? "review ready" : "missing", `${packageItems.length} items`, "indexed for inspection"),
       lane("blocked-items", "Blocked items", blockedItems.length ? "blocked" : "review ready", `${blockedItems.length} blockers`, "must be resolved first"),
+      ...acceptancePromotion.lanes,
       lane("next-action", "Next operator action", ready ? "ready" : "blocked", action.action || "unknown", action.status || "unknown"),
     ],
     protocol_summary: {
@@ -78,6 +85,7 @@ export function buildProductionMemoryOperatorRunPackageView(workspace, fallback)
         control("manifest check passed", payload.manifest_check_status === "passed"),
         control("handoff ready", payload.handoff_status === "ready"),
         control("blocked items absent", blockedItems.length === 0),
+        ...acceptancePromotion.controls,
         ...controls.map((item) => ({
           label: item.control_id || "control",
           status: item.status === "passed" ? "review ready" : "blocked",

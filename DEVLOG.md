@@ -9,6 +9,39 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Web Handoff Acceptance Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-operator-handoff-acceptance-overlay-001` on
+  `codex/afs-production-memory-web-handoff-acceptance-overlay-001`.
+- Added read-only generic Web visibility for acceptance feedback candidate
+  promotion summaries embedded in selected operator handoff packets and
+  operator run packages.
+- The Web Memory Workbench now surfaces the embedded acceptance promotion as a
+  workflow action, summary card, memory-loaded item, lane, protocol control,
+  and artifact inspector facts for both:
+  - `agentflow_production_memory_operator_handoff_packet`
+  - `agentflow_production_memory_operator_run_package`
+- Added a shared Web helper so handoff and run-package views do not duplicate
+  acceptance promotion UI projection logic.
+- Boundary kept: selected local JSON only, read-only Web projection, no
+  directory scan, no browser persistence, no provider execution, no Loulan
+  behavior, no Company KB write, no durable memory write, no new human
+  acceptance, no business validation, and no memory promotion.
+- Verification:
+  - Red Web static test failed first because the selected-file handoff and run
+    package views did not render an `Acceptance feedback candidate` lane.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_handoff_acceptance_overlay.py -q`
+    -> 3 passed.
+  - Related Web static regression passed (`7 passed`).
+  - Touched JS syntax checks passed with `node --check`.
+  - Focused production-memory/operator/contract/CLI regression passed
+    (`39 passed`).
+  - Expanded Web/static memory suite passed (`78 passed, 787 deselected`).
+  - Full suite passed on Python 3.12.12 (`865 passed`).
+  - Browser-level verification was not run because Browser control tools were
+    not exposed in this turn.
+
 ## 2026-06-02 - Production Memory Operator Handoff Acceptance Overlay 001
 
 - Continued from
