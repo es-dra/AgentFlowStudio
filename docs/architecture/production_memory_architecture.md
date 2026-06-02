@@ -763,6 +763,16 @@ view of the explicit decision and reviewed context overlay effect. It does not
 promote durable memory, write Company KB, follow refs, call providers, or
 execute the next pass.
 
+When an operator-loop manifest includes
+`acceptance_feedback_candidate_promotion`, the Web canvas surfaces the explicit
+acceptance feedback candidate decision and its reviewed overlay effect. If the
+candidate came from a next-operator action result, the manifest summary and Web
+canvas also expose a `Source action result` card, lane, memory evidence row,
+timeline step, and inspector facts for source artifact type/status/path. This
+is source visibility only. It does not create acceptance, follow refs, execute
+workflow actions, call providers, write Company KB, write durable memory, or
+promote the candidate beyond the explicit reviewed overlay.
+
 Next-context handoff artifacts render as a read-only task handoff canvas with
 included refs, blocked refs, no-provider controls, and non-claim boundaries for
 the next AI pass. They do not execute that pass, follow refs, call providers,

@@ -29,6 +29,12 @@ export function productionOperatorLoopFacts(payload) {
     ...(acceptanceCandidatePromotion.decision_effect ? [
       fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotion.decision_effect),
     ] : []),
+    ...(acceptanceCandidatePromotion.source_artifact_type ? [
+      fact("acceptance_feedback_source_artifact_type", acceptanceCandidatePromotion.source_artifact_type),
+    ] : []),
+    ...(acceptanceCandidatePromotion.source_artifact_status ? [
+      fact("acceptance_feedback_source_artifact_status", acceptanceCandidatePromotion.source_artifact_status),
+    ] : []),
     ...(startPacket.start_packet_status ? [
       fact("next_operator_start_packet_status", startPacket.start_packet_status),
     ] : []),

@@ -26,11 +26,13 @@ def acceptance_feedback_candidate_promotion_ready(promotion: dict[str, Any] | No
 def acceptance_feedback_candidate_promotion_nodes(promotion: dict[str, Any]) -> list[dict[str, str]]:
     decision = promotion["decision"]
     overlay = promotion["overlay"]
+    source_type = overlay.get("source_artifact_type", decision.get("source_artifact_type", "unknown"))
+    source_status = overlay.get("source_artifact_status", decision.get("source_artifact_status", "unknown"))
     return [
         _node(
             "acceptance_feedback_candidate_promotion_decision",
             decision.get("decision", "unknown"),
-            decision.get("decision_id", "unknown"),
+            _source_detail(source_type, source_status, decision.get("decision_id", "unknown")),
             ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND,
         ),
         _node(
@@ -62,17 +64,33 @@ def acceptance_feedback_candidate_promotion_controls(promotion: dict[str, Any]) 
 def acceptance_feedback_candidate_promotion_summary(promotion: dict[str, Any]) -> dict[str, Any]:
     decision = promotion["decision"]
     overlay = promotion["overlay"]
+    source_ready = overlay.get("source_ready_for_acceptance", decision.get("source_ready_for_acceptance") is True)
     return {
         "decision_id": decision.get("decision_id", "unknown"),
         "candidate_id": decision.get("candidate_id", "unknown"),
         "source_acceptance_feedback_event_id": decision.get("source_acceptance_feedback_event_id", "unknown"),
         "source_acceptance_decision": decision.get("source_acceptance_decision", "unknown"),
+        "source_artifact_type": overlay.get("source_artifact_type", decision.get("source_artifact_type", "unknown")),
+        "source_artifact_path": overlay.get("source_artifact_path", decision.get("source_artifact_path", "unknown")),
+        "source_artifact_status": overlay.get("source_artifact_status", decision.get("source_artifact_status", "unknown")),
+        "source_ready_for_acceptance": source_ready is True,
+        "source_target_ref": overlay.get("source_target_ref", decision.get("source_target_ref", "unknown")),
+        "source_target_artifact_type": overlay.get(
+            "source_target_artifact_type",
+            decision.get("source_target_artifact_type", "unknown"),
+        ),
         "decision": decision.get("decision", "unknown"),
         "decision_effect": overlay.get("decision_effect", "unknown"),
         "candidate_included_in_context": overlay.get("candidate_included_in_context") is True,
         "candidate_blocked_from_context": overlay.get("candidate_blocked_from_context") is True,
         "context_bundle_id": overlay.get("context_bundle_id", "unknown"),
     }
+
+
+def _source_detail(source_type: Any, source_status: Any, fallback: Any) -> str:
+    if source_type and source_type != "unknown" and source_status and source_status != "unknown":
+        return f"{source_type}:{source_status}"
+    return str(fallback)
 
 
 def _node(node_id: str, status: str, detail: Any, artifact_type: str) -> dict[str, str]:

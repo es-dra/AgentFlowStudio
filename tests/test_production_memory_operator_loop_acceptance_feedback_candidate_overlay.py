@@ -12,6 +12,9 @@ from agentflow.memory.production_acceptance_feedback_candidate import build_acce
 from agentflow.memory.production_acceptance_feedback_candidate_promotion import (
     build_acceptance_feedback_candidate_promotion_decision,
 )
+from agentflow.memory.production_action_result_acceptance_feedback import (
+    build_production_memory_action_result_acceptance_feedback_event,
+)
 from agentflow.memory.production_loop import load_production_memory_loop
 from agentflow.memory.production_operator_loop import (
     OPERATOR_LOOP_KIND,
@@ -58,6 +61,51 @@ def _loop_inputs(tmp_path: Path, decision: str = "promoted") -> tuple[dict, dict
     return loop, packet, promotion_decision
 
 
+def _action_result_acceptance_feedback_candidate_packet(tmp_path: Path) -> dict:
+    action_result = _next_operator_action_result(tmp_path)
+    event = build_production_memory_action_result_acceptance_feedback_event(
+        action_result,
+        decision="accepted",
+        summary="Human operator accepted the completed action result for the next local iteration.",
+        reviewer_role="operator",
+        reviewed_at="2026-06-03T12:05:00+08:00",
+        action_result_path="next_operator_action_result/next_operator_action_result.json",
+    )
+    return build_acceptance_feedback_candidate_packet(event, generated_at="2026-06-03T12:10:00+08:00")
+
+
+def _next_operator_action_result(tmp_path: Path) -> dict:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T12:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+    write_production_memory_operator_loop_run(
+        result,
+        tmp_path / "operator_loop_with_action_result",
+        write_run_package=True,
+        write_run_package_check=True,
+        write_next_operator_start_packet=True,
+        write_next_operator_start_event=True,
+        next_operator_start_event_decision="started",
+        next_operator_start_event_summary="Next operator started from the checked no-provider package.",
+        write_next_operator_action_result=True,
+        next_operator_action_result_decision="completed",
+        next_operator_action_result_summary="Next operator completed the recorded no-provider action.",
+        next_operator_action_result_refs=["next_pass_result/next_pass_result.json"],
+    )
+    return json.loads(
+        (
+            tmp_path
+            / "operator_loop_with_action_result"
+            / "next_operator_action_result"
+            / "next_operator_action_result.json"
+        ).read_text(encoding="utf-8")
+    )
+
+
 def test_operator_loop_can_include_acceptance_feedback_candidate_overlay(tmp_path: Path) -> None:
     loop, packet, decision = _loop_inputs(tmp_path)
 
@@ -86,6 +134,39 @@ def test_operator_loop_can_include_acceptance_feedback_candidate_overlay(tmp_pat
     assert "acceptance_feedback_candidate_promotion_decision/acceptance_feedback_candidate_promotion_decision.json" in artifact_paths
     assert "acceptance_feedback_candidate_reviewed_feedback/acceptance_feedback_candidate_promotion_overlay.json" in artifact_paths
     assert "acceptance_feedback_candidate_reviewed_feedback/context_bundle.json" in artifact_paths
+
+
+def test_operator_loop_acceptance_overlay_preserves_action_result_source_summary(tmp_path: Path) -> None:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    packet = _action_result_acceptance_feedback_candidate_packet(tmp_path)
+    decision = build_acceptance_feedback_candidate_promotion_decision(
+        packet,
+        decision="promoted",
+        rationale="Traceable action-result acceptance feedback selected for reviewed context assembly.",
+        reviewer_role="operator",
+        decided_at="2026-06-03T12:15:00+08:00",
+    )
+
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T12:20:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        acceptance_feedback_candidate_packet=packet,
+        acceptance_feedback_candidate_promotion_decision=decision,
+    )
+
+    summary = result["manifest"]["acceptance_feedback_candidate_promotion"]
+    node = next(
+        item
+        for item in result["manifest"]["operator_loop_nodes"]
+        if item["node_id"] == "acceptance_feedback_candidate_promotion_decision"
+    )
+    assert summary["source_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert summary["source_artifact_status"] == "action_completed"
+    assert summary["source_artifact_path"] == "next_operator_action_result/next_operator_action_result.json"
+    assert summary["source_target_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert summary["source_ready_for_acceptance"] is True
+    assert node["detail"] == "agentflow_production_memory_next_operator_action_result:action_completed"
 
 
 @pytest.mark.parametrize(

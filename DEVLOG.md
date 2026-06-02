@@ -9,6 +9,44 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Action Result Acceptance Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-action-result-acceptance-overlay-001` on
+  `codex/afs-production-memory-operator-loop-action-result-acceptance-overlay-001`.
+- Made the generic operator-loop acceptance feedback candidate promotion
+  summary preserve source artifact metadata when the candidate came from a
+  next-operator action result.
+- The operator-loop manifest now exposes action-result source type/status/path,
+  source target artifact type, and source readiness in
+  `acceptance_feedback_candidate_promotion`.
+- The acceptance feedback candidate promotion node detail now shows
+  `agentflow_production_memory_next_operator_action_result:action_completed`
+  when the promoted candidate came from a completed action result.
+- Added a small read-only Web helper for acceptance feedback source artifacts
+  so the operator-loop canvas can show `Source action result` as a card, lane,
+  memory evidence row, timeline step, and inspector facts without adding
+  browser ref following, directory scanning, provider execution, or
+  persistence.
+- Boundary kept: this remains explicit operator review of a candidate and a
+  no-provider operator-loop visibility layer. It does not create human
+  acceptance, write durable memory, write Company KB, execute the next pass,
+  call providers, auto-promote candidates, or claim business validation.
+- Verification:
+  - Initial focused tests failed because the operator-loop manifest summary
+    omitted `source_artifact_type` and the Web view did not render
+    `Source action result`.
+  - Focused operator-loop/Web tests passed (`8 passed`).
+  - Adjacent operator/acceptance/Web regression passed (`28 passed`).
+  - Expanded operator/contract regression passed (`45 passed`).
+  - Expanded Web/static memory tests passed (`93 passed, 824 deselected`).
+  - CLI smoke ran action result -> action-result acceptance feedback ->
+    candidate -> promoted decision -> operator-loop acceptance overlay and
+    produced a ready operator-loop manifest with action-result source metadata.
+  - Changed Python file passed `python -m py_compile`; changed Web modules
+    passed `node --check`.
+  - Full suite passed on Python 3.12.12 (`917 passed`).
+
 ## 2026-06-02 - Production Memory Action Result Acceptance Overlay 001
 
 - Continued from

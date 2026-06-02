@@ -1,4 +1,5 @@
 import { buildNextOperatorBrief } from "./memory-workbench-production-next-operator-brief.js";
+import { acceptanceFeedbackSourceParts } from "./memory-workbench-production-acceptance-source.js";
 import { actionResultActions, actionResultCards, actionResultControls, actionResultLanes, actionResultMemoryRows, actionResultTimeline, isActionResultReady } from "./memory-workbench-production-operator-loop-action-result.js";
 import { isStartEventReady, nextPassActionFor, nextPassStatusFor, startEventActions, startEventCards, startEventControls, startEventLanes, startEventMemoryRows, startEventTimeline } from "./memory-workbench-production-operator-loop-start-event.js";
 import {
@@ -30,6 +31,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const promotion = payload.next_pass_promotion || null;
   const feedbackCandidatePromotion = payload.operator_feedback_candidate_promotion || null;
   const acceptanceCandidatePromotion = payload.acceptance_feedback_candidate_promotion || null;
+  const acceptanceSource = acceptanceFeedbackSourceParts(acceptanceCandidatePromotion);
   const startPacket = objectValue(payload.next_operator_start_packet);
   const startPacketReady = startPacket?.start_packet_status === "ready" && startPacket.ready_for_next_operator === true;
   const startEvent = objectValue(payload.next_operator_start_event);
@@ -117,6 +119,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           acceptanceCandidatePromotion.decision_effect || "unknown",
         ),
       ] : []),
+      ...acceptanceSource.cards,
       ...(startPacket ? [
         card(
           "next_operator_start_packet",
@@ -154,6 +157,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       ] : []),
       ...startEventMemoryRows(startEvent, startEventReady),
       ...actionResultMemoryRows(actionResult, actionResultReady),
+      ...acceptanceSource.memory,
     ],
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
@@ -189,6 +193,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           acceptanceCandidatePromotion.decision_effect || "unknown",
         ),
       ] : []),
+      ...acceptanceSource.lanes,
       ...(startPacket ? [
         lane(
           "next-operator-start-packet",
@@ -282,6 +287,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     },
     timeline: [
       ...nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
+      ...acceptanceSource.timeline,
       ...(startPacket ? [
         step("Next operator start packet", startPacketReady ? "ready" : "blocked", startPacket.path || "not recorded"),
       ] : []),
