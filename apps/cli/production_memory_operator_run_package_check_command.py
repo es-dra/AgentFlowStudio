@@ -7,6 +7,7 @@ import typer
 from agentflow.memory.production_operator_run_package_check import (
     check_operator_run_package,
     write_operator_run_package_check,
+    write_operator_run_package_check_markdown,
 )
 
 
@@ -34,12 +35,19 @@ def production_memory_loop_check_operator_run_package_command(
         "-o",
         help="Optional JSON report path for the operator run package check.",
     ),
+    markdown_output_path: Path | None = typer.Option(
+        None,
+        "--markdown-output",
+        help="Optional Markdown report path for the operator run package check.",
+    ),
 ) -> None:
     """Check a production-memory operator run package without following refs."""
     try:
         check = check_operator_run_package(package_path, artifact_root=artifact_root)
         if output_path is not None:
             write_operator_run_package_check(check, output_path)
+        if markdown_output_path is not None:
+            write_operator_run_package_check_markdown(check, markdown_output_path)
     except ValueError as exc:
         typer.echo(f"Operator run package check failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -56,6 +64,8 @@ def production_memory_loop_check_operator_run_package_command(
     typer.echo("Writes Company KB: false" if not check["writes_company_kb"] else "Writes Company KB: true")
     if output_path is not None:
         typer.echo(f"Wrote: {str(output_path).replace(chr(92), '/')}")
+    if markdown_output_path is not None:
+        typer.echo(f"Wrote: {str(markdown_output_path).replace(chr(92), '/')}")
 
     if check["check_status"] != "passed":
         raise typer.Exit(code=1)

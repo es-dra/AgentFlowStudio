@@ -218,7 +218,7 @@ python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate
 python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --output data/processed/runs/production_memory_loop/operator_run_package_smoke
-python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json
+python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --markdown-output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.md
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -414,6 +414,12 @@ can include the candidate in the next context bundle; rejected, expired, or
 blocked decisions keep it visible as a blocked ref. The command still does not
 write durable memory, write Company KB, call providers, execute a next pass, or
 claim acceptance.
+
+The standalone operator run package check command reads one explicit package
+JSON and can write a machine JSON report with `--output` plus an operator-
+readable Markdown report with `--markdown-output`. The Markdown report is the
+same check result presented for handoff readability; it does not follow refs,
+call providers, write Company KB, promote memory, or claim acceptance.
 
 When `--write-run-package-check` is supplied together with
 `--write-run-package`, the operator-loop command also writes:

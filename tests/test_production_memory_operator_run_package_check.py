@@ -157,6 +157,7 @@ def test_operator_run_package_check_blocks_provider_and_write_boundaries(tmp_pat
 def test_operator_run_package_check_cli_writes_report_and_fails_on_missing_ref(tmp_path: Path) -> None:
     package_path = _write_operator_run_package(tmp_path)
     report_path = tmp_path / "operator_run_package_check.json"
+    markdown_report_path = tmp_path / "operator_run_package_check.md"
 
     success = subprocess.run(
         [
@@ -167,6 +168,8 @@ def test_operator_run_package_check_cli_writes_report_and_fails_on_missing_ref(t
             str(package_path),
             "--output",
             str(report_path),
+            "--markdown-output",
+            str(markdown_report_path),
         ],
         check=True,
         capture_output=True,
@@ -176,9 +179,11 @@ def test_operator_run_package_check_cli_writes_report_and_fails_on_missing_ref(t
     assert "Operator run package check: passed" in success.stdout
     assert "Missing package items: 0" in success.stdout
     assert report_path.exists()
+    assert markdown_report_path.exists()
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
     assert report["check_status"] == "passed"
+    assert "Ready for handoff: true" in markdown_report_path.read_text(encoding="utf-8")
 
     (tmp_path / "operator_manifest_check" / "operator_manifest_check.json").unlink()
     failure = subprocess.run(

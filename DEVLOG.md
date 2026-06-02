@@ -9,6 +9,41 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Run Package Check CLI Report 001
+
+- Continued from
+  `codex/afs-production-memory-run-package-check-report-001` on
+  `codex/afs-production-memory-run-package-check-cli-report-001`.
+- Added `--markdown-output` to the standalone
+  `production-memory-loop-check-operator-run-package` command.
+- The command still reads one explicit `operator_run_package.json`, keeps
+  `--output` as the JSON report path, and can now write a separate
+  operator-readable Markdown report without changing the JSON contract.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no automatic memory promotion, no Loulan
+  behavior, no human acceptance, and no business validation claim.
+- Verification so far:
+  - Red test failed first because the CLI did not recognize
+    `--markdown-output`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package_check.py -q`
+    -> 8 passed.
+  - Py compile for touched Python files passed.
+  - Focused production-memory/operator regression suite passed (`62 passed`).
+  - CLI help for `production-memory-loop-check-operator-run-package` lists
+    `--markdown-output`.
+  - CLI smoke wrote ignored runtime artifacts including standalone
+    `operator_run_package_check/operator_run_package_check.json` and
+    `operator_run_package_check/operator_run_package_check.md`; the JSON had
+    `check_status=passed`, `ready_for_handoff=true`, 18 checked items, 0
+    missing refs, 0 failed controls, no provider call, and no Company KB write;
+    the Markdown included status and non-claim boundaries.
+  - Full suite passed on Python 3.12.12 (`827 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Added-diff and new-file sensitive scans were clean.
+  - Staged `git diff --check` passed.
+  - Staged added-diff sensitive scan was clean.
+  - Line counts: standalone check CLI 74, focused test 242, check render 115.
+
 ## 2026-06-02 - Production Memory Run Package Check Report 001
 
 - Continued from
