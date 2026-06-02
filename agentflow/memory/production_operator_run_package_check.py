@@ -7,6 +7,10 @@ from typing import Any
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_operator_run_package import OPERATOR_RUN_PACKAGE_KIND
+from agentflow.memory.production_operator_run_package_check_render import (
+    render_operator_run_package_check_markdown,
+    write_operator_run_package_check_markdown,
+)
 from narratocut.utils import write_json
 
 OPERATOR_RUN_PACKAGE_CHECK_KIND = "agentflow_production_memory_operator_run_package_check"
@@ -85,6 +89,13 @@ def check_operator_run_package(
 
 def write_operator_run_package_check(check: dict[str, Any], output_path: str | Path) -> Path:
     return write_json(output_path, check)
+
+
+def write_operator_run_package_check_report(check: dict[str, Any], output_dir: str | Path) -> list[Path]:
+    output_root = Path(output_dir)
+    json_path = write_operator_run_package_check(check, output_root / "operator_run_package_check.json")
+    markdown_path = write_operator_run_package_check_markdown(check, output_root / "operator_run_package_check.md")
+    return [json_path, markdown_path]
 
 
 def _check_package_items(
@@ -210,5 +221,8 @@ __all__ = (
     "OPERATOR_RUN_PACKAGE_CHECK_KIND",
     "check_operator_run_package",
     "load_operator_run_package",
+    "render_operator_run_package_check_markdown",
     "write_operator_run_package_check",
+    "write_operator_run_package_check_markdown",
+    "write_operator_run_package_check_report",
 )

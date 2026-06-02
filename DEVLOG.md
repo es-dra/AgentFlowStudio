@@ -9,6 +9,48 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Run Package Check Report 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-run-package-check-output-001` on
+  `codex/afs-production-memory-run-package-check-report-001`.
+- Added an operator-readable Markdown report surface for
+  `agentflow_production_memory_operator_run_package_check` while preserving the
+  existing machine JSON check contract.
+- Split Markdown rendering into
+  `agentflow/memory/production_operator_run_package_check_render.py` so the
+  check module remains focused and under the project line-count target.
+- `write_production_memory_operator_loop_run(..., write_run_package_check=True)`
+  now writes both:
+  - `operator_run_package_check/operator_run_package_check.json`
+  - `operator_run_package_check/operator_run_package_check.md`
+- The Markdown report presents check status, ready-for-handoff, checked item
+  counts, missing/mismatched/unsafe refs, blockers, failed controls, provider
+  and write-boundary states, plus explicit non-claims.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no Loulan behavior, no human acceptance, no
+  business validation, and no provider success claim.
+- Verification so far:
+  - Red test failed first because the report render/write APIs did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package_check.py -q`
+    -> 8 passed.
+  - Py compile for touched Python files passed.
+  - Focused production-memory/operator regression suite passed (`62 passed`).
+  - CLI help for `production-memory-loop-run-operator-no-provider` passed.
+  - CLI smoke wrote ignored runtime artifacts including
+    `operator_run_package_check/operator_run_package_check.json` and
+    `operator_run_package_check/operator_run_package_check.md`; the JSON had
+    `check_status=passed`, `ready_for_handoff=true`, 18 checked items, 0
+    missing refs, 0 failed controls, no provider call, and no Company KB write;
+    the Markdown included status and non-claim boundaries.
+  - Full suite passed on Python 3.12.12 (`827 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Added-diff and new-file sensitive scans were clean.
+  - Line counts: check 228, check render 115, operator loop 291, focused test
+    237.
+- Staged `git diff --check` passed.
+- Staged added-diff sensitive scan was clean.
+
 ## 2026-06-02 - Production Memory Operator Loop Run Package Check Output 001
 
 - Continued from

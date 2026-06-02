@@ -41,6 +41,7 @@ project_input
   -> operator_manifest_check
   -> operator_handoff_packet
   -> operator_run_package
+  -> operator_run_package_check
 ```
 
 The committed example lives at:
@@ -134,6 +135,8 @@ The required root identifiers are:
 - `operator_run_package_check`: read-only handoff consistency check for a
   selected run package. It verifies package item refs and no-provider/write
   boundaries at handoff time without following refs into workflow execution.
+  The operator-loop writer can emit both the machine JSON and an operator-
+  readable Markdown report.
 
 All derived artifacts declare:
 
@@ -416,12 +419,14 @@ When `--write-run-package-check` is supplied together with
 `--write-run-package`, the operator-loop command also writes:
 
 - `operator_run_package_check/operator_run_package_check.json`
+- `operator_run_package_check/operator_run_package_check.md`
 
 This is a post-package handoff check. It is not added to the operator manifest
 or the run package itself, which avoids self-referential check chains. It
 confirms or blocks the final package as a next-operator entry artifact only; it
 does not call providers, execute workflows, write durable memory, write Company
-KB, or claim human acceptance.
+KB, or claim human acceptance. The Markdown report is a readable presentation
+of the same check result and boundaries; it is not a separate approval record.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as

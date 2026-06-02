@@ -13,6 +13,8 @@ from agentflow.memory.production_operator_loop import (
 from agentflow.memory.production_operator_run_package_check import (
     OPERATOR_RUN_PACKAGE_CHECK_KIND,
     check_operator_run_package,
+    render_operator_run_package_check_markdown,
+    write_operator_run_package_check_report,
 )
 
 
@@ -68,14 +70,59 @@ def test_operator_loop_writer_can_emit_run_package_check_after_run_package(tmp_p
     )
 
     check_path = tmp_path / "operator_run_package_check" / "operator_run_package_check.json"
+    markdown_path = tmp_path / "operator_run_package_check" / "operator_run_package_check.md"
     assert check_path in written_paths
+    assert markdown_path in written_paths
     assert check_path.exists()
+    assert markdown_path.exists()
     check = json.loads(check_path.read_text(encoding="utf-8"))
     assert check["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
     assert check["check_status"] == "passed"
     assert check["ready_for_handoff"] is True
     assert check["checked_item_count"] == 18
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "Status: passed" in markdown
+    assert "Provider calls: not started" in markdown
+    assert "Company KB write: disabled" in markdown
     assert result["operator_run_package_check"]["check_status"] == "passed"
+
+
+def test_operator_run_package_check_markdown_report_preserves_boundaries(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+    check = check_operator_run_package(package_path)
+
+    markdown = render_operator_run_package_check_markdown(check)
+
+    assert "# Production Memory Operator Run Package Check" in markdown
+    assert "Status: passed" in markdown
+    assert "Ready for handoff: true" in markdown
+    assert "Checked items: 18" in markdown
+    assert "Missing refs: 0" in markdown
+    assert "Failed controls: 0" in markdown
+    assert "Provider calls: not started" in markdown
+    assert "Durable memory write: disabled" in markdown
+    assert "Company KB write: disabled" in markdown
+    assert "- not human acceptance" in markdown
+    assert "- not business validation" in markdown
+    assert "- not durable memory" in markdown
+    assert "- not provider success" in markdown
+
+
+def test_operator_run_package_check_report_writer_preserves_json_contract(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+    check = check_operator_run_package(package_path)
+
+    written_paths = write_operator_run_package_check_report(check, tmp_path / "check_report")
+
+    json_path = tmp_path / "check_report" / "operator_run_package_check.json"
+    markdown_path = tmp_path / "check_report" / "operator_run_package_check.md"
+    assert written_paths == [json_path, markdown_path]
+    assert json_path.exists()
+    assert markdown_path.exists()
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+    assert report["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
+    assert report["check_status"] == "passed"
+    assert "Ready for handoff: true" in markdown_path.read_text(encoding="utf-8")
 
 
 def test_operator_run_package_check_reports_missing_package_item(tmp_path: Path) -> None:
@@ -178,10 +225,13 @@ def test_operator_loop_cli_can_write_run_package_check_with_run_package(tmp_path
     )
 
     check_path = output_dir / "operator_run_package_check" / "operator_run_package_check.json"
+    markdown_path = output_dir / "operator_run_package_check" / "operator_run_package_check.md"
     assert "Operator run package: ready" in result.stdout
     assert "Operator run package check: passed" in result.stdout
     assert check_path.exists()
+    assert markdown_path.exists()
     check = json.loads(check_path.read_text(encoding="utf-8"))
     assert check["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
     assert check["check_status"] == "passed"
     assert check["ready_for_handoff"] is True
+    assert "Failed controls: 0" in markdown_path.read_text(encoding="utf-8")
