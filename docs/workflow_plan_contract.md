@@ -1,6 +1,6 @@
 # Workflow Plan Contract
 
-Phase 7.7 adds a static workflow planning contract for NarratoCut.
+Phase 7.7 adds a static workflow planning contract for AgentFlow Studio.
 
 The planner turns a workflow YAML file and a planned input file into a
 reviewable draft:
@@ -78,7 +78,7 @@ Example:
   "notes": [
     "This is a draft plan only. It does not execute the workflow."
   ],
-  "created_by": "ncut draft-plan"
+  "created_by": "afs draft-plan"
 }
 ```
 
@@ -101,7 +101,7 @@ CLI exit behavior:
 Generate a static plan:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+.venv\Scripts\afs draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
 ```
 
 Expected output shape:

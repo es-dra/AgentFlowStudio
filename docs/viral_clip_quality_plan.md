@@ -4,7 +4,7 @@ Date: 2026-05-19
 
 ## Current Baseline
 
-NarratoCut can now close the local product chain for two cases:
+AgentFlow Studio can now close the local product chain for two cases:
 
 1. Source video only.
 2. Source video plus script.
@@ -102,7 +102,7 @@ This limits true "viral moment" recognition.
 
 ### Content Understanding Layer
 
-NarratoCut should treat content understanding as multiple local evidence
+AgentFlow Studio should treat content understanding as multiple local evidence
 channels:
 
 ```text

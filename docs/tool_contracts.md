@@ -1,6 +1,6 @@
 # Tool Contracts
 
-Phase 7.5B adds an agent-readable static catalog for NarratoCut's current
+Phase 7.5B adds an agent-readable static catalog for AgentFlow Studio's current
 capabilities. The catalog is descriptive only: no runtime registry, no skill
 runtime, and no autonomous agent control are added.
 
@@ -106,7 +106,7 @@ Allowed:
 Not allowed:
 
 - runtime skill registry
-- `ncut list-skills`
+- `afs list-skills`
 - autonomous agent execution
 - Web/API, database, queue, or hosted runtime
 
@@ -143,7 +143,7 @@ agent execution and requiring human review.
 Analyzes a UTF-8 text file and writes hook candidates to `hooks.json`.
 
 - Category: ROI analysis
-- Main entry points: `ncut analyze-hooks`, workflow node `analyze_hooks`
+- Main entry points: `afs analyze-hooks`, workflow node `analyze_hooks`
 - Inputs: `text_file`
 - Outputs: `hooks.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -154,7 +154,7 @@ Analyzes a UTF-8 text file and writes hook candidates to `hooks.json`.
 Generates mock short-video scripts from hook candidates.
 
 - Category: script generation
-- Main entry points: `ncut generate-scripts`, workflow node `generate_scripts`
+- Main entry points: `afs generate-scripts`, workflow node `generate_scripts`
 - Inputs: `hooks.json`
 - Outputs: `scripts.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -165,7 +165,7 @@ Generates mock short-video scripts from hook candidates.
 Generates deterministic clip planning contracts from scripts.
 
 - Category: clip planning
-- Main entry points: `ncut generate-clip-plans`, workflow node `generate_clip_plans`
+- Main entry points: `afs generate-clip-plans`, workflow node `generate_clip_plans`
 - Inputs: `scripts.json`
 - Outputs: `clip_plans.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -176,7 +176,7 @@ Generates deterministic clip planning contracts from scripts.
 Generates mock clip text files and a slice manifest from clip plans.
 
 - Category: mock slicing
-- Main entry points: `ncut mock-slice`, workflow node `mock_slice`
+- Main entry points: `afs mock-slice`, workflow node `mock_slice`
 - Inputs: `clip_plans.json`
 - Outputs: `slice_manifest.json`, `clips/`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -187,7 +187,7 @@ Generates mock clip text files and a slice manifest from clip plans.
 Builds a minimal FFmpeg slicing command list without executing FFmpeg.
 
 - Category: real slicing contract
-- Main entry point: `narratocut.slicing_sop.build_ffmpeg_slice_command`
+- Main entry point: `agentflow_studio.slicing_sop.build_ffmpeg_slice_command`
 - Inputs: `input_video_path`, `start_sec`, `duration_sec`, `output_video_path`
 - Outputs: `ffmpeg_command`
 - Requires: no installed FFmpeg because this tool only builds the command
@@ -198,7 +198,7 @@ Builds a minimal FFmpeg slicing command list without executing FFmpeg.
 Executes minimal local FFmpeg slicing from clip plans.
 
 - Category: real slicing PoC
-- Main entry points: `ncut slice-real`, `narratocut.slicing_sop.slice_clip_plans_real`
+- Main entry points: `afs slice-real`, `agentflow_studio.slicing_sop.slice_clip_plans_real`
 - Inputs: `input_video_path`, `clip_plans.json`
 - Outputs: `real_slice_manifest.json`, `clips/*.mp4`
 - Requires: installed FFmpeg; no network, no model provider, no API key
@@ -211,7 +211,7 @@ Reads local video metadata through FFprobe and writes `video_metadata.json`.
 
 - Category: real video metadata
 - Main entry points: workflow node `probe_video_metadata`,
-  `narratocut.slicing_sop.probe_video_metadata`
+  `agentflow_studio.slicing_sop.probe_video_metadata`
 - Inputs: `input_video_path`, `ffprobe_executable`
 - Outputs: `video_metadata.json`
 - Requires: installed FFprobe; no network, no model provider, no API key
@@ -224,7 +224,7 @@ FFmpeg availability.
 
 - Category: real video validation
 - Main entry points: workflow node `validate_clip_plan`,
-  `narratocut.slicing_sop.validate_clip_plan`
+  `agentflow_studio.slicing_sop.validate_clip_plan`
 - Inputs: `clip_plan.json`, `roi_config.json`, `video_metadata.json`
 - Outputs: `clip_plan_validation.json`
 - Requires: no network, no model provider, no API key
@@ -237,7 +237,7 @@ Executes the real-video workflow slicing node after validation succeeds.
 
 - Category: real video workflow node
 - Main entry points: workflow node `real_slice_video`,
-  `narratocut.slicing_sop.slice_clip_plans_real`
+  `agentflow_studio.slicing_sop.slice_clip_plans_real`
 - Inputs: `input_video_path`, `clip_plan.json`, `clip_plan_validation.json`
 - Outputs: `real_slice_manifest.json`, `clips/*.mp4`
 - Requires: installed FFmpeg; no network, no model provider, no API key
@@ -263,7 +263,7 @@ Generates a simple ordered assembly plan from successful real clip records.
 
 - Category: video assembly planning
 - Main entry points: workflow node `generate_assembly_plan`,
-  `narratocut.assembly_sop.build_assembly_plan`
+  `agentflow_studio.assembly_sop.build_assembly_plan`
 - Inputs: `real_slice_manifest.json`
 - Outputs: `assembly_plan.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -275,7 +275,7 @@ Concatenates ordered clip files into `final_video.mp4` with FFmpeg.
 
 - Category: video assembly execution
 - Main entry points: workflow node `concat_clips`,
-  `narratocut.assembly_sop.concat_clips`
+  `agentflow_studio.assembly_sop.concat_clips`
 - Inputs: `assembly_plan.json`, `clips/*.mp4`
 - Outputs: `concat_list.txt`, `final_video.mp4`,
   `final_video_manifest.json`
@@ -291,7 +291,7 @@ Probes the assembled final video and enriches `final_video_manifest.json`.
 
 - Category: video assembly metadata
 - Main entry points: workflow node `probe_final_video`,
-  `narratocut.slicing_sop.probe_video_metadata`
+  `agentflow_studio.slicing_sop.probe_video_metadata`
 - Inputs: `final_video.mp4`, `final_video_manifest.json`
 - Outputs: `final_video_manifest.json`
 - Requires: installed FFprobe; no network, no model provider, no API key
@@ -314,7 +314,7 @@ Extracts or mocks a local audio artifact from a video for ASR.
 
 - Category: video transcription audio
 - Main entry points: workflow node `extract_audio`,
-  `narratocut.audio_sop.extract_audio_from_video`
+  `agentflow_studio.audio_sop.extract_audio_from_video`
 - Inputs: `input_video_path`
 - Outputs: `audio_manifest.json`, `audio/audio.wav`
 - Requires: installed FFmpeg for real extraction mode. The Phase 11.1 examples
@@ -330,7 +330,7 @@ peaks, then writes `boundary_signal_manifest.json`.
 
 - Category: media boundary signal
 - Main entry points: workflow node `analyze_audio_boundary_signals`,
-  `narratocut.audio_sop.analyze_audio_boundary_signals`
+  `agentflow_studio.audio_sop.analyze_audio_boundary_signals`
 - Inputs: `audio/audio.wav` or workflow state `audio`
 - Outputs: `boundary_signal_manifest.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -344,7 +344,7 @@ fixture-backed mock ASR provider.
 
 - Category: video transcription ASR
 - Main entry points: workflow node `transcribe_audio_mock`,
-  `narratocut.asr_sop.MockASRProvider`
+  `agentflow_studio.asr_sop.MockASRProvider`
 - Inputs: `audio_manifest.json`, `asr_fixture.json`
 - Outputs: workflow state `transcript`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -357,11 +357,11 @@ enabled OpenAI-compatible ASR provider.
 
 - Category: video transcription ASR
 - Main entry points: workflow node `transcribe_audio_openai_compatible`,
-  `narratocut.asr_sop.OpenAICompatibleASRProvider`
+  `agentflow_studio.asr_sop.OpenAICompatibleASRProvider`
 - Inputs: `audio_manifest.json`, `audio/audio.wav`
 - Outputs: workflow state `transcript`
 - Requires: network, model provider, and API key. Calls are blocked unless
-  `NARRATOCUT_ALLOW_REMOTE_ASR=true` is set.
+  `AFS_ALLOW_REMOTE_ASR=true` is set.
 - Main checks: `transcript_segments_non_empty`, `transcript_timestamps_valid`
 
 ### `transcribe_audio_faster_whisper`
@@ -371,7 +371,7 @@ Converts an audio artifact into a timestamped `Transcript` using a local
 
 - Category: video transcription ASR
 - Main entry points: workflow node `transcribe_audio_faster_whisper`,
-  `narratocut.asr_sop.FasterWhisperASRProvider`
+  `agentflow_studio.asr_sop.FasterWhisperASRProvider`
 - Inputs: `audio_manifest.json`, `audio/audio.wav`
 - Outputs: workflow state `transcript`
 - Requires: local optional dependency `faster-whisper`; no API key and no
@@ -400,7 +400,7 @@ when the change is small and the candidate still satisfies duration bounds.
 
 - Category: candidate generation
 - Main entry points: workflow node `generate_candidate_windows`,
-  `narratocut.candidate_sop.generate_candidate_windows`
+  `agentflow_studio.candidate_sop.generate_candidate_windows`
 - Inputs: `transcript.json` or workflow state `transcript`, optional
   `boundary_signal_manifest`
 - Outputs: `candidate_windows.json`
@@ -422,7 +422,7 @@ Builds a timestamped OCR subtitle `Transcript` from frame-level OCR results.
 
 - Category: OCR timeline
 - Main entry points: workflow node `build_ocr_transcript`,
-  `narratocut.ocr_sop.build_ocr_transcript_from_frames`
+  `agentflow_studio.ocr_sop.build_ocr_transcript_from_frames`
 - Inputs: `ocr_frames.json`, optional source video path and timeline settings
 - Outputs: workflow state `ocr_transcript` and `ocr_transcript_manifest`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -447,7 +447,7 @@ selects highlights.
 
 - Category: candidate scoring
 - Main entry points: workflow node `score_candidate_windows`,
-  `narratocut.candidate_sop.score_candidate_windows`
+  `agentflow_studio.candidate_sop.score_candidate_windows`
 - Inputs: `candidate_windows.json` or workflow state `candidate_windows`
 - Outputs: workflow state `highlight_score_report` and `highlight_plan`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -487,7 +487,7 @@ Exports the current timestamped `Transcript` state to `subtitles.srt` and
 
 - Category: subtitle export
 - Main entry points: workflow node `write_subtitles`,
-  `narratocut.subtitle_sop.build_subtitle_export`
+  `agentflow_studio.subtitle_sop.build_subtitle_export`
 - Inputs: workflow state `transcript`
 - Outputs: `subtitles.srt`, `subtitle_manifest.json`
 - Requires: no FFmpeg, no network, no model provider, no API key
@@ -503,7 +503,7 @@ FFmpeg.
 
 - Category: subtitle burn execution
 - Main entry points: workflow node `burn_subtitles`,
-  `narratocut.subtitle_burn_sop.burn_subtitles_into_video`
+  `agentflow_studio.subtitle_burn_sop.burn_subtitles_into_video`
 - Inputs: `final_video.mp4`, `subtitles.srt`
 - Outputs: `final_video_with_subtitles.mp4`,
   `subtitle_burn_manifest.json`
@@ -524,7 +524,7 @@ Probes the subtitle-burned output video and enriches
 
 - Category: subtitle burn metadata
 - Main entry points: workflow node `probe_subtitle_burn`,
-  `narratocut.slicing_sop.probe_video_metadata`
+  `agentflow_studio.slicing_sop.probe_video_metadata`
 - Inputs: `final_video_with_subtitles.mp4`, `subtitle_burn_manifest.json`
 - Outputs: `subtitle_burn_manifest.json`
 - Requires: installed FFprobe; no network, no model provider, no API key
@@ -537,7 +537,7 @@ Exports a single `cover.jpg` image from an existing final video with FFmpeg.
 
 - Category: cover export execution
 - Main entry points: workflow node `export_cover`,
-  `narratocut.cover_sop.export_cover_from_video`
+  `agentflow_studio.cover_sop.export_cover_from_video`
 - Inputs: `final_video.mp4`
 - Outputs: `cover.jpg`, `cover_manifest.json`
 - Requires: installed FFmpeg; no network, no model provider, no API key
@@ -556,7 +556,7 @@ Mixes a local BGM audio file into an existing final video with FFmpeg.
 
 - Category: BGM mix execution
 - Main entry points: workflow node `mix_bgm`,
-  `narratocut.bgm_sop.mix_bgm_into_video`
+  `agentflow_studio.bgm_sop.mix_bgm_into_video`
 - Inputs: `final_video.mp4`, local BGM audio such as `bgm.mp3`
 - Outputs: `final_video_with_bgm.mp4`, `audio_mix_manifest.json`
 - Requires: installed FFmpeg; no network, no model provider, no API key
@@ -579,7 +579,7 @@ Probes the BGM-mixed output video and enriches `audio_mix_manifest.json`.
 
 - Category: BGM mix metadata
 - Main entry points: workflow node `probe_bgm_mix`,
-  `narratocut.slicing_sop.probe_video_metadata`
+  `agentflow_studio.slicing_sop.probe_video_metadata`
 - Inputs: `final_video_with_bgm.mp4`, `audio_mix_manifest.json`
 - Outputs: `audio_mix_manifest.json`
 - Requires: installed FFprobe; no network, no model provider, no API key
@@ -592,7 +592,7 @@ Writes a finished-package manifest that indexes existing final video outputs.
 
 - Category: finished package manifest
 - Main entry points: workflow node `write_finished_package`,
-  `narratocut.package_sop.build_finished_package_manifest`
+  `agentflow_studio.package_sop.build_finished_package_manifest`
 - Inputs: required `final_video.mp4`; optional subtitle-burned video,
   BGM-mixed video, cover image, and review report paths
 - Outputs: `finished_package_manifest.json`
@@ -612,7 +612,7 @@ Writes a human- and agent-readable Markdown report for a finished package run.
 
 - Category: finished package report
 - Main entry points: workflow node `write_package_report`,
-  `ncut package-report`, `narratocut.package_sop.write_package_report`
+  `afs package-report`, `agentflow_studio.package_sop.write_package_report`
 - Inputs: `finished_package_manifest.json`, `run_manifest.json`, optional
   `quality_report.json`, `review_report.json`, `clip_plan.json`,
   `highlight_score_report.json`, and `selection_diagnostics.json`
@@ -631,8 +631,8 @@ Writes a human- and agent-readable Markdown report for a finished package run.
 Summarizes one or more formal product runs into a delivery readiness report.
 
 - Category: delivery readiness
-- Main entry points: `ncut delivery-readiness`,
-  `narratocut.package_sop.write_delivery_readiness`
+- Main entry points: `afs delivery-readiness`,
+  `agentflow_studio.package_sop.write_delivery_readiness`
 - Inputs: one or more run directories after `inspect-run`, `review-run`, and
   `package-report`; expected run artifacts include
   `finished_package_manifest.json`, `quality_report.json`,
@@ -654,7 +654,7 @@ Summarizes one or more formal product runs into a delivery readiness report.
 Inspects a workflow run directory and writes `quality_report.json`.
 
 - Category: harness inspection
-- Main entry points: `ncut inspect-run`, `narratocut.harness.inspect_run`
+- Main entry points: `afs inspect-run`, `agentflow_studio.harness.inspect_run`
 - Inputs: `run_dir`
 - Outputs: `quality_report.json`
 - Requires: no FFmpeg, no network, no model provider, no API key

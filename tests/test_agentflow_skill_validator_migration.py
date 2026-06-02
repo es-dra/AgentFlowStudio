@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from agentflow.harness.agentflow_skill import validate_skill_invocation_result_replay
-from narratocut.harness.agentflow_skill import (
+from agentflow_studio.harness.agentflow_skill import (
     validate_skill_invocation_result_replay as compatibility_validate_skill_invocation_result_replay,
 )
 
@@ -28,5 +28,5 @@ def test_skill_replay_validator_imports_from_agentflow_harness() -> None:
     assert validation["does_not_execute"] is True
 
 
-def test_narratocut_skill_replay_validator_import_path_is_compatibility_wrapper() -> None:
+def test_agentflow_studio_skill_replay_validator_import_path_is_compatibility_wrapper() -> None:
     assert compatibility_validate_skill_invocation_result_replay is validate_skill_invocation_result_replay

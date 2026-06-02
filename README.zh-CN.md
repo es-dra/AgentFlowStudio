@@ -9,10 +9,10 @@ workflow 文件或 artifact 契约。
 当前顶层模块：
 
 - `agentflow/`：平台合同、harness、router、memory、skills 的逐步迁移层。
-- `narratostudio/`：制作侧结构化内容 handoff MVP。
-- `narratocut/`：分发侧短视频高光切片、包装、报告和复核 MVP。
+- `agentflow_production/`：制作侧结构化内容 handoff MVP。
+- `agentflow_studio/`：分发侧短视频高光切片、包装、报告和复核 MVP。
 
-NarratoCut 仍然是 Python 实现的 local-first CLI/Agent MVP：每个关键步骤
+AgentFlow Studio 仍然是 Python 实现的 local-first CLI/Agent MVP：每个关键步骤
 都会写出可读的 JSON 或媒体 artifact，并且可以通过 inspect/review 做质量
 检查。
 
@@ -31,7 +31,7 @@ AgentFlow 合同层 helper，以及确定性的 Production Memory Architecture
 扫描目录、持久化浏览器状态、执行 workflow、调用 provider，也不是 hosted Web
 产品。
 
-NarratoStudio 当前制作侧 workflow 是：
+AgentFlow Production 当前制作侧 workflow 是：
 
 ```text
 creative_brief
@@ -44,7 +44,7 @@ creative_brief
   -> production_report
 ```
 
-NarratoCut 当前分发侧主链路是：
+AgentFlow Studio 当前分发侧主链路是：
 
 ```text
 video / transcript / clip_plan
@@ -98,8 +98,8 @@ video / transcript / clip_plan
 ```text
 apps/                 CLI、API 和本地 Web 入口
 agentflow/            平台合同和 harness 迁移层
-narratostudio/        制作侧结构化 handoff 模块
-narratocut/           分发侧媒体 workflow 模块
+agentflow_production/        制作侧结构化 handoff 模块
+agentflow_studio/           分发侧媒体 workflow 模块
 workflows/            YAML workflow 定义
 prompts/              可审计 prompt 模板
 configs/              示例配置和 tool catalog
@@ -127,15 +127,15 @@ cd D:\Projects\AgentFlowStudio
 python -m venv .venv
 .venv\Scripts\pip install -e .[dev]
 .venv\Scripts\python -m pytest
-.venv\Scripts\ncut version
+.venv\Scripts\afs version
 ```
 
 运行默认 mock workflow：
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 预期产物包括：
@@ -202,7 +202,7 @@ source video + clip_plan
 
 ## Artifact / Review 模型
 
-NarratoCut 把生成产物当作一等契约。关键 artifact 包括：
+AgentFlow Studio 把生成产物当作一等契约。关键 artifact 包括：
 
 ```text
 run_manifest.json
@@ -228,7 +228,7 @@ finished_package_manifest.json
 - [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
 - [`docs/tool_contracts.md`](docs/tool_contracts.md)
 - [`docs/agent_usage_guide.md`](docs/agent_usage_guide.md)
-- [`docs/narratocut_delivery_checklist.md`](docs/narratocut_delivery_checklist.md)
+- [`docs/agentflow_studio_delivery_checklist.md`](docs/agentflow_studio_delivery_checklist.md)
 - [`docs/current_architecture.md`](docs/current_architecture.md)
 
 ## 远程 Provider 边界
@@ -239,13 +239,13 @@ finished_package_manifest.json
 远程 LLM 需要显式开启：
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
+$env:AFS_ALLOW_REMOTE_LLM="true"
 ```
 
 远程 ASR 需要显式开启：
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:AFS_ALLOW_REMOTE_ASR="true"
 ```
 
 本地模型配置应写入被 git 忽略的 `configs/models.yaml`。仓库只提交
@@ -256,7 +256,7 @@ $env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
 检查本机 FFmpeg / FFprobe：
 
 ```powershell
-.venv\Scripts\ncut ffmpeg-check --json
+.venv\Scripts\afs ffmpeg-check --json
 ```
 
 如果没有 FFmpeg，mock workflows 仍可运行。真实媒体 workflow 需要
@@ -266,7 +266,7 @@ FFmpeg/FFprobe。
 
 ```powershell
 .venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall apps agentflow narratocut narratostudio tests
+.venv\Scripts\python -m compileall apps agentflow agentflow_studio agentflow_production tests
 git diff --check
 .venv\Scripts\python -m apps.cli.main --help
 .venv\Scripts\python -m apps.cli.main version

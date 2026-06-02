@@ -7,14 +7,14 @@ import pytest
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.model_gateway import ModelConfigError
-from narratocut.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
-from narratocut.model_gateway.kling_video_smoke import run_kling_t2v_smoke
+from agentflow_studio.model_gateway import ModelConfigError
+from agentflow_studio.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
+from agentflow_studio.model_gateway.kling_video_smoke import run_kling_t2v_smoke
 from tests.kling_video_smoke_helpers import json_response, provider_config, store
 
 
 def test_kling_t2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     provider_store = store(tmp_path)
     calls: list[str] = []
     video_bytes = b"fake-t2v-mp4-bytes"
@@ -71,7 +71,7 @@ def test_kling_t2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp
             )
         raise AssertionError(f"unexpected URL: {url}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
 
     manifest = run_kling_t2v_smoke(
         provider_store,
@@ -104,7 +104,7 @@ def test_kling_t2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp
 
 
 def test_kling_t2v_smoke_rejects_i2v_service(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     provider_store = store(tmp_path)
 
     with pytest.raises(ModelConfigError, match="t2v api_family"):
@@ -127,7 +127,7 @@ def test_kling_t2v_smoke_cli_provider_config_help_uses_env_fallback() -> None:
 
 
 def test_kling_t2v_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     config_path = tmp_path / "providers.local.json"
     config_path.write_text(json.dumps(provider_config()), encoding="utf-8")
 
@@ -146,7 +146,7 @@ def test_kling_t2v_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) -> Non
 
     assert result.exit_code == 1
     assert "Kling T2V smoke failed" in result.output
-    assert "NARRATOCUT_ALLOW_REMOTE_VIDEO" in result.output
+    assert "AFS_ALLOW_REMOTE_VIDEO" in result.output
     assert "Traceback" not in result.output
     assert "fake-access-key" not in result.output
     assert "fake-secret-key" not in result.output

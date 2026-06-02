@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, PASSED
 from agentflow.memory.production_asset_feedback import ASSET_FEEDBACK_EVENT_KIND
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ASSET_PROFILE_UPDATE_CANDIDATE_KIND = "agentflow_production_memory_asset_profile_update_candidate"
 UNSAFE_EXTRA_FRAGMENTS = (

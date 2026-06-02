@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from narratocut.harness.quality_checks import build_quality_report
-from narratocut.harness.reviewer import review_run, write_review_report
-from narratocut.utils import write_json
+from agentflow_studio.harness.quality_checks import build_quality_report
+from agentflow_studio.harness.reviewer import review_run, write_review_report
+from agentflow_studio.utils import write_json
 
 
 def test_review_run_builds_passed_report_for_complete_mock_run(tmp_path) -> None:
@@ -95,7 +95,7 @@ def _write_complete_run(run_dir) -> Any:
     write_json(
         run_dir / "run_manifest.json",
         {
-            "project": "NarratoCut",
+            "project": "AgentFlow Studio",
             "run_id": run_dir.name,
             "workflow": "workflows/mock_text_to_slices.yaml",
             "mode": "mock",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from narratocut.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
+from agentflow_studio.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
 
 
 def test_workflow_runner_writes_run_manifest_and_trace(tmp_path) -> None:
@@ -23,7 +23,7 @@ def test_workflow_runner_writes_run_manifest_and_trace(tmp_path) -> None:
     trace = json.loads((output_dir / "trace.json").read_text(encoding="utf-8"))
 
     assert run.status == "success"
-    assert run_manifest["project"] == "NarratoCut"
+    assert run_manifest["project"] == "AgentFlow Studio"
     assert run_manifest["run_id"] == "run_full_mock"
     assert run_manifest["workflow"] == workflow_path
     assert run_manifest["mode"] == "mock"

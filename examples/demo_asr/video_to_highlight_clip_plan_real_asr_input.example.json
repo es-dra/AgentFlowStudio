@@ -3,7 +3,7 @@
   "audio_extraction_mode": "ffmpeg",
   "asr_base_url": "https://api.example.com/v1",
   "asr_model": "whisper-1",
-  "asr_api_key_env": "NARRATOCUT_OPENAI_API_KEY",
+  "asr_api_key_env": "AFS_OPENAI_API_KEY",
   "asr_timeout_sec": 60,
   "roi_config_path": "examples/demo_highlight/roi_config.json",
   "language": "zh-CN",

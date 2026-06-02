@@ -1,4 +1,4 @@
-﻿# AgentFlow Studio DEVLOG History Index - 2026-05
+# AgentFlow Studio DEVLOG History Index - 2026-05
 
 Status: compressed archive index created during `AFS-SLIMMING-DEVLOG-001`.
 
@@ -70,15 +70,15 @@ Committed historical details should live in focused handoff, maintenance, workbe
 | 48 | 1050 | 2026-05-24 - Alpha Readiness Evidence Report |
 | 49 | 1083 | 2026-05-26 - AFS-PROV-001 PosterFlow MiniMax Provider Replay |
 | 50 | 1124 | 2026-05-23 - PosterFlow Memory Demo Remote Image Workflow |
-| 51 | 1161 | 2026-05-23 - Phase 15.29 NarratoStudio Asset Reuse Chain Audit Smoke |
-| 52 | 1198 | 2026-05-23 - Phase 15.28 NarratoStudio Asset Reuse Chain Fixtures |
-| 53 | 1228 | 2026-05-23 - Phase 15.27 NarratoStudio Asset Reuse Review Surface |
-| 54 | 1268 | 2026-05-23 - Phase 15.26 NarratoStudio Asset Reuse Dry-run Planner |
-| 55 | 1307 | 2026-05-23 - Phase 15.25 NarratoStudio Asset Feedback Review Gate |
-| 56 | 1350 | 2026-05-23 - Phase 15.24 NarratoStudio Asset Feedback Review Harness |
-| 57 | 1390 | 2026-05-23 - Phase 15.23 NarratoStudio Asset Feedback Review Surface |
-| 58 | 1439 | 2026-05-23 - Phase 15.22 NarratoStudio Asset Feedback Source Validator |
-| 59 | 1482 | 2026-05-23 - Phase 15.21 NarratoStudio Asset Feedback Loop Smoke |
+| 51 | 1161 | 2026-05-23 - Phase 15.29 AgentFlow Production Asset Reuse Chain Audit Smoke |
+| 52 | 1198 | 2026-05-23 - Phase 15.28 AgentFlow Production Asset Reuse Chain Fixtures |
+| 53 | 1228 | 2026-05-23 - Phase 15.27 AgentFlow Production Asset Reuse Review Surface |
+| 54 | 1268 | 2026-05-23 - Phase 15.26 AgentFlow Production Asset Reuse Dry-run Planner |
+| 55 | 1307 | 2026-05-23 - Phase 15.25 AgentFlow Production Asset Feedback Review Gate |
+| 56 | 1350 | 2026-05-23 - Phase 15.24 AgentFlow Production Asset Feedback Review Harness |
+| 57 | 1390 | 2026-05-23 - Phase 15.23 AgentFlow Production Asset Feedback Review Surface |
+| 58 | 1439 | 2026-05-23 - Phase 15.22 AgentFlow Production Asset Feedback Source Validator |
+| 59 | 1482 | 2026-05-23 - Phase 15.21 AgentFlow Production Asset Feedback Loop Smoke |
 | 60 | 1519 | 2026-05-22 - Phase 15.20 Intermediate Asset / Memory Validator |
 | 61 | 1557 | 2026-05-22 - Phase 15.19 Skill Replay Validator Migration |
 | 62 | 1588 | 2026-05-22 - Phase 15.18 Router Dry-run Validator Migration |
@@ -94,8 +94,8 @@ Committed historical details should live in focused handoff, maintenance, workbe
 | 72 | 1791 | 2026-05-21 - Phase 15.6 AgentFlow Contract Registry |
 | 73 | 1807 | 2026-05-21 - Phase 15.5 AgentFlow Skill / Router Contracts |
 | 74 | 1829 | 2026-05-21 - Phase 15.4 AgentFlow Memory Signal Contracts |
-| 75 | 1850 | 2026-05-21 - Phase 15.3 NarratoStudio Review Hardening |
-| 76 | 1874 | 2026-05-20 - NarratoCut v0.1.0 Delivery Closeout |
+| 75 | 1850 | 2026-05-21 - Phase 15.3 AgentFlow Production Review Hardening |
+| 76 | 1874 | 2026-05-20 - AgentFlow Studio v0.1.0 Delivery Closeout |
 | 77 | 1897 | 2026-05-20 - Phase 14.5 Selection Diagnostics |
 | 78 | 1923 | 2026-05-19 - Phase 14.2A Candidate Windows |
 | 79 | 1949 | 2026-05-19 - Phase 14.0B Product Quality Smoke Reclassification |
@@ -145,7 +145,7 @@ Committed historical details should live in focused handoff, maintenance, workbe
 | 123 | 2605 | 2026-05-20 - Phase 14.6 Delivery Readiness Gate |
 | 124 | 2619 | 2026-05-20 - Phase 14.6 Selection-Quality Hardening |
 | 125 | 2633 | 2026-05-20 - Post-v0.1.0 Startup Scan and Phase 15 Planning |
-| 126 | 2648 | 2026-05-20 - NarratoStudio Mainline MVP |
+| 126 | 2648 | 2026-05-20 - AgentFlow Production Mainline MVP |
 | 127 | 2677 | 2026-05-21 - Phase 15.2 AgentFlow Mainline Contracts |
 | 128 | 2693 | 2026-05-22 - Phase 15.14 AgentFlow Architecture Refactor Plan |
 | 129 | 2702 | 2026-05-22 - Phase 15.15 AgentFlow Package Skeleton |

@@ -3,7 +3,7 @@
   "artifact_type": "agentflow_intermediate_asset",
   "asset_id": "af_intermediate_asset_001",
   "asset_kind": "style_constraint",
-  "module_origin": "NarratoStudio",
+  "module_origin": "AgentFlow Production",
   "created_by": "agent",
   "source_artifact_refs": [
     "creative_brief.json",

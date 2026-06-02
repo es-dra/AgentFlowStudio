@@ -8,7 +8,7 @@
   "promotion_decision_ref": "agentflow_memory_promotion_decision:af_memory_promotion_decision_001",
   "reuse_policy": {
     "allowed_modules": [
-      "NarratoStudio"
+      "AgentFlow Production"
     ],
     "requires_human_review": true,
     "allowed_task_types": [

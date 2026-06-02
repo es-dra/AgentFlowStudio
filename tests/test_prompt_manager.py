@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.core.prompts import PromptManager
+from agentflow_studio.core.prompts import PromptManager
 
 
 def test_prompt_manager_loads_and_renders_template(tmp_path) -> None:

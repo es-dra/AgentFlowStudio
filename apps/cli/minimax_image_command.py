@@ -5,12 +5,12 @@ from pathlib import Path
 import typer
 
 from apps.cli.kling_common import display_ref
-from narratocut.model_gateway.company_secrets import (
+from agentflow_studio.model_gateway.company_secrets import (
     COMPANY_PROVIDER_CONFIG_ENV,
     load_company_provider_secrets,
 )
-from narratocut.model_gateway.errors import ModelGatewayError
-from narratocut.model_gateway.minimax_image_smoke import run_minimax_image_smoke
+from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 
 
 def minimax_image_smoke_command(

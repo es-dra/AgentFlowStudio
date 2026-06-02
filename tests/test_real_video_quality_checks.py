@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from narratocut.harness import real_clip_quality
-from narratocut.harness.quality_checks import build_quality_report
-from narratocut.schemas import VideoMetadata
-from narratocut.utils import write_json
+from agentflow_studio.harness import real_clip_quality
+from agentflow_studio.harness.quality_checks import build_quality_report
+from agentflow_studio.schemas import VideoMetadata
+from agentflow_studio.utils import write_json
 
 
 def test_real_video_quality_profile_reports_failed_slice_manifest(tmp_path) -> None:

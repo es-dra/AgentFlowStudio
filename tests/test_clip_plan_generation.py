@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.schemas import ClipPlan, ScriptSegment, ShortVideoScript
-from narratocut.slicing_sop import generate_clip_plans_from_scripts
+from agentflow_studio.schemas import ClipPlan, ScriptSegment, ShortVideoScript
+from agentflow_studio.slicing_sop import generate_clip_plans_from_scripts
 
 
 def make_scripts(count: int = 3) -> list[ShortVideoScript]:

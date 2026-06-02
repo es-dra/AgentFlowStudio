@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript, VideoMetadata
-from narratocut.slicing_sop import validate_clip_plan
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript, VideoMetadata
+from agentflow_studio.slicing_sop import validate_clip_plan
+from agentflow_studio.workflow_engine import load_workflow
 
 
 VIDEO_TO_HIGHLIGHT_CLIP_PLAN_REAL_ASR_WORKFLOW = Path("workflows/video_to_highlight_clip_plan_real_asr.yaml")
@@ -61,9 +61,9 @@ def test_video_to_highlight_clip_plan_real_asr_workflow_writes_transcript_highli
     def fake_transcribe(self, audio_artifact, *, language=None):
         return Transcript.model_validate(_transcript_payload(source_video=audio_artifact.source_video))
 
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_ASR", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "true")
     monkeypatch.setattr(
-        "narratocut.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
+        "agentflow_studio.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
         fake_transcribe,
     )
     output_dir = tmp_path / "run"
@@ -122,7 +122,7 @@ def test_video_to_highlight_clip_plan_real_asr_workflow_writes_transcript_highli
 
 
 def test_video_to_highlight_clip_plan_real_asr_workflow_fails_without_remote_asr_opt_in(tmp_path, monkeypatch) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_ASR", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
     source_video = tmp_path / "input.mp4"
     source_video.write_text("not real video bytes", encoding="utf-8")
     roi_path = tmp_path / "roi_config.json"
@@ -153,7 +153,7 @@ def test_video_to_highlight_clip_plan_real_asr_workflow_fails_without_remote_asr
     manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
 
     assert status == "failed"
-    assert "NARRATOCUT_ALLOW_REMOTE_ASR" in manifest["error"]
+    assert "AFS_ALLOW_REMOTE_ASR" in manifest["error"]
     assert (output_dir / "audio_manifest.json").is_file()
     assert not (output_dir / "transcript.json").exists()
     assert not (output_dir / "highlight_plan.json").exists()

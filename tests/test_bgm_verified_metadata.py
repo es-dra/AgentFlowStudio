@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from narratocut.workflow_engine.bgm_nodes import mix_bgm_node
-from narratocut.workflow_engine.context import WorkflowContext
-from narratocut.workflow_engine.definitions import WorkflowStepDefinition
-from narratocut.utils import write_json
+from agentflow_studio.workflow_engine.bgm_nodes import mix_bgm_node
+from agentflow_studio.workflow_engine.context import WorkflowContext
+from agentflow_studio.workflow_engine.definitions import WorkflowStepDefinition
+from agentflow_studio.utils import write_json
 
 
 def test_mix_bgm_node_records_verified_local_bgm_metadata(tmp_path: Path, monkeypatch) -> None:
@@ -52,8 +52,8 @@ def test_mix_bgm_node_records_verified_local_bgm_metadata(tmp_path: Path, monkey
             "errors": [],
         }
 
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.check_ffmpeg_available", lambda executable="ffmpeg": _ffmpeg_info())
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.mix_bgm_into_video", fake_mix_bgm_into_video)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.check_ffmpeg_available", lambda executable="ffmpeg": _ffmpeg_info())
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.mix_bgm_into_video", fake_mix_bgm_into_video)
 
     mix_bgm_node(step, context)
 
@@ -64,6 +64,6 @@ def test_mix_bgm_node_records_verified_local_bgm_metadata(tmp_path: Path, monkey
 
 
 def _ffmpeg_info():
-    from narratocut.slicing_sop.ffmpeg_probe import FFmpegInfo
+    from agentflow_studio.slicing_sop.ffmpeg_probe import FFmpegInfo
 
     return FFmpegInfo(available=True, executable="ffmpeg", version="test", raw_output="test", error=None)

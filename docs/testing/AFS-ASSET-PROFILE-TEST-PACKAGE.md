@@ -69,9 +69,9 @@ deterministic package and tests pass.
 Required local setup:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
-$env:NARRATOCUT_ALLOW_REMOTE_VIDEO="true"
-$env:NARRATOCUT_PROVIDER_CONFIG="<local ignored provider config>"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_ALLOW_REMOTE_VIDEO="true"
+$env:AFS_PROVIDER_CONFIG="<local ignored provider config>"
 ```
 
 Then run:

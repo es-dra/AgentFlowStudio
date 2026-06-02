@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine import load_workflow
 
 
 SKILL_FILES = [

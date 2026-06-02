@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, PASSED
 from agentflow.memory.production_asset_profile_constants import ASSET_PROFILE_KIND, ASSET_PROFILE_READINESS_KIND
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ASSET_FEEDBACK_FIXTURE_KIND = "agentflow_production_memory_asset_feedback_fixture"
 ASSET_FEEDBACK_EVENT_KIND = "agentflow_production_memory_asset_feedback_event"

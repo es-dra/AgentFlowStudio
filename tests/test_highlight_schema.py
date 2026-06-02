@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from narratocut.schemas import HighlightPlan, HighlightSegment
+from agentflow_studio.schemas import HighlightPlan, HighlightSegment
 
 
 def test_script_only_highlight_plan_allows_untimed_highlights() -> None:

@@ -6,7 +6,7 @@ export function mountAppShell() {
   const root = document.querySelector("#app-root");
   if (!root) throw new Error("Missing #app-root");
   root.innerHTML = `
-    <main class="app-shell" aria-label="NarratoCut static artifact viewer">
+    <main class="app-shell" aria-label="AgentFlow Studio static artifact viewer">
       ${reviewShellTemplate()}
       ${productionShellTemplate()}
       ${memoryShellTemplate()}

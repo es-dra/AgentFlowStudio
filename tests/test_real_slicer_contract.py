@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from narratocut.slicing_sop.real_slicer import RealSlicingConfig, build_ffmpeg_slice_command
+from agentflow_studio.slicing_sop.real_slicer import RealSlicingConfig, build_ffmpeg_slice_command
 
 
 def test_build_ffmpeg_slice_command_uses_minimal_contract() -> None:

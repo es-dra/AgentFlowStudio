@@ -31,7 +31,7 @@ source video + clip_plan
 Required local tools:
 
 - Python 3.12
-- installed editable NarratoCut environment
+- installed editable AgentFlow Studio environment
 - FFmpeg and FFprobe available on `PATH`, or configured locally
 
 Required local ignored media:
@@ -75,9 +75,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/clip_plan_to_real_clips.yaml --input data/processed/runs/golden_path_phase13_clip_plan_to_real_clips_input.json --output data/processed/runs/golden_path_phase13_real_clips
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_real_clips
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_real_clips
+.venv\Scripts\afs run-workflow --workflow workflows/clip_plan_to_real_clips.yaml --input data/processed/runs/golden_path_phase13_clip_plan_to_real_clips_input.json --output data/processed/runs/golden_path_phase13_real_clips
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_real_clips
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_real_clips
 ```
 
 Expected key artifacts:
@@ -106,9 +106,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/clips_to_final_video.yaml --input data/processed/runs/golden_path_phase13_clips_to_final_video_input.json --output data/processed/runs/golden_path_phase13_final_video
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_final_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_final_video
+.venv\Scripts\afs run-workflow --workflow workflows/clips_to_final_video.yaml --input data/processed/runs/golden_path_phase13_clips_to_final_video_input.json --output data/processed/runs/golden_path_phase13_final_video
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_final_video
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_final_video
 ```
 
 Expected key artifacts:
@@ -128,9 +128,9 @@ review_report.json
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/processed/runs/golden_path_phase13_subtitles
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_subtitles
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_subtitles
+.venv\Scripts\afs run-workflow --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/processed/runs/golden_path_phase13_subtitles
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_subtitles
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_subtitles
 ```
 
 Expected key artifacts:
@@ -157,9 +157,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_subtitles.yaml --input data/processed/runs/golden_path_phase13_final_video_with_subtitles_input.json --output data/processed/runs/golden_path_phase13_subtitled_video
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_subtitled_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_subtitled_video
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_with_subtitles.yaml --input data/processed/runs/golden_path_phase13_final_video_with_subtitles_input.json --output data/processed/runs/golden_path_phase13_subtitled_video
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_subtitled_video
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_subtitled_video
 ```
 
 Expected key artifacts:
@@ -186,9 +186,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_to_cover.yaml --input data/processed/runs/golden_path_phase13_final_video_to_cover_input.json --output data/processed/runs/golden_path_phase13_cover
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_cover
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_cover
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_to_cover.yaml --input data/processed/runs/golden_path_phase13_final_video_to_cover_input.json --output data/processed/runs/golden_path_phase13_cover
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_cover
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_cover
 ```
 
 Expected key artifacts:
@@ -218,9 +218,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_bgm.yaml --input data/processed/runs/golden_path_phase13_final_video_with_bgm_input.json --output data/processed/runs/golden_path_phase13_bgm
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_bgm
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_bgm
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_with_bgm.yaml --input data/processed/runs/golden_path_phase13_final_video_with_bgm_input.json --output data/processed/runs/golden_path_phase13_bgm
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_bgm
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_bgm
 ```
 
 Expected key artifacts:
@@ -255,9 +255,9 @@ Create a local input bundle:
 Run:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_package.yaml --input data/processed/runs/golden_path_phase13_package_input.json --output data/processed/runs/golden_path_phase13_package
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/golden_path_phase13_package
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/golden_path_phase13_package
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_package.yaml --input data/processed/runs/golden_path_phase13_package_input.json --output data/processed/runs/golden_path_phase13_package
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/golden_path_phase13_package
+.venv\Scripts\afs review-run --run-dir data/processed/runs/golden_path_phase13_package
 ```
 
 Expected key artifacts:

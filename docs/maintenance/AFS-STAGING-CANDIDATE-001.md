@@ -31,8 +31,8 @@ Operational consequences:
   private retrospectives, real costs, customer details, and unpublished
   business assumptions must stay out of Git.
 - AFS repo-layer boundaries stay intact: `agentflow/` for platform
-  contracts/harness/router/memory/skills, `narratostudio/` for production-side
-  structured handoff, and `narratocut/` for distribution-side packaging/review.
+  contracts/harness/router/memory/skills, `agentflow_production/` for production-side
+  structured handoff, and `agentflow_studio/` for distribution-side packaging/review.
 
 ## Current Worktree Snapshot
 
@@ -53,7 +53,7 @@ Top-level untracked distribution:
 | `apps/` | 38 | CLI split, Web workbench, and Web slimming modules |
 | `tests/` | 26 | focused tests for memory pipeline, Web, and provider/operator paths |
 | `docs/` | 25 | archive, maintenance, handoff, workbench, retrospective, and task brief docs |
-| `narratocut/` | 18 | numbered demo evidence modules, provider/operator code, and workflow helper |
+| `agentflow_studio/` | 18 | numbered demo evidence modules, provider/operator code, and workflow helper |
 | `agentflow/` | 6 | memory video pipeline implementation |
 | `examples/` | 6 | sanitized AgentFlow example artifacts |
 | `tools/` | 1 | RECORDING-016 operator script |
@@ -67,7 +67,7 @@ Top-level untracked distribution:
 | AgentFlow contracts/examples | `agentflow/contracts/examples.py`, `agentflow/memory/promotion.py`, `examples/agentflow/*.json`, contract tests | stage as platform contract and Memory evidence infrastructure | contract/example tests and no-secret scan |
 | Memory video pipeline mainline | `agentflow/memory/video_pipeline*.py`, `apps/cli/memory_video_pipeline_command.py`, `apps/cli/memory_review_command.py`, `examples/agentflow/memory_video_pipeline_*.json`, `tests/test_memory_video_pipeline_*.py`, `tests/test_memory_review_cli.py` | mainline keep; stage as product-facing replacement for numbered demos | visible CLI remains `memory-video-pipeline-*`; focused memory pipeline tests |
 | Web Memory Workbench | `apps/web/memory-workbench*`, `apps/web/app-shell-*`, `apps/web/app-workspace-render.js`, `apps/web/production-*`, split CSS files, `docs/workbench/`, Web static tests | mainline keep; stage as local read-only operator UI | Web static tests and browser/static verification if UI is changed again |
-| Workflow-engine slimming | `narratocut/workflow_engine/*.py`, `tests/test_*workflow*.py` | stage as architecture slimming | focused workflow tests and full suite before integration |
+| Workflow-engine slimming | `agentflow_studio/workflow_engine/*.py`, `tests/test_*workflow*.py` | stage as architecture slimming | focused workflow tests and full suite before integration |
 | Evidence docs and runbooks | `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-012.md` through `RECORDING-016`, competition run sheet/talk track, Local Alpha reconciliation docs | preserve evidence; stage as docs/runbooks only | claim-boundary review; no generated media |
 
 ## Quarantine Before Staging
@@ -78,9 +78,9 @@ without a dedicated review or refactor.
 | Area | Files | Reason | Required action |
 |---|---|---|---|
 | Provider/operator CLI | `apps/cli/kling_*`, `apps/cli/minimax_image_command.py`, `apps/cli/memory_demo_commands.py` | hidden legacy/operator surface; not default product surface | reviewed in `AFS-PROVIDER-OPERATOR-STAGING-REVIEW-001`; stage only as separate support slice |
-| Provider config bridge | `narratocut/model_gateway/company_secrets.py` and imports | hardcoded local Company `.secrets` default removed; provider config now requires explicit `--provider-config` or `NARRATOCUT_PROVIDER_CONFIG` | reviewed; keep separate from mainline staging |
-| Provider runtime adapters | `narratocut/model_gateway/kling_*`, `narratocut/model_gateway/minimax_image_*`, `narratostudio/posterflow/minimax_provider.py` | useful gated provider clients, but tied to live-call policy | reviewed with no-secret scan, mocked tests, and capability gate checks; stage only separately |
-| Numbered demo runtime modules | `narratocut/memory_advantage_demo_012*.py`, `narratocut/memory_advantage_demo_015*.py`, shared DEMO-011 content | evidence/operator path only; protocol path should replace it | do not delete yet; stage only if preserving runnable evidence is intentional |
+| Provider config bridge | `agentflow_studio/model_gateway/company_secrets.py` and imports | hardcoded local Company `.secrets` default removed; provider config now requires explicit `--provider-config` or `AFS_PROVIDER_CONFIG` | reviewed; keep separate from mainline staging |
+| Provider runtime adapters | `agentflow_studio/model_gateway/kling_*`, `agentflow_studio/model_gateway/minimax_image_*`, `agentflow_production/posterflow/minimax_provider.py` | useful gated provider clients, but tied to live-call policy | reviewed with no-secret scan, mocked tests, and capability gate checks; stage only separately |
+| Numbered demo runtime modules | `agentflow_studio/memory_advantage_demo_012*.py`, `agentflow_studio/memory_advantage_demo_015*.py`, shared DEMO-011 content | evidence/operator path only; protocol path should replace it | do not delete yet; stage only if preserving runnable evidence is intentional |
 | RECORDING-016 script | `tools/run_memory_advantage_recording_016.ps1` | useful operator script but can trigger live video if explicitly allowed | now requires both explicit video gate and explicit provider config; keep as operator evidence only |
 
 ## Local-Only / Never Stage
@@ -154,9 +154,9 @@ git status --ignored --short
 ## Provider Config Bridge Update - 2026-05-31
 
 - Removed the hardcoded local Company `.secrets` provider-config default from
-  `narratocut/model_gateway/company_secrets.py`.
+  `agentflow_studio/model_gateway/company_secrets.py`.
 - `load_company_provider_secrets()` now resolves an explicit path first, then
-  `NARRATOCUT_PROVIDER_CONFIG`; if neither is present, it fails with a
+  `AFS_PROVIDER_CONFIG`; if neither is present, it fails with a
   configuration error instead of falling back to a machine-local path.
 - Hidden provider/operator CLI commands now default `--provider-config` to
   `None` and describe the environment-variable fallback in command help.

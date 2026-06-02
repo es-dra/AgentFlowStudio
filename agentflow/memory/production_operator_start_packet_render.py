@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def write_next_operator_start_packet_report(packet: dict[str, Any], output_dir: str | Path) -> list[Path]:

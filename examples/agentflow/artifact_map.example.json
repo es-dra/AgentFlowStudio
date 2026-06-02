@@ -6,12 +6,12 @@
     {
       "artifact_id": "creative_brief_demo",
       "artifact_type": "creative_brief",
-      "module_owner": "NarratoStudio",
+      "module_owner": "AgentFlow Production",
       "artifact_class": "source",
-      "path": "examples/narratostudio/creative_brief.example.json",
+      "path": "examples/agentflow_production/creative_brief.example.json",
       "produced_by": "human",
       "consumed_by": [
-        "workflows/narratostudio_brief_to_production_handoff.yaml"
+        "workflows/agentflow_production_handoff.yaml"
       ],
       "source_refs": [],
       "status": "available"
@@ -19,10 +19,10 @@
     {
       "artifact_id": "production_handoff_demo",
       "artifact_type": "production_handoff",
-      "module_owner": "NarratoStudio",
+      "module_owner": "AgentFlow Production",
       "artifact_class": "contract",
       "path": "production_handoff.json",
-      "produced_by": "workflows/narratostudio_brief_to_production_handoff.yaml",
+      "produced_by": "workflows/agentflow_production_handoff.yaml",
       "consumed_by": [
         "future_production_execution_layer"
       ],
@@ -34,7 +34,7 @@
     {
       "artifact_id": "distribution_package_demo",
       "artifact_type": "finished_package_manifest",
-      "module_owner": "NarratoCut",
+      "module_owner": "AgentFlow Studio",
       "artifact_class": "contract",
       "path": "finished_package_manifest.json",
       "produced_by": "workflows/video_to_finished_package_local_asr.yaml",

@@ -5,7 +5,7 @@ This document defines the current module responsibilities inside the
 
 The repository container is now `AgentFlowStudio`. The Python package names,
 CLI commands, workflow files, and module artifact contracts are intentionally
-unchanged in this phase. NarratoCut and NarratoStudio remain sibling MVP
+unchanged in this phase. AgentFlow Studio and AgentFlow Production remain sibling MVP
 modules used to validate AgentFlow Studio's distribution-side and
 production-side contract surfaces, while `agentflow/` owns platform contract
 helpers as they migrate out of module-specific locations.
@@ -38,15 +38,15 @@ Out of scope:
 - Router runtime, Memory runtime, or skill runtime
 - hosted API, database, provider calls, or Web UI
 
-## NarratoStudio
+## AgentFlow Production
 
 Owns:
 
 - production-side structured handoff contracts
 - deterministic creative-brief to handoff SOP logic
 - production handoff report rendering
-- NarratoStudio workflow node implementations
-- NarratoStudio quality profile checks
+- AgentFlow Production workflow node implementations
+- AgentFlow Production quality profile checks
 
 Consumes:
 
@@ -79,7 +79,7 @@ Out of scope:
 - Agent runtime
 - Web UI
 
-## NarratoCut
+## AgentFlow Studio
 
 Owns:
 
@@ -121,19 +121,19 @@ Out of scope:
 
 ## Cross-Module Boundary
 
-NarratoStudio does not directly call NarratoCut workflows.
+AgentFlow Production does not directly call AgentFlow Studio workflows.
 
-NarratoCut does not directly interpret story or prompt artifacts as final media.
+AgentFlow Studio does not directly interpret story or prompt artifacts as final media.
 If a future workflow connects the modules, it should pass through explicit
 handoff artifacts and concrete media or plan inputs.
 
 Recommended future bridge:
 
 ```text
-NarratoStudio production_handoff.json
+AgentFlow Production production_handoff.json
 -> production execution or asset generation layer
 -> source video / clips / final media
--> NarratoCut distribution package workflow
+-> AgentFlow Studio distribution package workflow
 ```
 
 The bridge is not implemented in Phase 15.2.

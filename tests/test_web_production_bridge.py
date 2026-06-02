@@ -18,14 +18,14 @@ from apps.web_bridge.bridge import (
 )
 from apps.web_bridge.server import serve
 from apps.web_bridge.workflow_profiles import workflow_web_profile
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine import load_workflow
 
 
 def test_bridge_health_reports_local_runtime_without_secrets() -> None:
     health = bridge_health()
     serialized = json.dumps(health, ensure_ascii=False)
 
-    assert health["service"] == "narratocut_web_bridge"
+    assert health["service"] == "agentflow_studio_web_bridge"
     assert health["status"] in {"ready", "degraded"}
     assert health["python"]["version"]
     assert "ffmpeg" in health["media"]
@@ -34,7 +34,7 @@ def test_bridge_health_reports_local_runtime_without_secrets() -> None:
     assert health["local_asr"]["status"] in {"ready", "missing_optional_dependency"}
     assert "workspace" in health
     assert "OPENAI_API_KEY" not in serialized
-    assert "NARRATOCUT_OPENAI_API_KEY" not in serialized
+    assert "AFS_OPENAI_API_KEY" not in serialized
     assert "api_key" not in serialized.lower()
 
 

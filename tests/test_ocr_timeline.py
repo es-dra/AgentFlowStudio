@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from narratocut.ocr_sop import build_ocr_transcript_from_frames
+from agentflow_studio.ocr_sop import build_ocr_transcript_from_frames
 
 
 def test_build_ocr_transcript_dedupes_and_merges_frame_text() -> None:

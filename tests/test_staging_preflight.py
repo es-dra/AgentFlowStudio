@@ -51,11 +51,11 @@ def test_preflight_expands_dirs_and_fails_oversized_files(tmp_path: Path) -> Non
 
 def test_preflight_rejects_hardcoded_company_secret_path(tmp_path: Path) -> None:
     repo = tmp_path
-    source = repo / "narratocut" / "model_gateway"
+    source = repo / "agentflow_studio" / "model_gateway"
     source.mkdir(parents=True)
     (source / "company_secrets.py").write_text(f'path = "{COMPANY_SECRET_PATH}"\n', encoding="utf-8")
 
-    report = run_preflight(repo, " M narratocut/model_gateway/company_secrets.py\n")
+    report = run_preflight(repo, " M agentflow_studio/model_gateway/company_secrets.py\n")
 
     assert not report.ok
     assert {finding.code for finding in report.findings} == {"hardcoded-company-secret-path"}

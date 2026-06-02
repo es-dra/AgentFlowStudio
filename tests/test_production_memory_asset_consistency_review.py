@@ -16,7 +16,7 @@ from agentflow.memory.production_asset_consistency_review import (
 )
 from agentflow.memory.production_asset_profile_context_projection import build_asset_profile_context_projection
 from agentflow.memory.production_asset_profile_promotion import build_asset_profile_promotion_review
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 from tests.production_memory_asset_profile_promotion_helpers import (
     GENERATED_AT,
     asset_profiles_and_candidate,

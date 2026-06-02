@@ -146,11 +146,11 @@ not browser acceptance.
 
 Gated provider validation was checked for readiness and not run:
 
-- `NARRATOCUT_ALLOW_REMOTE_IMAGE`: unset
-- `NARRATOCUT_ALLOW_REMOTE_VIDEO`: unset
-- `NARRATOCUT_IMAGE_BASE_URL`: unset
-- `NARRATOCUT_VIDEO_BASE_URL`: unset
-- `NARRATOCUT_PROVIDER_CONFIG`: unset
+- `AFS_ALLOW_REMOTE_IMAGE`: unset
+- `AFS_ALLOW_REMOTE_VIDEO`: unset
+- `AFS_IMAGE_BASE_URL`: unset
+- `AFS_VIDEO_BASE_URL`: unset
+- `AFS_PROVIDER_CONFIG`: unset
 
 This remains a recorded optional blocker, not a core milestone failure.
 

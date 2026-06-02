@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.subtitle_sop import build_subtitle_export, transcript_to_srt
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.subtitle_sop import build_subtitle_export, transcript_to_srt
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
 
 
 WORKFLOW = Path("workflows/transcript_to_subtitles.yaml")

@@ -6,7 +6,7 @@ from typing import Any
 
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, FAILED, PASSED
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND, build_next_pass_bundle
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 KIND = "agentflow_production_memory_loop"
 SCHEMA_VERSION = "production-memory-loop/v1"

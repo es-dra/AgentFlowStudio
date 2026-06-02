@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 SCHEMA_VERSION = "0.1.0"

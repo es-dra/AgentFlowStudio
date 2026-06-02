@@ -1,1 +1,1 @@
-"""Application entrypoints for NarratoCut."""
+"""Application entrypoints for AgentFlow Studio."""

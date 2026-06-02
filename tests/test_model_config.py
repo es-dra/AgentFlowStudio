@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.model_gateway import ModelConfigError, load_model_gateway_config
+from agentflow_studio.model_gateway import ModelConfigError, load_model_gateway_config
 
 
 def test_load_model_gateway_config_reads_example() -> None:

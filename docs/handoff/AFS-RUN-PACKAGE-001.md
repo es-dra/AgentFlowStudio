@@ -1,4 +1,4 @@
-﻿# AFS-RUN-PACKAGE-001 - Local Product Runtime Package
+# AFS-RUN-PACKAGE-001 - Local Product Runtime Package
 
 Status: DONE
 Date: 2026-05-27

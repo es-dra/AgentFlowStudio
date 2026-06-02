@@ -1,8 +1,8 @@
 # AgentFlow Studio Docs
 
 Use this page as the current navigation surface. AgentFlow Studio is the
-platform repository. NarratoCut is the distribution-side short video highlight
-workflow module, NarratoStudio is the production-side structured handoff
+platform repository. AgentFlow Studio is the distribution-side short video highlight
+workflow module, AgentFlow Production is the production-side structured handoff
 module, and `agentflow/` is the platform contract and harness migration layer.
 The main documentation goal is to make the product path, quality gates, and
 agent contracts obvious without reading every historical phase note.
@@ -17,8 +17,8 @@ agent contracts obvious without reading every historical phase note.
 - [Agent task brief template](agent_task_brief_template.md)
 - [Current task briefs](task_briefs/README.md)
 - [Post-v0.1.0 plan](post_v0_1_0_plan.md)
-- [NarratoStudio contracts](narratostudio_contracts.md)
-- [NarratoCut v0.1.0 delivery checklist](narratocut_delivery_checklist.md)
+- [AgentFlow Production contracts](agentflow_production_contracts.md)
+- [AgentFlow Studio v0.1.0 delivery checklist](agentflow_studio_delivery_checklist.md)
 - [Golden Path](golden_path.md)
 - [Golden Sample v0.1.0](golden_sample_v0_1_0.md)
 - [Alpha readiness report](alpha_readiness_report.md)
@@ -55,14 +55,14 @@ agent contracts obvious without reading every historical phase note.
     `package_report.md`.
 
 For final acceptance, run `inspect-run` and `review-run`, then refresh
-`package_report.md` with `ncut package-report --run-dir <run_dir>` so the
+`package_report.md` with `afs package-report --run-dir <run_dir>` so the
 Markdown report includes the final quality and review status.
 
 For release or handoff readiness across the current video-only and video+script
 paths, summarize refreshed product runs with:
 
 ```powershell
-.venv\Scripts\ncut delivery-readiness --run-dir <video_only_run> --run-dir <video_script_run> --output <report_dir>
+.venv\Scripts\afs delivery-readiness --run-dir <video_only_run> --run-dir <video_script_run> --output <report_dir>
 ```
 
 This writes `delivery_readiness.json` and `delivery_readiness.md`.
@@ -75,7 +75,7 @@ python -m apps.cli.main alpha-smoke
 python -m apps.cli.main alpha-smoke --json
 ```
 
-This reports the current NarratoStudio handoff, NarratoCut package, and
+This reports the current AgentFlow Production handoff, AgentFlow Studio package, and
 PosterFlow provider-readiness state as `pass`, `blocked`, or `fail` and points
 back to [`alpha_readiness_report.md`](alpha_readiness_report.md).
 
@@ -85,10 +85,10 @@ Operational agent guidance lives in
 parallel dispatch rules live in
 [`agent_operating_roster.md`](agent_operating_roster.md).
 
-NarratoStudio is now represented as a sibling MVP module for the production
+AgentFlow Production is now represented as a sibling MVP module for the production
 side. Its first workflow is a local-first structured production handoff
 generator, documented in
-[`narratostudio_contracts.md`](narratostudio_contracts.md).
+[`agentflow_production_contracts.md`](agentflow_production_contracts.md).
 
 ## Contracts
 
@@ -112,7 +112,7 @@ generator, documented in
 - [Project manifest contract](project_manifest_contract.md)
 - [Feedback contract](feedback_contract.md)
 - [Platform profile contract](platform_profile_contract.md)
-- [NarratoStudio contracts](narratostudio_contracts.md)
+- [AgentFlow Production contracts](agentflow_production_contracts.md)
 - [Asset lifecycle](asset_lifecycle.md)
 
 ## Quality And Acceptance

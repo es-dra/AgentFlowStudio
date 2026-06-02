@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.harness.reviewer import review_run
-from narratocut.utils import write_json
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.utils import write_json
 
 
 def test_reviewer_adds_recommendation_for_unavailable_ffmpeg(tmp_path) -> None:

@@ -1,7 +1,7 @@
-# NarratoCut Web UI Workbench
+# AgentFlow Studio Web UI Workbench
 
 This folder contains the local static Web workbench used by AgentFlow Studio
-and NarratoCut review flows. It has three modes:
+and AgentFlow Studio review flows. It has three modes:
 
 - `Review Mode`: read-only, local-only artifact inspection.
 - `Production Mode`: supervised local production through the optional Web
@@ -88,7 +88,7 @@ cover_manifest.json
 
 Artifact classification:
 
-- `known_contract`: supported NarratoCut artifact participating in summary,
+- `known_contract`: supported AgentFlow Studio artifact participating in summary,
   evidence, risk, asset, and inspector views.
 - `unknown_json`: parsed JSON object that is visible in inventory but excluded
   from acceptance summary.

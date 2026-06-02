@@ -114,7 +114,7 @@ Runtime CLI, only after the user confirms the local reference image path and
 the image provider gate is intentionally enabled:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE='true'
+$env:AFS_ALLOW_REMOTE_IMAGE='true'
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-012-i2i-runtime --subject-reference-image <ignored-local-reference.png> --run-dir data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency
 ```
 
@@ -122,7 +122,7 @@ Storyboard CLI, only after the keyframes are accepted for video spending and
 the video provider gate is intentionally enabled:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_VIDEO='true'
+$env:AFS_ALLOW_REMOTE_VIDEO='true'
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-012-i2v-runtime --run-dir data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency --duration 5 --mode pro --poll-interval-sec 5 --max-polls 120 --transport curl
 ```
 
@@ -216,11 +216,11 @@ validation.
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-012-plan --subject-reference-image-ref yiqi_front.png --output data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency\plan
 # provider calls not started
 
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE='true'
+$env:AFS_ALLOW_REMOTE_IMAGE='true'
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-012-i2i-runtime --subject-reference-image <ignored-local-reference.png> --run-dir data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency
 # Images: 6
 
-$env:NARRATOCUT_ALLOW_REMOTE_VIDEO='true'
+$env:AFS_ALLOW_REMOTE_VIDEO='true'
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-012-i2v-runtime --run-dir data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency --duration 5 --mode pro --poll-interval-sec 5 --max-polls 120 --transport curl
 # Videos: 6
 ```

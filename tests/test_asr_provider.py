@@ -6,16 +6,16 @@ import urllib.error
 
 import pytest
 
-from narratocut.asr_sop import (
+from agentflow_studio.asr_sop import (
     FasterWhisperASRProvider,
     MockASRProvider,
     OpenAICompatibleASRProvider,
     normalize_transcript_payload,
 )
-from narratocut.asr_sop import openai_compatible_provider
-from narratocut.asr_sop import faster_whisper_provider
-from narratocut.audio_sop import AudioArtifact
-from narratocut.schemas import Transcript
+from agentflow_studio.asr_sop import openai_compatible_provider
+from agentflow_studio.asr_sop import faster_whisper_provider
+from agentflow_studio.audio_sop import AudioArtifact
+from agentflow_studio.schemas import Transcript
 
 
 class FakeResponse:
@@ -70,7 +70,7 @@ def test_transcript_normalizer_rejects_empty_segments() -> None:
 
 
 def test_openai_compatible_asr_provider_requires_remote_opt_in(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_ASR", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
     audio_path = tmp_path / "audio.wav"
     audio_path.write_bytes(b"fake wav")
 
@@ -80,7 +80,7 @@ def test_openai_compatible_asr_provider_requires_remote_opt_in(monkeypatch, tmp_
         model="fake-asr",
     )
 
-    with pytest.raises(ValueError, match="NARRATOCUT_ALLOW_REMOTE_ASR"):
+    with pytest.raises(ValueError, match="AFS_ALLOW_REMOTE_ASR"):
         provider.transcribe(_audio_artifact(audio_path))
 
 
@@ -97,7 +97,7 @@ def test_openai_compatible_asr_provider_posts_audio_and_normalizes_transcript(mo
         return FakeResponse(_transcript_payload(source_video=None))
 
     monkeypatch.setattr(openai_compatible_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_ASR", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "true")
 
     provider = OpenAICompatibleASRProvider(
         base_url="https://example.test/v1",
@@ -127,7 +127,7 @@ def test_openai_compatible_asr_provider_wraps_request_errors(monkeypatch, tmp_pa
         raise urllib.error.URLError("network down")
 
     monkeypatch.setattr(openai_compatible_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_ASR", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "true")
 
     provider = OpenAICompatibleASRProvider(
         base_url="https://example.test/v1",
@@ -140,7 +140,7 @@ def test_openai_compatible_asr_provider_wraps_request_errors(monkeypatch, tmp_pa
 
 
 def test_faster_whisper_asr_provider_transcribes_locally_without_remote_opt_in(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_ASR", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
     audio_path = tmp_path / "audio.wav"
     audio_path.write_bytes(b"fake wav")
     captured = {}

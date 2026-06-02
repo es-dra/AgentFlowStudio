@@ -6,16 +6,16 @@ import json
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.model_gateway import ModelProviderError
-from narratocut.model_gateway.company_secrets import (
+from agentflow_studio.model_gateway import ModelProviderError
+from agentflow_studio.model_gateway.company_secrets import (
     COMPANY_PROVIDER_CONFIG_ENV,
     load_company_provider_secrets,
 )
-from narratocut.model_gateway.minimax_image_smoke import (
+from agentflow_studio.model_gateway.minimax_image_smoke import (
     build_minimax_image_request_plan,
     run_minimax_image_smoke,
 )
-from narratostudio.posterflow import minimax_provider
+from agentflow_studio.production.posterflow import minimax_provider
 
 
 PNG_BYTES = base64.b64decode(
@@ -39,7 +39,7 @@ class FakeResponse:
 
 
 def test_minimax_image_smoke_gate_disabled_fails_before_network(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     store = _store(tmp_path)
 
     def fake_urlopen(*args, **kwargs):  # pragma: no cover - must not call provider
@@ -55,7 +55,7 @@ def test_minimax_image_smoke_gate_disabled_fails_before_network(monkeypatch, tmp
             output_dir=tmp_path / "run",
         )
     except ModelProviderError as exc:
-        assert "NARRATOCUT_ALLOW_REMOTE_IMAGE" in str(exc)
+        assert "AFS_ALLOW_REMOTE_IMAGE" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("expected disabled gate failure")
 
@@ -63,7 +63,7 @@ def test_minimax_image_smoke_gate_disabled_fails_before_network(monkeypatch, tmp
 
 
 def test_minimax_image_smoke_normalizes_account_base_url_and_falls_back_model(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     store = _store(tmp_path)
     captured: dict[str, object] = {}
 
@@ -116,7 +116,7 @@ def test_minimax_image_smoke_normalizes_account_base_url_and_falls_back_model(mo
 
 
 def test_minimax_image_smoke_model_override_and_candidate_count(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     store = _store(tmp_path)
     captured: dict[str, object] = {}
 
@@ -148,7 +148,7 @@ def test_minimax_image_smoke_model_override_and_candidate_count(monkeypatch, tmp
 
 
 def test_minimax_i2i_request_plan_uses_subject_reference_placeholder(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     store = _store(tmp_path)
 
     plan = build_minimax_image_request_plan(
@@ -176,7 +176,7 @@ def test_minimax_i2i_request_plan_uses_subject_reference_placeholder(monkeypatch
 def test_minimax_i2i_smoke_sends_subject_reference_data_url_without_persisting_input(
     monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     store = _store(tmp_path)
     reference_path = tmp_path / "yiqi_reference.png"
     reference_path.write_bytes(PNG_BYTES)
@@ -229,7 +229,7 @@ def test_minimax_i2i_smoke_sends_subject_reference_data_url_without_persisting_i
 
 
 def test_minimax_image_smoke_passes_seed_to_provider_payload(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     store = _store(tmp_path)
     captured: dict[str, object] = {}
 
@@ -276,7 +276,7 @@ def test_minimax_i2i_smoke_cli_exposes_reference_image_option() -> None:
 
 
 def test_minimax_image_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     config_path = tmp_path / "providers.local.json"
     config_path.write_text(json.dumps(_provider_config()), encoding="utf-8")
 
@@ -295,7 +295,7 @@ def test_minimax_image_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) ->
 
     assert result.exit_code == 1
     assert "MiniMax image smoke failed" in result.output
-    assert "NARRATOCUT_ALLOW_REMOTE_IMAGE" in result.output
+    assert "AFS_ALLOW_REMOTE_IMAGE" in result.output
     assert "Traceback" not in result.output
     assert "fk-mm-key" not in result.output
 
@@ -323,7 +323,7 @@ def _provider_config() -> dict:
                 "account_ref": "minimax",
                 "capability": "image",
                 "api_family": "t2i",
-                "required_gate": "NARRATOCUT_ALLOW_REMOTE_IMAGE",
+                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
             },
         },
     }

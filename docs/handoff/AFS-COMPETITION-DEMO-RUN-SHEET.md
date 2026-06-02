@@ -120,7 +120,7 @@ From `D:\Projects\AgentFlowStudio`:
 
 The explicit video switch is required. If it is missing, the script stops
 before remote video calls. Provider config is also explicit: pass
-`-ProviderConfig` or set `NARRATOCUT_PROVIDER_CONFIG` in the current shell.
+`-ProviderConfig` or set `AFS_PROVIDER_CONFIG` in the current shell.
 
 During recording, show:
 

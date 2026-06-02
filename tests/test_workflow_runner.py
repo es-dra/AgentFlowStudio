@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.schemas import Hook, ShortVideoScript
-from narratocut.workflow_engine import (
+from agentflow_studio.schemas import Hook, ShortVideoScript
+from agentflow_studio.workflow_engine import (
     WorkflowContext,
     WorkflowDefinition,
     WorkflowRunner,

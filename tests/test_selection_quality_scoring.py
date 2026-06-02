@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from narratocut.candidate_sop import score_candidate_windows
+from agentflow_studio.candidate_sop import score_candidate_windows
 
 
 def test_score_candidate_windows_prioritizes_chinese_drama_hook() -> None:

@@ -6,12 +6,12 @@
   "project_goal": "Create a structured production handoff and later package distribution-ready short video artifacts.",
   "modules": [
     {
-      "module_id": "narratostudio",
+      "module_id": "agentflow_production",
       "role": "production_handoff",
       "status": "available"
     },
     {
-      "module_id": "narratocut",
+      "module_id": "agentflow_studio",
       "role": "distribution_package",
       "status": "available"
     }

@@ -5,11 +5,11 @@ import subprocess
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.schemas import Transcript, VideoMetadata
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.schemas import Transcript, VideoMetadata
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
 
 
 VIDEO_WORKFLOW = Path("workflows/video_to_finished_package_real_asr.yaml")
@@ -199,9 +199,9 @@ def _patch_real_asr(monkeypatch, *, source_video: str) -> None:
     def fake_transcribe(self, audio_artifact, *, language=None):  # noqa: ANN001, ANN202
         return Transcript.model_validate(_transcript_payload(source_video=source_video))
 
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_ASR", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "true")
     monkeypatch.setattr(
-        "narratocut.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
+        "agentflow_studio.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
         fake_transcribe,
     )
 
@@ -222,7 +222,7 @@ def _patch_real_tools(monkeypatch) -> None:
         )
 
     def fake_tool_check(executable="ffmpeg"):  # noqa: ANN001, ANN202
-        from narratocut.slicing_sop.ffmpeg_probe import FFmpegInfo
+        from agentflow_studio.slicing_sop.ffmpeg_probe import FFmpegInfo
 
         return FFmpegInfo(available=True, executable=str(executable), version="test", raw_output="test", error=None)
 
@@ -232,18 +232,18 @@ def _patch_real_tools(monkeypatch) -> None:
         output_path.write_bytes(b"fake media")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.workflow_engine.nodes.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.workflow_engine.nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.workflow_engine.assembly_nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.workflow_engine.assembly_nodes.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.harness.real_clip_quality.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.harness.final_video_quality.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.harness.bgm_quality.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
-    monkeypatch.setattr("narratocut.assembly_sop.concat.subprocess.run", fake_run)
-    monkeypatch.setattr("narratocut.bgm_sop.mix.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.nodes.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.assembly_nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.assembly_nodes.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.real_clip_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.final_video_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.bgm_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.assembly_sop.concat.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.bgm_sop.mix.subprocess.run", fake_run)
 
 
 def _transcript_payload(*, source_video: str) -> dict[str, object]:

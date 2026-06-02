@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.schemas import ROISettings
+from agentflow_studio.schemas import ROISettings
 
 
 def test_roi_settings_defaults_to_advisory_validation() -> None:

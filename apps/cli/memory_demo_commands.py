@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from narratocut.memory_advantage_demo_012 import (
+from agentflow_studio.memory_advantage_demo_012 import (
     DEFAULT_OUTPUT_DIR as DEMO_012_OUTPUT_DIR,
     DEFAULT_RUN_ROOT as DEMO_012_RUN_ROOT,
     build_demo_012_package,
@@ -12,18 +12,18 @@ from narratocut.memory_advantage_demo_012 import (
     run_demo_012_i2i_keyframes,
     write_demo_012_package,
 )
-from narratocut.memory_advantage_demo_015 import (
+from agentflow_studio.memory_advantage_demo_015 import (
     DEFAULT_OUTPUT_DIR as DEMO_015_OUTPUT_DIR,
     DEFAULT_RUN_ROOT as DEMO_015_RUN_ROOT,
     build_demo_015_package,
     run_demo_015_i2v_protocol,
     write_demo_015_package,
 )
-from narratocut.model_gateway.company_secrets import (
+from agentflow_studio.model_gateway.company_secrets import (
     COMPANY_PROVIDER_CONFIG_ENV,
     load_company_provider_secrets,
 )
-from narratocut.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 
 
 def memory_advantage_demo_012_plan_command(

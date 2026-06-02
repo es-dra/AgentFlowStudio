@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from narratocut.workflow_engine import draft_workflow_plan, write_workflow_plan
+from agentflow_studio.workflow_engine import draft_workflow_plan, write_workflow_plan
 
 
 def write_draft_plan_from_cli(

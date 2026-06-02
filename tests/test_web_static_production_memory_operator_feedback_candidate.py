@@ -8,7 +8,7 @@ from agentflow.memory.production_loop import load_production_memory_loop
 from agentflow.memory.production_operator_feedback import build_production_memory_operator_feedback_event
 from agentflow.memory.production_operator_feedback_candidate import build_operator_feedback_candidate_packet
 from agentflow.memory.production_operator_loop import build_production_memory_operator_loop_run
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 EXAMPLE_PATH = Path("examples/agentflow/production_memory_loop.example.json")

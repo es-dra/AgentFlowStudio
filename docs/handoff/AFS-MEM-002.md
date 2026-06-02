@@ -33,14 +33,14 @@ python -m pytest tests/test_agentflow_asset_memory_validator.py
 Focused verification after implementation:
 
 ```powershell
-python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_narratostudio_asset_feedback_smoke.py
+python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_agentflow_production_asset_feedback_smoke.py
 # 41 passed
 ```
 
 Requested verification:
 
 ```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_narratostudio_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_agentflow_production_asset_reuse_chain_audit_smoke.py tests/test_posterflow_quality.py
 # 24 passed
 
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help

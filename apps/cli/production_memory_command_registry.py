@@ -92,41 +92,74 @@ from apps.cli.production_memory_session_command import (
 
 def register_production_memory_commands(app: typer.Typer) -> None:
     """Register Production Memory CLI commands with a thin default help surface."""
-    _visible(app, "production-memory-loop-validate", production_memory_loop_validate_command)
-    _visible(app, "production-memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
-    _visible(app, "production-memory-loop-run-operator-no-provider", production_memory_loop_run_operator_no_provider_command)
+    _visible(app, "memory-loop-validate", production_memory_loop_validate_command)
+    _visible(app, "memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
     _visible(
         app,
-        "production-memory-loop-asset-profile-readiness",
+        "asset-profile-readiness",
         production_memory_loop_asset_profile_readiness_command,
     )
     _visible(
         app,
-        "production-memory-loop-run-asset-test-package",
+        "asset-test-package-run",
         production_memory_loop_run_asset_test_package_command,
     )
-    _visible(app, "production-memory-loop-record-asset-feedback", production_memory_loop_record_asset_feedback_command)
+    _visible(app, "asset-feedback-record", production_memory_loop_record_asset_feedback_command)
     _visible(
         app,
-        "production-memory-loop-draft-asset-profile-update-candidate",
+        "asset-profile-update-draft",
         production_memory_loop_draft_asset_profile_update_candidate_command,
     )
     _visible(
         app,
-        "production-memory-loop-review-asset-profile-update-candidate",
+        "asset-profile-update-review",
         production_memory_loop_review_asset_profile_update_candidate_command,
     )
     _visible(
         app,
-        "production-memory-loop-asset-profile-context-projection",
+        "asset-context-project",
         production_memory_loop_asset_profile_context_projection_command,
     )
     _visible(
         app,
-        "production-memory-loop-review-asset-consistency",
+        "asset-consistency-review",
         production_memory_loop_review_asset_consistency_command,
     )
 
+    _hidden(app, "production-memory-loop-validate", production_memory_loop_validate_command)
+    _hidden(app, "production-memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
+    _hidden(app, "production-memory-loop-run-operator-no-provider", production_memory_loop_run_operator_no_provider_command)
+    _hidden(
+        app,
+        "production-memory-loop-asset-profile-readiness",
+        production_memory_loop_asset_profile_readiness_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-run-asset-test-package",
+        production_memory_loop_run_asset_test_package_command,
+    )
+    _hidden(app, "production-memory-loop-record-asset-feedback", production_memory_loop_record_asset_feedback_command)
+    _hidden(
+        app,
+        "production-memory-loop-draft-asset-profile-update-candidate",
+        production_memory_loop_draft_asset_profile_update_candidate_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-review-asset-profile-update-candidate",
+        production_memory_loop_review_asset_profile_update_candidate_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-asset-profile-context-projection",
+        production_memory_loop_asset_profile_context_projection_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-review-asset-consistency",
+        production_memory_loop_review_asset_consistency_command,
+    )
     _hidden(app, "production-memory-loop-draft-feedback", production_memory_loop_draft_feedback_command)
     _hidden(app, "production-memory-loop-review-promotion", production_memory_loop_review_promotion_command)
     _hidden(

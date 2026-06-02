@@ -17,7 +17,7 @@ emits `.mp4` files.
 Real slicing is available only through the standalone PoC command:
 
 ```powershell
-.venv\Scripts\ncut slice-real --video <local_input.mp4> --clip-plans <clip_plans.json> --output data/outputs/real_slicing_demo
+.venv\Scripts\afs slice-real --video <local_input.mp4> --clip-plans <clip_plans.json> --output data/outputs/real_slicing_demo
 ```
 
 ## Minimal Real Slicing PoC

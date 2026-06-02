@@ -154,7 +154,7 @@ remote LLMs, slicing, or assembly.
 Generate a review report:
 
 ```powershell
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 Expected output shape:

@@ -42,15 +42,21 @@ def test_agentflow_memory_namespace_hosts_contract_helpers_without_runtime() -> 
 
 def test_agentflow_packages_are_included_in_setuptools_discovery() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject["project"]
+    scripts = project["scripts"]
     package_find = pyproject["tool"]["setuptools"]["packages"]["find"]
 
+    assert project["name"] == "agentflow-studio"
+    assert scripts == {"afs": "apps.cli.main:app"}
     assert package_find["where"] == ["."]
     assert "agentflow*" in package_find["include"]
+    assert "agentflow_studio*" in package_find["include"]
+    assert not any("narrato" in package for package in package_find["include"])
 
 
-def test_existing_agentflow_validator_imports_stay_in_narratocut_harness() -> None:
-    router = importlib.import_module("narratocut.harness.agentflow_router")
-    skill = importlib.import_module("narratocut.harness.agentflow_skill")
+def test_existing_agentflow_validator_imports_stay_in_agentflow_studio_harness() -> None:
+    router = importlib.import_module("agentflow_studio.harness.agentflow_router")
+    skill = importlib.import_module("agentflow_studio.harness.agentflow_skill")
 
     assert hasattr(router, "validate_router_decision_dry_run")
     assert hasattr(skill, "validate_skill_invocation_result_replay")

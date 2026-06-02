@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut import __version__
+from agentflow_studio import __version__
 
 
 def test_version_command() -> None:

@@ -15,7 +15,7 @@ from agentflow.memory.production_operator_run_package_check_render import (
     render_operator_run_package_check_markdown,
     write_operator_run_package_check_markdown,
 )
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 OPERATOR_RUN_PACKAGE_CHECK_KIND = "agentflow_production_memory_operator_run_package_check"
 

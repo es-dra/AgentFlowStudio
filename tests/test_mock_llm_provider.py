@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.model_gateway import MockLLMProvider
-from narratocut.schemas import Hook, ShortVideoScript
+from agentflow_studio.model_gateway import MockLLMProvider
+from agentflow_studio.schemas import Hook, ShortVideoScript
 
 
 def test_mock_llm_provider_returns_valid_hook_json() -> None:

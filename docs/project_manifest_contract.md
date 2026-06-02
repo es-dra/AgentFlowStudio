@@ -9,14 +9,14 @@ content-distribution project.
 
 This contract is intentionally small for `v0.1.0`.
 
-It may be created by a human, an agent, or a future console. NarratoCut does not
+It may be created by a human, an agent, or a future console. AgentFlow Studio does not
 yet require it to run the CLI product workflows.
 
 ## Required Fields
 
 - `schema_version`: contract version, currently `"0.1"`.
 - `project_id`: stable local project id.
-- `project_type`: for NarratoCut, use `short_video_distribution`.
+- `project_type`: for AgentFlow Studio, use `short_video_distribution`.
 - `goal`: human-readable project goal.
 - `source_assets`: raw or user-provided inputs.
 - `workflows`: workflow entries that are planned or recommended.

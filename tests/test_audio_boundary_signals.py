@@ -4,10 +4,10 @@ import json
 import wave
 from pathlib import Path
 
-from narratocut.audio_sop import AudioBoundarySignalConfig, analyze_audio_boundary_signals
-from narratocut.workflow_engine.definitions import WorkflowStepDefinition
-from narratocut.workflow_engine.transcription_nodes import analyze_audio_boundary_signals_node
-from narratocut.workflow_engine.context import WorkflowContext
+from agentflow_studio.audio_sop import AudioBoundarySignalConfig, analyze_audio_boundary_signals
+from agentflow_studio.workflow_engine.definitions import WorkflowStepDefinition
+from agentflow_studio.workflow_engine.transcription_nodes import analyze_audio_boundary_signals_node
+from agentflow_studio.workflow_engine.context import WorkflowContext
 
 
 def test_analyze_audio_boundary_signals_detects_low_energy_boundaries(tmp_path: Path) -> None:

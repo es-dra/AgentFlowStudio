@@ -6,15 +6,15 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.memory_advantage_demo_012 import (
+from agentflow_studio.memory_advantage_demo_012 import (
     DEMO_ID,
     build_demo_012_package,
     run_demo_012_i2v_storyboards,
     run_demo_012_i2i_keyframes,
     write_demo_012_package,
 )
-from narratocut.memory_advantage_demo_012_review import build_i2v_review, render_i2v_review_html
-from narratocut.memory_advantage_demo_012_content import MAX_T2I_PROMPT_CHARS
+from agentflow_studio.memory_advantage_demo_012_review import build_i2v_review, render_i2v_review_html
+from agentflow_studio.memory_advantage_demo_012_content import MAX_T2I_PROMPT_CHARS
 from tests.memory_advantage_demo_012_helpers import demo_012_store as _store
 from tests.memory_advantage_demo_012_helpers import write_i2i_manifest as _write_i2i_manifest
 from tests.memory_advantage_demo_012_helpers import write_i2v_manifest as _write_i2v_manifest
@@ -24,8 +24,8 @@ from tests.provider_smoke_helpers import provider_config
 def test_demo_012_package_locks_six_image_i2i_experiment_without_provider_calls(
     monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
 
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
 
@@ -63,7 +63,7 @@ def test_demo_012_package_locks_six_image_i2i_experiment_without_provider_calls(
 def test_demo_012_prompts_keep_baseline_fair_and_memory_structured(
     monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
 
     baseline = _request(package, "baseline", "neon_rain_turn")
@@ -84,7 +84,7 @@ def test_demo_012_prompts_keep_baseline_fair_and_memory_structured(
 
 
 def test_demo_012_image_prompts_fit_minimax_limit(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
 
     for request in package["image_requests"]:
@@ -92,7 +92,7 @@ def test_demo_012_image_prompts_fit_minimax_limit(monkeypatch, tmp_path) -> None
 
 
 def test_demo_012_writer_outputs_six_image_run_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
 
     paths = write_demo_012_package(package, tmp_path / "plan")
@@ -119,7 +119,7 @@ def test_demo_012_writer_outputs_six_image_run_package(monkeypatch, tmp_path) ->
 
 
 def test_demo_012_cli_writes_no_call_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     config_path = tmp_path / "providers.local.json"
     config_path.write_text(json.dumps(provider_config()), encoding="utf-8")
 
@@ -155,7 +155,7 @@ def test_demo_012_i2v_cli_exposes_runtime_command() -> None:
 
 
 def test_demo_012_i2i_runtime_uses_same_reference_and_six_calls(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     reference_path = tmp_path / "yiqi_front.png"
     reference_path.write_bytes(b"fake-png")
     calls = []
@@ -192,7 +192,7 @@ def test_demo_012_i2i_runtime_uses_same_reference_and_six_calls(monkeypatch, tmp
 
 
 def test_demo_012_i2v_runtime_uses_existing_keyframes_and_six_calls(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
     run_root = tmp_path / "run"
     calls = []
@@ -231,7 +231,7 @@ def test_demo_012_i2v_runtime_uses_existing_keyframes_and_six_calls(monkeypatch,
 
 
 def test_demo_012_i2v_review_summarizes_side_by_side_videos_without_claim(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     package = build_demo_012_package(_store(tmp_path), subject_reference_image_ref="yiqi_front.png")
     run_root = tmp_path / "run"
     for request in package["image_requests"]:

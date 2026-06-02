@@ -4,15 +4,15 @@
   "decision_id": "af_router_decision_001",
   "project_id": "agentflow_demo_project",
   "request_summary": "Generate a structured production handoff from a creative brief.",
-  "selected_skill_id": "narratostudio.production_handoff",
+  "selected_skill_id": "agentflow_studio.production.production_handoff",
   "selection_reason": "The request is production-side structured handoff generation from a creative brief.",
   "rejected_candidate_skills": [
     {
-      "skill_id": "narratocut.short_highlight_package",
+      "skill_id": "agentflow_studio.short_highlight_package",
       "reason": "Distribution-side video packaging is not requested."
     },
     {
-      "skill_id": "narratocut.video_script_highlight_package",
+      "skill_id": "agentflow_studio.video_script_highlight_package",
       "reason": "No source video plus script packaging task is requested."
     }
   ],

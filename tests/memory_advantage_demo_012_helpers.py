@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from narratocut.model_gateway.company_secrets import load_company_provider_secrets
+from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from tests.provider_smoke_helpers import provider_config
 
 

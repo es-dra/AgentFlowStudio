@@ -53,7 +53,7 @@ Files or directories this task may edit:
 Files, directories, branches, artifacts, or local state this task must not
 modify:
 
-- `narratostudio/posterflow/` implementation
+- `agentflow_production/posterflow/` implementation
 - `agentflow/memory/` promotion logic
 - provider configuration files
 - `.env`, `.dev.vars`, or `configs/models.yaml`
@@ -129,9 +129,9 @@ review, test desktop and narrow viewport, and record the result in the handoff.
 Mark every capability explicitly.
 
 - [x] No remote provider needed.
-- [ ] Remote LLM needed. Requires `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- [ ] Remote ASR needed. Requires `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- [ ] Remote image needed. Requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [ ] Remote LLM needed. Requires `AFS_ALLOW_REMOTE_LLM=true`.
+- [ ] Remote ASR needed. Requires `AFS_ALLOW_REMOTE_ASR=true`.
+- [ ] Remote image needed. Requires `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Remote video generation needed. Requires an explicit task-specific gate.
 - [ ] External download needed. Requires explicit source and artifact policy.
 

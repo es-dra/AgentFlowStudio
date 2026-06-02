@@ -6,8 +6,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.package_sop.delivery import build_delivery_readiness, write_delivery_readiness
-from narratocut.utils import write_json
+from agentflow_studio.package_sop.delivery import build_delivery_readiness, write_delivery_readiness
+from agentflow_studio.utils import write_json
 
 
 def test_delivery_readiness_passes_for_two_clean_product_runs(tmp_path: Path) -> None:
@@ -56,7 +56,7 @@ def test_write_delivery_readiness_writes_json_and_markdown(tmp_path: Path) -> No
     payload = json.loads(result["json_path"].read_text(encoding="utf-8"))
     assert payload["status"] == "pass"
     markdown = result["markdown_path"].read_text(encoding="utf-8")
-    assert "# NarratoCut Delivery Readiness" in markdown
+    assert "# AgentFlow Studio Delivery Readiness" in markdown
     assert "- Overall status: pass" in markdown
     assert "video_only" in markdown
 

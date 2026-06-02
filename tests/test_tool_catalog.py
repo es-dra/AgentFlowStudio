@@ -59,7 +59,7 @@ def _load_catalog() -> dict:
 def test_tool_catalog_declares_current_static_tools() -> None:
     catalog = _load_catalog()
 
-    assert catalog["project"] == "NarratoCut"
+    assert catalog["project"] == "AgentFlow Studio"
     assert catalog["version"] == 1
     assert catalog["catalog_kind"] == "static_tool_contracts"
     assert {tool["name"] for tool in catalog["tools"]} == EXPECTED_TOOLS

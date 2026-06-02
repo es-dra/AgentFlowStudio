@@ -63,10 +63,10 @@ def test_static_viewer_app_keeps_local_read_only_boundary() -> None:
         "localStorage.setItem",
         "FileSystemWritableFileStream",
         "OPENAI_API_KEY",
-        "NARRATOCUT_OPENAI_API_KEY",
+        "AFS_OPENAI_API_KEY",
         "data/processed/runs/demo",
-        "D:/Projects/NarratoCut/data",
-        "D:\\Projects\\NarratoCut\\data",
+        "D:/Projects/AgentFlow Studio/data",
+        "D:\\Projects\\AgentFlow Studio\\data",
     ]
 
     for pattern in forbidden_patterns:
@@ -103,7 +103,7 @@ def test_static_viewer_feedback_event_copy_does_not_write_files() -> None:
     workspace_render = _read_web_file("app-workspace-render.js")
 
     assert "feedback_event" in feedback
-    assert "narratocut_web_static_viewer" in feedback
+    assert "agentflow_studio_web_static_viewer" in feedback
     assert "navigator.clipboard.writeText" in feedback
     assert "feedback-output" in html
     assert "textarea" in html

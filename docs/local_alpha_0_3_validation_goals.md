@@ -106,7 +106,7 @@ Acceptance criteria:
 - PosterFlow live image smoke is `blocked` by default when image-provider env is
   not configured.
 - A live image smoke runs only when the local task intentionally enables
-  `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+  `AFS_ALLOW_REMOTE_IMAGE=true`.
 - Provider keys, base URLs, signed URLs, cookies, generated media, and private
   credentials are not committed.
 - If provider env is absent, Local Alpha 0.3 may still pass with live image

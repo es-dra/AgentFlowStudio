@@ -31,7 +31,7 @@ def test_intermediate_asset_architecture_doc_keeps_non_runtime_boundary() -> Non
     assert "does not execute workflows" in text
 
 
-def test_intermediate_asset_architecture_doc_anchors_narratostudio_assets() -> None:
+def test_intermediate_asset_architecture_doc_anchors_agentflow_production_assets() -> None:
     text = _text(ARCHITECTURE_DOC)
 
     for phrase in [
@@ -58,5 +58,5 @@ def test_intermediate_asset_architecture_records_asset_reuse_chain_audit_smoke()
     text = _text(ARCHITECTURE_DOC)
 
     assert "Phase 15.29" in text
-    assert "audit_narratostudio_asset_reuse_chain_fixture" in text
+    assert "audit_agentflow_production_asset_reuse_chain_fixture" in text
     assert "does not create a contract artifact" in text

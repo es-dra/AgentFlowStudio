@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from narratocut.slicing_sop import check_media_tools
-from narratocut.workflow_engine.input_bundle import load_workflow_inputs
+from agentflow_studio.slicing_sop import check_media_tools
+from agentflow_studio.workflow_engine.input_bundle import load_workflow_inputs
 
 from apps.web_bridge.utils import display_ref
 
@@ -34,7 +34,7 @@ def bridge_health() -> dict[str, Any]:
     asr = _local_asr_payload()
     status = "ready" if media_tools.status == "ready" and asr["status"] == "ready" else "degraded"
     return {
-        "service": "narratocut_web_bridge",
+        "service": "agentflow_studio_web_bridge",
         "status": status,
         "python": {
             "executable": display_ref(sys.executable),

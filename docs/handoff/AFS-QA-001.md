@@ -12,9 +12,9 @@ Worktree:
 Added a small shared evidence summary vocabulary in `agentflow/harness/` and
 mapped two existing surfaces to it:
 
-- `narratocut.harness.quality_checks.build_quality_report()` now adds an
+- `agentflow_studio.harness.quality_checks.build_quality_report()` now adds an
   additive `evidence_summary` field to inspect/quality reports.
-- `narratocut.harness.reviewer.review_run()` now adds an additive
+- `agentflow_studio.harness.reviewer.review_run()` now adds an additive
   `evidence_summary` field to review reports.
 
 The adapter normalizes `pass` / `passed`, `fail` / `failed`, and
@@ -26,14 +26,14 @@ promotion.
 
 - `agentflow/harness/evidence_summary.py`
 - `agentflow/harness/__init__.py`
-- `narratocut/harness/quality_checks.py`
-- `narratocut/harness/reviewer.py`
+- `agentflow_studio/harness/quality_checks.py`
+- `agentflow_studio/harness/reviewer.py`
 - `tests/test_evidence_summary.py`
 
 ## Verification
 
 ```powershell
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_narratostudio_review_hardening.py tests/test_evidence_summary.py
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agent_reviewer.py tests/test_harness_quality_checks.py tests/test_posterflow_quality.py tests/test_agentflow_production_review_hardening.py tests/test_evidence_summary.py
 # 24 passed
 
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help

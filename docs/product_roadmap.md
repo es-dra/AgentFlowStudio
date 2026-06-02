@@ -1,7 +1,7 @@
 # Product Roadmap
 
 This roadmap records the mainline direction after the v0.1.0 delivery closeout.
-The repository container is now `AgentFlowStudio`. NarratoCut remains the
+The repository container is now `AgentFlowStudio`. AgentFlow Studio remains the
 distribution-side short video highlight workflow module of AgentFlow Studio: it
 can produce local finished-package artifacts through workflow contracts, but it
 is not yet a consumer-facing product or Web UI.
@@ -14,7 +14,7 @@ artifact-first workflow contracts, review/harness boundaries, feedback and
 memory signal contracts, cost-quality traceability, and gradual platform-layer
 migration under `agentflow/`.
 
-NarratoCut is an artifact-driven short-video distribution workflow system for
+AgentFlow Studio is an artifact-driven short-video distribution workflow system for
 existing videos, transcripts, scripts, and clip plans.
 
 Current product path:
@@ -87,7 +87,7 @@ Purpose:
 Important boundary:
 
 - real ASR is opt-in only via explicit workflow and
-  `NARRATOCUT_ALLOW_REMOTE_ASR=true`
+  `AFS_ALLOW_REMOTE_ASR=true`
 - no video-frame highlight detection
 - no slicing or assembly in Phase 11 workflows
 
@@ -157,7 +157,7 @@ Not included:
 
 ## Next Direction After v0.1.0
 
-NarratoCut v0.1.0 should be treated as the stable distribution-side MVP before
+AgentFlow Studio v0.1.0 should be treated as the stable distribution-side MVP before
 opening broader AgentFlow Studio work.
 
 The detailed post-release plan is in
@@ -165,10 +165,10 @@ The detailed post-release plan is in
 
 Recommended sequence:
 
-1. Keep NarratoCut stable and fix contract or delivery-readiness regressions.
-2. Build a separate NarratoCut Web UI branch as a package/run/report viewer.
+1. Keep AgentFlow Studio stable and fix contract or delivery-readiness regressions.
+2. Build a separate AgentFlow Studio Web UI branch as a package/run/report viewer.
 3. On the mainline, expand AgentFlow Studio architecture and start
-   NarratoStudio production-side artifact contracts.
+   AgentFlow Production production-side artifact contracts.
 4. Merge the viewer branch only after it reads stable run/package artifacts
    instead of hard-coding demo paths.
 
@@ -177,7 +177,7 @@ Recommended sequence:
 Status: in progress.
 
 Phase 15 keeps the `v0.1.0` CLI/Agent MVP stable while the mainline defines the
-AgentFlow Studio contract layer and validates NarratoStudio as the
+AgentFlow Studio contract layer and validates AgentFlow Production as the
 production-side sibling module.
 
 Phase 15.17a records the repository container rename to `AgentFlowStudio` in
@@ -212,29 +212,29 @@ Current checkpoint:
 - the validator schema, status, and forbidden-fragment constants are in
   `agentflow.harness.constants`
 - Router dry-run and Skill replay validation now live in `agentflow.harness`
-  with NarratoCut compatibility imports preserved
+  with AgentFlow Studio compatibility imports preserved
 - intermediate asset and memory contract-set validation now lives in
   `agentflow.memory.assets` without Memory runtime behavior
-- NarratoStudio workflow outputs can now be adapted into an in-memory
+- AgentFlow Production workflow outputs can now be adapted into an in-memory
   asset-feedback smoke contract set without changing workflow execution or
   writing durable memory
-- NarratoStudio asset-feedback source payloads now have a pre-mapping validator
+- AgentFlow Production asset-feedback source payloads now have a pre-mapping validator
   so broken candidate memory, derived feedback, cost trace, or handoff-reference
   semantics fail before contract-set adaptation
-- NarratoStudio asset-feedback review now has a composed in-memory review
+- AgentFlow Production asset-feedback review now has a composed in-memory review
   artifact that stops before asset/memory adaptation when source validation
   fails
-- NarratoStudio asset-feedback review artifacts now have a harness-level
+- AgentFlow Production asset-feedback review artifacts now have a harness-level
   validator for Agent-readable gating without adding runtime execution
-- NarratoStudio asset-feedback review validations now have a decision-only gate
+- AgentFlow Production asset-feedback review validations now have a decision-only gate
   that blocks reuse planning when validation fails
-- NarratoStudio asset-feedback review gates can now produce a dry-run reuse
+- AgentFlow Production asset-feedback review gates can now produce a dry-run reuse
   plan for human/Agent inspection without executing reuse
-- NarratoStudio asset reuse dry-run chains now have a read-only review surface
+- AgentFlow Production asset reuse dry-run chains now have a read-only review surface
   that checks review, validation, gate, and plan consistency before any runtime
   reuse path is opened
-- The same NarratoStudio asset reuse chain now has a reusable in-memory fixture
+- The same AgentFlow Production asset reuse chain now has a reusable in-memory fixture
   builder for tests, without adding a new runtime or contract artifact type
-- The fixture-built NarratoStudio asset reuse chain now has a narrow audit
+- The fixture-built AgentFlow Production asset reuse chain now has a narrow audit
   smoke that keeps ready/blocked status shapes, side-effect boundaries, and
   contract-surface boundaries explicit

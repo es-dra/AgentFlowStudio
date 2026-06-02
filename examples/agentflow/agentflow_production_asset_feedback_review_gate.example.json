@@ -1,0 +1,48 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_production_asset_feedback_review_gate",
+  "gate_scope": "agentflow_production_asset_feedback_review",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "writes_long_term_memory": false,
+  "handoff_id": "production_handoff_demo",
+  "run_id": "agentflow_production_demo_run",
+  "gate_status": "passed",
+  "source_validation_artifact_type": "agentflow_production_asset_feedback_review_validation",
+  "source_validation_status": "passed",
+  "blocking_check_ids": [],
+  "next_allowed_actions": [
+    "human_review_reusable_asset_candidate",
+    "prepare_asset_reuse_dry_run"
+  ],
+  "checks": [
+    {
+      "check_id": "validation_artifact_type",
+      "status": "passed",
+      "message": "source artifact is a AgentFlow Production asset-feedback review validation"
+    },
+    {
+      "check_id": "validation_scope",
+      "status": "passed",
+      "message": "source validation scope is agentflow_production_asset_feedback_review"
+    },
+    {
+      "check_id": "validation_passed",
+      "status": "passed",
+      "message": "review validation passed"
+    },
+    {
+      "check_id": "validation_does_not_execute",
+      "status": "passed",
+      "message": "source validation does not execute workflows or tasks"
+    },
+    {
+      "check_id": "validation_does_not_write_memory",
+      "status": "passed",
+      "message": "source validation does not write long-term memory"
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

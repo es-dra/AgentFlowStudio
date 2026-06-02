@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def write_video_transcript_input(tmp_path: Path) -> Path:

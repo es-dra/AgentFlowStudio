@@ -7,6 +7,8 @@ handoff files.
 Current references:
 
 - Live work ledger: `TASK_TRACKER.md`.
+- Full rename maintainability pass:
+  `docs/maintenance/AFS-FULL-RENAME-MAINTAINABILITY-001.md`.
 - Mainline foundation cleanup:
   `docs/maintenance/AFS-MAINLINE-FOUNDATION-CLEANUP-001.md`.
 - Maintenance slimming boundary:
@@ -15,6 +17,21 @@ Current references:
   `docs/archive/devlog_history_2026_06_03_pre_slimming.md`.
 - Historical task archive:
   `docs/archive/task_history_2026_06_03_pre_slimming.md`.
+
+## 2026-06-03 - Full Rename Maintainability 001
+
+- Opened `codex/afs-full-rename-maintainability-001` from clean
+  `origin/master` to perform the requested full public rename in one pass.
+- Renamed package metadata to `agentflow-studio`, moved Python imports to
+  `agentflow_studio`, nested production handoff code under
+  `agentflow_studio.production`, and replaced public runtime gates with the
+  `AFS_*` prefix.
+- Replaced the public console script with `afs` and removed the legacy console
+  script. Short Production Memory commands are now the visible product surface;
+  old long `production-memory-loop-*` commands remain hidden aliases for
+  internal compatibility.
+- Boundary kept: no provider calls, Company KB writes, runtime media commits,
+  durable-memory claim, human acceptance claim, or business validation claim.
 
 ## 2026-06-03 - Maintenance Slimming 001
 

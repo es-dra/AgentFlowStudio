@@ -6,12 +6,12 @@ from pathlib import Path
 import pytest
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.audio_sop import AudioArtifact
-from narratocut.schemas import Transcript
-from narratocut.workflow_engine import load_workflow
-from narratocut.workflow_engine.context import WorkflowContext
-from narratocut.workflow_engine.definitions import WorkflowStepDefinition
-from narratocut.workflow_engine.transcription_nodes import transcribe_audio_openai_compatible_node
+from agentflow_studio.audio_sop import AudioArtifact
+from agentflow_studio.schemas import Transcript
+from agentflow_studio.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine.context import WorkflowContext
+from agentflow_studio.workflow_engine.definitions import WorkflowStepDefinition
+from agentflow_studio.workflow_engine.transcription_nodes import transcribe_audio_openai_compatible_node
 
 
 VIDEO_TO_TRANSCRIPT_REAL_ASR_WORKFLOW = Path("workflows/video_to_transcript_real_asr.yaml")
@@ -33,7 +33,7 @@ def test_video_to_transcript_real_asr_workflow_definition_is_explicit_remote_asr
 
 
 def test_transcribe_audio_openai_compatible_node_requires_remote_asr_opt_in(tmp_path, monkeypatch) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_ASR", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
     audio_path = tmp_path / "audio.wav"
     audio_path.write_bytes(b"fake wav")
     context = WorkflowContext(
@@ -68,7 +68,7 @@ def test_transcribe_audio_openai_compatible_node_requires_remote_asr_opt_in(tmp_
         },
     )
 
-    with pytest.raises(ValueError, match="NARRATOCUT_ALLOW_REMOTE_ASR"):
+    with pytest.raises(ValueError, match="AFS_ALLOW_REMOTE_ASR"):
         transcribe_audio_openai_compatible_node(step, context)
 
 
@@ -93,9 +93,9 @@ def test_video_to_transcript_real_asr_workflow_writes_transcript_with_provider_p
     def fake_transcribe(self, audio_artifact, *, language=None):
         return Transcript.model_validate(_transcript_payload(source_video=audio_artifact.source_video))
 
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_ASR", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "true")
     monkeypatch.setattr(
-        "narratocut.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
+        "agentflow_studio.workflow_engine.transcription_nodes.OpenAICompatibleASRProvider.transcribe",
         fake_transcribe,
     )
     output_dir = tmp_path / "run"

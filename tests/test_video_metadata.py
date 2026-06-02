@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from narratocut.slicing_sop.video_metadata import (
+from agentflow_studio.slicing_sop.video_metadata import (
     parse_ffprobe_video_metadata,
     probe_video_metadata,
 )
@@ -42,7 +42,7 @@ def test_probe_video_metadata_reports_missing_ffprobe(tmp_path, monkeypatch) -> 
     def fake_run(*args, **kwargs):
         raise FileNotFoundError("ffprobe missing")
 
-    monkeypatch.setattr("narratocut.slicing_sop.video_metadata.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.video_metadata.subprocess.run", fake_run)
 
     metadata = probe_video_metadata(video, ffprobe_executable="missing-ffprobe")
 
@@ -72,7 +72,7 @@ def test_probe_video_metadata_uses_ffprobe_json(tmp_path, monkeypatch) -> None:
             stderr="",
         )
 
-    monkeypatch.setattr("narratocut.slicing_sop.video_metadata.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.video_metadata.subprocess.run", fake_run)
 
     metadata = probe_video_metadata(video, ffprobe_executable="ffprobe-test")
 

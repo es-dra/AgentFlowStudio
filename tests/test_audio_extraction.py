@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from narratocut.audio_sop import (
+from agentflow_studio.audio_sop import (
     AudioExtractionConfig,
     build_ffmpeg_audio_extract_command,
     extract_audio_from_video,
@@ -71,7 +71,7 @@ def test_ffmpeg_audio_extraction_executes_command_and_records_manifest(tmp_path,
         output_path.write_bytes(b"fake wav")
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
-    monkeypatch.setattr("narratocut.audio_sop.extractor.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.audio_sop.extractor.subprocess.run", fake_run)
 
     artifact = extract_audio_from_video(
         input_video=source_video,
@@ -96,7 +96,7 @@ def test_ffmpeg_audio_extraction_records_failed_execution_metadata(tmp_path, mon
     def fake_run(command, capture_output, text, check):
         return subprocess.CompletedProcess(command, 1, stdout="", stderr="bad input")
 
-    monkeypatch.setattr("narratocut.audio_sop.extractor.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.audio_sop.extractor.subprocess.run", fake_run)
 
     artifact = extract_audio_from_video(
         input_video=source_video,

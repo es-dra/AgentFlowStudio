@@ -101,7 +101,7 @@ def production_memory_loop_run_asset_test_package_command(
     provider_config_path: Path | None = typer.Option(
         None,
         "--provider-config",
-        help="Local ignored provider config JSON. Defaults to NARRATOCUT_PROVIDER_CONFIG when provider validation runs.",
+        help="Local ignored provider config JSON. Defaults to AFS_PROVIDER_CONFIG when provider validation runs.",
     ),
     run_provider_validation: bool = typer.Option(
         False,

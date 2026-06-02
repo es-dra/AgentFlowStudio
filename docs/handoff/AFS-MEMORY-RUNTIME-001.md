@@ -58,7 +58,7 @@ D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentf
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
 # exited 0; status is blocked because remote image provider env is unset; writes_runtime_artifacts is false
 
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness narratostudio\posterflow narratocut\harness
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness agentflow_production\posterflow agentflow_studio\harness
 # passed
 
 git diff --check

@@ -36,7 +36,8 @@ docs/company_operating_model.md
 
 | ID | Owner role | Scope | Status | Verification / evidence |
 |---|---|---|---|---|
-| AFS-MAINTENANCE-SLIMMING-001 | Release Integrator + Memory / Evidence Steward | Slim documentation/status entrypoints, layer the CLI command surface, centralize Web artifact metadata, add a Production Memory asset facade, and record/clean safe ignored runtime residue | in progress | Evidence: `docs/maintenance/AFS-MAINTENANCE-SLIMMING-001.md`; no provider call, Company KB write, durable-memory claim, human acceptance, or business validation |
+| AFS-FULL-RENAME-MAINTAINABILITY-001 | Release Integrator + Memory / Evidence Steward | Rename package metadata, Python package, CLI script, public command surface, environment gates, and production-side naming to AgentFlow Studio / AFS | verified locally, PR pending | Evidence: `docs/maintenance/AFS-FULL-RENAME-MAINTAINABILITY-001.md`; `python -m pytest` passed with 980 tests; no provider call, Company KB write, durable-memory claim, human acceptance, or business validation |
+| AFS-MAINTENANCE-SLIMMING-001 | Release Integrator + Memory / Evidence Steward | Slim documentation/status entrypoints, layer the CLI command surface, centralize Web artifact metadata, add a Production Memory asset facade, and record/clean safe ignored runtime residue | superseded by full rename pass | Evidence: `docs/maintenance/AFS-MAINTENANCE-SLIMMING-001.md`; no provider call, Company KB write, durable-memory claim, human acceptance, or business validation |
 
 ## Current Mainline Baseline
 

@@ -5,8 +5,8 @@ import json
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
-from narratocut.utils import write_json
+from agentflow_studio.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
+from agentflow_studio.utils import write_json
 
 
 def test_generate_clip_plans_and_mock_slice_commands(tmp_path) -> None:

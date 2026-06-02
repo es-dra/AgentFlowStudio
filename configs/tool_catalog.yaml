@@ -1,5 +1,5 @@
 version: 1
-project: NarratoCut
+project: AgentFlow Studio
 catalog_kind: static_tool_contracts
 scope: phase_7_5b_agent_readable_catalog
 tools:
@@ -7,9 +7,9 @@ tools:
     description: Analyze a UTF-8 source text file and produce hook candidates.
     category: roi_analysis
     entrypoints:
-      cli: ncut analyze-hooks
+      cli: afs analyze-hooks
       workflow_node: analyze_hooks
-      python: narratocut.roi_sop.analyze_hooks_from_text
+      python: agentflow_studio.roi_sop.analyze_hooks_from_text
     input_artifacts:
       - text_file
     output_artifacts:
@@ -36,9 +36,9 @@ tools:
     description: Generate mock short-video scripts from hook candidates.
     category: script_generation
     entrypoints:
-      cli: ncut generate-scripts
+      cli: afs generate-scripts
       workflow_node: generate_scripts
-      python: narratocut.roi_sop.generate_scripts_from_hooks
+      python: agentflow_studio.roi_sop.generate_scripts_from_hooks
     input_artifacts:
       - hooks.json
     output_artifacts:
@@ -65,9 +65,9 @@ tools:
     description: Generate deterministic clip planning contracts from scripts.
     category: clip_planning
     entrypoints:
-      cli: ncut generate-clip-plans
+      cli: afs generate-clip-plans
       workflow_node: generate_clip_plans
-      python: narratocut.slicing_sop.generate_clip_plans_from_scripts
+      python: agentflow_studio.slicing_sop.generate_clip_plans_from_scripts
     input_artifacts:
       - scripts.json
     output_artifacts:
@@ -94,9 +94,9 @@ tools:
     description: Generate mock clip text files and a slice manifest from clip plans.
     category: mock_slicing
     entrypoints:
-      cli: ncut mock-slice
+      cli: afs mock-slice
       workflow_node: mock_slice
-      python: narratocut.slicing_sop.mock_slice_clip_plans
+      python: agentflow_studio.slicing_sop.mock_slice_clip_plans
     input_artifacts:
       - clip_plans.json
     output_artifacts:
@@ -127,7 +127,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: null
-      python: narratocut.slicing_sop.build_ffmpeg_slice_command
+      python: agentflow_studio.slicing_sop.build_ffmpeg_slice_command
     input_artifacts:
       - input_video_path
       - start_sec
@@ -156,9 +156,9 @@ tools:
     description: Execute minimal local FFmpeg slicing from clip plans.
     category: real_slicing_poc
     entrypoints:
-      cli: ncut slice-real
+      cli: afs slice-real
       workflow_node: null
-      python: narratocut.slicing_sop.slice_clip_plans_real
+      python: agentflow_studio.slicing_sop.slice_clip_plans_real
     input_artifacts:
       - input_video_path
       - clip_plans.json
@@ -191,7 +191,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: probe_video_metadata
-      python: narratocut.slicing_sop.probe_video_metadata
+      python: agentflow_studio.slicing_sop.probe_video_metadata
     input_artifacts:
       - input_video_path
       - ffprobe_executable
@@ -222,7 +222,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: validate_clip_plan
-      python: narratocut.slicing_sop.validate_clip_plan
+      python: agentflow_studio.slicing_sop.validate_clip_plan
     input_artifacts:
       - clip_plan.json
       - roi_config.json
@@ -255,7 +255,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: real_slice_video
-      python: narratocut.slicing_sop.slice_clip_plans_real
+      python: agentflow_studio.slicing_sop.slice_clip_plans_real
     input_artifacts:
       - input_video_path
       - clip_plan.json
@@ -289,7 +289,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: load_real_slice_manifest
-      python: narratocut.workflow_engine.assembly_nodes.load_real_slice_manifest_node
+      python: agentflow_studio.workflow_engine.assembly_nodes.load_real_slice_manifest_node
     input_artifacts:
       - real_slice_manifest.json
     output_artifacts:
@@ -316,7 +316,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: generate_assembly_plan
-      python: narratocut.assembly_sop.build_assembly_plan
+      python: agentflow_studio.assembly_sop.build_assembly_plan
     input_artifacts:
       - real_slice_manifest.json
     output_artifacts:
@@ -342,7 +342,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: concat_clips
-      python: narratocut.assembly_sop.concat_clips
+      python: agentflow_studio.assembly_sop.concat_clips
     input_artifacts:
       - assembly_plan.json
       - clips/*.mp4
@@ -375,7 +375,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: probe_final_video
-      python: narratocut.slicing_sop.probe_video_metadata
+      python: agentflow_studio.slicing_sop.probe_video_metadata
     input_artifacts:
       - final_video.mp4
       - final_video_manifest.json
@@ -403,7 +403,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: load_video
-      python: narratocut.workflow_engine.transcription_nodes.load_video_node
+      python: agentflow_studio.workflow_engine.transcription_nodes.load_video_node
     input_artifacts:
       - input_video_path
     output_artifacts:
@@ -430,7 +430,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: extract_audio
-      python: narratocut.audio_sop.extract_audio_from_video
+      python: agentflow_studio.audio_sop.extract_audio_from_video
     input_artifacts:
       - input_video_path
     output_artifacts:
@@ -462,7 +462,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: analyze_audio_boundary_signals
-      python: narratocut.audio_sop.analyze_audio_boundary_signals
+      python: agentflow_studio.audio_sop.analyze_audio_boundary_signals
     input_artifacts:
       - audio/audio.wav
       - workflow_state.audio
@@ -493,7 +493,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: transcribe_audio_mock
-      python: narratocut.asr_sop.MockASRProvider
+      python: agentflow_studio.asr_sop.MockASRProvider
     input_artifacts:
       - audio_manifest.json
       - asr_fixture.json
@@ -524,7 +524,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: transcribe_audio_openai_compatible
-      python: narratocut.asr_sop.OpenAICompatibleASRProvider
+      python: agentflow_studio.asr_sop.OpenAICompatibleASRProvider
     input_artifacts:
       - audio_manifest.json
       - audio/audio.wav
@@ -556,7 +556,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: transcribe_audio_faster_whisper
-      python: narratocut.asr_sop.FasterWhisperASRProvider
+      python: agentflow_studio.asr_sop.FasterWhisperASRProvider
     input_artifacts:
       - audio_manifest.json
       - audio/audio.wav
@@ -587,7 +587,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_transcript
-      python: narratocut.workflow_engine.transcription_nodes.write_transcript_node
+      python: agentflow_studio.workflow_engine.transcription_nodes.write_transcript_node
     input_artifacts:
       - workflow_state.transcript
     output_artifacts:
@@ -615,7 +615,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: generate_candidate_windows
-      python: narratocut.candidate_sop.generate_candidate_windows
+      python: agentflow_studio.candidate_sop.generate_candidate_windows
     input_artifacts:
       - transcript.json
       - workflow_state.transcript
@@ -649,7 +649,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: build_ocr_transcript
-      python: narratocut.ocr_sop.build_ocr_transcript_from_frames
+      python: agentflow_studio.ocr_sop.build_ocr_transcript_from_frames
     input_artifacts:
       - ocr_frames.json
       - input_video_path
@@ -680,7 +680,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_ocr_transcript
-      python: narratocut.workflow_engine.ocr_nodes.write_ocr_transcript_node
+      python: agentflow_studio.workflow_engine.ocr_nodes.write_ocr_transcript_node
     input_artifacts:
       - workflow_state.ocr_transcript
       - workflow_state.ocr_transcript_manifest
@@ -710,7 +710,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: score_candidate_windows
-      python: narratocut.candidate_sop.score_candidate_windows
+      python: agentflow_studio.candidate_sop.score_candidate_windows
     input_artifacts:
       - candidate_windows.json
       - workflow_state.candidate_windows
@@ -742,7 +742,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_highlight_score_report
-      python: narratocut.workflow_engine.ocr_nodes.write_highlight_score_report_node
+      python: agentflow_studio.workflow_engine.ocr_nodes.write_highlight_score_report_node
     input_artifacts:
       - workflow_state.highlight_score_report
     output_artifacts:
@@ -770,7 +770,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_selection_diagnostics
-      python: narratocut.workflow_engine.ocr_nodes.write_selection_diagnostics_node
+      python: agentflow_studio.workflow_engine.ocr_nodes.write_selection_diagnostics_node
     input_artifacts:
       - workflow_state.highlight_score_report
       - highlight_score_report.json
@@ -801,7 +801,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_subtitles
-      python: narratocut.subtitle_sop.build_subtitle_export
+      python: agentflow_studio.subtitle_sop.build_subtitle_export
     input_artifacts:
       - workflow_state.transcript
     output_artifacts:
@@ -834,7 +834,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: burn_subtitles
-      python: narratocut.subtitle_burn_sop.burn_subtitles_into_video
+      python: agentflow_studio.subtitle_burn_sop.burn_subtitles_into_video
     input_artifacts:
       - final_video.mp4
       - subtitles.srt
@@ -869,7 +869,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: probe_subtitle_burn
-      python: narratocut.slicing_sop.probe_video_metadata
+      python: agentflow_studio.slicing_sop.probe_video_metadata
     input_artifacts:
       - final_video_with_subtitles.mp4
       - subtitle_burn_manifest.json
@@ -898,7 +898,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: export_cover
-      python: narratocut.cover_sop.export_cover_from_video
+      python: agentflow_studio.cover_sop.export_cover_from_video
     input_artifacts:
       - final_video.mp4
     output_artifacts:
@@ -933,7 +933,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: mix_bgm
-      python: narratocut.bgm_sop.mix_bgm_into_video
+      python: agentflow_studio.bgm_sop.mix_bgm_into_video
     input_artifacts:
       - final_video.mp4
       - bgm.mp3
@@ -974,7 +974,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: probe_bgm_mix
-      python: narratocut.slicing_sop.probe_video_metadata
+      python: agentflow_studio.slicing_sop.probe_video_metadata
     input_artifacts:
       - final_video_with_bgm.mp4
       - audio_mix_manifest.json
@@ -1004,7 +1004,7 @@ tools:
     entrypoints:
       cli: null
       workflow_node: write_finished_package
-      python: narratocut.package_sop.build_finished_package_manifest
+      python: agentflow_studio.package_sop.build_finished_package_manifest
     input_artifacts:
       - final_video.mp4
       - final_video_with_subtitles.mp4
@@ -1037,9 +1037,9 @@ tools:
     description: Write a human- and agent-readable Markdown report for a finished package run.
     category: finished_package_report
     entrypoints:
-      cli: ncut package-report
+      cli: afs package-report
       workflow_node: write_package_report
-      python: narratocut.package_sop.write_package_report
+      python: agentflow_studio.package_sop.write_package_report
     input_artifacts:
       - finished_package_manifest.json
       - run_manifest.json
@@ -1073,9 +1073,9 @@ tools:
     description: Summarize one or more product runs into a final delivery readiness report.
     category: delivery_readiness
     entrypoints:
-      cli: ncut delivery-readiness
+      cli: afs delivery-readiness
       workflow_node: null
-      python: narratocut.package_sop.write_delivery_readiness
+      python: agentflow_studio.package_sop.write_delivery_readiness
     input_artifacts:
       - run_dir
       - finished_package_manifest.json
@@ -1112,9 +1112,9 @@ tools:
     description: Inspect a workflow run directory and write quality_report.json.
     category: harness_inspection
     entrypoints:
-      cli: ncut inspect-run
+      cli: afs inspect-run
       workflow_node: null
-      python: narratocut.harness.inspect_run
+      python: agentflow_studio.harness.inspect_run
     input_artifacts:
       - run_dir
     output_artifacts:

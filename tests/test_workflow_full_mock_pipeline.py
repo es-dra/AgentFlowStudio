@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
-from narratocut.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
+from agentflow_studio.schemas import ClipPlan, Hook, ShortVideoScript
+from agentflow_studio.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
 
 
 def test_workflow_runner_executes_full_mock_pipeline(tmp_path) -> None:

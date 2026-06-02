@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import HighlightPlan
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.schemas import HighlightPlan
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
 
 
 OCR_WORKFLOW = Path("workflows/video_subtitle_ocr_to_highlight_plan.yaml")
@@ -86,7 +86,7 @@ def test_video_subtitle_ocr_to_highlight_plan_workflow_writes_scored_outputs(tmp
     assert diagnostics["candidate_count"] == score_report["candidate_count"]
     assert highlight_plan.highlights
     assert highlight_plan.highlights[0].metadata["candidate_id"]
-    inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
-    review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
+    inspection = __import__("agentflow_studio.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
+    review = __import__("agentflow_studio.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"
     assert review["status"] == "passed"

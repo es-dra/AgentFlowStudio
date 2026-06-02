@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.schemas import ClipPlan, ClipSegment, ROISettings, VideoMetadata
-from narratocut.slicing_sop.clip_validation import validate_clip_plan
+from agentflow_studio.schemas import ClipPlan, ClipSegment, ROISettings, VideoMetadata
+from agentflow_studio.slicing_sop.clip_validation import validate_clip_plan
 
 
 def test_validate_clip_plan_returns_warning_for_roi_duration_without_blocking() -> None:

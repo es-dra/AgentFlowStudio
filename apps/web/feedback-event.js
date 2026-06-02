@@ -2,7 +2,7 @@ export function buildFeedbackEvent({ artifactFile, decision, riskCategory, note,
   return {
     schema_version: "0.1.0",
     event_type: "feedback_event",
-    source: "narratocut_web_static_viewer",
+    source: "agentflow_studio_web_static_viewer",
     created_at: new Date().toISOString(),
     artifact_file: artifactFile || null,
     decision: decision || "needs_changes",
@@ -18,7 +18,7 @@ export function buildRunFeedbackEvent({ run, workflow, review, decision, riskCat
   return {
     schema_version: "0.1.0",
     event_type: "run_feedback_event",
-    source: "narratocut_web_production_mode",
+    source: "agentflow_studio_web_production_mode",
     created_at: new Date().toISOString(),
     run_dir: run?.run_dir || null,
     run_id: run?.run_id || null,

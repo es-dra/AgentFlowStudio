@@ -64,7 +64,7 @@ Do not commit the video file. Media files under `data/raw/` are ignored.
 Check local tools:
 
 ```powershell
-.venv\Scripts\ncut ffmpeg-check --json
+.venv\Scripts\afs ffmpeg-check --json
 ```
 
 If tools are not on `PATH`, set environment variables:
@@ -98,7 +98,7 @@ segments inside that plan.
 ## Run
 
 ```powershell
-.venv\Scripts\ncut run-workflow `
+.venv\Scripts\afs run-workflow `
   --workflow workflows/real_video_roi_to_clips.yaml `
   --input examples/demo_real_video/input.example.json `
   --output data/processed/runs/demo_real_video
@@ -122,8 +122,8 @@ clips/
 ## Inspect And Review
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_real_video
 ```
 
 `inspect-run` writes `quality_report.json`.

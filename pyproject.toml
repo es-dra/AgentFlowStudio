@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "narratocut"
+name = "agentflow-studio"
 version = "0.1.0"
 description = "AI-assisted short video production workflow MVP for story-driven content."
 readme = "README.md"
@@ -22,11 +22,11 @@ dev = [
 ]
 
 [project.scripts]
-ncut = "apps.cli.main:app"
+afs = "apps.cli.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["apps*", "agentflow*", "narratocut*", "narratostudio*"]
+include = ["apps*", "agentflow*", "agentflow_studio*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

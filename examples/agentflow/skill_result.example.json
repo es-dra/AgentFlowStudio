@@ -4,7 +4,7 @@
   "result_id": "af_skill_result_001",
   "invocation_id": "af_skill_invocation_001",
   "project_id": "agentflow_demo_project",
-  "skill_id": "narratostudio.production_handoff",
+  "skill_id": "agentflow_studio.production.production_handoff",
   "execution_status": "succeeded",
   "output_artifacts": [
     "production_handoff.json",

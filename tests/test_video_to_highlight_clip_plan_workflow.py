@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript, VideoMetadata
-from narratocut.slicing_sop import validate_clip_plan
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.schemas import ClipPlan, HighlightPlan, ROISettings, Transcript, VideoMetadata
+from agentflow_studio.slicing_sop import validate_clip_plan
+from agentflow_studio.workflow_engine import load_workflow
 
 
 VIDEO_TO_HIGHLIGHT_CLIP_PLAN_WORKFLOW = Path("workflows/video_to_highlight_clip_plan.yaml")

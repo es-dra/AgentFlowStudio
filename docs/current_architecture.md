@@ -1,19 +1,19 @@
 # Current Architecture
 
-This document summarizes the NarratoCut architecture for the `v0.1.0` delivery
-closeout. NarratoCut is the distribution-side short video highlight workflow
+This document summarizes the AgentFlow Studio architecture for the `v0.1.0` delivery
+closeout. AgentFlow Studio is the distribution-side short video highlight workflow
 module of AgentFlow Studio. It is a reference for productization work, Golden
 Sample runs, and future UI/API or agent integration.
 
 ## Current Position
 
-NarratoCut is a CLI-first technical MVP for short-video distribution workflows.
+AgentFlow Studio is a CLI-first technical MVP for short-video distribution workflows.
 It is designed around readable artifacts, deterministic workflow execution,
 package reports, and post-run inspection/review.
 
-NarratoStudio is now added as a sibling MVP module inside this repository for
+AgentFlow Production is now added as a sibling MVP module inside this repository for
 production-side validation. It is a local-first structured production handoff
-generator, not a replacement or rename of NarratoCut.
+generator, not a replacement or rename of AgentFlow Studio.
 
 AgentFlow Studio is represented here by local-first module contracts only. The
 top-level platform architecture, module boundary, artifact map, memory
@@ -43,7 +43,7 @@ video / transcript / clip_plan
 - Inspectable/reviewable: `inspect-run` writes quality reports; `review-run`
   writes agent-readable review reports.
 - Mock-first by default: remote providers are opt-in.
-- CLI stays thin: business logic lives in `narratocut/*`, `workflow_engine`, or
+- CLI stays thin: business logic lives in `agentflow_studio/*`, `workflow_engine`, or
   `harness`.
 
 ## Main Layers
@@ -66,7 +66,7 @@ schemas
 harness
   -> run manifests, trace, inspect-run quality checks, review-run reports
 
-narratostudio
+agentflow_production
   -> production-side contracts and deterministic handoff SOP logic
 
 agentflow contract docs
@@ -110,7 +110,7 @@ Final artifact workflows:
 
 Production-side MVP workflow:
 
-- `narratostudio_brief_to_production_handoff.yaml`
+- `agentflow_production_brief_to_production_handoff.yaml`
 
 ## Important Artifacts
 
@@ -158,7 +158,7 @@ Enhancement/package artifacts:
 - `final_video_with_bgm.mp4`
 - `finished_package_manifest.json`
 
-NarratoStudio production handoff artifacts:
+AgentFlow Production production handoff artifacts:
 
 - `creative_brief.json`
 - `story_bible.json`
@@ -186,7 +186,7 @@ Important profiles include:
 - `cover_export`
 - `bgm_mix`
 - `finished_package`
-- `narratostudio_production_handoff`
+- `agentflow_production_handoff`
 - video transcript and highlight profiles
 
 ## Current Boundaries
@@ -195,7 +195,7 @@ The system does not yet provide:
 
 - physical package directory or zip export
 - Web UI
-- hosted NarratoStudio runtime or Web UI
+- hosted AgentFlow Production runtime or Web UI
 - AgentFlow Router runtime
 - AgentFlow Memory runtime
 - AgentFlow skill runtime

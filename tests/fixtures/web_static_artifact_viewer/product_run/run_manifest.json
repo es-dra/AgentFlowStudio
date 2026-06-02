@@ -1,5 +1,5 @@
 {
-  "project": "NarratoCut",
+  "project": "AgentFlow Studio",
   "run_id": "package_run_fixture",
   "workflow": "workflows/final_video_package.yaml",
   "mode": "final_video_package",

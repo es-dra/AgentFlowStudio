@@ -9,11 +9,11 @@ Current repository roles:
 
 ```text
 agentflow/        platform contracts, harness, router, memory, and skills
-narratostudio/    production-side structured content handoff
-narratocut/       distribution-side short video packaging and review
+agentflow_production/    production-side structured content handoff
+agentflow_studio/       distribution-side short video packaging and review
 ```
 
-Current NarratoCut MVP chain:
+Current AgentFlow Studio MVP chain:
 
 ```text
 subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
@@ -63,9 +63,9 @@ subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 - Do not migrate code from `D:\Projects\AVP` unless the user explicitly asks.
 - Do not commit secrets, provider keys, signed URLs, cookies, tokens, or private credentials.
 - Do not commit large media files or generated runtime artifacts.
-- Do not call remote LLMs unless `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- Do not call remote ASR unless `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- Do not call remote image providers unless `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- Do not call remote LLMs unless `AFS_ALLOW_REMOTE_LLM=true`.
+- Do not call remote ASR unless `AFS_ALLOW_REMOTE_ASR=true`.
+- Do not call remote image providers unless `AFS_ALLOW_REMOTE_IMAGE=true`.
 - Prefer schema-first design for workflow inputs, outputs, and intermediate artifacts.
 - New features should include focused tests or a clear reason when tests are deferred.
 - Keep files focused. Ideal file length is 300 lines or less.

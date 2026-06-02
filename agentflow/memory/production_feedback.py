@@ -6,7 +6,7 @@ from typing import Any
 
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.memory.production_loop import KIND, SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 FEEDBACK_CAPTURE_KIND = "agentflow_production_memory_feedback_capture"
 SUPPORTED_FEEDBACK_DECISIONS = frozenset({"accepted", "rejected", "needs_revision", "note"})

@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_production_asset_feedback_review_validation",
+  "validation_scope": "agentflow_production_asset_feedback_review",
+  "runtime_status": "not_implemented",
+  "does_not_execute": true,
+  "writes_long_term_memory": false,
+  "handoff_id": "production_handoff_demo",
+  "run_id": "agentflow_production_demo_run",
+  "overall_status": "passed",
+  "checks": [
+    {
+      "check_id": "review_does_not_execute",
+      "status": "passed",
+      "message": "review does not execute workflows or tasks"
+    },
+    {
+      "check_id": "review_does_not_write_memory",
+      "status": "passed",
+      "message": "review does not write long-term memory"
+    },
+    {
+      "check_id": "failed_source_skips_asset_memory_step",
+      "status": "passed",
+      "message": "failed source validation skips asset-memory adaptation"
+    }
+  ],
+  "metadata": {
+    "example": true
+  }
+}

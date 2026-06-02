@@ -27,7 +27,7 @@ brief / local media
 
 Overall status: `blocked`.
 
-Reason: NarratoStudio and NarratoCut have recorded local Alpha evidence, and
+Reason: AgentFlow Production and AgentFlow Studio have recorded local Alpha evidence, and
 the Web workbench can run a local mock workflow through the bridge. PosterFlow
 live image smoke is still blocked until local image-provider environment
 variables are intentionally enabled.
@@ -46,8 +46,8 @@ providers.
 
 | Capability | Current status | Evidence |
 |---|---|---|
-| NarratoStudio production handoff | pass | `docs/alpha_readiness_report.md`, `workflows/narratostudio_brief_to_production_handoff.yaml` |
-| NarratoCut finished package chain | pass on this machine with local ignored media and FFmpeg | `docs/alpha_readiness_report.md`, `workflows/video_to_finished_package_local_asr.yaml` |
+| AgentFlow Production production handoff | pass | `docs/alpha_readiness_report.md`, `workflows/agentflow_production_handoff.yaml` |
+| AgentFlow Studio finished package chain | pass on this machine with local ignored media and FFmpeg | `docs/alpha_readiness_report.md`, `workflows/video_to_finished_package_local_asr.yaml` |
 | Web workbench Review Mode | available | `apps/web/README.md`, `docs/handoff/AFS-WEB-REPLAY.md` |
 | Web workbench Production Mode | local bridge demo passed with `mock_text_to_slices` | `apps/web/README.md`, `docs/handoff/AFS-WEB-REPLAY.md` |
 | PosterFlow Memory OS demo contracts | available through mocked/local tests and pre-provider artifacts | `workflows/posterflow_memory_demo.yaml`, `tests/test_posterflow_workflow.py` |
@@ -56,8 +56,8 @@ providers.
 ## Required Local Setup
 
 - Python 3.12 local environment.
-- FFmpeg / FFprobe for real NarratoCut media workflows.
-- Local ignored media for the NarratoCut package demo.
+- FFmpeg / FFprobe for real AgentFlow Studio media workflows.
+- Local ignored media for the AgentFlow Studio package demo.
 - Optional local image-provider environment only for PosterFlow live smoke.
 
 Do not put provider keys, signed URLs, cookies, tokens, or private credentials
@@ -65,25 +65,25 @@ in repository files.
 
 ## Rerun Commands
 
-### NarratoStudio Handoff
+### AgentFlow Production Handoff
 
 ```powershell
-.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/narratostudio_brief_to_production_handoff.yaml --input examples/narratostudio/creative_brief.example.json --output data/processed/runs/demo_narratostudio_handoff_alpha
-.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_narratostudio_handoff_alpha
-.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_narratostudio_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/agentflow_production_handoff.yaml --input examples/agentflow_production/creative_brief.example.json --output data/processed/runs/demo_agentflow_production_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_agentflow_production_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_agentflow_production_handoff_alpha
 ```
 
 Acceptance: workflow succeeds, inspect passes, review passes, and generated
 handoff artifacts remain local runtime evidence rather than committed
 deliverables.
 
-### NarratoCut Finished Package
+### AgentFlow Studio Finished Package
 
 ```powershell
-.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main package-report --run-dir data/processed/runs/demo_narratocut_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main package-report --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
 ```
 
 Acceptance: workflow succeeds, inspect passes, review passes, package report is
@@ -119,7 +119,7 @@ Default status is blocked. Run only when local image-provider environment is
 already configured and the task intentionally enables:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
 ```
 
 Then follow `docs/alpha_readiness_report.md` and
@@ -132,8 +132,8 @@ generated media is staged.
 ## Acceptance Checklist
 
 - [ ] `alpha-smoke --json` returns machine-readable status.
-- [ ] NarratoStudio handoff evidence is either still recorded or freshly rerun.
-- [ ] NarratoCut package evidence is either still recorded or freshly rerun with
+- [ ] AgentFlow Production handoff evidence is either still recorded or freshly rerun.
+- [ ] AgentFlow Studio package evidence is either still recorded or freshly rerun with
       local ignored media.
 - [ ] Web workbench local bridge demo is rerun or linked to current browser
       smoke evidence.

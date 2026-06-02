@@ -4,7 +4,7 @@ export function reviewShellTemplate() {
           <span class="brand-mark">NC</span>
           <div>
             <p class="eyebrow" data-copy="brandKicker">内容生产验收</p>
-            <h1 data-copy="brandName">NarratoCut 本地验收台</h1>
+            <h1 data-copy="brandName">AgentFlow Studio 本地验收台</h1>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ export function reviewShellTemplate() {
               <p class="eyebrow" data-copy="stageKicker">Local Review Workbench</p>
               <h2 id="stage-title" data-copy="stageTitle">先看成品能否交付，再看证据和风险。</h2>
               <p class="stage-subtitle" data-copy="stageSubtitle">
-                这里不会启动工作流。请先用 CLI 产出 NarratoCut artifacts，再把需要审查的 JSON、Markdown 和视频文件选入本页。
+                这里不会启动工作流。请先用 CLI 产出 AgentFlow Studio artifacts，再把需要审查的 JSON、Markdown 和视频文件选入本页。
               </p>
             </div>
           </section>

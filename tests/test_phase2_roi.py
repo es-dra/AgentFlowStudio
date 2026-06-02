@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
-from narratocut.schemas import Hook, ShortVideoScript
-from narratocut.utils.json_io import write_json
+from agentflow_studio.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
+from agentflow_studio.schemas import Hook, ShortVideoScript
+from agentflow_studio.utils.json_io import write_json
 
 
 def test_analyze_hooks_from_text_returns_hooks() -> None:

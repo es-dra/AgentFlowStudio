@@ -20,8 +20,8 @@ EXAMPLE_PROTOCOL = Path("examples/agentflow/memory_video_pipeline_protocol.examp
 def test_protocol_example_builds_no_call_plan_without_provider_or_secret_side_effects(
     monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     protocol = _protocol()
 
     plan = build_memory_video_pipeline_plan(protocol)
@@ -109,8 +109,8 @@ def test_protocol_rejects_absolute_paths_signed_urls_and_data_urls() -> None:
 
 
 def test_cli_writes_no_call_plan_from_protocol(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     protocol_path = tmp_path / "protocol.json"
     protocol_path.write_text(json.dumps(_protocol(), ensure_ascii=False), encoding="utf-8")
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from narratocut.schemas import Transcript, TranscriptSegment
+from agentflow_studio.schemas import Transcript, TranscriptSegment
 
 
 def test_valid_transcript_segment_can_be_created() -> None:

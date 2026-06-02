@@ -8,7 +8,7 @@ from agentflow.memory.production_next_operator_start_event import (
     build_next_operator_start_event,
     write_next_operator_start_event_report,
 )
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 NEXT_OPERATOR_START_EVENT_ARTIFACTS = [

@@ -7,14 +7,14 @@ import pytest
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.model_gateway import ModelProviderError
-from narratocut.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
-from narratocut.model_gateway.kling_video_smoke import run_kling_i2v_smoke
+from agentflow_studio.model_gateway import ModelProviderError
+from agentflow_studio.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
+from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
 from tests.kling_video_smoke_helpers import json_response, provider_config, store
 
 
 def test_kling_i2v_smoke_gate_disabled_fails_before_network(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     provider_store = store(tmp_path)
@@ -22,9 +22,9 @@ def test_kling_i2v_smoke_gate_disabled_fails_before_network(monkeypatch, tmp_pat
     def fake_request(*args, **kwargs):  # pragma: no cover - must not call provider
         raise AssertionError("network should not be called when video gate is disabled")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
 
-    with pytest.raises(ModelProviderError, match="NARRATOCUT_ALLOW_REMOTE_VIDEO"):
+    with pytest.raises(ModelProviderError, match="AFS_ALLOW_REMOTE_VIDEO"):
         run_kling_i2v_smoke(
             provider_store,
             service_id="kling_i2v",
@@ -39,7 +39,7 @@ def test_kling_i2v_smoke_gate_disabled_fails_before_network(monkeypatch, tmp_pat
 
 
 def test_kling_i2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     provider_store = store(tmp_path)
@@ -100,7 +100,7 @@ def test_kling_i2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp
             )
         raise AssertionError(f"unexpected URL: {url}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
 
     manifest = run_kling_i2v_smoke(
         provider_store,
@@ -138,7 +138,7 @@ def test_kling_i2v_smoke_success_writes_video_and_safe_manifest(monkeypatch, tmp
 
 
 def test_kling_i2v_smoke_http_error_does_not_expose_response_body(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     provider_store = store(tmp_path)
@@ -156,7 +156,7 @@ def test_kling_i2v_smoke_http_error_does_not_expose_response_body(monkeypatch, t
         )
         raise httpx.HTTPStatusError("Unauthorized", request=request, response=response)
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_video_runtime.httpx.Client.request", fake_request)
 
     with pytest.raises(ModelProviderError) as exc_info:
         run_kling_i2v_smoke(
@@ -187,7 +187,7 @@ def test_kling_i2v_smoke_cli_provider_config_help_uses_env_fallback() -> None:
 
 
 def test_kling_i2v_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     config_path = tmp_path / "providers.local.json"
@@ -210,7 +210,7 @@ def test_kling_i2v_smoke_cli_gate_failure_is_clean(monkeypatch, tmp_path) -> Non
 
     assert result.exit_code == 1
     assert "Kling I2V smoke failed" in result.output
-    assert "NARRATOCUT_ALLOW_REMOTE_VIDEO" in result.output
+    assert "AFS_ALLOW_REMOTE_VIDEO" in result.output
     assert "Traceback" not in result.output
     assert "fake-access-key" not in result.output
     assert "fake-secret-key" not in result.output

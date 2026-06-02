@@ -33,8 +33,8 @@ present and the Kling quota can be used:
 
 The `-AllowRemoteVideo` switch is intentional. Without it, the script stops
 before provider calls. The same result can also be achieved by setting
-`NARRATOCUT_ALLOW_REMOTE_VIDEO=true` in the current shell. Provider config is
-also explicit: pass `-ProviderConfig` or set `NARRATOCUT_PROVIDER_CONFIG` to a
+`AFS_ALLOW_REMOTE_VIDEO=true` in the current shell. Provider config is
+also explicit: pass `-ProviderConfig` or set `AFS_PROVIDER_CONFIG` to a
 local ignored provider config file.
 
 ## What The Script Does

@@ -4,10 +4,10 @@ import json
 
 import pytest
 
-from narratocut.schemas import ClipPlan, HighlightPlan
-from narratocut.workflow_engine import WorkflowContext
-from narratocut.workflow_engine.definitions import WorkflowStepDefinition
-from narratocut.workflow_engine.highlight_nodes import (
+from agentflow_studio.schemas import ClipPlan, HighlightPlan
+from agentflow_studio.workflow_engine import WorkflowContext
+from agentflow_studio.workflow_engine.definitions import WorkflowStepDefinition
+from agentflow_studio.workflow_engine.highlight_nodes import (
     detect_highlights_node,
     generate_candidate_windows_node,
     generate_highlight_clip_plan_node,

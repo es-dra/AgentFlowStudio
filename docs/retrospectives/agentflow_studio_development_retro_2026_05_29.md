@@ -12,14 +12,14 @@ Observed current state:
   Kling/MiniMax provider, and memory-advantage demo changes are mixed in one
   checkout.
 - Visible repository files: 568.
-- Memory-advantage demo source files under `narratocut/`: 19.
+- Memory-advantage demo source files under `agentflow_studio/`: 19.
 - Demo/provider test files: 12.
 - Demo/provider handoff files: 10.
 - Large maintenance hotspots:
   - `DEVLOG.md`: 3255 lines.
   - `TASK_TRACKER.md`: 692 lines.
   - `apps/cli/memory_demo_commands.py`: 485 lines.
-  - `narratocut/model_gateway/kling_video_smoke.py`: 428 lines.
+  - `agentflow_studio/model_gateway/kling_video_smoke.py`: 428 lines.
   - `apps/web/styles.css`: 452 lines.
   - `apps/web/index.html`: 429 lines.
 

@@ -50,15 +50,15 @@ Current role:
 - centralizes AgentFlow contract example constants and loaders
 - reserves platform namespaces for contracts, harness, memory, router, and
   skills
-- keeps platform-level helpers separate from NarratoStudio production logic and
-  NarratoCut distribution logic
+- keeps platform-level helpers separate from AgentFlow Production production logic and
+  AgentFlow Studio distribution logic
 
 It is not an Agent runtime, Router runtime, Memory runtime, database, hosted
 API, or cross-module orchestrator.
 
-### NarratoStudio
+### AgentFlow Production
 
-NarratoStudio is the production-side MVP module.
+AgentFlow Production is the production-side MVP module.
 
 Current role:
 
@@ -80,9 +80,9 @@ creative_brief.json
 -> production_report.md
 ```
 
-### NarratoCut
+### AgentFlow Studio
 
-NarratoCut is the distribution-side MVP module.
+AgentFlow Studio is the distribution-side MVP module.
 
 Current role:
 
@@ -158,7 +158,7 @@ The current contract layer does not implement:
 Recommended mainline order:
 
 1. Stabilize platform contract docs and minimal examples.
-2. Strengthen NarratoStudio review gates around JSON artifact references.
+2. Strengthen AgentFlow Production review gates around JSON artifact references.
 3. Deepen feedback, memory candidate, and cost-quality trace contracts.
 4. Define minimal Skill and Router decision contracts without runtime behavior.
 5. Add a lightweight contract registry so Agents can discover current contract

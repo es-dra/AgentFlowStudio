@@ -3,8 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from narratocut.schemas import ClipPlan, ClipSegment
-from narratocut.slicing_sop.real_slicer import RealSlicingConfig, slice_clip_plans_real
+from agentflow_studio.schemas import ClipPlan, ClipSegment
+from agentflow_studio.slicing_sop.real_slicer import RealSlicingConfig, slice_clip_plans_real
 
 
 def test_slice_clip_plans_real_runs_ffmpeg_for_each_clip_plan(tmp_path, monkeypatch) -> None:
@@ -20,7 +20,7 @@ def test_slice_clip_plans_real_runs_ffmpeg_for_each_clip_plan(tmp_path, monkeypa
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
 
     manifest = slice_clip_plans_real(
         input_video=input_video,
@@ -74,7 +74,7 @@ def test_slice_clip_plans_real_writes_manifest(tmp_path, monkeypatch) -> None:
         output_path.write_bytes(b"fake mp4")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
 
     manifest = slice_clip_plans_real(
         input_video=input_video,
@@ -96,7 +96,7 @@ def test_slice_clip_plans_real_honors_configured_clips_dir(tmp_path, monkeypatch
         output_path.write_bytes(b"fake mp4")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
 
     manifest = slice_clip_plans_real(
         input_video=input_video,
@@ -116,7 +116,7 @@ def test_slice_clip_plans_real_reports_ffmpeg_failure(tmp_path, monkeypatch) -> 
     def fake_run(command, capture_output, text, check):
         return subprocess.CompletedProcess(command, 1, stdout="", stderr="ffmpeg failed")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
 
     manifest = slice_clip_plans_real(
         input_video=input_video,
@@ -134,7 +134,7 @@ def test_slice_clip_plans_real_reports_missing_input_without_subprocess(tmp_path
     def fail_if_called(*args, **kwargs):
         raise AssertionError("subprocess should not be called")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fail_if_called)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fail_if_called)
 
     manifest = slice_clip_plans_real(
         input_video=tmp_path / "missing.mp4",
@@ -153,7 +153,7 @@ def test_slice_clip_plans_real_reports_missing_ffmpeg(tmp_path, monkeypatch) -> 
     def fake_run(command, capture_output, text, check):
         raise FileNotFoundError("ffmpeg missing")
 
-    monkeypatch.setattr("narratocut.slicing_sop.real_slicer.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.real_slicer.subprocess.run", fake_run)
 
     manifest = slice_clip_plans_real(
         input_video=input_video,

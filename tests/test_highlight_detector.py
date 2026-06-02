@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from narratocut.highlight_sop import (
+from agentflow_studio.highlight_sop import (
     DeterministicHighlightDetector,
     detect_highlights_from_script,
     detect_highlights_from_transcript,
 )
-from narratocut.schemas import HighlightPlan, Transcript
+from agentflow_studio.schemas import HighlightPlan, Transcript
 
 
 DEMO_SCRIPT = Path("examples/demo_highlight/script.txt")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from narratocut.slicing_sop.ffmpeg_probe import (
+from agentflow_studio.slicing_sop.ffmpeg_probe import (
     check_ffmpeg_available,
     check_media_tools,
     resolve_media_tool_paths,

@@ -39,7 +39,7 @@ local content project brief
   + optional local script / notes
   + local BGM
   -> production handoff or workflow plan
-  -> NarratoCut local finished package run
+  -> AgentFlow Studio local finished package run
   -> inspect / review / package report
   -> Web workbench artifact review
   -> operator acceptance feedback
@@ -134,7 +134,7 @@ Acceptance criteria:
 - If image-provider env is absent, the live lane stays `blocked` and does not
   block the local product loop.
 - If image-provider env is intentionally configured, the task must use
-  `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` and record no-secret / no-artifact
+  `AFS_ALLOW_REMOTE_IMAGE=true` and record no-secret / no-artifact
   staging evidence.
 - A provider smoke never counts as creative-quality or business validation.
 
