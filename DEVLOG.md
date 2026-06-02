@@ -9,6 +9,42 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Acceptance Feedback Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-acceptance-feedback-promotion-001` on
+  `codex/afs-production-memory-acceptance-feedback-overlay-001`.
+- Added
+  `production-memory-loop-run-acceptance-feedback-candidate-reviewed-no-provider`
+  for converting an explicit acceptance feedback candidate decision into a
+  derived no-provider context bundle/readiness run.
+- Added
+  `agentflow_production_memory_acceptance_feedback_candidate_promotion_overlay`.
+  Promoted or merged decisions can include the reviewed acceptance feedback
+  candidate in the derived context bundle; rejected, expired, or blocked
+  decisions keep the candidate visible in blocked refs.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Loulan behavior, no new human acceptance,
+  no business validation, and no memory promotion.
+- Verification:
+  - Red test failed first because the overlay module did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_acceptance_feedback_candidate_overlay.py -q`
+    -> 5 passed.
+  - Py compile for touched Python files passed.
+  - CLI help for
+    `production-memory-loop-run-acceptance-feedback-candidate-reviewed-no-provider`
+    passed.
+  - Focused acceptance/operator overlay/contract/CLI regression passed
+    (`53 passed`).
+  - CLI smoke wrote ignored
+    `derived_production_memory_loop.json`, `production_memory_loop_run.json`,
+    `context_bundle.json`, `pass_readiness.json`, `next_pass_bundle.json`, and
+    `acceptance_feedback_candidate_promotion_overlay.json`; the overlay had
+    `decision=promoted`, `decision_effect=included_in_context`, no provider
+    call, no Company KB write, no durable memory write, and
+    `source_acceptance_decision=accepted`.
+  - Full suite passed on Python 3.12.12 (`855 passed`).
+
 ## 2026-06-02 - Production Memory Acceptance Feedback Promotion 001
 
 - Continued from
