@@ -9,6 +9,43 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-03 - Production Memory Asset Consistency Review 001
+
+- Merged PR #78 into `master` before opening this node, so consistency review
+  starts from the integrated context-projection baseline.
+- Created
+  `codex/afs-production-memory-cross-scene-consistency-review-001` from
+  updated `origin/master`.
+- Added `agentflow_production_memory_asset_consistency_review_fixture` and
+  `agentflow_production_memory_asset_consistency_review` for explicit
+  cross-scene/cross-shot observations against projected asset profile context.
+- Added product CLI command
+  `production-memory-loop-review-asset-consistency`.
+- Added sanitized committed fixture
+  `examples/agentflow/production_memory_asset_consistency_review.example.json`.
+- Boundary kept: unknown or blocked profile refs become `blocked_findings`;
+  `cannot_judge` is neutral; the review does not create asset feedback,
+  profile update candidates, promotion decisions, durable memory, or Company
+  KB writes.
+- TDD red state confirmed: focused test initially failed because
+  `agentflow.memory.production_asset_consistency_review` did not exist.
+- Verification so far:
+  - Focused consistency review tests passed (`8 passed`).
+  - Adjacent asset consistency/projection/promotion/update/feedback/readiness
+    suite passed (`52 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help exposes `production-memory-loop-review-asset-consistency`.
+  - CLI no-provider smoke ran asset test package -> feedback -> update
+    candidate -> promotion/version -> context projection -> consistency
+    review and wrote a ready review with one finding and zero blocked
+    findings.
+  - Changed Python files passed `python -m py_compile`.
+  - Full suite passed on Python 3.13.5 (`969 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+  - Diff-level sensitive-fragment scan had no added real private paths,
+    secrets, provider URLs, or media files; matches were existing rule text or
+    deliberate redaction-test literals.
+
 ## 2026-06-03 - Production Memory Asset Context Projection 001
 
 - Merged PR #77 into `master` before opening this node, so context projection

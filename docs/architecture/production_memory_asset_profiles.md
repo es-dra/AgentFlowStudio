@@ -237,6 +237,39 @@ The first supported CLI is:
 production-memory-loop-asset-profile-context-projection
 ```
 
+## Asset Consistency Review
+
+`agentflow_production_memory_asset_consistency_review` is the deterministic
+Node 5 artifact that records explicit tester/operator observations against
+projected asset profile context:
+
+```text
+asset profile context projection
+  + sanitized consistency review fixture
+  -> asset consistency review
+```
+
+Rules:
+
+- Consistency review uses only explicitly projected profile refs from
+  `included_refs`.
+- Unknown or blocked profile refs become `blocked_findings`.
+- `cannot_judge` is neutral and does not create feedback, candidates, or
+  promotion decisions.
+- The review records `kept`, `partially_kept`, `not_kept`, and
+  `cannot_judge` results using the same first taxonomy as asset feedback
+  intake.
+- The review is evidence only. It does not apply profile updates, unlock
+  context, write durable memory, or write Company KB.
+- Review input is a sanitized JSON or markdown-derived JSON fixture. Free-form
+  Markdown parsing remains out of scope for this node.
+
+The first supported CLI is:
+
+```text
+production-memory-loop-review-asset-consistency
+```
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation
