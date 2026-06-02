@@ -23,6 +23,7 @@ def render_operator_run_package_check_markdown(check: dict[str, Any]) -> str:
             f"Package status: {check.get('package_status', 'unknown')}",
             f"Manifest check: {check.get('manifest_check_status', 'unknown')}",
             f"Operator handoff: {check.get('handoff_status', 'unknown')}",
+            f"Acceptance promotion check: {_acceptance_check_status(check)}",
             "",
             f"Checked items: {check.get('checked_item_count', 0)}",
             f"Missing refs: {len(_list(check.get('missing_refs')))}",
@@ -34,6 +35,10 @@ def render_operator_run_package_check_markdown(check: dict[str, Any]) -> str:
             f"Provider calls: {_started_label(check.get('provider_calls_started'))}",
             f"Durable memory write: {_enabled_label(check.get('writes_long_term_memory'))}",
             f"Company KB write: {_enabled_label(check.get('writes_company_kb'))}",
+            "",
+            "## Acceptance Feedback Candidate Promotion Check",
+            "",
+            _acceptance_check_table(check.get("acceptance_feedback_candidate_promotion_check")),
             "",
             "## Checked Items",
             "",
@@ -83,6 +88,28 @@ def _blockers_table(check: dict[str, Any]) -> str:
     return "\n".join(rows)
 
 
+def _acceptance_check_table(value: Any) -> str:
+    item = _dict(value)
+    if not item:
+        return "- status: not recorded"
+    rows = [
+        f"- status: {item.get('status', 'unknown')}",
+        f"- requires acceptance context: {_bool_label(item.get('requires_acceptance_context'))}",
+        f"- handoff matches package: {_bool_label(item.get('handoff_matches_package'))}",
+        f"- decision: {item.get('decision', 'unknown')}",
+        f"- decision effect: {item.get('decision_effect', 'unknown')}",
+        f"- candidate included in context: {_bool_label(item.get('candidate_included_in_context'))}",
+    ]
+    reasons = _list(item.get("reasons"))
+    if reasons:
+        rows.extend(f"- reason: {reason}" for reason in reasons)
+    return "\n".join(rows)
+
+
+def _acceptance_check_status(check: dict[str, Any]) -> str:
+    return str(_dict(check.get("acceptance_feedback_candidate_promotion_check")).get("status", "not_recorded"))
+
+
 def _non_claims() -> list[str]:
     return [
         "not human acceptance",
@@ -107,6 +134,10 @@ def _enabled_label(value: Any) -> str:
 
 def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
 
 
 __all__ = (

@@ -6,6 +6,10 @@ from typing import Any
 
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
+from agentflow.memory.production_operator_run_package_acceptance_check import (
+    acceptance_feedback_candidate_promotion_failed_controls,
+    check_acceptance_feedback_candidate_promotion,
+)
 from agentflow.memory.production_operator_run_package import OPERATOR_RUN_PACKAGE_KIND
 from agentflow.memory.production_operator_run_package_check_render import (
     render_operator_run_package_check_markdown,
@@ -36,7 +40,11 @@ def check_operator_run_package(
     root = Path(artifact_root) if artifact_root is not None else _default_artifact_root(package_ref)
     checked_items, missing_refs, mismatched_refs, unsafe_refs = _check_package_items(package, root)
     blocked_items = _blocked_items(package)
-    failed_controls = _failed_controls(package)
+    acceptance_feedback_candidate_promotion_check = check_acceptance_feedback_candidate_promotion(package, root)
+    failed_controls = _dedupe_controls(
+        _failed_controls(package)
+        + acceptance_feedback_candidate_promotion_failed_controls(acceptance_feedback_candidate_promotion_check)
+    )
     check_status = (
         FAILED
         if (
@@ -74,6 +82,7 @@ def check_operator_run_package(
         "unsafe_refs": unsafe_refs,
         "blocked_items": blocked_items,
         "failed_controls": failed_controls,
+        "acceptance_feedback_candidate_promotion_check": acceptance_feedback_candidate_promotion_check,
         "next_operator_action": _dict(package.get("next_operator_action")),
         "claim_boundaries": {
             "structure_verification": "machine_checked" if check_status == PASSED else "blocked",

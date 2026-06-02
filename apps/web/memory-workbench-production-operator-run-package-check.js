@@ -11,8 +11,10 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
   const unsafe = arrayValue(payload.unsafe_refs);
   const blocked = arrayValue(payload.blocked_items);
   const failedControls = arrayValue(payload.failed_controls);
+  const acceptanceCheck = objectValue(payload.acceptance_feedback_candidate_promotion_check);
   const passed = payload.check_status === "passed";
   const ready = passed && payload.ready_for_handoff === true;
+  const acceptanceStatus = acceptanceCheckUiStatus(acceptanceCheck);
 
   return {
     ...fallback,
@@ -28,6 +30,7 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
       action("inspect_checked_items", "Inspect checked items", checked.length ? "review ready" : "missing", "assets"),
       action("inspect_missing_items", "Inspect missing items", missing.length ? "blocked" : "review ready", "review"),
       action("inspect_failed_controls", "Inspect controls", failedControls.length ? "blocked" : "review ready", "memory-loaded"),
+      action("inspect_acceptance_promotion_check", "Inspect acceptance check", acceptanceStatus, "memory-loaded"),
       action("prepare_handoff", "Prepare handoff", ready ? "ready" : "blocked", "next-pass"),
     ],
     assets: [
@@ -50,6 +53,7 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
       card("unsafe_items", "Unsafe items", unsafe.length ? "blocked" : "review ready", `${unsafe.length} items unsafe`),
       card("blocked_items", "Blocked items", blocked.length ? "blocked" : "review ready", `${blocked.length} package blockers`),
       card("failed_controls", "Failed controls", failedControls.length ? "blocked" : "review ready", `${failedControls.length} controls failed`),
+      card("acceptance_promotion_check", "Acceptance promotion check", acceptanceStatus, acceptanceCheckDetail(acceptanceCheck)),
     ],
     memory_loaded: [
       {
@@ -59,7 +63,7 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
         source_evidence_refs: [payload.package_path || "operator run package"],
         promotion_status: payload.check_status || "unknown",
         request_projection: `${checkedCount(payload, checked)} checked; ${missing.length + mismatched.length + unsafe.length} ref blockers`,
-        feedback_effect: "check report only; no durable memory or Company KB write",
+        feedback_effect: acceptanceCheckFeedbackEffect(acceptanceCheck),
         status: passed ? "review ready" : "blocked",
       },
     ],
@@ -68,6 +72,13 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
       lane("checked-items", "Checked items", checked.length ? "review ready" : "missing", `${checkedCount(payload, checked)} items`, "artifact refs checked"),
       lane("missing-items", "Missing items", missing.length ? "blocked" : "review ready", `${missing.length} items`, "excluded until present"),
       lane("failed-controls", "Failed controls", failedControls.length ? "blocked" : "review ready", `${failedControls.length} controls`, "handoff controls checked"),
+      lane(
+        "acceptance-promotion-check",
+        "Acceptance promotion check",
+        acceptanceStatus,
+        acceptanceCheckDetail(acceptanceCheck),
+        acceptanceCheckHandoffDetail(acceptanceCheck),
+      ),
       lane("next-operator", "Next operator", ready ? "ready" : "blocked", payload.next_operator_action?.action || "unknown", ready ? "handoff ready" : "blockers unresolved"),
     ],
     protocol_summary: {
@@ -84,6 +95,8 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
         control("unsafe refs absent", unsafe.length === 0),
         control("blocked items absent", blocked.length === 0),
         control("failed controls absent", failedControls.length === 0),
+        control("acceptance feedback candidate promotion check", acceptanceCheckPassedOrNotApplicable(acceptanceCheck)),
+        control("acceptance feedback candidate promotion included", acceptanceCheckIncludedOrNotRequired(acceptanceCheck)),
       ],
       boundaries: boundaryItems(payload.claim_boundaries),
     },
@@ -105,6 +118,7 @@ export function buildProductionMemoryOperatorRunPackageCheckView(workspace, fall
       step("Package check", payload.check_status || "unknown", `${checkedCount(payload, checked)} items checked`),
       step("Missing items", missing.length ? "blocked" : "review ready", `${missing.length} items`),
       step("Failed controls", failedControls.length ? "blocked" : "review ready", `${failedControls.length} controls`),
+      step("Acceptance promotion check", acceptanceStatus, acceptanceCheckDetail(acceptanceCheck)),
       step("Next operator", ready ? "ready" : "blocked", payload.next_operator_action?.action || "unknown"),
     ],
   };
@@ -126,6 +140,37 @@ function blockedAsset(path, detail) {
 
 function checkedCount(payload, checked) {
   return payload.checked_item_count ?? checked.length;
+}
+
+function acceptanceCheckUiStatus(check) {
+  if (check.status === "failed") return "blocked";
+  return "review ready";
+}
+
+function acceptanceCheckDetail(check) {
+  return check.decision_effect || check.status || "not_applicable";
+}
+
+function acceptanceCheckHandoffDetail(check) {
+  if (check.handoff_matches_package === false) return "handoff mismatch";
+  if (check.handoff_matches_package === true) return "handoff aligned";
+  return "not required";
+}
+
+function acceptanceCheckFeedbackEffect(check) {
+  if (check.status === "not_applicable" || !check.status) {
+    return "check report only; no durable memory or Company KB write";
+  }
+  return `acceptance promotion ${check.status}; no durable memory or Company KB write`;
+}
+
+function acceptanceCheckPassedOrNotApplicable(check) {
+  return !check.status || check.status === "not_applicable" || check.status === "passed";
+}
+
+function acceptanceCheckIncludedOrNotRequired(check) {
+  if (check.requires_acceptance_context !== true) return true;
+  return check.candidate_included_in_context === true && check.candidate_blocked_from_context !== true;
 }
 
 function action(id, label, status, focusTarget) {
@@ -154,6 +199,10 @@ function boundaryItems(boundaries = {}) {
     { label: "Company KB write", status: "blocked", detail: boundaries.company_kb_write || "not_written" },
     { label: "provider success", status: "blocked", detail: boundaries.provider_success || "not_claimed" },
   ];
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function step(label, status, detail) {

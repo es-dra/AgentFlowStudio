@@ -183,6 +183,7 @@ export function productionOperatorRunPackageFacts(payload) {
 }
 
 export function productionOperatorRunPackageCheckFacts(payload) {
+  const acceptanceCandidatePromotionCheck = objectValue(payload.acceptance_feedback_candidate_promotion_check);
   return [
     fact("check_status", payload.check_status || "unknown"),
     fact("package_status", payload.package_status || "unknown"),
@@ -192,6 +193,18 @@ export function productionOperatorRunPackageCheckFacts(payload) {
     fact("mismatched_refs", String(arrayValue(payload.mismatched_refs).length)),
     fact("unsafe_refs", String(arrayValue(payload.unsafe_refs).length)),
     fact("failed_controls", String(arrayValue(payload.failed_controls).length)),
+    ...(acceptanceCandidatePromotionCheck.status ? [
+      fact("acceptance_feedback_candidate_promotion_check", acceptanceCandidatePromotionCheck.status),
+    ] : []),
+    ...(acceptanceCandidatePromotionCheck.decision_effect ? [
+      fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotionCheck.decision_effect),
+    ] : []),
+    ...(acceptanceCandidatePromotionCheck.candidate_included_in_context !== undefined ? [
+      fact("acceptance_feedback_candidate_included", yesNo(acceptanceCandidatePromotionCheck.candidate_included_in_context)),
+    ] : []),
+    ...(acceptanceCandidatePromotionCheck.handoff_matches_package !== undefined ? [
+      fact("acceptance_feedback_candidate_handoff_matches_package", yesNo(acceptanceCandidatePromotionCheck.handoff_matches_package)),
+    ] : []),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),

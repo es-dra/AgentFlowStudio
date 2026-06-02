@@ -9,6 +9,40 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Run Package Check Acceptance Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-web-handoff-acceptance-overlay-001` on
+  `codex/afs-production-memory-run-package-check-acceptance-overlay-001`.
+- Added a machine consistency check for embedded
+  `acceptance_feedback_candidate_promotion` summaries in final operator run
+  packages. When the next operator action is
+  `run_next_ai_task_with_acceptance_feedback_context`, the run package check
+  now requires the package summary, compares it with the operator handoff
+  packet, and blocks mismatched or non-included candidates.
+- Added read-only Web visibility for the new
+  `acceptance_feedback_candidate_promotion_check` field in selected operator
+  run package check artifacts.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no Web directory scan, no browser persistence, no provider execution,
+  no Loulan behavior, no new human acceptance, no business validation, and no
+  memory promotion.
+- Verification:
+  - Red backend tests failed first because run package checks did not expose
+    `acceptance_feedback_candidate_promotion_check`.
+  - Red Web static test failed first because the selected-file run-package
+    check view did not render an `Acceptance promotion check` lane.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package_check_acceptance_overlay.py -q`
+    -> 4 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_run_package_check.py -q`
+    -> 3 passed.
+  - Focused production-memory/operator/contract/CLI regression passed
+    (`45 passed`).
+  - Expanded Web/static memory suite passed (`79 passed, 790 deselected`).
+  - Full suite passed on Python 3.12.12 (`870 passed`).
+  - Browser-level verification was not run because Browser control tools were
+    not exposed in this turn.
+
 ## 2026-06-02 - Production Memory Web Handoff Acceptance Overlay 001
 
 - Continued from
