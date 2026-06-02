@@ -5,6 +5,7 @@ import {
   productionAcceptanceFeedbackFacts,
   productionLoopFacts,
   productionNextContextHandoffFacts,
+  productionNextOperatorStartPacketFacts,
   productionNextPassPromotionFacts,
   productionNextPassResultFacts,
   productionNextPassReviewFacts,
@@ -33,6 +34,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_operator_handoff_packet: "Production memory operator handoff packet",
   agentflow_production_memory_operator_run_package: "Production memory operator run package",
   agentflow_production_memory_operator_run_package_check: "Production memory operator run package check",
+  agentflow_production_memory_next_operator_start_packet: "Production memory next operator start packet",
   agentflow_production_memory_acceptance_feedback_event: "Production memory acceptance feedback",
   agentflow_production_memory_acceptance_feedback_candidate_packet: "Production memory acceptance feedback candidate",
   agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: "Production memory acceptance feedback candidate promotion",
@@ -81,6 +83,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_operator_handoff_packet") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_operator_run_package") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_operator_run_package_check") return ["project", "assets", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_next_operator_start_packet") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_event") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
@@ -110,6 +113,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_operator_handoff_packet") return productionOperatorHandoffFacts(payload);
   if (type === "agentflow_production_memory_operator_run_package") return productionOperatorRunPackageFacts(payload);
   if (type === "agentflow_production_memory_operator_run_package_check") return productionOperatorRunPackageCheckFacts(payload);
+  if (type === "agentflow_production_memory_next_operator_start_packet") return productionNextOperatorStartPacketFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_event") return productionAcceptanceFeedbackFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return productionAcceptanceFeedbackCandidateFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return productionAcceptanceFeedbackCandidatePromotionFacts(payload);
@@ -203,6 +207,7 @@ function statusFor(type, payload) {
   if (type === "agentflow_production_memory_operator_handoff_packet") return payload.handoff_status || "review ready";
   if (type === "agentflow_production_memory_operator_run_package") return payload.package_status || "review ready";
   if (type === "agentflow_production_memory_operator_run_package_check") return payload.check_status || "review ready";
+  if (type === "agentflow_production_memory_next_operator_start_packet") return payload.start_packet_status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_event") return payload.status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";

@@ -211,6 +211,19 @@ export function productionOperatorRunPackageCheckFacts(payload) {
   ];
 }
 
+export function productionNextOperatorStartPacketFacts(payload) {
+  return [
+    fact("start_packet_status", payload.start_packet_status || "unknown"),
+    fact("ready_for_next_operator", yesNo(payload.ready_for_next_operator)),
+    fact("checked_package_items", String(payload.checked_package_item_count ?? arrayValue(payload.checked_package_items).length)),
+    fact("next_operator_action", payload.next_operator_action?.action || "unknown"),
+    fact("package_check_status", payload.package_check_status || "unknown"),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);

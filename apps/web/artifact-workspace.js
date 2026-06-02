@@ -11,7 +11,6 @@ export async function parseFiles(files) {
       artifacts.push(buildArtifact({ file, rawText: "", payload: null, parseStatus: "valid", localFile: file }));
       continue;
     }
-
     const text = await file.text();
     if (extension === "md") {
       artifacts.push(buildArtifact({ file, rawText: text, payload: null, parseStatus: "valid" }));
@@ -117,6 +116,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryOperatorManifestCheck,
     productionMemoryOperatorHandoffPacket,
     productionMemoryOperatorRunPackage,
+    productionMemoryNextOperatorStartPacket: byType("agentflow_production_memory_next_operator_start_packet") || null,
     productionMemoryAcceptanceFeedbackEvent,
     productionMemoryAcceptanceFeedbackCandidatePacket,
     productionMemoryAcceptanceFeedbackCandidatePromotionDecision,
