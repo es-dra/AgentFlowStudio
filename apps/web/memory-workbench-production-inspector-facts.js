@@ -117,6 +117,15 @@ export function productionAcceptanceFeedbackCandidatePromotionFacts(payload) {
     fact("decision", payload.decision || "unknown"),
     fact("decision_effect", payload.decision_effect || "unknown"),
     fact("candidate_id", payload.candidate_id || "unknown"),
+    ...(payload.source_artifact_type ? [
+      fact("source_artifact_type", payload.source_artifact_type),
+    ] : []),
+    ...(payload.source_artifact_status ? [
+      fact("source_artifact_status", payload.source_artifact_status),
+    ] : []),
+    ...(payload.source_target_ref ? [
+      fact("source_target_ref", payload.source_target_ref),
+    ] : []),
     fact("source_acceptance_decision", payload.source_acceptance_decision || "unknown"),
     fact("candidate_reuse_allowed", yesNo(payload.candidate_reuse_allowed)),
     fact("candidate_is_durable_memory", yesNo(payload.candidate_is_durable_memory)),

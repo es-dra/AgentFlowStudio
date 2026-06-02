@@ -599,21 +599,25 @@ decision template.
 The acceptance feedback candidate promotion decision is the explicit review
 surface for that candidate packet. It records the source packet, source
 acceptance feedback event, source pending template, candidate id, decision,
-rationale, reviewer role, and whether future candidate reuse is allowed. It
-does not write durable memory, write Company KB, execute a next pass, or claim
-new human acceptance or business validation. A promoted or merged decision is
-only eligibility for a later next-context overlay, not a Company memory
-promotion.
+rationale, reviewer role, source artifact type/status/path, target ref, target
+artifact type, and whether future candidate reuse is allowed. It does not write
+durable memory, write Company KB, execute a next pass, or claim new human
+acceptance or business validation. A promoted or merged decision is only
+eligibility for a later next-context overlay, not a Company memory promotion.
 
 The acceptance feedback candidate reviewed run is the explicit-decision overlay
 surface after acceptance feedback candidate review. It converts the reviewed
 candidate packet into normal source records for a derived no-provider loop:
-operator-run-package evidence, human acceptance feedback event, memory
-candidate, explicit promotion decision, and a requested candidate ref. Promoted
-or merged decisions can include the candidate in the next context bundle;
-rejected, expired, or blocked decisions keep it visible as a blocked ref. The
-command still does not write durable memory, write Company KB, call providers,
-execute a next pass, or claim new human acceptance or business validation.
+source artifact evidence, human acceptance feedback event, memory candidate,
+explicit promotion decision, and a requested candidate ref. Source artifact
+evidence can be an operator run package or a next-operator action result.
+Promoted or merged decisions can include the candidate in the next context
+bundle; rejected, expired, or blocked decisions keep it visible as a blocked
+ref. Standalone overlay artifacts may preserve ignored local run evidence
+paths, but the derived loop projects only safe short source paths so validation
+still rejects private or runtime paths. The command still does not write
+durable memory, write Company KB, call providers, execute a next pass, or claim
+new human acceptance or business validation.
 
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
@@ -740,11 +744,12 @@ not promote memory, execute workflow actions, follow refs, write Company KB, or
 write durable memory.
 
 Acceptance feedback candidate promotion decision artifacts render as a
-read-only explicit-decision canvas with the source acceptance decision,
-candidate reuse status, decision effect, no-provider controls, and non-claim
-boundaries. They do not execute workflow actions, follow refs, call providers,
-write Company KB, write durable memory, or claim new human acceptance or
-business validation.
+read-only explicit-decision canvas with the source artifact, source acceptance
+decision, candidate reuse status, decision effect, no-provider controls, and
+non-claim boundaries. The source can be an operator run package or a
+next-operator action result. They do not execute workflow actions, follow refs,
+call providers, write Company KB, write durable memory, or claim new human
+acceptance or business validation.
 
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and

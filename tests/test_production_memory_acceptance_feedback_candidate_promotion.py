@@ -10,6 +10,9 @@ import pytest
 
 from agentflow.memory.production_acceptance_feedback import build_production_memory_acceptance_feedback_event
 from agentflow.memory.production_acceptance_feedback_candidate import build_acceptance_feedback_candidate_packet
+from agentflow.memory.production_action_result_acceptance_feedback import (
+    build_production_memory_action_result_acceptance_feedback_event,
+)
 from agentflow.memory.production_acceptance_feedback_candidate_promotion import (
     ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND,
     build_acceptance_feedback_candidate_promotion_decision,
@@ -92,6 +95,38 @@ def test_acceptance_feedback_candidate_promotion_decision_is_explicit_and_no_wri
     assert decision["candidate_is_durable_memory"] is False
     assert decision["claim_boundaries"]["human_acceptance"] == "accepted"
     assert decision["claim_boundaries"]["business_validation"] == "not_validated"
+
+
+def test_action_result_acceptance_feedback_candidate_promotion_preserves_source_artifact(
+    tmp_path: Path,
+) -> None:
+    packet = _action_result_acceptance_feedback_candidate_packet(tmp_path)
+
+    decision = _decision(packet)
+
+    assert decision["source_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert decision["source_artifact_status"] == "action_completed"
+    assert decision["source_artifact_path"] == "next_operator_action_result/next_operator_action_result.json"
+    assert decision["source_ready_for_acceptance"] is True
+    assert decision["source_target_ref"].startswith("next-operator-action-result:")
+    assert decision["source_target_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert decision["claim_boundaries"]["human_acceptance"] == "accepted"
+    assert decision["provider_calls_started"] is False
+    assert decision["writes_company_kb"] is False
+
+
+def test_action_result_promotion_allows_local_run_source_path(tmp_path: Path) -> None:
+    packet = _action_result_acceptance_feedback_candidate_packet(tmp_path)
+    packet["source_artifact_path"] = (
+        "data/processed/runs/production_memory_loop/operator_loop/next_operator_action_result/"
+        "next_operator_action_result.json"
+    )
+
+    decision = _decision(packet)
+
+    assert decision["source_artifact_path"].startswith("data/processed/runs/")
+    assert decision["provider_calls_started"] is False
+    assert decision["writes_company_kb"] is False
 
 
 def test_rejected_acceptance_feedback_candidate_decision_blocks_reuse(tmp_path: Path) -> None:
@@ -184,3 +219,47 @@ def test_cli_reviews_acceptance_feedback_candidate_promotion(tmp_path: Path) -> 
     assert decision["claim_boundaries"]["human_acceptance"] == "accepted"
     assert decision["claim_boundaries"]["business_validation"] == "not_validated"
     assert (output_dir / "acceptance_feedback_candidate_promotion_decision.md").exists()
+
+
+def _action_result_acceptance_feedback_candidate_packet(tmp_path: Path) -> dict:
+    action_result = _next_operator_action_result(tmp_path)
+    event = build_production_memory_action_result_acceptance_feedback_event(
+        action_result,
+        decision="accepted",
+        summary="Human operator accepted the completed action result for the next local iteration.",
+        reviewer_role="operator",
+        reviewed_at="2026-06-03T12:05:00+08:00",
+        action_result_path="next_operator_action_result/next_operator_action_result.json",
+    )
+    return build_acceptance_feedback_candidate_packet(event, generated_at="2026-06-03T12:10:00+08:00")
+
+
+def _next_operator_action_result(tmp_path: Path) -> dict:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T12:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+    write_production_memory_operator_loop_run(
+        result,
+        tmp_path / "operator_loop_with_action_result",
+        write_run_package=True,
+        write_run_package_check=True,
+        write_next_operator_start_packet=True,
+        write_next_operator_start_event=True,
+        next_operator_start_event_decision="started",
+        next_operator_start_event_summary="Next operator started from the checked no-provider package.",
+        write_next_operator_action_result=True,
+        next_operator_action_result_decision="completed",
+        next_operator_action_result_summary="Next operator completed the recorded no-provider action.",
+        next_operator_action_result_refs=["next_pass_result/next_pass_result.json"],
+    )
+    action_result_path = (
+        tmp_path
+        / "operator_loop_with_action_result"
+        / "next_operator_action_result"
+        / "next_operator_action_result.json"
+    )
+    return json.loads(action_result_path.read_text(encoding="utf-8"))

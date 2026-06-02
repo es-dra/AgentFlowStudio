@@ -69,8 +69,15 @@ def build_acceptance_feedback_candidate_promotion_decision(
         "source_promotion_decision_template_id": template.get("decision_id", "unknown"),
         "source_operator_loop_id": packet.get("source_operator_loop_id", "unknown"),
         "source_project_id": packet.get("source_project_id", "unknown"),
+        "source_artifact_type": packet.get("source_artifact_type", "agentflow_production_memory_operator_run_package"),
+        "source_artifact_path": packet.get("source_artifact_path", packet.get("source_package_path", "unknown")),
+        "source_artifact_status": packet.get("source_artifact_status", packet.get("source_check_status", "unknown")),
+        "source_ready_for_acceptance": packet.get("source_ready_for_acceptance") is True,
         "candidate_id": candidate_id,
         "source_candidate_status": candidate_status,
+        "source_target_ref": candidate.get("target_ref", "unknown"),
+        "source_target_artifact_type": candidate.get("target_artifact_type", "unknown"),
+        "source_target_status": candidate.get("target_status", "unknown"),
         "source_acceptance_decision": packet.get("source_acceptance_decision", "unknown"),
         "source_human_acceptance_recorded": packet.get("source_human_acceptance_recorded") is True,
         "decision": decision,
@@ -94,7 +101,7 @@ def build_acceptance_feedback_candidate_promotion_decision(
         "claim_boundaries": _claim_boundaries(packet),
         "non_claims": _non_claims(),
     }
-    _reject_unsafe(promotion_decision)
+    _reject_unsafe(promotion_decision, allow_source_refs=True)
     return promotion_decision
 
 
@@ -122,6 +129,8 @@ def render_acceptance_feedback_candidate_promotion_markdown(decision: dict[str, 
             f"Candidate: {decision.get('candidate_id', 'unknown')}",
             f"Candidate reuse: {reuse}",
             f"Source human acceptance: {decision.get('source_acceptance_decision', 'unknown')}",
+            f"Source artifact: {decision.get('source_artifact_type', 'unknown')}",
+            f"Source artifact status: {decision.get('source_artifact_status', 'unknown')}",
             "Provider calls: not started",
             "Writes long-term memory: false",
             "Writes Company KB: false",

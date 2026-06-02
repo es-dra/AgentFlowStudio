@@ -10,6 +10,7 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
   const candidateId = payload.candidate_id || "unknown";
   const reuseAllowed = payload.candidate_reuse_allowed === true;
   const ready = boundaryOk(payload) && decision !== "pending";
+  const source = sourceInfo(payload);
 
   return {
     ...fallback,
@@ -38,6 +39,7 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
       card("explicit_decision", "Explicit decision", ready ? "review ready" : "blocked", decision),
       card("decision_effect", "Decision effect", effectStatus(effect), effect),
       card("candidate_reuse", "Candidate reuse", reuseAllowed ? "review ready" : "blocked", reuseAllowed ? "allowed" : "blocked"),
+      card("source_artifact", "Source artifact", source.status, source.type),
       card("source_acceptance", "Source acceptance", payload.source_human_acceptance_recorded ? "review ready" : "blocked", payload.source_acceptance_decision || "unknown"),
       card("claim_boundaries", "Non-claim boundaries", "blocked", "not durable memory / not Company KB promotion"),
     ],
@@ -46,7 +48,7 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
         id: candidateId,
         title: payload.source_packet_id || "acceptance feedback candidate",
         why_eligible: "explicit acceptance feedback promotion decision controls reuse",
-        source_evidence_refs: evidenceRefs(payload),
+        source_evidence_refs: evidenceRefs(payload, source),
         promotion_status: decision,
         request_projection: payload.rationale || effect,
         feedback_effect: "candidate can inform later context only through this explicit decision",
@@ -56,6 +58,7 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
     lanes: [
       lane("acceptance-candidate-promotion", "Acceptance candidate promotion", ready ? "ready" : "blocked", candidateId, decision),
       lane("decision-effect", "Decision effect", effectStatus(effect), decision, effect),
+      lane(source.id, source.title, source.status, source.path, source.detail),
       lane("source-acceptance", "Source acceptance", payload.source_human_acceptance_recorded ? "review ready" : "blocked", payload.source_acceptance_decision || "unknown", payload.source_acceptance_feedback_event_id || "feedback"),
       lane("non-claims", "Non-claims", "blocked", "no durable memory", "no Company KB promotion"),
     ],
@@ -89,6 +92,7 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
     },
     timeline: [
       step("Candidate", payload.source_candidate_status || "unknown", candidateId),
+      step(source.title, source.status, source.detail),
       step("Decision", ready ? "ready" : "blocked", decision),
       step("Effect", effectStatus(effect), effect),
       step("Boundaries", "blocked", "not business validation / not durable memory"),
@@ -96,11 +100,25 @@ export function buildProductionMemoryAcceptanceFeedbackCandidatePromotionView(wo
   };
 }
 
-function evidenceRefs(payload) {
+function sourceInfo(payload) {
+  const type = payload.source_artifact_type || payload.source_target_artifact_type || "agentflow_production_memory_operator_run_package";
+  const isActionResult = type === "agentflow_production_memory_next_operator_action_result";
+  return {
+    id: isActionResult ? "source-action-result" : "source-package",
+    title: isActionResult ? "Source action result" : "Source package",
+    type,
+    status: payload.source_artifact_status ? "review ready" : "blocked",
+    detail: payload.source_artifact_status || payload.source_target_status || "unknown",
+    path: payload.source_artifact_path || payload.source_target_ref || "unknown",
+  };
+}
+
+function evidenceRefs(payload, source) {
   return [
+    source.path,
     payload.source_acceptance_feedback_event_id,
     payload.source_promotion_decision_template_id,
-  ].filter(Boolean);
+  ].filter((item) => item && item !== "unknown");
 }
 
 function boundaryItems(payload) {

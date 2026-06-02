@@ -62,7 +62,7 @@ def build_loop_with_acceptance_feedback_candidate_reviewed_feedback(
     _append_unique(derived["artifact_ledger"], _package_artifact(packet, target_ref), "ref_id")
     _append_unique(derived["feedback_events"], _acceptance_feedback_record(packet, candidate, feedback_id, target_ref), "feedback_id")
     _append_unique(derived["memory_candidates"], _acceptance_memory_candidate_record(candidate, packet), "candidate_id")
-    _append_unique(derived["promotion_decisions"], deepcopy(promotion_decision), "decision_id")
+    _append_unique(derived["promotion_decisions"], _promotion_decision_record(promotion_decision), "decision_id")
 
     requested_refs = _requested_refs(derived)
     candidate_id = str(candidate["candidate_id"])
@@ -102,6 +102,12 @@ def build_acceptance_feedback_candidate_promotion_overlay(
         "source_decision_id": promotion_decision.get("decision_id", "unknown"),
         "source_acceptance_feedback_event_id": packet.get("source_acceptance_feedback_event_id", "unknown"),
         "source_acceptance_decision": packet.get("source_acceptance_decision", "unknown"),
+        "source_artifact_type": packet.get("source_artifact_type", "agentflow_production_memory_operator_run_package"),
+        "source_artifact_path": packet.get("source_artifact_path", packet.get("source_package_path", "unknown")),
+        "source_artifact_status": packet.get("source_artifact_status", packet.get("source_check_status", "unknown")),
+        "source_ready_for_acceptance": packet.get("source_ready_for_acceptance") is True,
+        "source_target_ref": _dict(packet.get("memory_candidate")).get("target_ref", "unknown"),
+        "source_target_artifact_type": _dict(packet.get("memory_candidate")).get("target_artifact_type", "unknown"),
         "candidate_id": candidate_id,
         "decision": promotion_decision.get("decision", "unknown"),
         "decision_effect": "included_in_context" if candidate_id in included_ids else "blocked_from_context",
@@ -184,17 +190,20 @@ def _validate_promotion_decision(packet: dict[str, Any], decision: dict[str, Any
         raise ValueError("acceptance feedback candidate decision must not write memory or Company KB")
     if decision.get("decision") in REUSE_ALLOWED_DECISIONS and candidate.get("status") != "candidate":
         raise ValueError("only candidate acceptance feedback can be promoted or merged")
-    _reject_unsafe(decision)
+    _reject_unsafe(decision, allow_source_refs=True)
 
 
 def _package_artifact(packet: dict[str, Any], target_ref: str) -> dict[str, Any]:
     candidate = _dict(packet.get("memory_candidate"))
+    artifact_type = candidate.get("target_artifact_type", packet.get("source_artifact_type", "agentflow_production_memory_operator_run_package"))
+    label = _artifact_label(str(artifact_type))
     return {
         "ref_id": target_ref,
-        "title": "operator run package acceptance evidence",
+        "artifact_type": artifact_type,
+        "title": f"{label} acceptance evidence",
         "status": "accepted" if candidate.get("status") == "candidate" else "blocked",
         "eligible_for_next_context": False,
-        "summary": "Operator run package captured as acceptance feedback evidence only.",
+        "summary": f"{label} captured as acceptance feedback evidence only.",
         "source_refs": [],
     }
 
@@ -223,6 +232,29 @@ def _acceptance_memory_candidate_record(candidate: dict[str, Any], packet: dict[
     record["writes_company_kb"] = False
     record["source_acceptance_feedback_candidate_packet_id"] = packet.get("packet_id", "unknown")
     return record
+
+
+def _promotion_decision_record(decision: dict[str, Any]) -> dict[str, Any]:
+    record = deepcopy(decision)
+    if isinstance(record.get("source_artifact_path"), str):
+        record["source_artifact_path"] = _safe_source_path(record["source_artifact_path"])
+    return record
+
+
+def _safe_source_path(path: str) -> str:
+    normalized = path.replace("\\", "/")
+    if "data/processed/runs/" not in normalized:
+        return normalized
+    parts = [part for part in normalized.split("/") if part]
+    if len(parts) >= 2:
+        return "/".join(parts[-2:])
+    return parts[-1] if parts else "unknown"
+
+
+def _artifact_label(artifact_type: str) -> str:
+    if artifact_type == "agentflow_production_memory_next_operator_action_result":
+        return "next operator action result"
+    return "operator run package"
 
 
 def _requested_refs(loop: dict[str, Any]) -> list[Any]:

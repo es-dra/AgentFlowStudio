@@ -9,6 +9,40 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Action Result Acceptance Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-action-result-acceptance-feedback-001` on
+  `codex/afs-production-memory-action-result-acceptance-overlay-001`.
+- Made acceptance-feedback candidate promotion decisions source-aware so a
+  candidate drafted from a next-operator action result preserves
+  `source_artifact_type`, `source_artifact_status`, `source_artifact_path`,
+  target ref, and target artifact type.
+- Made the acceptance-feedback candidate reviewed overlay preserve the source
+  artifact type/status and write a source-aware artifact ledger record instead
+  of package-only evidence wording.
+- Kept standalone promotion/overlay artifacts able to reference ignored
+  `data/processed/runs/...` source evidence, while projecting a safe short path
+  into derived loops so production-memory loop validation still rejects private
+  or runtime paths in committed/source loop payloads.
+- Updated the read-only Web promotion view and inspector facts so selected
+  promotion decisions can show `Source action result` and action-result source
+  fields.
+- Boundary kept: this is still explicit review and no-provider context overlay
+  only. It does not write durable memory, write Company KB, execute a next pass,
+  call providers, auto-promote memory, claim new human acceptance, or claim
+  business validation.
+- Verification:
+  - Focused promotion/overlay/Web tests passed (`20 passed`).
+  - Adjacent acceptance/operator overlay regression passed (`42 passed`).
+  - CLI smoke ran action result -> acceptance feedback -> candidate ->
+    promotion decision -> reviewed overlay, producing a ready run with
+    action-result source metadata and `candidate_included_in_context: true`.
+  - Changed Python files passed `python -m py_compile`; changed Web modules
+    passed `node --check`.
+  - Expanded Web/static memory tests passed (`92 passed, 823 deselected`).
+  - Full suite passed on Python 3.12.12 (`915 passed`).
+
 ## 2026-06-02 - Production Memory Action Result Acceptance Feedback 001
 
 - Continued from
