@@ -1,5 +1,6 @@
 import { ARTIFACT_ALIASES, ARTIFACT_CLASSES, RECOMMENDED_ARTIFACTS, VIDEO_EXTENSIONS, sourceRoleFor } from "./artifact-contracts.js?v=m4-memory-canvas-tools";
 import { normalizeAssetLedger, normalizeEvidenceMap, normalizeRiskLedger } from "./artifact-ledgers.js?v=m4-memory-canvas-tools";
+import { artifactWorkspaceSlotsFromRegistry } from "./artifact-registry.js?v=m4-memory-canvas-tools";
 import { asList, asObject, asText, collectChecks, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 export { asText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 const AGENTFLOW_KIND_ARTIFACTS = new Set(Object.keys(ARTIFACT_ALIASES).filter((type) => type.startsWith("agentflow_")));
@@ -112,6 +113,7 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryAssetProfileVersion = byType("agentflow_production_memory_asset_profile_version") || null;
   const productionMemoryAssetProfileContextProjection = byType("agentflow_production_memory_asset_profile_context_projection") || null;
   const productionMemoryAssetConsistencyReview = byType("agentflow_production_memory_asset_consistency_review") || null;
+  const registrySlots = artifactWorkspaceSlotsFromRegistry(byType);
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
   const workspaceParts = { warnings, errors };
   return {
@@ -152,6 +154,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryAssetProfileVersion,
     productionMemoryAssetProfileContextProjection,
     productionMemoryAssetConsistencyReview,
+    ...registrySlots,
     companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),

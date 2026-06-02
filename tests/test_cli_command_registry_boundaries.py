@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typer.testing import CliRunner
+
+from apps.cli.main import app
+
 
 PRODUCT_REGISTRY = Path("apps/cli/command_registry.py")
+PRODUCTION_MEMORY_REGISTRY = Path("apps/cli/production_memory_command_registry.py")
 SUPPORT_REGISTRY = Path("apps/cli/support_command_registry.py")
 
 
@@ -18,10 +23,43 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source
     assert "memory-video-pipeline-package" in source
+    assert "register_production_memory_commands" in source
+    assert "production-memory-loop-next-operator-start-packet" not in source
+    assert "production-memory-loop-record-next-operator-start" not in source
+    assert "production-memory-loop-record-next-operator-action-result" not in source
+    assert "production-memory-loop-record-action-result-acceptance-feedback" not in source
+
+
+def test_production_memory_registry_layers_public_and_hidden_commands() -> None:
+    source = PRODUCTION_MEMORY_REGISTRY.read_text(encoding="utf-8")
+
+    assert "production-memory-loop-asset-profile-readiness" in source
+    assert "production-memory-loop-run-asset-test-package" in source
+    assert "production-memory-loop-record-asset-feedback" in source
     assert "production-memory-loop-next-operator-start-packet" in source
-    assert "production-memory-loop-record-next-operator-start" in source
     assert "production-memory-loop-record-next-operator-action-result" in source
     assert "production-memory-loop-record-action-result-acceptance-feedback" in source
+    assert "_visible(app" in source
+    assert "_hidden(app" in source
+    assert "hidden=True" in source
+
+
+def test_default_help_keeps_production_memory_product_surface_thin() -> None:
+    result = CliRunner().invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "production-memory-loop-run-asset-test-package" in result.output
+    assert "production-memory-loop-record-asset-feedback" in result.output
+    assert "production-memory-loop-record-next-operator-action-result" not in result.output
+    assert "production-memory-loop-record-action-result-acceptance-feedback" not in result.output
+    assert "production-memory-loop-next-operator-start-packet" not in result.output
+
+
+def test_hidden_production_memory_support_commands_remain_callable() -> None:
+    result = CliRunner().invoke(app, ["production-memory-loop-record-next-operator-action-result", "--help"])
+
+    assert result.exit_code == 0
+    assert "recorded-at" in result.output
 
 
 def test_support_command_registry_keeps_hidden_provider_and_demo_surface() -> None:

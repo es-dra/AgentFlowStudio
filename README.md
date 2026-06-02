@@ -25,8 +25,15 @@ only and is not used as a source-code base.
 ## Current Status
 
 AgentFlow Studio is currently a local-first platform repository with working
-MVP modules and contract-layer AgentFlow helpers. It is not yet a hosted
-platform, consumer SaaS app, desktop app, or Web UI product.
+MVP modules, contract-layer AgentFlow helpers, and a deterministic Production
+Memory Architecture slice. It is positioned as a memory-driven AI content
+production workbench, with `Memory OS` kept as the long-term product vision.
+
+The repository includes a local read-only Web Memory Workbench for selected
+artifact files. That workbench can inspect local JSON/Markdown artifacts and
+render the Production Memory asset loop, but it does not scan directories,
+persist browser state, execute workflows, call providers, or act as a hosted
+Web product.
 
 NarratoStudio's current production-side workflow is:
 
@@ -80,7 +87,7 @@ Supported today:
 
 Not included yet:
 
-- Web UI or desktop UI
+- hosted Web UI, desktop UI, SaaS runtime, or workflow execution UI
 - automatic music selection or licensing management
 - transition templates or multi-track timeline editing
 - visual highlight detection from video frames

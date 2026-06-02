@@ -32,6 +32,7 @@ import {
   productionOperatorRunPackageFacts,
   productionSessionFacts,
 } from "./memory-workbench-production-inspector-facts.js";
+import { artifactFocusTargetsFor, artifactLabelFor } from "./artifact-registry.js?v=m4-memory-canvas-tools";
 
 const TYPE_LABELS = {
   agentflow_memory_video_pipeline_package: "Pipeline package",
@@ -90,7 +91,7 @@ function summarizeArtifact(artifact) {
     id: artifact.fileName,
     artifact_type: type,
     focus_targets: focusTargetsFor(type),
-    title: TYPE_LABELS[type] || type,
+    title: artifactLabelFor(type) || TYPE_LABELS[type] || type,
     status: statusFor(type, payload),
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
@@ -98,6 +99,8 @@ function summarizeArtifact(artifact) {
 }
 
 function focusTargetsFor(type) {
+  const registryTargets = artifactFocusTargetsFor(type);
+  if (registryTargets.length) return registryTargets;
   if (type === "agentflow_memory_video_pipeline_protocol") return ["project", "assets", "memory-loaded"];
   if (type === "agentflow_memory_video_pipeline_package") return ["project", "next-pass"];
   if (type === "agentflow_memory_video_pipeline_review") return ["baseline-run", "memory-backed-run", "review"];

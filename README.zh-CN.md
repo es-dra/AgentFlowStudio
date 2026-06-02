@@ -2,23 +2,36 @@
 
 [English README](README.md)
 
-AgentFlow Studio 是面向 Agent 的内容生产与分发工作流平台。当前仓库容器已经改名为 `AgentFlowStudio`；本阶段刻意不改 Python 包名、CLI 命令、workflow 文件或 artifact 契约。
+AgentFlow Studio 是面向 Agent 的内容生产与分发工作流平台。当前仓库容器
+已经改名为 `AgentFlowStudio`；本阶段刻意不改 Python 包名、CLI 命令、
+workflow 文件或 artifact 契约。
 
 当前顶层模块：
 
 - `agentflow/`：平台合同、harness、router、memory、skills 的逐步迁移层。
-- `narratostudio/`：承制侧结构化内容生产 handoff MVP。
-- `narratocut/`：分发侧短视频高光切片、包装、报告、验收 MVP。
+- `narratostudio/`：制作侧结构化内容 handoff MVP。
+- `narratocut/`：分发侧短视频高光切片、包装、报告和复核 MVP。
 
-NarratoCut 仍然是 Python 实现的 local-first CLI/Agent MVP：每个关键步骤都会写出可读的 JSON 或媒体产物，并且可以通过 inspect/review 做质量检查。
+NarratoCut 仍然是 Python 实现的 local-first CLI/Agent MVP：每个关键步骤
+都会写出可读的 JSON 或媒体 artifact，并且可以通过 inspect/review 做质量
+检查。
 
-这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移来源。
+这是一个 clean-room 项目。之前的 AVP 工作区只作为参考材料，不作为代码迁移
+来源。
 
 ## 当前状态
 
-AgentFlow Studio 当前定位是本地优先的平台仓库，包含已经工作的 MVP 模块和 AgentFlow 合同层 helper。它还不是 Hosted 平台、普通用户 SaaS、桌面端工具或 Web UI 产品。
+AgentFlow Studio 当前是本地优先的平台仓库，包含已经工作的 MVP 模块、
+AgentFlow 合同层 helper，以及确定性的 Production Memory Architecture
+切片。近期产品定位是“记忆驱动的 AI 内容生产工作台”，`Memory OS` 保留为
+长期愿景。
 
-NarratoStudio 当前承制侧 workflow 是：
+仓库已经包含一个本地只读 Web Memory Workbench，用于选择本地 artifact 文件
+并检查 JSON/Markdown 结构，也可以渲染 Production Memory asset loop。它不会
+扫描目录、持久化浏览器状态、执行 workflow、调用 provider，也不是 hosted Web
+产品。
+
+NarratoStudio 当前制作侧 workflow 是：
 
 ```text
 creative_brief
@@ -49,44 +62,50 @@ video / transcript / clip_plan
 
 已经支持：
 
-- script / timestamped transcript 到 highlight_plan
-- mock ASR 和显式 opt-in 的 OpenAI-compatible ASR 路径
-- ClipPlan 与视频元数据校验
-- 基于 FFmpeg 的真实视频切片
-- real clips 到 final_video.mp4 的简单拼接
-- final video 质量检查和 FFmpeg warning 分类
-- subtitles.srt 导出
-- 字幕烧录
-- 封面图导出
-- 本地 BGM 混音和音量配置
-- finished package manifest 索引
-- inspect-run / review-run 质量报告
-- package_report.md 和 delivery-readiness 交付报告
-- draft-plan 静态 workflow 计划
+- deterministic script/transcript highlight workflows
+- OCR-subtitle timeline from frame-level OCR results
+- explainable candidate-window scoring to selected highlights
+- mock and explicit opt-in OpenAI-compatible ASR paths
+- local faster-whisper ASR path for offline product smokes
+- ClipPlan validation against probed video metadata
+- real FFmpeg slicing from existing ClipPlans
+- simple final-video assembly from real clips
+- final video quality hardening with FFmpeg warning classification
+- subtitle export to SRT
+- subtitle burn-in for existing videos and SRT files
+- cover image export from an existing final video
+- local BGM mixing with bounded volume settings
+- finished package manifest indexing
+- PosterFlow Memory Demo with explicit remote-image opt-in and local preview
+- `inspect-run` and `review-run` reports for generated run artifacts
+- `package_report.md` and delivery-readiness reports for handoff
+- `draft-plan` for static workflow plans
+- Production Memory asset loop artifacts and local read-only Web inspection
 
 尚未包含：
 
-- Web UI 或桌面 UI
+- hosted Web UI、桌面 UI、SaaS runtime 或 workflow execution UI
 - 自动选曲或版权管理
-- 转场模板或多轨时间线
+- 转场模板或多轨时间线编辑
 - 基于视频画面的自动高光识别
+- 真实 OCR frame extraction/provider integration
 - 发布平台上传
 - 物理 package 目录或 zip 导出
-- Hosted API、数据库、队列或 SaaS runtime
+- hosted API、数据库、队列或 SaaS runtime
 
 ## 项目结构
 
 ```text
-apps/                 CLI、API 和未来 Web 入口
+apps/                 CLI、API 和本地 Web 入口
 agentflow/            平台合同和 harness 迁移层
-narratostudio/        承制侧结构化 handoff 模块
+narratostudio/        制作侧结构化 handoff 模块
 narratocut/           分发侧媒体 workflow 模块
 workflows/            YAML workflow 定义
 prompts/              可审计 prompt 模板
 configs/              示例配置和 tool catalog
 examples/             面向用户的 demo 输入
 data/                 本地运行数据；生成产物默认被 git 忽略
-docs/                 架构、契约、路线图和验收文档
+docs/                 架构、契约、路线图和 smoke 文档
 tests/                自动化测试和 fixtures
 ```
 
@@ -95,7 +114,8 @@ tests/                自动化测试和 fixtures
 - 推荐 Python 3.12。
 - 项目声明支持 `>=3.11,<3.13`。
 - 暂不建议使用 Python 3.13，因为媒体、ASR 和模型相关依赖可能滞后。
-- 真实视频切片、final video assembly、字幕烧录、封面导出、BGM 混音需要 FFmpeg 和 FFprobe。
+- 真实视频切片、final video assembly、字幕烧录、封面导出、BGM 混音需要
+  FFmpeg 和 FFprobe。
 - 远程 LLM / ASR 默认关闭。
 
 ## 快速开始
@@ -133,11 +153,12 @@ slice_manifest.json
 clips/
 ```
 
-`data/processed/`、`data/reports/` 和 `data/raw/` 下的本地媒体/运行产物默认被 git 忽略。
+`data/processed/`、`data/reports/` 和 `data/raw/` 下的本地媒体/运行产物
+默认被 git 忽略。
 
 ## 产品级 Golden Path
 
-Phase 13 之后，推荐用 Golden Path 做本地产品验收：
+Phase 13 之后，推荐用 Golden Path 做本地产品 smoke：
 
 ```text
 source video + clip_plan
@@ -151,7 +172,9 @@ source video + clip_plan
   -> inspect/review
 ```
 
-所需本地文件、命令、预期产物和验收标准见 [`docs/golden_path.md`](docs/golden_path.md)。v0.1.0 的最小验收路径见 [`docs/golden_sample_v0_1_0.md`](docs/golden_sample_v0_1_0.md)。
+所需本地文件、命令、预期产物和验收标准见
+[`docs/golden_path.md`](docs/golden_path.md)。v0.1.0 的最小验收路径见
+[`docs/golden_sample_v0_1_0.md`](docs/golden_sample_v0_1_0.md)。
 
 ## 主要 Workflow
 
@@ -210,7 +233,8 @@ finished_package_manifest.json
 
 ## 远程 Provider 边界
 
-默认模型和 ASR 路径都是本地/mock。标准 CLI 和 workflow 不需要 API key，也不会访问网络。
+默认模型和 ASR 路径都是本地/mock。标准 CLI 和 workflow 不需要 API key，
+也不会访问网络。
 
 远程 LLM 需要显式开启：
 
@@ -224,7 +248,8 @@ $env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
 $env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
 ```
 
-本地模型配置应写入被 git 忽略的 `configs/models.yaml`。仓库只提交 `configs/models.example.yaml` 等示例配置。
+本地模型配置应写入被 git 忽略的 `configs/models.yaml`。仓库只提交
+`configs/models.example.yaml` 等示例配置。
 
 ## FFmpeg 边界
 
@@ -234,7 +259,8 @@ $env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
 .venv\Scripts\ncut ffmpeg-check --json
 ```
 
-如果没有 FFmpeg，mock workflows 仍可运行。真实媒体 workflow 需要 FFmpeg/FFprobe。
+如果没有 FFmpeg，mock workflows 仍可运行。真实媒体 workflow 需要
+FFmpeg/FFprobe。
 
 ## 开发检查
 
