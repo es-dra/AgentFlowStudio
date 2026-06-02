@@ -21,6 +21,9 @@ from apps.cli.production_memory_loop_command import (
     production_memory_loop_run_reviewed_feedback_no_provider_command,
     production_memory_loop_validate_command,
 )
+from apps.cli.production_memory_acceptance_feedback_command import (
+    production_memory_loop_record_acceptance_feedback_command,
+)
 from apps.cli.production_memory_next_context_command import production_memory_loop_next_context_handoff_command
 from apps.cli.production_memory_next_pass_promotion_command import (
     production_memory_loop_review_next_pass_promotion_command,
@@ -110,6 +113,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-capture-operator-feedback")(
         production_memory_loop_capture_operator_feedback_command
+    )
+    app.command(name="production-memory-loop-record-acceptance-feedback")(
+        production_memory_loop_record_acceptance_feedback_command
     )
     app.command(name="production-memory-loop-draft-operator-feedback-candidate")(
         production_memory_loop_draft_operator_feedback_candidate_command

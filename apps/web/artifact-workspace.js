@@ -4,7 +4,7 @@ import { asList, asObject, asText, collectChecks, normalizeStatus } from "./arti
 
 export { asText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 
-const AGENTFLOW_KIND_ARTIFACTS = new Set(["agentflow_production_memory_loop", "agentflow_production_memory_operator_loop_run", "agentflow_production_memory_operator_manifest_check", "agentflow_production_memory_operator_handoff_packet", "agentflow_production_memory_operator_run_package", "agentflow_production_memory_next_context_handoff", "agentflow_production_memory_next_task_packet", "agentflow_production_memory_next_pass_review", "agentflow_production_memory_next_pass_result", "agentflow_company_kb_feedback_candidate_packet"]);
+const AGENTFLOW_KIND_ARTIFACTS = new Set(["agentflow_production_memory_loop", "agentflow_production_memory_operator_loop_run", "agentflow_production_memory_operator_manifest_check", "agentflow_production_memory_operator_handoff_packet", "agentflow_production_memory_operator_run_package", "agentflow_production_memory_acceptance_feedback_event", "agentflow_production_memory_next_context_handoff", "agentflow_production_memory_next_task_packet", "agentflow_production_memory_next_pass_review", "agentflow_production_memory_next_pass_result", "agentflow_company_kb_feedback_candidate_packet"]);
 
 export async function parseFiles(files) {
   const artifacts = [];
@@ -98,6 +98,7 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryOperatorManifestCheck = byType("agentflow_production_memory_operator_manifest_check") || null;
   const productionMemoryOperatorHandoffPacket = byType("agentflow_production_memory_operator_handoff_packet") || null;
   const productionMemoryOperatorRunPackage = byType("agentflow_production_memory_operator_run_package") || null;
+  const productionMemoryAcceptanceFeedbackEvent = byType("agentflow_production_memory_acceptance_feedback_event") || null;
   const productionMemoryNextContextHandoff = byType("agentflow_production_memory_next_context_handoff") || null;
   const productionMemoryNextTaskPacket = byType("agentflow_production_memory_next_task_packet") || null;
   const productionMemoryNextPassResult = byType("agentflow_production_memory_next_pass_result") || null;
@@ -118,6 +119,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryOperatorManifestCheck,
     productionMemoryOperatorHandoffPacket,
     productionMemoryOperatorRunPackage,
+    productionMemoryAcceptanceFeedbackEvent,
     productionMemoryNextContextHandoff,
     productionMemoryNextTaskPacket,
     productionMemoryNextPassResult,

@@ -9,6 +9,48 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Acceptance Feedback 001
+
+- Continued from
+  `codex/afs-production-memory-run-package-check-cli-report-001` on
+  `codex/afs-production-memory-acceptance-feedback-001`.
+- Added `production-memory-loop-record-acceptance-feedback` for recording a
+  human-supplied `accepted`, `rejected`, or `needs_revision` decision from one
+  explicit `operator_run_package_check.json`.
+- Added `agentflow_production_memory_acceptance_feedback_event` with JSON and
+  Markdown outputs. `accepted` requires the source package check to be passed
+  and ready for handoff; `rejected` and `needs_revision` can preserve blockers.
+- Added a read-only generic Web workbench canvas for selected acceptance
+  feedback event JSON, including source check status, acceptance decision,
+  business-validation boundary, memory boundary, and no-provider controls.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no Loulan behavior, no business validation, no
+  provider success claim, and no memory promotion.
+- Verification:
+  - Red test failed first because the acceptance feedback module did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_acceptance_feedback.py -q`
+    -> 4 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_acceptance_feedback.py -q`
+    -> 2 passed.
+  - Smoke initially failed because the source package check contained a legal
+    ignored runtime ref under `data/processed/runs`; acceptance-feedback safety
+    scanning now allows source refs from ignored runtime output while keeping
+    human input, provider URL, media, and secret scanning strict.
+  - Py compile for touched Python files passed.
+  - JS import smoke for the new Web module/controller/workspace passed.
+  - Focused production-memory/Web/contract regression passed (`52 passed`).
+  - CLI help for `production-memory-loop-record-acceptance-feedback` passed.
+  - CLI smoke wrote ignored `acceptance_feedback_event.json` and
+    `acceptance_feedback_event.md`; the JSON had `status=human_recorded`,
+    `acceptance_decision=accepted`, `source_check_status=passed`,
+    `business_validation=not_validated`, no provider call, no Company KB write,
+    no memory candidate, and no promotion decision.
+  - Full suite passed on Python 3.12.12 (`833 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Added-diff and new-file sensitive scans were clean.
+  - Line counts: acceptance feedback module 204, CLI 57, Web view 125,
+    Python test 127, Web static test 131, `artifact-workspace.js` 282.
+
 ## 2026-06-02 - Production Memory Run Package Check CLI Report 001
 
 - Continued from

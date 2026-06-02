@@ -72,6 +72,19 @@ export function productionOperatorFeedbackFacts(payload) {
   ];
 }
 
+export function productionAcceptanceFeedbackFacts(payload) {
+  return [
+    fact("status", payload.status || "unknown"),
+    fact("acceptance_decision", payload.acceptance_decision || "unknown"),
+    fact("source_check_status", payload.source_check_status || "unknown"),
+    fact("source_ready_for_handoff", yesNo(payload.source_ready_for_handoff)),
+    fact("business_validation", payload.business_validation || "not_validated"),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionOperatorFeedbackCandidateFacts(payload) {
   return [
     fact("candidate_generation_status", payload.candidate_generation_status || "unknown"),

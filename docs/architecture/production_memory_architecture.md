@@ -42,6 +42,7 @@ project_input
   -> operator_handoff_packet
   -> operator_run_package
   -> operator_run_package_check
+  -> explicit acceptance_feedback_event
 ```
 
 The committed example lives at:
@@ -137,6 +138,12 @@ The required root identifiers are:
   boundaries at handoff time without following refs into workflow execution.
   The operator-loop writer can emit both the machine JSON and an operator-
   readable Markdown report.
+- `acceptance_feedback_event`: human-supplied accept, reject, or
+  needs-revision feedback recorded from an explicit operator run package check.
+  An `accepted` decision requires a passed, ready package check. This event
+  records human acceptance feedback only; it does not create memory candidates,
+  create promotion decisions, write durable memory, write Company KB, call
+  providers, or claim business validation.
 
 All derived artifacts declare:
 
@@ -193,6 +200,10 @@ All derived artifacts declare:
   claim human acceptance.
 - Operator run package checks cannot make a package ready by themselves; they
   can only confirm or block the package as a handoff entry artifact.
+- Acceptance feedback events can record a human-supplied package decision only
+  after reading one explicit operator run package check. `accepted` requires a
+  passed and ready check; `rejected` and `needs_revision` can preserve blockers
+  without converting them into memory or business validation.
 
 ## CLI Surface
 
@@ -219,6 +230,7 @@ python -m apps.cli.main production-memory-loop-review-operator-feedback-candidat
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --output data/processed/runs/production_memory_loop/operator_run_package_smoke
 python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --markdown-output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.md
+python -m apps.cli.main production-memory-loop-record-acceptance-feedback data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --decision accepted --summary "Human operator accepted the package for the next local iteration." --reviewed-at 2026-06-03T00:05:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -338,6 +350,11 @@ The operator feedback candidate reviewed run command writes:
 - `next_pass_bundle.json`
 - `operator_feedback_candidate_promotion_overlay.json`
 
+The acceptance feedback command writes:
+
+- `acceptance_feedback_event.json`
+- `acceptance_feedback_event.md`
+
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
@@ -434,6 +451,12 @@ does not call providers, execute workflows, write durable memory, write Company
 KB, or claim human acceptance. The Markdown report is a readable presentation
 of the same check result and boundaries; it is not a separate approval record.
 
+The acceptance feedback event is a separate human-supplied record after the
+machine check. It can record `accepted`, `rejected`, or `needs_revision` for
+the package, but it keeps `business_validation: not_validated`,
+`feedback_is_memory: false`, `creates_memory_candidate: false`, and
+`creates_promotion_decision: false`.
+
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
 candidate items with `requires_human_review: true`,
@@ -458,6 +481,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_handoff_packet`
 - `agentflow_production_memory_operator_run_package`
 - `agentflow_production_memory_operator_run_package_check`
+- `agentflow_production_memory_acceptance_feedback_event`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
 - `agentflow_production_memory_next_pass_result`
@@ -503,6 +527,13 @@ failed controls, no-provider controls, and non-claim boundaries. They confirm
 or block the package as a next-operator entry artifact only; they do not follow
 refs from the browser, execute workflows, call providers, write Company KB,
 claim provider success, or promote durable memory.
+
+Acceptance feedback event artifacts render as a read-only human feedback canvas
+with the explicit package decision, source check status, ready-for-handoff
+state, business-validation boundary, memory boundary, no-provider controls, and
+non-claim boundaries. They do not follow refs from the browser, execute
+workflows, call providers, write Company KB, claim provider success, promote
+memory, or claim business validation.
 
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and
@@ -566,9 +597,11 @@ It does not:
 
 ## Non-Claims
 
-This slice is structure and runtime verification only. It is not:
+Machine-generated production-memory artifacts are structure and runtime
+verification only. The only artifact in this loop that can record human
+acceptance is an explicit `acceptance_feedback_event`, and that event still is
+not:
 
-- human acceptance;
 - business validation;
 - durable Memory OS;
 - provider success;
