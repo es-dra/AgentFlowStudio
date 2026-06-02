@@ -24,6 +24,7 @@ from agentflow.memory.production_operator_feedback_candidate_overlay import (
 from agentflow.memory.production_operator_feedback_candidate_promotion import (
     write_operator_feedback_candidate_promotion_decision,
 )
+from agentflow.memory.production_operator_handoff import build_operator_handoff_packet, write_operator_handoff_packet
 from agentflow.memory.production_operator_manifest import build_operator_manifest
 from agentflow.memory.production_operator_manifest_check import check_operator_manifest, write_operator_manifest_check
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
@@ -131,6 +132,7 @@ def write_production_memory_operator_loop_run(
     output_dir: str | Path,
     *,
     write_manifest_check: bool = False,
+    write_handoff_packet: bool = False,
 ) -> list[Path]:
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
@@ -194,7 +196,7 @@ def write_production_memory_operator_loop_run(
     manifest_path = write_json(output_root / "production_memory_operator_loop_run.json", manifest)
     written_paths.append(manifest_path)
     result["manifest"] = manifest
-    if write_manifest_check:
+    if write_manifest_check or write_handoff_packet:
         check = check_operator_manifest(manifest_path)
         result["operator_manifest_check"] = check
         written_paths.append(
@@ -203,6 +205,14 @@ def write_production_memory_operator_loop_run(
                 output_root / "operator_manifest_check" / "operator_manifest_check.json",
             )
         )
+    if write_handoff_packet:
+        packet = build_operator_handoff_packet(
+            result["manifest"],
+            manifest_check=result["operator_manifest_check"],
+            generated_at=str(result["manifest"].get("generated_at", "")),
+        )
+        result["operator_handoff_packet"] = packet
+        written_paths.extend(write_operator_handoff_packet(packet, output_root / "operator_handoff"))
     return written_paths
 
 

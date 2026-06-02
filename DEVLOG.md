@@ -9,6 +9,39 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Handoff Output 001
+
+- Continued from
+  `codex/afs-production-memory-operator-handoff-web-001` on
+  `codex/afs-production-memory-operator-loop-handoff-output-001`.
+- Added `--write-handoff-packet` to
+  `production-memory-loop-run-operator-no-provider`.
+- The option writes the operator manifest check and then writes
+  `operator_handoff/operator_handoff_packet.json` plus Markdown in the same
+  no-provider operator-loop run.
+- Writer behavior keeps `--write-manifest-check` available, and
+  `--write-handoff-packet` implicitly writes the manifest check because handoff
+  readiness depends on explicit manifest-check evidence.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no automatic memory promotion, no Loulan
+  behavior, no human acceptance, and no business validation claim.
+- Verification so far:
+  - Red tests failed first because `write_handoff_packet` and
+    `--write-handoff-packet` did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_loop_manifest_check.py -q`
+    -> 4 passed.
+  - Focused operator/handoff/check/registry/contract suite passed
+    (`49 passed`).
+  - CLI help lists `--write-handoff-packet`.
+  - CLI smoke wrote ignored runtime artifacts under
+    `data/processed/runs/production_memory_loop/operator_loop_handoff_smoke/`,
+    including `operator_manifest_check/operator_manifest_check.json` and
+    `operator_handoff/operator_handoff_packet.json` plus Markdown.
+  - Full suite passed on Python 3.12.12 (`810 passed`).
+  - Line counts: operator loop 267, operator CLI 174, manifest-check test 131.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff and new-file sensitive scans were clean.
+
 ## 2026-06-02 - Production Memory Operator Handoff Web 001
 
 - Continued from

@@ -79,6 +79,11 @@ def production_memory_loop_run_operator_no_provider_command(
         "--write-manifest-check",
         help="Write a read-only operator manifest consistency check report after generating artifacts.",
     ),
+    write_handoff_packet: bool = typer.Option(
+        False,
+        "--write-handoff-packet",
+        help="Write a no-provider operator handoff packet after the manifest check report.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -119,6 +124,7 @@ def production_memory_loop_run_operator_no_provider_command(
             result,
             output_dir,
             write_manifest_check=write_manifest_check,
+            write_handoff_packet=write_handoff_packet,
         )
     except ValueError as exc:
         typer.echo(f"Production memory operator loop failed: {exc}", err=True)
@@ -144,6 +150,8 @@ def production_memory_loop_run_operator_no_provider_command(
         )
     if "operator_manifest_check" in result:
         typer.echo(f"Operator manifest check: {result['operator_manifest_check']['check_status']}")
+    if "operator_handoff_packet" in result:
+        typer.echo(f"Operator handoff packet: {result['operator_handoff_packet']['handoff_status']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
