@@ -9,6 +9,36 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Manifest Check 001
+
+- Continued from `codex/afs-production-memory-operator-manifest-split-001`
+  on `codex/afs-production-memory-operator-manifest-check-001`.
+- Added a read-only no-provider operator manifest consistency check:
+  `production-memory-loop-check-operator-manifest`.
+- The check verifies generated artifact refs listed in
+  `production_memory_operator_loop_run.json`, reports missing refs,
+  mismatched artifact kinds, unsafe refs, failed nodes, failed controls, and
+  write/provider boundary flags.
+- Boundary kept: no workflow execution from the check, no Web behavior change,
+  no provider call, no Company KB write, no durable memory write, no Loulan
+  behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - Red test failed first with missing
+    `agentflow.memory.production_operator_manifest_check` module.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_manifest_check.py -q`
+    -> 5 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_manifest_check.py tests\test_production_memory_operator_loop.py tests\test_cli_command_registry_boundaries.py -q`
+    -> 14 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow\memory\production_operator_manifest_check.py apps\cli\production_memory_operator_manifest_check_command.py apps\cli\command_registry.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m apps.cli.main --help`
+    -> passed and lists `production-memory-loop-check-operator-manifest`.
+  - CLI smoke wrote ignored artifacts under
+    `data/processed/runs/production_memory_loop/operator_manifest_check` and
+    the operator manifest check passed with 15 checked refs, 0 missing refs, 0
+    mismatched refs, 0 failed nodes, and 0 failed controls.
+  - Full suite passed on Python 3.12.12 (`795 passed`).
+
 ## 2026-06-02 - Production Memory Operator Manifest Split 001
 
 - Continued from
