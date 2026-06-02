@@ -35,6 +35,9 @@ from apps.cli.production_memory_operator_command import production_memory_loop_r
 from apps.cli.production_memory_operator_manifest_check_command import (
     production_memory_loop_check_operator_manifest_command,
 )
+from apps.cli.production_memory_operator_run_package_check_command import (
+    production_memory_loop_check_operator_run_package_command,
+)
 from apps.cli.production_memory_operator_feedback_candidate_command import (
     production_memory_loop_draft_operator_feedback_candidate_command,
 )
@@ -98,6 +101,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-check-operator-manifest")(
         production_memory_loop_check_operator_manifest_command
+    )
+    app.command(name="production-memory-loop-check-operator-run-package")(
+        production_memory_loop_check_operator_run_package_command
     )
     app.command(name="production-memory-loop-operator-handoff-packet")(
         production_memory_loop_operator_handoff_packet_command

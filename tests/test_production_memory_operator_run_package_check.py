@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from agentflow.memory.production_loop import load_production_memory_loop
+from agentflow.memory.production_operator_loop import (
+    build_production_memory_operator_loop_run,
+    write_production_memory_operator_loop_run,
+)
+from agentflow.memory.production_operator_run_package_check import (
+    OPERATOR_RUN_PACKAGE_CHECK_KIND,
+    check_operator_run_package,
+)
+
+
+EXAMPLE_PATH = Path("examples/agentflow/production_memory_loop.example.json")
+
+
+def _write_operator_run_package(tmp_path: Path) -> Path:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-02T20:30:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+    write_production_memory_operator_loop_run(result, tmp_path, write_run_package=True)
+    return tmp_path / "operator_run_package" / "operator_run_package.json"
+
+
+def test_operator_run_package_check_passes_complete_package(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+
+    check = check_operator_run_package(package_path)
+
+    assert check["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
+    assert check["check_status"] == "passed"
+    assert check["package_status"] == "ready"
+    assert check["ready_for_handoff"] is True
+    assert check["provider_calls_started"] is False
+    assert check["writes_long_term_memory"] is False
+    assert check["writes_company_kb"] is False
+    assert check["missing_refs"] == []
+    assert check["mismatched_refs"] == []
+    assert check["unsafe_refs"] == []
+    assert check["failed_controls"] == []
+    assert check["checked_item_count"] == len(check["checked_items"])
+    assert "operator_handoff/operator_handoff_packet.json" in {item["path"] for item in check["checked_items"]}
+
+
+def test_operator_run_package_check_reports_missing_package_item(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+    (tmp_path / "operator_handoff" / "operator_handoff_packet.json").unlink()
+
+    check = check_operator_run_package(package_path)
+
+    assert check["check_status"] == "failed"
+    assert check["ready_for_handoff"] is False
+    assert check["missing_refs"] == ["operator_handoff/operator_handoff_packet.json"]
+
+
+def test_operator_run_package_check_blocks_provider_and_write_boundaries(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+    package = json.loads(package_path.read_text(encoding="utf-8"))
+    package["provider_calls_started"] = True
+    package["writes_company_kb"] = True
+    package_path.write_text(json.dumps(package), encoding="utf-8")
+
+    check = check_operator_run_package(package_path)
+
+    assert check["check_status"] == "failed"
+    assert check["ready_for_handoff"] is False
+    assert check["provider_calls_started"] is True
+    assert check["writes_company_kb"] is True
+    failed_controls = {item["control_id"]: item["status"] for item in check["failed_controls"]}
+    assert failed_controls["provider_calls_not_started"] == "failed"
+    assert failed_controls["company_kb_write_disabled"] == "failed"
+
+
+def test_operator_run_package_check_cli_writes_report_and_fails_on_missing_ref(tmp_path: Path) -> None:
+    package_path = _write_operator_run_package(tmp_path)
+    report_path = tmp_path / "operator_run_package_check.json"
+
+    success = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.cli.main",
+            "production-memory-loop-check-operator-run-package",
+            str(package_path),
+            "--output",
+            str(report_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Operator run package check: passed" in success.stdout
+    assert "Missing package items: 0" in success.stdout
+    assert report_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
+    assert report["check_status"] == "passed"
+
+    (tmp_path / "operator_manifest_check" / "operator_manifest_check.json").unlink()
+    failure = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.cli.main",
+            "production-memory-loop-check-operator-run-package",
+            str(package_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert failure.returncode == 1
+    assert "Operator run package check: failed" in failure.stdout
+    assert "Missing package items: 1" in failure.stdout

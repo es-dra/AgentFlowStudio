@@ -9,6 +9,38 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Run Package Check 001
+
+- Continued from
+  `codex/afs-production-memory-operator-run-package-web-001` on
+  `codex/afs-production-memory-operator-run-package-check-001`.
+- Added `agentflow_production_memory_operator_run_package_check` as a read-only
+  handoff-time consistency check for selected operator run packages.
+- Added `production-memory-loop-check-operator-run-package`; the command reads
+  one explicit `operator_run_package.json`, verifies package item refs and
+  no-provider/write boundaries, and optionally writes a JSON check report.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no ref following beyond existence/type checks,
+  no Loulan behavior, no human acceptance, and no business validation claim.
+- Verification so far:
+  - Red test failed first because
+    `agentflow.memory.production_operator_run_package_check` did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package_check.py -q`
+    -> 4 passed.
+  - Focused operator/run-package/check/registry suite passed (`23 passed`).
+  - CLI help for `production-memory-loop-check-operator-run-package` passed.
+  - CLI smoke wrote an ignored
+    `operator_run_package_check/operator_run_package_check.json` report with
+    `check_status=passed`, `ready_for_handoff=true`, 18 checked items, and no
+    missing refs.
+  - Full suite passed on Python 3.12.12 (`821 passed`).
+  - `python -m apps.cli.main --help` lists
+    `production-memory-loop-check-operator-run-package`.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff sensitive scan was clean.
+  - Line counts: run-package check module 178, CLI command 55, command
+    registry 178, focused test 101.
+
 ## 2026-06-02 - Production Memory Operator Run Package Web 001
 
 - Continued from

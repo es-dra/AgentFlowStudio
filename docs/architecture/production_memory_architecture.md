@@ -131,6 +131,9 @@ The required root identifiers are:
   handoff Markdown, and manifest output refs. It is an entry artifact for the
   next operator, not a new memory store, provider validation, or acceptance
   record.
+- `operator_run_package_check`: read-only handoff consistency check for a
+  selected run package. It verifies package item refs and no-provider/write
+  boundaries at handoff time without following refs into workflow execution.
 
 All derived artifacts declare:
 
@@ -185,6 +188,8 @@ All derived artifacts declare:
 - Operator run packages are final run indexes only. They do not execute a
   provider call, write Company KB, write durable memory, promote candidates, or
   claim human acceptance.
+- Operator run package checks cannot make a package ready by themselves; they
+  can only confirm or block the package as a handoff entry artifact.
 
 ## CLI Surface
 
@@ -210,6 +215,7 @@ python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate
 python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --output data/processed/runs/production_memory_loop/operator_run_package_smoke
+python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
