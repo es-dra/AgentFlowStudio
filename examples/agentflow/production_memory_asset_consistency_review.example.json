@@ -1,0 +1,31 @@
+{
+  "kind": "agentflow_production_memory_asset_consistency_review_fixture",
+  "artifact_type": "agentflow_production_memory_asset_consistency_review_fixture",
+  "schema_version": "production-memory-loop/v1",
+  "fixture_id": "asset-consistency-fixture:generic-character-cross-scene-001",
+  "project_id": "project:generic-content-loop",
+  "source_context_projection_ref": "asset-profile-context-projection:no-provider",
+  "source_result_ref": "next-pass-result:sanitized-cross-scene-001",
+  "source_feedback_input_type": "json_fixture",
+  "comparison_scope": "cross_scene",
+  "review_items": [
+    {
+      "profile_ref": "asset-profile:character:lead:v2",
+      "profile_kind": "character",
+      "output_refs": [
+        "output:scene-001",
+        "output:scene-002"
+      ],
+      "review_dimension": "character_identity",
+      "review_result": "kept",
+      "failure_attribution": "unknown",
+      "drift_observations": [],
+      "violated_constraints": [],
+      "evidence_refs": [
+        "output:scene-001",
+        "output:scene-002"
+      ],
+      "suggested_next_state": "no_change"
+    }
+  ]
+}
