@@ -21,6 +21,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "production-memory-loop-next-operator-start-packet" in source
     assert "production-memory-loop-record-next-operator-start" in source
     assert "production-memory-loop-record-next-operator-action-result" in source
+    assert "production-memory-loop-record-action-result-acceptance-feedback" in source
 
 
 def test_support_command_registry_keeps_hidden_provider_and_demo_surface() -> None:

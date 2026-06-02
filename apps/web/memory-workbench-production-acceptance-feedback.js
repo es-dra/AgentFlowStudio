@@ -6,11 +6,13 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
 
   const payload = artifact.payload;
   const boundaries = payload.claim_boundaries || {};
+  const source = sourceInfo(payload);
   const ready = payload.status === "human_recorded"
     && payload.provider_calls_started === false
     && payload.writes_long_term_memory === false
     && payload.writes_company_kb === false
     && payload.business_validation === "not_validated";
+  const reusableForNextPass = ready && source.ready;
 
   return {
     ...fallback,
@@ -23,7 +25,7 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
     },
     workflow_actions: [
       action("inspect_acceptance_feedback", "Inspect feedback", ready ? "review ready" : "blocked", "feedback"),
-      action("inspect_source_check", "Inspect source check", payload.source_check_status ? "review ready" : "missing", "review"),
+      action("inspect_source_artifact", `Inspect ${source.shortLabel}`, source.status !== "unknown" ? "review ready" : "missing", "review"),
       action("inspect_boundaries", "Inspect boundaries", "blocked", "memory-loaded"),
       action("start_business_validation", "Business validation", "blocked", "next-pass"),
     ],
@@ -31,14 +33,14 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
       {
         id: payload.feedback_id || artifact.fileName,
         label: "acceptance feedback event",
-        detail: payload.source_package_path || "source package not recorded",
+        detail: source.path,
         status: ready ? "review ready" : "blocked",
       },
     ],
     bundle_summary: [
       card("acceptance_decision", "Acceptance decision", ready ? "review ready" : "blocked", payload.acceptance_decision || "unknown"),
-      card("source_check", "Source check", payload.source_check_status === "passed" ? "review ready" : "blocked", payload.source_check_status || "unknown"),
-      card("ready_for_handoff", "Ready for handoff", payload.source_ready_for_handoff === true ? "review ready" : "blocked", boolText(payload.source_ready_for_handoff)),
+      card("source_artifact", source.title, source.ready ? "review ready" : "blocked", source.status),
+      card("ready_for_source_use", source.readyTitle, source.ready ? "review ready" : "blocked", boolText(source.ready)),
       card("business_validation", "Business validation", "blocked", payload.business_validation || "not_validated"),
       card("memory_boundary", "Memory boundary", payload.feedback_is_memory === false ? "review ready" : "blocked", "feedback is not memory"),
     ],
@@ -47,7 +49,7 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
         id: payload.feedback_id || "acceptance-feedback",
         title: payload.acceptance_scope || "operator run package",
         why_eligible: "human-supplied acceptance feedback is selected evidence only",
-        source_evidence_refs: [payload.source_package_path || "operator run package check"],
+        source_evidence_refs: [source.path],
         promotion_status: "not_promoted",
         request_projection: payload.summary || "not recorded",
         feedback_effect: "records human acceptance decision without business validation or memory promotion",
@@ -55,8 +57,8 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
       },
     ],
     lanes: [
-      lane("acceptance-feedback", "Acceptance feedback", ready ? "review ready" : "blocked", payload.source_check_status || "unknown", payload.acceptance_decision || "unknown"),
-      lane("source-package-check", "Source package check", payload.source_ready_for_handoff ? "ready" : "blocked", payload.source_package_path || "unknown", payload.source_check_status || "unknown"),
+      lane("acceptance-feedback", "Acceptance feedback", ready ? "review ready" : "blocked", source.status, payload.acceptance_decision || "unknown"),
+      lane(source.id, source.title, source.ready ? "ready" : "blocked", source.path, source.status),
       lane("business-boundary", "Business boundary", "blocked", "human feedback", payload.business_validation || "not_validated"),
       lane("memory-boundary", "Memory boundary", payload.feedback_is_memory === false ? "review ready" : "blocked", "feedback", "not memory"),
     ],
@@ -74,7 +76,7 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
       boundaries: boundaryItems(payload),
     },
     review: {
-      storyboard_adherence: `source_check=${payload.source_check_status || "unknown"}`,
+      storyboard_adherence: `${source.factLabel}=${source.status}`,
       visual_consistency: `decision=${payload.acceptance_decision || "unknown"}`,
       boundary: "human acceptance feedback only / no business validation / no memory promotion",
     },
@@ -83,16 +85,57 @@ export function buildProductionMemoryAcceptanceFeedbackView(workspace, fallback)
       summary: payload.summary || "acceptance feedback recorded without promotion side effects",
     },
     next_pass: {
-      status: payload.acceptance_decision === "accepted" && ready ? "ready" : "blocked",
-      action: payload.acceptance_decision === "accepted" && ready ? "continue_operator_iteration" : "resolve_acceptance_feedback_blockers",
+      status: payload.acceptance_decision === "accepted" && reusableForNextPass ? "ready" : "blocked",
+      action: nextPassAction(payload, source, reusableForNextPass),
     },
     timeline: [
-      step("Source package check", payload.source_check_status || "unknown", payload.source_package_path),
+      step(source.title, source.status, source.path),
       step("Human feedback", payload.status || "unknown", payload.acceptance_decision),
       step("Business validation", "blocked", payload.business_validation || "not_validated"),
       step("Memory promotion", "blocked", boundaries.memory_promotion || "not_performed"),
     ],
   };
+}
+
+function sourceInfo(payload) {
+  if (isActionResultSource(payload)) {
+    const status = payload.source_artifact_status || payload.source_action_result_status || "unknown";
+    return {
+      id: "source-action-result",
+      title: "Source action result",
+      shortLabel: "source action result",
+      readyTitle: "Ready for acceptance",
+      factLabel: "source_action_result",
+      status,
+      ready: payload.source_ready_for_acceptance === true,
+      path: payload.source_artifact_path || "next operator action result not recorded",
+    };
+  }
+  return {
+    id: "source-package-check",
+    title: "Source package check",
+    shortLabel: "source package check",
+    readyTitle: "Ready for handoff",
+    factLabel: "source_check",
+    status: payload.source_check_status || payload.source_artifact_status || "unknown",
+    ready: payload.source_ready_for_handoff === true,
+    path: payload.source_package_path || payload.source_artifact_path || "operator run package check not recorded",
+  };
+}
+
+function isActionResultSource(payload) {
+  return payload.feedback_scope === "next_operator_action_result"
+    || payload.source_artifact_type === "agentflow_production_memory_next_operator_action_result";
+}
+
+function nextPassAction(payload, source, ready) {
+  if (payload.acceptance_decision !== "accepted" || !ready) {
+    return "resolve_acceptance_feedback_blockers";
+  }
+  if (source.id === "source-action-result") {
+    return "draft_acceptance_feedback_candidate_from_action_result";
+  }
+  return "continue_operator_iteration";
 }
 
 function boundaryItems(payload) {

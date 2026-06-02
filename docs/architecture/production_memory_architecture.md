@@ -49,6 +49,7 @@ project_input
   -> next_operator_start_packet
   -> explicit next_operator_start_event
   -> explicit next_operator_action_result
+  -> explicit action_result acceptance_feedback_event
 ```
 
 The committed example lives at:
@@ -145,8 +146,10 @@ The required root identifiers are:
   The operator-loop writer can emit both the machine JSON and an operator-
   readable Markdown report.
 - `acceptance_feedback_event`: human-supplied accept, reject, or
-  needs-revision feedback recorded from an explicit operator run package check.
-  An `accepted` decision requires a passed, ready package check. This event
+  needs-revision feedback recorded from an explicit operator run package check
+  or an explicit next-operator action result. An `accepted` package decision
+  requires a passed, ready package check; an `accepted` action-result decision
+  requires a completed action result with at least one result ref. This event
   records human acceptance feedback only; it does not create memory candidates,
   create promotion decisions, write durable memory, write Company KB, call
   providers, or claim business validation.
@@ -243,9 +246,16 @@ All derived artifacts declare:
   after reading one explicit operator run package check. `accepted` requires a
   passed and ready check; `rejected` and `needs_revision` can preserve blockers
   without converting them into memory or business validation.
+- Acceptance feedback events can also record a human-supplied action-result
+  decision only after reading one explicit next-operator action result.
+  `accepted` requires `action_completed`, `completed`, and at least one result
+  ref; `rejected` and `needs_revision` can preserve action-result blockers
+  without converting them into memory or business validation.
 - Acceptance feedback candidate packets are still candidate-only. Their
   pending promotion templates cannot enter next context as reviewed decisions.
-  Rejected or needs-revision source feedback produces a blocked candidate.
+  Rejected or needs-revision source feedback produces a blocked candidate. A
+  candidate packet drafted from action-result acceptance feedback targets that
+  action result, not the prior operator run package.
 - Acceptance feedback candidate reuse requires an explicit
   `acceptance_feedback_candidate_promotion_decision`; the pending template is
   never sufficient.
@@ -304,6 +314,7 @@ python -m apps.cli.main production-memory-loop-run-acceptance-feedback-candidate
 python -m apps.cli.main production-memory-loop-next-operator-start-packet data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --generated-at 2026-06-03T09:30:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_packet
 python -m apps.cli.main production-memory-loop-record-next-operator-start data/processed/runs/production_memory_loop/next_operator_start_packet/next_operator_start_packet.json --decision started --summary "Next operator received the checked start packet." --recorded-at 2026-06-03T09:45:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_event
 python -m apps.cli.main production-memory-loop-record-next-operator-action-result data/processed/runs/production_memory_loop/next_operator_start_event/next_operator_start_event.json --decision completed --summary "Next operator completed the recorded action and produced a local result ref." --result-ref next_pass_result/next_pass_result.json --recorded-at 2026-06-03T10:30:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_action_result
+python -m apps.cli.main production-memory-loop-record-action-result-acceptance-feedback data/processed/runs/production_memory_loop/next_operator_action_result/next_operator_action_result.json --decision accepted --summary "Human operator accepted the completed action result for the next local iteration." --reviewed-at 2026-06-03T10:35:00+08:00 --output data/processed/runs/production_memory_loop/action_result_acceptance_feedback
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -715,11 +726,12 @@ content quality, next-pass execution success, memory candidate creation,
 promotion-decision creation, Company KB promotion, or durable memory promotion.
 
 Acceptance feedback event artifacts render as a read-only human feedback canvas
-with the explicit package decision, source check status, ready-for-handoff
-state, business-validation boundary, memory boundary, no-provider controls, and
-non-claim boundaries. They do not follow refs from the browser, execute
-workflows, call providers, write Company KB, claim provider success, promote
-memory, or claim business validation.
+with the explicit decision, source artifact status, source readiness state,
+business-validation boundary, memory boundary, no-provider controls, and
+non-claim boundaries. The source can be either an operator run package check or
+a next-operator action result. They do not follow refs from the browser,
+execute workflows, call providers, write Company KB, claim provider success,
+promote memory, or claim business validation.
 
 Acceptance feedback candidate packet artifacts render as a read-only candidate
 review canvas with the source acceptance feedback, memory candidate, pending

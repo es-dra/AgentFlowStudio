@@ -24,6 +24,9 @@ from apps.cli.production_memory_loop_command import (
 from apps.cli.production_memory_acceptance_feedback_command import (
     production_memory_loop_record_acceptance_feedback_command,
 )
+from apps.cli.production_memory_action_result_acceptance_feedback_command import (
+    production_memory_loop_record_action_result_acceptance_feedback_command,
+)
 from apps.cli.production_memory_acceptance_feedback_candidate_command import (
     production_memory_loop_draft_acceptance_feedback_candidate_command,
 )
@@ -134,6 +137,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-record-acceptance-feedback")(
         production_memory_loop_record_acceptance_feedback_command
+    )
+    app.command(name="production-memory-loop-record-action-result-acceptance-feedback")(
+        production_memory_loop_record_action_result_acceptance_feedback_command
     )
     app.command(name="production-memory-loop-draft-acceptance-feedback-candidate")(
         production_memory_loop_draft_acceptance_feedback_candidate_command

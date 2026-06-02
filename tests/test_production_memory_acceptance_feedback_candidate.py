@@ -13,6 +13,9 @@ from agentflow.memory.production_acceptance_feedback_candidate import (
     ACCEPTANCE_FEEDBACK_CANDIDATE_PACKET_KIND,
     build_acceptance_feedback_candidate_packet,
 )
+from agentflow.memory.production_action_result_acceptance_feedback import (
+    build_production_memory_action_result_acceptance_feedback_event,
+)
 from agentflow.memory.production_loop import load_production_memory_loop
 from agentflow.memory.production_operator_loop import (
     build_production_memory_operator_loop_run,
@@ -146,3 +149,55 @@ def test_cli_drafts_acceptance_feedback_candidate_packet(tmp_path: Path) -> None
     assert packet["kind"] == ACCEPTANCE_FEEDBACK_CANDIDATE_PACKET_KIND
     assert candidate["candidate_is_promoted_memory"] is False
     assert decision["decision"] == "pending"
+
+
+def test_action_result_acceptance_feedback_candidate_targets_action_result(tmp_path: Path) -> None:
+    action_result = _next_operator_action_result(tmp_path)
+    event = build_production_memory_action_result_acceptance_feedback_event(
+        action_result,
+        decision="accepted",
+        summary="Human operator accepted the completed action result for the next local iteration.",
+        reviewer_role="operator",
+        reviewed_at="2026-06-03T12:05:00+08:00",
+    )
+
+    packet = build_acceptance_feedback_candidate_packet(event, generated_at="2026-06-03T12:10:00+08:00")
+
+    assert packet["source_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert packet["source_artifact_status"] == "action_completed"
+    assert packet["source_acceptance_decision"] == "accepted"
+    assert packet["memory_candidate"]["status"] == "candidate"
+    assert packet["memory_candidate"]["target_artifact_type"] == "agentflow_production_memory_next_operator_action_result"
+    assert packet["memory_candidate"]["target_status"] == "action_completed"
+    assert packet["memory_candidate"]["target_ref"].startswith("next-operator-action-result:")
+
+
+def _next_operator_action_result(tmp_path: Path) -> dict:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T12:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+    write_production_memory_operator_loop_run(
+        result,
+        tmp_path / "operator_loop_with_action_result",
+        write_run_package=True,
+        write_run_package_check=True,
+        write_next_operator_start_packet=True,
+        write_next_operator_start_event=True,
+        next_operator_start_event_decision="started",
+        next_operator_start_event_summary="Next operator started from the checked no-provider package.",
+        write_next_operator_action_result=True,
+        next_operator_action_result_decision="completed",
+        next_operator_action_result_summary="Next operator completed the recorded no-provider action.",
+        next_operator_action_result_refs=["next_pass_result/next_pass_result.json"],
+    )
+    action_result_path = (
+        tmp_path
+        / "operator_loop_with_action_result"
+        / "next_operator_action_result"
+        / "next_operator_action_result.json"
+    )
+    return json.loads(action_result_path.read_text(encoding="utf-8"))

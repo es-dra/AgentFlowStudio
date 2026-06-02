@@ -99,6 +99,7 @@ def write_production_memory_acceptance_feedback_event(event: dict[str, Any], out
 
 def render_acceptance_feedback_markdown(event: dict[str, Any]) -> str:
     boundaries = _dict(event.get("claim_boundaries"))
+    source = _source_summary(event)
     return "\n".join(
         [
             "# Production Memory Acceptance Feedback Event",
@@ -106,8 +107,8 @@ def render_acceptance_feedback_markdown(event: dict[str, Any]) -> str:
             f"Status: {event.get('status', 'unknown')}",
             f"Decision: {event.get('acceptance_decision', 'unknown')}",
             f"Scope: {event.get('acceptance_scope', 'unknown')}",
-            f"Source check: {event.get('source_check_status', 'unknown')}",
-            f"Ready for handoff: {_bool_label(event.get('source_ready_for_handoff'))}",
+            f"{source['title']}: {source['status']}",
+            f"{source['ready_title']}: {_bool_label(source['ready'])}",
             "Provider calls: not started",
             "Writes long-term memory: false",
             "Writes Company KB: false",
@@ -195,6 +196,25 @@ def _non_claims() -> list[str]:
         "not Company KB promotion",
         "not memory promotion",
     ]
+
+
+def _source_summary(event: dict[str, Any]) -> dict[str, Any]:
+    if (
+        event.get("feedback_scope") == "next_operator_action_result"
+        or event.get("source_artifact_type") == "agentflow_production_memory_next_operator_action_result"
+    ):
+        return {
+            "title": "Source action result",
+            "status": event.get("source_action_result_status", event.get("source_artifact_status", "unknown")),
+            "ready_title": "Ready for acceptance",
+            "ready": event.get("source_ready_for_acceptance") is True,
+        }
+    return {
+        "title": "Source check",
+        "status": event.get("source_check_status", "unknown"),
+        "ready_title": "Ready for handoff",
+        "ready": event.get("source_ready_for_handoff") is True,
+    }
 
 
 def _control(control_id: str, passed: bool) -> dict[str, str]:

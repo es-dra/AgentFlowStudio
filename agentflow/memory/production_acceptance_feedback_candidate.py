@@ -55,6 +55,10 @@ def build_acceptance_feedback_candidate_packet(
         "source_acceptance_feedback_event_id": feedback_id,
         "source_operator_loop_id": event.get("source_operator_loop_id", "unknown"),
         "source_project_id": event.get("source_project_id", "unknown"),
+        "source_artifact_type": _source_artifact_type(event),
+        "source_artifact_path": _source_artifact_path(event),
+        "source_artifact_status": _source_artifact_status(event),
+        "source_ready_for_acceptance": _source_ready_for_acceptance(event),
         "source_package_path": event.get("source_package_path", "unknown"),
         "source_check_status": event.get("source_check_status", "unknown"),
         "source_ready_for_handoff": event.get("source_ready_for_handoff") is True,
@@ -149,9 +153,9 @@ def _memory_candidate(event: dict[str, Any], generated_at: str) -> dict[str, Any
         "source_feedback_ids": [feedback_id],
         "source_operator_loop_id": event.get("source_operator_loop_id", "unknown"),
         "source_acceptance_decision": decision,
-        "target_ref": f"operator-run-package:{event.get('source_operator_loop_id', 'unknown')}",
-        "target_status": event.get("source_check_status", "unknown"),
-        "target_artifact_type": "agentflow_production_memory_operator_run_package",
+        "target_ref": _target_ref(event),
+        "target_status": _source_artifact_status(event),
+        "target_artifact_type": _source_artifact_type(event),
         "statement": event.get("summary", ""),
         "candidate_is_promoted_memory": False,
         "writes_long_term_memory": False,
@@ -184,6 +188,39 @@ def _claim_boundaries(event: dict[str, Any]) -> dict[str, str]:
         "company_kb_promotion": "not_performed",
         "memory_promotion": "not_performed",
     }
+
+
+def _source_artifact_type(event: dict[str, Any]) -> str:
+    explicit_type = event.get("source_artifact_type")
+    if isinstance(explicit_type, str) and explicit_type.strip():
+        return explicit_type
+    return "agentflow_production_memory_operator_run_package"
+
+
+def _source_artifact_path(event: dict[str, Any]) -> str:
+    for key in ("source_artifact_path", "source_package_path"):
+        value = event.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return "unknown"
+
+
+def _source_artifact_status(event: dict[str, Any]) -> str:
+    for key in ("source_artifact_status", "source_action_result_status", "source_check_status"):
+        value = event.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return "unknown"
+
+
+def _source_ready_for_acceptance(event: dict[str, Any]) -> bool:
+    return event.get("source_ready_for_acceptance") is True or event.get("source_ready_for_handoff") is True
+
+
+def _target_ref(event: dict[str, Any]) -> str:
+    if event.get("feedback_scope") == "next_operator_action_result":
+        return f"next-operator-action-result:{event.get('source_action_result_id', 'unknown')}"
+    return f"operator-run-package:{event.get('source_operator_loop_id', 'unknown')}"
 
 
 def _non_claims() -> list[str]:

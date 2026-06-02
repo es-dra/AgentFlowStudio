@@ -9,6 +9,47 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Action Result Acceptance Feedback 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-action-result-output-001` on
+  `codex/afs-production-memory-action-result-acceptance-feedback-001`.
+- Added an explicit no-provider bridge from
+  `agentflow_production_memory_next_operator_action_result` to
+  `agentflow_production_memory_acceptance_feedback_event`.
+- Added product CLI command
+  `production-memory-loop-record-action-result-acceptance-feedback`, writing
+  the existing `acceptance_feedback_event.json` / `.md` contract from a
+  selected completed action result.
+- Generalized acceptance-feedback candidate packets so the candidate target can
+  be either an operator run package source or a next-operator action-result
+  source.
+- Updated the read-only generic Web acceptance-feedback canvas and inspector
+  facts to show action-result source status, action decision, and result ref
+  count without adding directory scans, browser persistence, provider
+  execution, or project-specific inspectors.
+- Boundary kept: an action result is still not human acceptance by itself.
+  Human acceptance is recorded only through the explicit feedback event. The
+  feedback event remains not memory, not a memory candidate, not a promotion
+  decision, not business validation, not provider success, not a Company KB
+  write, and not a durable-memory write.
+- Verification:
+  - Focused action-result feedback/candidate/Web/registry suite passed
+    (`13 passed`).
+  - Adjacent acceptance feedback and action-result regression passed
+    (`25 passed`).
+  - Changed Python files passed `python -m py_compile`; changed Web modules
+    passed `node --check`.
+  - CLI help exposes
+    `production-memory-loop-record-action-result-acceptance-feedback`.
+  - CLI smoke wrote ignored no-provider action-result and acceptance feedback
+    artifacts with `feedback_scope: next_operator_action_result`,
+    `source_artifact_status: action_completed`, `writes_company_kb: false`,
+    and `provider_calls_started: false`.
+  - Expanded Web/static memory tests passed (`91 passed, 818 deselected`).
+  - Full suite passed on Python 3.12.12 (`909 passed`).
+  - `git diff --check` passed with CRLF warnings only.
+
 ## 2026-06-02 - Production Memory Operator Loop Action Result Output 001
 
 - Continued from

@@ -78,8 +78,21 @@ export function productionAcceptanceFeedbackFacts(payload) {
   return [
     fact("status", payload.status || "unknown"),
     fact("acceptance_decision", payload.acceptance_decision || "unknown"),
+    fact("feedback_scope", payload.feedback_scope || "unknown"),
+    ...(payload.source_artifact_status ? [
+      fact("source_artifact_status", payload.source_artifact_status),
+    ] : []),
     fact("source_check_status", payload.source_check_status || "unknown"),
     fact("source_ready_for_handoff", yesNo(payload.source_ready_for_handoff)),
+    ...(payload.source_action_result_status ? [
+      fact("source_action_result_status", payload.source_action_result_status),
+    ] : []),
+    ...(payload.source_action_decision ? [
+      fact("source_action_decision", payload.source_action_decision),
+    ] : []),
+    ...(payload.source_result_refs ? [
+      fact("source_result_refs", String(arrayValue(payload.source_result_refs).length)),
+    ] : []),
     fact("business_validation", payload.business_validation || "not_validated"),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
