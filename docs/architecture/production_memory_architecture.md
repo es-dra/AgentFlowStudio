@@ -43,6 +43,7 @@ project_input
   -> operator_run_package
   -> operator_run_package_check
   -> explicit acceptance_feedback_event
+  -> acceptance_feedback_candidate_packet
 ```
 
 The committed example lives at:
@@ -144,6 +145,10 @@ The required root identifiers are:
   records human acceptance feedback only; it does not create memory candidates,
   create promotion decisions, write durable memory, write Company KB, call
   providers, or claim business validation.
+- `acceptance_feedback_candidate_packet`: candidate-only packet drafted from
+  an explicit acceptance feedback event. It carries one memory candidate and a
+  pending promotion decision template, but it writes no long-term memory,
+  writes no Company KB, and does not make the candidate promoted memory.
 
 All derived artifacts declare:
 
@@ -204,6 +209,9 @@ All derived artifacts declare:
   after reading one explicit operator run package check. `accepted` requires a
   passed and ready check; `rejected` and `needs_revision` can preserve blockers
   without converting them into memory or business validation.
+- Acceptance feedback candidate packets are still candidate-only. Their
+  pending promotion templates cannot enter next context as reviewed decisions.
+  Rejected or needs-revision source feedback produces a blocked candidate.
 
 ## CLI Surface
 
@@ -231,6 +239,7 @@ python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-r
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --output data/processed/runs/production_memory_loop/operator_run_package_smoke
 python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --markdown-output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.md
 python -m apps.cli.main production-memory-loop-record-acceptance-feedback data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --decision accepted --summary "Human operator accepted the package for the next local iteration." --reviewed-at 2026-06-03T00:05:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback
+python -m apps.cli.main production-memory-loop-draft-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback/acceptance_feedback_event.json --generated-at 2026-06-03T01:10:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -355,6 +364,13 @@ The acceptance feedback command writes:
 - `acceptance_feedback_event.json`
 - `acceptance_feedback_event.md`
 
+The acceptance feedback candidate command writes:
+
+- `acceptance_feedback_candidate_packet.json`
+- `memory_candidate.json`
+- `promotion_decision_template.json`
+- `acceptance_feedback_candidate_packet.md`
+
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
@@ -457,6 +473,12 @@ the package, but it keeps `business_validation: not_validated`,
 `feedback_is_memory: false`, `creates_memory_candidate: false`, and
 `creates_promotion_decision: false`.
 
+The acceptance feedback candidate packet is the explicit bridge from human
+acceptance feedback evidence to a candidate-only memory review packet. It may
+draft a candidate for later operator review, but it keeps
+`candidate_is_promoted_memory: false` and emits only a `pending` promotion
+decision template.
+
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
 candidate items with `requires_human_review: true`,
@@ -482,6 +504,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_run_package`
 - `agentflow_production_memory_operator_run_package_check`
 - `agentflow_production_memory_acceptance_feedback_event`
+- `agentflow_production_memory_acceptance_feedback_candidate_packet`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
 - `agentflow_production_memory_next_pass_result`
@@ -534,6 +557,12 @@ state, business-validation boundary, memory boundary, no-provider controls, and
 non-claim boundaries. They do not follow refs from the browser, execute
 workflows, call providers, write Company KB, claim provider success, promote
 memory, or claim business validation.
+
+Acceptance feedback candidate packet artifacts render as a read-only candidate
+review canvas with the source acceptance feedback, memory candidate, pending
+promotion template, no-provider controls, and non-claim boundaries. They do
+not promote memory, execute workflow actions, follow refs, write Company KB, or
+write durable memory.
 
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and

@@ -9,6 +9,49 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Acceptance Feedback Candidate 001
+
+- Continued from
+  `codex/afs-production-memory-acceptance-feedback-001` on
+  `codex/afs-production-memory-acceptance-feedback-candidate-001`.
+- Added `production-memory-loop-draft-acceptance-feedback-candidate` for
+  drafting candidate-only memory packets and pending promotion templates from
+  explicit `acceptance_feedback_event.json` artifacts.
+- Added `agentflow_production_memory_acceptance_feedback_candidate_packet`.
+  Accepted source feedback drafts a `candidate` memory candidate; rejected or
+  needs-revision source feedback drafts a `blocked` candidate.
+- Added a read-only generic Web workbench canvas for selected acceptance
+  feedback candidate packet JSON, including source acceptance decision, memory
+  candidate status, pending promotion template, business-validation boundary,
+  and no-provider controls.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no Loulan behavior, no business validation, no
+  provider success claim, and no memory promotion.
+- Verification:
+  - Red test failed first because the candidate module did not exist.
+  - Web red test then failed because the packet source role/view was not wired.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_acceptance_feedback_candidate.py -q`
+    -> 6 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_acceptance_feedback_candidate.py -q`
+    -> 2 passed.
+  - Py compile for touched Python files passed.
+  - JS import smoke for the new Web module/controller/workspace passed.
+  - Focused acceptance/Web/contract regression passed (`40 passed`).
+  - CLI help for `production-memory-loop-draft-acceptance-feedback-candidate`
+    passed.
+  - CLI smoke wrote ignored
+    `acceptance_feedback_candidate_packet.json`, `memory_candidate.json`,
+    `promotion_decision_template.json`, and
+    `acceptance_feedback_candidate_packet.md`; the packet had
+    `candidate_generation_status=candidate_only`,
+    `source_acceptance_decision=accepted`,
+    `business_validation=not_validated`, no provider call, no Company KB write,
+    `candidate_is_promoted_memory=false`, and `promotion_decision=pending`.
+  - Full suite passed on Python 3.12.12 (`841 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Line counts: candidate module 197, CLI 45, Web view 125, Python test 122,
+    Web static test 127, `artifact-workspace.js` 284.
+
 ## 2026-06-02 - Production Memory Acceptance Feedback 001
 
 - Continued from

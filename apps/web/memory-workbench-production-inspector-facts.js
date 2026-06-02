@@ -85,6 +85,18 @@ export function productionAcceptanceFeedbackFacts(payload) {
   ];
 }
 
+export function productionAcceptanceFeedbackCandidateFacts(payload) {
+  return [
+    fact("candidate_generation_status", payload.candidate_generation_status || "unknown"),
+    fact("source_acceptance_decision", payload.source_acceptance_decision || "unknown"),
+    fact("memory_candidate_status", payload.memory_candidate?.status || "unknown"),
+    fact("promotion_decision", payload.promotion_decision_template?.decision || "unknown"),
+    fact("candidate_is_promoted_memory", yesNo(payload.candidate_is_promoted_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionOperatorFeedbackCandidateFacts(payload) {
   return [
     fact("candidate_generation_status", payload.candidate_generation_status || "unknown"),
