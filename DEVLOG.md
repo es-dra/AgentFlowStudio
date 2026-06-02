@@ -9,6 +9,44 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Next Pass Result Scaffold 001
+
+- Continued from `codex/afs-production-memory-next-pass-result-web-001`
+  on `codex/afs-production-memory-operator-loop-next-pass-result-scaffold-001`.
+- Extended the generic no-provider operator-loop command with
+  `--draft-next-pass-result` so the manifest can include a local
+  `agentflow_production_memory_next_pass_result` scaffold from the generated
+  next-task packet.
+- The scaffold is an operator-completion envelope only. It is not next-pass
+  execution, not generated content, not feedback capture, not human acceptance,
+  and not memory promotion.
+- The read-only generic Web operator-loop canvas now surfaces the embedded
+  next-pass result scaffold as a dedicated lane, summary card, next-pass action,
+  protocol control, and inspector facts.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass review unless an explicit result is supplied, no feedback
+  auto-capture, no Web scan/persistence, no Loulan behavior, no human
+  acceptance, and no business validation claim.
+- Verification:
+  - Red focused tests failed because `draft_next_pass_result` / the CLI flag
+    did not exist, and the operator-loop Web canvas had no next-pass result
+    lane.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py -q`
+    -> 7 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_web_static_production_memory_operator_loop_result_scaffold.py -q`
+    -> 2 passed.
+  - `node --check` passed for
+    `apps\web\memory-workbench-production-operator-loop.js` and
+    `apps\web\memory-workbench-production-inspector-facts.js`.
+  - Focused production-memory / contract / Web suite passed (`61 passed`).
+  - CLI smoke wrote ignored runtime artifacts under
+    `data/processed/runs/production_memory_loop/operator_loop_next_pass_result_scaffold_smoke/`
+    with `Next pass result scaffold: scaffolded_for_operator_completion`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest`
+    -> 790 passed on Python 3.12.12.
+  - `agentflow/memory/production_operator_manifest.py` is now exactly 300
+    lines; the next manifest behavior should first split helper logic.
+
 ## 2026-06-02 - Production Memory Next Pass Result Web 001
 
 - Continued from `codex/afs-production-memory-next-pass-result-scaffold-001`

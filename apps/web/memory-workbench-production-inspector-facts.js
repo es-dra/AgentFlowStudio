@@ -84,12 +84,17 @@ export function productionOperatorFeedbackCandidateFacts(payload) {
 }
 
 export function productionOperatorLoopFacts(payload) {
+  const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);
   const feedbackCandidatePromotion = objectValue(payload.operator_feedback_candidate_promotion);
   return [
     fact("chain_status", payload.chain_status || "unknown"),
     fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
     fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
+    ...(resultScaffold.result_status ? [fact("next_pass_result_status", resultScaffold.result_status)] : []),
+    ...(resultScaffold.output_artifact_count !== undefined ? [
+      fact("next_pass_result_output_artifacts", String(resultScaffold.output_artifact_count)),
+    ] : []),
     ...(promotion.decision ? [fact("next_pass_promotion_decision", promotion.decision)] : []),
     ...(promotion.decision_effect ? [fact("next_pass_promotion_effect", promotion.decision_effect)] : []),
     ...(feedbackCandidatePromotion.decision ? [

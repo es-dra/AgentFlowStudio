@@ -175,6 +175,7 @@ python -m apps.cli.main production-memory-loop-draft-feedback examples/agentflow
 python -m apps.cli.main production-memory-loop-review-promotion data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --decision promoted --rationale "Candidate is traceable to reviewed feedback." --decided-at 2026-06-02T00:05:00+08:00 --output data/processed/runs/production_memory_loop/promotion_decision
 python -m apps.cli.main production-memory-loop-run-reviewed-feedback-no-provider examples/agentflow/production_memory_loop.example.json --feedback-capture data/processed/runs/production_memory_loop/feedback_capture/production_memory_feedback_capture.json --promotion-decision data/processed/runs/production_memory_loop/promotion_decision/promotion_decision.json --output data/processed/runs/production_memory_loop/reviewed_feedback
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T01:00:00+08:00 --source-kb-status restructuring_or_unknown --output data/processed/runs/production_memory_loop/operator_loop
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T12:00:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --output data/processed/runs/production_memory_loop/operator_loop_with_result_scaffold
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T04:00:00+08:00 --source-kb-status restructuring_or_unknown --next-pass-result next_pass_result.json --output data/processed/runs/production_memory_loop/operator_loop_with_review
 python -m apps.cli.main production-memory-loop-next-context-handoff data/processed/runs/production_memory_loop/no_provider/production_memory_loop_run.json --generated-at 2026-06-02T01:40:00+08:00 --output data/processed/runs/production_memory_loop/next_context_handoff
 python -m apps.cli.main production-memory-loop-next-task-packet data/processed/runs/production_memory_loop/next_context_handoff/next_context_handoff.json --generated-at 2026-06-02T03:12:00+08:00 --output data/processed/runs/production_memory_loop/next_task_packet
@@ -311,6 +312,17 @@ The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
 
 - `production_memory_operator_loop_run.json`
+
+If `--draft-next-pass-result` is supplied, the operator-loop command also
+creates a local next-pass result scaffold from the generated next-task packet
+and writes:
+
+- `next_pass_result/next_pass_result.json`
+- `next_pass_result/next_pass_result.md`
+
+This option prepares an operator-completion envelope only. It does not execute
+the next pass, call a provider, generate content, create feedback, review the
+result, or promote memory.
 
 If `--next-pass-result` is supplied, the operator-loop command also reviews
 that explicit result JSON against the generated next-task packet and writes:

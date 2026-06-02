@@ -10,6 +10,7 @@ from agentflow.memory.production_next_pass_promotion import (
     NEXT_PASS_PROMOTION_DECISION_KIND,
     NEXT_PASS_PROMOTION_OVERLAY_KIND,
 )
+from agentflow.memory.production_next_pass_result import NEXT_PASS_RESULT_KIND
 from agentflow.memory.production_next_pass_review import NEXT_PASS_REVIEW_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
 from agentflow.memory.production_session import SESSION_REPORT_KIND
@@ -25,6 +26,7 @@ OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
 
 def operator_output_artifacts(
     *,
+    include_next_pass_result: bool = False,
     include_next_pass_review: bool = False,
     include_next_pass_promotion: bool = False,
     include_operator_feedback_candidate_promotion: bool = False,
@@ -39,6 +41,13 @@ def operator_output_artifacts(
         _artifact(NEXT_TASK_PACKET_KIND, "next_task_packet/next_task_packet.json"),
         _artifact("markdown_report", "next_task_packet/next_task_packet.md"),
     ]
+    if include_next_pass_result:
+        artifacts.extend(
+            [
+                _artifact(NEXT_PASS_RESULT_KIND, "next_pass_result/next_pass_result.json"),
+                _artifact("markdown_report", "next_pass_result/next_pass_result.md"),
+            ]
+        )
     if include_next_pass_review:
         artifacts.extend(
             [

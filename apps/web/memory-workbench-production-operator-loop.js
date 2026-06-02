@@ -8,6 +8,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const nodes = arrayValue(payload.operator_loop_nodes);
   const outputs = arrayValue(payload.output_artifacts);
   const company = payload.company_kb_feedback || {};
+  const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = payload.next_pass_promotion || null;
   const feedbackCandidatePromotion = payload.operator_feedback_candidate_promotion || null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
@@ -23,6 +24,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     workflow_actions: [
       action("inspect_operator_loop", "Inspect operator loop", "review ready", "project"),
       action("inspect_generated_artifacts", "Inspect artifacts", outputs.length ? "ready" : "missing", "assets"),
+      action("inspect_next_pass_result", "Inspect result scaffold", resultScaffold ? "review ready" : "missing", "next-pass"),
       action("inspect_next_pass_promotion", "Inspect promotion", promotion ? "review ready" : "missing", "next-pass"),
       action(
         "inspect_operator_feedback_candidate_promotion",
@@ -42,6 +44,14 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     bundle_summary: [
       card("operator_nodes", "Operator nodes", nodes.length ? "review ready" : "missing", `${nodes.length} chain nodes`),
       card("output_artifacts", "Output artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} generated artifact refs`),
+      ...(resultScaffold ? [
+        card(
+          "next_pass_result",
+          "Next pass result",
+          resultScaffold.result_status || "unknown",
+          `${resultScaffold.output_artifact_count ?? 0} scaffolded outputs`,
+        ),
+      ] : []),
       ...(promotion ? [card("next_pass_promotion", "Next pass promotion", promotion.decision || "unknown", promotion.decision_effect || "unknown")] : []),
       ...(feedbackCandidatePromotion ? [
         card(
@@ -66,6 +76,15 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
       lane("generated-artifacts", "Generated artifacts", outputs.length ? "review ready" : "missing", `${outputs.length} outputs`, "explicit artifact refs"),
+      ...(resultScaffold ? [
+        lane(
+          "next-pass-result",
+          "Next pass result",
+          resultScaffold.result_status || "unknown",
+          `${resultScaffold.output_artifact_count ?? 0} outputs`,
+          "scaffolded for operator completion",
+        ),
+      ] : []),
       ...(promotion ? [lane("next-pass-promotion", "Next pass promotion", promotion.decision || "unknown", promotion.candidate_id || "candidate", promotion.decision_effect || "unknown")] : []),
       ...(feedbackCandidatePromotion ? [
         lane(
@@ -86,6 +105,13 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         control("provider calls not started", payload.provider_calls_started === false),
         control("durable memory write disabled", payload.writes_long_term_memory === false),
         control("Company KB write disabled", payload.writes_company_kb === false),
+        ...(resultScaffold ? [
+          control(
+            "next-pass result no-provider mode",
+            resultScaffold.provider_mode === "no-provider" && resultScaffold.provider_calls_started === false,
+          ),
+          control("next-pass result memory write disabled", resultScaffold.writes_long_term_memory === false),
+        ] : []),
         ...(promotion ? [
           control("next-pass promotion no-provider mode", hasPassedControl(payload, "next_pass_promotion_no_provider_mode")),
           control("next-pass promotion memory write disabled", hasPassedControl(payload, "next_pass_promotion_long_term_memory_write_disabled")),
@@ -116,16 +142,17 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
     },
     next_pass: {
       status: ready ? "ready" : "blocked",
-      action: nextPassAction(ready, promotion, feedbackCandidatePromotion),
+      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion),
     },
     timeline: nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
   };
 }
 
-function nextPassAction(ready, promotion, feedbackCandidatePromotion) {
+function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion) {
   if (!ready) return "resolve_operator_loop_blockers";
   if (feedbackCandidatePromotion) return "inspect_operator_feedback_candidate_overlay_before_next_pass";
   if (promotion) return "inspect_next_pass_promotion_overlay_before_followup_context";
+  if (resultScaffold) return "inspect_next_pass_result_scaffold_before_review";
   return "inspect_generated_artifacts_before_next_pass";
 }
 
@@ -173,4 +200,8 @@ function isOperatorLoopArtifact(artifact) {
 
 function arrayValue(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }

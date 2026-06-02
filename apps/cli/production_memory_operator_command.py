@@ -33,6 +33,11 @@ def production_memory_loop_run_operator_no_provider_command(
         "--source-kb-status",
         help="Current source Company KB state label; metadata only.",
     ),
+    draft_next_pass_result: bool = typer.Option(
+        False,
+        "--draft-next-pass-result",
+        help="Draft a no-provider next-pass result scaffold from the generated next-task packet.",
+    ),
     next_pass_result_path: Path | None = typer.Option(
         None,
         "--next-pass-result",
@@ -99,6 +104,7 @@ def production_memory_loop_run_operator_no_provider_command(
             loop,
             generated_at=generated_at,
             source_kb_status=source_kb_status,
+            draft_next_pass_result=draft_next_pass_result,
             next_pass_result=next_pass_result,
             next_pass_promotion_decision=next_pass_promotion_decision,
             operator_feedback_candidate_packet=operator_feedback_candidate_packet,
@@ -116,6 +122,8 @@ def production_memory_loop_run_operator_no_provider_command(
     typer.echo("Writes Company KB: false")
     typer.echo(f"Included refs: {manifest['context_summary']['included_ref_count']}")
     typer.echo(f"Blocked refs: {manifest['context_summary']['blocked_ref_count']}")
+    if "next_pass_result" in manifest:
+        typer.echo(f"Next pass result scaffold: {manifest['next_pass_result']['result_status']}")
     if "next_pass_review" in manifest:
         typer.echo(f"Next pass review: {manifest['next_pass_review']['review_status']}")
     if "next_pass_promotion" in manifest:

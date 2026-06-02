@@ -14,6 +14,7 @@ from agentflow.memory.production_next_pass_promotion import (
     write_next_pass_promotion_decision,
     write_next_pass_reviewed_feedback_run,
 )
+from agentflow.memory.production_next_pass_result import build_next_pass_result_scaffold, write_next_pass_result_scaffold
 from agentflow.memory.production_next_pass_review import build_next_pass_review, write_next_pass_review
 from agentflow.memory.production_next_task import build_next_task_packet, write_next_task_packet
 from agentflow.memory.production_operator_feedback_candidate_overlay import (
@@ -37,6 +38,7 @@ def build_production_memory_operator_loop_run(
     *,
     generated_at: str,
     source_kb_status: str = "restructuring_or_unknown",
+    draft_next_pass_result: bool = False,
     next_pass_result: dict[str, Any] | None = None,
     next_pass_promotion_decision: dict[str, Any] | None = None,
     operator_feedback_candidate_packet: dict[str, Any] | None = None,
@@ -45,6 +47,8 @@ def build_production_memory_operator_loop_run(
     """Build an auditable no-provider operator loop from source loop to feedback packet."""
     if not isinstance(generated_at, str) or not generated_at.strip():
         raise ValueError("generated_at is required")
+    if draft_next_pass_result and next_pass_result is not None:
+        raise ValueError("draft_next_pass_result cannot be combined with next_pass_result")
     if next_pass_promotion_decision is not None and next_pass_result is None:
         raise ValueError("next_pass_promotion_decision requires next_pass_result")
     if operator_feedback_candidate_packet is not None and operator_feedback_candidate_promotion_decision is None:
@@ -55,6 +59,9 @@ def build_production_memory_operator_loop_run(
     run = build_production_memory_loop_run(loop)
     handoff = build_next_context_handoff(run, generated_at=generated_at)
     next_task_packet = build_next_task_packet(handoff, generated_at=generated_at)
+    next_pass_result_scaffold = (
+        build_next_pass_result_scaffold(next_task_packet, generated_at=generated_at) if draft_next_pass_result else None
+    )
     next_pass_review = (
         build_next_pass_review(next_task_packet, next_pass_result, reviewed_at=generated_at)
         if next_pass_result is not None
@@ -77,6 +84,7 @@ def build_production_memory_operator_loop_run(
         run,
         handoff,
         next_task_packet,
+        next_pass_result_scaffold,
         next_pass_review,
         next_pass_promotion,
         operator_feedback_candidate_promotion,
@@ -92,6 +100,8 @@ def build_production_memory_operator_loop_run(
         "session_report": report,
         "company_kb_feedback_candidate_packet": packet,
     }
+    if next_pass_result_scaffold is not None:
+        result["next_pass_result"] = next_pass_result_scaffold
     if next_pass_review is not None:
         result["next_pass_review"] = next_pass_review
     if next_pass_promotion is not None:
@@ -117,6 +127,7 @@ def build_production_memory_operator_loop_run(
 
 def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir: str | Path) -> list[Path]:
     output_root = Path(output_dir)
+    include_result = "next_pass_result" in result
     include_review = "next_pass_review" in result
     include_promotion = "next_pass_promotion_overlay" in result
     include_operator_feedback_candidate_promotion = "operator_feedback_candidate_promotion_overlay" in result
@@ -124,6 +135,8 @@ def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir
     written_paths.extend(write_production_memory_loop_run(result["run"], output_root / "run"))
     written_paths.extend(write_next_context_handoff(result["next_context_handoff"], output_root / "next_context_handoff"))
     written_paths.extend(write_next_task_packet(result["next_task_packet"], output_root / "next_task_packet"))
+    if include_result:
+        written_paths.extend(write_next_pass_result_scaffold(result["next_pass_result"], output_root / "next_pass_result"))
     if include_review:
         written_paths.extend(write_next_pass_review(result["next_pass_review"], output_root / "next_pass_review"))
     if include_promotion:
@@ -166,6 +179,7 @@ def write_production_memory_operator_loop_run(result: dict[str, Any], output_dir
     manifest = {
         **result["manifest"],
         "output_artifacts": operator_output_artifacts(
+            include_next_pass_result=include_result,
             include_next_pass_review=include_review,
             include_next_pass_promotion=include_promotion,
             include_operator_feedback_candidate_promotion=include_operator_feedback_candidate_promotion,

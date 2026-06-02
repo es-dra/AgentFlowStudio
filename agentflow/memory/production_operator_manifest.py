@@ -11,6 +11,7 @@ from agentflow.memory.production_next_pass_promotion import (
     NEXT_PASS_PROMOTION_DECISION_KIND,
     NEXT_PASS_PROMOTION_OVERLAY_KIND,
 )
+from agentflow.memory.production_next_pass_result import NEXT_PASS_RESULT_KIND
 from agentflow.memory.production_next_pass_review import NEXT_PASS_REVIEW_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
 from agentflow.memory.production_operator_feedback_candidate_manifest import (
@@ -28,6 +29,7 @@ def build_operator_manifest(
     run: dict[str, Any],
     handoff: dict[str, Any],
     next_task_packet: dict[str, Any],
+    next_pass_result: dict[str, Any] | None,
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
     operator_feedback_candidate_promotion: dict[str, Any] | None,
@@ -41,6 +43,7 @@ def build_operator_manifest(
     ready = (
         readiness.get("ready") is True
         and next_task_packet.get("packet_status") == "ready"
+        and _next_pass_result_ready(next_pass_result)
         and _next_pass_review_ready(next_pass_review)
         and _next_pass_promotion_ready(next_pass_promotion)
         and operator_feedback_candidate_promotion_ready(operator_feedback_candidate_promotion)
@@ -62,6 +65,7 @@ def build_operator_manifest(
             loop,
             run,
             next_task_packet,
+            next_pass_result,
             next_pass_review,
             next_pass_promotion,
             operator_feedback_candidate_promotion,
@@ -80,11 +84,14 @@ def build_operator_manifest(
         "controls": _controls(run, packet, next_pass_promotion, operator_feedback_candidate_promotion),
         "non_claim_boundaries": report.get("claim_boundaries", {}),
         "output_artifacts": operator_output_artifacts(
+            include_next_pass_result=next_pass_result is not None,
             include_next_pass_review=next_pass_review is not None,
             include_next_pass_promotion=next_pass_promotion is not None,
             include_operator_feedback_candidate_promotion=operator_feedback_candidate_promotion is not None,
         ),
     }
+    if next_pass_result is not None:
+        manifest["next_pass_result"] = _next_pass_result_summary(next_pass_result)
     if next_pass_review is not None:
         manifest["next_pass_review"] = _next_pass_review_summary(next_pass_review)
     if next_pass_promotion is not None:
@@ -100,6 +107,7 @@ def _operator_loop_nodes(
     loop: dict[str, Any],
     run: dict[str, Any],
     next_task_packet: dict[str, Any],
+    next_pass_result: dict[str, Any] | None,
     next_pass_review: dict[str, Any] | None,
     next_pass_promotion: dict[str, Any] | None,
     operator_feedback_candidate_promotion: dict[str, Any] | None,
@@ -130,6 +138,15 @@ def _operator_loop_nodes(
             NEXT_TASK_PACKET_KIND,
         ),
     ]
+    if next_pass_result is not None:
+        nodes.append(
+            _node(
+                "next_pass_result",
+                next_pass_result.get("result_status", "unknown"),
+                "operator completion scaffold",
+                NEXT_PASS_RESULT_KIND,
+            )
+        )
     if next_pass_review is not None:
         nodes.append(
             _node(
@@ -207,6 +224,17 @@ def _next_pass_review_ready(next_pass_review: dict[str, Any] | None) -> bool:
     return next_pass_review is None or next_pass_review.get("review_status") == "ready_for_operator_review"
 
 
+def _next_pass_result_ready(next_pass_result: dict[str, Any] | None) -> bool:
+    if next_pass_result is None:
+        return True
+    return (
+        next_pass_result.get("result_status") == "scaffolded_for_operator_completion"
+        and next_pass_result.get("provider_calls_started") is False
+        and next_pass_result.get("writes_long_term_memory") is False
+        and next_pass_result.get("writes_company_kb") is False
+    )
+
+
 def _next_pass_promotion_ready(next_pass_promotion: dict[str, Any] | None) -> bool:
     if next_pass_promotion is None:
         return True
@@ -242,6 +270,19 @@ def _next_task_packet_summary(packet: dict[str, Any]) -> dict[str, Any]:
         "packet_status": packet.get("packet_status", "unknown"),
         "allowed_ref_count": len(packet.get("allowed_context_refs", [])),
         "blocked_ref_count": len(packet.get("blocked_refs", [])),
+    }
+
+
+def _next_pass_result_summary(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "result_id": result.get("result_id", "unknown"),
+        "result_status": result.get("result_status", "unknown"),
+        "provider_mode": result.get("provider_mode", "unknown"),
+        "provider_calls_started": result.get("provider_calls_started") is True,
+        "writes_long_term_memory": result.get("writes_long_term_memory") is True,
+        "writes_company_kb": result.get("writes_company_kb") is True,
+        "output_artifact_count": len(result.get("output_artifacts", [])),
+        "feedback_event_count": len(result.get("feedback_events", [])),
     }
 
 
