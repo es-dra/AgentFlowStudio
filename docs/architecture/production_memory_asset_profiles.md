@@ -115,6 +115,42 @@ failure_attribution:
   unknown
 ```
 
+## Asset Profile Update Candidate
+
+`agentflow_production_memory_asset_profile_update_candidate` turns one asset
+feedback event into a structured candidate patch. It is the next deterministic
+node after feedback intake:
+
+```text
+asset feedback event
+  -> structured proposed_profile_patch.patch_ops
+  -> explicit profile promotion/versioning decision in a later node
+```
+
+Rules:
+
+- It is not a profile version.
+- It is not a profile promotion decision.
+- It does not apply the patch.
+- It does not unlock next-context eligibility.
+- It does not write durable memory or Company KB.
+- `cannot_judge` creates a blocked no-patch candidate.
+- `kept + no_change` records `no_update_recommended` with no patch.
+- Negative feedback without structured patch operations records
+  `blocked_missing_patch_ops`.
+- Drift and violated-constraint feedback becomes structured `patch_ops`, not
+  free-form profile mutation.
+
+The first supported patch operation is:
+
+```text
+op: add_unique
+path: /negative_constraints/- | /evidence_refs/-
+value: sanitized scalar
+rationale: bounded explanation
+evidence_refs: [source feedback event id]
+```
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation

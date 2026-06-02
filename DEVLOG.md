@@ -9,6 +9,41 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Asset Profile Update Candidate 001
+
+- Merged PR #74 and PR #75 into `master` with merge commits before opening
+  this node, so the next slice starts from an integrated baseline instead of a
+  third stacked feature branch.
+- Created
+  `codex/afs-production-memory-asset-profile-update-candidate-001` from the
+  updated `origin/master`.
+- Added `agentflow_production_memory_asset_profile_update_candidate` as the
+  candidate-only bridge from asset feedback event to structured profile patch
+  operations.
+- Added product CLI command
+  `production-memory-loop-draft-asset-profile-update-candidate`.
+- Added a guard for negative feedback without structured patch operations:
+  those candidates become `blocked_missing_patch_ops`, not
+  `no_update_recommended`.
+- Boundary kept: update candidate is not a profile version, not a profile
+  promotion decision, not durable memory, not Company KB, not provider
+  validation, and does not unlock next-context eligibility.
+- Verification:
+  - TDD red state confirmed because
+    `agentflow.memory.production_asset_profile_update_candidate` did not exist.
+  - Focused update candidate tests passed (`10 passed`).
+  - Adjacent asset update/feedback/readiness suite passed (`27 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help exposes
+    `production-memory-loop-draft-asset-profile-update-candidate`.
+  - CLI no-provider smoke wrote ignored asset test package, asset feedback
+    event, and asset profile update candidate outputs.
+  - Changed Python files passed `python -m py_compile`.
+  - Diff-level sensitive-fragment scan had no added real private paths or
+    secrets; matches were rule constants or deliberate redaction-test literals.
+  - Full suite passed on Python 3.13.5 (`944 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+
 ## 2026-06-02 - Production Memory Asset Feedback Intake 001
 
 - Continued from PR #74 baseline
