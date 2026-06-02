@@ -47,6 +47,9 @@ from apps.cli.production_memory_operator_feedback_candidate_promotion_command im
 from apps.cli.production_memory_operator_feedback_command import (
     production_memory_loop_capture_operator_feedback_command,
 )
+from apps.cli.production_memory_operator_handoff_command import (
+    production_memory_loop_operator_handoff_packet_command,
+)
 from apps.cli.production_memory_session_command import (
     production_memory_loop_company_kb_candidates_command,
     production_memory_loop_session_report_command,
@@ -95,6 +98,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-check-operator-manifest")(
         production_memory_loop_check_operator_manifest_command
+    )
+    app.command(name="production-memory-loop-operator-handoff-packet")(
+        production_memory_loop_operator_handoff_packet_command
     )
     app.command(name="production-memory-loop-capture-operator-feedback")(
         production_memory_loop_capture_operator_feedback_command

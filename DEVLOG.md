@@ -9,6 +9,41 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Handoff Packet 001
+
+- Continued from
+  `codex/afs-production-memory-operator-manifest-check-web-001` on
+  `codex/afs-production-memory-operator-handoff-packet-001`.
+- Added `agentflow_production_memory_operator_handoff_packet` as a
+  no-provider operator/agent handoff artifact built from a selected operator
+  manifest plus an operator manifest check report.
+- Added `production-memory-loop-operator-handoff-packet` to write JSON and
+  Markdown handoff artifacts with source manifest status, manifest-check
+  status, output refs, blocked items, next operator action, handoff prompt,
+  controls, and non-claim boundaries.
+- Missing or failed manifest checks block handoff readiness; the packet still
+  records the blocker instead of treating partial evidence as ready.
+- Boundary kept: no provider call, no next-pass execution, no Company KB
+  write, no durable memory write, no automatic memory promotion, no Loulan
+  behavior, no human acceptance, and no business validation claim.
+- Verification so far:
+  - Red test failed first because
+    `agentflow.memory.production_operator_handoff` did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_handoff_packet.py -q`
+    -> 7 passed.
+  - Focused operator/check/registry suite passed (`23 passed`).
+  - Focused handoff/operator/check/registry/contract suite passed
+    (`47 passed`).
+  - CLI smoke wrote a ready handoff packet under ignored
+    `data/processed/runs/production_memory_loop/operator_handoff_smoke/`.
+  - Full suite passed on Python 3.12.12 (`806 passed`).
+  - `py_compile` passed for the new module, CLI command, registry, and test.
+  - CLI help lists `production-memory-loop-operator-handoff-packet`.
+  - Line counts: handoff module 268, handoff CLI 82, command registry 187,
+    handoff test 218.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff and new-file sensitive scans were clean.
+
 ## 2026-06-02 - Production Memory Operator Manifest Check Web 001
 
 - Continued from
