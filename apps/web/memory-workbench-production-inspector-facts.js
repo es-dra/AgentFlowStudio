@@ -110,6 +110,20 @@ export function productionOperatorHandoffFacts(payload) {
   ];
 }
 
+export function productionOperatorRunPackageFacts(payload) {
+  return [
+    fact("package_status", payload.package_status || "unknown"),
+    fact("manifest_check_status", payload.manifest_check_status || "unknown"),
+    fact("handoff_status", payload.handoff_status || "unknown"),
+    fact("package_items", String(arrayValue(payload.package_items).length)),
+    fact("blocked_items", String(arrayValue(payload.blocked_items).length)),
+    fact("next_operator_action", payload.next_operator_action?.action || "unknown"),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);

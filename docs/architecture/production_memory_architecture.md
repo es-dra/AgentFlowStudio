@@ -426,6 +426,9 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_session_report`
 - `agentflow_company_kb_feedback_candidate_packet`
 - `agentflow_production_memory_operator_loop_run`
+- `agentflow_production_memory_operator_manifest_check`
+- `agentflow_production_memory_operator_handoff_packet`
+- `agentflow_production_memory_operator_run_package`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
 - `agentflow_production_memory_next_pass_result`
@@ -448,6 +451,22 @@ Operator-loop manifests render as a read-only chain canvas with operator nodes,
 generated artifact refs, Company KB feedback candidate boundaries, provider
 controls, and non-claim boundaries. They are review manifests only; they do not
 follow artifact refs, execute workflows, or promote memory.
+
+Operator manifest check artifacts render as a read-only machine-check canvas
+with checked refs, missing refs, failed nodes, failed controls, no-provider
+controls, and non-claim boundaries. They do not follow refs, execute workflows,
+call providers, write Company KB, or promote durable memory.
+
+Operator handoff packet artifacts render as a read-only handoff canvas with
+artifact refs, blocked items, manifest-check status, the recorded next operator
+action, no-provider controls, and non-claim boundaries. They do not follow refs,
+execute workflows, call providers, write Company KB, or promote durable memory.
+
+Operator run package artifacts render as a read-only final-run canvas with the
+manifest status, manifest-check status, handoff status, package items, blocked
+items, no-provider controls, and non-claim boundaries. They are entry artifacts
+for the next operator only; they do not follow refs, execute workflows, call
+providers, write Company KB, claim provider success, or promote durable memory.
 
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and

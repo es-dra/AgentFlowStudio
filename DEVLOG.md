@@ -9,6 +9,38 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Run Package Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-run-package-001` on
+  `codex/afs-production-memory-operator-run-package-web-001`.
+- Added read-only Web memory workbench support for selected
+  `agentflow_production_memory_operator_run_package` artifacts.
+- The canvas now shows package readiness, manifest-check status, handoff
+  status, package items, blocked items, no-provider controls, non-claim
+  boundaries, and the recorded next operator action.
+- Added inspector facts for package status, manifest-check status, handoff
+  status, package item count, blocked item count, next operator action,
+  provider state, durable memory write state, and Company KB write state.
+- Boundary kept: selected local JSON only, read-only view, no provider call, no
+  Company KB write, no durable memory write, no workflow execution from Web, no
+  ref following, no Web scan/persistence, no Loulan behavior, no human
+  acceptance, and no business validation claim.
+- Verification so far:
+  - Red Web static test failed first because the run package source role was
+    still `unclassified` and no dedicated Web view existed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_run_package.py -q`
+    -> 2 passed.
+  - Focused run-package/operator/Web regression suite passed (`47 passed`).
+  - Expanded Web static suite passed (`48 passed`).
+  - JS syntax checks for touched Web modules passed.
+  - Full suite passed on Python 3.12.12 (`817 passed`).
+  - Line counts: run-package Web view 155, run-package Web test 129,
+    artifact workspace 298, controller 81, inspector 251, production
+    inspector facts 193, artifact contracts 103.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff and new-file sensitive scans were clean.
+
 ## 2026-06-02 - Production Memory Operator Run Package 001
 
 - Continued from

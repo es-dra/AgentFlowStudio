@@ -25,6 +25,7 @@ export const ARTIFACT_ALIASES = {
   agentflow_production_memory_operator_loop_run: ["production_memory_operator_loop_run.json"],
   agentflow_production_memory_operator_manifest_check: ["operator_manifest_check.json"],
   agentflow_production_memory_operator_handoff_packet: ["operator_handoff_packet.json"],
+  agentflow_production_memory_operator_run_package: ["operator_run_package.json"],
   agentflow_production_memory_next_context_handoff: ["next_context_handoff.json"],
   agentflow_production_memory_next_task_packet: ["next_task_packet.json"],
   agentflow_production_memory_next_pass_result: ["next_pass_result.json"],
@@ -86,6 +87,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_production_memory_operator_loop_run") return "production memory operator loop run";
   if (type === "agentflow_production_memory_operator_manifest_check") return "production memory operator manifest check";
   if (type === "agentflow_production_memory_operator_handoff_packet") return "production memory operator handoff packet";
+  if (type === "agentflow_production_memory_operator_run_package") return "production memory operator run package";
   if (type === "agentflow_production_memory_next_context_handoff") return "production memory next context handoff";
   if (type === "agentflow_production_memory_next_task_packet") return "production memory next task packet";
   if (type === "agentflow_production_memory_next_pass_result") return "production memory next pass result";
