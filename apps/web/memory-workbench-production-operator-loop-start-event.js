@@ -68,7 +68,16 @@ export function startEventTimeline(startEvent, ready) {
   return [step("Next operator start event", ready ? "ready" : "blocked", startEvent.path || "not recorded")];
 }
 
-export function nextPassStatusFor(ready, startPacket, startPacketReady, startEvent, startEventReady) {
+export function nextPassStatusFor(
+  ready,
+  startPacket,
+  startPacketReady,
+  startEvent,
+  startEventReady,
+  actionResult = null,
+  actionResultReady = false,
+) {
+  if (actionResult) return actionResultReady ? "ready" : "blocked";
   if (startEvent) return startEventReady ? "ready" : "blocked";
   if (startPacket) return startPacketReady ? "ready" : "blocked";
   return ready ? "ready" : "blocked";
@@ -84,8 +93,11 @@ export function nextPassActionFor(
   startPacketReady,
   startEvent,
   startEventReady,
+  actionResult = null,
+  actionResultReady = false,
 ) {
   if (!ready) return "resolve_operator_loop_blockers";
+  if (actionResult) return actionResultReady ? "inspect_next_operator_action_result_before_next_loop" : "resolve_next_operator_action_result_blockers";
   if (startEvent) return startEventReady ? "continue_recorded_next_operator_action" : "resolve_next_operator_start_event_blockers";
   if (startPacket) return startPacketReady ? "start_next_operator_action" : "resolve_next_operator_start_packet_blockers";
   if (acceptanceCandidatePromotion) return "inspect_acceptance_feedback_candidate_overlay_before_next_pass";

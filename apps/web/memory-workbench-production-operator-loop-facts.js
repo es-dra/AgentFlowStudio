@@ -5,6 +5,7 @@ export function productionOperatorLoopFacts(payload) {
   const acceptanceCandidatePromotion = objectValue(payload.acceptance_feedback_candidate_promotion);
   const startPacket = objectValue(payload.next_operator_start_packet);
   const startEvent = objectValue(payload.next_operator_start_event);
+  const actionResult = objectValue(payload.next_operator_action_result);
   return [
     fact("chain_status", payload.chain_status || "unknown"),
     fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
@@ -45,6 +46,18 @@ export function productionOperatorLoopFacts(payload) {
     ] : []),
     ...(startEvent.start_event_is_execution !== undefined ? [
       fact("next_operator_start_event_execution", yesNo(startEvent.start_event_is_execution)),
+    ] : []),
+    ...(actionResult.result_status ? [
+      fact("next_operator_action_result_status", actionResult.result_status),
+    ] : []),
+    ...(actionResult.action_decision ? [
+      fact("next_operator_action_decision", actionResult.action_decision),
+    ] : []),
+    ...(actionResult.action_result_is_acceptance !== undefined ? [
+      fact("next_operator_action_result_acceptance", yesNo(actionResult.action_result_is_acceptance)),
+    ] : []),
+    ...(actionResult.action_result_is_execution !== undefined ? [
+      fact("next_operator_action_result_execution", yesNo(actionResult.action_result_is_execution)),
     ] : []),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),

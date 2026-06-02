@@ -143,6 +143,31 @@ def production_memory_loop_run_operator_no_provider_command(
         "--next-operator-start-role",
         help="Operator role label for the start event.",
     ),
+    write_next_operator_action_result: bool = typer.Option(
+        False,
+        "--write-next-operator-action-result",
+        help="Write an explicit next-operator action result after the start event.",
+    ),
+    next_operator_action_decision: str | None = typer.Option(
+        None,
+        "--next-operator-action-decision",
+        help="Action result decision: completed, blocked, or deferred.",
+    ),
+    next_operator_action_summary: str | None = typer.Option(
+        None,
+        "--next-operator-action-summary",
+        help="Bounded action result summary. Required with --write-next-operator-action-result.",
+    ),
+    next_operator_action_result_refs: list[str] | None = typer.Option(
+        None,
+        "--next-operator-action-result-ref",
+        help="Repeatable explicit result ref for a completed next-operator action.",
+    ),
+    next_operator_action_role: str = typer.Option(
+        "next_operator",
+        "--next-operator-action-role",
+        help="Operator role label for the action result.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -205,6 +230,11 @@ def production_memory_loop_run_operator_no_provider_command(
             next_operator_start_event_decision=next_operator_start_decision,
             next_operator_start_event_summary=next_operator_start_summary,
             next_operator_start_event_operator_role=next_operator_start_role,
+            write_next_operator_action_result=write_next_operator_action_result,
+            next_operator_action_result_decision=next_operator_action_decision,
+            next_operator_action_result_summary=next_operator_action_summary,
+            next_operator_action_result_refs=next_operator_action_result_refs,
+            next_operator_action_result_operator_role=next_operator_action_role,
         )
     except ValueError as exc:
         typer.echo(f"Production memory operator loop failed: {exc}", err=True)
@@ -245,6 +275,8 @@ def production_memory_loop_run_operator_no_provider_command(
         typer.echo(f"Next operator start packet: {result['next_operator_start_packet']['start_packet_status']}")
     if "next_operator_start_event" in result:
         typer.echo(f"Next operator start event: {result['next_operator_start_event']['event_status']}")
+    if "next_operator_action_result" in result:
+        typer.echo(f"Next operator action result: {result['next_operator_action_result']['result_status']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
@@ -258,6 +290,8 @@ def production_memory_loop_run_operator_no_provider_command(
     if "next_operator_start_packet" in result and result["next_operator_start_packet"]["start_packet_status"] != "ready":
         raise typer.Exit(code=1)
     if "next_operator_start_event" in result and result["next_operator_start_event"]["provider_calls_started"] is not False:
+        raise typer.Exit(code=1)
+    if "next_operator_action_result" in result and result["next_operator_action_result"]["provider_calls_started"] is not False:
         raise typer.Exit(code=1)
 
 

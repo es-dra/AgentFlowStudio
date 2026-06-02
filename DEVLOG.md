@@ -9,6 +9,46 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Action Result Output 001
+
+- Continued from
+  `codex/afs-production-memory-next-operator-action-result-001` on
+  `codex/afs-production-memory-operator-loop-action-result-output-001`.
+- Added an optional operator-loop post-check output path for
+  `next_operator_action_result`, gated behind a written
+  `next_operator_start_event`.
+- Added CLI flags to
+  `production-memory-loop-run-operator-no-provider`:
+  `--write-next-operator-action-result`,
+  `--next-operator-action-decision`, `--next-operator-action-summary`,
+  repeatable `--next-operator-action-result-ref`, and
+  `--next-operator-action-role`.
+- Split operator-loop writing into
+  `agentflow/memory/production_operator_loop_writer.py` so the builder module
+  stays focused while preserving the public import surface.
+- Added read-only generic Web rendering for embedded action results as a card,
+  lane, memory row, controls, timeline step, next-pass status/action, and
+  inspector facts.
+- Boundary kept: action result is `post_check_artifacts` only, not
+  `output_artifacts` or run-package checked items; no provider call, Company
+  KB write, durable memory write, Web execution, scan/persistence, ref
+  following, project-specific behavior, human acceptance, business validation,
+  generated-content claim, next-pass execution claim, memory candidate
+  creation, promotion decision creation, or memory promotion.
+- Verification:
+  - Red backend/Web tests failed first before the writer/CLI flag/Web view
+    existed.
+  - Focused action-result and adjacent start-event/operator-loop/Web
+    regression passed (`14 passed`).
+  - Focused backend/contract/CLI suite passed (`45 passed`).
+  - Expanded Web/static memory suite passed (`90 passed, 814 deselected`).
+  - CLI help exposes the new flags.
+  - CLI smoke wrote ignored runtime action-result artifacts and JSON smoke
+    confirmed post-check-only placement plus no-provider/write/claim
+    boundaries.
+  - Full suite passed on Python 3.12.12 (`904 passed`).
+  - `git diff --check` passed with CRLF warnings only.
+
 ## 2026-06-02 - Production Memory Next Operator Action Result 001
 
 - Continued from

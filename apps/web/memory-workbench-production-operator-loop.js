@@ -1,15 +1,6 @@
 import { buildNextOperatorBrief } from "./memory-workbench-production-next-operator-brief.js";
-import {
-  isStartEventReady,
-  nextPassActionFor,
-  nextPassStatusFor,
-  startEventActions,
-  startEventCards,
-  startEventControls,
-  startEventLanes,
-  startEventMemoryRows,
-  startEventTimeline,
-} from "./memory-workbench-production-operator-loop-start-event.js";
+import { actionResultActions, actionResultCards, actionResultControls, actionResultLanes, actionResultMemoryRows, actionResultTimeline, isActionResultReady } from "./memory-workbench-production-operator-loop-action-result.js";
+import { isStartEventReady, nextPassActionFor, nextPassStatusFor, startEventActions, startEventCards, startEventControls, startEventLanes, startEventMemoryRows, startEventTimeline } from "./memory-workbench-production-operator-loop-start-event.js";
 import {
   action,
   arrayValue,
@@ -43,6 +34,8 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const startPacketReady = startPacket?.start_packet_status === "ready" && startPacket.ready_for_next_operator === true;
   const startEvent = objectValue(payload.next_operator_start_event);
   const startEventReady = isStartEventReady(startEvent);
+  const actionResult = objectValue(payload.next_operator_action_result);
+  const actionResultReady = isActionResultReady(actionResult);
   const nextOperatorBrief = startPacket ? buildNextOperatorBrief(startPacket) : null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
@@ -75,6 +68,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         action("inspect_next_operator_start_packet", "Inspect start packet", startPacketReady ? "review ready" : "blocked", "next-pass"),
       ] : []),
       ...startEventActions(startEvent, startEventReady),
+      ...actionResultActions(actionResult, actionResultReady),
       action("review_company_candidates", "Review candidates", company.requires_human_review ? "blocked" : "review ready", "review"),
       action("prepare_next_pass", "Prepare next pass", ready ? "ready" : "blocked", "next-pass"),
     ],
@@ -132,6 +126,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         ),
       ] : []),
       ...startEventCards(startEvent),
+      ...actionResultCards(actionResult),
       card("company_kb_feedback", "Company KB feedback", company.promotion_status || "unknown", companyBoundary(company)),
     ],
     memory_loaded: [
@@ -158,6 +153,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         },
       ] : []),
       ...startEventMemoryRows(startEvent, startEventReady),
+      ...actionResultMemoryRows(actionResult, actionResultReady),
     ],
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
@@ -203,6 +199,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         ),
       ] : []),
       ...startEventLanes(startEvent, startEventReady),
+      ...actionResultLanes(actionResult, actionResultReady),
       lane("company-kb-feedback", "Company KB feedback", company.promotion_status || "unknown", `${company.candidate_item_count ?? 0} candidates`, companyBoundary(company)),
     ],
     protocol_summary: {
@@ -251,6 +248,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           control("next operator start packet Company KB write disabled", startPacket.writes_company_kb === false),
         ] : []),
         ...startEventControls(startEvent, startEventReady),
+        ...actionResultControls(actionResult, actionResultReady),
         control("Company feedback candidate only", company.promotion_status === "candidate_only"),
         control("Human review required for Company feedback", company.requires_human_review === true, "blocked"),
       ],
@@ -267,7 +265,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       summary: nextOperatorBrief?.prompt_excerpt || `${company.candidate_item_count ?? 0} Company KB feedback candidates remain candidate-only`,
     },
     next_pass: {
-      status: nextPassStatusFor(ready, startPacket, startPacketReady, startEvent, startEventReady),
+      status: nextPassStatusFor(ready, startPacket, startPacketReady, startEvent, startEventReady, actionResult, actionResultReady),
       action: nextPassActionFor(
         ready,
         resultScaffold,
@@ -278,6 +276,8 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         startPacketReady,
         startEvent,
         startEventReady,
+        actionResult,
+        actionResultReady,
       ),
     },
     timeline: [
@@ -286,6 +286,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
         step("Next operator start packet", startPacketReady ? "ready" : "blocked", startPacket.path || "not recorded"),
       ] : []),
       ...startEventTimeline(startEvent, startEventReady),
+      ...actionResultTimeline(actionResult, actionResultReady),
     ],
   };
 }

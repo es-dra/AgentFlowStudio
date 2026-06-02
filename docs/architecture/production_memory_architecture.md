@@ -705,6 +705,15 @@ operator-loop canvas surfaces the start receipt as a card, lane, memory row,
 controls, timeline step, and inspector facts. This is still a read-only
 post-check display; it does not execute the recorded next action.
 
+When an operator-loop manifest embeds `next_operator_action_result`, the
+generic operator-loop canvas surfaces the action outcome as a post-check card,
+lane, memory row, controls, timeline step, and inspector facts. This artifact is
+written only after an explicit start event and remains outside
+`output_artifacts` and run-package checked items. It records a bounded
+operator-action outcome only; it does not claim human acceptance, generated
+content quality, next-pass execution success, memory candidate creation,
+promotion-decision creation, Company KB promotion, or durable memory promotion.
+
 Acceptance feedback event artifacts render as a read-only human feedback canvas
 with the explicit package decision, source check status, ready-for-handoff
 state, business-validation boundary, memory boundary, no-provider controls, and
