@@ -97,6 +97,19 @@ export function productionOperatorManifestCheckFacts(payload) {
   ];
 }
 
+export function productionOperatorHandoffFacts(payload) {
+  return [
+    fact("handoff_status", payload.handoff_status || "unknown"),
+    fact("manifest_check_status", payload.manifest_check_status || "unknown"),
+    fact("artifact_refs", String(arrayValue(payload.artifact_refs).length)),
+    fact("blocked_items", String(arrayValue(payload.blocked_items).length)),
+    fact("next_operator_action", payload.next_operator_action?.action || "unknown"),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);

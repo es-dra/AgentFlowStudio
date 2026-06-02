@@ -9,6 +9,39 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Handoff Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-handoff-packet-001` on
+  `codex/afs-production-memory-operator-handoff-web-001`.
+- Added read-only Web memory workbench support for selected
+  `agentflow_production_memory_operator_handoff_packet` artifacts.
+- The canvas now shows handoff readiness, manifest-check status, artifact refs,
+  blocked items, non-claim boundaries, controls, and the next operator action.
+- Added inspector facts for handoff status, manifest-check status, artifact ref
+  count, blocked item count, next operator action, provider state, durable
+  memory write state, and Company KB write state.
+- Boundary kept: selected local JSON only; no provider call, no Company KB
+  write, no durable memory write, no workflow execution from Web, no ref
+  following, no Web scan/persistence, no Loulan behavior, no human acceptance,
+  and no business validation claim.
+- Verification so far:
+  - Red Web static test failed first because the handoff packet source role was
+    still `unclassified` and no dedicated Web view existed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_handoff_packet.py -q`
+    -> 2 passed.
+  - Focused production-memory Web suite passed (`17 passed`).
+  - All expanded Web static tests passed (`93 passed`) after PowerShell glob
+    expansion was corrected with `Get-ChildItem`.
+  - Full suite passed on Python 3.12.12 (`808 passed`).
+  - Line counts: handoff Web view 151, Web static test 137,
+    `artifact-workspace.js` 296, controller 79, inspector 246, inspector facts
+    179, contracts 101.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff and new-file sensitive scans were clean.
+  - Browser-level smoke was not run because Browser control tools were not
+    exposed in this turn.
+
 ## 2026-06-02 - Production Memory Operator Handoff Packet 001
 
 - Continued from
