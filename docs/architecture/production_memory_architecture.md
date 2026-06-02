@@ -46,6 +46,8 @@ project_input
   -> acceptance_feedback_candidate_packet
   -> explicit acceptance_feedback_candidate_promotion_decision
   -> acceptance_feedback_candidate_reviewed_context_overlay
+  -> next_operator_start_packet
+  -> explicit next_operator_start_event
 ```
 
 The committed example lives at:
@@ -163,6 +165,14 @@ The required root identifiers are:
   candidate was included in or blocked from a derived context bundle. It writes
   no long-term memory, writes no Company KB, does not execute a next pass, and
   does not claim new human acceptance or business validation.
+- `next_operator_start_packet`: checked no-provider startup packet for the
+  next operator. It is generated only after a passed operator run package
+  check and preserves the allowed package items, operator prompt excerpt,
+  start requirements, no-provider/write boundaries, and non-claims.
+- `next_operator_start_event`: explicit start receipt for a selected
+  `next_operator_start_packet`. It can record `started`, `blocked`, or
+  `deferred`, but it is not human acceptance, not a next-pass execution result,
+  not memory, not a memory candidate, and not a promotion decision.
 
 All derived artifacts declare:
 
@@ -238,6 +248,13 @@ All derived artifacts declare:
   context bundle only through the reviewed no-provider overlay command.
 - Rejected, expired, or blocked acceptance feedback candidate decisions remain
   visible in `blocked_refs` when requested for follow-up context.
+- A next-operator start packet requires a passed operator run package check,
+  ready package, ready handoff packet, no blocked items, no failed controls,
+  and no provider or write side effects.
+- A `started` next-operator start event requires a ready start packet.
+  `blocked` and `deferred` events may preserve startup blockers, but none of
+  these events claims human acceptance, next-pass execution, durable memory,
+  Company KB promotion, provider success, or business validation.
 
 ## CLI Surface
 
@@ -268,6 +285,8 @@ python -m apps.cli.main production-memory-loop-record-acceptance-feedback data/p
 python -m apps.cli.main production-memory-loop-draft-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback/acceptance_feedback_event.json --generated-at 2026-06-03T01:10:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate
 python -m apps.cli.main production-memory-loop-review-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback_candidate/acceptance_feedback_candidate_packet.json --decision promoted --rationale "Traceable acceptance feedback selected for the next context overlay." --decided-at 2026-06-03T02:15:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-acceptance-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/acceptance_feedback_candidate/acceptance_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/acceptance_feedback_candidate_promotion/acceptance_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate_reviewed
+python -m apps.cli.main production-memory-loop-next-operator-start-packet data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --generated-at 2026-06-03T09:30:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_packet
+python -m apps.cli.main production-memory-loop-record-next-operator-start data/processed/runs/production_memory_loop/next_operator_start_packet/next_operator_start_packet.json --decision started --summary "Next operator received the checked start packet." --recorded-at 2026-06-03T09:45:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_event
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -412,6 +431,16 @@ The acceptance feedback candidate reviewed run command writes:
 - `pass_readiness.json`
 - `next_pass_bundle.json`
 - `acceptance_feedback_candidate_promotion_overlay.json`
+
+The next-operator start packet command writes:
+
+- `next_operator_start_packet.json`
+- `next_operator_start_packet.md`
+
+The next-operator start event command writes:
+
+- `next_operator_start_event.json`
+- `next_operator_start_event.md`
 
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
@@ -564,6 +593,8 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_handoff_packet`
 - `agentflow_production_memory_operator_run_package`
 - `agentflow_production_memory_operator_run_package_check`
+- `agentflow_production_memory_next_operator_start_packet`
+- `agentflow_production_memory_next_operator_start_event`
 - `agentflow_production_memory_acceptance_feedback_event`
 - `agentflow_production_memory_acceptance_feedback_candidate_packet`
 - `agentflow_production_memory_acceptance_feedback_candidate_promotion_decision`
@@ -612,6 +643,19 @@ failed controls, no-provider controls, and non-claim boundaries. They confirm
 or block the package as a next-operator entry artifact only; they do not follow
 refs from the browser, execute workflows, call providers, write Company KB,
 claim provider success, or promote durable memory.
+
+Next-operator start packet artifacts render as a read-only startup canvas with
+checked package items, blocked items, failed controls, operator prompt excerpt,
+start requirements, no-provider controls, and non-claim boundaries. They are
+startup packets only; they do not execute the next pass, claim human
+acceptance, write Company KB, or promote durable memory.
+
+Next-operator start event artifacts render as a read-only start receipt canvas
+with `started`, `blocked`, or `deferred` state, source start-packet status,
+start requirements, no-provider controls, and non-claim boundaries. They record
+operator startup state only; they do not claim human acceptance, next-pass
+execution success, business validation, provider success, Company KB
+promotion, or memory promotion.
 
 Acceptance feedback event artifacts render as a read-only human feedback canvas
 with the explicit package decision, source check status, ready-for-handoff

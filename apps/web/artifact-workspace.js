@@ -117,6 +117,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryOperatorHandoffPacket,
     productionMemoryOperatorRunPackage,
     productionMemoryNextOperatorStartPacket: byType("agentflow_production_memory_next_operator_start_packet") || null,
+    productionMemoryNextOperatorStartEvent: byType("agentflow_production_memory_next_operator_start_event") || null,
     productionMemoryAcceptanceFeedbackEvent,
     productionMemoryAcceptanceFeedbackCandidatePacket,
     productionMemoryAcceptanceFeedbackCandidatePromotionDecision,

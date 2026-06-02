@@ -9,6 +9,31 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Operator Start Event 001
+
+- Continued from `codex/afs-production-memory-next-operator-brief-001` on
+  `codex/afs-production-memory-next-operator-start-event-001`.
+- Added `agentflow_production_memory_next_operator_start_event` as an explicit
+  no-provider start receipt after a checked `next_operator_start_packet`.
+- Added product CLI command
+  `production-memory-loop-record-next-operator-start`, writing
+  `next_operator_start_event.json` and `.md` from a selected start packet.
+- Added read-only Web recognition, inspector facts, and generic canvas view for
+  selected `next_operator_start_event.json`.
+- Boundary kept: selected local JSON only; no provider call, Company KB write,
+  durable memory write, Web execution, scan/persistence, ref following,
+  project-specific behavior, human acceptance, business validation, next-pass
+  execution claim, or memory promotion.
+- Verification:
+  - Red backend/Web tests failed first before the module/source role/view
+    existed.
+  - Focused tests passed (`9 passed`).
+  - Expanded operator-loop/Web regression passed (`29 passed`).
+  - Expanded Web/static memory suite passed (`85 passed, 805 deselected`).
+  - CLI help exposes the product command; CLI smoke wrote ignored runtime
+    start-event artifacts and preserved not-claimed boundaries.
+  - Full suite passed on Python 3.12.12 (`890 passed`).
+
 ## 2026-06-02 - Production Memory Next Operator Brief 001
 
 - Continued from

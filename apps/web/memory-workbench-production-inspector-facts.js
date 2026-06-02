@@ -224,6 +224,20 @@ export function productionNextOperatorStartPacketFacts(payload) {
   ];
 }
 
+export function productionNextOperatorStartEventFacts(payload) {
+  return [
+    fact("event_status", payload.event_status || "unknown"),
+    fact("start_decision", payload.start_decision || "unknown"),
+    fact("source_start_packet_status", payload.source_start_packet_status || "unknown"),
+    fact("source_ready_for_next_operator", yesNo(payload.source_ready_for_next_operator)),
+    fact("source_next_operator_action", payload.source_next_operator_action || "unknown"),
+    fact("human_acceptance", payload.claim_boundaries?.human_acceptance || "unknown"),
+    fact("next_pass_execution", payload.claim_boundaries?.next_pass_execution || "unknown"),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);
