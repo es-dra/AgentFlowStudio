@@ -9,6 +9,21 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-03 - Mainline Foundation Cleanup 001
+
+- Merged PR #80 into `master`, making the remote mainline include the complete
+  Production Memory Asset Loop through the read-only Web cockpit.
+- Created a clean mainline cleanup worktree from updated `origin/master`.
+- Audited `codex/loulan-memory-pilot` as a pressure-sample evidence branch
+  rather than an AFS product branch.
+- Adopted only generic positioning and knowledge-feedback lessons into
+  `docs/strategy/AFS-POSITIONING-KB-FEEDBACK-2026-06-02.md`.
+- Recorded cleanup boundaries in
+  `docs/maintenance/AFS-MAINLINE-FOUNDATION-CLEANUP-001.md`.
+- Boundary kept: no Loulan production content, project-specific inspector,
+  Company KB write, provider call, durable-memory claim, human acceptance
+  claim, or business-validation claim was added.
+
 ## 2026-06-03 - Production Memory Asset Cockpit Web 001
 
 - Merged PR #79 into `master` before opening this node, so the Web cockpit
