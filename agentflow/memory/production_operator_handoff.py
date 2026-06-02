@@ -5,6 +5,10 @@ from typing import Any
 
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
+from agentflow.memory.production_operator_acceptance_feedback_candidate_handoff import (
+    acceptance_feedback_candidate_promotion_markdown,
+    acceptance_feedback_candidate_promotion_prompt,
+)
 from agentflow.memory.production_operator_manifest_check import OPERATOR_MANIFEST_CHECK_KIND
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND
 from narratocut.utils import write_json
@@ -28,7 +32,7 @@ def build_operator_handoff_packet(
     ready = not blocked_items
     check_status = manifest_check.get("check_status", "unknown") if manifest_check else "not_supplied"
     output_artifacts = _list(manifest.get("output_artifacts"))
-    return {
+    packet = {
         "kind": OPERATOR_HANDOFF_PACKET_KIND,
         "artifact_type": OPERATOR_HANDOFF_PACKET_KIND,
         "schema_version": manifest.get("schema_version", SCHEMA_VERSION),
@@ -55,6 +59,10 @@ def build_operator_handoff_packet(
         "non_claims": _non_claims(),
         "claim_boundaries": _claim_boundaries(manifest, manifest_check),
     }
+    acceptance_feedback_promotion = _dict(manifest.get("acceptance_feedback_candidate_promotion"))
+    if acceptance_feedback_promotion:
+        packet["acceptance_feedback_candidate_promotion"] = acceptance_feedback_promotion
+    return packet
 
 
 def write_operator_handoff_packet(packet: dict[str, Any], output_dir: str | Path) -> list[Path]:
@@ -85,6 +93,10 @@ def render_operator_handoff_packet_markdown(packet: dict[str, Any]) -> str:
             "## Handoff Prompt",
             "",
             str(packet.get("handoff_prompt", "")),
+            "",
+            acceptance_feedback_candidate_promotion_markdown(
+                packet.get("acceptance_feedback_candidate_promotion")
+            ),
             "",
             "## Artifact Refs",
             "",
@@ -156,14 +168,31 @@ def _next_operator_action(
         return _action("review_next_pass_feedback_candidates", "ready", "Explicit promotion decision is required.")
     if manifest.get("next_pass_result") and not manifest.get("next_pass_review"):
         return _action("review_or_complete_next_pass_result", "ready", "Review the scaffolded or explicit next-pass result.")
+    acceptance_feedback_promotion = _dict(manifest.get("acceptance_feedback_candidate_promotion"))
+    if acceptance_feedback_promotion.get("candidate_included_in_context") is True:
+        return _action(
+            "run_next_ai_task_with_acceptance_feedback_context",
+            "ready",
+            "Use the generated next-task packet with promoted acceptance feedback candidate context.",
+        )
+    if acceptance_feedback_promotion.get("candidate_blocked_from_context") is True:
+        return _action(
+            "run_next_ai_task_without_acceptance_feedback_candidate",
+            "ready",
+            "Use the generated next-task packet without blocked acceptance feedback candidate refs.",
+        )
     return _action("run_next_ai_task_from_next_task_packet", "ready", "Use the generated next-task packet.")
 
 
 def _handoff_prompt(manifest: dict[str, Any], ready: bool) -> str:
     packet = _dict(manifest.get("next_task_packet"))
     prefix = "Use the generated next_task_packet for the next AI task." if ready else "Resolve blocked_items before the next AI task."
+    acceptance_feedback_clause = acceptance_feedback_candidate_promotion_prompt(
+        manifest.get("acceptance_feedback_candidate_promotion")
+    )
     return (
         f"{prefix} Task packet: {packet.get('task_packet_id', 'unknown')}. "
+        f"{acceptance_feedback_clause}"
         "Do not use blocked refs, unpromoted candidates, or feedback events as memory. "
         "Do not call remote providers without an explicit provider gate. "
         "Do not write Company KB or durable memory from this handoff."

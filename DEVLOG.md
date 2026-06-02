@@ -9,6 +9,46 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Handoff Acceptance Overlay 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-acceptance-feedback-overlay-001`
+  on `codex/afs-production-memory-operator-handoff-acceptance-overlay-001`.
+- Added a no-provider handoff/run-package propagation layer for embedded
+  acceptance feedback candidate promotion summaries. When the operator-loop
+  manifest includes a promoted acceptance feedback candidate overlay, both
+  `operator_handoff_packet` and `operator_run_package` now expose
+  `acceptance_feedback_candidate_promotion` plus operator-readable Markdown.
+- Updated the next operator action for the promoted-overlay case to
+  `run_next_ai_task_with_acceptance_feedback_context`, while baseline
+  no-overlay handoffs keep the existing generic action.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Loulan behavior, no new human acceptance,
+  no business validation, and no memory promotion.
+- Verification:
+  - Red focused test failed first because `operator_handoff_packet.json` did
+    not expose `acceptance_feedback_candidate_promotion`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_handoff_acceptance_feedback_overlay.py -q`
+    -> 1 passed.
+  - Focused handoff/run-package/run-package-check regression passed
+    (`20 passed`).
+  - Focused operator-loop acceptance overlay plus Web static regression passed
+    (`6 passed`).
+  - Expanded production-memory/operator/contract/CLI regression passed
+    (`52 passed`).
+  - Expanded Web static regression passed (`8 passed`).
+  - Py compile for touched Python files passed.
+  - CLI help passed.
+  - CLI smoke wrote ignored seed, acceptance feedback event, candidate packet,
+    explicit promoted decision, and final operator-loop handoff/run-package
+    chain under
+    `data/processed/runs/production_memory_loop/handoff_acceptance_overlay_smoke/`.
+    The final handoff action was
+    `run_next_ai_task_with_acceptance_feedback_context`, package check passed,
+    and both handoff/run-package Markdown reports exposed the acceptance
+    feedback candidate promotion section.
+  - Full suite passed on Python 3.12.12 (`862 passed`).
+
 ## 2026-06-02 - Production Memory Operator Loop Acceptance Feedback Candidate Overlay 001
 
 - Continued from

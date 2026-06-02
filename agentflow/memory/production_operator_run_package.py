@@ -5,6 +5,9 @@ from typing import Any
 
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
+from agentflow.memory.production_operator_acceptance_feedback_candidate_handoff import (
+    acceptance_feedback_candidate_promotion_markdown,
+)
 from agentflow.memory.production_operator_handoff import OPERATOR_HANDOFF_PACKET_KIND
 from agentflow.memory.production_operator_manifest_check import OPERATOR_MANIFEST_CHECK_KIND
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND
@@ -29,7 +32,7 @@ def build_operator_run_package(
 
     blocked_items = _blocked_items(manifest, manifest_check, handoff_packet)
     ready = not blocked_items
-    return {
+    package = {
         "kind": OPERATOR_RUN_PACKAGE_KIND,
         "artifact_type": OPERATOR_RUN_PACKAGE_KIND,
         "schema_version": manifest.get("schema_version", SCHEMA_VERSION),
@@ -55,6 +58,10 @@ def build_operator_run_package(
         "non_claims": _non_claims(),
         "claim_boundaries": _claim_boundaries(manifest, manifest_check, handoff_packet),
     }
+    acceptance_feedback_promotion = _dict(handoff_packet.get("acceptance_feedback_candidate_promotion"))
+    if acceptance_feedback_promotion:
+        package["acceptance_feedback_candidate_promotion"] = acceptance_feedback_promotion
+    return package
 
 
 def write_operator_run_package(package: dict[str, Any], output_dir: str | Path) -> list[Path]:
@@ -86,6 +93,10 @@ def render_operator_run_package_markdown(package: dict[str, Any]) -> str:
             "## Package Items",
             "",
             _package_items_table(package.get("package_items")),
+            "",
+            acceptance_feedback_candidate_promotion_markdown(
+                package.get("acceptance_feedback_candidate_promotion")
+            ),
             "",
             "## Blocked Items",
             "",
