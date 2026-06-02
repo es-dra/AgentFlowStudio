@@ -1,0 +1,26 @@
+{
+  "kind": "agentflow_production_memory_asset_feedback_fixture",
+  "schema_version": "production-memory-loop/v1",
+  "feedback_event_id": "asset-feedback:lead-character:identity:v1",
+  "project_id": "project:generic-content-loop",
+  "source_test_package_ref": "asset_test_package.json",
+  "source_readiness_ref": "asset_profile_readiness.json",
+  "source_feedback_input_type": "json_fixture",
+  "profile_id": "asset-profile:character:lead:v1",
+  "profile_kind": "character",
+  "review_dimension": "character_identity",
+  "review_result": "partially_kept",
+  "drift_observations": [
+    "The face shape stayed close, but the age impression became softer in the second pass."
+  ],
+  "violated_constraints": [
+    "do not change age impression"
+  ],
+  "failure_attribution": "character_inconsistency",
+  "suggested_next_state": "candidate",
+  "evidence_refs": [
+    "asset-profile:character:lead:v1",
+    "asset-profile-readiness:asset-profile-seed:generic-production-loop:v1"
+  ],
+  "reviewer_role": "tester"
+}

@@ -9,6 +9,39 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Asset Feedback Intake 001
+
+- Continued from PR #74 baseline
+  `codex/afs-production-memory-asset-profile-readiness-001` on stacked branch
+  `codex/afs-production-memory-asset-feedback-intake-001`.
+- Added `agentflow_production_memory_asset_feedback_event` as the first
+  tester feedback intake node after the asset test package.
+- Added product CLI command
+  `production-memory-loop-record-asset-feedback`, reading
+  `asset_profiles.json`, `asset_profile_readiness.json`, and a sanitized
+  feedback JSON fixture, then writing `asset_feedback_event.json` and `.md`.
+- Added committed sanitized fixture
+  `examples/agentflow/production_memory_asset_feedback.example.json`.
+- Boundary kept: feedback is not memory, not a memory candidate, not a
+  promotion decision, not profile versioning, not Company KB, and not provider
+  validation. Blocked or retired profile feedback can be recorded, but it does
+  not unlock next-context eligibility.
+- Verification:
+  - TDD red state confirmed because
+    `agentflow.memory.production_asset_feedback` did not exist.
+  - Focused asset feedback intake tests passed (`10 passed`).
+  - Focused asset feedback/profile readiness suite passed (`17 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help exposes `production-memory-loop-record-asset-feedback`.
+  - CLI no-provider smoke wrote ignored `asset_feedback_event.json` and `.md`.
+  - Changed Python files passed `python -m py_compile`.
+  - Full suite passed on Python 3.13.5 (`934 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+  - Spec reviewer returned `PASS_WITH_CONCERNS`; both optional concerns were
+    addressed with explicit retired-profile and unsupported-input-type tests.
+  - Security audit initially blocked on newly written absolute local paths in
+    the handoff note; those paths were removed before final verification.
+
 ## 2026-06-02 - Production Memory Asset Profile Readiness 001
 
 - Continued from
