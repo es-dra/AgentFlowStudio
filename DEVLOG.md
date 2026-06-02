@@ -9,6 +9,30 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Manifest Split 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-next-pass-result-scaffold-001`
+  on `codex/afs-production-memory-operator-manifest-split-001`.
+- Split next-pass operator-manifest helper logic into
+  `agentflow/memory/production_operator_next_pass_manifest.py`.
+- Kept behavior unchanged: the main operator manifest still assembles the same
+  next-pass result, review, promotion nodes, controls, summaries, and ready
+  gates through the new helper module.
+- Boundary kept: no contract change, no CLI surface change, no provider call,
+  no Company KB write, no durable memory write, no Web behavior change, no
+  Loulan behavior, no human acceptance, and no business validation claim.
+- Verification:
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow\memory\production_operator_manifest.py agentflow\memory\production_operator_next_pass_manifest.py agentflow\memory\production_operator_loop.py`
+    -> passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests/test_production_memory_operator_loop.py tests/test_production_memory_operator_loop_promotion.py tests/test_web_static_production_memory_operator_loop.py tests/test_web_static_production_memory_operator_loop_result_scaffold.py -q`
+    -> 15 passed.
+  - Focused production-memory / contract / Web suite passed (`67 passed`).
+  - Full suite passed on Python 3.12.12 (`790 passed`).
+  - Line counts after split by `Get-Content`: operator manifest 230 lines,
+    next-pass manifest helper 156 lines, feedback-candidate manifest helper 95
+    lines.
+
 ## 2026-06-02 - Production Memory Operator Loop Next Pass Result Scaffold 001
 
 - Continued from `codex/afs-production-memory-next-pass-result-web-001`

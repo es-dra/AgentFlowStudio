@@ -7,18 +7,22 @@ from agentflow.memory.company_kb_feedback import COMPANY_KB_FEEDBACK_PACKET_KIND
 from agentflow.memory.production_loop import CONTEXT_BUNDLE_KIND, PASS_READINESS_KIND, SCHEMA_VERSION
 from agentflow.memory.production_next_context import NEXT_CONTEXT_HANDOFF_KIND
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND
-from agentflow.memory.production_next_pass_promotion import (
-    NEXT_PASS_PROMOTION_DECISION_KIND,
-    NEXT_PASS_PROMOTION_OVERLAY_KIND,
-)
-from agentflow.memory.production_next_pass_result import NEXT_PASS_RESULT_KIND
-from agentflow.memory.production_next_pass_review import NEXT_PASS_REVIEW_KIND
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
 from agentflow.memory.production_operator_feedback_candidate_manifest import (
     operator_feedback_candidate_promotion_controls,
     operator_feedback_candidate_promotion_nodes,
     operator_feedback_candidate_promotion_ready,
     operator_feedback_candidate_promotion_summary,
+)
+from agentflow.memory.production_operator_next_pass_manifest import (
+    next_pass_nodes,
+    next_pass_promotion_controls,
+    next_pass_promotion_ready,
+    next_pass_promotion_summary,
+    next_pass_result_ready,
+    next_pass_result_summary,
+    next_pass_review_ready,
+    next_pass_review_summary,
 )
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_session import SESSION_REPORT_KIND
@@ -43,9 +47,9 @@ def build_operator_manifest(
     ready = (
         readiness.get("ready") is True
         and next_task_packet.get("packet_status") == "ready"
-        and _next_pass_result_ready(next_pass_result)
-        and _next_pass_review_ready(next_pass_review)
-        and _next_pass_promotion_ready(next_pass_promotion)
+        and next_pass_result_ready(next_pass_result)
+        and next_pass_review_ready(next_pass_review)
+        and next_pass_promotion_ready(next_pass_promotion)
         and operator_feedback_candidate_promotion_ready(operator_feedback_candidate_promotion)
         and report.get("session_status") == "ready"
     )
@@ -91,11 +95,11 @@ def build_operator_manifest(
         ),
     }
     if next_pass_result is not None:
-        manifest["next_pass_result"] = _next_pass_result_summary(next_pass_result)
+        manifest["next_pass_result"] = next_pass_result_summary(next_pass_result)
     if next_pass_review is not None:
-        manifest["next_pass_review"] = _next_pass_review_summary(next_pass_review)
+        manifest["next_pass_review"] = next_pass_review_summary(next_pass_review)
     if next_pass_promotion is not None:
-        manifest["next_pass_promotion"] = _next_pass_promotion_summary(next_pass_promotion)
+        manifest["next_pass_promotion"] = next_pass_promotion_summary(next_pass_promotion)
     if operator_feedback_candidate_promotion is not None:
         manifest["operator_feedback_candidate_promotion"] = operator_feedback_candidate_promotion_summary(
             operator_feedback_candidate_promotion
@@ -138,43 +142,7 @@ def _operator_loop_nodes(
             NEXT_TASK_PACKET_KIND,
         ),
     ]
-    if next_pass_result is not None:
-        nodes.append(
-            _node(
-                "next_pass_result",
-                next_pass_result.get("result_status", "unknown"),
-                "operator completion scaffold",
-                NEXT_PASS_RESULT_KIND,
-            )
-        )
-    if next_pass_review is not None:
-        nodes.append(
-            _node(
-                "next_pass_review",
-                next_pass_review.get("review_status", "unknown"),
-                "explicit next-pass result review",
-                NEXT_PASS_REVIEW_KIND,
-            )
-        )
-    if next_pass_promotion is not None:
-        decision = next_pass_promotion["decision"]
-        overlay = next_pass_promotion["overlay"]
-        nodes.extend(
-            [
-                _node(
-                    "next_pass_promotion_decision",
-                    decision.get("decision", "unknown"),
-                    decision.get("decision_id", "unknown"),
-                    NEXT_PASS_PROMOTION_DECISION_KIND,
-                ),
-                _node(
-                    "next_pass_promotion_overlay",
-                    overlay.get("decision_effect", "unknown"),
-                    overlay.get("context_bundle_id", "unknown"),
-                    NEXT_PASS_PROMOTION_OVERLAY_KIND,
-                ),
-            ]
-        )
+    nodes.extend(next_pass_nodes(next_pass_result, next_pass_review, next_pass_promotion))
     if operator_feedback_candidate_promotion is not None:
         nodes.extend(operator_feedback_candidate_promotion_nodes(operator_feedback_candidate_promotion))
     nodes.extend(
@@ -206,45 +174,10 @@ def _controls(
         _control("human_review_required_for_company_feedback", packet.get("requires_human_review") is True),
     ]
     if next_pass_promotion is not None:
-        overlay = next_pass_promotion["overlay"]
-        controls.extend(
-            [
-                _control("next_pass_promotion_decision_explicit", next_pass_promotion["decision"].get("template_only") is False),
-                _control("next_pass_promotion_no_provider_mode", overlay.get("provider_mode") == "no-provider"),
-                _control("next_pass_promotion_long_term_memory_write_disabled", overlay.get("writes_long_term_memory") is False),
-                _control("next_pass_promotion_company_kb_write_disabled", overlay.get("writes_company_kb") is False),
-            ]
-        )
+        controls.extend(next_pass_promotion_controls(next_pass_promotion))
     if operator_feedback_candidate_promotion is not None:
         controls.extend(operator_feedback_candidate_promotion_controls(operator_feedback_candidate_promotion))
     return controls
-
-
-def _next_pass_review_ready(next_pass_review: dict[str, Any] | None) -> bool:
-    return next_pass_review is None or next_pass_review.get("review_status") == "ready_for_operator_review"
-
-
-def _next_pass_result_ready(next_pass_result: dict[str, Any] | None) -> bool:
-    if next_pass_result is None:
-        return True
-    return (
-        next_pass_result.get("result_status") == "scaffolded_for_operator_completion"
-        and next_pass_result.get("provider_calls_started") is False
-        and next_pass_result.get("writes_long_term_memory") is False
-        and next_pass_result.get("writes_company_kb") is False
-    )
-
-
-def _next_pass_promotion_ready(next_pass_promotion: dict[str, Any] | None) -> bool:
-    if next_pass_promotion is None:
-        return True
-    overlay = next_pass_promotion["overlay"]
-    return (
-        overlay.get("run_readiness") == PASSED
-        and overlay.get("provider_calls_started") is False
-        and overlay.get("writes_long_term_memory") is False
-        and overlay.get("writes_company_kb") is False
-    )
 
 
 def _session_report_summary(report: dict[str, Any]) -> dict[str, Any]:
@@ -270,43 +203,6 @@ def _next_task_packet_summary(packet: dict[str, Any]) -> dict[str, Any]:
         "packet_status": packet.get("packet_status", "unknown"),
         "allowed_ref_count": len(packet.get("allowed_context_refs", [])),
         "blocked_ref_count": len(packet.get("blocked_refs", [])),
-    }
-
-
-def _next_pass_result_summary(result: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "result_id": result.get("result_id", "unknown"),
-        "result_status": result.get("result_status", "unknown"),
-        "provider_mode": result.get("provider_mode", "unknown"),
-        "provider_calls_started": result.get("provider_calls_started") is True,
-        "writes_long_term_memory": result.get("writes_long_term_memory") is True,
-        "writes_company_kb": result.get("writes_company_kb") is True,
-        "output_artifact_count": len(result.get("output_artifacts", [])),
-        "feedback_event_count": len(result.get("feedback_events", [])),
-    }
-
-
-def _next_pass_review_summary(review: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "review_id": review.get("review_id", "unknown"),
-        "review_status": review.get("review_status", "unknown"),
-        "used_allowed_ref_count": len(review.get("used_allowed_refs", [])),
-        "blocked_or_unknown_ref_count": len(review.get("blocked_or_unknown_refs", [])),
-        "feedback_candidate_count": len(review.get("feedback_candidates", [])),
-    }
-
-
-def _next_pass_promotion_summary(promotion: dict[str, Any]) -> dict[str, Any]:
-    decision = promotion["decision"]
-    overlay = promotion["overlay"]
-    return {
-        "decision_id": decision.get("decision_id", "unknown"),
-        "candidate_id": decision.get("candidate_id", "unknown"),
-        "decision": decision.get("decision", "unknown"),
-        "decision_effect": overlay.get("decision_effect", "unknown"),
-        "candidate_included_in_context": overlay.get("candidate_included_in_context") is True,
-        "candidate_blocked_from_context": overlay.get("candidate_blocked_from_context") is True,
-        "context_bundle_id": overlay.get("context_bundle_id", "unknown"),
     }
 
 
