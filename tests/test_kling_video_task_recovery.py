@@ -4,13 +4,13 @@ import json
 
 import pytest
 
-from narratocut.model_gateway import ModelProviderError
-from narratocut.model_gateway import kling_video_smoke
+from agentflow_studio.model_gateway import ModelProviderError
+from agentflow_studio.model_gateway import kling_video_smoke
 from tests.kling_video_smoke_helpers import Completed, curl_response, store
 
 
 def test_i2v_curl_poll_failure_preserves_safe_task_state(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     provider_store = store(tmp_path)
@@ -41,7 +41,7 @@ def test_i2v_curl_poll_failure_preserves_safe_task_state(monkeypatch, tmp_path) 
             )
         raise AssertionError(f"unexpected curl config: {config_text}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_transport.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_transport.subprocess.run", fake_run)
 
     with pytest.raises(ModelProviderError) as exc_info:
         kling_video_smoke.run_kling_i2v_smoke(
@@ -85,7 +85,7 @@ def test_i2v_curl_poll_failure_preserves_safe_task_state(monkeypatch, tmp_path) 
 
 
 def test_kling_video_resume_polls_safe_state_and_writes_manifest(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     provider_store = store(tmp_path)
     output_dir = tmp_path / "run"
     output_dir.mkdir()
@@ -100,7 +100,7 @@ def test_kling_video_resume_polls_safe_state_and_writes_manifest(monkeypatch, tm
                 "api_family": "i2v",
                 "capability": "video",
                 "model": "kling-v3",
-                "required_gate": "NARRATOCUT_ALLOW_REMOTE_VIDEO",
+                "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
                 "gate_status": "enabled",
                 "input_image": {
                     "path_persisted": False,
@@ -157,7 +157,7 @@ def test_kling_video_resume_polls_safe_state_and_writes_manifest(monkeypatch, tm
             return Completed(stdout=b"HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\n\r\n" + video_bytes)
         raise AssertionError(f"unexpected curl config: {config_text}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_transport.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_transport.subprocess.run", fake_run)
 
     manifest = kling_video_smoke.resume_kling_video_task(
         provider_store,

@@ -188,9 +188,9 @@ Remote-provider policy must name the capability:
 
 | Capability | Default | Required gate |
 |---|---|---|
-| LLM | off | `NARRATOCUT_ALLOW_REMOTE_LLM=true` |
-| ASR | off | `NARRATOCUT_ALLOW_REMOTE_ASR=true` |
-| image generation | off | `NARRATOCUT_ALLOW_REMOTE_IMAGE=true` |
+| LLM | off | `AFS_ALLOW_REMOTE_LLM=true` |
+| ASR | off | `AFS_ALLOW_REMOTE_ASR=true` |
+| image generation | off | `AFS_ALLOW_REMOTE_IMAGE=true` |
 | video generation | off | task-specific explicit approval until a project gate exists |
 | external download | off | task-specific source and artifact policy |
 

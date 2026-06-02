@@ -1,0 +1,44 @@
+id: agentflow_studio.production.production_handoff
+name: AgentFlow Production Handoff
+version: 1
+status: mvp
+description: Generate a local-first structured production handoff from a creative brief.
+primary_workflow: workflows/agentflow_production_handoff.yaml
+positioning: AgentFlow Production MVP is a local-first structured production handoff generator.
+input_contract:
+  required:
+    - creative_brief
+  optional:
+    - metadata
+output_artifacts:
+  - creative_brief.json
+  - story_bible.json
+  - episode_outline.json
+  - scene_plan.json
+  - shot_plan.json
+  - prompt_pack.json
+  - production_handoff.json
+  - production_report.md
+  - memory_candidates.json
+  - cost_quality_trace.json
+  - feedback_signal_log.json
+  - execution_trace.json
+quality_gates:
+  - inspect-run
+  - review-run
+  - agentflow_production_handoff
+dependencies:
+  local: []
+  network: false
+when_to_use:
+  - The user needs a production-side handoff for short drama, episodic story, IP content, or commercial content planning.
+  - The output must be agent-readable and structured before any media generation or Web UI work.
+when_not_to_use:
+  - The user needs finished video packaging or distribution-side highlight selection; use AgentFlow Studio skills instead.
+  - The user needs a generic one-off article, ad copy, or chat-only content generation result.
+  - The user expects remote LLM generation or automatic long-term memory promotion.
+failure_recovery:
+  missing_creative_brief: Provide a creative_brief.json matching docs/agentflow_production_contracts.md.
+  weak_handoff: Review production_report.md, then refine creative_brief.json and rerun.
+  memory_candidate_disagreement: Treat memory_candidates.json as candidate-only and do not promote without explicit review.
+  feedback_conflict: Use feedback.jsonl as the source of truth; feedback_signal_log.json is derived.

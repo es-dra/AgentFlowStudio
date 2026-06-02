@@ -4,7 +4,7 @@ from typer.testing import CliRunner
 
 from apps.cli import main as cli_main
 from apps.cli import media_commands
-from narratocut.slicing_sop import FFmpegInfo
+from agentflow_studio.slicing_sop import FFmpegInfo
 
 
 def test_ffmpeg_check_command_reports_available(monkeypatch) -> None:

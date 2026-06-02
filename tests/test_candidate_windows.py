@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.candidate_sop import generate_candidate_windows
-from narratocut.schemas import Transcript
+from agentflow_studio.candidate_sop import generate_candidate_windows
+from agentflow_studio.schemas import Transcript
 
 
 def test_generate_candidate_windows_from_transcript_segment_windows() -> None:

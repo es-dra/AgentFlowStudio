@@ -7,7 +7,7 @@ from typing import Any
 import typer
 
 from agentflow.memory.promotion import validate_evidence_reuse_review
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def memory_evidence_reuse_review_command(

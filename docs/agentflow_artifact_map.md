@@ -60,7 +60,7 @@ must not become an implicit global preference without a promotion decision.
 project_manifest.example.json
 -> contract_registry.example.json
 -> creative_brief.json
--> NarratoStudio workflow
+-> AgentFlow Production workflow
 -> production_handoff.json
 -> production_report.md
 -> router_decision.json
@@ -68,7 +68,7 @@ project_manifest.example.json
 -> skill_result.json
 -> future production execution layer
 -> media / clip plan / final video
--> NarratoCut workflow
+-> AgentFlow Studio workflow
 -> finished_package_manifest.json
 -> package_report.md
 -> review_report.json

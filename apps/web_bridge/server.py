@@ -18,7 +18,7 @@ from apps.web_bridge.bridge import (
 
 
 class BridgeRequestHandler(BaseHTTPRequestHandler):
-    server_version = "NarratoCutWebBridge/0.1"
+    server_version = "AgentFlow StudioWebBridge/0.1"
 
     def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib handler API
         self._send_json({"status": "ok"})
@@ -99,12 +99,12 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
 def serve(host: str = "127.0.0.1", port: int = 8787) -> None:
     server = ThreadingHTTPServer((host, port), BridgeRequestHandler)
-    print(f"NarratoCut web bridge listening on http://{host}:{port}")
+    print(f"AgentFlow Studio web bridge listening on http://{host}:{port}")
     server.serve_forever()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the local NarratoCut Web UI bridge.")
+    parser = argparse.ArgumentParser(description="Run the local AgentFlow Studio Web UI bridge.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default=8787, type=int)
     args = parser.parse_args()

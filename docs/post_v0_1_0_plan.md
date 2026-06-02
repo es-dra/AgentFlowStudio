@@ -1,9 +1,9 @@
 # Post-v0.1.0 Plan
 
-This page records the first operating plan after the NarratoCut `v0.1.0`
+This page records the first operating plan after the AgentFlow Studio `v0.1.0`
 delivery closeout.
 
-NarratoCut is the distribution-side short-video highlight, packaging, report,
+AgentFlow Studio is the distribution-side short-video highlight, packaging, report,
 and review module of AgentFlow Studio. The repository container was later
 renamed to `AgentFlowStudio`; the post-`v0.1.0` goal remains to protect the
 local-first CLI/Agent MVP while preparing the next workstreams without turning
@@ -14,7 +14,7 @@ the stable distribution module into a premature hosted platform runtime.
 Current release baseline confirmed during the post-`v0.1.0` startup scan:
 
 - branch: `master`
-- remote at release time: `git@github.com:es-dra/NarratoCut.git`
+- remote at release time: `git@github.com:es-dra/AgentFlow Studio.git`
 - `master`, `origin/master`, and `v0.1.0^{}`: `bf5e7a1`
 - `v0.1.0` tag type: annotated tag
 - `v0.1.0` tag object: `460deba`
@@ -65,7 +65,7 @@ The first Web UI branch should be a viewer, not an editor.
 Recommended branch objective:
 
 ```text
-NarratoCut package/run viewer for existing local artifacts.
+AgentFlow Studio package/run viewer for existing local artifacts.
 ```
 
 The branch should consume stable artifacts in this order:
@@ -111,17 +111,17 @@ The mainline should expand architecture and contracts before runtime.
 Near-term architecture documents should define:
 
 - AgentFlow Studio top-level module map
-- NarratoStudio production-side artifact contracts
+- AgentFlow Production production-side artifact contracts
 - AgentFlow Skills task/skill contract boundaries
 - AgentFlow Router MVP scope and non-goals
 - AgentFlow Memory feedback and learning contract
-- how NarratoCut package artifacts flow into downstream publishing or feedback
+- how AgentFlow Studio package artifacts flow into downstream publishing or feedback
 
 Boundaries:
 
 - do not rename Python packages, workflows, artifacts, or CLI commands in this
   post-release lane
-- do not add a platform runtime inside NarratoCut before the contracts are clear
+- do not add a platform runtime inside AgentFlow Studio before the contracts are clear
 - keep AgentFlow keys machine-readable and stable
 - keep human-facing product docs clear about what is implemented versus planned
 

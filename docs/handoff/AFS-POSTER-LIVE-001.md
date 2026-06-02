@@ -12,11 +12,11 @@ running the PosterFlow live smoke later.
 Checked without printing secrets:
 
 ```text
-NARRATOCUT_ALLOW_REMOTE_IMAGE=unset
-NARRATOCUT_IMAGE_PROVIDER=unset
-NARRATOCUT_IMAGE_BASE_URL=unset
-NARRATOCUT_IMAGE_API_KEY=unset
-NARRATOCUT_IMAGE_MODEL=unset
+AFS_ALLOW_REMOTE_IMAGE=unset
+AFS_IMAGE_PROVIDER=unset
+AFS_IMAGE_BASE_URL=unset
+AFS_IMAGE_API_KEY=unset
+AFS_IMAGE_MODEL=unset
 ```
 
 ## Local-Only Setup Checklist
@@ -25,11 +25,11 @@ Set variables only in the local shell or local ignored config. Do not paste keys
 into chat and do not commit config files.
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
-$env:NARRATOCUT_IMAGE_PROVIDER="minimax"
-$env:NARRATOCUT_IMAGE_BASE_URL="<local-provider-base-url>"
-$env:NARRATOCUT_IMAGE_API_KEY="<set-in-local-shell-only>"
-$env:NARRATOCUT_IMAGE_MODEL="image-01"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_IMAGE_PROVIDER="minimax"
+$env:AFS_IMAGE_BASE_URL="<local-provider-base-url>"
+$env:AFS_IMAGE_API_KEY="<set-in-local-shell-only>"
+$env:AFS_IMAGE_MODEL="image-01"
 ```
 
 Then run:

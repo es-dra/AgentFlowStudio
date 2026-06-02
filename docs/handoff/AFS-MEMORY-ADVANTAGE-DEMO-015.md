@@ -66,7 +66,7 @@ lanes: baseline, memory_backed
 Runtime command:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_VIDEO='true'
+$env:AFS_ALLOW_REMOTE_VIDEO='true'
 .\.venv\Scripts\python.exe -m apps.cli.main memory-advantage-demo-015-i2v-runtime --source-keyframe data\processed\runs\memory_advantage_demo_012\asset_i2i_i2v_consistency\live\memory_assisted\desert_wind_walk\image\image_candidates\candidate_001.jpg --run-dir data\processed\runs\memory_advantage_demo_015\memory_backed_desert_recovery_i2v --duration 15 --mode pro --poll-interval-sec 5 --max-polls 180 --transport curl
 ```
 
@@ -176,7 +176,7 @@ python -m json.tool data\processed\runs\memory_advantage_demo_015\memory_backed_
 .\.venv\Scripts\python.exe -m pytest tests\test_memory_advantage_demo_015.py tests\test_kling_video_smoke.py tests\test_kling_video_request_plan.py tests\test_kling_video_task_recovery.py -q
 # 23 passed
 
-.\.venv\Scripts\python.exe -m compileall apps\cli narratocut\model_gateway narratocut\memory_advantage_demo_015.py narratocut\memory_advantage_demo_015_content.py
+.\.venv\Scripts\python.exe -m compileall apps\cli agentflow_studio\model_gateway agentflow_studio\memory_advantage_demo_015.py agentflow_studio\memory_advantage_demo_015_content.py
 # passed
 
 git diff --check

@@ -9,7 +9,7 @@ from agentflow.memory.production_acceptance_feedback_candidate import (
     ACCEPTANCE_FEEDBACK_CANDIDATE_PACKET_KIND,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND = (
     "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision"

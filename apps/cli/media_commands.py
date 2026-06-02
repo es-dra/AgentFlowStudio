@@ -6,7 +6,7 @@ from typing import Optional
 
 import typer
 
-from narratocut.slicing_sop import check_ffmpeg_available, check_media_tools
+from agentflow_studio.slicing_sop import check_ffmpeg_available, check_media_tools
 
 
 def ffmpeg_check_command(

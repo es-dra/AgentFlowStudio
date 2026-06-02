@@ -10,7 +10,7 @@ from agentflow.memory.production_asset_profile_constants import (
     PROVIDER_VALIDATION_RESULT_KIND,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
+from agentflow_studio.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
 
 
 def build_provider_validation_plan(
@@ -33,7 +33,7 @@ def build_provider_validation_plan(
         "run_provider_validation": run_provider_validation,
         "image_service": image_service,
         "video_service": video_service,
-        "required_gates": ["NARRATOCUT_ALLOW_REMOTE_IMAGE", "NARRATOCUT_ALLOW_REMOTE_VIDEO"],
+        "required_gates": ["AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_VIDEO"],
         "local_inputs": {
             "project_materials_provided": project_materials_path is not None,
             "character_reference_image_provided": character_reference_image_path is not None,
@@ -60,12 +60,12 @@ def provider_validation_blockers(
     if provider_plan.get("run_provider_validation") is not True:
         return [_blocker("provider_validation_not_requested", "provider validation was not requested")]
     blockers: list[dict[str, str]] = []
-    if not _env_gate_enabled("NARRATOCUT_ALLOW_REMOTE_IMAGE"):
-        blockers.append(_blocker("image_gate_unset", "set NARRATOCUT_ALLOW_REMOTE_IMAGE=true for live image smoke"))
-    if not _env_gate_enabled("NARRATOCUT_ALLOW_REMOTE_VIDEO"):
-        blockers.append(_blocker("video_gate_unset", "set NARRATOCUT_ALLOW_REMOTE_VIDEO=true for live video smoke"))
+    if not _env_gate_enabled("AFS_ALLOW_REMOTE_IMAGE"):
+        blockers.append(_blocker("image_gate_unset", "set AFS_ALLOW_REMOTE_IMAGE=true for live image smoke"))
+    if not _env_gate_enabled("AFS_ALLOW_REMOTE_VIDEO"):
+        blockers.append(_blocker("video_gate_unset", "set AFS_ALLOW_REMOTE_VIDEO=true for live video smoke"))
     if provider_config_path is None and not os.environ.get(COMPANY_PROVIDER_CONFIG_ENV):
-        blockers.append(_blocker("provider_config_missing", "provide --provider-config or NARRATOCUT_PROVIDER_CONFIG"))
+        blockers.append(_blocker("provider_config_missing", "provide --provider-config or AFS_PROVIDER_CONFIG"))
     if character_reference_image_path is None:
         blockers.append(_blocker("character_reference_image_missing", "provide a local ignored character reference image"))
     if image_service == "gpt_image2":
@@ -87,9 +87,9 @@ def run_provider_validation(
     image_output = output_root / "image"
     video_output = output_root / "video"
     try:
-        from narratocut.model_gateway.company_secrets import load_company_provider_secrets
-        from narratocut.model_gateway.kling_video_smoke import run_kling_i2v_smoke
-        from narratocut.model_gateway.minimax_image_smoke import run_minimax_image_smoke
+        from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
+        from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
+        from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 
         store = load_company_provider_secrets(provider_config_path)
         prompts = _dict(seed.get("provider_validation"))

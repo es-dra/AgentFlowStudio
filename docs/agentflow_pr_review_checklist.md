@@ -70,7 +70,7 @@ Run these commands before claiming the PR is ready:
 .venv\Scripts\python.exe -m pytest tests/test_contract_examples.py
 .venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_audit.py
 .venv\Scripts\python.exe -m pytest
-.venv\Scripts\python.exe -m compileall apps narratocut narratostudio tests
+.venv\Scripts\python.exe -m compileall apps agentflow_studio agentflow_production tests
 git diff --check
 .venv\Scripts\python.exe -m apps.cli.main --help
 .venv\Scripts\python.exe -m apps.cli.main version

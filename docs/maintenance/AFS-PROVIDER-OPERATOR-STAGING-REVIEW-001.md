@@ -17,10 +17,10 @@ Reviewed paths:
 - Hidden CLI: `apps/cli/kling_video_command.py`,
   `apps/cli/minimax_image_command.py`, `apps/cli/memory_demo_commands.py`,
   and the hidden registrations in `apps/cli/support_command_registry.py`.
-- Provider config bridge: `narratocut/model_gateway/company_secrets.py`.
-- Kling runtime: `narratocut/model_gateway/kling_*.py`.
-- MiniMax runtime: `narratocut/model_gateway/minimax_image_*.py` and
-  `narratostudio/posterflow/minimax_provider.py`.
+- Provider config bridge: `agentflow_studio/model_gateway/company_secrets.py`.
+- Kling runtime: `agentflow_studio/model_gateway/kling_*.py`.
+- MiniMax runtime: `agentflow_studio/model_gateway/minimax_image_*.py` and
+  `agentflow_production/posterflow/minimax_provider.py`.
 - Operator runbook script:
   `tools/run_memory_advantage_recording_016.ps1`.
 - Tests: provider smoke helpers, Kling/MiniMax tests, PosterFlow provider
@@ -31,8 +31,8 @@ Reviewed paths:
 | Area | Result | Notes |
 |---|---|---|
 | Default product surface | pass | `apps.cli.main --help` keeps `memory-video-pipeline-*` visible and hides direct provider/demo commands. |
-| Provider config | pass | No machine-local Company `.secrets` default remains. Provider config is explicit through `--provider-config`, `-ProviderConfig`, or `NARRATOCUT_PROVIDER_CONFIG`. |
-| Capability gates | pass | Image and video use separate gates: `NARRATOCUT_ALLOW_REMOTE_IMAGE` and `NARRATOCUT_ALLOW_REMOTE_VIDEO`. |
+| Provider config | pass | No machine-local Company `.secrets` default remains. Provider config is explicit through `--provider-config`, `-ProviderConfig`, or `AFS_PROVIDER_CONFIG`. |
+| Capability gates | pass | Image and video use separate gates: `AFS_ALLOW_REMOTE_IMAGE` and `AFS_ALLOW_REMOTE_VIDEO`. |
 | RECORDING-016 script | fixed in this pass | Live path now requires provider config before calling Kling I2V; dry-run still makes no provider call. |
 | Secrets scan | pass | High-risk key/token/private-key patterns and the old local Company `.secrets` path did not match in reviewed paths. |
 | File size | pass | Reviewed code, tests, script, and this doc stay under the 300-line target. |

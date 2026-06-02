@@ -4,12 +4,12 @@ from pathlib import Path
 
 import typer
 
-from narratocut.model_gateway.company_secrets import (
+from agentflow_studio.model_gateway.company_secrets import (
     COMPANY_PROVIDER_CONFIG_ENV,
     load_company_provider_secrets,
 )
-from narratocut.model_gateway.errors import ModelGatewayError
-from narratocut.model_gateway.kling_video_smoke import (
+from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.kling_video_smoke import (
     resume_kling_video_task,
     run_kling_i2v_smoke,
     run_kling_t2v_smoke,

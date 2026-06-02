@@ -12,8 +12,8 @@ Worktree:
 Added a read-only Alpha smoke/status CLI entry that reports current Alpha
 readiness across:
 
-- NarratoStudio production handoff
-- NarratoCut finished package
+- AgentFlow Production production handoff
+- AgentFlow Studio finished package
 - PosterFlow provider readiness
 
 The command does not run workflows, write `data/processed` artifacts, call
@@ -29,8 +29,8 @@ python -m apps.cli.main alpha-smoke --json
 Default no-provider-env result:
 
 - overall: `blocked`
-- `narratostudio_handoff`: `pass`
-- `narratocut_package`: `pass`
+- `agentflow_production_handoff`: `pass`
+- `agentflow_studio_package`: `pass`
 - `posterflow_live_smoke`: `blocked`
 
 ## Mainline Writeback Candidate

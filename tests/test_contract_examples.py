@@ -10,7 +10,7 @@ from agentflow.contracts.examples import (
     AGENTFLOW_EXAMPLE_PATHS,
     AGENTFLOW_SKILL_ROUTER_EXAMPLES,
 )
-from narratostudio import CreativeBrief
+from agentflow_studio.production import CreativeBrief
 
 
 FORBIDDEN_PRIVATE_OR_GENERATED_FRAGMENTS = [
@@ -62,8 +62,8 @@ def test_platform_profile_examples_have_schema_version() -> None:
         assert payload["aspect_ratio"]
 
 
-def test_narratostudio_creative_brief_example_has_schema_version() -> None:
-    payload = json.loads(Path("examples/narratostudio/creative_brief.example.json").read_text(encoding="utf-8"))
+def test_agentflow_production_creative_brief_example_has_schema_version() -> None:
+    payload = json.loads(Path("examples/agentflow_production/creative_brief.example.json").read_text(encoding="utf-8"))
 
     assert payload["schema_version"] == "0.1.0"
     assert CreativeBrief.model_validate(payload).artifact_type == "creative_brief"
@@ -74,7 +74,7 @@ def test_agentflow_project_manifest_example_has_schema_version() -> None:
 
     assert payload["schema_version"] == "0.1.0"
     assert payload["artifact_type"] == "agentflow_project_manifest"
-    assert {module["module_id"] for module in payload["modules"]} == {"narratostudio", "narratocut"}
+    assert {module["module_id"] for module in payload["modules"]} == {"agentflow_production", "agentflow_studio"}
 
 
 def test_agentflow_artifact_map_example_has_schema_version() -> None:
@@ -82,7 +82,7 @@ def test_agentflow_artifact_map_example_has_schema_version() -> None:
 
     assert payload["schema_version"] == "0.1.0"
     assert payload["artifact_type"] == "agentflow_artifact_map"
-    assert {artifact["module_owner"] for artifact in payload["artifacts"]} == {"NarratoStudio", "NarratoCut"}
+    assert {artifact["module_owner"] for artifact in payload["artifacts"]} == {"AgentFlow Production", "AgentFlow Studio"}
 
 
 def test_agentflow_feedback_event_example_jsonl_has_schema_version() -> None:
@@ -163,7 +163,7 @@ def test_agentflow_intermediate_asset_example_is_candidate_with_evidence() -> No
     assert payload["artifact_type"] == "agentflow_intermediate_asset"
     assert payload["asset_id"]
     assert payload["asset_kind"]
-    assert payload["module_origin"] in {"NarratoStudio", "NarratoCut", "AgentFlow"}
+    assert payload["module_origin"] in {"AgentFlow Production", "AgentFlow Studio", "AgentFlow"}
     assert payload["source_artifact_refs"]
     assert payload["evidence_refs"]
     assert payload["reuse_status"] == "candidate"
@@ -194,14 +194,14 @@ def test_agentflow_asset_reuse_decision_is_decision_only() -> None:
     assert payload["does_not_execute"] is True
 
 
-def test_agentflow_narratostudio_asset_feedback_review_is_review_only() -> None:
+def test_agentflow_production_asset_feedback_review_is_review_only() -> None:
     payload = json.loads(
-        Path("examples/agentflow/narratostudio_asset_feedback_review.example.json").read_text(encoding="utf-8")
+        Path("examples/agentflow/agentflow_production_asset_feedback_review.example.json").read_text(encoding="utf-8")
     )
 
     assert payload["schema_version"] == "0.1.0"
-    assert payload["artifact_type"] == "agentflow_narratostudio_asset_feedback_review"
-    assert payload["validation_scope"] == "narratostudio_asset_feedback_loop"
+    assert payload["artifact_type"] == "agentflow_production_asset_feedback_review"
+    assert payload["validation_scope"] == "agentflow_production_asset_feedback_loop"
     assert payload["runtime_status"] == "not_implemented"
     assert payload["does_not_execute"] is True
     assert payload["writes_long_term_memory"] is False
@@ -210,16 +210,16 @@ def test_agentflow_narratostudio_asset_feedback_review_is_review_only() -> None:
     assert payload["asset_memory_validation"]["artifact_type"] == "agentflow_asset_memory_validation"
 
 
-def test_agentflow_narratostudio_asset_feedback_review_validation_is_harness_only() -> None:
+def test_agentflow_production_asset_feedback_review_validation_is_harness_only() -> None:
     payload = json.loads(
-        Path("examples/agentflow/narratostudio_asset_feedback_review_validation.example.json").read_text(
+        Path("examples/agentflow/agentflow_production_asset_feedback_review_validation.example.json").read_text(
             encoding="utf-8"
         )
     )
 
     assert payload["schema_version"] == "0.1.0"
-    assert payload["artifact_type"] == "agentflow_narratostudio_asset_feedback_review_validation"
-    assert payload["validation_scope"] == "narratostudio_asset_feedback_review"
+    assert payload["artifact_type"] == "agentflow_production_asset_feedback_review_validation"
+    assert payload["validation_scope"] == "agentflow_production_asset_feedback_review"
     assert payload["runtime_status"] == "not_implemented"
     assert payload["does_not_execute"] is True
     assert payload["writes_long_term_memory"] is False
@@ -227,19 +227,19 @@ def test_agentflow_narratostudio_asset_feedback_review_validation_is_harness_onl
     assert payload["checks"]
 
 
-def test_agentflow_narratostudio_asset_feedback_review_gate_is_decision_only() -> None:
+def test_agentflow_production_asset_feedback_review_gate_is_decision_only() -> None:
     payload = json.loads(
-        Path("examples/agentflow/narratostudio_asset_feedback_review_gate.example.json").read_text(encoding="utf-8")
+        Path("examples/agentflow/agentflow_production_asset_feedback_review_gate.example.json").read_text(encoding="utf-8")
     )
 
     assert payload["schema_version"] == "0.1.0"
-    assert payload["artifact_type"] == "agentflow_narratostudio_asset_feedback_review_gate"
-    assert payload["gate_scope"] == "narratostudio_asset_feedback_review"
+    assert payload["artifact_type"] == "agentflow_production_asset_feedback_review_gate"
+    assert payload["gate_scope"] == "agentflow_production_asset_feedback_review"
     assert payload["runtime_status"] == "not_implemented"
     assert payload["does_not_execute"] is True
     assert payload["writes_long_term_memory"] is False
     assert payload["gate_status"] in {"passed", "blocked"}
-    assert payload["source_validation_artifact_type"] == "agentflow_narratostudio_asset_feedback_review_validation"
+    assert payload["source_validation_artifact_type"] == "agentflow_production_asset_feedback_review_validation"
     assert isinstance(payload["blocking_check_ids"], list)
     assert payload["next_allowed_actions"]
     check_ids = {check["check_id"] for check in payload["checks"]}
@@ -252,14 +252,14 @@ def test_agentflow_narratostudio_asset_feedback_review_gate_is_decision_only() -
     } <= check_ids
 
 
-def test_agentflow_narratostudio_asset_reuse_dry_run_plan_is_plan_only() -> None:
+def test_agentflow_production_asset_reuse_dry_run_plan_is_plan_only() -> None:
     payload = json.loads(
-        Path("examples/agentflow/narratostudio_asset_reuse_dry_run_plan.example.json").read_text(encoding="utf-8")
+        Path("examples/agentflow/agentflow_production_asset_reuse_dry_run_plan.example.json").read_text(encoding="utf-8")
     )
 
     assert payload["schema_version"] == "0.1.0"
-    assert payload["artifact_type"] == "agentflow_narratostudio_asset_reuse_dry_run_plan"
-    assert payload["plan_scope"] == "narratostudio_asset_reuse_dry_run"
+    assert payload["artifact_type"] == "agentflow_production_asset_reuse_dry_run_plan"
+    assert payload["plan_scope"] == "agentflow_production_asset_reuse_dry_run"
     assert payload["runtime_status"] == "not_implemented"
     assert payload["does_not_execute"] is True
     assert payload["writes_long_term_memory"] is False
@@ -320,11 +320,11 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_intermediate_asset",
         "agentflow_reusable_asset_profile",
         "agentflow_asset_reuse_decision",
-        "agentflow_narratostudio_asset_feedback_review",
-        "agentflow_narratostudio_asset_feedback_review_validation",
-        "agentflow_narratostudio_asset_feedback_review_gate",
-        "agentflow_narratostudio_asset_reuse_dry_run_plan",
-        "agentflow_narratostudio_asset_reuse_review",
+        "agentflow_production_asset_feedback_review",
+        "agentflow_production_asset_feedback_review_validation",
+        "agentflow_production_asset_feedback_review_gate",
+        "agentflow_production_asset_reuse_dry_run_plan",
+        "agentflow_production_asset_reuse_review",
     }
     assert expected_types <= registered_types
     assert all(contract["example_path"] for contract in payload["contracts"])

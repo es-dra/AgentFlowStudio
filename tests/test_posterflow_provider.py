@@ -7,11 +7,11 @@ import urllib.error
 
 import pytest
 
-from narratocut.model_gateway import ModelProviderError
-from narratostudio.posterflow import minimax_provider, provider as poster_provider
-from narratostudio.posterflow.minimax_provider import MiniMaxImageProvider
-from narratostudio.posterflow.provider import OpenAICompatibleImageProvider, create_image_provider_from_env
-from narratostudio.posterflow.schemas import PosterPromptPack
+from agentflow_studio.model_gateway import ModelProviderError
+from agentflow_studio.production.posterflow import minimax_provider, provider as poster_provider
+from agentflow_studio.production.posterflow.minimax_provider import MiniMaxImageProvider
+from agentflow_studio.production.posterflow.provider import OpenAICompatibleImageProvider, create_image_provider_from_env
+from agentflow_studio.production.posterflow.schemas import PosterPromptPack
 
 
 PNG_BYTES = base64.b64decode(
@@ -39,28 +39,28 @@ class FakeResponse:
 
 
 def test_openai_compatible_image_provider_requires_remote_image_opt_in(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     provider = OpenAICompatibleImageProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",
         model="fake-image-model",
     )
 
-    with pytest.raises(ModelProviderError, match="NARRATOCUT_ALLOW_REMOTE_IMAGE"):
+    with pytest.raises(ModelProviderError, match="AFS_ALLOW_REMOTE_IMAGE"):
         provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
 
 
 def test_openai_compatible_image_provider_checks_remote_gate_before_api_key(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
-    monkeypatch.delenv("NARRATOCUT_IMAGE_API_KEY", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_IMAGE_API_KEY", raising=False)
     provider = OpenAICompatibleImageProvider(
         base_url="https://example.test/v1",
         api_key=None,
-        api_key_env="NARRATOCUT_IMAGE_API_KEY",
+        api_key_env="AFS_IMAGE_API_KEY",
         model="fake-image-model",
     )
 
-    with pytest.raises(ModelProviderError, match="NARRATOCUT_ALLOW_REMOTE_IMAGE"):
+    with pytest.raises(ModelProviderError, match="AFS_ALLOW_REMOTE_IMAGE"):
         provider.generate(_prompt_pack(), tmp_path, candidate_count=1)
 
 
@@ -86,7 +86,7 @@ def test_openai_compatible_image_provider_writes_three_images_without_secrets(mo
         return FakeResponse({"data": [{"b64_json": PNG_B64}, {"b64_json": PNG_B64}, {"b64_json": PNG_B64}]})
 
     monkeypatch.setattr(poster_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = OpenAICompatibleImageProvider(
         base_url="https://example.test/v1",
         api_key="secret-key",
@@ -114,7 +114,7 @@ def test_openai_compatible_image_provider_wraps_request_errors(monkeypatch, tmp_
         raise urllib.error.URLError("network down")
 
     monkeypatch.setattr(poster_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = OpenAICompatibleImageProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",
@@ -136,7 +136,7 @@ def test_openai_compatible_image_provider_does_not_expose_http_error_body(monkey
         )
 
     monkeypatch.setattr(poster_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = OpenAICompatibleImageProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",
@@ -169,7 +169,7 @@ def test_minimax_image_provider_writes_base64_images_without_secrets(monkeypatch
         )
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io",
         api_key="secret-key",
@@ -205,7 +205,7 @@ def test_minimax_image_provider_uses_jpg_extension_for_jpeg_base64(monkeypatch, 
         )
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io",
         api_key="secret-key",
@@ -231,7 +231,7 @@ def test_minimax_image_provider_accepts_v1_base_url_without_double_v1(monkeypatc
         )
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io/v1",
         api_key="secret-key",
@@ -248,7 +248,7 @@ def test_minimax_image_provider_rejects_candidate_count_outside_api_range(monkey
         raise AssertionError("MiniMax provider should validate n before remote calls")
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io",
         api_key="secret-key",
@@ -270,7 +270,7 @@ def test_minimax_image_provider_does_not_expose_http_error_body(monkeypatch, tmp
         )
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io",
         api_key="secret-key",
@@ -298,7 +298,7 @@ def test_minimax_image_provider_rejects_nonzero_base_response_without_leaking_me
         )
 
     monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     provider = MiniMaxImageProvider(
         base_url="https://api.minimax.io",
         api_key="secret-key",
@@ -314,10 +314,10 @@ def test_minimax_image_provider_rejects_nonzero_base_response_without_leaking_me
 
 
 def test_create_image_provider_from_env_selects_minimax(monkeypatch) -> None:
-    monkeypatch.setenv("NARRATOCUT_IMAGE_PROVIDER", "minimax")
-    monkeypatch.setenv("NARRATOCUT_IMAGE_API_KEY", "secret-key")
-    monkeypatch.delenv("NARRATOCUT_IMAGE_BASE_URL", raising=False)
-    monkeypatch.delenv("NARRATOCUT_IMAGE_MODEL", raising=False)
+    monkeypatch.setenv("AFS_IMAGE_PROVIDER", "minimax")
+    monkeypatch.setenv("AFS_IMAGE_API_KEY", "secret-key")
+    monkeypatch.delenv("AFS_IMAGE_BASE_URL", raising=False)
+    monkeypatch.delenv("AFS_IMAGE_MODEL", raising=False)
 
     provider = create_image_provider_from_env()
 

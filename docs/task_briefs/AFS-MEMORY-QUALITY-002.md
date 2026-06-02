@@ -38,8 +38,8 @@ Files or directories this task may edit:
 
 - `agentflow/memory/`
 - `agentflow/harness/` only for evidence-summary or validator integration
-- `narratostudio/posterflow/`
-- `narratocut/harness/posterflow_quality*.py`
+- `agentflow_production/posterflow/`
+- `agentflow_studio/harness/posterflow_quality*.py`
 - `examples/agentflow/`
 - `tests/test_agentflow_asset_memory_validator.py`
 - `tests/test_contract_examples.py`
@@ -93,7 +93,7 @@ modify:
 ```powershell
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main alpha-smoke --json
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness narratostudio\posterflow narratocut\harness
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow\harness agentflow_production\posterflow agentflow_studio\harness
 git diff --check
 ```
 
@@ -109,9 +109,9 @@ git diff --check
 Mark every capability explicitly.
 
 - [x] No remote provider needed.
-- [ ] Remote LLM needed. Requires `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- [ ] Remote ASR needed. Requires `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- [ ] Remote image needed. Requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [ ] Remote LLM needed. Requires `AFS_ALLOW_REMOTE_LLM=true`.
+- [ ] Remote ASR needed. Requires `AFS_ALLOW_REMOTE_ASR=true`.
+- [ ] Remote image needed. Requires `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Remote video generation needed. Requires an explicit task-specific gate.
 - [ ] External download needed. Requires explicit source and artifact policy.
 

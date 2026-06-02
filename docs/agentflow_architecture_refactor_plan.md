@@ -19,16 +19,16 @@ Planning boundary:
 
 AgentFlow Studio now has three concerns in one repository:
 
-- `narratocut/`: distribution-side media packaging, highlight selection,
+- `agentflow_studio/`: distribution-side media packaging, highlight selection,
   local slicing, final video assembly, reports, and review.
-- `narratostudio/`: production-side structured handoff generation and
+- `agentflow_production/`: production-side structured handoff generation and
   production artifact contracts.
 - AgentFlow platform contracts: project manifests, artifact maps, memory
   signals, intermediate assets, router decisions, skill invocation/result
   records, static contract audit, and replay validators.
 
 The repository container is now `AgentFlowStudio`. The refactor should make the
-platform contract layer explicit without breaking the current NarratoCut
+platform contract layer explicit without breaking the current AgentFlow Studio
 CLI/Agent MVP, package imports, workflow files, or artifact contracts.
 
 ## Target Package Boundary
@@ -43,20 +43,20 @@ agentflow/
   router/         decision-only validation helpers, not Router runtime
   skills/         skill invocation/result replay helpers, not skill runtime
 
-narratostudio/
+agentflow_production/
   contracts/      production-side artifact schemas
   sop/            deterministic production handoff logic
   nodes/          workflow node adapters for production handoff workflow
 
-narratocut/
+agentflow_studio/
   harness/        distribution artifact inspection and review
   workflow_engine/
   schemas/
   *_sop modules
 ```
 
-`agentflow/` owns the platform contract layer. `narratostudio/` and
-`narratocut/` keep module-owned domain logic. The platform package may validate
+`agentflow/` owns the platform contract layer. `agentflow_production/` and
+`agentflow_studio/` keep module-owned domain logic. The platform package may validate
 or index artifacts, but it must not become a hidden orchestrator.
 
 ## Ownership Rules
@@ -79,7 +79,7 @@ Platform-owned:
 - `agentflow_router_dry_run_validation`
 - `agentflow_skill_replay_validation`
 
-NarratoStudio-owned:
+AgentFlow Production-owned:
 
 - `creative_brief.json`
 - `story_bible.json`
@@ -90,9 +90,9 @@ NarratoStudio-owned:
 - `production_handoff.json`
 - `production_report.md`
 - production handoff deterministic SOP logic
-- `narratostudio_production_handoff` quality profile
+- `agentflow_production_handoff` quality profile
 
-NarratoCut-owned:
+AgentFlow Studio-owned:
 
 - highlight, clip, transcript, slicing, assembly, subtitle, cover, BGM, and
   package schemas
@@ -115,20 +115,20 @@ Step 2: move pure contract utilities.
 - Do not move workflow nodes, SOP logic, or media-specific checks.
 - The first harness utility slice centralizes AgentFlow validator schema,
   status, and forbidden-fragment constants in `agentflow.harness.constants`
-  while keeping validator functions in `narratocut.harness.*`.
+  while keeping validator functions in `agentflow_studio.harness.*`.
 
 Step 3: split AgentFlow harness validators.
 
 - Move Router dry-run and skill replay validators from
-  `narratocut.harness.*` into `agentflow.harness.*`.
-- Keep `narratocut.harness.agentflow_router` and
-  `narratocut.harness.agentflow_skill` as compatibility import wrappers.
+  `agentflow_studio.harness.*` into `agentflow.harness.*`.
+- Keep `agentflow_studio.harness.agentflow_router` and
+  `agentflow_studio.harness.agentflow_skill` as compatibility import wrappers.
 - No validator should execute workflows, select skills, invoke providers, or
   write durable state.
 - Migrate Router dry-run validation before Skill replay validation so each
   behavior surface can keep a narrow regression matrix.
 - New code should import these validators from `agentflow.harness.*`; the
-  `narratocut.harness.*` paths exist only for compatibility during the first
+  `agentflow_studio.harness.*` paths exist only for compatibility during the first
   migration window.
 
 Step 4: expose compatibility imports.
@@ -158,13 +158,13 @@ Step 6: add memory and asset contract validators.
 
 Compatibility import paths are required for the first migration stage. Current
 tests and user workflows may import AgentFlow validators through
-`narratocut.harness.*`; those paths should keep working while new docs point to
+`agentflow_studio.harness.*`; those paths should keep working while new docs point to
 `agentflow.harness.*`.
 
 The deprecation window should last until:
 
 - all tests import the new platform path directly
-- docs no longer recommend the old platform-in-NarratoCut path
+- docs no longer recommend the old platform-in-AgentFlow Studio path
 - Web UI branch has rebased and verified it does not depend on old locations
 - at least one full verification run passes after the import move
 
@@ -178,11 +178,11 @@ Only after that window should wrappers be removed.
 | Contract audit gate | `.venv\Scripts\python.exe -m pytest tests/test_agentflow_contract_audit.py` |
 | Router dry-run validator | `.venv\Scripts\python.exe -m pytest tests/test_agentflow_router_dry_run_validator.py` |
 | Skill replay validator | `.venv\Scripts\python.exe -m pytest tests/test_agentflow_skill_replay_validator.py` |
-| NarratoStudio workflow smoke | run the local `narratostudio_brief_to_production_handoff` workflow, then inspect/review |
-| NarratoCut delivery readiness | rerun the current video-only and video+script golden paths when distribution code moves |
+| AgentFlow Production workflow smoke | run the local `agentflow_production_brief_to_production_handoff` workflow, then inspect/review |
+| AgentFlow Studio delivery readiness | rerun the current video-only and video+script golden paths when distribution code moves |
 | CLI help/version | `.venv\Scripts\python.exe -m apps.cli.main --help` and `.venv\Scripts\python.exe -m apps.cli.main version` |
 | Full Python suite | `.venv\Scripts\python.exe -m pytest` |
-| Import and bytecode check | `.venv\Scripts\python.exe -m compileall apps agentflow narratocut narratostudio tests` |
+| Import and bytecode check | `.venv\Scripts\python.exe -m compileall apps agentflow agentflow_studio agentflow_production tests` |
 
 For docs-only planning changes, the targeted document tests are enough before
 full verification. For any import move, run the complete matrix.
@@ -221,7 +221,7 @@ Scope:
 
 Completion rule: this slice is complete when `agentflow` imports cleanly, the
 reserved namespaces import cleanly, and existing
-`narratocut.harness.agentflow_*` validator imports still work.
+`agentflow_studio.harness.agentflow_*` validator imports still work.
 
 The second implementation branch can move pure constants or validators only if
 the compatibility import strategy is already tested.

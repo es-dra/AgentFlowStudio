@@ -18,8 +18,8 @@ def test_architecture_refactor_plan_defines_target_package_boundaries() -> None:
 
     assert "Phase 15.14" in text
     assert "agentflow/" in text
-    assert "narratostudio/" in text
-    assert "narratocut/" in text
+    assert "agentflow_production/" in text
+    assert "agentflow_studio/" in text
     assert "platform contract layer" in text
     assert "module-owned domain logic" in text
 
@@ -47,8 +47,8 @@ def test_architecture_refactor_plan_contains_regression_matrix() -> None:
         "Contract example tests",
         "Router dry-run validator",
         "Skill replay validator",
-        "NarratoStudio workflow smoke",
-        "NarratoCut delivery readiness",
+        "AgentFlow Production workflow smoke",
+        "AgentFlow Studio delivery readiness",
         "CLI help/version",
     ]:
         assert phrase in text

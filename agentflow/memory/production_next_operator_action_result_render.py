@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def render_next_operator_action_result_markdown(result: dict[str, Any]) -> str:

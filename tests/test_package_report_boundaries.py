@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.package_sop import write_package_report
-from narratocut.utils import write_json
+from agentflow_studio.package_sop import write_package_report
+from agentflow_studio.utils import write_json
 
 
 def test_package_report_documents_elastic_clip_boundary_evidence(tmp_path: Path) -> None:

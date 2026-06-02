@@ -12,7 +12,7 @@ from agentflow.memory.production_next_pass_promotion import (
 )
 from agentflow.memory.production_next_pass_review import NEXT_PASS_RESULT_KIND, build_next_pass_review
 from agentflow.memory.production_next_task import build_next_task_packet
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 EXAMPLE_PATH = Path("examples/agentflow/production_memory_loop.example.json")

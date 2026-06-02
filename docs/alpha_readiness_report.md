@@ -10,8 +10,8 @@ This report records the current Alpha demo readiness for three local-first
 chains:
 
 - PosterFlow visual memory demo
-- NarratoStudio production handoff chain
-- NarratoCut short-video finished package chain
+- AgentFlow Production production handoff chain
+- AgentFlow Studio short-video finished package chain
 
 It is an engineering readiness report. It does not certify creative quality,
 durable Memory runtime, Web UI readiness, hosted service readiness, or provider
@@ -57,11 +57,11 @@ used.
 Environment check:
 
 ```text
-NARRATOCUT_ALLOW_REMOTE_IMAGE=unset
-NARRATOCUT_IMAGE_PROVIDER=unset
-NARRATOCUT_IMAGE_BASE_URL=unset
-NARRATOCUT_IMAGE_API_KEY=unset
-NARRATOCUT_IMAGE_MODEL=unset
+AFS_ALLOW_REMOTE_IMAGE=unset
+AFS_IMAGE_PROVIDER=unset
+AFS_IMAGE_BASE_URL=unset
+AFS_IMAGE_API_KEY=unset
+AFS_IMAGE_MODEL=unset
 ```
 
 Safety gate command:
@@ -84,10 +84,10 @@ Observed result:
 To run the live MiniMax smoke later, set local environment variables only:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
-$env:NARRATOCUT_IMAGE_PROVIDER="minimax"
-$env:NARRATOCUT_IMAGE_API_KEY="<local-provider-key>"
-$env:NARRATOCUT_IMAGE_MODEL="image-01"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_IMAGE_PROVIDER="minimax"
+$env:AFS_IMAGE_API_KEY="<local-provider-key>"
+$env:AFS_IMAGE_MODEL="image-01"
 .venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/posterflow_memory_demo.yaml --input examples/posterflow/poster_brief.example.json --output data/processed/poster_runs/cyber_xianxia_001/live_001
 .venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/poster_runs/cyber_xianxia_001/live_001
 .venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/poster_runs/cyber_xianxia_001/live_001
@@ -119,16 +119,16 @@ Expected live smoke artifacts:
 Boundary: PosterFlow memory artifacts are demo-only memory candidates and
 profiles, not durable Memory runtime writes.
 
-## NarratoStudio Handoff Chain
+## AgentFlow Production Handoff Chain
 
 Status: passed.
 
 Commands:
 
 ```powershell
-.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/narratostudio_brief_to_production_handoff.yaml --input examples/narratostudio/creative_brief.example.json --output data/processed/runs/demo_narratostudio_handoff_alpha
-.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_narratostudio_handoff_alpha
-.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_narratostudio_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/agentflow_production_handoff.yaml --input examples/agentflow_production/creative_brief.example.json --output data/processed/runs/demo_agentflow_production_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_agentflow_production_handoff_alpha
+.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_agentflow_production_handoff_alpha
 ```
 
 Observed result:
@@ -136,7 +136,7 @@ Observed result:
 - workflow: success
 - inspect: `65 passed / 0 failed / 0 warnings`
 - review: `83 passed / 0 failed / 0 warnings`
-- run dir: `data/processed/runs/demo_narratostudio_handoff_alpha`
+- run dir: `data/processed/runs/demo_agentflow_production_handoff_alpha`
 
 Key artifacts:
 
@@ -162,7 +162,7 @@ Boundary: this does not prove mature creative quality, real prompt/model
 selection, provider cost optimization, I2V/T2V readiness, or durable reusable
 asset promotion.
 
-## NarratoCut Package Chain
+## AgentFlow Studio Package Chain
 
 Status: passed after committed example input alignment.
 
@@ -187,10 +187,10 @@ Fix applied in this branch:
 Commands after alignment:
 
 ```powershell
-.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_narratocut_package_alpha
-.venv\Scripts\python.exe -m apps.cli.main package-report --run-dir data/processed/runs/demo_narratocut_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
+.venv\Scripts\python.exe -m apps.cli.main package-report --run-dir data/processed/runs/demo_agentflow_studio_package_alpha
 ```
 
 Observed result:
@@ -199,7 +199,7 @@ Observed result:
 - inspect: `8 passed / 0 failed / 0 warnings`
 - review: `41 passed / 0 failed / 0 warnings`
 - package report refreshed
-- run dir: `data/processed/runs/demo_narratocut_package_alpha`
+- run dir: `data/processed/runs/demo_agentflow_studio_package_alpha`
 
 Key artifacts:
 
@@ -240,10 +240,10 @@ driven. This is not a claim of mature viral/editorial judgment.
 ## Current Demoable Capabilities
 
 - AgentFlow Studio can show an artifact-first platform repository with three
-  bounded modules: `agentflow/`, `narratostudio/`, and `narratocut/`.
-- NarratoStudio can generate a structured production handoff and report from a
+  bounded modules: `agentflow/`, `agentflow_production/`, and `agentflow_studio/`.
+- AgentFlow Production can generate a structured production handoff and report from a
   creative brief through local deterministic SOPs.
-- NarratoCut can run a local video-only short-video package chain through ASR,
+- AgentFlow Studio can run a local video-only short-video package chain through ASR,
   candidate scoring, slicing, assembly, subtitles, BGM mix, package manifest,
   inspect, review, and package report.
 - PosterFlow can build pre-provider poster planning artifacts, Memory OS
@@ -257,7 +257,7 @@ driven. This is not a claim of mature viral/editorial judgment.
 - No AgentFlow Router runtime, skill runtime, or Memory runtime exists.
 - No database, vector store, hosted API, publishing integration, or durable
   memory store exists.
-- No long-term memory write is performed by PosterFlow or NarratoStudio.
+- No long-term memory write is performed by PosterFlow or AgentFlow Production.
 - No real creative quality loop has been validated across multiple customer
   cases.
 - No provider cost-quality optimization loop is implemented.

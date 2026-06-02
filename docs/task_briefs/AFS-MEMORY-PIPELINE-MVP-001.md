@@ -36,7 +36,7 @@ Base branch: master after AFS-MAINTENANCE-RESET-001
 ## Write Scope
 
 - `agentflow/memory/`
-- `narratocut/model_gateway/` only for provider-adapter reuse, not new gates
+- `agentflow_studio/model_gateway/` only for provider-adapter reuse, not new gates
 - `apps/cli/` for one generic protocol command
 - `examples/agentflow/` sanitized protocol examples
 - focused tests for protocol parsing, safety, review, and no-call planning
@@ -84,7 +84,7 @@ Base branch: master after AFS-MAINTENANCE-RESET-001
 
 ```powershell
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_kling_video_smoke.py tests/test_minimax_image_smoke.py -q
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory narratocut\model_gateway apps\cli
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m compileall agentflow\memory agentflow_studio\model_gateway apps\cli
 git diff --check
 ```
 
@@ -99,9 +99,9 @@ git diff --check
 ## Remote Provider Policy
 
 - [ ] No remote provider needed.
-- [ ] Remote LLM needed. Requires `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- [ ] Remote ASR needed. Requires `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- [ ] Remote image needed. Requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [ ] Remote LLM needed. Requires `AFS_ALLOW_REMOTE_LLM=true`.
+- [ ] Remote ASR needed. Requires `AFS_ALLOW_REMOTE_ASR=true`.
+- [ ] Remote image needed. Requires `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Remote video generation needed. Requires an explicit task-specific gate.
 - [x] Default work is no-call planning. Live image/video execution requires a
       separate user-approved run with the relevant gates enabled.

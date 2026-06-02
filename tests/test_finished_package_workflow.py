@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run, write_review_report
-from narratocut.package_sop import write_package_report
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
-from narratocut.workflow_engine.planner import draft_workflow_plan
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run, write_review_report
+from agentflow_studio.package_sop import write_package_report
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine.planner import draft_workflow_plan
 
 
 WORKFLOW = Path("workflows/final_video_package.yaml")
@@ -80,7 +80,7 @@ def test_final_video_package_workflow_writes_package_manifest(tmp_path) -> None:
     assert run_manifest["artifacts"]["finished_package_manifest"] == "finished_package_manifest.json"
     assert run_manifest["artifacts"]["package_report"] == "package_report.md"
     report_text = (output_dir / "package_report.md").read_text(encoding="utf-8")
-    assert "# NarratoCut Package Report" in report_text
+    assert "# AgentFlow Studio Package Report" in report_text
     assert "demo_package" in report_text
     assert "- Workflow: workflows/final_video_package.yaml" in report_text
     assert "final_video" in report_text

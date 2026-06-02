@@ -5,11 +5,11 @@ import subprocess
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.schemas import VideoMetadata
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.schemas import VideoMetadata
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
 
 
 WORKFLOW = Path("workflows/clips_to_final_video.yaml")
@@ -293,7 +293,7 @@ def _patch_assembly_tools(
         )
 
     def fake_tool_check(executable="ffmpeg"):  # noqa: ANN001, ANN202
-        from narratocut.slicing_sop.ffmpeg_probe import FFmpegInfo
+        from agentflow_studio.slicing_sop.ffmpeg_probe import FFmpegInfo
 
         return FFmpegInfo(
             available=True,
@@ -311,7 +311,7 @@ def _patch_assembly_tools(
         output_path.write_bytes(b"fake final video")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.workflow_engine.assembly_nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.workflow_engine.assembly_nodes.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.harness.final_video_quality.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.assembly_sop.concat.subprocess.run", ffmpeg_run or fake_run)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.assembly_nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.assembly_nodes.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.final_video_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.assembly_sop.concat.subprocess.run", ffmpeg_run or fake_run)

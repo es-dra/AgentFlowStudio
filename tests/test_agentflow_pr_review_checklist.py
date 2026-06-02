@@ -34,7 +34,7 @@ def test_agentflow_pr_review_checklist_requires_current_verification_gate() -> N
     assert ".venv\\Scripts\\python.exe -m pytest tests/test_contract_examples.py" in checklist
     assert ".venv\\Scripts\\python.exe -m pytest tests/test_agentflow_contract_audit.py" in checklist
     assert ".venv\\Scripts\\python.exe -m pytest" in checklist
-    assert ".venv\\Scripts\\python.exe -m compileall apps narratocut narratostudio tests" in checklist
+    assert ".venv\\Scripts\\python.exe -m compileall apps agentflow_studio agentflow_production tests" in checklist
     assert "git diff --check" in checklist
     assert ".venv\\Scripts\\python.exe -m apps.cli.main --help" in checklist
     assert ".venv\\Scripts\\python.exe -m apps.cli.main version" in checklist

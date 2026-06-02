@@ -11,7 +11,7 @@ from agentflow.memory.production_loop import (
     write_production_memory_loop_run,
 )
 from agentflow.memory import production_next_pass_promotion_records as records
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 NEXT_PASS_PROMOTION_DECISION_KIND = "agentflow_production_memory_next_pass_promotion_decision"
 NEXT_PASS_PROMOTION_OVERLAY_KIND = "agentflow_production_memory_next_pass_promotion_overlay"

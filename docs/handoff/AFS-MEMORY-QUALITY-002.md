@@ -77,7 +77,7 @@ python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_agent
 python -m pytest tests/test_agentflow_asset_memory_validator.py tests/test_contract_examples.py tests/test_agentflow_contract_helpers.py tests/test_posterflow_workflow.py tests/test_posterflow_quality.py tests/test_posterflow_provider.py
 python -m pytest
 python -m apps.cli.main alpha-smoke --json
-python -m compileall agentflow\memory agentflow\contracts agentflow\harness narratostudio\posterflow narratocut\harness apps\web_bridge apps\cli
+python -m compileall agentflow\memory agentflow\contracts agentflow\harness agentflow_production\posterflow agentflow_studio\harness apps\web_bridge apps\cli
 git diff --check
 ```
 

@@ -1,7 +1,7 @@
 const COPY = {
   zh: {
     languageToggle: "English",
-    fileInputLabel: "选择本地 NarratoCut 验收文件",
+    fileInputLabel: "选择本地 AgentFlow Studio 验收文件",
     overallLabel: "交付状态",
     emptyInventory: "这里是 Contract Inspector。选择本地 artifact 后，会显示文件名、合同类型、schema_version 和解析状态。",
     emptyInspector: "选择 quality、review 或 delivery readiness artifact 后，这里会显示审查项、建议和门禁结果。",
@@ -27,7 +27,7 @@ const COPY = {
     feedbackCopyFallback: "已生成 JSON；请从文本框手动复制。",
     staticText: {
       brandKicker: "内容生产验收",
-      brandName: "NarratoCut 本地验收台",
+      brandName: "AgentFlow Studio 本地验收台",
       importButton: "选择验收文件",
       boundaryUpload: "不上传",
       boundaryBackend: "不执行后端",
@@ -48,7 +48,7 @@ const COPY = {
       handoffGroupTitle: "交付门禁",
       stageKicker: "Local Review Workbench",
       stageTitle: "先看成品能否交付，再看证据和风险。",
-      stageSubtitle: "这里不会启动工作流。请先用 CLI 产出 NarratoCut artifacts，再把需要审查的 JSON、Markdown 和视频文件选入本页。",
+      stageSubtitle: "这里不会启动工作流。请先用 CLI 产出 AgentFlow Studio artifacts，再把需要审查的 JSON、Markdown 和视频文件选入本页。",
       statArtifactsLabel: "已选文件",
       statKnownLabel: "参与验收",
       statWarningsLabel: "风险提示",
@@ -118,7 +118,7 @@ const COPY = {
   },
   en: {
     languageToggle: "中文",
-    fileInputLabel: "Select local NarratoCut review files",
+    fileInputLabel: "Select local AgentFlow Studio review files",
     overallLabel: "Delivery status",
     emptyInventory: "This is the Contract Inspector. Select artifacts to inspect file names, contract types, schema_version, and parse status.",
     emptyInspector: "Select quality, review, or delivery readiness artifacts to inspect checks, recommendations, and gates.",
@@ -144,7 +144,7 @@ const COPY = {
     feedbackCopyFallback: "JSON generated; copy it from the text box.",
     staticText: {
       brandKicker: "Content review",
-      brandName: "NarratoCut Review Desk",
+      brandName: "AgentFlow Studio Review Desk",
       importButton: "Select review files",
       boundaryUpload: "No upload",
       boundaryBackend: "No backend execution",
@@ -165,7 +165,7 @@ const COPY = {
       handoffGroupTitle: "Handoff gate",
       stageKicker: "Local Review Workbench",
       stageTitle: "Judge deliverability first, then inspect evidence and risk.",
-      stageSubtitle: "This page does not start workflows. Generate NarratoCut artifacts with the CLI first, then select the JSON, Markdown, and video files to review.",
+      stageSubtitle: "This page does not start workflows. Generate AgentFlow Studio artifacts with the CLI first, then select the JSON, Markdown, and video files to review.",
       statArtifactsLabel: "Selected files",
       statKnownLabel: "Acceptance inputs",
       statWarningsLabel: "Risk notes",

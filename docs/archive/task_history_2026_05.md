@@ -44,7 +44,7 @@ should not remain the live tracker.
 
 ## Historical Branch / Worktree Notes
 
-- The old `origin/codex/narratocut-web-ui` branch was archived by tag and
+- The old `origin/codex/agentflow_studio-web-ui` branch was archived by tag and
   deleted after useful work was replayed.
 - Completed Local Alpha 0.2 and 0.3 implementation worktrees were removed after
   verified integration.

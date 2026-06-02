@@ -29,11 +29,11 @@ def test_agentflow_contract_helpers_list_committed_examples() -> None:
         "agentflow_intermediate_asset",
         "agentflow_reusable_asset_profile",
         "agentflow_asset_reuse_decision",
-        "agentflow_narratostudio_asset_feedback_review",
-        "agentflow_narratostudio_asset_feedback_review_validation",
-        "agentflow_narratostudio_asset_feedback_review_gate",
-        "agentflow_narratostudio_asset_reuse_dry_run_plan",
-        "agentflow_narratostudio_asset_reuse_review",
+        "agentflow_production_asset_feedback_review",
+        "agentflow_production_asset_feedback_review_validation",
+        "agentflow_production_asset_feedback_review_gate",
+        "agentflow_production_asset_reuse_dry_run_plan",
+        "agentflow_production_asset_reuse_review",
     }
     assert expected_types <= AGENTFLOW_EXAMPLE_TYPES
 

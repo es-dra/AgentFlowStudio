@@ -81,9 +81,9 @@ provider_validation_blockers.json
 The deterministic package is the core milestone. Provider validation is
 optional and gated:
 
-- image: `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`
-- video: `NARRATOCUT_ALLOW_REMOTE_VIDEO=true`
-- config: `--provider-config` or `NARRATOCUT_PROVIDER_CONFIG`
+- image: `AFS_ALLOW_REMOTE_IMAGE=true`
+- video: `AFS_ALLOW_REMOTE_VIDEO=true`
+- config: `--provider-config` or `AFS_PROVIDER_CONFIG`
 
 MiniMax I2I and Kling I2V reuse existing smoke adapters. GPT Image2 is recorded
 as a blocker until a verified adapter exists.

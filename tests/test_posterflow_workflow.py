@@ -5,10 +5,10 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratostudio.posterflow import provider as poster_provider
-from narratostudio.posterflow.schemas import (
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.production.posterflow import provider as poster_provider
+from agentflow_studio.production.posterflow.schemas import (
     ContextAssemblyTrace,
     ContextBundle,
     NextRoundPrompt,
@@ -209,10 +209,10 @@ def _run_posterflow_workflow(monkeypatch, tmp_path) -> Path:
         return FakeResponse()
 
     monkeypatch.setattr(poster_provider.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", "true")
-    monkeypatch.setenv("NARRATOCUT_IMAGE_BASE_URL", "https://example.test/v1")
-    monkeypatch.setenv("NARRATOCUT_IMAGE_API_KEY", "secret-key")
-    monkeypatch.setenv("NARRATOCUT_IMAGE_MODEL", "fake-image-model")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_IMAGE_BASE_URL", "https://example.test/v1")
+    monkeypatch.setenv("AFS_IMAGE_API_KEY", "secret-key")
+    monkeypatch.setenv("AFS_IMAGE_MODEL", "fake-image-model")
 
     output_dir = tmp_path / "poster_run"
     status, manifest_path = run_workflow_from_cli(

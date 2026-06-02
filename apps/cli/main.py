@@ -9,13 +9,13 @@ from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
 from apps.cli.command_registry import register_commands
 from apps.cli.plan_commands import write_draft_plan_from_cli
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut import __version__
-from narratocut.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
-from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
-from narratocut.utils import write_json
+from agentflow_studio import __version__
+from agentflow_studio.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
+from agentflow_studio.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
+from agentflow_studio.utils import write_json
 
 app = typer.Typer(
-    help="NarratoCut command line interface.",
+    help="AgentFlow Studio command line interface.",
     no_args_is_help=True,
 )
 
@@ -24,7 +24,7 @@ def main(
     version: Optional[bool] = typer.Option(
         None,
         "--version",
-        help="Show the NarratoCut version and exit.",
+        help="Show the AgentFlow Studio version and exit.",
         is_eager=True,
     ),
 ) -> None:
@@ -34,7 +34,7 @@ def main(
 
 @app.command(name="version")
 def version_command() -> None:
-    """Print the NarratoCut version."""
+    """Print the AgentFlow Studio version."""
     typer.echo(__version__)
 
 @app.command(name="analyze-hooks")

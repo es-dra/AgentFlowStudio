@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from agentflow.harness.evidence_summary import build_evidence_summary
-from narratocut.harness.quality_checks import build_quality_report
-from narratocut.harness.reviewer import review_run
-from narratocut.utils import write_json
+from agentflow_studio.harness.quality_checks import build_quality_report
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.utils import write_json
 
 
 def test_evidence_summary_normalizes_statuses_and_boundary() -> None:

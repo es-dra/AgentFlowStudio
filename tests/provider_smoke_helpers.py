@@ -34,7 +34,7 @@ def provider_config() -> dict:
                 "account_ref": "minimax",
                 "capability": "image",
                 "api_family": "t2i",
-                "required_gate": "NARRATOCUT_ALLOW_REMOTE_IMAGE",
+                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
             },
             "kling_i2v": {
                 "provider": "kling",
@@ -44,7 +44,7 @@ def provider_config() -> dict:
                 "default_model_ref": "accounts.kling.default_models.i2v",
                 "create_endpoint_ref": "accounts.kling.endpoints.i2v_create",
                 "query_endpoint_ref": "accounts.kling.endpoints.i2v_query",
-                "required_gate": "NARRATOCUT_ALLOW_REMOTE_VIDEO",
+                "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
             },
             "kling_t2v": {
                 "provider": "kling",
@@ -54,7 +54,7 @@ def provider_config() -> dict:
                 "default_model_ref": "accounts.kling.default_models.t2v",
                 "create_endpoint_ref": "accounts.kling.endpoints.t2v_create",
                 "query_endpoint_ref": "accounts.kling.endpoints.t2v_query",
-                "required_gate": "NARRATOCUT_ALLOW_REMOTE_VIDEO",
+                "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
             },
         },
     }

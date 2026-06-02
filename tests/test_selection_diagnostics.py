@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from narratocut.candidate_sop import build_selection_diagnostics
+from agentflow_studio.candidate_sop import build_selection_diagnostics
 
 
 def test_selection_diagnostics_flags_actionable_near_miss() -> None:

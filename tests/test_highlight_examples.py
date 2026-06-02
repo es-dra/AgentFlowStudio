@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import PureWindowsPath
 
-from narratocut.schemas import ROISettings, Transcript
+from agentflow_studio.schemas import ROISettings, Transcript
 
 
 EXAMPLE_ROOT = "examples/demo_highlight"

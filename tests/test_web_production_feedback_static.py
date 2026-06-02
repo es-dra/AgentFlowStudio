@@ -125,7 +125,7 @@ console.log(JSON.stringify(event));
     event = json.loads(result.stdout)
 
     assert event["event_type"] == "run_feedback_event"
-    assert event["source"] == "narratocut_web_production_mode"
+    assert event["source"] == "agentflow_studio_web_production_mode"
     assert event["run_dir"] == "data/processed/runs/web_bridge/mock_text_to_slices"
     assert event["workflow"] == "mock_text_to_slices"
     assert event["review_status"] == "passed"

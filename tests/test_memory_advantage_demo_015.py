@@ -6,25 +6,25 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.memory_advantage_demo_015 import (
+from agentflow_studio.memory_advantage_demo_015 import (
     DEMO_ID,
     build_demo_015_package,
     run_demo_015_i2v_protocol,
     write_demo_015_package,
 )
-from narratocut.memory_advantage_demo_015_content import MAX_KLING_PROMPT_CHARS
-from narratocut.memory_advantage_demo_015_review import (
+from agentflow_studio.memory_advantage_demo_015_content import MAX_KLING_PROMPT_CHARS
+from agentflow_studio.memory_advantage_demo_015_review import (
     build_demo_015_i2v_review,
     render_demo_015_i2v_review_html,
 )
-from narratocut.model_gateway.company_secrets import load_company_provider_secrets
+from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from tests.provider_smoke_helpers import provider_config
 
 
 def test_demo_015_package_defines_memory_backed_protocol_without_provider_calls(
     monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
 
     package = build_demo_015_package(_store(tmp_path), source_keyframe_ref="candidate_001.jpg")
 
@@ -50,7 +50,7 @@ def test_demo_015_package_defines_memory_backed_protocol_without_provider_calls(
 
 
 def test_demo_015_prompts_are_projection_of_memory_not_prompt_length_bait(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     package = build_demo_015_package(_store(tmp_path), source_keyframe_ref="candidate_001.jpg")
 
     baseline = _request(package, "baseline")
@@ -74,7 +74,7 @@ def test_demo_015_prompts_are_projection_of_memory_not_prompt_length_bait(monkey
 
 
 def test_demo_015_writer_outputs_protocol_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     package = build_demo_015_package(_store(tmp_path), source_keyframe_ref="candidate_001.jpg")
 
     paths = write_demo_015_package(package, tmp_path / "plan")
@@ -97,7 +97,7 @@ def test_demo_015_writer_outputs_protocol_package(monkeypatch, tmp_path) -> None
 
 
 def test_demo_015_cli_writes_no_call_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     config_path = tmp_path / "providers.local.json"
     config_path.write_text(json.dumps(provider_config()), encoding="utf-8")
 
@@ -124,7 +124,7 @@ def test_demo_015_cli_writes_no_call_package(monkeypatch, tmp_path) -> None:
 
 
 def test_demo_015_i2v_runtime_uses_same_keyframe_and_two_video_calls(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     source = tmp_path / "candidate_001.jpg"
     source.write_bytes(b"fake-jpg")
     calls = []
@@ -163,7 +163,7 @@ def test_demo_015_i2v_runtime_uses_same_keyframe_and_two_video_calls(monkeypatch
 
 
 def test_demo_015_i2v_review_summarizes_without_claim(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     source = tmp_path / "candidate_001.jpg"
     source.write_bytes(b"fake-jpg")
     package = build_demo_015_package(_store(tmp_path), source_keyframe_ref=source.name)

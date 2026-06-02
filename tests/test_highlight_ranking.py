@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.highlight_sop import ROIHighlightRanker, rank_highlights_by_roi
-from narratocut.schemas import HighlightPlan, HighlightSegment, ROISettings
+from agentflow_studio.highlight_sop import ROIHighlightRanker, rank_highlights_by_roi
+from agentflow_studio.schemas import HighlightPlan, HighlightSegment, ROISettings
 
 
 def test_ranker_without_roi_returns_new_plan_sorted_by_base_signal() -> None:

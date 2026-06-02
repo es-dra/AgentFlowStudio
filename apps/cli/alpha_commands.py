@@ -11,11 +11,11 @@ import typer
 ALPHA_READINESS_DOC = Path("docs/alpha_readiness_report.md")
 DOCS_INDEX = Path("docs/README.md")
 IMAGE_ENV_VARS = [
-    "NARRATOCUT_ALLOW_REMOTE_IMAGE",
-    "NARRATOCUT_IMAGE_PROVIDER",
-    "NARRATOCUT_IMAGE_BASE_URL",
-    "NARRATOCUT_IMAGE_API_KEY",
-    "NARRATOCUT_IMAGE_MODEL",
+    "AFS_ALLOW_REMOTE_IMAGE",
+    "AFS_IMAGE_PROVIDER",
+    "AFS_IMAGE_BASE_URL",
+    "AFS_IMAGE_API_KEY",
+    "AFS_IMAGE_MODEL",
 ]
 
 
@@ -39,8 +39,8 @@ def alpha_smoke_command(
 
 def build_alpha_smoke_readiness() -> dict[str, Any]:
     checks = [
-        _narratostudio_handoff_check(),
-        _narratocut_package_check(),
+        _agentflow_production_handoff_check(),
+        _agentflow_studio_package_check(),
         _posterflow_live_smoke_check(),
     ]
     return {
@@ -77,15 +77,15 @@ def format_alpha_smoke_readiness(summary: dict[str, Any]) -> list[str]:
     return lines
 
 
-def _narratostudio_handoff_check() -> dict[str, Any]:
+def _agentflow_production_handoff_check() -> dict[str, Any]:
     required = [
         ALPHA_READINESS_DOC,
-        Path("workflows/narratostudio_brief_to_production_handoff.yaml"),
-        Path("examples/narratostudio/creative_brief.example.json"),
+        Path("workflows/agentflow_production_handoff.yaml"),
+        Path("examples/agentflow_production/creative_brief.example.json"),
     ]
     return _static_evidence_check(
-        check_id="narratostudio_handoff",
-        label="NarratoStudio production handoff",
+        check_id="agentflow_production_handoff",
+        label="AgentFlow Production production handoff",
         required_paths=required,
         summary="Deterministic handoff evidence is recorded",
         gaps=[
@@ -94,7 +94,7 @@ def _narratostudio_handoff_check() -> dict[str, Any]:
     )
 
 
-def _narratocut_package_check() -> dict[str, Any]:
+def _agentflow_studio_package_check() -> dict[str, Any]:
     required = [
         ALPHA_READINESS_DOC,
         Path("workflows/video_to_finished_package_local_asr.yaml"),
@@ -102,8 +102,8 @@ def _narratocut_package_check() -> dict[str, Any]:
         Path("examples/demo_bgm/bgm.metadata.example.json"),
     ]
     return _static_evidence_check(
-        check_id="narratocut_package",
-        label="NarratoCut finished package",
+        check_id="agentflow_studio_package",
+        label="AgentFlow Studio finished package",
         required_paths=required,
         summary="Local package-chain evidence is recorded",
         gaps=[
@@ -115,8 +115,8 @@ def _narratocut_package_check() -> dict[str, Any]:
 
 def _posterflow_live_smoke_check() -> dict[str, Any]:
     env_status = _env_status()
-    provider = os.environ.get("NARRATOCUT_IMAGE_PROVIDER", "openai_compatible").strip().lower()
-    allow_remote = os.environ.get("NARRATOCUT_ALLOW_REMOTE_IMAGE", "").strip().lower() == "true"
+    provider = os.environ.get("AFS_IMAGE_PROVIDER", "openai_compatible").strip().lower()
+    allow_remote = os.environ.get("AFS_ALLOW_REMOTE_IMAGE", "").strip().lower() == "true"
     required_paths = [
         ALPHA_READINESS_DOC,
         Path("workflows/posterflow_memory_demo.yaml"),
@@ -130,11 +130,11 @@ def _posterflow_live_smoke_check() -> dict[str, Any]:
     elif not allow_remote:
         status = "blocked"
         summary = "Remote image provider is not enabled"
-        gaps = ["Set NARRATOCUT_ALLOW_REMOTE_IMAGE=true only for an intentional live image smoke"]
+        gaps = ["Set AFS_ALLOW_REMOTE_IMAGE=true only for an intentional live image smoke"]
     elif provider not in {"", "openai_compatible", "minimax"}:
         status = "fail"
         summary = "Unsupported image provider is configured"
-        gaps = ["Use NARRATOCUT_IMAGE_PROVIDER=openai_compatible or minimax"]
+        gaps = ["Use AFS_IMAGE_PROVIDER=openai_compatible or minimax"]
     else:
         gaps = _image_provider_config_gaps(provider)
         status = "blocked" if gaps else "pass"
@@ -172,13 +172,13 @@ def _static_evidence_check(
 
 def _image_provider_config_gaps(provider: str) -> list[str]:
     gaps: list[str] = []
-    if not os.environ.get("NARRATOCUT_IMAGE_API_KEY"):
-        gaps.append("NARRATOCUT_IMAGE_API_KEY is not set")
+    if not os.environ.get("AFS_IMAGE_API_KEY"):
+        gaps.append("AFS_IMAGE_API_KEY is not set")
     if provider in {"", "openai_compatible"}:
-        if not os.environ.get("NARRATOCUT_IMAGE_BASE_URL"):
-            gaps.append("NARRATOCUT_IMAGE_BASE_URL is not set for openai_compatible")
-        if not os.environ.get("NARRATOCUT_IMAGE_MODEL"):
-            gaps.append("NARRATOCUT_IMAGE_MODEL is not set for openai_compatible")
+        if not os.environ.get("AFS_IMAGE_BASE_URL"):
+            gaps.append("AFS_IMAGE_BASE_URL is not set for openai_compatible")
+        if not os.environ.get("AFS_IMAGE_MODEL"):
+            gaps.append("AFS_IMAGE_MODEL is not set for openai_compatible")
     return gaps
 
 

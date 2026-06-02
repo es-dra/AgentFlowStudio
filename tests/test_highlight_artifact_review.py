@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.quality_checks import build_quality_report
-from narratocut.harness.reviewer import review_run
-from narratocut.utils import write_json
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.quality_checks import build_quality_report
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.utils import write_json
 
 
 SCRIPT_WORKFLOW = Path("workflows/script_to_highlight_plan.yaml")

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.schemas import VideoMetadata
-from narratocut.utils import write_json
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.schemas import VideoMetadata
+from agentflow_studio.utils import write_json
 
 
 def test_bgm_mix_review_fails_when_manifest_succeeds_but_output_missing(tmp_path) -> None:
@@ -55,7 +55,7 @@ def test_bgm_mix_review_warns_on_duration_drift(tmp_path, monkeypatch) -> None:
             errors=[],
         )
 
-    monkeypatch.setattr("narratocut.harness.bgm_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.bgm_quality.probe_video_metadata", fake_probe)
 
     inspection = inspect_run(run_dir)
     review = review_run(run_dir)

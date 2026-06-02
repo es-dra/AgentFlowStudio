@@ -93,7 +93,7 @@ export function productionShellTemplate() {
               <p class="eyebrow">Supervised Production Workspace</p>
               <h2>当前任务、下一步、阻塞项和可交付物在一个任务台里看清楚。</h2>
               <p class="stage-subtitle">
-                浏览器只连接本机 bridge。执行仍由 NarratoCut CLI 和 workflow engine 完成；用户在这里选择 workflow、生成计划、启动本地运行、查看步骤和进入验收。
+                浏览器只连接本机 bridge。执行仍由 AgentFlow Studio CLI 和 workflow engine 完成；用户在这里选择 workflow、生成计划、启动本地运行、查看步骤和进入验收。
               </p>
             </div>
           </section>

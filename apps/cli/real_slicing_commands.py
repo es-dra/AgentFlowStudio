@@ -6,8 +6,8 @@ from typing import Any
 import typer
 
 from apps.cli.artifact_loaders import load_clip_plans
-from narratocut.schemas import ClipPlan
-from narratocut.slicing_sop import RealSlicingConfig, slice_clip_plans_real
+from agentflow_studio.schemas import ClipPlan
+from agentflow_studio.slicing_sop import RealSlicingConfig, slice_clip_plans_real
 
 
 def slice_real_command(

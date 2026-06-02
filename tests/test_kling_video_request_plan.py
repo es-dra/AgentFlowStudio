@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from narratocut.model_gateway import ModelConfigError, ModelProviderError
-from narratocut.model_gateway.company_secrets import (
+from agentflow_studio.model_gateway import ModelConfigError, ModelProviderError
+from agentflow_studio.model_gateway.company_secrets import (
     COMPANY_PROVIDER_CONFIG_ENV,
     load_company_provider_secrets,
 )
-from narratocut.model_gateway.kling_plan import build_kling_request_plan
+from agentflow_studio.model_gateway.kling_plan import build_kling_request_plan
 from tests.kling_video_smoke_helpers import provider_config, store
 
 
@@ -53,7 +53,7 @@ def test_kling_i2v_plan_requires_image_reference(tmp_path) -> None:
 
 
 def test_kling_i2v_dry_run_plan_uses_video_gate_and_local_image_ref(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     provider_store = store(tmp_path)
 
     plan = build_kling_request_plan(
@@ -67,7 +67,7 @@ def test_kling_i2v_dry_run_plan_uses_video_gate_and_local_image_ref(monkeypatch,
 
     assert plan["service_id"] == "kling_i2v"
     assert plan["capability"] == "video"
-    assert plan["required_gate"] == "NARRATOCUT_ALLOW_REMOTE_VIDEO"
+    assert plan["required_gate"] == "AFS_ALLOW_REMOTE_VIDEO"
     assert plan["gate_status"] == "enabled"
     assert plan["live_call_authorized"] is True
     assert plan["create_request"]["url"] == "https://api-beijing.klingai.com/v1/videos/image2video"
@@ -91,7 +91,7 @@ def test_kling_i2v_dry_run_plan_uses_video_gate_and_local_image_ref(monkeypatch,
 def test_kling_t2v_plan_can_require_live_gate(tmp_path) -> None:
     provider_store = store(tmp_path)
 
-    with pytest.raises(ModelProviderError, match="NARRATOCUT_ALLOW_REMOTE_VIDEO"):
+    with pytest.raises(ModelProviderError, match="AFS_ALLOW_REMOTE_VIDEO"):
         build_kling_request_plan(
             provider_store,
             service_id="kling_t2v",
@@ -124,7 +124,7 @@ def _store_with_removed_image_service(tmp_path):
         "default_model_ref": "accounts.kling.default_models.image",
         "create_endpoint_ref": "accounts.kling.endpoints.image_create",
         "query_endpoint_ref": "accounts.kling.endpoints.image_query",
-        "required_gate": "NARRATOCUT_ALLOW_REMOTE_IMAGE",
+        "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
     }
     config_path = tmp_path / "providers.local.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")

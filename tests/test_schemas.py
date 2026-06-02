@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from narratocut.schemas import (
+from agentflow_studio.schemas import (
     Asset,
     ClipPlan,
     ClipSegment,

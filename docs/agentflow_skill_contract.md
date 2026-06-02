@@ -131,7 +131,7 @@ secret fragments.
 
 The implementation entry point for new code is
 `agentflow.harness.agentflow_skill.validate_skill_invocation_result_replay`.
-`narratocut.harness.agentflow_skill` remains a compatibility import wrapper for
+`agentflow_studio.harness.agentflow_skill` remains a compatibility import wrapper for
 the first migration window.
 
 ## Current Skill Surfaces
@@ -142,7 +142,7 @@ Important current skills:
 
 - `short_highlight_package.skill.yaml`
 - `video_script_highlight_package.skill.yaml`
-- `narratostudio_production_handoff.skill.yaml`
+- `agentflow_production_handoff.skill.yaml`
 
 These are agent-readable contracts, not a full skill runtime.
 

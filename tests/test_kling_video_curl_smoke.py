@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 
-from narratocut.model_gateway.kling_video_smoke import run_kling_i2v_smoke, run_kling_t2v_smoke
+from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke, run_kling_t2v_smoke
 from tests.kling_video_smoke_helpers import Completed, curl_response, store
 
 
 def test_kling_t2v_smoke_can_use_curl_transport_without_persisting_token(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     provider_store = store(tmp_path)
     video_bytes = b"fake-curl-t2v-mp4-bytes"
     commands: list[list[str]] = []
@@ -54,7 +54,7 @@ def test_kling_t2v_smoke_can_use_curl_transport_without_persisting_token(monkeyp
             return Completed(stdout=b"HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\n\r\n" + video_bytes)
         raise AssertionError(f"unexpected command: {command}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_transport.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_transport.subprocess.run", fake_run)
 
     manifest = run_kling_t2v_smoke(
         provider_store,
@@ -76,7 +76,7 @@ def test_kling_t2v_smoke_can_use_curl_transport_without_persisting_token(monkeyp
 
 
 def test_kling_i2v_smoke_can_use_curl_transport_without_persisting_token(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     image_path = tmp_path / "candidate.png"
     image_path.write_bytes(b"image-bytes")
     provider_store = store(tmp_path)
@@ -118,7 +118,7 @@ def test_kling_i2v_smoke_can_use_curl_transport_without_persisting_token(monkeyp
             return Completed(stdout=b"HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\n\r\n" + video_bytes)
         raise AssertionError(f"unexpected command: {command}")
 
-    monkeypatch.setattr("narratocut.model_gateway.kling_transport.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.kling_transport.subprocess.run", fake_run)
 
     manifest = run_kling_i2v_smoke(
         provider_store,

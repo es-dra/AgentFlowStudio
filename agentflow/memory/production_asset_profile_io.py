@@ -11,7 +11,7 @@ from agentflow.memory.production_asset_profile_render import (
     tester_feedback_template,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def write_asset_profile_test_package(bundle: dict[str, Any], output_dir: str | Path) -> list[Path]:

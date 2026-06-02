@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.utils import write_json
-from narratocut.workflow_engine.planner import draft_workflow_plan, write_workflow_plan
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine.planner import draft_workflow_plan, write_workflow_plan
 
 
 def test_draft_workflow_plan_from_workflow_yaml() -> None:
@@ -35,7 +35,7 @@ def test_draft_workflow_plan_from_workflow_yaml() -> None:
     assert "run_manifest.json" in plan["artifacts"]["expected"]
     assert "no_execution" in plan["constraints"]
     assert "no_ffmpeg" in plan["constraints"]
-    assert plan["created_by"] == "ncut draft-plan"
+    assert plan["created_by"] == "afs draft-plan"
     assert "\\" not in json.dumps(plan, ensure_ascii=False)
 
 

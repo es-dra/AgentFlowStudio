@@ -11,7 +11,7 @@ from agentflow.memory.production_operator_acceptance_feedback_candidate_handoff 
 from agentflow.memory.production_operator_handoff import OPERATOR_HANDOFF_PACKET_KIND
 from agentflow.memory.production_operator_manifest_check import OPERATOR_MANIFEST_CHECK_KIND
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 OPERATOR_RUN_PACKAGE_KIND = "agentflow_production_memory_operator_run_package"
 

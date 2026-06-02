@@ -38,33 +38,33 @@ in-memory artifact set and returns `agentflow_asset_memory_validation`; it does
 not execute workflows, promote memory, create asset profiles, or write durable
 state.
 
-`agentflow.memory.narratostudio_assets.build_narratostudio_asset_memory_contract_set`
-is the NarratoStudio smoke adapter. It maps existing run payloads into the same
+`agentflow.memory.agentflow_production_assets.build_agentflow_production_asset_memory_contract_set`
+is the AgentFlow Production smoke adapter. It maps existing run payloads into the same
 contract set for validation only. It does not read run directories, write
 profiles, execute durable candidate promotion, or make the resulting profile
 durable.
 
-`agentflow.memory.narratostudio_assets.validate_narratostudio_asset_feedback_sources`
-validates the NarratoStudio source payloads before that mapping. It keeps
+`agentflow.memory.agentflow_production_assets.validate_agentflow_production_asset_feedback_sources`
+validates the AgentFlow Production source payloads before that mapping. It keeps
 `memory_candidates.json` candidate-only, verifies `feedback_signal_log.json` is
 derived from `feedback.jsonl`, requires local deterministic cost-quality
 evidence, and checks that `production_handoff.json` still references the prompt
 pack artifact.
 
-`agentflow.memory.narratostudio_review.review_narratostudio_asset_feedback_loop`
-composes the source validation, NarratoStudio smoke adapter, and AgentFlow
+`agentflow.memory.agentflow_production_review.review_agentflow_production_asset_feedback_loop`
+composes the source validation, AgentFlow Production smoke adapter, and AgentFlow
 asset/memory contract-set validation into one review artifact. If source
 validation fails, it marks the asset/memory step `not_run` instead of building
 contracts from broken source semantics.
 
-`agentflow.harness.narratostudio_review.validate_narratostudio_asset_feedback_review`
+`agentflow.harness.agentflow_production_review.validate_agentflow_production_asset_feedback_review`
 validates that composed review artifact as a harness-level gate. It checks the
 review-only boundary, embedded validation status consistency, failed-source
 skip behavior, and private path/secret hygiene without re-running workflows.
 
-## NarratoStudio Asset Examples
+## AgentFlow Production Asset Examples
 
-NarratoStudio should treat these as likely intermediate asset kinds:
+AgentFlow Production should treat these as likely intermediate asset kinds:
 
 - character reference
 - style constraint
@@ -76,7 +76,7 @@ NarratoStudio should treat these as likely intermediate asset kinds:
 These assets help the system learn which creative rules, prompts, and execution
 strategies converge toward the user's preferred production style.
 
-The Phase 15.21 smoke loop uses current NarratoStudio artifacts as evidence:
+The Phase 15.21 smoke loop uses current AgentFlow Production artifacts as evidence:
 
 - `production_handoff.json`
 - `memory_candidates.json`
@@ -103,7 +103,7 @@ gate only allows later dry-run reuse planning or human review; it does not
 promote memory, persist reusable assets, or execute workflows.
 
 Phase 15.26 adds that dry-run reuse planning surface. It turns a passed gate and
-existing review artifact into `agentflow_narratostudio_asset_reuse_dry_run_plan`
+existing review artifact into `agentflow_production_asset_reuse_dry_run_plan`
 so a later Agent can see candidate reuse actions before any execution path is
 opened.
 
@@ -116,7 +116,7 @@ Phase 15.28 adds a reusable in-memory fixture builder for that same chain. It
 does not define a new artifact type; it only composes the existing review,
 validation, gate, dry-run plan, and reuse review payloads for repeatable tests.
 
-Phase 15.29 adds `audit_narratostudio_asset_reuse_chain_fixture` as a narrow
+Phase 15.29 adds `audit_agentflow_production_asset_reuse_chain_fixture` as a narrow
 smoke audit over that fixture-built chain. It verifies expected chain keys,
 artifact types, ready/blocked status shapes, and side-effect boundaries. It
 does not create a contract artifact or execute reuse.

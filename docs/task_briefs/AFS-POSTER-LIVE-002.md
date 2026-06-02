@@ -74,7 +74,7 @@ modify:
 - [ ] If live env is missing, handoff records blocked status and exact local
       setup variables without secret values.
 - [ ] If live env is present, PosterFlow live smoke runs only with
-      `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+      `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Inspect/review output and artifact paths are recorded without committing
       generated images or run directories.
 - [ ] A no-secret and no-generated-artifact staged-file review is recorded.
@@ -91,7 +91,7 @@ git diff --check
 Optional live smoke, only if local environment is already configured:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main run-workflow --workflow workflows/posterflow_memory_demo.yaml --input examples/posterflow/poster_brief.example.json --output data/processed/poster_runs/cyber_xianxia_001/live_002
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main inspect-run --run-dir data/processed/poster_runs/cyber_xianxia_001/live_002
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main review-run --run-dir data/processed/poster_runs/cyber_xianxia_001/live_002
@@ -108,9 +108,9 @@ D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main review-run
 Mark every capability explicitly.
 
 - [ ] No remote provider needed.
-- [ ] Remote LLM needed. Requires `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- [ ] Remote ASR needed. Requires `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- [x] Remote image may be needed. Requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [ ] Remote LLM needed. Requires `AFS_ALLOW_REMOTE_LLM=true`.
+- [ ] Remote ASR needed. Requires `AFS_ALLOW_REMOTE_ASR=true`.
+- [x] Remote image may be needed. Requires `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Remote video generation needed. Requires an explicit task-specific gate.
 - [ ] External download needed. Requires explicit source and artifact policy.
 

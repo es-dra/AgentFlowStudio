@@ -115,7 +115,7 @@ workstation. It does not prove creative fit.
 
 | Item | State | Next condition |
 |---|---|---|
-| `AFS-POSTER-LIVE-002` | blocked | Open only if local image-provider env is intentionally configured and `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`. |
+| `AFS-POSTER-LIVE-002` | blocked | Open only if local image-provider env is intentionally configured and `AFS_ALLOW_REMOTE_IMAGE=true`. |
 | Human product acceptance | pending | A human reviews the final package and records accept/reject feedback. |
 | Business validation | pending / out of 0.4 scope | Real user, market, distribution, or revenue evidence exists. |
 | Real second-pass run | pending | A follow-up lane executes a second pass from the context bundle and compares outputs. |

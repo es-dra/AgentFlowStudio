@@ -1,6 +1,6 @@
 # Asset Lifecycle
 
-NarratoCut runs create many local files. This lifecycle vocabulary keeps raw
+AgentFlow Studio runs create many local files. This lifecycle vocabulary keeps raw
 inputs, generated evidence, final package assets, and future published assets
 separate for humans, agents, and Web UI code.
 

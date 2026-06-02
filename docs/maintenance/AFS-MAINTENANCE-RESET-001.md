@@ -1,4 +1,4 @@
-﻿# AFS-MAINTENANCE-RESET-001 - Classification Record
+# AFS-MAINTENANCE-RESET-001 - Classification Record
 
 Status: classification complete. This record classifies the current dirty
 checkout before more demo, provider, or Web implementation work is opened.
@@ -42,8 +42,8 @@ $utf8.GetString($bytes) | Out-Null
 |---|---|---|---|
 | Local Alpha 0.4 acceptance and memory-quality docs | `docs/local_alpha_0_4_acceptance_reconciliation.md`, 0.4 goals/scenario docs, `AFS-MEMORY-QUALITY-002` handoff, related contract examples/tests | promote | Keep as current Local Alpha 0.4 evidence ledger. These are structural/runtime evidence docs, not human acceptance or business validation. |
 | Web operator fixes | `apps/web/production-render.js`, `tests/test_web_production_mode_static.py`, `docs/handoff/AFS-WEB-OPERATOR-002.md` | promote after focused verification | Keep the stale-readiness blocker fix because it protects the 0.4 operator path. Do not add new Web product surface until `AFS-WORKBENCH-REDESIGN-001`. |
-| Provider adapters and smoke clients | `narratocut/model_gateway/kling_*`, `minimax_image_smoke.py`, CLI provider command files, provider tests | keep temporarily, then promote behind generic gateway boundary | Keep only if tests show no secret persistence, no ungated calls, sanitized manifests, and capability-specific gates. Later consolidate under a provider gateway instead of experiment commands. |
-| Memory-advantage experiment code | `narratocut/memory_advantage_demo_*`, `apps/cli/memory_demo_commands.py`, focused demo tests, demo handoffs | archive evidence, promote only generic parts | Do not add more numbered modules. Promote reusable protocol runner/review/contact-sheet pieces into `AFS-MEMORY-PIPELINE-MVP-001`; archive or remove bespoke demo modules after replacement. |
+| Provider adapters and smoke clients | `agentflow_studio/model_gateway/kling_*`, `minimax_image_smoke.py`, CLI provider command files, provider tests | keep temporarily, then promote behind generic gateway boundary | Keep only if tests show no secret persistence, no ungated calls, sanitized manifests, and capability-specific gates. Later consolidate under a provider gateway instead of experiment commands. |
+| Memory-advantage experiment code | `agentflow_studio/memory_advantage_demo_*`, `apps/cli/memory_demo_commands.py`, focused demo tests, demo handoffs | archive evidence, promote only generic parts | Do not add more numbered modules. Promote reusable protocol runner/review/contact-sheet pieces into `AFS-MEMORY-PIPELINE-MVP-001`; archive or remove bespoke demo modules after replacement. |
 | RECORDING-016 script | `tools/run_memory_advantage_recording_016.ps1` and ignored run evidence | archive as demo evidence | Keep as a reproducibility artifact for competition material until a protocol-driven runner replaces it. Do not treat it as product command. |
 | Task tracker / devlog / handoff archive | `TASK_TRACKER.md`, `DEVLOG.md`, `docs/archive/`, `docs/handoff/` | split and compress | Live tracker is fixed. `DEVLOG.md` remains too large and should be compressed into dated index entries in a follow-up cleanup if risk is acceptable. |
 | Retrospectives and task briefs | `docs/retrospectives/`, `docs/task_briefs/AFS-MAINTENANCE-RESET-001.md`, `AFS-MEMORY-PIPELINE-MVP-001.md`, `AFS-WORKBENCH-REDESIGN-001.md` | promote | Use as the next operating queue. They should guide cleanup, pipeline MVP, and workbench redesign. |
@@ -79,7 +79,7 @@ $utf8.GetString($bytes) | Out-Null
 ## Remaining Risks
 
 - `DEVLOG.md` is still too large for a quick project memory surface.
-- `narratocut/model_gateway/kling_video_smoke.py` exceeds the 300-line ideal
+- `agentflow_studio/model_gateway/kling_video_smoke.py` exceeds the 300-line ideal
   and needs consolidation or splitting before it becomes stable product code.
 - `memory_advantage_demo_011_content.py` remains as shared legacy asset-card
   data for DEMO-012/015; migrate that shape into the generic protocol examples

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from narratocut.workflow_engine import (
+from agentflow_studio.workflow_engine import (
     WorkflowContext,
     WorkflowRunner,
     default_node_registry,
     load_workflow,
 )
-from narratocut.workflow_engine.input_bundle import load_workflow_inputs
+from agentflow_studio.workflow_engine.input_bundle import load_workflow_inputs
 
 
 def run_workflow_from_cli(

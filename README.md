@@ -11,11 +11,11 @@ Current top-level modules:
 
 - `agentflow/`: platform contracts, harness helpers, router, memory, and skill
   boundaries as they are gradually migrated into the platform layer.
-- `narratostudio/`: production-side structured content handoff MVP.
-- `narratocut/`: distribution-side short video highlight, packaging, report,
+- `agentflow_production/`: production-side structured content handoff MVP.
+- `agentflow_studio/`: distribution-side short video highlight, packaging, report,
   and review MVP.
 
-NarratoCut remains the Python-based, local-first CLI/Agent MVP for AI-assisted
+AgentFlow Studio remains the Python-based, local-first CLI/Agent MVP for AI-assisted
 short video packaging: each major step writes readable JSON or media artifacts,
 and those artifacts can be inspected and reviewed after a run.
 
@@ -35,7 +35,7 @@ render the Production Memory asset loop, but it does not scan directories,
 persist browser state, execute workflows, call providers, or act as a hosted
 Web product.
 
-NarratoStudio's current production-side workflow is:
+AgentFlow Production's current production-side workflow is:
 
 ```text
 creative_brief
@@ -48,7 +48,7 @@ creative_brief
   -> production_report
 ```
 
-NarratoCut's current distribution-side product path is:
+AgentFlow Studio's current distribution-side product path is:
 
 ```text
 video / transcript / clip_plan
@@ -101,8 +101,8 @@ Not included yet:
 ```text
 apps/                 CLI, API, and future web entrypoints
 agentflow/            Platform contract and harness migration layer
-narratostudio/        Production-side structured handoff module
-narratocut/           Distribution-side media workflow module
+agentflow_production/        Production-side structured handoff module
+agentflow_studio/           Distribution-side media workflow module
 workflows/            YAML workflow definitions
 prompts/              Auditable prompt templates
 configs/              Example configuration and tool catalog files
@@ -131,15 +131,15 @@ cd D:\Projects\AgentFlowStudio
 python -m venv .venv
 .venv\Scripts\pip install -e .[dev]
 .venv\Scripts\python -m pytest
-.venv\Scripts\ncut version
+.venv\Scripts\afs version
 ```
 
 Run the default mock workflow:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 Expected generated files include:
@@ -209,7 +209,7 @@ Workflow details are documented in [`workflows/README.md`](workflows/README.md).
 
 ## Artifact and Review Model
 
-NarratoCut treats generated files as first-class contracts. Important artifacts
+AgentFlow Studio treats generated files as first-class contracts. Important artifacts
 include:
 
 ```text
@@ -239,7 +239,7 @@ Contract references:
 - [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
 - [`docs/tool_contracts.md`](docs/tool_contracts.md)
 - [`docs/agent_usage_guide.md`](docs/agent_usage_guide.md)
-- [`docs/narratocut_delivery_checklist.md`](docs/narratocut_delivery_checklist.md)
+- [`docs/agentflow_studio_delivery_checklist.md`](docs/agentflow_studio_delivery_checklist.md)
 - [`docs/current_architecture.md`](docs/current_architecture.md)
 
 ## Remote Provider Boundary
@@ -250,13 +250,13 @@ commands do not need API keys and do not access the network.
 Remote LLM calls require:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_LLM="true"
+$env:AFS_ALLOW_REMOTE_LLM="true"
 ```
 
 Remote ASR calls require:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
+$env:AFS_ALLOW_REMOTE_ASR="true"
 ```
 
 Local model settings belong in `configs/models.yaml`, which is ignored by git.
@@ -267,7 +267,7 @@ Commit only example configuration files such as `configs/models.example.yaml`.
 Check local FFmpeg and FFprobe availability:
 
 ```powershell
-.venv\Scripts\ncut ffmpeg-check --json
+.venv\Scripts\afs ffmpeg-check --json
 ```
 
 If FFmpeg is missing, mock workflows can still run. Real media workflows need
@@ -277,7 +277,7 @@ FFmpeg/FFprobe.
 
 ```powershell
 .venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall apps agentflow narratocut narratostudio tests
+.venv\Scripts\python -m compileall apps agentflow agentflow_studio agentflow_production tests
 git diff --check
 .venv\Scripts\python -m apps.cli.main --help
 .venv\Scripts\python -m apps.cli.main version

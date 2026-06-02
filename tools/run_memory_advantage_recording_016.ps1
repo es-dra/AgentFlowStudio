@@ -94,7 +94,7 @@ This run is for a prerecording workflow demonstration.
 - Source keyframe: same file for both lanes.
 - Baseline lane: current user task plus source keyframe only.
 - Memory-backed lane: same task and source keyframe plus character, scene, and feedback memory projection.
-- Provider route: Kling I2V, duration 15s, mode pro. Live provider calls require either -AllowRemoteVideo or NARRATOCUT_ALLOW_REMOTE_VIDEO=true in the current shell, plus -ProviderConfig or NARRATOCUT_PROVIDER_CONFIG.
+- Provider route: Kling I2V, duration 15s, mode pro. Live provider calls require either -AllowRemoteVideo or AFS_ALLOW_REMOTE_VIDEO=true in the current shell, plus -ProviderConfig or AFS_PROVIDER_CONFIG.
 - Claim boundary: provider/runtime evidence and visual review only; not human acceptance, business validation, or durable memory runtime proof.
 
 "@
@@ -111,15 +111,15 @@ if ($DryRun) {
 }
 
 if ($AllowRemoteVideo) {
-    $env:NARRATOCUT_ALLOW_REMOTE_VIDEO = "true"
+    $env:AFS_ALLOW_REMOTE_VIDEO = "true"
 }
 
-$VideoGate = ([string]$env:NARRATOCUT_ALLOW_REMOTE_VIDEO).Trim().ToLowerInvariant()
+$VideoGate = ([string]$env:AFS_ALLOW_REMOTE_VIDEO).Trim().ToLowerInvariant()
 if ($VideoGate -notin @("1", "true", "yes", "on")) {
-    throw "Remote video calls are disabled. Re-run with -AllowRemoteVideo, or set NARRATOCUT_ALLOW_REMOTE_VIDEO=true in this shell."
+    throw "Remote video calls are disabled. Re-run with -AllowRemoteVideo, or set AFS_ALLOW_REMOTE_VIDEO=true in this shell."
 }
 
-$ProviderConfigEnv = ([string]$env:NARRATOCUT_PROVIDER_CONFIG).Trim()
+$ProviderConfigEnv = ([string]$env:AFS_PROVIDER_CONFIG).Trim()
 $ProviderConfigArgs = @()
 if ($ProviderConfigPath) {
     if (-not (Test-Path -LiteralPath $ProviderConfigPath)) {
@@ -127,9 +127,9 @@ if ($ProviderConfigPath) {
     }
     $ProviderConfigArgs = @("--provider-config", $ProviderConfigPath)
 } elseif (-not $ProviderConfigEnv) {
-    throw "Provider config is required. Pass -ProviderConfig with a local ignored config file, or set NARRATOCUT_PROVIDER_CONFIG in this shell."
+    throw "Provider config is required. Pass -ProviderConfig with a local ignored config file, or set AFS_PROVIDER_CONFIG in this shell."
 } elseif (-not (Test-Path -LiteralPath $ProviderConfigEnv)) {
-    throw "Provider config from NARRATOCUT_PROVIDER_CONFIG was not found: $ProviderConfigEnv"
+    throw "Provider config from AFS_PROVIDER_CONFIG was not found: $ProviderConfigEnv"
 }
 
 if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {

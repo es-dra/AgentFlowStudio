@@ -41,7 +41,7 @@ work.
 | Memory video pipeline contract | `agentflow/memory/video_pipeline*.py`, `apps/cli/memory_video_pipeline_command.py`, `examples/agentflow/memory_video_pipeline_*.example.json`, `tests/test_memory_video_pipeline_*.py`, `docs/handoff/AFS-MEMORY-PIPELINE-MVP-001.md` | mainline keep | This is the replacement path for numbered memory demos. It stays no-call unless a later provider-execution slice adds explicit gates. |
 | Visible CLI surface | `memory-video-pipeline-plan`, `memory-video-pipeline-review`, `memory-video-pipeline-observe`, `memory-video-pipeline-present`, `memory-video-pipeline-package`, `memory-evidence-reuse-review` | mainline keep | These commands should remain visible in `--help`; they must not scan directories, call providers, copy generated media, or write durable memory by default. |
 | Web Memory Workbench | `apps/web/memory-workbench*.js`, `apps/web/memory-workbench*.css`, `docs/workbench/`, `tests/test_web_memory_*.py` | mainline keep, still static/local | Keep as operator UI for explicit package artifacts. It remains read-only/local, with no provider call, directory scan, browser persistence, artifact writes, or durable Memory runtime. |
-| Workflow engine core | `narratocut/workflow_engine/`, `workflows/`, `tests/test_*workflow*.py` | mainline keep | Keep execution order in `workflow_engine`; keep quality gates in `harness`; avoid circular imports. Current files are under the 300-line target after helper slimming. |
+| Workflow engine core | `agentflow_studio/workflow_engine/`, `workflows/`, `tests/test_*workflow*.py` | mainline keep | Keep execution order in `workflow_engine`; keep quality gates in `harness`; avoid circular imports. Current files are under the 300-line target after helper slimming. |
 | AgentFlow contracts and examples | `agentflow/contracts/`, `examples/agentflow/`, related contract tests | mainline keep | Keep sanitized examples only. Examples must not contain private paths, provider keys, signed URLs, bearer headers, data URLs, or generated media. |
 
 ## Evidence To Preserve
@@ -49,9 +49,9 @@ work.
 | Evidence group | Current files | Classification | Boundary |
 |---|---|---|---|
 | Local Alpha 0.4 evidence | `docs/handoff/AFS-RUN-PACKAGE-001.md`, `docs/handoff/AFS-WEB-OPERATOR-002.md`, `docs/handoff/AFS-MEMORY-QUALITY-002.md`, `docs/local_alpha_0_4_acceptance_reconciliation.md` | preserve evidence | Structure/runtime/review evidence only. Do not treat as business validation or durable Memory runtime. |
-| DEMO-012 | `narratocut/memory_advantage_demo_012*.py`, `tests/test_memory_advantage_demo_012.py`, `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-012.md` | preserve evidence, legacy hidden | First credible route pattern: fixed reference -> MiniMax I2I keyframes -> Kling I2V. Keep until the protocol runner covers the same evidence path. |
+| DEMO-012 | `agentflow_studio/memory_advantage_demo_012*.py`, `tests/test_memory_advantage_demo_012.py`, `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-012.md` | preserve evidence, legacy hidden | First credible route pattern: fixed reference -> MiniMax I2I keyframes -> Kling I2V. Keep until the protocol runner covers the same evidence path. |
 | DEMO-013 and DEMO-014 | `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-013.md`, `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-014.md` | preserve as docs-only evidence | Useful comparison history, not product surface. Do not reopen as Python modules. |
-| DEMO-015 | `narratocut/memory_advantage_demo_015*.py`, `tests/test_memory_advantage_demo_015.py`, `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-015.md` | preserve evidence, legacy hidden | Keep protocol/runtime evidence until generic memory video pipeline live execution and review can replace it. |
+| DEMO-015 | `agentflow_studio/memory_advantage_demo_015*.py`, `tests/test_memory_advantage_demo_015.py`, `docs/handoff/AFS-MEMORY-ADVANTAGE-DEMO-015.md` | preserve evidence, legacy hidden | Keep protocol/runtime evidence until generic memory video pipeline live execution and review can replace it. |
 | RECORDING-016 | `docs/handoff/AFS-MEMORY-ADVANTAGE-RECORDING-016.md`, `tools/run_memory_advantage_recording_016.ps1`, generated evidence under ignored `data/processed/` | preserve evidence and runbook | Current strongest demo signal. Keep claims bounded to cross-run consistency and asset-anchor retention. Live video remains explicit-gate only. |
 | Competition material | `docs/handoff/AFS-COMPETITION-DEMO-RUN-SHEET.md`, `docs/handoff/AFS-COMPETITION-DEMO-TALK-TRACK.md` | preserve presentation support | Keep as rehearsal material. It must preserve non-claim boundaries and avoid committing generated media. |
 
@@ -59,11 +59,11 @@ work.
 
 | Area | Current files | Classification | Retirement condition |
 |---|---|---|---|
-| Direct Kling video smoke | `narratocut/model_gateway/kling_*.py`, `apps/cli/kling_video_command.py`, `tests/test_kling_video_*.py`, `tests/kling_video_smoke_helpers.py` | keep hidden/operator | Retire direct CLI exposure after `memory-video-pipeline-*` can run optional gated live I2V lanes and task recovery through a protocol file. |
-| Direct MiniMax image smoke | `narratocut/model_gateway/minimax_image_*.py`, `apps/cli/minimax_image_command.py`, `tests/test_minimax_image_smoke.py` | keep hidden/operator | Retire direct CLI exposure after protocol execution owns optional gated keyframe generation and subject-reference handling. |
-| PosterFlow provider adapter | `narratostudio/posterflow/minimax_provider.py`, `tests/test_posterflow_provider.py` | keep adapter | This is a provider adapter, not a product command. Keep as long as PosterFlow and MiniMax image generation are supported behind explicit image gates. |
+| Direct Kling video smoke | `agentflow_studio/model_gateway/kling_*.py`, `apps/cli/kling_video_command.py`, `tests/test_kling_video_*.py`, `tests/kling_video_smoke_helpers.py` | keep hidden/operator | Retire direct CLI exposure after `memory-video-pipeline-*` can run optional gated live I2V lanes and task recovery through a protocol file. |
+| Direct MiniMax image smoke | `agentflow_studio/model_gateway/minimax_image_*.py`, `apps/cli/minimax_image_command.py`, `tests/test_minimax_image_smoke.py` | keep hidden/operator | Retire direct CLI exposure after protocol execution owns optional gated keyframe generation and subject-reference handling. |
+| PosterFlow provider adapter | `agentflow_production/posterflow/minimax_provider.py`, `tests/test_posterflow_provider.py` | keep adapter | This is a provider adapter, not a product command. Keep as long as PosterFlow and MiniMax image generation are supported behind explicit image gates. |
 | Numbered demo CLI wrapper | `apps/cli/memory_demo_commands.py` | keep hidden until replacement | Remove after DEMO-012 and DEMO-015 runtime behavior is represented by protocol-driven commands and tests. |
-| Shared DEMO-011 content | `narratocut/memory_advantage_demo_011_content.py` | keep temporarily | Delete after asset-card data is migrated into sanitized protocol examples or a generic asset-memory fixture. |
+| Shared DEMO-011 content | `agentflow_studio/memory_advantage_demo_011_content.py` | keep temporarily | Delete after asset-card data is migrated into sanitized protocol examples or a generic asset-memory fixture. |
 
 ## Removal Candidates
 
@@ -72,7 +72,7 @@ imports, tests, and docs for the affected area.
 
 | Candidate | Evidence | Proposed action | Gate before deletion |
 |---|---|---|---|
-| Old generated bytecode caches | ignored `__pycache__` entries under `apps/`, `agentflow/`, `narratocut/`, `narratostudio/`, `tests/` | applied: deleted from local checkout only | Confirmed all 35 targets were inside the repository and ignored by Git before deletion; never stage generated caches. |
+| Old generated bytecode caches | ignored `__pycache__` entries under `apps/`, `agentflow/`, `agentflow_studio/`, `agentflow_production/`, `tests/` | applied: deleted from local checkout only | Confirmed all 35 targets were inside the repository and ignored by Git before deletion; never stage generated caches. |
 | Long-form historical DEVLOG body | root `DEVLOG.md` had a multi-thousand-line historical body | applied: compressed into dated archive index | Created `docs/archive/devlog_history_2026_05.md`, preserved current 2026-05-31 entries in root `DEVLOG.md`, and saved full pre-slimming raw text under ignored `data/processed/maintenance_backups/AFS-SLIMMING-DEVLOG-001/`. |
 | DEMO-012 bespoke runtime modules | active only as evidence/operator path | replace with protocol execution, then remove | Protocol runner supports same MiniMax I2I + Kling I2V chain with tests and hidden legacy command removed. |
 | DEMO-015 bespoke runtime modules | active only as evidence/operator path | replace with protocol execution, then remove | Protocol runner supports same baseline vs memory-backed I2V chain and review artifact shape. |
@@ -81,7 +81,7 @@ imports, tests, and docs for the affected area.
 ## Applied Cleanup - 2026-05-31
 
 - Deleted 35 ignored `__pycache__` directories under `apps/`, `agentflow/`,
-  `narratocut/`, `narratostudio/`, and `tests/`.
+  `agentflow_studio/`, `agentflow_production/`, and `tests/`.
 - Before deletion, each resolved absolute path was confirmed inside
   `D:\Projects\AgentFlowStudio`, and each relative path was confirmed ignored
   by Git with `git check-ignore`.
@@ -136,10 +136,10 @@ imports, tests, and docs for the affected area.
   `docs/company_operating_model.md` -> `TASK_TRACKER.md` / branch handoff ->
   current task.
 - Provider config bridge issue captured and addressed:
-  `narratocut/model_gateway/company_secrets.py` no longer hardcodes a local
+  `agentflow_studio/model_gateway/company_secrets.py` no longer hardcodes a local
   Company `.secrets` path as a default. Provider/operator staging still needs
   separate no-secret and capability-gate review. Focused provider/operator
-  tests now cover explicit path, `NARRATOCUT_PROVIDER_CONFIG`, and hidden CLI
+  tests now cover explicit path, `AFS_PROVIDER_CONFIG`, and hidden CLI
   help fallback wording.
 - Provider/operator staging review added:
   `docs/maintenance/AFS-PROVIDER-OPERATOR-STAGING-REVIEW-001.md` records the
@@ -155,8 +155,8 @@ imports, tests, and docs for the affected area.
 
 ## Applied Oversized File Split - 2026-05-31
 
-- Split `narratocut/memory_advantage_demo_012_review.py` by moving HTML
-  rendering into `narratocut/memory_advantage_demo_012_review_html.py`.
+- Split `agentflow_studio/memory_advantage_demo_012_review.py` by moving HTML
+  rendering into `agentflow_studio/memory_advantage_demo_012_review_html.py`.
 - Split `tests/test_memory_advantage_demo_012.py` by moving fake provider
   manifest helpers into `tests/memory_advantage_demo_012_helpers.py`.
 - Split `tests/test_contract_examples.py` by moving memory-video-pipeline

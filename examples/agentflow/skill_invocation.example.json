@@ -3,11 +3,11 @@
   "artifact_type": "agentflow_skill_invocation",
   "invocation_id": "af_skill_invocation_001",
   "project_id": "agentflow_demo_project",
-  "skill_id": "narratostudio.production_handoff",
+  "skill_id": "agentflow_studio.production.production_handoff",
   "requested_by": "agent",
   "execution_status": "planned",
   "input_artifacts": [
-    "examples/narratostudio/creative_brief.example.json"
+    "examples/agentflow_production/creative_brief.example.json"
   ],
   "expected_output_artifacts": [
     "production_handoff.json",

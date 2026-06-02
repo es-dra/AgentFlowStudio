@@ -75,9 +75,9 @@ Add task-specific docs below:
 Mark every capability explicitly.
 
 - [ ] No remote provider needed.
-- [ ] Remote LLM needed. Requires `NARRATOCUT_ALLOW_REMOTE_LLM=true`.
-- [ ] Remote ASR needed. Requires `NARRATOCUT_ALLOW_REMOTE_ASR=true`.
-- [ ] Remote image needed. Requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`.
+- [ ] Remote LLM needed. Requires `AFS_ALLOW_REMOTE_LLM=true`.
+- [ ] Remote ASR needed. Requires `AFS_ALLOW_REMOTE_ASR=true`.
+- [ ] Remote image needed. Requires `AFS_ALLOW_REMOTE_IMAGE=true`.
 - [ ] Remote video generation needed. Requires an explicit task-specific gate.
 - [ ] External download needed. Requires explicit source and artifact policy.
 

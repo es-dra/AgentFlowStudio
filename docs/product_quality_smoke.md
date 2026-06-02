@@ -164,8 +164,8 @@ only when:
 Real ASR remains explicit opt-in:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
-$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_OPENAI_API_KEY="<your-local-key>"
 ```
 
 Tests for these workflows continue to mock ASR and FFmpeg, so CI does not call

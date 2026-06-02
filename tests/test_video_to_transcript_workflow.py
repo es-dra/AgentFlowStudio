@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import Transcript
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.schemas import Transcript
+from agentflow_studio.workflow_engine import load_workflow
 
 
 VIDEO_TO_TRANSCRIPT_WORKFLOW = Path("workflows/video_to_transcript.yaml")

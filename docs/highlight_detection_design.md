@@ -1,6 +1,6 @@
 # Highlight Detection Design
 
-Phase 10 introduces text-based highlight detection. It moves NarratoCut from
+Phase 10 introduces text-based highlight detection. It moves AgentFlow Studio from
 "execute a provided ClipPlan" toward "help decide what should be clipped".
 
 ## Goal
@@ -53,7 +53,7 @@ video slicing workflow.
 ## Artifact Shape
 
 The first version should introduce a highlight schema under
-`narratocut/schemas/` and keep it small.
+`agentflow_studio/schemas/` and keep it small.
 
 Recommended `HighlightSegment` fields:
 
@@ -135,7 +135,7 @@ Required:
 
 - deterministic mock provider output for tests
 - schema validation for generated highlight plans
-- no remote LLM calls unless `NARRATOCUT_ALLOW_REMOTE_LLM=true`
+- no remote LLM calls unless `AFS_ALLOW_REMOTE_LLM=true`
 
 Not required in Phase 10:
 
@@ -147,7 +147,7 @@ Not required in Phase 10:
 
 ## Phase 10.3 Deterministic Baseline
 
-Phase 10.3 adds `narratocut.highlight_sop` as an offline baseline detector.
+Phase 10.3 adds `agentflow_studio.highlight_sop` as an offline baseline detector.
 This module is intentionally not a fake-data generator and not an LLM wrapper.
 It is a deterministic rule-based detector used to make Phase 10 testable before
 provider-backed detection is introduced.

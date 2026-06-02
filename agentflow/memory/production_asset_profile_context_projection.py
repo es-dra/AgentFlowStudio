@@ -11,7 +11,7 @@ from agentflow.memory.production_asset_profile_promotion_utils import (
     reject_unsafe_asset_profile_promotion,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ASSET_PROFILE_CONTEXT_PROJECTION_KIND = "agentflow_production_memory_asset_profile_context_projection"
 

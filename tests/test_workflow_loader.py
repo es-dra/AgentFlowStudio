@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from narratocut.workflow_engine import WorkflowDefinition, load_workflow
+from agentflow_studio.workflow_engine import WorkflowDefinition, load_workflow
 
 
 def test_load_workflow_reads_mock_roi_to_script_yaml() -> None:

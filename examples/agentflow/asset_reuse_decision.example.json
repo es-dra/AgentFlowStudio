@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "artifact_type": "agentflow_asset_reuse_decision",
   "decision_id": "af_asset_reuse_decision_001",
-  "target_task": "narratostudio_brief_to_production_handoff",
+  "target_task": "agentflow_production_brief_to_production_handoff",
   "selected_asset_profile_ids": [
     "af_reusable_asset_profile_001"
   ],

@@ -1,10 +1,10 @@
 # Feedback Contract
 
 `feedback.jsonl` records human or agent review decisions about clips,
-candidates, packages, and runs. It is the smallest bridge from NarratoCut
+candidates, packages, and runs. It is the smallest bridge from AgentFlow Studio
 delivery results to future AgentFlow Memory.
 
-NarratoCut `v0.1.0` does not implement a memory runtime. This contract only
+AgentFlow Studio `v0.1.0` does not implement a memory runtime. This contract only
 defines the local event shape that future tools can append and read.
 
 ## Event Fields

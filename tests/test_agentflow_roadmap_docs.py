@@ -66,8 +66,8 @@ def test_phase15_roadmap_records_asset_reuse_dry_run_planner() -> None:
     phase15 = _text(PHASE15_ROADMAP)
 
     assert "Phase 15.26" in phase15
-    assert "NarratoStudio Asset Reuse Dry-run Planner" in phase15
-    assert "agentflow_narratostudio_asset_reuse_dry_run_plan" in phase15
+    assert "AgentFlow Production Asset Reuse Dry-run Planner" in phase15
+    assert "agentflow_production_asset_reuse_dry_run_plan" in phase15
     assert "does not execute asset reuse" in phase15
 
 
@@ -75,8 +75,8 @@ def test_phase15_roadmap_records_asset_reuse_review_surface() -> None:
     phase15 = _text(PHASE15_ROADMAP)
 
     assert "Phase 15.27" in phase15
-    assert "NarratoStudio Asset Reuse Review Surface" in phase15
-    assert "agentflow_narratostudio_asset_reuse_review" in phase15
+    assert "AgentFlow Production Asset Reuse Review Surface" in phase15
+    assert "agentflow_production_asset_reuse_review" in phase15
     assert "reviews existing in-memory review, validation, gate, and dry-run plan" in phase15
 
 
@@ -84,8 +84,8 @@ def test_phase15_roadmap_records_asset_reuse_chain_fixtures() -> None:
     phase15 = _text(PHASE15_ROADMAP)
 
     assert "Phase 15.28" in phase15
-    assert "NarratoStudio Asset Reuse Chain Fixtures" in phase15
-    assert "build_narratostudio_asset_reuse_dry_run_chain" in phase15
+    assert "AgentFlow Production Asset Reuse Chain Fixtures" in phase15
+    assert "build_agentflow_production_asset_reuse_dry_run_chain" in phase15
     assert "does not define a new contract artifact type" in phase15
 
 
@@ -93,8 +93,8 @@ def test_phase15_roadmap_records_asset_reuse_chain_audit_smoke() -> None:
     phase15 = _text(PHASE15_ROADMAP)
 
     assert "Phase 15.29" in phase15
-    assert "NarratoStudio Asset Reuse Chain Audit Smoke" in phase15
-    assert "audit_narratostudio_asset_reuse_chain_fixture" in phase15
+    assert "AgentFlow Production Asset Reuse Chain Audit Smoke" in phase15
+    assert "audit_agentflow_production_asset_reuse_chain_fixture" in phase15
     assert "does not register a new contract artifact type" in phase15
 
 
@@ -262,5 +262,5 @@ def test_memory_workbench_implementation_brief_scopes_static_first_screen() -> N
         "Browser screenshot",
     ]:
         assert phrase in brief
-    assert "NARRATOCUT_ALLOW_REMOTE_IMAGE=true" not in brief
-    assert "NARRATOCUT_ALLOW_REMOTE_VIDEO=true" not in brief
+    assert "AFS_ALLOW_REMOTE_IMAGE=true" not in brief
+    assert "AFS_ALLOW_REMOTE_VIDEO=true" not in brief

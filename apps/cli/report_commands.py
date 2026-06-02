@@ -5,8 +5,8 @@ from typing import Any
 
 import typer
 
-from narratocut.harness import inspect_run, review_run, write_review_report
-from narratocut.package_sop import PACKAGE_REPORT, write_delivery_readiness, write_package_report
+from agentflow_studio.harness import inspect_run, review_run, write_review_report
+from agentflow_studio.package_sop import PACKAGE_REPORT, write_delivery_readiness, write_package_report
 
 
 def inspect_run_output(run_dir: Path) -> tuple[dict[str, Any], list[str]]:

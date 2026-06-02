@@ -25,7 +25,7 @@ from agentflow.memory.production_operator_loop import (
     build_production_memory_operator_loop_run,
     write_production_memory_operator_loop_run,
 )
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 EXAMPLE_LOOP = Path("examples/agentflow/production_memory_loop.example.json")

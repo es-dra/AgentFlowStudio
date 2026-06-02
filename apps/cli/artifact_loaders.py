@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 from pydantic import ValidationError
 
-from narratocut.schemas import ClipPlan, Hook, ShortVideoScript
+from agentflow_studio.schemas import ClipPlan, Hook, ShortVideoScript
 
 
 def load_hooks(hooks_path: Path) -> list[Hook]:

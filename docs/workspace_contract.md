@@ -1,6 +1,6 @@
 # Workspace Contract
 
-This document defines how NarratoCut should organize product inputs, workflow
+This document defines how AgentFlow Studio should organize product inputs, workflow
 runs, generated packages, and local cache artifacts after the local-first CLI
 product MVP.
 
@@ -44,7 +44,7 @@ apps/           CLI/API/Web entrypoint shells
 configs/        committed example configs and static tool catalog
 docs/           product, architecture, acceptance, and contract docs
 examples/       committed input examples and fixtures
-narratocut/     implementation modules
+agentflow_studio/     implementation modules
 prompts/        prompt templates
 skills/         agent-readable task contracts
 tests/          unit, workflow, and contract tests
@@ -186,14 +186,14 @@ candidate scoring report without changing it:
 
 Workflow execution writes an initial `package_report.md`. A formal acceptance
 run should execute `inspect-run`, then `review-run`, then refresh the Markdown
-summary with `ncut package-report --run-dir <run_dir>` so the report captures
+summary with `afs package-report --run-dir <run_dir>` so the report captures
 the final quality and review status.
 
 When comparing the video-only and video+script product paths for a release or
 handoff, write a delivery summary after both runs are refreshed:
 
 ```powershell
-.venv\Scripts\ncut delivery-readiness `
+.venv\Scripts\afs delivery-readiness `
   --run-dir data/processed/runs/acceptance/<video_only_run> `
   --run-dir data/processed/runs/acceptance/<video_script_run> `
   --output data/reports/acceptance/<acceptance_id>

@@ -1,1 +1,1 @@
-"""NarratoCut CLI package."""
+"""AgentFlow Studio CLI package."""

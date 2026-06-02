@@ -3,7 +3,7 @@
   "artifact_type": "agentflow_memory_candidate",
   "candidate_id": "af_memory_candidate_001",
   "project_id": "agentflow_demo_project",
-  "module_owner": "NarratoStudio",
+  "module_owner": "AgentFlow Production",
   "source_artifact": "memory_candidates.json",
   "source_of_truth": "feedback.jsonl",
   "derived_from_feedback_signal": "feedback_signal_log.json",

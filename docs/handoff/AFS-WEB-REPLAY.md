@@ -7,7 +7,7 @@ In progress on `codex/afs-web-ui-replay`.
 ## Scope
 
 This branch replays only the Web UI workbench surface from
-`codex/narratocut-web-ui` onto the current AgentFlow Studio mainline.
+`codex/agentflow_studio-web-ui` onto the current AgentFlow Studio mainline.
 
 Included:
 

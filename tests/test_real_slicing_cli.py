@@ -5,7 +5,7 @@ import json
 from typer.testing import CliRunner
 
 from apps.cli.main import app
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 
 def test_slice_real_command_writes_real_slice_manifest(tmp_path, monkeypatch) -> None:

@@ -7,7 +7,7 @@ from agentflow.harness.constants import (
     PASSED,
     WARNING,
 )
-from narratocut.harness import agentflow_router, agentflow_skill
+from agentflow_studio.harness import agentflow_router, agentflow_skill
 
 
 def test_agentflow_harness_constants_define_shared_validation_contract() -> None:

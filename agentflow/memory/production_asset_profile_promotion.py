@@ -27,7 +27,7 @@ from agentflow.memory.production_asset_profile_promotion_utils import (
     version_change_summary,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ASSET_PROFILE_PROMOTION_DECISION_KIND = "agentflow_production_memory_asset_profile_promotion_decision"
 ASSET_PROFILE_VERSION_KIND = "agentflow_production_memory_asset_profile_version"

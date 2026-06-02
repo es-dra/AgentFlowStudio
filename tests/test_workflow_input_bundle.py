@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.workflow_engine.input_bundle import load_workflow_inputs
-from narratocut.utils import write_json
+from agentflow_studio.workflow_engine.input_bundle import load_workflow_inputs
+from agentflow_studio.utils import write_json
 
 
 def test_load_workflow_inputs_keeps_text_files_as_legacy_input(tmp_path) -> None:

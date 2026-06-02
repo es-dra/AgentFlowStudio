@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from narratocut.model_gateway import ModelGateway, ModelGatewayError
+from agentflow_studio.model_gateway import ModelGateway, ModelGatewayError
 
 
 def test_model_gateway_default_provider_uses_mock_hooks() -> None:

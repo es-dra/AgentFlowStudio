@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.candidate_sop import generate_candidate_windows, score_candidate_windows
-from narratocut.schemas import HighlightPlan, Transcript
+from agentflow_studio.candidate_sop import generate_candidate_windows, score_candidate_windows
+from agentflow_studio.schemas import HighlightPlan, Transcript
 
 
 def test_score_candidate_windows_prioritizes_ocr_hook_and_payoff() -> None:

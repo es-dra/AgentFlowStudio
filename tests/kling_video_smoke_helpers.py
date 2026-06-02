@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from narratocut.model_gateway.company_secrets import load_company_provider_secrets
+from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from tests.provider_smoke_helpers import provider_config
 
 

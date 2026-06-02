@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.highlight_sop.alignment import align_script_highlights_to_transcript
-from narratocut.schemas import HighlightPlan, Transcript
+from agentflow_studio.highlight_sop.alignment import align_script_highlights_to_transcript
+from agentflow_studio.schemas import HighlightPlan, Transcript
 
 
 def test_script_highlight_alignment_creates_timestamped_highlights_from_transcript_segments() -> None:

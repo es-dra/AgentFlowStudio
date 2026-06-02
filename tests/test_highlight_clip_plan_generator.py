@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.highlight_sop import generate_clip_plan_from_highlights
-from narratocut.schemas import HighlightPlan, HighlightSegment, ROISettings, VideoMetadata
-from narratocut.slicing_sop import validate_clip_plan
+from agentflow_studio.highlight_sop import generate_clip_plan_from_highlights
+from agentflow_studio.schemas import HighlightPlan, HighlightSegment, ROISettings, VideoMetadata
+from agentflow_studio.slicing_sop import validate_clip_plan
 
 
 def test_generate_clip_plan_from_ranked_timestamped_highlights_preserves_order() -> None:

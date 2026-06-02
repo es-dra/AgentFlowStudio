@@ -61,7 +61,7 @@ CLI and Web mainline:
 
 Workflow-engine slimming:
 
-- `narratocut/workflow_engine/`
+- `agentflow_studio/workflow_engine/`
 - focused workflow tests touched by the current checkout
 
 Evidence docs and runbooks:
@@ -84,12 +84,12 @@ Reviewed support/evidence layer:
 - `apps/cli/kling_*`, `apps/cli/minimax_image_command.py`,
   `apps/cli/memory_demo_commands.py`
 - `apps/cli/support_command_registry.py`
-- `narratocut/model_gateway/`
-- `narratostudio/posterflow/minimax_provider.py`
-- `narratocut/memory_advantage_demo_012_review_html.py`
-- `narratocut/memory_advantage_demo_011_content.py`
-- `narratocut/memory_advantage_demo_012*.py`
-- `narratocut/memory_advantage_demo_015*.py`
+- `agentflow_studio/model_gateway/`
+- `agentflow_production/posterflow/minimax_provider.py`
+- `agentflow_studio/memory_advantage_demo_012_review_html.py`
+- `agentflow_studio/memory_advantage_demo_011_content.py`
+- `agentflow_studio/memory_advantage_demo_012*.py`
+- `agentflow_studio/memory_advantage_demo_015*.py`
 - `pyproject.toml`
 - `tests/kling_video_smoke_helpers.py`, `tests/provider_smoke_helpers.py`
 - `tests/test_kling_video_*.py`, `tests/test_minimax_image_smoke.py`

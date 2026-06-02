@@ -127,4 +127,4 @@ Not preferred as the first slice:
 - database-backed memory
 - remote provider orchestration
 - Web UI-driven runtime
-- multi-module execution across NarratoStudio and NarratoCut
+- multi-module execution across AgentFlow Production and AgentFlow Studio

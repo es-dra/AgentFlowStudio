@@ -327,9 +327,9 @@ is a separate smoke lane:
 deterministic package passes -> provider gates checked -> provider smoke may run
 ```
 
-Image smoke requires `NARRATOCUT_ALLOW_REMOTE_IMAGE=true`. Video smoke requires
-`NARRATOCUT_ALLOW_REMOTE_VIDEO=true`. Provider config must come from a local
-ignored config path or `NARRATOCUT_PROVIDER_CONFIG`.
+Image smoke requires `AFS_ALLOW_REMOTE_IMAGE=true`. Video smoke requires
+`AFS_ALLOW_REMOTE_VIDEO=true`. Provider config must come from a local
+ignored config path or `AFS_PROVIDER_CONFIG`.
 
 MiniMax I2I and Kling I2V reuse existing gated smoke adapters. GPT Image2 is
 recorded as a blocker until a verified adapter exists in this repository.

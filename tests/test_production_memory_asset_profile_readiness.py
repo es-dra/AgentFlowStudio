@@ -170,8 +170,8 @@ def test_asset_profile_cli_help_and_no_provider_smoke(tmp_path: Path) -> None:
 
 def test_asset_profile_provider_validation_gate_writes_blockers_without_network(tmp_path: Path) -> None:
     env = os.environ.copy()
-    env.pop("NARRATOCUT_ALLOW_REMOTE_IMAGE", None)
-    env.pop("NARRATOCUT_ALLOW_REMOTE_VIDEO", None)
+    env.pop("AFS_ALLOW_REMOTE_IMAGE", None)
+    env.pop("AFS_ALLOW_REMOTE_VIDEO", None)
     output_dir = tmp_path / "package"
 
     result = subprocess.run(

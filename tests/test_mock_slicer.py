@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from narratocut.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
+from agentflow_studio.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
 
 from tests.test_clip_plan_generation import make_scripts
 

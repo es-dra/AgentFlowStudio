@@ -7,7 +7,7 @@
 要求：
 - 只输出 JSON，不要输出解释、Markdown 或代码围栏。
 - JSON 必须是数组。
-- 每个元素必须能被 NarratoCut 的 ShortVideoScript schema 校验。
+- 每个元素必须能被 AgentFlow Studio 的 ShortVideoScript schema 校验。
 - script 的 hook_id 和 project_id 必须来自输入 hook。
 - segments 至少包含 opening、body、climax 三段。
 

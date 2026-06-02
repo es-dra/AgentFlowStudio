@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.candidate_sop.audio_boundaries import apply_audio_boundary_refinement
-from narratocut.candidate_sop.boundaries import elastic_time_windows
+from agentflow_studio.candidate_sop.audio_boundaries import apply_audio_boundary_refinement
+from agentflow_studio.candidate_sop.boundaries import elastic_time_windows
 
 
 def test_elastic_time_windows_balances_long_source_window() -> None:

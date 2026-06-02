@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import Transcript
-from narratocut.workflow_engine import load_workflow
+from agentflow_studio.schemas import Transcript
+from agentflow_studio.workflow_engine import load_workflow
 
 from tests.test_product_golden_path_workflows import (
     _assert_product_outputs,
@@ -112,8 +112,8 @@ def test_video_to_finished_package_local_asr_workflow_runs_product_path(tmp_path
     assert (output_dir / "selection_diagnostics.json").is_file()
     assert all(segment["end_sec"] - segment["start_sec"] <= 8.0 for segment in clip_plan["segments"])
     assert all(segment["metadata"].get("candidate_id") for segment in clip_plan["segments"])
-    inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
-    review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
+    inspection = __import__("agentflow_studio.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
+    review = __import__("agentflow_studio.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"
     assert review["status"] == "passed"
     assert review["quality_level"] == "product_mvp"
@@ -137,8 +137,8 @@ def test_video_script_to_finished_package_local_asr_workflow_runs_product_path(t
     assert (output_dir / "script_highlight_alignment.json").is_file()
     assert (output_dir / "selection_diagnostics.json").is_file()
     assert any(candidate["script_alignment"] for candidate in candidates["candidates"])
-    inspection = __import__("narratocut.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
-    review = __import__("narratocut.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
+    inspection = __import__("agentflow_studio.harness.inspection", fromlist=["inspect_run"]).inspect_run(output_dir)
+    review = __import__("agentflow_studio.harness.reviewer", fromlist=["review_run"]).review_run(output_dir)
     assert inspection["status"] == "pass"
     assert review["status"] == "passed"
     assert _product_warnings(inspection).isdisjoint(_six_quality_warnings())
@@ -178,6 +178,6 @@ def _patch_local_asr(monkeypatch, *, source_video: str) -> None:
         )
 
     monkeypatch.setattr(
-        "narratocut.workflow_engine.transcription_nodes.FasterWhisperASRProvider.transcribe",
+        "agentflow_studio.workflow_engine.transcription_nodes.FasterWhisperASRProvider.transcribe",
         fake_transcribe,
     )

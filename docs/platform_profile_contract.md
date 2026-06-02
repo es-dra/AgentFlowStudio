@@ -4,7 +4,7 @@ Platform profiles describe lightweight distribution preferences for a target
 platform. They help agents choose candidate settings and package review
 criteria without hard-coding platform assumptions into workflow nodes.
 
-NarratoCut `v0.1.0` ships example profiles only. Product workflows do not yet
+AgentFlow Studio `v0.1.0` ships example profiles only. Product workflows do not yet
 load these profiles automatically.
 
 ## Required Fields

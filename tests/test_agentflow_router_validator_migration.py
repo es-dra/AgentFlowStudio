@@ -4,16 +4,16 @@ import json
 from pathlib import Path
 
 from agentflow.harness.agentflow_router import validate_router_decision_dry_run
-from narratocut.harness.agentflow_router import (
+from agentflow_studio.harness.agentflow_router import (
     validate_router_decision_dry_run as compatibility_validate_router_decision_dry_run,
 )
 
 
 ROUTER_DECISION_EXAMPLE = Path("examples/agentflow/router_decision.example.json")
 KNOWN_SKILL_IDS = {
-    "narratostudio.production_handoff",
-    "narratocut.short_highlight_package",
-    "narratocut.video_script_highlight_package",
+    "agentflow_studio.production.production_handoff",
+    "agentflow_studio.short_highlight_package",
+    "agentflow_studio.video_script_highlight_package",
 }
 
 
@@ -29,5 +29,5 @@ def test_router_validator_imports_from_agentflow_harness() -> None:
     assert validation["does_not_execute"] is True
 
 
-def test_narratocut_router_validator_import_path_is_compatibility_wrapper() -> None:
+def test_agentflow_studio_router_validator_import_path_is_compatibility_wrapper() -> None:
     assert compatibility_validate_router_decision_dry_run is validate_router_decision_dry_run

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from narratocut.schemas import Transcript
-from narratocut.subtitle_sop.timeline import build_clip_timeline_subtitle_export
+from agentflow_studio.schemas import Transcript
+from agentflow_studio.subtitle_sop.timeline import build_clip_timeline_subtitle_export
 
 
 def test_clip_timeline_subtitles_map_source_transcript_to_final_video_timeline() -> None:

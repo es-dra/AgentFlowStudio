@@ -1,6 +1,6 @@
 # Golden Sample v0.1.0
 
-This page records the smallest acceptance path for NarratoCut `v0.1.0`.
+This page records the smallest acceptance path for AgentFlow Studio `v0.1.0`.
 
 The repository does not commit real media, generated clips, model cache, or
 package outputs. The commands below expect local ignored inputs.
@@ -25,33 +25,33 @@ data/processed/product_acceptance_phase14_1/video_script_local_asr_input.json
 ## Video-Only Path
 
 ```powershell
-.venv\Scripts\ncut run-workflow `
+.venv\Scripts\afs run-workflow `
   --workflow workflows/video_to_finished_package_local_asr.yaml `
   --input data/processed/product_acceptance_phase14_1/video_only_local_asr_input.json `
   --output data/processed/runs/acceptance/v0_1_0_video_only
 
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/acceptance/v0_1_0_video_only
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/acceptance/v0_1_0_video_only
-.venv\Scripts\ncut package-report --run-dir data/processed/runs/acceptance/v0_1_0_video_only
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/acceptance/v0_1_0_video_only
+.venv\Scripts\afs review-run --run-dir data/processed/runs/acceptance/v0_1_0_video_only
+.venv\Scripts\afs package-report --run-dir data/processed/runs/acceptance/v0_1_0_video_only
 ```
 
 ## Video Plus Script Path
 
 ```powershell
-.venv\Scripts\ncut run-workflow `
+.venv\Scripts\afs run-workflow `
   --workflow workflows/video_script_to_finished_package_local_asr.yaml `
   --input data/processed/product_acceptance_phase14_1/video_script_local_asr_input.json `
   --output data/processed/runs/acceptance/v0_1_0_video_script
 
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/acceptance/v0_1_0_video_script
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/acceptance/v0_1_0_video_script
-.venv\Scripts\ncut package-report --run-dir data/processed/runs/acceptance/v0_1_0_video_script
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/acceptance/v0_1_0_video_script
+.venv\Scripts\afs review-run --run-dir data/processed/runs/acceptance/v0_1_0_video_script
+.venv\Scripts\afs package-report --run-dir data/processed/runs/acceptance/v0_1_0_video_script
 ```
 
 ## Delivery Readiness
 
 ```powershell
-.venv\Scripts\ncut delivery-readiness `
+.venv\Scripts\afs delivery-readiness `
   --run-dir data/processed/runs/acceptance/v0_1_0_video_only `
   --run-dir data/processed/runs/acceptance/v0_1_0_video_script `
   --output data/reports/acceptance/v0_1_0_delivery_readiness

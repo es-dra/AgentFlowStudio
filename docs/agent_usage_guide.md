@@ -1,9 +1,9 @@
 # Agent Usage Guide
 
-This guide is the operational path for using NarratoCut as the distribution
+This guide is the operational path for using AgentFlow Studio as the distribution
 module of AgentFlow Studio.
 
-NarratoCut `v0.1.0` is local-first. Do not call remote LLMs or remote ASR
+AgentFlow Studio `v0.1.0` is local-first. Do not call remote LLMs or remote ASR
 unless the user explicitly enables the relevant environment flags.
 
 ## 1. Choose A Skill
@@ -23,7 +23,7 @@ artifacts, quality gates, and failure recovery notes.
 Video-only local path:
 
 ```powershell
-.venv\Scripts\ncut run-workflow `
+.venv\Scripts\afs run-workflow `
   --workflow workflows/video_to_finished_package_local_asr.yaml `
   --input data/processed/product_acceptance_phase14_1/video_only_local_asr_input.json `
   --output data/processed/runs/acceptance/video_only_v0_1_0
@@ -32,7 +32,7 @@ Video-only local path:
 Video plus script local path:
 
 ```powershell
-.venv\Scripts\ncut run-workflow `
+.venv\Scripts\afs run-workflow `
   --workflow workflows/video_script_to_finished_package_local_asr.yaml `
   --input data/processed/product_acceptance_phase14_1/video_script_local_asr_input.json `
   --output data/processed/runs/acceptance/video_script_v0_1_0
@@ -46,15 +46,15 @@ ignored media and local model cache paths that are not committed to git.
 After each run:
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir <run_dir>
-.venv\Scripts\ncut review-run --run-dir <run_dir>
-.venv\Scripts\ncut package-report --run-dir <run_dir>
+.venv\Scripts\afs inspect-run --run-dir <run_dir>
+.venv\Scripts\afs review-run --run-dir <run_dir>
+.venv\Scripts\afs package-report --run-dir <run_dir>
 ```
 
 Then compare one or more refreshed product runs:
 
 ```powershell
-.venv\Scripts\ncut delivery-readiness `
+.venv\Scripts\afs delivery-readiness `
   --run-dir <video_only_run_dir> `
   --run-dir <video_script_run_dir> `
   --output data/reports/acceptance/v0_1_0_delivery_readiness
@@ -79,7 +79,7 @@ state, and whether the artifact existed when the run manifest was written.
 
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
-| FFmpeg command fails | FFmpeg or FFprobe missing | Run `ncut ffmpeg-check --json`, then install FFmpeg or set `NCUT_FFMPEG_PATH` / `NCUT_FFPROBE_PATH`. |
+| FFmpeg command fails | FFmpeg or FFprobe missing | Run `afs ffmpeg-check --json`, then install FFmpeg or set `NCUT_FFMPEG_PATH` / `NCUT_FFPROBE_PATH`. |
 | Local ASR fails | faster-whisper missing or model cache unavailable | Install `faster-whisper`, verify `configs/models.yaml`, or use the prepared local model cache. |
 | ASR text quality is weak | Small local model or poor audio | Retry with a better local model, add script input, or treat the result as `needs_review`. |
 | No candidates selected | Transcript too sparse or duration gates too strict | Review `candidate_windows.json` and loosen candidate settings in the input bundle. |

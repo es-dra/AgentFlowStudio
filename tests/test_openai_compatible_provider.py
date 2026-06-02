@@ -5,8 +5,8 @@ import urllib.error
 
 import pytest
 
-from narratocut.model_gateway import ModelProviderError, OpenAICompatibleProvider
-from narratocut.model_gateway import openai_compatible
+from agentflow_studio.model_gateway import ModelProviderError, OpenAICompatibleProvider
+from agentflow_studio.model_gateway import openai_compatible
 
 
 class FakeResponse:
@@ -24,10 +24,10 @@ class FakeResponse:
 
 
 def test_openai_compatible_provider_requires_api_key(monkeypatch) -> None:
-    monkeypatch.delenv("NARRATOCUT_TEST_KEY", raising=False)
+    monkeypatch.delenv("AFS_TEST_KEY", raising=False)
     provider = OpenAICompatibleProvider(
         base_url="https://example.test/v1",
-        api_key_env="NARRATOCUT_TEST_KEY",
+        api_key_env="AFS_TEST_KEY",
         model="fake-model",
     )
 
@@ -44,14 +44,14 @@ def test_openai_compatible_provider_requires_base_url_or_model() -> None:
 
 
 def test_openai_compatible_provider_requires_remote_call_opt_in(monkeypatch) -> None:
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_LLM", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     provider = OpenAICompatibleProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",
         model="fake-model",
     )
 
-    with pytest.raises(ModelProviderError, match="NARRATOCUT_ALLOW_REMOTE_LLM"):
+    with pytest.raises(ModelProviderError, match="AFS_ALLOW_REMOTE_LLM"):
         provider.generate("hello")
 
 
@@ -66,7 +66,7 @@ def test_openai_compatible_provider_returns_chat_completion(monkeypatch) -> None
         return FakeResponse({"choices": [{"message": {"content": "model text"}}]})
 
     monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
 
     provider = OpenAICompatibleProvider(
         base_url="https://example.test/v1",
@@ -88,7 +88,7 @@ def test_openai_compatible_provider_rejects_missing_choices(monkeypatch) -> None
         return FakeResponse({"choices": []})
 
     monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
     provider = OpenAICompatibleProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",
@@ -104,7 +104,7 @@ def test_openai_compatible_provider_wraps_request_errors(monkeypatch) -> None:
         raise urllib.error.URLError("network down")
 
     monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setenv("NARRATOCUT_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
     provider = OpenAICompatibleProvider(
         base_url="https://example.test/v1",
         api_key="fake-key",

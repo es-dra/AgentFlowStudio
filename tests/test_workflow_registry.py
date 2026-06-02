@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from narratocut.workflow_engine import NodeRegistry
+from agentflow_studio.workflow_engine import NodeRegistry
 
 
 def test_node_registry_registers_and_returns_handler() -> None:

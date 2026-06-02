@@ -20,7 +20,7 @@ from agentflow.memory.production_asset_profile_promotion_utils import (
 )
 from agentflow.memory.production_asset_consistency_review_render import render_asset_consistency_review_markdown
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND = "agentflow_production_memory_asset_consistency_review_fixture"
 ASSET_CONSISTENCY_REVIEW_KIND = "agentflow_production_memory_asset_consistency_review"

@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.schemas import VideoMetadata
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
-from narratocut.workflow_engine.planner import draft_workflow_plan
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.schemas import VideoMetadata
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine.planner import draft_workflow_plan
 
 
 WORKFLOW = Path("workflows/final_video_with_bgm.yaml")
@@ -132,14 +132,14 @@ def test_final_video_with_bgm_records_failed_ffmpeg_mix(tmp_path, monkeypatch) -
 
 
 def test_bgm_mix_config_rejects_unsafe_output_name() -> None:
-    from narratocut.bgm_sop import BGMMixConfig
+    from agentflow_studio.bgm_sop import BGMMixConfig
 
     with pytest.raises(ValueError, match="safe relative file name"):
         BGMMixConfig(output_name="../outside.mp4")
 
 
 def test_bgm_mix_config_rejects_volume_above_one() -> None:
-    from narratocut.bgm_sop import BGMMixConfig
+    from agentflow_studio.bgm_sop import BGMMixConfig
 
     with pytest.raises(ValueError, match="between 0 and 1"):
         BGMMixConfig(bgm_volume=1.5)
@@ -149,7 +149,7 @@ def test_bgm_mix_config_rejects_volume_above_one() -> None:
 
 
 def test_bgm_mix_command_loops_bgm_and_maps_video() -> None:
-    from narratocut.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
+    from agentflow_studio.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
 
     command = build_ffmpeg_bgm_mix_command(
         source_video="final_video.mp4",
@@ -165,7 +165,7 @@ def test_bgm_mix_command_loops_bgm_and_maps_video() -> None:
 
 
 def test_bgm_mix_command_supports_bgm_only_strategy_for_silent_video() -> None:
-    from narratocut.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
+    from agentflow_studio.bgm_sop import BGMMixConfig, build_ffmpeg_bgm_mix_command
 
     command = build_ffmpeg_bgm_mix_command(
         source_video="silent_final_video.mp4",
@@ -242,7 +242,7 @@ def _patch_bgm_mix_tools(
         )
 
     def fake_tool_check(executable="ffmpeg"):  # noqa: ANN001, ANN202
-        from narratocut.slicing_sop.ffmpeg_probe import FFmpegInfo
+        from agentflow_studio.slicing_sop.ffmpeg_probe import FFmpegInfo
 
         return FFmpegInfo(
             available=True,
@@ -260,7 +260,7 @@ def _patch_bgm_mix_tools(
         output_path.write_bytes(b"fake bgm video")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.workflow_engine.bgm_nodes.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.harness.bgm_quality.probe_video_metadata", fake_probe)
-    monkeypatch.setattr("narratocut.bgm_sop.mix.subprocess.run", ffmpeg_run or fake_run)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.bgm_nodes.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.harness.bgm_quality.probe_video_metadata", fake_probe)
+    monkeypatch.setattr("agentflow_studio.bgm_sop.mix.subprocess.run", ffmpeg_run or fake_run)

@@ -7,6 +7,6 @@ providers:
 
   openai_compatible:
     type: openai_compatible
-    base_url: ${NARRATOCUT_OPENAI_BASE_URL}
-    api_key_env: NARRATOCUT_OPENAI_API_KEY
-    model: ${NARRATOCUT_OPENAI_MODEL}
+    base_url: ${AFS_OPENAI_BASE_URL}
+    api_key_env: AFS_OPENAI_API_KEY
+    model: ${AFS_OPENAI_MODEL}

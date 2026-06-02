@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.harness.quality_checks import build_quality_report
-from narratocut.utils import write_json
+from agentflow_studio.harness.quality_checks import build_quality_report
+from agentflow_studio.utils import write_json
 
 
 def test_build_quality_report_passes_for_complete_mock_run(tmp_path) -> None:

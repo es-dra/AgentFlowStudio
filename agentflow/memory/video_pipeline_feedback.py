@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from narratocut.utils import write_json
+from agentflow_studio.utils import write_json
 
 from agentflow.memory.video_pipeline import SCHEMA_VERSION
 from agentflow.memory.video_pipeline_observation import OBSERVATION_TYPE

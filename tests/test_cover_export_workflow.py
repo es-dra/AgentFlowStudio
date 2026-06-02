@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.harness.inspection import inspect_run
-from narratocut.harness.reviewer import review_run
-from narratocut.utils import write_json
-from narratocut.workflow_engine import load_workflow
-from narratocut.workflow_engine.planner import draft_workflow_plan
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.harness.reviewer import review_run
+from agentflow_studio.utils import write_json
+from agentflow_studio.workflow_engine import load_workflow
+from agentflow_studio.workflow_engine.planner import draft_workflow_plan
 
 
 WORKFLOW = Path("workflows/final_video_to_cover.yaml")
@@ -129,14 +129,14 @@ def test_final_video_to_cover_records_failed_ffmpeg_export(tmp_path, monkeypatch
 
 
 def test_cover_export_config_rejects_unsafe_output_name() -> None:
-    from narratocut.cover_sop import CoverExportConfig
+    from agentflow_studio.cover_sop import CoverExportConfig
 
     with pytest.raises(ValueError, match="safe relative file name"):
         CoverExportConfig(output_name="../outside.jpg")
 
 
 def test_cover_export_command_marks_single_image_output() -> None:
-    from narratocut.cover_sop import CoverExportConfig, build_ffmpeg_cover_export_command
+    from agentflow_studio.cover_sop import CoverExportConfig, build_ffmpeg_cover_export_command
 
     command = build_ffmpeg_cover_export_command(
         source_video="final_video.mp4",
@@ -234,7 +234,7 @@ def _patch_cover_export_tools(
     ffmpeg_run=None,
 ) -> None:
     def fake_tool_check(executable="ffmpeg"):  # noqa: ANN001, ANN202
-        from narratocut.slicing_sop.ffmpeg_probe import FFmpegInfo
+        from agentflow_studio.slicing_sop.ffmpeg_probe import FFmpegInfo
 
         return FFmpegInfo(
             available=True,
@@ -252,5 +252,5 @@ def _patch_cover_export_tools(
         output_path.write_bytes(b"fake cover")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("narratocut.workflow_engine.cover_nodes.check_ffmpeg_available", fake_tool_check)
-    monkeypatch.setattr("narratocut.cover_sop.export.subprocess.run", ffmpeg_run or fake_run)
+    monkeypatch.setattr("agentflow_studio.workflow_engine.cover_nodes.check_ffmpeg_available", fake_tool_check)
+    monkeypatch.setattr("agentflow_studio.cover_sop.export.subprocess.run", ffmpeg_run or fake_run)

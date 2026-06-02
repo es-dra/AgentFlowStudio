@@ -12,9 +12,9 @@ ROUTER_CONTRACT = Path("docs/agentflow_router_contract.md")
 RUNTIME_READINESS = Path("docs/agentflow_runtime_readiness.md")
 PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 KNOWN_SKILL_IDS = {
-    "narratostudio.production_handoff",
-    "narratocut.short_highlight_package",
-    "narratocut.video_script_highlight_package",
+    "agentflow_studio.production.production_handoff",
+    "agentflow_studio.short_highlight_package",
+    "agentflow_studio.video_script_highlight_package",
 }
 
 

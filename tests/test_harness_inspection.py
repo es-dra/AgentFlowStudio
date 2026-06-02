@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from narratocut.harness.inspection import inspect_run
-from narratocut.utils import write_json
+from agentflow_studio.harness.inspection import inspect_run
+from agentflow_studio.utils import write_json
 
 
 def test_inspect_run_writes_quality_report_and_artifact_statuses(tmp_path) -> None:

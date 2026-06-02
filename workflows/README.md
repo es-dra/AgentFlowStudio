@@ -1,6 +1,6 @@
 # Workflows
 
-This directory contains YAML workflow definitions for NarratoCut.
+This directory contains YAML workflow definitions for AgentFlow Studio.
 
 ## Current Recommended Product Workflows
 
@@ -13,7 +13,7 @@ component workflow:
 | `video_script_to_finished_package_local_asr.yaml` | product / recommended | The user has a source video plus script. | `script_highlight_alignment.json`, `boundary_signal_manifest.json`, `candidate_windows.json`, `highlight_score_report.json`, `selection_diagnostics.json`, `finished_package_manifest.json`, `package_report.md` |
 | `video_to_finished_package_real_asr.yaml` | product / optional | Explicit remote ASR is allowed. | Same package outputs, but remote ASR is opt-in. |
 | `video_script_to_finished_package_real_asr.yaml` | product / optional | Video plus script with explicit remote ASR. | Same package outputs plus script alignment. |
-| `narratostudio_brief_to_production_handoff.yaml` | production / recommended | The user needs a local-first structured production handoff. | `production_handoff.json`, `production_report.md`, `memory_candidates.json`, `cost_quality_trace.json` |
+| `agentflow_production_brief_to_production_handoff.yaml` | production / recommended | The user needs a local-first structured production handoff. | `production_handoff.json`, `production_report.md`, `memory_candidates.json`, `cost_quality_trace.json` |
 | `posterflow_memory_demo.yaml` | demo / optional remote image | The user needs a visual poster-memory demo with explicit remote-image opt-in. | `poster_candidates_manifest.json`, `poster_preview.html`, `poster_memory_candidates.json`, `next_round_prompt.json`, `round_2/poster_candidates_manifest.json`, `poster_round_comparison.json` |
 
 Component workflows such as `transcript_to_candidate_windows.yaml`,
@@ -28,9 +28,9 @@ on filenames.
 After a formal product run, use:
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir <run_dir>
-.venv\Scripts\ncut review-run --run-dir <run_dir>
-.venv\Scripts\ncut package-report --run-dir <run_dir>
+.venv\Scripts\afs inspect-run --run-dir <run_dir>
+.venv\Scripts\afs review-run --run-dir <run_dir>
+.venv\Scripts\afs package-report --run-dir <run_dir>
 ```
 
 The workflow writes an initial `package_report.md`; the final command refreshes
@@ -40,7 +40,7 @@ For a formal delivery checkpoint that compares multiple accepted product runs,
 for example video-only plus video+script, write a separate readiness summary:
 
 ```powershell
-.venv\Scripts\ncut delivery-readiness `
+.venv\Scripts\afs delivery-readiness `
   --run-dir <video_only_run_dir> `
   --run-dir <video_script_run_dir> `
   --output <delivery_report_dir>
@@ -57,24 +57,24 @@ package generation when the audio artifact is mocked or cannot be analyzed.
 
 ## Available workflows
 
-### `narratostudio_brief_to_production_handoff.yaml`
+### `agentflow_production_brief_to_production_handoff.yaml`
 
-NarratoStudio MVP production-side workflow:
+AgentFlow Production MVP production-side workflow:
 
-1. `narratostudio_load_creative_brief`
-2. `narratostudio_build_story_bible`
-3. `narratostudio_build_episode_outline`
-4. `narratostudio_build_scene_plan`
-5. `narratostudio_build_shot_plan`
-6. `narratostudio_build_prompt_pack`
-7. `narratostudio_build_production_handoff`
+1. `agentflow_production_load_creative_brief`
+2. `agentflow_production_build_story_bible`
+3. `agentflow_production_build_episode_outline`
+4. `agentflow_production_build_scene_plan`
+5. `agentflow_production_build_shot_plan`
+6. `agentflow_production_build_prompt_pack`
+7. `agentflow_production_build_production_handoff`
 
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/narratostudio_brief_to_production_handoff.yaml --input examples/narratostudio/creative_brief.example.json --output data/processed/runs/demo_narratostudio_handoff
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_narratostudio_handoff
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_narratostudio_handoff
+.venv\Scripts\afs run-workflow --workflow workflows/agentflow_production_handoff.yaml --input examples/agentflow_production/creative_brief.example.json --output data/processed/runs/demo_agentflow_production_handoff
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_agentflow_production_handoff
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_agentflow_production_handoff
 ```
 
 This workflow writes `creative_brief.json`, `story_bible.json`,
@@ -107,13 +107,13 @@ PosterFlow Memory Demo workflow:
 Example:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_IMAGE="true"
-$env:NARRATOCUT_IMAGE_BASE_URL="https://your-openai-compatible-host/v1"
-$env:NARRATOCUT_IMAGE_API_KEY="<local-secret>"
-$env:NARRATOCUT_IMAGE_MODEL="<image-model>"
-.venv\Scripts\ncut run-workflow --workflow workflows/posterflow_memory_demo.yaml --input examples/posterflow/poster_brief.example.json --output data/processed/poster_runs/cyber_xianxia_001/run_001
-.venv\Scripts\ncut inspect-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
-.venv\Scripts\ncut review-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_IMAGE_BASE_URL="https://your-openai-compatible-host/v1"
+$env:AFS_IMAGE_API_KEY="<local-secret>"
+$env:AFS_IMAGE_MODEL="<image-model>"
+.venv\Scripts\afs run-workflow --workflow workflows/posterflow_memory_demo.yaml --input examples/posterflow/poster_brief.example.json --output data/processed/poster_runs/cyber_xianxia_001/run_001
+.venv\Scripts\afs inspect-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
+.venv\Scripts\afs review-run --run-dir data/processed/poster_runs/cyber_xianxia_001/run_001
 ```
 
 Open `poster_preview.html` from the run directory to inspect the three
@@ -135,7 +135,7 @@ Phase 3 demo workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/mock_roi_to_script.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_workflow
+.venv\Scripts\afs run-workflow --workflow workflows/mock_roi_to_script.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_workflow
 ```
 
 Generated files are written to the output directory. Runs under `data/processed/` are ignored by git.
@@ -159,7 +159,7 @@ Phase 6 full mock workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
+.venv\Scripts\afs run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
 ```
 
 This workflow writes `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_manifest.json`, `.txt` mock clips under `clips/`, and run contract artifacts.
@@ -167,19 +167,19 @@ This workflow writes `hooks.json`, `scripts.json`, `clip_plans.json`, `slice_man
 Draft a static workflow plan without executing the workflow:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
+.venv\Scripts\afs draft-plan --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/reports/workflow_plan.json
 ```
 
 Inspect the run:
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 Generate an agent-readable review report:
 
 ```powershell
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 ### `real_video_roi_to_clips.yaml`
@@ -195,9 +195,9 @@ Phase 9 real-video workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_real_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\afs run-workflow --workflow workflows/real_video_roi_to_clips.yaml --input examples/demo_real_video/input.example.json --output data/processed/runs/demo_real_video
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_real_video
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_real_video
 ```
 
 This workflow requires a local video at `data/raw/demo_real_video/input.mp4`
@@ -217,10 +217,10 @@ Phase 12.1 primary execution workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/reports/phase_12_1_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/processed/runs/demo_clip_plan_to_real_clips
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
+.venv\Scripts\afs draft-plan --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/reports/phase_12_1_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/clip_plan_to_real_clips.yaml --input examples/demo_slicing/clip_plan_to_real_clips_input.example.json --output data/processed/runs/demo_clip_plan_to_real_clips
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_clip_plan_to_real_clips
 ```
 
 The example expects a local ignored video at
@@ -255,10 +255,10 @@ Phase 12.1B composition smoke workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/reports/video_to_real_clips_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/processed/runs/demo_video_to_real_clips
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_real_clips
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_real_clips
+.venv\Scripts\afs draft-plan --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/reports/video_to_real_clips_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_real_clips.yaml --input examples/demo_asr/video_to_real_clips_input.example.json --output data/processed/runs/demo_video_to_real_clips
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_to_real_clips
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_to_real_clips
 ```
 
 This workflow composes the Phase 11 mock-ASR planning chain with the Phase
@@ -283,10 +283,10 @@ Phase 12.2 simple assembly workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/reports/clips_to_final_video_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/processed/runs/demo_clips_to_final_video
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_clips_to_final_video
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_clips_to_final_video
+.venv\Scripts\afs draft-plan --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/reports/clips_to_final_video_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/clips_to_final_video.yaml --input examples/demo_assembly/clips_to_final_video_input.example.json --output data/processed/runs/demo_clips_to_final_video
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_clips_to_final_video
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_clips_to_final_video
 ```
 
 This workflow consumes an existing `real_slice_manifest.json` and its `clips/`
@@ -309,10 +309,10 @@ Phase 13.2 basic subtitle export workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/reports/transcript_to_subtitles_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/processed/runs/demo_transcript_to_subtitles
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_transcript_to_subtitles
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_transcript_to_subtitles
+.venv\Scripts\afs draft-plan --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/reports/transcript_to_subtitles_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/transcript_to_subtitles.yaml --input examples/demo_subtitles/transcript_to_subtitles_input.example.json --output data/processed/runs/demo_transcript_to_subtitles
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_transcript_to_subtitles
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_transcript_to_subtitles
 ```
 
 This workflow consumes an existing timestamped `transcript.json` and writes
@@ -334,10 +334,10 @@ Phase 13.3 subtitle burn-in workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/reports/final_video_with_subtitles_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/processed/runs/demo_final_video_with_subtitles
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_with_subtitles
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_with_subtitles
+.venv\Scripts\afs draft-plan --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/reports/final_video_with_subtitles_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_with_subtitles.yaml --input examples/demo_subtitles/final_video_with_subtitles_input.example.json --output data/processed/runs/demo_final_video_with_subtitles
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_final_video_with_subtitles
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_final_video_with_subtitles
 ```
 
 This workflow consumes an existing `final_video.mp4` and an existing
@@ -362,10 +362,10 @@ Phase 13.4 cover export workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/reports/final_video_to_cover_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/processed/runs/demo_final_video_to_cover
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_to_cover
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_to_cover
+.venv\Scripts\afs draft-plan --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/reports/final_video_to_cover_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_to_cover.yaml --input examples/demo_cover/final_video_to_cover_input.example.json --output data/processed/runs/demo_final_video_to_cover
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_final_video_to_cover
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_final_video_to_cover
 ```
 
 This workflow consumes an existing `final_video.mp4`, extracts one frame with
@@ -389,10 +389,10 @@ Phase 13.5 local BGM mix workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/reports/final_video_with_bgm_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/processed/runs/demo_final_video_with_bgm
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_with_bgm
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_with_bgm
+.venv\Scripts\afs draft-plan --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/reports/final_video_with_bgm_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_with_bgm.yaml --input examples/demo_bgm/final_video_with_bgm_input.example.json --output data/processed/runs/demo_final_video_with_bgm
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_final_video_with_bgm
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_final_video_with_bgm
 ```
 
 This workflow consumes an existing `final_video.mp4` and a local BGM audio file,
@@ -421,10 +421,10 @@ Phase 13.7 finished package manifest workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/reports/final_video_package_workflow_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/processed/runs/demo_final_video_package
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_final_video_package
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_final_video_package
+.venv\Scripts\afs draft-plan --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/reports/final_video_package_workflow_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/final_video_package.yaml --input examples/demo_package/final_video_package_input.example.json --output data/processed/runs/demo_final_video_package
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_final_video_package
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_final_video_package
 ```
 
 This workflow consumes paths to existing final video artifacts and writes
@@ -471,11 +471,11 @@ rather than direct raw-transcript highlights.
 Example:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
-$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_finished_package_real_asr.yaml --input examples/demo_asr/video_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_real_asr
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_finished_package_real_asr.yaml --input examples/demo_asr/video_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_real_asr
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_to_finished_package_real_asr
 ```
 
 This workflow uses ASR transcript text as the highlight signal and writes
@@ -501,9 +501,9 @@ Example:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install faster-whisper
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_local_asr
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_finished_package_local_asr.yaml --input examples/demo_asr/video_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_to_finished_package_local_asr
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_to_finished_package_local_asr
 ```
 
 The committed example uses `asr_model: small`, `asr_device: cpu`, and
@@ -522,11 +522,11 @@ then scores short candidates before slicing and packaging.
 Example:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
-$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
-.venv\Scripts\ncut run-workflow --workflow workflows/video_script_to_finished_package_real_asr.yaml --input examples/demo_asr/video_script_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_real_asr
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\afs run-workflow --workflow workflows/video_script_to_finished_package_real_asr.yaml --input examples/demo_asr/video_script_to_finished_package_real_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_real_asr
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_real_asr
 ```
 
 Low-confidence script-to-transcript alignments are skipped and reported in the
@@ -545,9 +545,9 @@ Example:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install faster-whisper
-.venv\Scripts\ncut run-workflow --workflow workflows/video_script_to_finished_package_local_asr.yaml --input examples/demo_asr/video_script_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_local_asr
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
+.venv\Scripts\afs run-workflow --workflow workflows/video_script_to_finished_package_local_asr.yaml --input examples/demo_asr/video_script_to_finished_package_local_asr_input.example.json --output data/processed/runs/demo_video_script_to_finished_package_local_asr
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_script_to_finished_package_local_asr
 ```
 
 For local small-model Chinese ASR, the example uses a lower
@@ -568,7 +568,7 @@ Phase 10 script highlight workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
+.venv\Scripts\afs run-workflow --workflow workflows/script_to_highlight_plan.yaml --input examples/demo_highlight/script_input.example.json --output data/processed/runs/demo_highlight_script
 ```
 
 This workflow writes a ranked `highlight_plan.json`. It intentionally does not
@@ -584,8 +584,8 @@ Phase 14.2A transcript candidate-window workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/reports/transcript_candidate_windows_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/processed/runs/demo_transcript_candidate_windows
+.venv\Scripts\afs draft-plan --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/reports/transcript_candidate_windows_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/transcript_to_candidate_windows.yaml --input examples/demo_highlight/transcript_candidate_windows_input.example.json --output data/processed/runs/demo_transcript_candidate_windows
 ```
 
 This workflow writes `candidate_windows.json` from adjacent transcript segment
@@ -613,10 +613,10 @@ Phase 14.2B/C OCR-subtitle timeline and candidate scoring workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut draft-plan --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/reports/video_subtitle_ocr_to_highlight_plan.json
-.venv\Scripts\ncut run-workflow --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+.venv\Scripts\afs draft-plan --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/reports/video_subtitle_ocr_to_highlight_plan.json
+.venv\Scripts\afs run-workflow --workflow workflows/video_subtitle_ocr_to_highlight_plan.yaml --input examples/demo_ocr/video_subtitle_ocr_to_highlight_plan_input.example.json --output data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_subtitle_ocr_to_highlight_plan
 ```
 
 The committed example expects a local ignored video at
@@ -647,7 +647,7 @@ Phase 10 timestamped transcript workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
+.venv\Scripts\afs run-workflow --workflow workflows/transcript_to_highlight_clip_plan.yaml --input examples/demo_highlight/transcript_input.example.json --output data/processed/runs/demo_highlight_transcript
 ```
 
 This workflow writes a ranked `highlight_plan.json` and an executable
@@ -666,7 +666,7 @@ Phase 11.1 video-to-transcript workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_transcript.yaml --input examples/demo_asr/video_to_transcript_input.example.json --output data/processed/runs/demo_video_to_transcript
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_transcript.yaml --input examples/demo_asr/video_to_transcript_input.example.json --output data/processed/runs/demo_video_to_transcript
 ```
 
 The example uses `audio_extraction_mode: mock` and a fixture-backed mock ASR
@@ -696,7 +696,7 @@ Phase 11.2 mock-ASR video-to-clip-plan workflow:
 Example:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_highlight_clip_plan.yaml --input examples/demo_asr/video_to_highlight_clip_plan_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_highlight_clip_plan.yaml --input examples/demo_asr/video_to_highlight_clip_plan_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan
 ```
 
 This workflow composes Phase 11.1 transcript generation with the Phase 10
@@ -716,13 +716,13 @@ Phase 11.5 explicit remote-ASR video-to-transcript workflow:
 Example:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
-$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_transcript_real_asr.yaml --input examples/demo_asr/video_to_transcript_real_asr_input.example.json --output data/processed/runs/demo_video_to_transcript_real_asr
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_transcript_real_asr.yaml --input examples/demo_asr/video_to_transcript_real_asr_input.example.json --output data/processed/runs/demo_video_to_transcript_real_asr
 ```
 
 This workflow is intentionally separate from the mock ASR workflows. It may
-call a remote ASR provider only when `NARRATOCUT_ALLOW_REMOTE_ASR=true` is set
+call a remote ASR provider only when `AFS_ALLOW_REMOTE_ASR=true` is set
 and an API key is available through the configured environment variable. It
 writes `audio_manifest.json`, `audio/audio.wav`, and `transcript.json`. It does
 not detect highlights, generate `clip_plan.json`, run FFmpeg slicing, stitch
@@ -746,9 +746,9 @@ Phase 11.6 explicit real-ASR video-to-highlight-clip-plan workflow:
 Example:
 
 ```powershell
-$env:NARRATOCUT_ALLOW_REMOTE_ASR="true"
-$env:NARRATOCUT_OPENAI_API_KEY="<your-local-key>"
-.venv\Scripts\ncut run-workflow --workflow workflows/video_to_highlight_clip_plan_real_asr.yaml --input examples/demo_asr/video_to_highlight_clip_plan_real_asr_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan_real_asr
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_OPENAI_API_KEY="<your-local-key>"
+.venv\Scripts\afs run-workflow --workflow workflows/video_to_highlight_clip_plan_real_asr.yaml --input examples/demo_asr/video_to_highlight_clip_plan_real_asr_input.example.json --output data/processed/runs/demo_video_to_highlight_clip_plan_real_asr
 ```
 
 This workflow composes explicit remote ASR with the Phase 10 highlight
@@ -761,8 +761,8 @@ clips, add subtitles, add BGM, or export a final video.
 Phase 11 video workflows can be inspected and reviewed with the same commands:
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_video_to_transcript
-.venv\Scripts\ncut review-run --run-dir data/processed/runs/demo_video_to_transcript
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_video_to_transcript
+.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_video_to_transcript
 ```
 
 For video transcript profiles, inspection covers `audio_manifest.json`,

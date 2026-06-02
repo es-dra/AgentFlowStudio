@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from narratocut.schemas import WorkflowRun
-from narratocut.workflow_engine import WorkflowContext
+from agentflow_studio.schemas import WorkflowRun
+from agentflow_studio.workflow_engine import WorkflowContext
 
 from apps.web_bridge.utils import display_ref, duration_ms, load_json_object, value_from
 

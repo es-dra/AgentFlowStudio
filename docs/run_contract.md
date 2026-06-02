@@ -1,6 +1,6 @@
 # Workflow Run Contract
 
-Phase 7.5 standardizes workflow run outputs so a NarratoCut run can be inspected,
+Phase 7.5 standardizes workflow run outputs so a AgentFlow Studio run can be inspected,
 evaluated, replayed, and read by future agent tooling without giving an agent
 control of the workflow.
 
@@ -52,7 +52,7 @@ artifacts it produced.
 
 Key fields:
 
-- `project`: always `NarratoCut`
+- `project`: always `AgentFlow Studio`
 - `run_id`: run directory identity
 - `workflow`: workflow YAML path or workflow name
 - `mode`: currently `mock`
@@ -69,7 +69,7 @@ Example:
 
 ```json
 {
-  "project": "NarratoCut",
+  "project": "AgentFlow Studio",
   "run_id": "demo_full_mock",
   "workflow": "workflows/mock_text_to_slices.yaml",
   "mode": "mock",
@@ -191,13 +191,13 @@ artifacts, not workflow execution order.
 Run the mock workflow:
 
 ```powershell
-.venv\Scripts\ncut run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
+.venv\Scripts\afs run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
 ```
 
 Inspect a run:
 
 ```powershell
-.venv\Scripts\ncut inspect-run --run-dir data/processed/runs/demo_full_mock
+.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_full_mock
 ```
 
 Expected output shape:

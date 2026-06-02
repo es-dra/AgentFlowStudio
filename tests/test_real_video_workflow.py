@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from apps.cli.workflow_commands import run_workflow_from_cli
-from narratocut.schemas import ClipPlan, ClipSegment, ROISettings
-from narratocut.utils import write_json
+from agentflow_studio.schemas import ClipPlan, ClipSegment, ROISettings
+from agentflow_studio.utils import write_json
 
 
 def test_real_video_workflow_writes_reviewable_failure_artifacts_when_ffprobe_is_missing(
@@ -31,8 +31,8 @@ def test_real_video_workflow_writes_reviewable_failure_artifacts_when_ffprobe_is
     def fake_run(*args, **kwargs):
         raise FileNotFoundError("missing tool")
 
-    monkeypatch.setattr("narratocut.slicing_sop.video_metadata.subprocess.run", fake_run)
-    monkeypatch.setattr("narratocut.slicing_sop.ffmpeg_probe.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.video_metadata.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.slicing_sop.ffmpeg_probe.subprocess.run", fake_run)
 
     status, _ = run_workflow_from_cli(
         workflow_path="workflows/real_video_roi_to_clips.yaml",

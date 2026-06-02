@@ -13,9 +13,9 @@ from apps.web_bridge.diagnostics import bridge_health, inspect_workflow_input
 from apps.web_bridge.run_state import bridge_progress, initial_steps, run_status, steps_from_context, write_bridge_status
 from apps.web_bridge.utils import display_ref, safe_stem
 from apps.web_bridge.workflow_profiles import workflow_web_profile
-from narratocut.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
-from narratocut.workflow_engine.input_bundle import load_workflow_inputs
-from narratocut.workflow_engine.planner import draft_workflow_plan, write_workflow_plan
+from agentflow_studio.workflow_engine import WorkflowContext, WorkflowRunner, default_node_registry, load_workflow
+from agentflow_studio.workflow_engine.input_bundle import load_workflow_inputs
+from agentflow_studio.workflow_engine.planner import draft_workflow_plan, write_workflow_plan
 
 
 WORKFLOW_ROOT = Path("workflows")
@@ -132,7 +132,7 @@ def start_workflow_run(workflow_path: Path, input_path: Path, output_dir: Path |
     thread = threading.Thread(
         target=_run_workflow_thread,
         args=(workflow, context, run_key),
-        name=f"narratocut-web-run-{context.run_id}",
+        name=f"agentflow_studio-web-run-{context.run_id}",
         daemon=True,
     )
     _RUN_THREADS[run_key] = thread
