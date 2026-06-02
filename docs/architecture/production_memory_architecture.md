@@ -48,6 +48,7 @@ project_input
   -> acceptance_feedback_candidate_reviewed_context_overlay
   -> next_operator_start_packet
   -> explicit next_operator_start_event
+  -> explicit next_operator_action_result
 ```
 
 The committed example lives at:
@@ -176,6 +177,12 @@ The required root identifiers are:
   The operator-loop writer can also embed this as a post-check artifact after
   writing a checked start packet; it stays outside `output_artifacts` and the
   run-package checked item list.
+- `next_operator_action_result`: explicit outcome receipt for the action
+  recorded in a `next_operator_start_event`. It can record `completed`,
+  `blocked`, or `deferred`, and a completed action requires at least one local
+  or logical result ref. It is not human acceptance, not generated content, not
+  a next-pass execution result, not memory, not a memory candidate, and not a
+  promotion decision.
 
 All derived artifacts declare:
 
@@ -258,6 +265,11 @@ All derived artifacts declare:
   `blocked` and `deferred` events may preserve startup blockers, but none of
   these events claims human acceptance, next-pass execution, durable memory,
   Company KB promotion, provider success, or business validation.
+- A completed next-operator action result requires a started
+  `next_operator_start_event` and at least one result ref. Blocked and deferred
+  results can preserve operator blockers, but none of these results claims
+  human acceptance, generated content, next-pass execution success, durable
+  memory, Company KB promotion, provider success, or business validation.
 
 ## CLI Surface
 
@@ -291,6 +303,7 @@ python -m apps.cli.main production-memory-loop-review-acceptance-feedback-candid
 python -m apps.cli.main production-memory-loop-run-acceptance-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/acceptance_feedback_candidate/acceptance_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/acceptance_feedback_candidate_promotion/acceptance_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate_reviewed
 python -m apps.cli.main production-memory-loop-next-operator-start-packet data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --generated-at 2026-06-03T09:30:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_packet
 python -m apps.cli.main production-memory-loop-record-next-operator-start data/processed/runs/production_memory_loop/next_operator_start_packet/next_operator_start_packet.json --decision started --summary "Next operator received the checked start packet." --recorded-at 2026-06-03T09:45:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_start_event
+python -m apps.cli.main production-memory-loop-record-next-operator-action-result data/processed/runs/production_memory_loop/next_operator_start_event/next_operator_start_event.json --decision completed --summary "Next operator completed the recorded action and produced a local result ref." --result-ref next_pass_result/next_pass_result.json --recorded-at 2026-06-03T10:30:00+08:00 --output data/processed/runs/production_memory_loop/next_operator_action_result
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
@@ -445,6 +458,11 @@ The next-operator start event command writes:
 
 - `next_operator_start_event.json`
 - `next_operator_start_event.md`
+
+The next-operator action result command writes:
+
+- `next_operator_action_result.json`
+- `next_operator_action_result.md`
 
 When `--write-next-operator-start-event` is supplied with the operator-loop
 command, it writes:
@@ -612,6 +630,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_run_package_check`
 - `agentflow_production_memory_next_operator_start_packet`
 - `agentflow_production_memory_next_operator_start_event`
+- `agentflow_production_memory_next_operator_action_result`
 - `agentflow_production_memory_acceptance_feedback_event`
 - `agentflow_production_memory_acceptance_feedback_candidate_packet`
 - `agentflow_production_memory_acceptance_feedback_candidate_promotion_decision`
@@ -673,6 +692,13 @@ start requirements, no-provider controls, and non-claim boundaries. They record
 operator startup state only; they do not claim human acceptance, next-pass
 execution success, business validation, provider success, Company KB
 promotion, or memory promotion.
+
+Next-operator action result artifacts render as a read-only action-outcome
+canvas with `completed`, `blocked`, or `deferred` state, source start-event
+status, result refs, no-provider controls, and non-claim boundaries. They
+record the operator action outcome only; they do not claim human acceptance,
+generated content, next-pass execution success, business validation, provider
+success, Company KB promotion, or memory promotion.
 
 When an operator-loop manifest embeds `next_operator_start_event`, the generic
 operator-loop canvas surfaces the start receipt as a card, lane, memory row,

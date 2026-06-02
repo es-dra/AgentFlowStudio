@@ -62,7 +62,6 @@ export function normalizeWorkspace(artifacts) {
   const errors = artifacts
     .filter((artifact) => artifact.artifactClass === ARTIFACT_CLASSES.INVALID)
     .map((artifact) => `${artifact.fileName}: ${artifact.message || "invalid artifact"}`);
-
   if (summaryArtifacts.length > 0) {
     for (const type of RECOMMENDED_ARTIFACTS) {
       if (!summaryArtifacts.some((artifact) => artifact.artifactType === type)) {
@@ -70,7 +69,6 @@ export function normalizeWorkspace(artifacts) {
       }
     }
   }
-
   for (const artifact of artifacts) {
     for (const schemaWarning of artifact.schemaWarnings) {
       warnings.push(`${artifact.fileName}: ${schemaWarning}`);
@@ -82,7 +80,6 @@ export function normalizeWorkspace(artifacts) {
       warnings.push(`${artifact.fileName}: unsupported_file; not included in summary.`);
     }
   }
-
   const run = normalizeRun(byType("run_manifest"));
   const packageSummary = normalizePackage(byType("package_manifest"));
   const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
@@ -104,7 +101,6 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryOperatorFeedbackCandidatePacket = byType("agentflow_production_memory_operator_feedback_candidate_packet") || null;
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
   const workspaceParts = { warnings, errors };
-
   return {
     artifacts,
     run,
@@ -118,6 +114,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryOperatorRunPackage,
     productionMemoryNextOperatorStartPacket: byType("agentflow_production_memory_next_operator_start_packet") || null,
     productionMemoryNextOperatorStartEvent: byType("agentflow_production_memory_next_operator_start_event") || null,
+    productionMemoryNextOperatorActionResult: byType("agentflow_production_memory_next_operator_action_result") || null,
     productionMemoryAcceptanceFeedbackEvent,
     productionMemoryAcceptanceFeedbackCandidatePacket,
     productionMemoryAcceptanceFeedbackCandidatePromotionDecision,

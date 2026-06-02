@@ -240,6 +240,20 @@ export function productionNextOperatorStartEventFacts(payload) {
   ];
 }
 
+export function productionNextOperatorActionResultFacts(payload) {
+  return [
+    fact("result_status", payload.result_status || "unknown"),
+    fact("action_decision", payload.action_decision || "unknown"),
+    fact("source_start_event_status", payload.source_start_event_status || "unknown"),
+    fact("source_next_operator_action", payload.source_next_operator_action || "unknown"),
+    fact("result_refs", String(arrayValue(payload.result_refs).length)),
+    fact("action_result_acceptance", yesNo(payload.action_result_is_acceptance)),
+    fact("action_result_execution", yesNo(payload.action_result_is_execution)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+  ];
+}
+
 export function productionSessionFacts(payload) {
   return [
     fact("session_status", payload.session_status || "unknown"),

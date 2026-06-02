@@ -4,6 +4,7 @@ import {
   productionAcceptanceFeedbackCandidateFacts,
   productionAcceptanceFeedbackFacts,
   productionLoopFacts,
+  productionNextOperatorActionResultFacts,
   productionNextOperatorStartEventFacts,
   productionNextContextHandoffFacts,
   productionNextOperatorStartPacketFacts,
@@ -37,6 +38,7 @@ const TYPE_LABELS = {
   agentflow_production_memory_operator_run_package_check: "Production memory operator run package check",
   agentflow_production_memory_next_operator_start_packet: "Production memory next operator start packet",
   agentflow_production_memory_next_operator_start_event: "Production memory next operator start event",
+  agentflow_production_memory_next_operator_action_result: "Production memory next operator action result",
   agentflow_production_memory_acceptance_feedback_event: "Production memory acceptance feedback",
   agentflow_production_memory_acceptance_feedback_candidate_packet: "Production memory acceptance feedback candidate",
   agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: "Production memory acceptance feedback candidate promotion",
@@ -87,6 +89,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_operator_run_package_check") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_operator_start_packet") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_next_operator_start_event") return ["project", "assets", "memory-loaded", "review", "next-pass"];
+  if (type === "agentflow_production_memory_next_operator_action_result") return ["project", "assets", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_event") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
@@ -118,6 +121,7 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_operator_run_package_check") return productionOperatorRunPackageCheckFacts(payload);
   if (type === "agentflow_production_memory_next_operator_start_packet") return productionNextOperatorStartPacketFacts(payload);
   if (type === "agentflow_production_memory_next_operator_start_event") return productionNextOperatorStartEventFacts(payload);
+  if (type === "agentflow_production_memory_next_operator_action_result") return productionNextOperatorActionResultFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_event") return productionAcceptanceFeedbackFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return productionAcceptanceFeedbackCandidateFacts(payload);
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return productionAcceptanceFeedbackCandidatePromotionFacts(payload);
@@ -213,6 +217,7 @@ function statusFor(type, payload) {
   if (type === "agentflow_production_memory_operator_run_package_check") return payload.check_status || "review ready";
   if (type === "agentflow_production_memory_next_operator_start_packet") return payload.start_packet_status || "review ready";
   if (type === "agentflow_production_memory_next_operator_start_event") return payload.event_status || "review ready";
+  if (type === "agentflow_production_memory_next_operator_action_result") return payload.result_status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_event") return payload.status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
