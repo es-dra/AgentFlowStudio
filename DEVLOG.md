@@ -9,6 +9,55 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Asset Profile Promotion Versioning 001
+
+- Merged PR #76 into `master` with a merge commit before opening this node, so
+  profile promotion/versioning starts from the integrated update-candidate
+  baseline.
+- Created
+  `codex/afs-production-memory-asset-profile-promotion-versioning-001` from
+  updated `origin/master`.
+- Added `agentflow_production_memory_asset_profile_promotion_decision` for an
+  explicit local project profile decision over one structured update
+  candidate.
+- Added `agentflow_production_memory_asset_profile_version`, written only for
+  `promoted` or `merged` decisions against `candidate_only` source candidates.
+- Added `version_change_summary` to profile version artifacts before merging
+  PR #77 so Node 4 can trace source profile, target profile, source candidate,
+  source decision, patch count, and applied patch paths without relying on the
+  promotion decision alone.
+- Added product CLI command
+  `production-memory-loop-review-asset-profile-update-candidate`.
+- Boundary kept: this is local profile versioning, not durable memory, not
+  Company KB, not provider validation, not Web adaptation, not human
+  acceptance, and not business validation.
+- Verification:
+  - TDD red state confirmed because
+    `agentflow.memory.production_asset_profile_promotion` did not exist.
+  - Focused profile promotion/versioning tests passed (`11 passed`).
+  - Adjacent asset promotion/update/feedback/readiness suite passed
+    (`38 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help exposes
+    `production-memory-loop-review-asset-profile-update-candidate` with
+    `--decision` required.
+  - CLI no-provider smoke wrote ignored
+    `asset_profile_promotion_decision.json` and
+    `asset_profile_version.json`.
+  - Changed Python files passed `python -m py_compile`.
+  - Security audit returned `PASS`; diff-level sensitive-fragment scan found
+    no added real private paths or secrets.
+  - Spec reviewer initially blocked implicit default promotion and polluted
+    profile write flags; both were fixed with red/green regressions. The later
+    stale-output concern was also fixed so rejected re-reviews remove old
+    version files from the same output directory.
+  - Full suite passed on Python 3.13.5 (`955 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+  - Core implementation was split below the project 300-line target after the
+    first green run.
+  - Follow-up `version_change_summary` focused regression passed
+    (`11 passed`).
+
 ## 2026-06-02 - Production Memory Asset Profile Update Candidate 001
 
 - Merged PR #74 and PR #75 into `master` with merge commits before opening

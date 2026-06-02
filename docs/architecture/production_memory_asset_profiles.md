@@ -1,7 +1,8 @@
 # Production Memory Asset Profiles
 
 Status: implementation slice for
-`AFS-PRODUCTION-MEMORY-ASSET-PROFILE-READINESS-001`.
+`AFS-PRODUCTION-MEMORY-ASSET-PROFILE-READINESS-001` through local profile
+promotion/versioning.
 
 ## Positioning
 
@@ -150,6 +151,58 @@ value: sanitized scalar
 rationale: bounded explanation
 evidence_refs: [source feedback event id]
 ```
+
+## Asset Profile Promotion And Versioning
+
+`agentflow_production_memory_asset_profile_promotion_decision` records an
+explicit operator decision for one
+`agentflow_production_memory_asset_profile_update_candidate`.
+
+`agentflow_production_memory_asset_profile_version` is written only when the
+decision is `promoted` or `merged` and the source candidate is `candidate_only`.
+
+Rules:
+
+- The decision is local project profile versioning, not durable memory.
+- It does not write Company KB.
+- It does not claim human acceptance, business validation, provider success, or
+  next-pass execution.
+- `rejected`, `expired`, and `blocked` decisions record the review result but
+  do not create a new profile version.
+- `blocked_cannot_judge`, `blocked_missing_patch_ops`, and
+  `no_update_recommended` candidates cannot be promoted into a version.
+- Only whitelisted structured patch operations are applied.
+- `add_unique` patch operations are idempotent and dedupe existing profile
+  values before applying the new version.
+
+The first supported review CLI is:
+
+```text
+production-memory-loop-review-asset-profile-update-candidate
+```
+
+This command reads `asset_profiles.json` plus one update-candidate JSON and
+writes:
+
+```text
+asset_profile_promotion_decision.json
+asset_profile_promotion_decision.md
+asset_profile_version.json
+asset_profile_version.md
+```
+
+The version files are omitted when the explicit decision blocks versioning.
+
+Each written profile version includes `version_change_summary` with the source
+profile, target profile, source candidate, source decision, patch operation
+count, and applied patch paths. This is trace metadata for downstream context
+projection; it is not a durable memory write.
+
+Downstream context projection must treat the profile version as the inclusion
+authority. The promotion decision may explain why a version was allowed, but
+Node 4 must still check `profile_version_applied`, `usable_for_next_context`,
+the embedded profile `context_eligibility`, blockers, superseded profile IDs,
+and missing refs before including anything in the next context.
 
 ## Provider Boundary
 
