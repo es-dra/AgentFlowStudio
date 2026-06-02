@@ -28,6 +28,7 @@ from agentflow.memory.production_operator_handoff import build_operator_handoff_
 from agentflow.memory.production_operator_manifest import build_operator_manifest
 from agentflow.memory.production_operator_manifest_check import check_operator_manifest, write_operator_manifest_check
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
+from agentflow.memory.production_operator_run_package import build_operator_run_package, write_operator_run_package
 from agentflow.memory.production_session import (
     build_production_memory_session_report,
     write_production_memory_session_report,
@@ -133,6 +134,7 @@ def write_production_memory_operator_loop_run(
     *,
     write_manifest_check: bool = False,
     write_handoff_packet: bool = False,
+    write_run_package: bool = False,
 ) -> list[Path]:
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
@@ -196,6 +198,8 @@ def write_production_memory_operator_loop_run(
     manifest_path = write_json(output_root / "production_memory_operator_loop_run.json", manifest)
     written_paths.append(manifest_path)
     result["manifest"] = manifest
+    if write_run_package:
+        write_handoff_packet = True
     if write_manifest_check or write_handoff_packet:
         check = check_operator_manifest(manifest_path)
         result["operator_manifest_check"] = check
@@ -213,6 +217,15 @@ def write_production_memory_operator_loop_run(
         )
         result["operator_handoff_packet"] = packet
         written_paths.extend(write_operator_handoff_packet(packet, output_root / "operator_handoff"))
+    if write_run_package:
+        package = build_operator_run_package(
+            result["manifest"],
+            manifest_check=result["operator_manifest_check"],
+            handoff_packet=result["operator_handoff_packet"],
+            generated_at=str(result["manifest"].get("generated_at", "")),
+        )
+        result["operator_run_package"] = package
+        written_paths.extend(write_operator_run_package(package, output_root / "operator_run_package"))
     return written_paths
 
 

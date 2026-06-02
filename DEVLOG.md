@@ -9,6 +9,47 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Run Package 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-handoff-output-001` on
+  `codex/afs-production-memory-operator-run-package-001`.
+- Added `agentflow_production_memory_operator_run_package` as a final
+  no-provider run package for an unattended operator-loop run.
+- Added `--write-run-package` to
+  `production-memory-loop-run-operator-no-provider`; the option implicitly
+  writes the operator manifest check and operator handoff packet first.
+- The package indexes `production_memory_operator_loop_run.json`,
+  `operator_manifest_check/operator_manifest_check.json`,
+  `operator_handoff/operator_handoff_packet.json`, the handoff Markdown, and
+  the manifest output refs without adding a self-referential manifest artifact.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no automatic memory promotion, no Loulan
+  behavior, no human acceptance, and no business validation claim.
+- Worktree hygiene note: when using the patch tool from a preserved checkout,
+  target files by absolute worktree path or verify `git status` immediately;
+  an initial test file was created in the wrong checkout and was removed before
+  implementation continued.
+- Verification so far:
+  - Red test failed first because
+    `agentflow.memory.production_operator_run_package` did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package.py -q`
+    -> 5 passed.
+  - Focused operator/run-package/handoff/check/registry/contract suite passed
+    (`54 passed`).
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m py_compile agentflow\memory\production_operator_run_package.py agentflow\memory\production_operator_loop.py apps\cli\production_memory_operator_command.py tests\test_production_memory_operator_run_package.py`
+    -> passed.
+  - CLI help lists `--write-run-package`.
+  - CLI smoke wrote ignored runtime artifacts under
+    `data/processed/runs/production_memory_loop/operator_run_package_smoke/`,
+    including manifest check, handoff packet, and `operator_run_package`
+    JSON/Markdown.
+  - Full suite passed on Python 3.12.12 (`815 passed`).
+  - Physical line counts: run-package module 299, operator loop 280,
+    operator CLI 184, run-package test 171.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff and new-file sensitive scans were clean.
+
 ## 2026-06-02 - Production Memory Operator Loop Handoff Output 001
 
 - Continued from

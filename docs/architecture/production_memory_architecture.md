@@ -38,6 +38,9 @@ project_input
   -> operator_feedback_candidate_packet
   -> explicit operator_feedback_candidate_promotion_decision
   -> operator_feedback_candidate_reviewed_context_overlay
+  -> operator_manifest_check
+  -> operator_handoff_packet
+  -> operator_run_package
 ```
 
 The committed example lives at:
@@ -117,6 +120,17 @@ The required root identifiers are:
   candidate was included in or blocked from a derived context bundle. It writes
   no long-term memory, writes no Company KB, does not execute a next pass, and
   does not claim human acceptance.
+- `operator_manifest_check`: read-only machine check for the operator-loop
+  manifest's generated artifact refs, node states, controls, and no-provider
+  write boundaries.
+- `operator_handoff_packet`: no-provider handoff artifact for the next operator
+  or agent. It requires an explicit manifest check before readiness and records
+  blocked items plus the next operator action.
+- `operator_run_package`: final no-provider run package for unattended
+  handoff. It indexes the operator manifest, manifest check, handoff packet,
+  handoff Markdown, and manifest output refs. It is an entry artifact for the
+  next operator, not a new memory store, provider validation, or acceptance
+  record.
 
 All derived artifacts declare:
 
@@ -165,6 +179,12 @@ All derived artifacts declare:
   bundle only through the reviewed no-provider overlay command.
 - Rejected, expired, or blocked operator feedback candidate decisions remain
   visible in `blocked_refs` when requested for follow-up context.
+- Operator handoff readiness requires an explicit operator manifest check.
+- Operator run packages cannot make a blocked handoff ready; they must preserve
+  the manifest, check, and handoff blocker chain.
+- Operator run packages are final run indexes only. They do not execute a
+  provider call, write Company KB, write durable memory, promote candidates, or
+  claim human acceptance.
 
 ## CLI Surface
 
@@ -189,6 +209,7 @@ python -m apps.cli.main production-memory-loop-capture-operator-feedback data/pr
 python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback/operator_feedback_event.json --generated-at 2026-06-02T08:20:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate
 python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --output data/processed/runs/production_memory_loop/operator_run_package_smoke
 ```
 
 These commands validate the loop, run no-provider context assembly, and draft
