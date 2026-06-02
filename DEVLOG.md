@@ -9,6 +9,51 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Asset Profile Readiness 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-action-result-acceptance-overlay-001`
+  on `codex/afs-production-memory-asset-profile-readiness-001`.
+- Added a non-Web tester package that runs the generic no-provider
+  production-memory operator loop and derives character/scene
+  `agentflow_production_memory_asset_profile` records from a sanitized seed.
+- Added product CLI commands:
+  `production-memory-loop-asset-profile-readiness` and
+  `production-memory-loop-run-asset-test-package`.
+- Added the committed sanitized seed
+  `examples/agentflow/production_memory_asset_profile_seed.example.json`.
+  It contains placeholders and evidence refs only; it does not commit Loulan
+  script text, storyboard text, character images, generated media, provider
+  config, or private Company KB material.
+- Added tester-facing outputs:
+  `asset_profiles.json`, `asset_profile_readiness.json/.md`,
+  `asset_test_package.json/.md`, `asset_consistency_rubric.md`,
+  `tester_feedback_template.md`, `provider_validation_plan.json`, and
+  `provider_validation_blockers.json`.
+- Optional provider validation is gated and separate from the core milestone.
+  MiniMax I2I and Kling I2V reuse existing smoke adapters when local gates,
+  config, and reference image are provided. GPT Image2 is recorded as a
+  blocker until a verified adapter exists.
+- Boundary kept: no Web adaptation, no provider execution in the core package,
+  no Company KB write, no durable memory write, no committed runtime media, no
+  automatic memory promotion, no human acceptance claim, no business validation
+  claim, and no Memory OS completion claim.
+- Verification:
+  - TDD red state confirmed: focused test initially failed because
+    `agentflow.memory.production_asset_profiles` did not exist.
+  - Focused asset profile tests passed (`7 passed`).
+  - Focused asset/contract/CLI registry suite passed (`33 passed`).
+  - CLI help exposed both new commands.
+  - CLI smoke wrote a ready no-provider asset test package under ignored
+    `data/processed/runs/production_memory_loop/asset_test_package`.
+  - Full suite passed on Python 3.13.5 (`924 passed`).
+  - Python 3.12.13 from the Codex runtime exists but did not have `pytest`,
+    so it could not be used for the verification run.
+  - `git diff --check` passed with CRLF warnings only.
+  - Optional provider validation was attempted after deterministic tests and
+    wrote blockers for unset image/video gates, missing provider config, and
+    missing character reference image; no provider success was claimed.
+
 ## 2026-06-02 - Production Memory Operator Loop Action Result Acceptance Overlay 001
 
 - Continued from

@@ -67,6 +67,18 @@ The required root identifiers are:
 }
 ```
 
+Asset profile readiness is documented separately:
+
+```text
+docs/architecture/production_memory_asset_profiles.md
+```
+
+That slice keeps character and scene assets as unified
+`agentflow_production_memory_asset_profile` records with
+`profile_kind: character | scene`. It produces tester-facing readiness and
+feedback templates, not human acceptance, durable memory, Company KB writes, or
+provider-success claims.
+
 ## Source Records
 
 - `project_input`: sanitized operator goal and initial source refs.

@@ -1,0 +1,90 @@
+{
+  "kind": "agentflow_production_memory_asset_profile_seed",
+  "artifact_type": "agentflow_production_memory_asset_profile_seed",
+  "schema_version": "production-memory-loop/v1",
+  "seed_id": "asset-profile-seed:generic-production-loop:v1",
+  "project_id": "project:generic-content-loop",
+  "project_material_refs": [
+    {
+      "ref_id": "local-material:script:v1",
+      "material_kind": "script",
+      "storage_policy": "local_ignored",
+      "summary": "Sanitized final script placeholder for tester-supplied project materials."
+    },
+    {
+      "ref_id": "local-material:storyboard:v1",
+      "material_kind": "storyboard",
+      "storage_policy": "local_ignored",
+      "summary": "Sanitized storyboard placeholder for tester-supplied project materials."
+    },
+    {
+      "ref_id": "local-material:character-reference:v1",
+      "material_kind": "character_reference_image",
+      "storage_policy": "local_ignored",
+      "summary": "Local ignored character reference image placeholder; image bytes are never committed."
+    }
+  ],
+  "profiles": [
+    {
+      "profile_id": "asset-profile:character:lead:v1",
+      "profile_kind": "character",
+      "display_name": "Sanitized lead character",
+      "profile_scope": "project",
+      "profile_version": "v1",
+      "profile_status": "promoted",
+      "context_eligibility": "included",
+      "allowed_variations": [
+        "pose",
+        "expression",
+        "camera angle"
+      ],
+      "negative_constraints": [
+        "do not add headwear",
+        "do not change age impression"
+      ],
+      "evidence_refs": [
+        "artifact:approved_storyboard:v1",
+        "memory:candidate:approved-style:v1"
+      ],
+      "promotion_decision_refs": [
+        "promotion:approved-style:v1"
+      ],
+      "evidence_strength": "medium",
+      "confidence": "tester_review_required"
+    },
+    {
+      "profile_id": "asset-profile:scene:oasis:v1",
+      "profile_kind": "scene",
+      "display_name": "Sanitized oasis scene",
+      "profile_scope": "project",
+      "profile_version": "v1",
+      "profile_status": "promoted",
+      "context_eligibility": "included",
+      "allowed_variations": [
+        "lens",
+        "foreground blocking"
+      ],
+      "negative_constraints": [
+        "do not remove the water landmark"
+      ],
+      "evidence_refs": [
+        "artifact:approved_storyboard:v1"
+      ],
+      "promotion_decision_refs": [
+        "promotion:approved-style:v1"
+      ],
+      "evidence_strength": "medium",
+      "confidence": "tester_review_required"
+    }
+  ],
+  "provider_validation": {
+    "image_prompt": "Sanitized character consistency keyframe prompt.",
+    "video_prompt": "Sanitized scene continuity image-to-video prompt."
+  },
+  "claim_boundaries": {
+    "human_acceptance": "not_reviewed",
+    "business_validation": "not_validated",
+    "durable_memory_runtime": "not_written",
+    "provider_success": "not_attempted"
+  }
+}
