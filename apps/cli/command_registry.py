@@ -43,6 +43,9 @@ from apps.cli.production_memory_next_pass_result_command import (
 )
 from apps.cli.production_memory_next_pass_review_command import production_memory_loop_review_next_pass_command
 from apps.cli.production_memory_next_task_command import production_memory_loop_next_task_packet_command
+from apps.cli.production_memory_next_operator_start_command import (
+    production_memory_loop_next_operator_start_packet_command,
+)
 from apps.cli.production_memory_operator_command import production_memory_loop_run_operator_no_provider_command
 from apps.cli.production_memory_operator_manifest_check_command import (
     production_memory_loop_check_operator_manifest_command,
@@ -160,6 +163,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-session-report")(production_memory_loop_session_report_command)
     app.command(name="production-memory-loop-company-kb-candidates")(production_memory_loop_company_kb_candidates_command)
+    app.command(name="production-memory-loop-next-operator-start-packet")(
+        production_memory_loop_next_operator_start_packet_command
+    )
     app.command(name="web-bridge")(web_bridge_command)
 
 

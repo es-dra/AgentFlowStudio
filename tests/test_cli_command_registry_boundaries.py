@@ -18,6 +18,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source
     assert "memory-video-pipeline-package" in source
+    assert "production-memory-loop-next-operator-start-packet" in source
 
 
 def test_support_command_registry_keeps_hidden_provider_and_demo_surface() -> None:

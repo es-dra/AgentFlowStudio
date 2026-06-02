@@ -9,6 +9,34 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Operator Start Packet 001
+
+- Continued from
+  `codex/afs-production-memory-run-package-check-acceptance-overlay-001` on
+  `codex/afs-production-memory-next-operator-start-packet-001`.
+- Added a no-provider next-operator start packet that can be built only from a
+  passed final operator run package check plus the matching ready run package
+  and handoff packet.
+- The new packet preserves the checked package item list, next operator action,
+  handoff prompt, provider/write boundaries, non-claims, and acceptance
+  feedback candidate promotion check summary when present.
+- Added product CLI command:
+  `production-memory-loop-next-operator-start-packet`.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no next-pass execution, no Web scan/persistence, no Loulan behavior,
+  no new human acceptance, no business validation, and no memory promotion.
+- Verification:
+  - Red focused test failed first because
+    `agentflow.memory.production_operator_start_packet` did not exist.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_next_operator_start_packet.py -q`
+    -> 6 passed.
+  - Focused production-memory/CLI regression passed (`20 passed`).
+  - CLI help lists `production-memory-loop-next-operator-start-packet`.
+  - CLI smoke wrote ignored no-provider runtime artifacts under
+    `data/processed/runs/production_memory_loop/next_operator_start_packet_smoke_20260602/`
+    and produced `next_operator_start_packet.json` / `.md` with status `ready`.
+  - Full suite passed on Python 3.12.12 (`876 passed`).
+
 ## 2026-06-02 - Production Memory Run Package Check Acceptance Overlay 001
 
 - Continued from
