@@ -1,5 +1,16 @@
 import {
   companyKbFeedbackFacts,
+  productionAssetConsistencyReviewFacts,
+  productionAssetFeedbackFacts,
+  productionAssetProfileContextProjectionFacts,
+  productionAssetProfileFacts,
+  productionAssetProfilePromotionFacts,
+  productionAssetProfileReadinessFacts,
+  productionAssetProfileSeedFacts,
+  productionAssetProfileUpdateCandidateFacts,
+  productionAssetProfileVersionFacts,
+  productionAssetProviderValidationFacts,
+  productionAssetTestPackageFacts,
   productionAcceptanceFeedbackCandidatePromotionFacts,
   productionAcceptanceFeedbackCandidateFacts,
   productionAcceptanceFeedbackFacts,
@@ -50,6 +61,19 @@ const TYPE_LABELS = {
   agentflow_production_memory_next_pass_promotion_overlay: "Production memory next pass promotion overlay",
   agentflow_production_memory_operator_feedback_event: "Production memory operator feedback",
   agentflow_production_memory_operator_feedback_candidate_packet: "Production memory operator feedback candidate",
+  agentflow_production_memory_asset_profile_seed: "Production memory asset profile seed",
+  agentflow_production_memory_asset_profile: "Production memory asset profile",
+  agentflow_production_memory_asset_profile_readiness: "Production memory asset profile readiness",
+  agentflow_production_memory_asset_test_package: "Production memory asset test package",
+  agentflow_production_memory_asset_provider_validation_plan: "Production memory asset provider validation plan",
+  agentflow_production_memory_asset_provider_validation_blockers: "Production memory asset provider validation blockers",
+  agentflow_production_memory_asset_provider_validation_result: "Production memory asset provider validation result",
+  agentflow_production_memory_asset_feedback_event: "Production memory asset feedback",
+  agentflow_production_memory_asset_profile_update_candidate: "Production memory asset profile update candidate",
+  agentflow_production_memory_asset_profile_promotion_decision: "Production memory asset profile promotion decision",
+  agentflow_production_memory_asset_profile_version: "Production memory asset profile version",
+  agentflow_production_memory_asset_profile_context_projection: "Production memory asset profile context projection",
+  agentflow_production_memory_asset_consistency_review: "Production memory asset consistency review",
   agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
 };
 
@@ -101,6 +125,7 @@ function focusTargetsFor(type) {
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return ["project", "memory-loaded", "review", "next-pass"];
   if (type === "agentflow_production_memory_operator_feedback_event") return ["project", "memory-loaded", "review", "feedback"];
   if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
+  if (type.startsWith("agentflow_production_memory_asset_")) return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
   return [];
 }
@@ -133,6 +158,19 @@ function factsFor(type, payload) {
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return productionNextPassPromotionFacts(payload);
   if (type === "agentflow_production_memory_operator_feedback_event") return productionOperatorFeedbackFacts(payload);
   if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return productionOperatorFeedbackCandidateFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_seed") return productionAssetProfileSeedFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile") return productionAssetProfileFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_readiness") return productionAssetProfileReadinessFacts(payload);
+  if (type === "agentflow_production_memory_asset_test_package") return productionAssetTestPackageFacts(payload);
+  if (type === "agentflow_production_memory_asset_provider_validation_plan") return productionAssetProviderValidationFacts(payload);
+  if (type === "agentflow_production_memory_asset_provider_validation_blockers") return productionAssetProviderValidationFacts(payload);
+  if (type === "agentflow_production_memory_asset_provider_validation_result") return productionAssetProviderValidationFacts(payload);
+  if (type === "agentflow_production_memory_asset_feedback_event") return productionAssetFeedbackFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_update_candidate") return productionAssetProfileUpdateCandidateFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_promotion_decision") return productionAssetProfilePromotionFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_version") return productionAssetProfileVersionFacts(payload);
+  if (type === "agentflow_production_memory_asset_profile_context_projection") return productionAssetProfileContextProjectionFacts(payload);
+  if (type === "agentflow_production_memory_asset_consistency_review") return productionAssetConsistencyReviewFacts(payload);
   if (type === "agentflow_company_kb_feedback_candidate_packet") return companyKbFeedbackFacts(payload);
   return [
     fact("artifact_type", payload.artifact_type || "unknown"),
@@ -223,6 +261,15 @@ function statusFor(type, payload) {
   if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
   if (type === "agentflow_production_memory_operator_feedback_event") return payload.status || "review ready";
   if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_readiness") return payload.readiness_status || "review ready";
+  if (type === "agentflow_production_memory_asset_feedback_event") return payload.parse_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_update_candidate") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_version") return payload.usable_for_next_context === true ? "review ready" : "blocked";
+  if (type === "agentflow_production_memory_asset_profile_context_projection") return payload.projection_status || "review ready";
+  if (type === "agentflow_production_memory_asset_consistency_review") return payload.review_status || "review ready";
+  if (type.startsWith("agentflow_production_memory_asset_provider_validation_")) return payload.validation_status || payload.status || "review ready";
+  if (type.startsWith("agentflow_production_memory_asset_")) return payload.profile_status || payload.package_status || "review ready";
   if (payload.writes_long_term_memory === true) return "blocked";
   return "review ready";
 }

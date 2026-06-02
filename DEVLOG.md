@@ -9,6 +9,45 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-03 - Production Memory Asset Cockpit Web 001
+
+- Merged PR #79 into `master` before opening this node, so the Web cockpit
+  starts from the integrated asset consistency review baseline.
+- Created
+  `codex/afs-production-memory-asset-cockpit-web-001` from updated
+  `origin/master`.
+- Added a generic read-only asset cockpit for selected local asset artifacts in
+  the Web Memory Workbench.
+- Registered asset profile seed, profile, readiness, test package, optional
+  provider validation plan/blocker/result, feedback event, update candidate,
+  promotion decision, profile version, context projection, and consistency
+  review artifact types.
+- Added structured inspector facts and source roles for the asset loop.
+- Split asset cockpit helpers into
+  `apps/web/memory-workbench-production-assets-shared.js`, keeping the main
+  builder under the local 300-line target.
+- Boundary kept: Web remains selected-file only; it does not scan folders,
+  persist browser state, execute providers or workflows, create feedback,
+  create profile updates, create promotion decisions, write durable memory, or
+  write Company KB.
+- TDD red state confirmed: focused Web static test initially failed because
+  asset projection/review artifacts were `unclassified`.
+- Implementation issue found and fixed: the asset artifact selector originally
+  matched empty slots because both sides of the predicate were `undefined`;
+  it now requires a real item before comparing payload `kind`.
+- Verification:
+  - Focused asset cockpit Web tests passed (`3 passed`).
+  - Adjacent asset projection/consistency/Web boundary suite passed
+    (`24 passed`).
+  - Focused contract examples and CLI registry suite passed (`26 passed`).
+  - CLI help passed.
+  - New asset cockpit JS modules passed `node --check`.
+  - Full suite passed on Python 3.13.5 (`972 passed`).
+  - `git diff --check` passed with LF-to-CRLF warnings only.
+  - Browser-level smoke was attempted with local Edge headless. `file://` and
+    short-lived local HTTP runs did not produce a usable rendered memory DOM
+    capture, so browser smoke is not counted as passing evidence.
+
 ## 2026-06-03 - Production Memory Asset Consistency Review 001
 
 - Merged PR #78 into `master` before opening this node, so consistency review

@@ -270,6 +270,54 @@ The first supported CLI is:
 production-memory-loop-review-asset-consistency
 ```
 
+## Web Read-Only Asset Cockpit
+
+Node 6 adds Web Workbench rendering for the deterministic asset loop. It is a
+read-only selected-file view over existing JSON artifacts:
+
+```text
+selected local asset JSON
+  -> artifact workspace normalization
+  -> read-only asset cockpit view
+```
+
+Supported asset artifacts include:
+
+- `agentflow_production_memory_asset_profile_seed`
+- `agentflow_production_memory_asset_profile`
+- `agentflow_production_memory_asset_profile_readiness`
+- `agentflow_production_memory_asset_test_package`
+- `agentflow_production_memory_asset_feedback_event`
+- `agentflow_production_memory_asset_profile_update_candidate`
+- `agentflow_production_memory_asset_profile_promotion_decision`
+- `agentflow_production_memory_asset_profile_version`
+- `agentflow_production_memory_asset_profile_context_projection`
+- `agentflow_production_memory_asset_consistency_review`
+- optional provider validation plan/blocker/result artifacts
+
+The cockpit prioritizes the latest selected deterministic node for display:
+
+```text
+consistency review
+  -> context projection
+  -> profile version
+  -> promotion decision
+  -> update candidate
+  -> feedback event
+  -> readiness / test package / seed
+```
+
+Rules:
+
+- The view only uses explicit selected local files.
+- It does not follow refs or scan folders.
+- It does not persist browser state.
+- It does not execute providers or workflows.
+- It does not create feedback, profile updates, promotion decisions, profile
+  versions, context projections, or consistency reviews.
+- It does not write durable memory or Company KB.
+- It is generic AFS behavior and does not add project-specific inspectors.
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation
