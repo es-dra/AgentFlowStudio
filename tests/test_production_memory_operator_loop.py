@@ -10,6 +10,7 @@ from agentflow.memory.production_next_pass_result import NEXT_PASS_RESULT_KIND
 from agentflow.memory.production_operator_loop import (
     OPERATOR_LOOP_KIND,
     build_production_memory_operator_loop_run,
+    write_production_memory_operator_loop_run,
 )
 
 
@@ -209,6 +210,37 @@ def test_operator_loop_cli_writes_optional_next_pass_result_scaffold(tmp_path: P
     assert "next_pass_result/next_pass_result.json" in artifact_paths
     assert "next_pass_result/next_pass_result.md" in artifact_paths
     assert "next_pass_review/next_pass_review.json" not in artifact_paths
+
+
+def test_operator_loop_manifest_embeds_next_operator_start_brief_summary(tmp_path: Path) -> None:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-03T10:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+
+    write_production_memory_operator_loop_run(
+        result,
+        tmp_path,
+        write_run_package=True,
+        write_run_package_check=True,
+        write_next_operator_start_packet=True,
+    )
+
+    manifest = json.loads((tmp_path / "production_memory_operator_loop_run.json").read_text(encoding="utf-8"))
+    start_packet = manifest["next_operator_start_packet"]
+    assert start_packet["next_operator_action"] == "review_or_complete_next_pass_result"
+    assert start_packet["operator_prompt_excerpt"].startswith("Use the generated next_task_packet")
+    assert "Do not call remote providers" in start_packet["operator_prompt_excerpt"]
+    assert start_packet["start_requirements"] == [
+        "Execute next operator action: review_or_complete_next_pass_result",
+        "Use only checked package items and the embedded operator prompt.",
+        "Do not use blocked refs, unpromoted candidates, or feedback events as memory.",
+        "Do not call remote providers without an explicit provider gate.",
+        "Do not write Company KB or durable memory from this start packet.",
+    ]
 
 
 def test_operator_loop_can_include_explicit_next_pass_review() -> None:

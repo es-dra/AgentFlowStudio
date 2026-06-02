@@ -1,3 +1,5 @@
+import { buildNextOperatorBrief } from "./memory-workbench-production-next-operator-brief.js";
+
 const NEXT_OPERATOR_START_PACKET_TYPE = "agentflow_production_memory_next_operator_start_packet";
 
 export function buildProductionMemoryNextOperatorStartPacketView(workspace, fallback) {
@@ -11,6 +13,7 @@ export function buildProductionMemoryNextOperatorStartPacketView(workspace, fall
   const nonClaims = arrayValue(payload.non_claims);
   const action = objectValue(payload.next_operator_action);
   const ready = payload.start_packet_status === "ready" && payload.ready_for_next_operator === true;
+  const nextOperatorBrief = buildNextOperatorBrief(payload);
 
   return {
     ...fallback,
@@ -86,9 +89,10 @@ export function buildProductionMemoryNextOperatorStartPacketView(workspace, fall
       visual_consistency: `${blocked.length} start blockers`,
       boundary: "next-operator start packet only / no provider call / no Company KB write",
     },
+    next_operator_brief: nextOperatorBrief,
     feedback: {
       status: ready ? "review ready" : "blocked",
-      summary: ready ? "Start packet is ready for the recorded next operator action." : "Resolve start packet blockers before use.",
+      summary: nextOperatorBrief.prompt_excerpt || (ready ? "Start packet is ready for the recorded next operator action." : "Resolve start packet blockers before use."),
     },
     next_pass: {
       status: ready ? "ready" : "blocked",

@@ -9,6 +9,42 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Next Operator Brief 001
+
+- Continued from
+  `codex/afs-production-memory-operator-readiness-cockpit-001` on
+  `codex/afs-production-memory-next-operator-brief-001`.
+- Embedded a sanitized `operator_prompt_excerpt` and `start_requirements` in
+  the operator-loop manifest's `next_operator_start_packet` summary so Web can
+  show the next-operator brief without following artifact refs.
+- Added a focused Web helper for `next_operator_brief` and surfaced the recorded
+  next action, prompt excerpt, and requirements in the operator readiness
+  summary.
+- Split pure operator-loop Web helper functions into
+  `memory-workbench-production-operator-loop-utils.js`; the operator-loop view
+  file is back under the 300-line project target.
+- Boundary kept: selected local JSON only, no ref following, no provider call,
+  no workflow execution from Web, no directory scan, no browser persistence, no
+  Company KB write, no durable memory write, no human acceptance, no business
+  validation, and no memory promotion.
+- Verification:
+  - Red backend test failed first because the manifest start-packet summary had
+    no `operator_prompt_excerpt`.
+  - Red Web static test failed first because the operator-loop view had no
+    `next_operator_brief`.
+  - Focused red/green tests passed (`1 passed` + `1 passed`).
+  - Focused operator-loop/start-packet regression passed (`14 passed`).
+  - Focused Web/start-packet/readiness regression passed (`7 passed`).
+  - Focused operator-loop/Web refactor regression passed (`12 passed`).
+  - JS syntax checks passed for touched Web modules.
+  - Expanded Web/static memory suite passed (`83 passed, 800 deselected`).
+  - Full suite passed on Python 3.12.12 (`883 passed`).
+  - CLI smoke wrote ignored runtime artifacts and confirmed the manifest has
+    `operator_prompt_excerpt` and `start_requirements`.
+  - `git diff --check` exited 0 with CRLF normalization warnings only.
+  - Added-line sensitive scan, project-specific term scan, ignored-runtime
+    check, and touched-Web forbidden behavior scan were clean.
+
 ## 2026-06-02 - Production Memory Operator Readiness Cockpit 001
 
 - Continued from

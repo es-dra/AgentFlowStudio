@@ -1,3 +1,5 @@
+import { nextOperatorBriefCards } from "./memory-workbench-production-next-operator-brief.js";
+
 export function buildDemoEvidenceSummary(view) {
   if (isOperatorReadinessView(view)) return buildOperatorReadinessSummary(view);
 
@@ -58,12 +60,15 @@ function buildOperatorReadinessSummary(view) {
   const protocol = view.protocol_summary || {};
   const controls = Array.isArray(protocol.controls) ? protocol.controls : [];
   const boundaries = Array.isArray(protocol.boundaries) ? protocol.boundaries : [];
+  const brief = view.next_operator_brief || {};
   const readyControls = controls.filter((item) => item.status === "review ready").length;
   return {
     title: "Operator Readiness Summary",
     status: view.next_pass?.status === "ready" ? "review ready" : "blocked",
     talk_track: [
       "Start packet is ready for the recorded next operator action.",
+      `Next operator action: ${brief.action || view.next_pass?.action || "not recorded"}`,
+      brief.prompt_excerpt ? `Operator prompt: ${brief.prompt_excerpt}` : "Operator prompt is not embedded in the selected manifest.",
       "Post-check artifacts are visible from the selected operator-loop manifest.",
       "Provider calls, durable memory writes, and Company KB writes remain disabled.",
     ],
@@ -83,6 +88,7 @@ function buildOperatorReadinessSummary(view) {
         status: "blocked",
         detail: `${boundaries.length} boundaries remain visible`,
       },
+      ...nextOperatorBriefCards(brief),
     ],
     comparison: [],
     non_claims: boundaries.map((item) => ({
@@ -94,7 +100,13 @@ function buildOperatorReadinessSummary(view) {
 }
 
 function isOperatorReadinessView(view) {
-  return view?.project?.format === "agentflow_production_memory_operator_loop_run"
-    && Array.isArray(view?.bundle_summary)
-    && view.bundle_summary.some((item) => item.id === "next_operator_start_packet");
+  return Boolean(view?.next_operator_brief)
+    && (
+      view?.project?.format === "agentflow_production_memory_next_operator_start_packet"
+      || (
+        view?.project?.format === "agentflow_production_memory_operator_loop_run"
+        && Array.isArray(view?.bundle_summary)
+        && view.bundle_summary.some((item) => item.id === "next_operator_start_packet")
+      )
+    );
 }

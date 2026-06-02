@@ -1,3 +1,18 @@
+import { buildNextOperatorBrief } from "./memory-workbench-production-next-operator-brief.js";
+import {
+  action,
+  arrayValue,
+  boundaryItems,
+  card,
+  companyBoundary,
+  control,
+  hasPassedControl,
+  isOperatorLoopArtifact,
+  lane,
+  objectValue,
+  step,
+} from "./memory-workbench-production-operator-loop-utils.js";
+
 const OPERATOR_LOOP_TYPE = "agentflow_production_memory_operator_loop_run";
 
 export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
@@ -15,6 +30,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const acceptanceCandidatePromotion = payload.acceptance_feedback_candidate_promotion || null;
   const startPacket = objectValue(payload.next_operator_start_packet);
   const startPacketReady = startPacket?.start_packet_status === "ready" && startPacket.ready_for_next_operator === true;
+  const nextOperatorBrief = startPacket ? buildNextOperatorBrief(startPacket) : null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
     ...fallback,
@@ -227,9 +243,10 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       visual_consistency: `${outputs.length} output artifacts`,
       boundary: "read-only operator manifest / no provider call / no Company KB write",
     },
+    next_operator_brief: nextOperatorBrief,
     feedback: {
       status: company.requires_human_review ? "blocked" : "review ready",
-      summary: `${company.candidate_item_count ?? 0} Company KB feedback candidates remain candidate-only`,
+      summary: nextOperatorBrief?.prompt_excerpt || `${company.candidate_item_count ?? 0} Company KB feedback candidates remain candidate-only`,
     },
     next_pass: {
       status: startPacket ? (startPacketReady ? "ready" : "blocked") : (ready ? "ready" : "blocked"),
@@ -252,54 +269,4 @@ function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromo
   if (promotion) return "inspect_next_pass_promotion_overlay_before_followup_context";
   if (resultScaffold) return "inspect_next_pass_result_scaffold_before_review";
   return "inspect_generated_artifacts_before_next_pass";
-}
-
-function companyBoundary(company) {
-  if (company.requires_human_review) return "candidate-only; human review required before Company KB promotion";
-  return company.writes_company_kb === false ? "Company KB write disabled" : "unknown";
-}
-
-function action(id, label, status, focusTarget) {
-  return { id, label, status, focusTarget, focus_target: focusTarget };
-}
-
-function card(id, title, status, detail) {
-  return { id, title, status, detail };
-}
-
-function lane(id, title, status, input, output) {
-  return { id, title, status, input, output };
-}
-
-function control(label, passed, forcedStatus = null) {
-  return { label, status: forcedStatus || (passed ? "review ready" : "blocked"), detail: passed ? "confirmed by manifest" : "not confirmed" };
-}
-
-function boundaryItems(boundaries = {}) {
-  return [
-    { label: "human acceptance", status: "blocked", detail: boundaries.human_acceptance || "not_reviewed" },
-    { label: "business validation", status: "blocked", detail: boundaries.business_validation || "not_validated" },
-    { label: "durable memory runtime", status: "blocked", detail: boundaries.durable_memory_runtime || "not_implemented" },
-    { label: "provider success", status: "blocked", detail: boundaries.provider_success || "not_attempted" },
-  ];
-}
-
-function hasPassedControl(payload, controlId) {
-  return arrayValue(payload.controls).some((item) => item?.control_id === controlId && item?.status === "passed");
-}
-
-function step(label, status, detail) {
-  return { label, status, detail: detail || "not recorded" };
-}
-
-function isOperatorLoopArtifact(artifact) {
-  return artifact?.artifactType === OPERATOR_LOOP_TYPE && artifact?.payload?.kind === OPERATOR_LOOP_TYPE;
-}
-
-function arrayValue(value) {
-  return Array.isArray(value) ? value : [];
-}
-
-function objectValue(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }

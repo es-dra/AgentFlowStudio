@@ -58,6 +58,8 @@ def _start_packet_summary(packet: dict[str, Any]) -> dict[str, Any]:
         "markdown_path": "next_operator_start_packet/next_operator_start_packet.md",
         "checked_package_item_count": packet.get("checked_package_item_count", 0),
         "next_operator_action": action.get("action", "unknown"),
+        "operator_prompt_excerpt": _text_excerpt(packet.get("operator_prompt", "")),
+        "start_requirements": [str(item) for item in _list(packet.get("start_requirements"))],
         "provider_calls_started": packet.get("provider_calls_started") is True,
         "writes_long_term_memory": packet.get("writes_long_term_memory") is True,
         "writes_company_kb": packet.get("writes_company_kb") is True,
@@ -81,6 +83,11 @@ def _dict(value: Any) -> dict[str, Any]:
 
 def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _text_excerpt(value: Any, *, limit: int = 480) -> str:
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else f"{text[: limit - 3].rstrip()}..."
 
 
 __all__ = (

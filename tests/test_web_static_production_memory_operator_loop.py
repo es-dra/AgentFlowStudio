@@ -255,6 +255,9 @@ console.log(JSON.stringify({{
   memoryIds: view.memory_loaded.map((item) => item.id),
   protocolControls: view.protocol_summary.controls.map((item) => `${{item.label}}:${{item.status}}`),
   nextPassAction: view.next_pass.action,
+  nextOperatorBrief: view.next_operator_brief,
+  summaryTalkTrack: view.demo_summary.talk_track,
+  summaryCards: view.demo_summary.evidence_cards.map((item) => `${{item.label}}:${{item.status}}:${{item.detail}}`),
   timelineLabels: view.timeline.map((item) => item.label),
 }}));
 """
@@ -279,6 +282,13 @@ console.log(JSON.stringify({{
     assert "next_operator_start_packet" in payload["memoryIds"]
     assert "next operator start packet ready:review ready" in payload["protocolControls"]
     assert payload["nextPassAction"] == "start_next_operator_action"
+    assert payload["nextOperatorBrief"]["status"] == "review ready"
+    assert payload["nextOperatorBrief"]["action"] == "review_or_complete_next_pass_result"
+    assert payload["nextOperatorBrief"]["prompt_excerpt"].startswith("Use the generated next_task_packet")
+    assert "Do not call remote providers" in payload["nextOperatorBrief"]["prompt_excerpt"]
+    assert "Do not write Company KB or durable memory from this start packet." in payload["nextOperatorBrief"]["requirements"]
+    assert any(line.startswith("Next operator action: review_or_complete_next_pass_result") for line in payload["summaryTalkTrack"])
+    assert any("Operator prompt:review ready:Use the generated next_task_packet" in card for card in payload["summaryCards"])
     assert "Next operator start packet" in payload["timelineLabels"]
 
 
@@ -289,6 +299,8 @@ def test_web_static_operator_loop_slice_adds_no_provider_scan_or_project_specifi
         Path("apps/web/memory-workbench-controller.js"),
         Path("apps/web/memory-workbench-inspector.js"),
         Path("apps/web/memory-workbench-production-operator-loop.js"),
+        Path("apps/web/memory-workbench-production-operator-loop-utils.js"),
+        Path("apps/web/memory-workbench-production-next-operator-brief.js"),
     ]
     combined = "\n".join(path.read_text(encoding="utf-8").lower() for path in files if path.exists())
 
