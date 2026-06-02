@@ -99,6 +99,19 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryNextPassReview = byType("agentflow_production_memory_next_pass_review") || null;
   const productionMemoryOperatorFeedbackEvent = byType("agentflow_production_memory_operator_feedback_event") || null;
   const productionMemoryOperatorFeedbackCandidatePacket = byType("agentflow_production_memory_operator_feedback_candidate_packet") || null;
+  const productionMemoryAssetProfileSeed = byType("agentflow_production_memory_asset_profile_seed") || null;
+  const productionMemoryAssetProfile = byType("agentflow_production_memory_asset_profile") || null;
+  const productionMemoryAssetProfileReadiness = byType("agentflow_production_memory_asset_profile_readiness") || null;
+  const productionMemoryAssetTestPackage = byType("agentflow_production_memory_asset_test_package") || null;
+  const productionMemoryAssetProviderValidationPlan = byType("agentflow_production_memory_asset_provider_validation_plan") || null;
+  const productionMemoryAssetProviderValidationBlockers = byType("agentflow_production_memory_asset_provider_validation_blockers") || null;
+  const productionMemoryAssetProviderValidationResult = byType("agentflow_production_memory_asset_provider_validation_result") || null;
+  const productionMemoryAssetFeedbackEvent = byType("agentflow_production_memory_asset_feedback_event") || null;
+  const productionMemoryAssetProfileUpdateCandidate = byType("agentflow_production_memory_asset_profile_update_candidate") || null;
+  const productionMemoryAssetProfilePromotionDecision = byType("agentflow_production_memory_asset_profile_promotion_decision") || null;
+  const productionMemoryAssetProfileVersion = byType("agentflow_production_memory_asset_profile_version") || null;
+  const productionMemoryAssetProfileContextProjection = byType("agentflow_production_memory_asset_profile_context_projection") || null;
+  const productionMemoryAssetConsistencyReview = byType("agentflow_production_memory_asset_consistency_review") || null;
   const companyKbFeedbackCandidatePacket = byType("agentflow_company_kb_feedback_candidate_packet") || null;
   const workspaceParts = { warnings, errors };
   return {
@@ -126,6 +139,19 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryNextPassPromotionOverlay: byType("agentflow_production_memory_next_pass_promotion_overlay") || null,
     productionMemoryOperatorFeedbackEvent,
     productionMemoryOperatorFeedbackCandidatePacket,
+    productionMemoryAssetProfileSeed,
+    productionMemoryAssetProfile,
+    productionMemoryAssetProfileReadiness,
+    productionMemoryAssetTestPackage,
+    productionMemoryAssetProviderValidationPlan,
+    productionMemoryAssetProviderValidationBlockers,
+    productionMemoryAssetProviderValidationResult,
+    productionMemoryAssetFeedbackEvent,
+    productionMemoryAssetProfileUpdateCandidate,
+    productionMemoryAssetProfilePromotionDecision,
+    productionMemoryAssetProfileVersion,
+    productionMemoryAssetProfileContextProjection,
+    productionMemoryAssetConsistencyReview,
     companyKbFeedbackCandidatePacket,
     memoryBundle,
     quality: normalizeQuality(byType("quality_report")),

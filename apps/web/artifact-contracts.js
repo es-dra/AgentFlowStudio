@@ -41,6 +41,19 @@ export const ARTIFACT_ALIASES = {
   agentflow_production_memory_next_pass_promotion_overlay: ["next_pass_promotion_overlay.json"],
   agentflow_production_memory_operator_feedback_event: ["operator_feedback_event.json"],
   agentflow_production_memory_operator_feedback_candidate_packet: ["operator_feedback_candidate_packet.json"],
+  agentflow_production_memory_asset_profile_seed: ["production_memory_asset_profile_seed.example.json", "asset_profile_seed.json"],
+  agentflow_production_memory_asset_profile: ["asset_profile.json"],
+  agentflow_production_memory_asset_profile_readiness: ["asset_profile_readiness.json"],
+  agentflow_production_memory_asset_test_package: ["asset_test_package.json"],
+  agentflow_production_memory_asset_provider_validation_plan: ["provider_validation_plan.json"],
+  agentflow_production_memory_asset_provider_validation_blockers: ["provider_validation_blockers.json"],
+  agentflow_production_memory_asset_provider_validation_result: ["provider_validation_result.json"],
+  agentflow_production_memory_asset_feedback_event: ["asset_feedback_event.json"],
+  agentflow_production_memory_asset_profile_update_candidate: ["asset_profile_update_candidate.json"],
+  agentflow_production_memory_asset_profile_promotion_decision: ["asset_profile_promotion_decision.json"],
+  agentflow_production_memory_asset_profile_version: ["asset_profile_version.json"],
+  agentflow_production_memory_asset_profile_context_projection: ["asset_profile_context_projection.json"],
+  agentflow_production_memory_asset_consistency_review: ["asset_consistency_review.json"],
   agentflow_company_kb_feedback_candidate_packet: [
     "company_kb_feedback_candidate_packet.json",
     "company_kb_feedback_candidate_packet.example.json",
@@ -110,6 +123,19 @@ export function sourceRoleFor(type, fileName) {
   if (type === "agentflow_production_memory_next_pass_promotion_overlay") return "production memory next pass promotion overlay";
   if (type === "agentflow_production_memory_operator_feedback_event") return "production memory operator feedback event";
   if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return "production memory operator feedback candidate packet";
+  if (type === "agentflow_production_memory_asset_profile_seed") return "production memory asset profile seed";
+  if (type === "agentflow_production_memory_asset_profile") return "production memory asset profile";
+  if (type === "agentflow_production_memory_asset_profile_readiness") return "production memory asset profile readiness";
+  if (type === "agentflow_production_memory_asset_test_package") return "production memory asset test package";
+  if (type === "agentflow_production_memory_asset_provider_validation_plan") return "production memory asset provider validation plan";
+  if (type === "agentflow_production_memory_asset_provider_validation_blockers") return "production memory asset provider validation blockers";
+  if (type === "agentflow_production_memory_asset_provider_validation_result") return "production memory asset provider validation result";
+  if (type === "agentflow_production_memory_asset_feedback_event") return "production memory asset feedback event";
+  if (type === "agentflow_production_memory_asset_profile_update_candidate") return "production memory asset profile update candidate";
+  if (type === "agentflow_production_memory_asset_profile_promotion_decision") return "production memory asset profile promotion decision";
+  if (type === "agentflow_production_memory_asset_profile_version") return "production memory asset profile version";
+  if (type === "agentflow_production_memory_asset_profile_context_projection") return "production memory asset profile context projection";
+  if (type === "agentflow_production_memory_asset_consistency_review") return "production memory asset consistency review";
   if (type === "agentflow_company_kb_feedback_candidate_packet") return "Company KB feedback candidate packet";
   if (type === "local_video") return "user selected local preview media";
   if (type === "unsupported_file") return "unsupported file";
