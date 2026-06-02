@@ -22,6 +22,10 @@ Current references:
   candidate.
 - Added `agentflow_production_memory_asset_profile_version`, written only for
   `promoted` or `merged` decisions against `candidate_only` source candidates.
+- Added `version_change_summary` to profile version artifacts before merging
+  PR #77 so Node 4 can trace source profile, target profile, source candidate,
+  source decision, patch count, and applied patch paths without relying on the
+  promotion decision alone.
 - Added product CLI command
   `production-memory-loop-review-asset-profile-update-candidate`.
 - Boundary kept: this is local profile versioning, not durable memory, not
@@ -51,6 +55,8 @@ Current references:
   - `git diff --check` passed with LF-to-CRLF warnings only.
   - Core implementation was split below the project 300-line target after the
     first green run.
+  - Follow-up `version_change_summary` focused regression passed
+    (`11 passed`).
 
 ## 2026-06-02 - Production Memory Asset Profile Update Candidate 001
 

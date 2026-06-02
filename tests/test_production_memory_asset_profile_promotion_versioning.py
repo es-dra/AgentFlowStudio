@@ -53,6 +53,12 @@ def test_asset_profile_promotion_decision_applies_v2_profile_without_memory_writ
     assert version["profile_version"] == "v2"
     assert version["source_decision_id"] == decision["decision_id"]
     assert version["profile_version_applied"] is True
+    summary = version["version_change_summary"]
+    assert summary["summary"] == "Applied 2 structured profile patch operations from explicit promoted decision."
+    assert summary["source_profile_id"] == "asset-profile:character:lead:v1"
+    assert summary["target_profile_id"] == "asset-profile:character:lead:v2"
+    assert summary["source_decision_id"] == decision["decision_id"]
+    assert summary["patch_ops_count"] == 2
     assert version["writes_long_term_memory"] is False
     assert version["writes_company_kb"] is False
     profile = version["profile"]

@@ -89,6 +89,27 @@ def next_profile_id(profile_id: str, next_label: str) -> str:
     return f"{profile_id}:{next_label}"
 
 
+def version_change_summary(
+    *,
+    source_profile_id: str,
+    target_profile_id: str,
+    candidate: dict[str, Any],
+    decision: dict[str, Any],
+    patch_ops: list[dict[str, Any]],
+) -> dict[str, Any]:
+    decision_value = str(decision["decision"])
+    return {
+        "summary": f"Applied {len(patch_ops)} structured profile patch operations from explicit {decision_value} decision.",
+        "source_profile_id": source_profile_id,
+        "target_profile_id": target_profile_id,
+        "source_candidate_id": candidate["candidate_id"],
+        "source_decision_id": decision["decision_id"],
+        "decision": decision_value,
+        "patch_ops_count": len(patch_ops),
+        "applied_paths": sorted({str(op.get("path")) for op in patch_ops}),
+    }
+
+
 def remove_stale_profile_version_outputs(output_root: Path) -> None:
     for name in ("asset_profile_version.json", "asset_profile_version.md"):
         path = output_root / name
@@ -107,4 +128,5 @@ __all__ = (
     "require_text",
     "remove_stale_profile_version_outputs",
     "safe_id",
+    "version_change_summary",
 )

@@ -193,6 +193,17 @@ asset_profile_version.md
 
 The version files are omitted when the explicit decision blocks versioning.
 
+Each written profile version includes `version_change_summary` with the source
+profile, target profile, source candidate, source decision, patch operation
+count, and applied patch paths. This is trace metadata for downstream context
+projection; it is not a durable memory write.
+
+Downstream context projection must treat the profile version as the inclusion
+authority. The promotion decision may explain why a version was allowed, but
+Node 4 must still check `profile_version_applied`, `usable_for_next_context`,
+the embedded profile `context_eligibility`, blockers, superseded profile IDs,
+and missing refs before including anything in the next context.
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation

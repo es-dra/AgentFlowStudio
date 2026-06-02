@@ -60,6 +60,7 @@ Outputs:
   - `writes_company_kb: false`
   - `profile_status: promoted`
   - `supersedes_profile_id`
+  - `version_change_summary`
   - source evidence refs
   - explicit local profile decision refs
 - This is local project profile versioning only; it is not durable Memory OS
@@ -102,6 +103,12 @@ Next deterministic node:
 ```text
 Node 4 Asset Profile Context Projection
 ```
+
+Node 4 should consume `agentflow_production_memory_asset_profile_version` as
+the authority for context inclusion. Do not include a profile only because the
+promotion decision says `eligible_by_explicit_profile_version`; also check the
+version `profile_version_applied`, `usable_for_next_context`, embedded profile
+`context_eligibility`, blockers, superseded IDs, and missing refs.
 
 Web cockpit remains deferred until profile feedback, update candidate,
 promotion/versioning, and context projection are deterministic.

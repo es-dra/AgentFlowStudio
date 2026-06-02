@@ -25,6 +25,7 @@ def render_asset_profile_promotion_decision_markdown(decision: dict[str, Any]) -
 
 
 def render_asset_profile_version_markdown(version: dict[str, Any]) -> str:
+    change_summary = version.get("version_change_summary") if isinstance(version.get("version_change_summary"), dict) else {}
     return "\n".join(
         [
             "# Production Memory Asset Profile Version",
@@ -33,6 +34,7 @@ def render_asset_profile_version_markdown(version: dict[str, Any]) -> str:
             f"Version: {version.get('profile_version', 'unknown')}",
             f"Supersedes: {version.get('source_profile_id', 'unknown')}",
             f"Source decision: {version.get('source_decision_id', 'unknown')}",
+            f"Change summary: {change_summary.get('summary', 'unknown')}",
             f"Usable for next context: {str(version.get('usable_for_next_context') is True).lower()}",
             "Writes long-term memory: false",
             "Writes Company KB: false",

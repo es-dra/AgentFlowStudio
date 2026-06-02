@@ -24,6 +24,7 @@ from agentflow.memory.production_asset_profile_promotion_utils import (
     reject_unsafe_asset_profile_promotion,
     remove_stale_profile_version_outputs,
     safe_id,
+    version_change_summary,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from narratocut.utils import write_json
@@ -201,6 +202,13 @@ def _build_profile_version(
         "source_candidate_id": candidate["candidate_id"],
         "source_decision_id": decision["decision_id"],
         "source_patch_ops_count": len(patch_ops),
+        "version_change_summary": version_change_summary(
+            source_profile_id=source_profile_id,
+            target_profile_id=str(profile["profile_id"]),
+            candidate=candidate,
+            decision=decision,
+            patch_ops=patch_ops,
+        ),
         "profile_version_applied": True,
         "usable_for_next_context": profile["usable_for_next_context"],
         "profile": profile,
