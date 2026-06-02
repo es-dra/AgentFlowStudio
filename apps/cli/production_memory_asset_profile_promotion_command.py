@@ -12,6 +12,53 @@ from agentflow.memory.production_asset_profile_promotion import (
 )
 
 
+def asset_profile_update_review_command(
+    asset_profiles_path: Path = typer.Option(
+        ...,
+        "--asset-profiles",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to asset_profiles.json from the asset test package.",
+    ),
+    update_candidate_path: Path = typer.Option(
+        ...,
+        "--candidate",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to update candidate JSON.",
+    ),
+    decision: str = typer.Option(
+        ...,
+        "--decision",
+        help="Reviewed decision: promoted, merged, rejected, expired, or blocked.",
+    ),
+    rationale: str = typer.Option(..., "--rationale", help="Operator rationale for the profile decision."),
+    reviewer_role: str = typer.Option("operator", "--reviewer-role", help="Reviewer role label."),
+    decided_at: str = typer.Option(..., "--decided-at", help="ISO timestamp for the explicit decision."),
+    output_dir: Path = typer.Option(
+        Path("data/processed/runs/production_memory_loop/asset_profile_promotion"),
+        "--output",
+        "-o",
+        help="Directory for asset profile promotion decision and version artifacts.",
+        show_default=False,
+    ),
+) -> None:
+    """Review a structured asset profile update candidate and optionally apply a local profile version."""
+    _run_asset_profile_update_review(
+        asset_profiles_path=asset_profiles_path,
+        update_candidate_path=update_candidate_path,
+        decision=decision,
+        rationale=rationale,
+        reviewer_role=reviewer_role,
+        decided_at=decided_at,
+        output_dir=output_dir,
+    )
+
+
 def production_memory_loop_review_asset_profile_update_candidate_command(
     asset_profiles_path: Path = typer.Option(
         ...,
@@ -29,7 +76,8 @@ def production_memory_loop_review_asset_profile_update_candidate_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_asset_profile_update_candidate JSON.",
+        help="Path to asset profile update candidate JSON.",
+        hidden=True,
     ),
     decision: str = typer.Option(
         ...,
@@ -44,9 +92,31 @@ def production_memory_loop_review_asset_profile_update_candidate_command(
         "--output",
         "-o",
         help="Directory for asset profile promotion decision and version artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Review a structured asset profile update candidate and optionally apply a local profile version."""
+    _run_asset_profile_update_review(
+        asset_profiles_path=asset_profiles_path,
+        update_candidate_path=update_candidate_path,
+        decision=decision,
+        rationale=rationale,
+        reviewer_role=reviewer_role,
+        decided_at=decided_at,
+        output_dir=output_dir,
+    )
+
+
+def _run_asset_profile_update_review(
+    *,
+    asset_profiles_path: Path,
+    update_candidate_path: Path,
+    decision: str,
+    rationale: str,
+    reviewer_role: str,
+    decided_at: str,
+    output_dir: Path,
+) -> None:
     try:
         asset_profiles = load_asset_profiles(asset_profiles_path)
         candidate = load_asset_profile_update_candidate(update_candidate_path)
@@ -72,4 +142,7 @@ def production_memory_loop_review_asset_profile_update_candidate_command(
         typer.echo(f"Wrote: {str(path).replace(chr(92), '/')}")
 
 
-__all__ = ("production_memory_loop_review_asset_profile_update_candidate_command",)
+__all__ = (
+    "asset_profile_update_review_command",
+    "production_memory_loop_review_asset_profile_update_candidate_command",
+)

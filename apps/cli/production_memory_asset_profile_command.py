@@ -32,7 +32,7 @@ def production_memory_loop_asset_profile_readiness_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_asset_profile_seed JSON.",
+        help="Path to asset profile seed JSON.",
     ),
     generated_at: str = typer.Option(
         "2026-06-02T00:00:00+08:00",
@@ -44,6 +44,7 @@ def production_memory_loop_asset_profile_readiness_command(
         "--output",
         "-o",
         help="Directory for asset profile readiness artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Build tester-facing character/scene asset readiness from an operator artifact."""
@@ -72,7 +73,8 @@ def production_memory_loop_run_asset_test_package_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_loop JSON.",
+        help="Path to production-memory loop JSON.",
+        show_default=False,
     ),
     asset_profile_seed_path: Path = typer.Option(
         ...,
@@ -81,7 +83,7 @@ def production_memory_loop_run_asset_test_package_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_asset_profile_seed JSON.",
+        help="Path to asset profile seed JSON.",
     ),
     generated_at: str = typer.Option(
         "2026-06-02T00:00:00+08:00",
@@ -123,6 +125,7 @@ def production_memory_loop_run_asset_test_package_command(
         "--output",
         "-o",
         help="Directory for the full no-provider asset test package.",
+        show_default=False,
     ),
 ) -> None:
     """Run the no-provider operator loop and write a tester-facing asset package."""

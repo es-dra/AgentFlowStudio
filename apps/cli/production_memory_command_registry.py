@@ -18,6 +18,7 @@ from apps.cli.production_memory_action_result_acceptance_feedback_command import
     production_memory_loop_record_action_result_acceptance_feedback_command,
 )
 from apps.cli.production_memory_asset_consistency_review_command import (
+    asset_consistency_review_command,
     production_memory_loop_review_asset_consistency_command,
 )
 from apps.cli.production_memory_asset_feedback_command import (
@@ -31,6 +32,7 @@ from apps.cli.production_memory_asset_profile_context_projection_command import 
     production_memory_loop_asset_profile_context_projection_command,
 )
 from apps.cli.production_memory_asset_profile_promotion_command import (
+    asset_profile_update_review_command,
     production_memory_loop_review_asset_profile_update_candidate_command,
 )
 from apps.cli.production_memory_asset_profile_update_candidate_command import (
@@ -113,7 +115,7 @@ def register_production_memory_commands(app: typer.Typer) -> None:
     _visible(
         app,
         "asset-profile-update-review",
-        production_memory_loop_review_asset_profile_update_candidate_command,
+        asset_profile_update_review_command,
     )
     _visible(
         app,
@@ -123,7 +125,7 @@ def register_production_memory_commands(app: typer.Typer) -> None:
     _visible(
         app,
         "asset-consistency-review",
-        production_memory_loop_review_asset_consistency_command,
+        asset_consistency_review_command,
     )
 
     _hidden(app, "production-memory-loop-validate", production_memory_loop_validate_command)

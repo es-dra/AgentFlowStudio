@@ -31,7 +31,7 @@ def production_memory_loop_validate_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_loop JSON.",
+        help="Path to production-memory loop JSON.",
     ),
 ) -> None:
     """Validate a generic production-memory loop contract without execution."""
@@ -54,13 +54,15 @@ def production_memory_loop_run_no_provider_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_loop JSON.",
+        help="Path to production-memory loop JSON.",
+        show_default=False,
     ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/no_provider"),
         "--output",
         "-o",
         help="Directory for no-provider run artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Build context bundle and readiness artifacts without provider access."""
@@ -90,7 +92,7 @@ def production_memory_loop_draft_feedback_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_loop JSON.",
+        help="Path to production-memory loop JSON.",
     ),
     target_ref: str = typer.Option(..., "--target-ref", help="Artifact ledger ref receiving feedback."),
     decision: str = typer.Option("note", "--decision", help="Feedback decision: accepted, rejected, needs_revision, or note."),

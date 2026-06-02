@@ -39,6 +39,7 @@ def memory_video_pipeline_plan_command(
         "--output",
         "-o",
         help="Ignored output directory for no-call plan artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Write a no-call memory video pipeline plan from one protocol file."""
@@ -81,6 +82,7 @@ def memory_video_pipeline_review_command(
         "--output",
         "-o",
         help="Ignored output directory for no-call review artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Write a no-call memory video pipeline review from explicit artifacts."""
@@ -124,6 +126,7 @@ def memory_video_pipeline_observe_command(
         "--output",
         "-o",
         help="Ignored output directory for bounded human-observation artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Write a bounded human visual observation from a review artifact."""
@@ -176,6 +179,7 @@ def memory_video_pipeline_present_command(
         "--output",
         "-o",
         help="Ignored output directory for presentation-facing material.",
+        show_default=False,
     ),
 ) -> None:
     """Write a presentation-facing package from protocol, review, and observation."""
@@ -233,6 +237,7 @@ def memory_video_pipeline_package_command(
         "--output",
         "-o",
         help="Ignored output directory for the no-call package.",
+        show_default=False,
     ),
 ) -> None:
     """Write the no-call product package for one memory video pipeline run."""

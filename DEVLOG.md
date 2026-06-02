@@ -7,6 +7,8 @@ handoff files.
 Current references:
 
 - Live work ledger: `TASK_TRACKER.md`.
+- CLI help cleanup:
+  `docs/maintenance/AFS-CLI-HELP-CLEANUP-001.md`.
 - Full rename maintainability pass:
   `docs/maintenance/AFS-FULL-RENAME-MAINTAINABILITY-001.md`.
 - Mainline foundation cleanup:
@@ -17,6 +19,17 @@ Current references:
   `docs/archive/devlog_history_2026_06_03_pre_slimming.md`.
 - Historical task archive:
   `docs/archive/task_history_2026_06_03_pre_slimming.md`.
+
+## 2026-06-03 - CLI Help Cleanup 001
+
+- Opened `codex/afs-cli-help-cleanup-001` after the full rename reached
+  `master` to remove tester-facing CLI help truncation/mojibake risk.
+- Root cause: Typer/Rich cropped long artifact kinds, option names, and default
+  output paths with a Unicode ellipsis, which rendered poorly in some Windows
+  output paths.
+- Added a CLI boundary regression test for visible product command help and
+  updated public command options to use shorter labels while keeping hidden
+  legacy aliases callable.
 
 ## 2026-06-03 - Full Rename Maintainability 001
 
