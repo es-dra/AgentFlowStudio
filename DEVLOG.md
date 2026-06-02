@@ -9,6 +9,37 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Manifest Check Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-loop-manifest-check-output-001`
+  on `codex/afs-production-memory-operator-manifest-check-web-001`.
+- Added read-only Web memory workbench support for selected
+  `agentflow_production_memory_operator_manifest_check` reports.
+- The canvas now shows manifest check status, checked refs, missing refs,
+  mismatched refs, failed nodes, failed controls, no-provider/write-disabled
+  controls, and non-claim boundaries.
+- Boundary kept: selected local JSON only; no provider call, no Company KB
+  write, no durable memory write, no workflow execution from Web, no ref
+  following, no Web scan/persistence, no Loulan behavior, no human acceptance,
+  and no business validation claim.
+- Verification so far:
+  - Red Web static test failed first because the report source role was still
+    `unclassified` and no dedicated Web view existed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_manifest_check.py -q`
+    -> 2 passed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_manifest_check.py tests\test_web_static_production_memory_operator_loop.py tests\test_production_memory_operator_manifest_check.py tests\test_production_memory_operator_loop_manifest_check.py -q`
+    -> 12 passed.
+  - All `tests/test_web*.py` passed (`91 passed`).
+  - Full suite passed on Python 3.12.12 (`799 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - High-risk added-diff/new-file sensitive scan was clean; broad scan hits
+    were existing policy text and a test forbidden-string assertion.
+  - Line counts: new Web view 160, new Web static test 125,
+    `artifact-workspace.js` 294, all touched code/test files under 300 lines.
+  - Browser-level smoke was not run because Browser control tools were not
+    exposed in this turn.
+
 ## 2026-06-02 - Production Memory Operator Loop Manifest Check Output 001
 
 - Continued from `codex/afs-production-memory-operator-manifest-check-001`

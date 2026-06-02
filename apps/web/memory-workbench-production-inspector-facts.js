@@ -83,6 +83,20 @@ export function productionOperatorFeedbackCandidateFacts(payload) {
   ];
 }
 
+export function productionOperatorManifestCheckFacts(payload) {
+  return [
+    fact("check_status", payload.check_status || "unknown"),
+    fact("checked_refs", String(payload.checked_ref_count ?? arrayValue(payload.checked_refs).length)),
+    fact("missing_refs", String(arrayValue(payload.missing_refs).length)),
+    fact("mismatched_refs", String(arrayValue(payload.mismatched_refs).length)),
+    fact("unsafe_refs", String(arrayValue(payload.unsafe_refs).length)),
+    fact("failed_nodes", String(arrayValue(payload.failed_nodes).length)),
+    fact("failed_controls", String(arrayValue(payload.failed_controls).length)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);

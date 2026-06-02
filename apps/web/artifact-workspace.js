@@ -4,6 +4,8 @@ import { asList, asObject, asText, collectChecks, normalizeStatus } from "./arti
 
 export { asText, normalizeStatus } from "./artifact-values.js?v=m4-memory-canvas-tools";
 
+const AGENTFLOW_KIND_ARTIFACTS = new Set(["agentflow_production_memory_loop", "agentflow_production_memory_operator_loop_run", "agentflow_production_memory_operator_manifest_check", "agentflow_production_memory_next_context_handoff", "agentflow_production_memory_next_task_packet", "agentflow_production_memory_next_pass_review", "agentflow_production_memory_next_pass_result", "agentflow_company_kb_feedback_candidate_packet"]);
+
 export async function parseFiles(files) {
   const artifacts = [];
   for (const file of files) {
@@ -93,6 +95,7 @@ export function normalizeWorkspace(artifacts) {
   const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
   const productionMemorySessionReport = byType("agentflow_production_memory_session_report") || null;
   const productionMemoryOperatorLoopRun = byType("agentflow_production_memory_operator_loop_run") || null;
+  const productionMemoryOperatorManifestCheck = byType("agentflow_production_memory_operator_manifest_check") || null;
   const productionMemoryNextContextHandoff = byType("agentflow_production_memory_next_context_handoff") || null;
   const productionMemoryNextTaskPacket = byType("agentflow_production_memory_next_task_packet") || null;
   const productionMemoryNextPassResult = byType("agentflow_production_memory_next_pass_result") || null;
@@ -110,6 +113,7 @@ export function normalizeWorkspace(artifacts) {
     productionMemoryLoop,
     productionMemorySessionReport,
     productionMemoryOperatorLoopRun,
+    productionMemoryOperatorManifestCheck,
     productionMemoryNextContextHandoff,
     productionMemoryNextTaskPacket,
     productionMemoryNextPassResult,
@@ -165,25 +169,7 @@ function detectArtifactType(fileName, payload) {
     if (aliases.includes(normalizedName)) return type;
   }
   if (payload && payload.artifact_index && payload.workflow) return "run_manifest";
-  if (payload && payload.kind === "agentflow_production_memory_loop") return "agentflow_production_memory_loop";
-  if (payload && payload.kind === "agentflow_production_memory_operator_loop_run") {
-    return "agentflow_production_memory_operator_loop_run";
-  }
-  if (payload && payload.kind === "agentflow_production_memory_next_context_handoff") {
-    return "agentflow_production_memory_next_context_handoff";
-  }
-  if (payload && payload.kind === "agentflow_production_memory_next_task_packet") {
-    return "agentflow_production_memory_next_task_packet";
-  }
-  if (payload && payload.kind === "agentflow_production_memory_next_pass_review") {
-    return "agentflow_production_memory_next_pass_review";
-  }
-  if (payload && payload.kind === "agentflow_production_memory_next_pass_result") {
-    return "agentflow_production_memory_next_pass_result";
-  }
-  if (payload && payload.kind === "agentflow_company_kb_feedback_candidate_packet") {
-    return "agentflow_company_kb_feedback_candidate_packet";
-  }
+  if (payload && AGENTFLOW_KIND_ARTIFACTS.has(payload.kind)) return payload.kind;
   if (payload && typeof payload.artifact_type === "string" && payload.artifact_type.startsWith("agentflow_")) return payload.artifact_type;
   if (payload && payload.assets && payload.package_id) return "package_manifest";
   if (payload && payload.sections && payload.summary) return "review_report";
