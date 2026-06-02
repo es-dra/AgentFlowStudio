@@ -9,6 +9,41 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Run Package Check Web 001
+
+- Continued from
+  `codex/afs-production-memory-operator-run-package-check-001` on
+  `codex/afs-production-memory-operator-run-package-check-web-001`.
+- Added read-only Web memory workbench support for selected
+  `agentflow_production_memory_operator_run_package_check` artifacts.
+- The canvas now shows package-check status, checked package items, missing or
+  blocked refs, failed controls, no-provider controls, non-claim boundaries,
+  and the next-operator handoff state.
+- Added inspector facts for check status, package status, ready-for-handoff,
+  checked item count, missing/mismatched/unsafe refs, failed controls,
+  provider state, durable-memory write state, and Company KB write state.
+- Boundary kept: selected local JSON only, read-only view, no provider call, no
+  Company KB write, no durable memory write, no workflow execution from Web, no
+  ref following, no Web scan/persistence, no Loulan behavior, no human
+  acceptance, and no business validation claim.
+- Verification so far:
+  - Red Web static test failed first because the check report source role was
+    still `unclassified` and no dedicated Web view existed.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_web_static_production_memory_operator_run_package_check.py -q`
+    -> 2 passed.
+  - Focused run-package-check/operator/Web regression suite passed (`43
+    passed`).
+  - Expanded Web static suite passed (`50 passed`).
+  - Full suite passed on Python 3.12.12 (`823 passed`).
+  - JS syntax checks for touched Web modules passed.
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Broad changed-file sensitive scan only matched existing historical policy
+    text.
+  - Staged `git diff --check` passed.
+  - Staged added-diff sensitive scan was clean.
+  - Line counts: run-package-check Web view 155, controller 79, inspector 236,
+    production inspector facts 190, artifact contracts 101.
+
 ## 2026-06-02 - Production Memory Operator Run Package Check 001
 
 - Continued from

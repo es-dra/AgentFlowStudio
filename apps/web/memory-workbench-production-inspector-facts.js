@@ -124,6 +124,22 @@ export function productionOperatorRunPackageFacts(payload) {
   ];
 }
 
+export function productionOperatorRunPackageCheckFacts(payload) {
+  return [
+    fact("check_status", payload.check_status || "unknown"),
+    fact("package_status", payload.package_status || "unknown"),
+    fact("ready_for_handoff", yesNo(payload.ready_for_handoff)),
+    fact("checked_items", String(payload.checked_item_count ?? arrayValue(payload.checked_items).length)),
+    fact("missing_refs", String(arrayValue(payload.missing_refs).length)),
+    fact("mismatched_refs", String(arrayValue(payload.mismatched_refs).length)),
+    fact("unsafe_refs", String(arrayValue(payload.unsafe_refs).length)),
+    fact("failed_controls", String(arrayValue(payload.failed_controls).length)),
+    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
+    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
+    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
+  ];
+}
+
 export function productionOperatorLoopFacts(payload) {
   const resultScaffold = objectValue(payload.next_pass_result);
   const promotion = objectValue(payload.next_pass_promotion);

@@ -474,6 +474,13 @@ items, no-provider controls, and non-claim boundaries. They are entry artifacts
 for the next operator only; they do not follow refs, execute workflows, call
 providers, write Company KB, claim provider success, or promote durable memory.
 
+Operator run package check artifacts render as a read-only handoff check canvas
+with the package check status, checked package items, missing or blocked refs,
+failed controls, no-provider controls, and non-claim boundaries. They confirm
+or block the package as a next-operator entry artifact only; they do not follow
+refs from the browser, execute workflows, call providers, write Company KB,
+claim provider success, or promote durable memory.
+
 When an operator-loop manifest includes `next_pass_promotion`, the Web canvas
 also surfaces a Next pass promotion card, lane, controls, inspector facts, and
 next-pass action. This is a read-only view of the explicit decision and derived
