@@ -214,7 +214,7 @@ python -m apps.cli.main production-memory-loop-capture-operator-feedback data/pr
 python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback/operator_feedback_event.json --generated-at 2026-06-02T08:20:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate
 python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
-python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --output data/processed/runs/production_memory_loop/operator_run_package_smoke
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --output data/processed/runs/production_memory_loop/operator_run_package_smoke
 python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json
 ```
 
@@ -412,6 +412,17 @@ blocked decisions keep it visible as a blocked ref. The command still does not
 write durable memory, write Company KB, call providers, execute a next pass, or
 claim acceptance.
 
+When `--write-run-package-check` is supplied together with
+`--write-run-package`, the operator-loop command also writes:
+
+- `operator_run_package_check/operator_run_package_check.json`
+
+This is a post-package handoff check. It is not added to the operator manifest
+or the run package itself, which avoids self-referential check chains. It
+confirms or blocks the final package as a next-operator entry artifact only; it
+does not call providers, execute workflows, write durable memory, write Company
+KB, or claim human acceptance.
+
 The Company KB feedback candidate packet is a source-to-candidate bridge for
 the local Company knowledge-base workflow. It records reusable lessons as
 candidate items with `requires_human_review: true`,
@@ -435,6 +446,7 @@ The Web workbench recognizes both:
 - `agentflow_production_memory_operator_manifest_check`
 - `agentflow_production_memory_operator_handoff_packet`
 - `agentflow_production_memory_operator_run_package`
+- `agentflow_production_memory_operator_run_package_check`
 - `agentflow_production_memory_next_context_handoff`
 - `agentflow_production_memory_next_task_packet`
 - `agentflow_production_memory_next_pass_result`

@@ -29,6 +29,10 @@ from agentflow.memory.production_operator_manifest import build_operator_manifes
 from agentflow.memory.production_operator_manifest_check import check_operator_manifest, write_operator_manifest_check
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND, operator_output_artifacts
 from agentflow.memory.production_operator_run_package import build_operator_run_package, write_operator_run_package
+from agentflow.memory.production_operator_run_package_check import (
+    check_operator_run_package,
+    write_operator_run_package_check,
+)
 from agentflow.memory.production_session import (
     build_production_memory_session_report,
     write_production_memory_session_report,
@@ -135,7 +139,10 @@ def write_production_memory_operator_loop_run(
     write_manifest_check: bool = False,
     write_handoff_packet: bool = False,
     write_run_package: bool = False,
+    write_run_package_check: bool = False,
 ) -> list[Path]:
+    if write_run_package_check and not write_run_package:
+        raise ValueError("write_run_package_check requires write_run_package")
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
     include_review = "next_pass_review" in result
@@ -226,6 +233,15 @@ def write_production_memory_operator_loop_run(
         )
         result["operator_run_package"] = package
         written_paths.extend(write_operator_run_package(package, output_root / "operator_run_package"))
+    if write_run_package_check:
+        check = check_operator_run_package(output_root / "operator_run_package" / "operator_run_package.json")
+        result["operator_run_package_check"] = check
+        written_paths.append(
+            write_operator_run_package_check(
+                check,
+                output_root / "operator_run_package_check" / "operator_run_package_check.json",
+            )
+        )
     return written_paths
 
 

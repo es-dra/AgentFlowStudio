@@ -9,6 +9,43 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Run Package Check Output 001
+
+- Continued from
+  `codex/afs-production-memory-operator-run-package-check-web-001` on
+  `codex/afs-production-memory-operator-loop-run-package-check-output-001`.
+- Added `--write-run-package-check` to
+  `production-memory-loop-run-operator-no-provider`.
+- The option requires `--write-run-package` and writes
+  `operator_run_package_check/operator_run_package_check.json` after the final
+  run package is written.
+- The check is a post-package handoff artifact only; it is not added to the
+  operator manifest or run package itself, avoiding a self-referential check
+  chain.
+- Boundary kept: no provider call, no Company KB write, no durable memory
+  write, no workflow execution, no ref following beyond package item
+  existence/type checks, no Loulan behavior, no human acceptance, and no
+  business validation claim.
+- Verification so far:
+  - Red tests failed first because the writer lacked
+    `write_run_package_check` and the CLI lacked `--write-run-package-check`.
+  - `data\processed\venvs\afs-py312\Scripts\python.exe -m pytest tests\test_production_memory_operator_run_package_check.py -q`
+    -> 6 passed.
+  - Focused operator/run-package/check/registry/contract suite passed (`60
+    passed`).
+  - Py compile for touched Python files passed.
+  - CLI help for `production-memory-loop-run-operator-no-provider` lists
+    `--write-run-package-check`.
+  - CLI smoke wrote ignored runtime artifacts including
+    `operator_run_package_check/operator_run_package_check.json` with
+    `check_status=passed`, `ready_for_handoff=true`, 18 checked items, 0
+    missing refs, 0 failed controls, no provider call, and no Company KB write.
+  - Full suite passed on Python 3.12.12 (`825 passed`).
+  - `git diff --check` passed with CRLF normalization warnings only.
+  - Staged `git diff --check` passed.
+  - Staged added-diff sensitive scan was clean.
+  - Line counts: operator loop 281, CLI command 181, focused test 155.
+
 ## 2026-06-02 - Production Memory Operator Run Package Check Web 001
 
 - Continued from

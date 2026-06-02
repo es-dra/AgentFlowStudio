@@ -51,6 +51,33 @@ def test_operator_run_package_check_passes_complete_package(tmp_path: Path) -> N
     assert "operator_handoff/operator_handoff_packet.json" in {item["path"] for item in check["checked_items"]}
 
 
+def test_operator_loop_writer_can_emit_run_package_check_after_run_package(tmp_path: Path) -> None:
+    loop = load_production_memory_loop(EXAMPLE_PATH)
+    result = build_production_memory_operator_loop_run(
+        loop,
+        generated_at="2026-06-02T22:00:00+08:00",
+        source_kb_status="restructuring_or_unknown",
+        draft_next_pass_result=True,
+    )
+
+    written_paths = write_production_memory_operator_loop_run(
+        result,
+        tmp_path,
+        write_run_package=True,
+        write_run_package_check=True,
+    )
+
+    check_path = tmp_path / "operator_run_package_check" / "operator_run_package_check.json"
+    assert check_path in written_paths
+    assert check_path.exists()
+    check = json.loads(check_path.read_text(encoding="utf-8"))
+    assert check["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
+    assert check["check_status"] == "passed"
+    assert check["ready_for_handoff"] is True
+    assert check["checked_item_count"] == 18
+    assert result["operator_run_package_check"]["check_status"] == "passed"
+
+
 def test_operator_run_package_check_reports_missing_package_item(tmp_path: Path) -> None:
     package_path = _write_operator_run_package(tmp_path)
     (tmp_path / "operator_handoff" / "operator_handoff_packet.json").unlink()
@@ -123,3 +150,38 @@ def test_operator_run_package_check_cli_writes_report_and_fails_on_missing_ref(t
     assert failure.returncode == 1
     assert "Operator run package check: failed" in failure.stdout
     assert "Missing package items: 1" in failure.stdout
+
+
+def test_operator_loop_cli_can_write_run_package_check_with_run_package(tmp_path: Path) -> None:
+    output_dir = tmp_path / "operator_loop"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "apps.cli.main",
+            "production-memory-loop-run-operator-no-provider",
+            str(EXAMPLE_PATH),
+            "--generated-at",
+            "2026-06-02T22:05:00+08:00",
+            "--source-kb-status",
+            "restructuring_or_unknown",
+            "--draft-next-pass-result",
+            "--write-run-package",
+            "--write-run-package-check",
+            "--output",
+            str(output_dir),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    check_path = output_dir / "operator_run_package_check" / "operator_run_package_check.json"
+    assert "Operator run package: ready" in result.stdout
+    assert "Operator run package check: passed" in result.stdout
+    assert check_path.exists()
+    check = json.loads(check_path.read_text(encoding="utf-8"))
+    assert check["kind"] == OPERATOR_RUN_PACKAGE_CHECK_KIND
+    assert check["check_status"] == "passed"
+    assert check["ready_for_handoff"] is True

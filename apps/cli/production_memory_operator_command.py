@@ -89,6 +89,11 @@ def production_memory_loop_run_operator_no_provider_command(
         "--write-run-package",
         help="Write a final no-provider operator run package with manifest check and handoff packet.",
     ),
+    write_run_package_check: bool = typer.Option(
+        False,
+        "--write-run-package-check",
+        help="Write a read-only run package consistency check after the final operator run package.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -131,6 +136,7 @@ def production_memory_loop_run_operator_no_provider_command(
             write_manifest_check=write_manifest_check,
             write_handoff_packet=write_handoff_packet,
             write_run_package=write_run_package,
+            write_run_package_check=write_run_package_check,
         )
     except ValueError as exc:
         typer.echo(f"Production memory operator loop failed: {exc}", err=True)
@@ -160,6 +166,8 @@ def production_memory_loop_run_operator_no_provider_command(
         typer.echo(f"Operator handoff packet: {result['operator_handoff_packet']['handoff_status']}")
     if "operator_run_package" in result:
         typer.echo(f"Operator run package: {result['operator_run_package']['package_status']}")
+    if "operator_run_package_check" in result:
+        typer.echo(f"Operator run package check: {result['operator_run_package_check']['check_status']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
@@ -167,6 +175,8 @@ def production_memory_loop_run_operator_no_provider_command(
     if manifest["chain_status"] != "ready":
         raise typer.Exit(code=1)
     if "operator_run_package" in result and result["operator_run_package"]["package_status"] != "ready":
+        raise typer.Exit(code=1)
+    if "operator_run_package_check" in result and result["operator_run_package_check"]["check_status"] != "passed":
         raise typer.Exit(code=1)
 
 
