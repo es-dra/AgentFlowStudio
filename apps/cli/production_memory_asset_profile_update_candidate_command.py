@@ -19,7 +19,7 @@ def production_memory_loop_draft_asset_profile_update_candidate_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_asset_feedback_event JSON.",
+        help="Path to asset feedback event JSON.",
     ),
     generated_at: str = typer.Option(
         "2026-06-02T00:10:00+08:00",
@@ -31,6 +31,7 @@ def production_memory_loop_draft_asset_profile_update_candidate_command(
         "--output",
         "-o",
         help="Directory for no-provider asset profile update candidate artifacts.",
+        show_default=False,
     ),
 ) -> None:
     """Draft a candidate-only structured profile patch from asset feedback evidence."""

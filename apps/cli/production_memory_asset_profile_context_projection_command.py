@@ -19,13 +19,14 @@ def production_memory_loop_asset_profile_context_projection_command(
         file_okay=True,
         dir_okay=False,
         readable=True,
-        help="Path to agentflow_production_memory_asset_profile_version JSON. May be repeated.",
+        help="Path to asset profile version JSON. May be repeated.",
     ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/asset_profile_context_projection"),
         "--output",
         "-o",
         help="Directory for no-provider asset profile context projection artifacts.",
+        show_default=False,
     ),
     generated_at: str = typer.Option(
         "2026-06-03T00:00:00+08:00",

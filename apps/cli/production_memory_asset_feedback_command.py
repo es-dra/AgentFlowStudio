@@ -46,6 +46,7 @@ def production_memory_loop_record_asset_feedback_command(
         "--output",
         "-o",
         help="Directory for no-provider asset feedback event artifacts.",
+        show_default=False,
     ),
     generated_at: str = typer.Option(
         "2026-06-02T00:00:00+08:00",

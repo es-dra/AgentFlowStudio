@@ -10,6 +10,38 @@ from apps.cli.main import app
 PRODUCT_REGISTRY = Path("apps/cli/command_registry.py")
 PRODUCTION_MEMORY_REGISTRY = Path("apps/cli/production_memory_command_registry.py")
 SUPPORT_REGISTRY = Path("apps/cli/support_command_registry.py")
+VISIBLE_PRODUCT_COMMANDS = (
+    "version",
+    "analyze-hooks",
+    "generate-scripts",
+    "run-workflow",
+    "draft-plan",
+    "generate-clip-plans",
+    "mock-slice",
+    "slice-real",
+    "ffmpeg-check",
+    "inspect-run",
+    "review-run",
+    "package-report",
+    "delivery-readiness",
+    "alpha-smoke",
+    "memory-video-pipeline-plan",
+    "memory-video-pipeline-review",
+    "memory-video-pipeline-observe",
+    "memory-video-pipeline-present",
+    "memory-video-pipeline-package",
+    "memory-evidence-reuse-review",
+    "memory-loop-validate",
+    "memory-loop-run-no-provider",
+    "asset-profile-readiness",
+    "asset-test-package-run",
+    "asset-feedback-record",
+    "asset-profile-update-draft",
+    "asset-profile-update-review",
+    "asset-context-project",
+    "asset-consistency-review",
+    "web-bridge",
+)
 
 
 def test_product_command_registry_has_no_direct_provider_or_demo_registrations() -> None:
@@ -63,6 +95,16 @@ def test_default_help_keeps_production_memory_product_surface_thin() -> None:
     assert "production-memory-loop-record-next-operator-action-result" not in result.output
     assert "production-memory-loop-record-action-result-acceptance-feedback" not in result.output
     assert "production-memory-loop-next-operator-start-packet" not in result.output
+
+
+def test_visible_product_command_help_avoids_terminal_truncation_glyphs() -> None:
+    runner = CliRunner()
+
+    for command in VISIBLE_PRODUCT_COMMANDS:
+        result = runner.invoke(app, [command, "--help"])
+        assert result.exit_code == 0, command
+        assert "\u2026" not in result.output, command
+        assert "\ufffd" not in result.output, command
 
 
 def test_hidden_production_memory_support_commands_remain_callable() -> None:
