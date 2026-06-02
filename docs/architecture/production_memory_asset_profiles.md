@@ -76,6 +76,45 @@ systems.
 - Local project materials and character-reference paths are runtime inputs and
   are not persisted in package artifacts.
 
+## Asset Feedback Intake
+
+`agentflow_production_memory_asset_feedback_event` records tester feedback
+against one character or scene profile. It is an evidence-only intake artifact:
+
+- It is not memory.
+- It is not a memory candidate.
+- It is not a promotion decision.
+- It does not unlock next-context use for a blocked or retired profile.
+- It records `json_fixture` or `markdown_derived_fixture` as the source input
+  type, but it does not parse free-form Markdown in this slice.
+- It rejects private paths, media bytes, signed URLs, provider secrets, and
+  provider result URLs.
+
+The first supported taxonomy is shared with the later cross-scene consistency
+review node:
+
+```text
+review_dimension:
+  character_identity
+  wardrobe_or_body_anchor
+  scene_spatial_anchor
+  lighting_or_time_anchor
+  negative_constraint_violations
+  allowed_variation_fit
+  overall_result
+
+failure_attribution:
+  prompt_issue
+  context_issue
+  profile_issue
+  reference_asset_issue
+  model_capability_issue
+  style_drift
+  character_inconsistency
+  scene_inconsistency
+  unknown
+```
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation

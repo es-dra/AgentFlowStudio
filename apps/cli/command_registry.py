@@ -31,6 +31,9 @@ from apps.cli.production_memory_asset_profile_command import (
     production_memory_loop_asset_profile_readiness_command,
     production_memory_loop_run_asset_test_package_command,
 )
+from apps.cli.production_memory_asset_feedback_command import (
+    production_memory_loop_record_asset_feedback_command,
+)
 from apps.cli.production_memory_acceptance_feedback_candidate_command import (
     production_memory_loop_draft_acceptance_feedback_candidate_command,
 )
@@ -150,6 +153,9 @@ def register_product_commands(app: typer.Typer) -> None:
     )
     app.command(name="production-memory-loop-run-asset-test-package")(
         production_memory_loop_run_asset_test_package_command
+    )
+    app.command(name="production-memory-loop-record-asset-feedback")(
+        production_memory_loop_record_asset_feedback_command
     )
     app.command(name="production-memory-loop-draft-acceptance-feedback-candidate")(
         production_memory_loop_draft_acceptance_feedback_candidate_command
