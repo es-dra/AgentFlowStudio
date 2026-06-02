@@ -1,3 +1,5 @@
+export { productionOperatorLoopFacts } from "./memory-workbench-production-operator-loop-facts.js";
+
 export function companyKbFeedbackFacts(payload) {
   return [
     fact("promotion_status", payload.promotion_status || "unknown"),
@@ -233,46 +235,6 @@ export function productionNextOperatorStartEventFacts(payload) {
     fact("source_next_operator_action", payload.source_next_operator_action || "unknown"),
     fact("human_acceptance", payload.claim_boundaries?.human_acceptance || "unknown"),
     fact("next_pass_execution", payload.claim_boundaries?.next_pass_execution || "unknown"),
-    fact("writes_company_kb", yesNo(payload.writes_company_kb)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-  ];
-}
-
-export function productionOperatorLoopFacts(payload) {
-  const resultScaffold = objectValue(payload.next_pass_result);
-  const promotion = objectValue(payload.next_pass_promotion);
-  const feedbackCandidatePromotion = objectValue(payload.operator_feedback_candidate_promotion);
-  const acceptanceCandidatePromotion = objectValue(payload.acceptance_feedback_candidate_promotion);
-  const startPacket = objectValue(payload.next_operator_start_packet);
-  return [
-    fact("chain_status", payload.chain_status || "unknown"),
-    fact("operator_nodes", String(arrayValue(payload.operator_loop_nodes).length)),
-    fact("output_artifacts", String(arrayValue(payload.output_artifacts).length)),
-    fact("post_check_artifacts", String(arrayValue(payload.post_check_artifacts).length)),
-    ...(resultScaffold.result_status ? [fact("next_pass_result_status", resultScaffold.result_status)] : []),
-    ...(resultScaffold.output_artifact_count !== undefined ? [
-      fact("next_pass_result_output_artifacts", String(resultScaffold.output_artifact_count)),
-    ] : []),
-    ...(promotion.decision ? [fact("next_pass_promotion_decision", promotion.decision)] : []),
-    ...(promotion.decision_effect ? [fact("next_pass_promotion_effect", promotion.decision_effect)] : []),
-    ...(feedbackCandidatePromotion.decision ? [
-      fact("operator_feedback_candidate_promotion_decision", feedbackCandidatePromotion.decision),
-    ] : []),
-    ...(feedbackCandidatePromotion.decision_effect ? [
-      fact("operator_feedback_candidate_promotion_effect", feedbackCandidatePromotion.decision_effect),
-    ] : []),
-    ...(acceptanceCandidatePromotion.decision ? [
-      fact("acceptance_feedback_candidate_promotion_decision", acceptanceCandidatePromotion.decision),
-    ] : []),
-    ...(acceptanceCandidatePromotion.decision_effect ? [
-      fact("acceptance_feedback_candidate_promotion_effect", acceptanceCandidatePromotion.decision_effect),
-    ] : []),
-    ...(startPacket.start_packet_status ? [
-      fact("next_operator_start_packet_status", startPacket.start_packet_status),
-    ] : []),
-    ...(startPacket.ready_for_next_operator !== undefined ? [
-      fact("ready_for_next_operator", yesNo(startPacket.ready_for_next_operator)),
-    ] : []),
     fact("writes_company_kb", yesNo(payload.writes_company_kb)),
     fact("provider_calls_started", yesNo(payload.provider_calls_started)),
   ];

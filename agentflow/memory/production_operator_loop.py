@@ -37,11 +37,11 @@ from agentflow.memory.production_operator_run_package_check import (
     check_operator_run_package,
     write_operator_run_package_check_report,
 )
-from agentflow.memory.production_operator_start_packet_output import write_next_operator_start_packet_from_operator_loop
-from agentflow.memory.production_session import (
-    build_production_memory_session_report,
-    write_production_memory_session_report,
+from agentflow.memory.production_operator_post_check_outputs import (
+    validate_post_check_output_options,
+    write_post_check_outputs,
 )
+from agentflow.memory.production_session import build_production_memory_session_report, write_production_memory_session_report
 from narratocut.utils import write_json
 
 
@@ -159,11 +159,19 @@ def write_production_memory_operator_loop_run(
     write_run_package: bool = False,
     write_run_package_check: bool = False,
     write_next_operator_start_packet: bool = False,
+    write_next_operator_start_event: bool = False,
+    next_operator_start_event_decision: str | None = None,
+    next_operator_start_event_summary: str | None = None,
+    next_operator_start_event_operator_role: str = "next_operator",
 ) -> list[Path]:
-    if write_run_package_check and not write_run_package:
-        raise ValueError("write_run_package_check requires write_run_package")
-    if write_next_operator_start_packet and not write_run_package_check:
-        raise ValueError("write_next_operator_start_packet requires write_run_package_check")
+    validate_post_check_output_options(
+        write_run_package=write_run_package,
+        write_run_package_check=write_run_package_check,
+        write_next_operator_start_packet=write_next_operator_start_packet,
+        write_next_operator_start_event=write_next_operator_start_event,
+        next_operator_start_event_decision=next_operator_start_event_decision,
+        next_operator_start_event_summary=next_operator_start_event_summary,
+    )
     output_root = Path(output_dir)
     include_result = "next_pass_result" in result
     include_review = "next_pass_review" in result
@@ -275,18 +283,17 @@ def write_production_memory_operator_loop_run(
         check = check_operator_run_package(output_root / "operator_run_package" / "operator_run_package.json")
         result["operator_run_package_check"] = check
         written_paths.extend(write_operator_run_package_check_report(check, output_root / "operator_run_package_check"))
-    if write_next_operator_start_packet:
-        written_paths.extend(
-            write_next_operator_start_packet_from_operator_loop(
-                result,
-                output_root,
-                generated_at=str(result["manifest"].get("generated_at", "")),
-            )
+    written_paths.extend(
+        write_post_check_outputs(
+            result,
+            output_root,
+            write_next_operator_start_packet=write_next_operator_start_packet,
+            write_next_operator_start_event=write_next_operator_start_event,
+            next_operator_start_event_decision=next_operator_start_event_decision,
+            next_operator_start_event_summary=next_operator_start_event_summary,
+            next_operator_start_event_operator_role=next_operator_start_event_operator_role,
         )
+    )
     return written_paths
 
-__all__ = (
-    "OPERATOR_LOOP_KIND",
-    "build_production_memory_operator_loop_run",
-    "write_production_memory_operator_loop_run",
-)
+__all__ = ("OPERATOR_LOOP_KIND", "build_production_memory_operator_loop_run", "write_production_memory_operator_loop_run")

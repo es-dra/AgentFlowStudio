@@ -9,6 +9,36 @@ Current references:
 - Historical DEVLOG index: `docs/archive/devlog_history_2026_05.md`.
 - Pre-reset task history: `docs/archive/task_history_2026_05.md`.
 
+## 2026-06-02 - Production Memory Operator Loop Start Event Output 001
+
+- Continued from `codex/afs-production-memory-next-operator-start-event-001`
+  on `codex/afs-production-memory-operator-loop-start-event-output-001`.
+- Added an optional operator-loop post-check output path for
+  `next_operator_start_event`, gated behind a written start packet and explicit
+  start decision/summary.
+- Added CLI flags to
+  `production-memory-loop-run-operator-no-provider`:
+  `--write-next-operator-start-event`,
+  `--next-operator-start-decision`, `--next-operator-start-summary`, and
+  `--next-operator-start-role`.
+- Added read-only generic Web rendering for embedded operator-loop start
+  events as a card, lane, memory row, controls, timeline step, and inspector
+  facts.
+- Boundary kept: start event is `post_check_artifacts` only, not
+  `output_artifacts` or run-package checked items; no provider call, Company
+  KB write, durable memory write, Web execution, scan/persistence, ref
+  following, project-specific behavior, human acceptance, business validation,
+  next-pass execution claim, or memory promotion.
+- Verification:
+  - Red backend/Web tests failed first before the writer/CLI flag/Web view
+    existed.
+  - Focused operator-loop/start-event/Web/CLI regression passed (`19 passed`).
+  - Expanded Web/static memory suite passed (`86 passed, 808 deselected`).
+  - CLI help exposes the new flags.
+  - CLI smoke wrote ignored runtime start-event artifacts and manifest smoke
+    confirmed post-check-only placement.
+  - Full suite passed on Python 3.12.12 (`894 passed`).
+
 ## 2026-06-02 - Production Memory Next Operator Start Event 001
 
 - Continued from `codex/afs-production-memory-next-operator-brief-001` on

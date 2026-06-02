@@ -123,6 +123,26 @@ def production_memory_loop_run_operator_no_provider_command(
         "--write-next-operator-start-packet",
         help="Write a post-check next-operator start packet after the final run package check.",
     ),
+    write_next_operator_start_event: bool = typer.Option(
+        False,
+        "--write-next-operator-start-event",
+        help="Write an explicit next-operator start event after the start packet.",
+    ),
+    next_operator_start_decision: str | None = typer.Option(
+        None,
+        "--next-operator-start-decision",
+        help="Start event decision: started, blocked, or deferred. Required with --write-next-operator-start-event.",
+    ),
+    next_operator_start_summary: str | None = typer.Option(
+        None,
+        "--next-operator-start-summary",
+        help="Bounded start event summary. Required with --write-next-operator-start-event.",
+    ),
+    next_operator_start_role: str = typer.Option(
+        "next_operator",
+        "--next-operator-start-role",
+        help="Operator role label for the start event.",
+    ),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/production_memory_loop/operator_loop"),
         "--output",
@@ -181,6 +201,10 @@ def production_memory_loop_run_operator_no_provider_command(
             write_run_package=write_run_package,
             write_run_package_check=write_run_package_check,
             write_next_operator_start_packet=write_next_operator_start_packet,
+            write_next_operator_start_event=write_next_operator_start_event,
+            next_operator_start_event_decision=next_operator_start_decision,
+            next_operator_start_event_summary=next_operator_start_summary,
+            next_operator_start_event_operator_role=next_operator_start_role,
         )
     except ValueError as exc:
         typer.echo(f"Production memory operator loop failed: {exc}", err=True)
@@ -219,6 +243,8 @@ def production_memory_loop_run_operator_no_provider_command(
         typer.echo(f"Operator run package check: {result['operator_run_package_check']['check_status']}")
     if "next_operator_start_packet" in result:
         typer.echo(f"Next operator start packet: {result['next_operator_start_packet']['start_packet_status']}")
+    if "next_operator_start_event" in result:
+        typer.echo(f"Next operator start event: {result['next_operator_start_event']['event_status']}")
     typer.echo(f"Company KB candidates: {manifest['company_kb_feedback']['promotion_status']}")
     for path in written_paths:
         typer.echo(f"Wrote: {_display_ref(path)}")
@@ -230,6 +256,8 @@ def production_memory_loop_run_operator_no_provider_command(
     if "operator_run_package_check" in result and result["operator_run_package_check"]["check_status"] != "passed":
         raise typer.Exit(code=1)
     if "next_operator_start_packet" in result and result["next_operator_start_packet"]["start_packet_status"] != "ready":
+        raise typer.Exit(code=1)
+    if "next_operator_start_event" in result and result["next_operator_start_event"]["provider_calls_started"] is not False:
         raise typer.Exit(code=1)
 
 

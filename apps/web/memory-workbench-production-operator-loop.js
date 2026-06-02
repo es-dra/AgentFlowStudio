@@ -1,5 +1,16 @@
 import { buildNextOperatorBrief } from "./memory-workbench-production-next-operator-brief.js";
 import {
+  isStartEventReady,
+  nextPassActionFor,
+  nextPassStatusFor,
+  startEventActions,
+  startEventCards,
+  startEventControls,
+  startEventLanes,
+  startEventMemoryRows,
+  startEventTimeline,
+} from "./memory-workbench-production-operator-loop-start-event.js";
+import {
   action,
   arrayValue,
   boundaryItems,
@@ -30,6 +41,8 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
   const acceptanceCandidatePromotion = payload.acceptance_feedback_candidate_promotion || null;
   const startPacket = objectValue(payload.next_operator_start_packet);
   const startPacketReady = startPacket?.start_packet_status === "ready" && startPacket.ready_for_next_operator === true;
+  const startEvent = objectValue(payload.next_operator_start_event);
+  const startEventReady = isStartEventReady(startEvent);
   const nextOperatorBrief = startPacket ? buildNextOperatorBrief(startPacket) : null;
   const ready = payload.chain_status === "ready" && payload.provider_calls_started === false;
   return {
@@ -61,6 +74,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       ...(startPacket ? [
         action("inspect_next_operator_start_packet", "Inspect start packet", startPacketReady ? "review ready" : "blocked", "next-pass"),
       ] : []),
+      ...startEventActions(startEvent, startEventReady),
       action("review_company_candidates", "Review candidates", company.requires_human_review ? "blocked" : "review ready", "review"),
       action("prepare_next_pass", "Prepare next pass", ready ? "ready" : "blocked", "next-pass"),
     ],
@@ -117,6 +131,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           startPacketReady ? "ready" : "blocked",
         ),
       ] : []),
+      ...startEventCards(startEvent),
       card("company_kb_feedback", "Company KB feedback", company.promotion_status || "unknown", companyBoundary(company)),
     ],
     memory_loaded: [
@@ -142,6 +157,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           status: startPacketReady ? "review ready" : "blocked",
         },
       ] : []),
+      ...startEventMemoryRows(startEvent, startEventReady),
     ],
     lanes: [
       lane("operator-loop", "Operator loop", ready ? "ready" : "blocked", payload.loop_id || "loop", payload.chain_status || "unknown"),
@@ -186,6 +202,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           startPacket.start_packet_status || "unknown",
         ),
       ] : []),
+      ...startEventLanes(startEvent, startEventReady),
       lane("company-kb-feedback", "Company KB feedback", company.promotion_status || "unknown", `${company.candidate_item_count ?? 0} candidates`, companyBoundary(company)),
     ],
     protocol_summary: {
@@ -233,6 +250,7 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
           control("next operator start packet memory write disabled", startPacket.writes_long_term_memory === false),
           control("next operator start packet Company KB write disabled", startPacket.writes_company_kb === false),
         ] : []),
+        ...startEventControls(startEvent, startEventReady),
         control("Company feedback candidate only", company.promotion_status === "candidate_only"),
         control("Human review required for Company feedback", company.requires_human_review === true, "blocked"),
       ],
@@ -249,24 +267,25 @@ export function buildProductionMemoryOperatorLoopView(workspace, fallback) {
       summary: nextOperatorBrief?.prompt_excerpt || `${company.candidate_item_count ?? 0} Company KB feedback candidates remain candidate-only`,
     },
     next_pass: {
-      status: startPacket ? (startPacketReady ? "ready" : "blocked") : (ready ? "ready" : "blocked"),
-      action: nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion, startPacket, startPacketReady),
+      status: nextPassStatusFor(ready, startPacket, startPacketReady, startEvent, startEventReady),
+      action: nextPassActionFor(
+        ready,
+        resultScaffold,
+        promotion,
+        feedbackCandidatePromotion,
+        acceptanceCandidatePromotion,
+        startPacket,
+        startPacketReady,
+        startEvent,
+        startEventReady,
+      ),
     },
     timeline: [
       ...nodes.map((node) => step(node.node_id, node.status || "unknown", node.detail)),
       ...(startPacket ? [
         step("Next operator start packet", startPacketReady ? "ready" : "blocked", startPacket.path || "not recorded"),
       ] : []),
+      ...startEventTimeline(startEvent, startEventReady),
     ],
   };
-}
-
-function nextPassAction(ready, resultScaffold, promotion, feedbackCandidatePromotion, acceptanceCandidatePromotion, startPacket, startPacketReady) {
-  if (!ready) return "resolve_operator_loop_blockers";
-  if (startPacket) return startPacketReady ? "start_next_operator_action" : "resolve_next_operator_start_packet_blockers";
-  if (acceptanceCandidatePromotion) return "inspect_acceptance_feedback_candidate_overlay_before_next_pass";
-  if (feedbackCandidatePromotion) return "inspect_operator_feedback_candidate_overlay_before_next_pass";
-  if (promotion) return "inspect_next_pass_promotion_overlay_before_followup_context";
-  if (resultScaffold) return "inspect_next_pass_result_scaffold_before_review";
-  return "inspect_generated_artifacts_before_next_pass";
 }

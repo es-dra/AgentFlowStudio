@@ -173,6 +173,9 @@ The required root identifiers are:
   `next_operator_start_packet`. It can record `started`, `blocked`, or
   `deferred`, but it is not human acceptance, not a next-pass execution result,
   not memory, not a memory candidate, and not a promotion decision.
+  The operator-loop writer can also embed this as a post-check artifact after
+  writing a checked start packet; it stays outside `output_artifacts` and the
+  run-package checked item list.
 
 All derived artifacts declare:
 
@@ -280,6 +283,7 @@ python -m apps.cli.main production-memory-loop-draft-operator-feedback-candidate
 python -m apps.cli.main production-memory-loop-review-operator-feedback-candidate data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --decision promoted --rationale "Traceable operator feedback selected for the next context overlay." --decided-at 2026-06-02T08:30:00+08:00 --output data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion
 python -m apps.cli.main production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider examples/agentflow/production_memory_loop.example.json --candidate-packet data/processed/runs/production_memory_loop/operator_feedback_candidate/operator_feedback_candidate_packet.json --promotion-decision data/processed/runs/production_memory_loop/operator_feedback_candidate_promotion/operator_feedback_candidate_promotion_decision.json --output data/processed/runs/production_memory_loop/operator_feedback_candidate_reviewed
 python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-02T18:10:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --output data/processed/runs/production_memory_loop/operator_run_package_smoke
+python -m apps.cli.main production-memory-loop-run-operator-no-provider examples/agentflow/production_memory_loop.example.json --generated-at 2026-06-03T10:00:00+08:00 --source-kb-status restructuring_or_unknown --draft-next-pass-result --write-run-package --write-run-package-check --write-next-operator-start-packet --write-next-operator-start-event --next-operator-start-decision started --next-operator-start-summary "Next operator received the checked no-provider start packet." --output data/processed/runs/production_memory_loop/operator_loop_with_start_event
 python -m apps.cli.main production-memory-loop-check-operator-run-package data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package/operator_run_package.json --output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --markdown-output data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.md
 python -m apps.cli.main production-memory-loop-record-acceptance-feedback data/processed/runs/production_memory_loop/operator_run_package_smoke/operator_run_package_check/operator_run_package_check.json --decision accepted --summary "Human operator accepted the package for the next local iteration." --reviewed-at 2026-06-03T00:05:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback
 python -m apps.cli.main production-memory-loop-draft-acceptance-feedback-candidate data/processed/runs/production_memory_loop/acceptance_feedback/acceptance_feedback_event.json --generated-at 2026-06-03T01:10:00+08:00 --output data/processed/runs/production_memory_loop/acceptance_feedback_candidate
@@ -441,6 +445,19 @@ The next-operator start event command writes:
 
 - `next_operator_start_event.json`
 - `next_operator_start_event.md`
+
+When `--write-next-operator-start-event` is supplied with the operator-loop
+command, it writes:
+
+- `next_operator_start_event/next_operator_start_event.json`
+- `next_operator_start_event/next_operator_start_event.md`
+
+This requires `--write-next-operator-start-packet` plus an explicit
+`--next-operator-start-decision` and `--next-operator-start-summary`. The
+embedded event is recorded as a post-check artifact only. It is not added to
+`output_artifacts`, not included in the operator run package checked items, not
+human acceptance, not next-pass execution, not memory, and not a promotion
+decision.
 
 The operator-loop command writes the existing no-provider run, session report,
 next context handoff, next task packet, Company KB candidate packet, and:
@@ -656,6 +673,11 @@ start requirements, no-provider controls, and non-claim boundaries. They record
 operator startup state only; they do not claim human acceptance, next-pass
 execution success, business validation, provider success, Company KB
 promotion, or memory promotion.
+
+When an operator-loop manifest embeds `next_operator_start_event`, the generic
+operator-loop canvas surfaces the start receipt as a card, lane, memory row,
+controls, timeline step, and inspector facts. This is still a read-only
+post-check display; it does not execute the recorded next action.
 
 Acceptance feedback event artifacts render as a read-only human feedback canvas
 with the explicit package decision, source check status, ready-for-handoff
