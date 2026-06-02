@@ -204,6 +204,39 @@ Node 4 must still check `profile_version_applied`, `usable_for_next_context`,
 the embedded profile `context_eligibility`, blockers, superseded profile IDs,
 and missing refs before including anything in the next context.
 
+## Asset Profile Context Projection
+
+`agentflow_production_memory_asset_profile_context_projection` is the
+deterministic Node 4 artifact that turns explicitly versioned profiles into the
+next context payload:
+
+```text
+asset profile version
+  -> included_refs / blocked_refs
+  -> context_payload.asset_profile_refs
+```
+
+Rules:
+
+- Only `agentflow_production_memory_asset_profile_version` artifacts may enter
+  this projection.
+- A promotion decision by itself is explanation evidence, not context
+  inclusion authority.
+- The projected version must have `profile_version_applied: true`,
+  `usable_for_next_context: true`, an embedded promoted profile, included
+  `context_eligibility`, no profile blockers, and explicit decision refs.
+- Superseded source profiles and stale profile versions are blocked rather
+  than silently discarded.
+- Every projection lists both `included_refs` and `blocked_refs`.
+- The projection is no-provider only and writes neither durable memory nor
+  Company KB.
+
+The first supported CLI is:
+
+```text
+production-memory-loop-asset-profile-context-projection
+```
+
 ## Provider Boundary
 
 The deterministic package is the core milestone. Optional provider validation
