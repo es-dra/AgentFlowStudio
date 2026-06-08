@@ -64,12 +64,17 @@ def run_curl(
         config.append(curl_config("header", f"Authorization: {authorization}"))
     if payload is not None:
         config.append(curl_config("data-binary", payload.decode("utf-8")))
-    result = subprocess.run(
-        command,
-        input="".join(config).encode("utf-8"),
-        capture_output=True,
-        check=False,
-    )
+    result = None
+    for attempt in range(2):
+        result = subprocess.run(
+            command,
+            input="".join(config).encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 35 or attempt == 1:
+            break
+    assert result is not None
     if result.returncode != 0:
         raise ModelProviderError(
             f"{method} request failed: CurlError({result.returncode})"

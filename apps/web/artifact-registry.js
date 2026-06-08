@@ -1,4 +1,13 @@
 export const ARTIFACT_REGISTRY = {
+  agentflow_project_manifest: {
+    aliases: ["project_manifest.json", "project_manifest.example.json"],
+    sourceRole: "AgentFlow project manifest",
+    label: "AgentFlow project manifest",
+    workspaceSlot: "agentflowProjectManifest",
+    focusTargets: ["project", "assets", "memory-loaded", "feedback", "next-pass"],
+    viewRoute: "project_manifest",
+    factsBuilder: "projectManifestFacts",
+  },
   agentflow_production_memory_asset_profile_seed: {
     aliases: ["production_memory_asset_profile_seed.example.json", "asset_profile_seed.json"],
     sourceRole: "production memory asset profile seed",

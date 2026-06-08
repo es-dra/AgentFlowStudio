@@ -1,0 +1,9 @@
+{
+  "project_id": "proj_runtime_demo",
+  "generated_at": "2026-06-04T08:35:00+08:00",
+  "feedback": {
+    "review_result": "partially_kept",
+    "notes": "Runtime fixture feedback. This is raw evidence and not durable memory.",
+    "suggested_next_state": "candidate"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "project_id": "proj_runtime_demo",
+  "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
+  "image_service": "minimax_image",
+  "video_service": "kling_i2v",
+  "generated_at": "2026-06-04T09:00:00+08:00"
+}

@@ -1,307 +1,155 @@
-# Company Operating Model Projection
+# AFS 公司运营模型执行投影
 
-This document is the AgentFlow Studio execution-facing projection of the local
-company knowledge base.
+本文是 `10-Startup` 源头知识库在 AgentFlow Studio 仓库中的执行投影。它只保留项目开发需要的规则摘要，不复制公司私密战略、真实成本、客户信息、内部复盘或 secret。
 
-The source-of-truth company rules live outside this repository:
-
-```text
-D:\Learning materials\Learning_notes\Company
-```
-
-This repository should contain only the subset needed to execute AgentFlow
-Studio work safely. Do not copy confidential company strategy, private
-retrospectives, real costs, customer information, provider secrets, or
-unpublished business assumptions into this repo.
-
-## Rule Hierarchy
-
-Use this hierarchy when instructions appear in more than one place:
+源头知识库：
 
 ```text
-Company source knowledge base
-  -> global workflow skills
-  -> project AGENTS.md
-  -> task tracker / branch handoff
-  -> local task prompt
+D:\Learning materials\Learning_notes\10-Startup
 ```
 
-### Company Source Knowledge Base
-
-Purpose: durable company rules, strategy, operating system, research reserve,
-asset memory, and private retrospectives.
-
-Location:
+## 规则层级
 
 ```text
-D:\Learning materials\Learning_notes\Company
+10-Startup 源头知识库
+  -> 全局 workflow skills
+  -> AGENTS.md
+  -> docs/company_operating_model.md
+  -> TASK_TRACKER.md / branch handoff
+  -> 当前任务
 ```
 
-Relevant current source areas:
+## 目录职责
 
-- `00-company-os/`: company charter, knowledge governance, confidentiality,
-  company memory.
-- `20-operating-system/`: AI-native company operating model, task splitting,
-  weekly cadence.
-- `30-engineering/`: project development, worktree/subagent coordination,
-  quality gates, release rules.
-- `40-agent-workforce/`: agent roles and task templates.
-- `60-assets-and-memory/`: reusable company assets, memory promotion, failure
-  patterns.
+| 层级 | 职责 |
+|---|---|
+| `10-Startup` | 公司源头规则、判断、候选记忆、战略、反模式、治理规则 |
+| workflow skill | 从源头规则抽取的可执行流程 |
+| AFS repo | 代码、测试、contract、runbook、handoff、执行投影 |
+| worktree / branch | 某条开发线的实际变更 |
+| Agent | 执行具体任务，不能自动晋升公司规则或商业结论 |
 
-### Global Workflow Skills
+## 任务难度
 
-Purpose: executable rules used by coding agents across projects.
-
-Current roles:
-
-- The installed `project-development-workflow` skill remains the active project
-  startup and engineering discipline used by Codex in concrete repositories.
-- `Company/Workflow/ai-native-company-workflow/` is the newer company-level
-  source-aligned workflow. It should guide future updates to installed skills
-  and project rules.
-- `Company/Workflow/project-development-workflow/` is legacy reference material.
-  Reuse durable ideas, but do not treat it as the highest source.
-- `Company/Workflow/research-coding-workflow/` is retained as research reserve
-  for model, experiment, benchmark, and paper-sensitive work.
-
-### Project AGENTS.md
-
-Purpose: repo-local execution rules for AgentFlow Studio.
-
-`AGENTS.md` should stay concise and execution-facing. It should not become a
-copy of the private company knowledge base.
-
-### TASK_TRACKER.md
-
-Purpose: current multi-session task state for this repository.
-
-It should track branch/worktree, owner role, write scope, acceptance criteria,
-verification, evidence, and handoff status. A task is not complete just because
-code was written.
-
-## Fast Entry Points
-
-Use the lightest entry that fits the task:
-
-- Small local question or one-file doc edit: `AGENTS.md` plus the touched file.
-- Normal project work: `AGENTS.md`, this document, and `TASK_TRACKER.md`.
-- Parallel or delegated work: also use `docs/agent_operating_roster.md` and
-  `docs/agent_task_brief_template.md`.
-- Company-rule change: edit the source rule in `Company/` first, then project
-  only the execution-facing subset back into this repository.
-
-The goal is to reduce routing overhead. Do not reread every Company document
-for routine implementation after the relevant source rule has already been
-projected here.
-
-## Task Difficulty And Dispatch
-
-Every new AgentFlow Studio development conversation should classify the task
-before choosing an execution shape:
-
-| Mode | Use when | Execution shape | Subagent policy |
-|---|---|---|---|
-| Light | read-only analysis, tiny docs, narrow mechanical edits | main checkout is acceptable after scan | no subagent |
-| Standard | normal feature, local bug, focused CLI/schema/docs work | one task line; worktree if dirty, multi-file, or risky | optional Reviewer or QA |
-| Deep | cross-module work, Memory OS, provider/media, Web UI, architecture, experiments | split into bounded lanes with explicit integration order | role-specific Explorer/Worker/Reviewer/QA/Librarian |
-| Strategic | company rules, product direction, business validation, memory promotion | human keeps final judgment; agents prepare evidence and candidates | no final judgment by agent |
-
-Do not start parallel work just because it is available. Parallel work is
-justified only when each lane has:
-
-- independent write scope or explicitly read-only scope;
-- known verification command or artifact check;
-- branch/worktree owner;
-- integration order;
-- close condition.
-
-Subagents are dynamically started and closed. They are not persistent staff.
-An agent that has returned its artifact, become blocked outside its control,
-lost recoverable ID state, or drifted outside its brief must be closed or
-marked inactive. Useful output should be converted into a verified artifact,
-handoff, backlog item, or memory candidate before the lane is closed.
-
-## Worktree Policy
-
-Keep the main checkout stable for scan, sync, and integration.
-
-Use global worktrees for nontrivial or parallel development:
-
-```text
-C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\<branch-slug>
-```
-
-Use `codex/*` branch names by default.
-
-Parallel work is allowed only when:
-
-- write scopes do not overlap;
-- verification commands are known;
-- shared contracts have an owner;
-- integration order is clear;
-- remote provider calls remain explicitly gated.
-
-Preserved branches need an extra gate:
-
-- repair or move old worktrees after repository renames;
-- compare divergence against `master`;
-- push useful checkpoints for backup;
-- classify the branch as `integrated`, `preserved`, `stale`, or `delete`;
-- rebase or replay preserved branches before integration.
-
-## Agent Work Policy
-
-Subagent or delegated work must have:
-
-- goal;
-- non-goals;
-- branch/worktree;
-- write scope;
-- do-not-touch list;
-- acceptance criteria;
-- verification commands;
-- expected artifacts;
-- remote-provider policy;
-- return format.
-
-Review order:
-
-```text
-spec compliance
-  -> code quality
-  -> QA / artifact verification
-  -> integration
-```
-
-Subagents are task-scoped. Close them after the assigned artifact, review, or
-QA result is collected. If the agent manager reports an old agent ID as
-`not found`, treat it as inactive history rather than an open workstream.
-
-Use `docs/agent_operating_roster.md` for role selection and
-`docs/agent_task_brief_template.md` for the brief passed to workers or
-reviewers.
-
-### Provider Capability Gates
-
-Remote-provider policy must name the capability:
-
-| Capability | Default | Required gate |
+| 模式 | 适用场景 | 执行形态 |
 |---|---|---|
-| LLM | off | `AFS_ALLOW_REMOTE_LLM=true` |
-| ASR | off | `AFS_ALLOW_REMOTE_ASR=true` |
-| image generation | off | `AFS_ALLOW_REMOTE_IMAGE=true` |
-| video generation | off | task-specific explicit approval until a project gate exists |
-| external download | off | task-specific source and artifact policy |
+| Light | 小问题、只读扫描、单文件轻微修改 | 当前 checkout 可完成 |
+| Standard | 普通功能、局部 bug、CLI/schema/docs | 一条开发线，必要时 worktree |
+| Deep | 多模块、Runtime Service、Web、provider、架构、清理 | 维护账本、隔离分支、明确验证 |
+| Strategic | 公司规则、产品方向、商业验证、记忆晋升 | Agent 只准备 evidence/candidate，人工决策 |
 
-Authorization for one capability does not authorize another. Tests and dry-run
-validators should prefer mocked providers unless a task explicitly requests a
-live provider smoke.
+## 当前主线
 
-## Quality And Evidence
+当前目标是本地内测可用，不是 SaaS。
 
-Separate these levels in reports:
+已具备：
 
-- structure verification: tests, schema, compile, diff checks;
-- runtime verification: CLI/workflow run and generated artifacts;
-- human acceptance: reviewed output satisfies the intended task;
-- business validation: real user or market signal.
+- deterministic Production Memory asset loop。
+- read-only Web Memory Workbench。
+- Asset Profile Review Screen。
+- Real Asset Test Run Harness。
+- Two-Round Context Runtime Validation。
+- Project Manifest v0.1。
+- Provider Validation Gate。
+- Runtime Service v0.1。
 
-For Memory OS work, keep these boundaries explicit:
+下一步重点：
 
-- feedback source of truth is not the same as derived feedback signals;
-- memory candidate is not durable memory;
-- project prefix is not a complete memory runtime;
-- context bundle existence does not prove context selection quality;
-- demo success is not product validation.
+- 维护性重置与中文化。
+- Runtime Service v0.2。
+- OpenAPI / 前端 client 对接。
+- 前端画布工作台接入。
+- provider gate 继续保持默认 blocked。
 
-## Current Product Push
+## Worktree 政策
 
-Mainline is the stable integration surface. Local Alpha 0.2 is integrated and
-cleaned up. Local Alpha 0.3 engineering acceptance is integrated on `master`
-for the planning boundary, Web operator loop, and Memory runtime contract.
-Local Alpha 0.4 has now produced real local runtime evidence, Web operator
-evidence, and a structural memory reuse review on this workstation. The
-acceptance reconciliation is recorded in
-`docs/local_alpha_0_4_acceptance_reconciliation.md`. PosterFlow live image
-smoke remains intentionally blocked until a local image-provider environment is
-configured.
-
-The next milestone is:
+默认分支前缀：
 
 ```text
-AgentFlow Studio Local Alpha 0.4:
-one real local product loop with evidence-to-memory reuse
+codex/
 ```
 
-The product loop for this milestone is:
+默认 worktree 根：
 
 ```text
-local content project brief
-  + local ignored source media
-  + optional local script / notes
-  + local BGM
-  -> production handoff or workflow plan
-  -> local finished package run
-  -> inspect / review / package report
-  -> Web workbench artifact review
-  -> operator acceptance feedback
-  -> memory candidate
-  -> explicit promotion decision
-  -> context bundle for a second pass
+C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\
 ```
 
-Use `docs/local_alpha_0_4_product_loop_goals.md` as the milestone boundary,
-`docs/local_alpha_0_4_scenario_package.md` as the shared scenario package, and
-`TASK_TRACKER.md` as the live project ledger.
+正常开发应使用隔离 worktree。若当前 checkout 已有必须保留的未提交成果，可以在当前 checkout 切到新的维护分支，但必须记录 dirty ownership ledger。
 
-Local Alpha 0.4 queue state:
+## Provider Gate
 
-| ID | Purpose | Suggested branch | Status |
-|---|---|---|---|
-| AFS-PROD-LOOP-001 | Define the 0.4 scenario package and runbook | `codex/afs-prod-loop-brief` | complete after integration |
-| AFS-RUN-PACKAGE-001 | Produce local runtime package evidence or an actionable blocker | `codex/afs-run-package-loop` | completed after local inputs were supplied |
-| AFS-WEB-OPERATOR-002 | Adapt Web operator path to the 0.4 scenario | `codex/afs-web-operator-loop` | integrated with follow-up readiness fix |
-| AFS-MEMORY-QUALITY-002 | Evaluate traceable evidence reuse in a second pass | `codex/afs-memory-quality-loop` | complete as structural review |
-| AFS-ALPHA-0-4-ACCEPTANCE | Reconcile 0.4 evidence into pass/block/non-claim states | main checkout | current docs-only lane |
-| AFS-POSTER-LIVE-002 | Optional live image smoke or blocked evidence | `codex/afs-poster-live-002` | optional; blocked by missing local provider env |
+远程能力默认关闭，必须按能力单独授权：
 
-The next executable 0.4 lanes should be narrow follow-ups, not another repeat
-of `AFS-MEMORY-QUALITY-002`: a read-only memory review CLI, a Web evidence
-summary, a real second-pass run, or a human acceptance feedback lane. They may
-reference ignored runtime evidence under
-`data/processed/runs/local_alpha_0_4_product_loop`, but should commit only
-contracts, docs, tests, and non-secret examples. Treat `docs/task_briefs/` as
-the copy-paste source for delegated workers.
+| 能力 | 默认状态 | gate |
+|---|---|---|
+| LLM | 关闭 | `AFS_ALLOW_REMOTE_LLM=true` |
+| ASR | 关闭 | `AFS_ALLOW_REMOTE_ASR=true` |
+| image | 关闭 | `AFS_ALLOW_REMOTE_IMAGE=true` |
+| video | 关闭 | 任务级显式授权或后续独立 gate |
+| external download | 关闭 | 任务级来源、用途和保存策略 |
 
-For the post-demo slimming phase, the visible CLI product surface should favor
-the generic memory video pipeline:
+Provider smoke 只代表 runtime verification，不代表 human acceptance、business validation 或 durable memory。
+
+## 维护规则
+
+涉及清理、中文化、重构或删除时：
+
+1. 先写维护账本。
+2. 分类为保留、归档、删除候选、暂缓。
+3. 明确替代路径。
+4. 运行维护审计。
+5. 再执行删除或拆分。
+
+维护审计入口：
+
+```powershell
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+```
+
+## AgentOps 最小层
+
+AFS 近期不接外部观测 SaaS，但保留本地 artifact：
+
+- `agentflow_run_trace`
+- `agentflow_quality_report`
+- `agentflow_guardrail_result`
+- `agentflow_handoff_record`
+- `agentflow_maintenance_audit_report`
+
+这些 artifact 只作为证据，不能自动写长期记忆或公司知识库。
+
+## 前后端协作
+
+后端对接面：
 
 ```text
-memory-video-pipeline-plan
-memory-video-pipeline-review
-memory-video-pipeline-observe
-memory-video-pipeline-present
-memory-video-pipeline-package
+Runtime Service v0.1+
 ```
 
-Numbered memory-advantage demo commands and direct provider smoke commands are
-legacy evidence/operator paths. Keep them gated and directly invocable only for
-existing runbooks, but do not present them as the default product path.
+前端只使用安全引用：
 
-## Promotion Back To Company
+- `project_id`
+- `job_id`
+- `artifact_id`
+- safe summary
+- safe manifest
 
-Project experience may be promoted back to `Company/` only when it is reusable
-outside this repository.
+前端不接触：
 
-Promotion candidates include:
+- CLI 内部实现。
+- provider secret。
+- 本地素材绝对路径。
+- signed URL。
+- 生成媒体字节。
 
-- confirmed multi-agent workflow rules;
-- worktree conflict patterns;
-- reusable task templates;
-- failure patterns;
-- quality gates that prevented real regressions;
-- Memory OS demo evidence and lessons.
+## 记录规则
 
-Do not promote one-off observations, unverified AI suggestions, or single demo
-successes as company rules.
+有意义的工作必须更新：
+
+- `TASK_TRACKER.md`
+- `DEVLOG.md`
+- `docs/handoff/`
+- `docs/maintenance/`
+
+可复用经验回流 `10-Startup` 时只能进入 candidate/limited 流程。Agent 不能自行把候选规则晋升为 active。

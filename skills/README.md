@@ -1,18 +1,18 @@
-# AgentFlow Studio Agent Skills
+# AgentFlow Studio Skill 目录
 
-This directory contains agent-readable task contracts. They are not runtime
-agents and do not call models by themselves. A skill tells an agent when to use
-a AgentFlow Studio workflow, which inputs are required, which artifacts to read, and
-which quality gates must pass before treating a result as usable.
+本目录保存 agent-readable task contract。它们不是运行时 agent，也不会自己调用模型。
 
-Current recommended product skills:
+Skill 的作用是告诉 Agent：
 
-- `short_highlight_package.skill.yaml`: video-only local-first short highlight
-  package generation.
-- `video_script_highlight_package.skill.yaml`: video plus script local-first
-  short highlight package generation.
-- `agentflow_production_handoff.skill.yaml`: production-side local-first
-  structured handoff generation from a creative brief.
+- 什么时候使用某条 AFS workflow；
+- 必须提供哪些输入；
+- 应该读取哪些 artifact；
+- 哪些 quality gate 通过后，结果才可继续流转。
 
-Agents should prefer these skill files over guessing from the full `workflows/`
-directory.
+当前推荐产品 skill：
+
+- `short_highlight_package.skill.yaml`：本地优先的视频高光短内容包。
+- `video_script_highlight_package.skill.yaml`：视频 + 脚本的本地优先高光短内容包。
+- `agentflow_production_handoff.skill.yaml`：从 creative brief 生成结构化 production handoff。
+
+Agent 应优先读取这些 skill 文件，而不是扫描整个 `workflows/` 目录后自行猜测。

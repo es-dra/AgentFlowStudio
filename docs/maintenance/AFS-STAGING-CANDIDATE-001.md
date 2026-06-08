@@ -14,7 +14,7 @@ and durable memory promotion remain separate.
 This classification uses the active project hierarchy:
 
 ```text
-Company source knowledge base
+10-Startup source knowledge base
   -> global workflow skills
   -> project AGENTS.md
   -> docs/company_operating_model.md
@@ -24,7 +24,7 @@ Company source knowledge base
 
 Operational consequences:
 
-- `D:\Learning materials\Learning_notes\Company` remains the company
+- `D:\Learning materials\Learning_notes\10-Startup` remains the company
   source-of-truth knowledge base.
 - This repository should stage only execution-facing AFS projection material.
 - Private company strategy, provider secrets, local secret file contents,
@@ -117,8 +117,8 @@ Interpretation for staging:
    Product registrations now live in `apps/cli/command_registry.py`; hidden
    provider/demo registrations live in `apps/cli/support_command_registry.py`.
 3. Run `python -B tools/staging_preflight.py --repo-root .` before staging to
-   catch local-only paths, effective line-count regressions, and hardcoded
-   Company `.secrets` paths.
+  catch local-only paths, effective line-count regressions, and hardcoded
+   10-Startup `.secrets` paths.
 4. Keep provider direct commands and numbered demo runtime out of the default
    product surface even if they are staged as reviewed hidden support.
 5. Keep generated runtime artifacts, provider configs, local media, caches, and
@@ -153,7 +153,7 @@ git status --ignored --short
 
 ## Provider Config Bridge Update - 2026-05-31
 
-- Removed the hardcoded local Company `.secrets` provider-config default from
+- Removed the hardcoded local 10-Startup `.secrets` provider-config default from
   `agentflow_studio/model_gateway/company_secrets.py`.
 - `load_company_provider_secrets()` now resolves an explicit path first, then
   `AFS_PROVIDER_CONFIG`; if neither is present, it fails with a

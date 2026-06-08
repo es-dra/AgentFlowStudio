@@ -2,12 +2,12 @@
 
 This document defines how AgentFlow Studio uses agent roles, subagents, and
 worktrees during development. It is an execution surface, not the private
-Company source of truth.
+10-Startup source of truth.
 
 Source rules remain in:
 
 ```text
-D:\Learning materials\Learning_notes\Company
+D:\Learning materials\Learning_notes\10-Startup
 ```
 
 ## Current State

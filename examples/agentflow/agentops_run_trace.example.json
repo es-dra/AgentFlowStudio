@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_run_trace",
+  "trace_id": "trace_runtime_demo_001",
+  "project_id": "proj_runtime_demo",
+  "job_id": "job_asset_test_demo",
+  "action": "asset_test_run",
+  "status": "blocked",
+  "input_refs": [
+    {
+      "role": "asset_profile_seed",
+      "ref": "production_memory_asset_profile_seed.example.json"
+    }
+  ],
+  "tool_gate_state": {
+    "remote_llm": "blocked_by_default",
+    "remote_asr": "blocked_by_default",
+    "remote_image": "blocked_by_default",
+    "remote_video": "blocked_by_default"
+  },
+  "generated_artifact_refs": [
+    {
+      "artifact_id": "runs-proj_runtime_demo-job_asset_test_demo-real_asset_test_report",
+      "artifact_type": "agentflow_real_asset_test_report",
+      "role": "real_asset_test_report"
+    }
+  ],
+  "blocked_refs": [
+    {
+      "ref": "project_materials",
+      "reason": "explicit local materials were not provided in this fixture"
+    }
+  ],
+  "tester_feedback": {
+    "status": "not_recorded"
+  },
+  "non_claims": [
+    "not human acceptance",
+    "not business validation",
+    "not durable memory"
+  ],
+  "writes_long_term_memory": false,
+  "writes_company_kb": false,
+  "metadata": {
+    "example": true
+  }
+}

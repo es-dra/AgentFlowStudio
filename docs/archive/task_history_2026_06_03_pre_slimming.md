@@ -7,10 +7,10 @@ active, next, and blocked work plus short links to current evidence. Historical
 completed rows from the pre-reset tracker were moved to
 `docs/archive/task_history_2026_05.md`.
 
-Company source knowledge base:
+10-Startup source knowledge base:
 
 ```text
-D:\Learning materials\Learning_notes\Company
+D:\Learning materials\Learning_notes\10-Startup
 ```
 
 Project-facing operating model:

@@ -2,8 +2,58 @@
   "schema_version": "0.1.0",
   "artifact_type": "agentflow_project_manifest",
   "project_id": "agentflow_demo_project",
+  "project_type": "short_video_campaign",
   "project_name": "Echo City Launch",
-  "project_goal": "Create a structured production handoff and later package distribution-ready short video artifacts.",
+  "goal": "Create a local internal-test content production loop that can reuse reviewed asset profile context across rounds.",
+  "project_goal": "Create a local internal-test content production loop that can reuse reviewed asset profile context across rounds.",
+  "source_assets": [
+    {
+      "asset_id": "source:brief:echo-city",
+      "asset_type": "creative_brief",
+      "ref": "artifact:creative_brief:echo-city",
+      "status": "available"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "run:asset-loop-round-1",
+      "round": 1,
+      "ref": "artifact:real_asset_test_report:round_1",
+      "status": "completed_with_blocks"
+    },
+    {
+      "run_id": "run:asset-loop-round-2",
+      "round": 2,
+      "ref": "artifact:two_round_context_runtime_report:round_2",
+      "status": "ready_for_next_round"
+    }
+  ],
+  "packages": [
+    {
+      "package_id": "package:asset-test:round-1",
+      "run_id": "run:asset-loop-round-1",
+      "ref": "artifact:asset_test_package:round_1",
+      "status": "review_ready"
+    }
+  ],
+  "feedback_refs": [
+    {
+      "feedback_id": "feedback:asset:round-1:lead-character",
+      "run_id": "run:asset-loop-round-1",
+      "ref": "artifact:asset_feedback_event:round_1",
+      "status": "raw_evidence"
+    }
+  ],
+  "profile_version_refs": [
+    {
+      "profile_version_id": "asset-profile-version:lead-character:v2",
+      "profile_id": "asset-profile:character:lead:v2",
+      "run_id": "run:asset-loop-round-1",
+      "ref": "artifact:asset_profile_version:round_1",
+      "status": "context_eligible"
+    }
+  ],
+  "status": "in_progress",
   "modules": [
     {
       "module_id": "agentflow_production",
@@ -18,8 +68,14 @@
   ],
   "artifact_map": "examples/agentflow/artifact_map.example.json",
   "feedback_events": "examples/agentflow/feedback_event.example.jsonl",
-  "status": "draft",
+  "does_not_store_secrets": true,
+  "does_not_store_private_asset_bytes": true,
+  "does_not_store_provider_responses": true,
+  "does_not_auto_sync": true,
+  "does_not_create_database": true,
+  "does_not_create_account": true,
   "metadata": {
-    "example": true
+    "example": true,
+    "contract_scope": "local_read_only_project_workbench"
   }
 }

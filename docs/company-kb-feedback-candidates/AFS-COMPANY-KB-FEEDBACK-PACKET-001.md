@@ -16,7 +16,7 @@ Source slice: `AFS-COMPANY-KB-FEEDBACK-PACKET-001`
 ## Explicit Non-Promotions
 
 - This file does not promote AgentFlow Studio evidence to Company memory.
-- This file does not write the local Company source knowledge base.
+- This file does not write the local 10-Startup source knowledge base.
 - This file does not define durable Memory OS behavior.
 - This file does not claim human acceptance or business validation.
 - This file does not authorize provider calls.

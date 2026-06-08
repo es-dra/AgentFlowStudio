@@ -314,6 +314,11 @@ def test_agentflow_contract_registry_example_indexes_current_contracts() -> None
         "agentflow_memory_video_pipeline_presentation_package",
         "agentflow_memory_video_pipeline_package",
         "agentflow_production_memory_loop",
+        "agentflow_run_trace",
+        "agentflow_quality_report",
+        "agentflow_guardrail_result",
+        "agentflow_handoff_record",
+        "agentflow_maintenance_audit_report",
         "agentflow_skill_invocation",
         "agentflow_skill_result",
         "agentflow_router_decision",
@@ -370,6 +375,8 @@ def test_agentflow_contract_registry_declares_validation_rules_without_runtime()
         "memory_video_presentation_no_media_copy",
         "memory_video_package_no_call_feedback_draft",
         "production_memory_loop_no_provider_context_bundle",
+        "local_agentops_non_claims",
+        "local_agentops_no_company_write",
     } <= rule_ids
     assert "execute_workflow" not in rule_ids
     assert "call_remote_provider" not in rule_ids

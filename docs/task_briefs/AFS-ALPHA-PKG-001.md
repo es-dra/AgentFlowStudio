@@ -41,7 +41,7 @@ Base branch: master
 - `apps/web/`
 - Provider configuration files.
 - `data/processed/`, `data/raw/`, or generated media artifacts.
-- `D:\Learning materials\Learning_notes\Company` unless separately requested.
+- `D:\Learning materials\Learning_notes\10-Startup` unless separately requested.
 
 ## Input Docs
 
@@ -97,5 +97,5 @@ docs/local_alpha_0_2_acceptance.md
 3. Verification commands and results.
 4. Evidence or artifact paths.
 5. Risks and unfinished work.
-6. Memory candidates for `Company/` or project docs.
+6. Memory candidates for `10-Startup` or project docs.
 7. Whether the subagent or worktree should be closed, preserved, or continued.

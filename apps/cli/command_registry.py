@@ -22,6 +22,7 @@ from apps.cli.report_commands import (
     package_report_command,
     review_run_output,
 )
+from apps.cli.runtime_service_command import runtime_service_command
 from apps.web_bridge.server import serve as serve_web_bridge
 
 
@@ -49,6 +50,7 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
     register_production_memory_commands(app)
     app.command(name="web-bridge")(web_bridge_command)
+    app.command(name="runtime-service")(runtime_service_command)
 
 
 def inspect_run_command(

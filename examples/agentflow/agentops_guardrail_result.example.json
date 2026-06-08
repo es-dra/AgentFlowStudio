@@ -1,0 +1,30 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_guardrail_result",
+  "guardrail_id": "guardrail_runtime_demo_001",
+  "project_id": "proj_runtime_demo",
+  "source_trace_id": "trace_runtime_demo_001",
+  "guardrails": [
+    {
+      "gate": "secret_scan",
+      "status": "passed",
+      "reason": "example payload contains no secret-like fields"
+    },
+    {
+      "gate": "provider_execution",
+      "status": "blocked",
+      "reason": "live provider gate was not explicitly opened"
+    }
+  ],
+  "overall_status": "blocked",
+  "non_claims": [
+    "not human acceptance",
+    "not business validation",
+    "not durable memory"
+  ],
+  "writes_long_term_memory": false,
+  "writes_company_kb": false,
+  "metadata": {
+    "example": true
+  }
+}

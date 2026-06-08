@@ -1,63 +1,50 @@
-# AgentFlow Studio Web UI Workbench
+# AFS 过渡 Web 工作台
 
-This folder contains the local static Web workbench used by AgentFlow Studio
-and AgentFlow Studio review flows. It has three modes:
+本目录保存本地静态 Web workbench。它是过渡 read-only 工具，不是最终前端产品；后续外部画布工作台应主要对接 Runtime Service。
 
-- `Review Mode`: read-only, local-only artifact inspection.
-- `Production Mode`: supervised local production through the optional Web
-  Bridge on `127.0.0.1`.
-- `Memory Workbench`: static/local-only evidence canvas for the
-  Project -> Assets -> Memory Loaded -> Baseline Run -> Memory-backed Run ->
-  Review -> Feedback -> Next Pass loop.
+## 模式
 
-Open the UI directly:
+- `Review Mode`：read-only、local-only，只检查用户显式选择的 artifact。
+- `Production Mode`：通过本地 Web Bridge 在 `127.0.0.1` 上做受监督本地执行。
+- `Memory Workbench`：static/local-only evidence canvas，用于 Project -> Assets -> Memory Loaded -> Baseline Run -> Memory-backed Run -> Review -> Feedback -> Next Pass。
+
+直接打开：
 
 ```text
 apps/web/index.html
 ```
 
-Review Mode and Memory Workbench need no server. For Production Mode, start the
-local bridge in another terminal:
+`Review Mode` 和 `Memory Workbench` 不需要 server。`Production Mode` 需要先启动本地 bridge：
 
 ```powershell
 python -m apps.cli.main web-bridge --host 127.0.0.1 --port 8787
 ```
 
-Then open `apps/web/index.html` or serve the folder locally. The browser only
-connects to `http://127.0.0.1:8787`.
+浏览器只连接 `http://127.0.0.1:8787`。
 
-## Current Slice
+## 当前切片
 
-The current workbench line includes:
+当前工作台线包括：
 
-- M1.1 safe local artifact parsing.
-- M1.2 default Chinese UI with an in-memory language toggle.
-- M1.2.1 denser workbench layout and acceptance-oriented metrics.
-- M1.3 expanded artifact universe.
-- M1.4 production-oriented review information architecture.
-- M1.5 local video preview for explicitly selected `.mp4`, `.webm`, or `.mov`
-  files only.
-- M2 feedback event copy for manual JSON copy/export.
-- M3 and M3.1 supervised Production Mode with workflow selection, plan
-  generation, local run launch, polling, review refresh, video review, and
-  run-level feedback JSON copy.
-- M4 through M4.9 static Memory Workbench, explicit memory package loading,
-  selected bundle summaries, read-only artifact inspector, canvas focus,
-  workflow action strip, browser-local feedback draft preview, sample bundle,
-  protocol panel, and demo evidence summary.
-- M5 through M5.3 AgentFlow Studio Canvas polish, demo-ready checklist,
-  readiness cockpit, and operator command dock.
+- M1.1 safe local artifact parsing。
+- M1.2 default Chinese UI，语言切换只保存在 in-memory 状态。
+- M1.2.1 更密集的 workbench layout 和 acceptance-oriented metrics。
+- M1.3 expanded artifact universe。
+- M1.4 production-oriented review information architecture。
+- M1.5 explicit local video preview，只支持用户显式选择的 `.mp4`、`.webm`、`.mov`。
+- M2 feedback event copy，用于人工复制/export JSON。
+- M3 / M3.1 supervised Production Mode。
+- M4 到 M4.9 static Memory Workbench、artifact inspector、protocol panel、demo evidence summary。
+- M5 到 M5.3 Canvas polish、demo-ready checklist、readiness cockpit、operator command dock。
 
-Detailed history lives in
-[`../../docs/workbench/web_workbench_milestones.md`](../../docs/workbench/web_workbench_milestones.md).
+历史详情见：
 
-## Supported Artifacts
+- `../../docs/workbench/web_workbench_milestones.md`
+- `../../docs/workbench/web_workbench_reference.md`
 
-The viewer reads only files explicitly selected by the user with the file
-picker. It does not scan directories and it does not follow paths declared
-inside manifests.
+## 支持的 Artifact
 
-Recommended product-run set:
+推荐 product-run 文件：
 
 ```text
 run_manifest.json
@@ -67,7 +54,7 @@ review_report.json
 package_report.md
 ```
 
-Optional and expanded read-only artifacts include:
+可选只读 artifact：
 
 ```text
 delivery_readiness.json
@@ -83,64 +70,37 @@ audio_mix_manifest.json
 cover_manifest.json
 ```
 
-`package_manifest.json` and `finished_package_manifest.json` are normalized as
-`package_manifest`; the selected file name remains visible.
+分类规则：
 
-Artifact classification:
+- `known_contract`：已支持的 AFS artifact。
+- `unknown_json`：可解析 JSON，但不进入验收 summary。
+- `unsupported_file`：只作为 load note。
+- `local_media`：只用于 local video preview。
 
-- `known_contract`: supported AgentFlow Studio artifact participating in summary,
-  evidence, risk, asset, and inspector views.
-- `unknown_json`: parsed JSON object that is visible in inventory but excluded
-  from acceptance summary.
-- `unsupported_file`: selected file type that remains a load note only.
-- `local_media`: explicit video file eligible for local video preview only.
-- Invalid JSON or non-object JSON: recoverable load error.
+缺少 `schema_version` 是 warning，不是 fatal error。
 
-Missing `schema_version` is a warning, not a fatal error.
+## 边界
 
-Reference details live in
-[`../../docs/workbench/web_workbench_reference.md`](../../docs/workbench/web_workbench_reference.md).
+- read-only。
+- local-only。
+- no upload。
+- no backend execution in Review Mode。
+- no remote backend execution。
+- no persistence。
+- no browser persistence。
+- no provider calls。
+- no provider config。
+- no workflow execution in Review Mode。
+- no browser-side workflow execution。
+- no automatic directory scanning。
+- does not scan directories。
+- no manifest path auto-read。
+- no SaaS、account system、cloud storage、database、collaboration service。
 
-## Boundaries
+`feedback event copy` 只生成 JSON 文本，供人工复制。它 does not write files，不上传数据，不调用 backend，也不持久化状态。
 
-- Review Mode is read-only and local-only.
-- Production Mode is local-only and explicitly bridge-backed.
-- Memory Workbench is static/local-only and uses either the sanitized fixture or
-  explicitly selected memory pipeline JSON artifacts.
-- no upload
-- no backend execution in Review Mode
-- no remote backend execution
-- no persistence in browser state
-- no browser persistence
-- no provider calls
-- no provider config
-- no workflow execution in Review Mode
-- no browser-side workflow execution
-- no automatic directory scanning
-- no manifest path auto-read
-- no SaaS, account system, cloud storage, database, or collaboration service
+`local video preview` 只使用用户显式选择的本地视频文件。
 
-Feedback event copy generates JSON text for manual copy. It does not write
-files, append JSONL, upload data, call a backend, or persist state.
+## 编码说明
 
-Production Mode sends explicit workflow paths, input paths, and output
-directories to the local bridge selected by the user. Workflow execution still
-goes through `WorkflowRunner` and existing CLI contracts; browser code does not
-run Python directly.
-
-## Encoding Note
-
-The source files are UTF-8 and the browser renders Chinese copy directly. Some
-Windows terminals may show terminal mojibake with legacy code pages. For review,
-prefer the browser, an editor opened as UTF-8, or an encoding-aware check. The
-default Chinese copy is restored on refresh because the language toggle is
-in-memory only.
-
-## More Detail
-
-- Design brief:
-  [`../../docs/workbench/AFS-WORKBENCH-REDESIGN-001.md`](../../docs/workbench/AFS-WORKBENCH-REDESIGN-001.md)
-- Milestones:
-  [`../../docs/workbench/web_workbench_milestones.md`](../../docs/workbench/web_workbench_milestones.md)
-- Artifact and boundary reference:
-  [`../../docs/workbench/web_workbench_reference.md`](../../docs/workbench/web_workbench_reference.md)
+source files are utf-8。浏览器可直接渲染中文；部分 Windows terminal 可能出现 terminal mojibake。审查时优先用浏览器或 UTF-8 编辑器。

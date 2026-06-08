@@ -1,4 +1,5 @@
 import { clearNode, metaLine, node, row, statusPill } from "./render-helpers.js";
+import { renderAssetReviewScreen } from "./memory-workbench-asset-review-render.js";
 import { renderDemoReadyChecklist } from "./memory-workbench-demo-checklist-render.js";
 import { renderDemoEvidenceSummary } from "./memory-workbench-demo-render.js";
 import { renderActionStrip, renderOperatorDock, renderStudioStatus, renderToolbar } from "./memory-workbench-studio-render.js";
@@ -47,6 +48,7 @@ function renderSummary(elements, fixture, copy) {
     metaLine(`Format: ${project.format}`),
     metaLine(`Route: ${project.route}`),
   );
+  renderAssetReviewScreen(elements.memoryProjectSummary, fixture.asset_review_screen, copy);
 
   clearNode(elements.memoryAssetSummary);
   for (const asset of fixture.assets) {

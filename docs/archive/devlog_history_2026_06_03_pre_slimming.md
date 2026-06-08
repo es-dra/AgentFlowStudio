@@ -2469,7 +2469,7 @@ Current references:
 ## 2026-05-31 - Pre-Staging Candidate Ledger
 
 - Continued repository slimming under the full project rule hierarchy:
-  Company source knowledge base -> global workflow skills -> project
+  10-Startup source knowledge base -> global workflow skills -> project
   `AGENTS.md` -> `docs/company_operating_model.md` -> `TASK_TRACKER.md` /
   branch handoff -> current task.
 - Remote-provider policy: no remote provider calls. This was classification and
