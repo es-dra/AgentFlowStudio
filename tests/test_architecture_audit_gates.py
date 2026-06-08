@@ -8,10 +8,6 @@ SOURCE_ROOTS = ("agentflow", "agentflow_studio", "apps")
 
 KNOWN_AGENTFLOW_STUDIO_IMPORT_DEBT: set[tuple[str, str]] = set()
 
-KNOWN_PACKAGE_CYCLE_DEBT = {
-    frozenset({"agentflow_studio.harness", "agentflow_studio.workflow_engine"}),
-}
-
 KNOWN_HIDDEN_COMMAND_DEBT = {
     "kling-i2v-smoke",
     "kling-t2v-smoke",
@@ -93,10 +89,10 @@ def test_agentflow_core_does_not_depend_on_studio_layer() -> None:
     assert actual <= KNOWN_AGENTFLOW_STUDIO_IMPORT_DEBT
 
 
-def test_package_level_cycle_debt_is_frozen() -> None:
+def test_package_level_cycles_are_not_allowed() -> None:
     cycles = {frozenset(cycle) for cycle in _package_cycles(_package_edges())}
 
-    assert cycles <= KNOWN_PACKAGE_CYCLE_DEBT
+    assert cycles == set()
 
 
 def test_hidden_cli_surface_debt_is_frozen() -> None:

@@ -40,6 +40,8 @@ class ReviewedPath:
 def review_directory(path: str) -> ReviewedPath:
     if path == ".":
         return _dir(path, "production_spine", "current", "仓库根目录承载项目入口、配置、文档和源码。")
+    if path in {".github", ".github/workflows"}:
+        return _dir(path, "operations_spine", "current", "GitHub Actions 维护门禁和协作自动化配置。")
     if path in {"agentflow", "agentflow/contracts", "agentflow/harness", "agentflow/memory", "agentflow/router", "agentflow/skills"}:
         return _dir(path, "production_spine", "current", "平台 contract、harness、memory、router 或 skill 核心代码。")
     if path.startswith("agentflow_studio"):
@@ -106,6 +108,8 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(path, git_state, "delete_candidate", "delete_candidate", "README.md 已作为中文主入口，旧中文副本会制造双入口漂移。", "删除或转为短跳转后再次运行审查。")
     if path in {"README.md", "AGENTS.md", "TASK_TRACKER.md", "DEVLOG.md", "pyproject.toml", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
         return _file(path, git_state, "production_spine", "current", "项目入口、规则、跟踪、配置或许可证。")
+    if path == ".github/workflows/maintenance.yml":
+        return _file(path, git_state, "operations_spine", "current", "CI 维护门禁，运行 CLI、维护审计、测试和空白检查。")
     if path == "apps/__init__.py":
         return _file(path, git_state, "production_spine", "current", "apps Python package marker。")
     if path.endswith("/.gitkeep") and path.startswith("data/"):

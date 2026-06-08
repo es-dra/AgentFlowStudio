@@ -63,3 +63,30 @@
 - 全量 pytest：`992 passed, 1 warning`。
 - `git diff --check` 通过。
 - 静态 import 搜索未发现 `model_gateway` 与 `production` 之间的交叉引用。
+
+## 2026-06-08 - Maintenance Debt Closure 001
+
+- 新增 `agentflow_studio/workflow_run_artifacts.py`，把 workflow trace 与 run manifest 写入从 `harness` 包中抽到中立模块。
+- `workflow_engine.runner` 不再依赖 `harness`，`harness.trace` 与 `harness.run_manifest` 改为兼容导出层。
+- 架构门禁从“冻结已知包级循环债务”改为“不允许任何包级循环”。
+- 新增 `.github/workflows/maintenance.yml`，CI 默认运行 CLI smoke、`maintenance_audit`、全量 pytest 和 `git diff --check`，并显式关闭 live provider gate。
+- 新增 `tests/test_ci_maintenance_workflow.py`，防止维护门禁缺失或 CI 默认打开 provider。
+
+边界：
+
+- 未调用 live provider。
+- 未删除仍被测试和文档引用的 hidden CLI 兼容命令。
+- 未写入或晋升 `10-Startup` / COS active rule。
+- 未声明 human acceptance、business validation 或 durable memory。
+
+验证记录：
+
+- 红灯确认：移除 `harness/workflow_engine` 循环豁免后，架构门禁能捕获旧循环。
+- 聚焦测试：`12 passed`。
+- 静态 import 搜索未发现 `harness` 与 `workflow_engine` 之间的交叉引用。
+- Retention review 对新增 `.github/workflows/maintenance.yml` 先报 `manual_review_required_count=3`；已将 `.github` 和 workflow 文件登记为 `operations_spine`，复测 `manual_review_required_count=0`。
+- CLI help 可运行；CLI version 输出 `0.1.0`。
+- `maintenance_audit`：`failed=0, passed=4, warning=2`。
+- `repository_retention_review --summary-only`：`delete_candidate_count=0`，`manual_review_required_count=0`。
+- 全量 pytest：`994 passed, 1 warning`。
+- `git diff --check` 通过。

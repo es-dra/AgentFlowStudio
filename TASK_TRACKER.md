@@ -25,6 +25,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | ID | Owner role | 范围 | 状态 | 证据 |
 |---|---|---|---|---|
+| AFS-MAINTENANCE-DEBT-CLOSURE-001 | Architecture Reset Lead + QA / Release Gatekeeper | 解除剩余包级循环、收紧架构门禁、新增 CI 维护门禁 | 已完成 | `docs/maintenance/AFS-MAINTENANCE-DEBT-CLOSURE-001.zh-CN.md` |
 | AFS-MODEL-GATEWAY-CYCLE-001 | Architecture Reset Lead | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 | `docs/maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md` |
 | AFS-PRODUCT-SPINE-RESET-003 | Maintainability Steward + Architecture Reset Lead | 删除旧入口、压缩历史文档面、强化 retention review、消除旧包/CLI/Web surface | 已提交 | `docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md` |
 | AFS-RUNTIME-SERVICE-V0-2-001 | Runtime/API Integrator + Frontend Contract Steward | Runtime Service、OpenAPI、frontend-safe refs、request fixture | 已合入基线 | `docs/frontend_integration/`；`docs/handoff/AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md` |
@@ -34,7 +35,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | 模块 | 状态 | 证据 |
 |---|---|---|
-| Git | 当前分支 `codex/afs-model-gateway-cycle-001` | `git status --short --branch` |
+| Git | 当前分支 `codex/afs-maintenance-debt-closure-001` | `git status --short --branch` |
 | Production Memory Asset Loop | deterministic 本地 contract chain 已具备 | `agentflow/memory/`；`apps/cli/production_memory_command_registry.py` |
 | Runtime Service | 前端主对接面 | `apps/api/`；`apps/cli/runtime_service_command.py` |
 | 过渡 Web | 只保留 read-only / local-only artifact viewer | `apps/web/README.md` |
@@ -45,11 +46,12 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 | ID | 范围 | 状态 |
 |---|---|---|
 | AFS-MODEL-GATEWAY-CYCLE-001 | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 |
-| AFS-WORKFLOW-HARNESS-CYCLE-001 | 解除 `agentflow_studio.harness <-> agentflow_studio.workflow_engine` 循环 | 排队 |
-| AFS-CI-MAINTENANCE-GATE-001 | 加入 `maintenance_audit`、focused pytest、`git diff --check` 到 CI | 排队 |
+| AFS-WORKFLOW-HARNESS-CYCLE-001 | 解除 `agentflow_studio.harness <-> agentflow_studio.workflow_engine` 循环 | 已完成 |
+| AFS-CI-MAINTENANCE-GATE-001 | 加入 `maintenance_audit`、focused pytest、`git diff --check` 到 CI | 已完成 |
 
 ## 当前阻塞和残留
 
 - `maintenance_audit` 预计仍会保留低置信 secret-like warning 和 300 行以上文件 warning；只要 `failed=0` 即可继续。
 - `docs/archive/` 中仍有历史引用；它们不是当前任务入口。
+- Hidden CLI support commands 仍是兼容支持面；删除前必须做独立 CLI 协议迁移。
 - Provider validation 默认关闭，除非显式授权对应 capability gate。
