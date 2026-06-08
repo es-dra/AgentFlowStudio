@@ -18,7 +18,6 @@ def read_web_shell_source() -> str:
             "index.html",
             "app-shell-template.js",
             "app-shell-review-template.js",
-            "app-shell-production-template.js",
             "app-shell-memory-template.js",
         ]
     )

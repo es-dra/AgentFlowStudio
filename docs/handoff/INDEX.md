@@ -1,10 +1,10 @@
 # Handoff Index
 
-Status: handoff directory index for current AgentFlow Studio maintenance.
+Status: current handoff directory index for AgentFlow Studio.
 
-The `docs/handoff/` directory preserves node-by-node implementation evidence.
-Do not treat every file here as current product direction. Use this index to
-route new work.
+This directory now keeps only handoff files that still support the current
+local-internal-test product spine. Old node-by-node, demo, competition, and
+Web bridge handoffs were deleted instead of migrated.
 
 ## Current Mainline Evidence
 
@@ -29,36 +29,34 @@ asset profile package
 -> read-only Web cockpit
 ```
 
+## Runtime Service / Frontend Handoff
+
+- `AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
+- `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
+
+## Local Internal Test Handoff
+
+- `AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`
+
 ## Current Maintenance Evidence
 
-- `../maintenance/AFS-MAINLINE-FOUNDATION-CLEANUP-001.md`
-- `../maintenance/AFS-MAINTENANCE-SLIMMING-001.md`
-- `../maintenance/AFS-CLI-SURFACE-ASSESSMENT-001.md`
-- `../maintenance/AFS-IGNORED-RUNTIME-CLEANUP-MANIFEST-001.md`
+- `../maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md`
+- `../maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md`
+- `../maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`
 
-## Preserved Evidence, Not Current Product Line
+## Deleted Surfaces
 
-- `AFS-MEMORY-ADVANTAGE-DEMO-012.md`
-- `AFS-MEMORY-ADVANTAGE-DEMO-013.md`
-- `AFS-MEMORY-ADVANTAGE-DEMO-014.md`
-- `AFS-MEMORY-ADVANTAGE-DEMO-015.md`
-- `AFS-MEMORY-ADVANTAGE-RECORDING-016.md`
+Deleted from current handoff surface:
 
-These files are historical provider/demo evidence. Do not add new numbered demo
-modules unless the tracker is explicitly changed.
-
-## Older Production Memory Node Evidence
-
-Production Memory operator, next-pass, action-result, and acceptance-feedback
-handoffs remain useful for debugging and regression history. They are no longer
-the preferred entrypoint for product-level tester handoff; prefer the asset-loop
-documents listed under current mainline evidence.
+- old numbered memory/demo handoffs;
+- old competition demo run/talk docs;
+- old Company KB feedback handoffs;
+- old generic Production Memory operator node handoffs;
+- old Web bridge and Web operator handoffs.
 
 ## Routing Rule
 
 - Product/tester handoff: start with the asset loop current evidence.
-- Engineering debugging: use the specific node handoff that matches the failing
-  artifact or CLI command.
-- New Web work: start from the read-only cockpit handoff and current Web tests.
-- Provider work: start from provider-gated docs and never infer authorization
-  from deterministic test success.
+- Frontend integration: start with Runtime Service / frontend contract handoffs.
+- New Web work: start from the read-only asset cockpit handoff and current Web tests.
+- Provider work: start from provider-gated docs and never infer authorization from deterministic test success.

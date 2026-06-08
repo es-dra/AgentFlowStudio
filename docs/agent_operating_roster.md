@@ -16,8 +16,9 @@ D:\Learning materials\Learning_notes\10-Startup
   integration, and final verification.
 - Worktree root:
   `C:\Users\chenzy\.config\superpowers\worktrees\AgentFlowStudio\`.
-- Current branch state: `master` is the only active local/remote branch. The
-  old Web UI branch was replayed, archived by tag, and deleted.
+- Current branch state: active maintenance work is on
+  `codex/afs-product-spine-reset-003`; `master` / `origin/master` remain the
+  integration baselines.
 - Subagents are ephemeral task workers. A visible historical agent card in the
   UI is not an active lane unless the agent manager can still resume or close
   the ID.
@@ -59,7 +60,7 @@ controller, or a fresh subagent for the current task.
 | Role | Use when | Guardrail |
 |---|---|---|
 | Provider Adapter Agent | ASR, image, LLM, or video provider behavior changes | Must name the capability gate and avoid live calls unless opted in |
-| Web UI Agent | Improve `apps/web` or `apps/web_bridge` product usability | Must keep browser state local-only and avoid provider secrets or persistence |
+| Web UI Agent | Improve transitional `apps/web` read-only artifact views or frontend integration docs | Must keep browser state local-only and avoid provider secrets or persistence |
 | Media QA Agent | Real video, subtitle, BGM, cover, or package artifact checks | Must separate runtime verification from human acceptance |
 | Security / Secret Audit Agent | Config, provider, release, or publishing-sensitive work | Must inspect for secrets and private paths before integration |
 | Docs Projection Agent | Company-to-project rule projection or public docs alignment | Must not copy confidential Company content into the repo |
@@ -100,12 +101,9 @@ Idle agents create stale context, not capacity.
 
 | ID | Suggested branch | Owner role | Primary scope | Dependency |
 |---|---|---|---|---|
-| AFS-PROD-LOOP-001 | `codex/afs-prod-loop-brief` | Orchestrator + Product Lead | Local Alpha 0.4 scenario package and runbook | Complete after integration |
-| AFS-RUN-PACKAGE-001 | `codex/afs-run-package-loop` | Workflow Engineer + Harness / QA Reviewer | Local runtime package or actionable blocker | Completed after local inputs were supplied |
-| AFS-WEB-OPERATOR-002 | `codex/afs-web-operator-loop` | Web UI Agent + QA Reviewer | Web operator path for the 0.4 scenario | Integrated with follow-up readiness fix |
-| AFS-MEMORY-QUALITY-002 | `codex/afs-memory-quality-loop` | Memory / Evidence Steward | Traceable evidence reuse evaluation | Complete as structural review |
-| AFS-ALPHA-0-4-ACCEPTANCE | main checkout | Orchestrator + Harness / QA Reviewer | 0.4 pass/block/non-claim reconciliation | Current docs-only lane |
-| AFS-POSTER-LIVE-002 | `codex/afs-poster-live-002` | Provider Adapter Agent + Security / Secret Audit Agent | Optional live image smoke or blocked evidence | Optional; blocked until local image env is intentionally configured |
+| AFS-PRODUCT-SPINE-RESET-003 | `codex/afs-product-spine-reset-003` | Maintainability Steward + Architecture Reset Lead | Delete retired surfaces and remove package cycles | Active |
+| AFS-RUNTIME-SERVICE-V0-2-001 | master / current branch | Runtime/API Integrator | Runtime Service and frontend-safe API contract | Integrated baseline |
+| AFS-FRONTEND-WORKBENCH-INTEGRATION-001 | external frontend branch | Web UI Agent + Runtime/API Integrator | External canvas workbench -> Runtime Service | Pending external frontend handoff |
 
 Open the next queue as separate worktrees only if their write scopes remain disjoint.
 When a shared contract becomes unstable, stop parallel implementation and assign

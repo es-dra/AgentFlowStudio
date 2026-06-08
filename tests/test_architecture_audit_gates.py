@@ -78,6 +78,10 @@ def test_runtime_service_does_not_depend_on_cli_or_legacy_web_bridge() -> None:
     assert forbidden == set()
 
 
+def test_legacy_web_bridge_package_is_retired() -> None:
+    assert not Path("apps/web_bridge").exists()
+
+
 def test_apps_use_platform_json_helper_not_studio_utils() -> None:
     forbidden = _import_pairs(Path("apps"), ("agentflow_studio.utils",))
 

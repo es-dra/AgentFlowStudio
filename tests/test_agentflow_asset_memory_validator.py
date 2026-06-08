@@ -137,7 +137,7 @@ def test_asset_memory_validator_rejects_durable_memory_claim_refs() -> None:
     assert _failed_check_ids(validation) >= {"promotion_decision_no_durable_memory_claims"}
 
 
-def test_evidence_reuse_review_accepts_local_alpha_0_4_chain_example() -> None:
+def test_evidence_reuse_review_accepts_production_memory_chain_example() -> None:
     review = validate_evidence_reuse_review(
         evidence_reuse_review=_json(EVIDENCE_REUSE_REVIEW_EXAMPLE),
         memory_candidate=_json(MEMORY_CANDIDATE_EXAMPLE),
@@ -145,7 +145,7 @@ def test_evidence_reuse_review_accepts_local_alpha_0_4_chain_example() -> None:
     )
 
     assert review["artifact_type"] == "agentflow_memory_evidence_reuse_review_validation"
-    assert review["review_scope"] == "local_alpha_0_4_evidence_reuse"
+    assert review["review_scope"] == "production_memory_evidence_reuse"
     assert review["runtime_status"] == "not_implemented"
     assert review["does_not_execute"] is True
     assert review["writes_long_term_memory"] is False

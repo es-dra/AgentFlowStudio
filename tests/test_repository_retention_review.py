@@ -29,12 +29,12 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     assert files["README.zh-CN.md"]["status"] == "delete_candidate"
     assert files["agentflow/contracts.py"]["product_surface"] == "production_spine"
     assert files["agentflow/contracts.py"]["status"] == "current"
-    assert files["apps/web_bridge/server.py"]["product_surface"] == "quarantine_candidate"
+    assert files["apps/web_bridge/server.py"]["product_surface"] == "delete_candidate"
     assert files["apps/web_bridge/server.py"]["status"] == "legacy_runtime_surface"
     assert files["agentflow_studio/memory_advantage_demo_012.py"]["product_surface"] == "quarantine_candidate"
     assert files["agentflow_studio/memory_advantage_demo_012.py"]["status"] == "legacy_demo_runtime"
-    assert report["summary"]["delete_candidate_count"] == 1
-    assert report["summary"]["product_surface_counts"]["quarantine_candidate"] >= 2
+    assert report["summary"]["delete_candidate_count"] == 3
+    assert report["summary"]["product_surface_counts"]["quarantine_candidate"] >= 1
 
 
 def test_repository_retention_review_marks_deleted_redundant_entry_as_applied(tmp_path: Path) -> None:

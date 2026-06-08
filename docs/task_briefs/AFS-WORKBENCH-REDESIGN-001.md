@@ -42,7 +42,7 @@ Base branch: master after AFS-MAINTENANCE-RESET-001
 ## Do Not Touch
 
 - `apps/web/*.js`, `apps/web/*.css`, `apps/web/index.html`
-- `apps/web_bridge/`
+- Runtime Service frontend contract docs
 - provider code or configs
 - generated artifacts and local media
 - private Company knowledge base

@@ -88,26 +88,17 @@ const ids = [
   "video-preview-content", "report-content", "report-tabs", "overall-status", "overall-status-label",
   "overall-status-value", "stat-artifacts", "stat-known", "stat-warnings", "stat-errors",
   "feedback-artifact", "feedback-decision", "feedback-risk", "feedback-time", "feedback-note",
-  "feedback-output", "feedback-status", "feedback-copy", "mode-review", "mode-production",
-  "mode-memory", "review-workbench", "production-workbench", "memory-workbench",
+  "feedback-output", "feedback-status", "feedback-copy", "mode-review",
+  "mode-memory", "review-workbench", "memory-workbench",
   "memory-sample-bundle", "memory-source-status", "memory-project-summary", "memory-bundle-summary",
       "memory-artifact-inspector", "memory-feedback-preview", "memory-feedback-copy",
       "memory-feedback-output", "memory-feedback-status", "memory-action-strip", "memory-asset-summary",
       "memory-state-strip", "memory-canvas-stage", "memory-demo-summary", "memory-demo-checklist", "memory-protocol-summary", "memory-lane-grid", "memory-run-timeline",
-  "memory-provenance-panel", "bridge-health", "workflow-select", "workflow-input-path",
-  "workflow-output-dir", "workflow-profile", "quick-demo-button", "product-workflow-button",
-  "create-plan-button", "run-workflow-button", "refresh-review-button", "production-overview",
-  "readiness-checklist", "production-next-action", "acceptance-path-detail", "operator-loop-status",
-  "step-timeline", "production-artifacts", "production-video-preview", "production-asset-match",
-  "supervision-panel", "supervision-actions", "production-log", "run-feedback-decision",
-  "run-feedback-risk", "run-feedback-time", "run-feedback-note", "run-feedback-copy",
-  "run-feedback-output", "run-feedback-status",
+  "memory-provenance-panel",
 ];
 for (const id of ids) byId.set(id, element(id));
 byId.get("feedback-decision").value = "approved";
 byId.get("feedback-risk").value = "general_review";
-byId.get("run-feedback-decision").value = "approved";
-byId.get("run-feedback-risk").value = "production_readiness";
 
 globalThis.document = {
   documentElement: element("html"),
@@ -117,7 +108,6 @@ globalThis.document = {
     return element(selector);
   },
   querySelectorAll(selector) {
-    if (selector === "#production-path li") return [element("li"), element("li"), element("li"), element("li"), element("li"), element("li")];
     return [];
   },
 };

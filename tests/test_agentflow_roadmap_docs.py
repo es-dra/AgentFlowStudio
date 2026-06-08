@@ -98,87 +98,39 @@ def test_phase15_roadmap_records_asset_reuse_chain_audit_smoke() -> None:
     assert "does not register a new contract artifact type" in phase15
 
 
-def test_local_alpha_0_3_validation_goals_are_discoverable() -> None:
+def test_old_local_alpha_docs_are_retired_from_current_doc_surface() -> None:
     docs_index = _text(DOCS_INDEX)
     task_briefs_index = _text(TASK_BRIEFS_INDEX)
-    goals = _text(LOCAL_ALPHA_0_3_GOALS)
 
-    assert LOCAL_ALPHA_0_3_GOALS.exists()
-    assert "local_alpha_0_3_validation_goals.md" in docs_index
-    assert "local_alpha_0_3_validation_goals.md" in task_briefs_index
-    assert "repeatable\nlocal operator loop" in goals
-    assert "AFS-WEB-REVIEW-001" in goals
-    assert "AFS-MEMORY-RUNTIME-001" in goals
+    for path in [
+        LOCAL_ALPHA_0_3_GOALS,
+        LOCAL_ALPHA_0_4_GOALS,
+        LOCAL_ALPHA_0_4_SCENARIO,
+        LOCAL_ALPHA_0_4_ACCEPTANCE,
+        Path("docs/local_alpha_0_2_acceptance.md"),
+    ]:
+        assert not path.exists()
+        assert path.name not in docs_index
+        assert path.name not in task_briefs_index
 
 
-def test_local_alpha_0_3_task_briefs_exist() -> None:
+def test_legacy_web_bridge_briefs_are_retired_from_current_task_surface() -> None:
+    task_briefs_index = _text(TASK_BRIEFS_INDEX)
+
     for brief in [
-        "AFS-PROD-NEXT-001.md",
+        "AFS-WEB-UX-001.md",
         "AFS-WEB-REVIEW-001.md",
-        "AFS-MEMORY-RUNTIME-001.md",
-        "AFS-POSTER-LIVE-002.md",
-    ]:
-        assert (Path("docs/task_briefs") / brief).exists()
-
-
-def test_local_alpha_0_4_product_loop_goals_are_discoverable() -> None:
-    docs_index = _text(DOCS_INDEX)
-    task_briefs_index = _text(TASK_BRIEFS_INDEX)
-    goals = _text(LOCAL_ALPHA_0_4_GOALS)
-
-    assert LOCAL_ALPHA_0_4_GOALS.exists()
-    assert "local_alpha_0_4_product_loop_goals.md" in docs_index
-    assert "local_alpha_0_4_product_loop_goals.md" in task_briefs_index
-    assert "one real local product loop" in goals
-    assert "local_alpha_0_4_scenario_package.md" in goals
-    assert "AFS-PROD-LOOP-001" in goals
-    assert "AFS-WEB-OPERATOR-002" in goals
-    assert "AFS-MEMORY-QUALITY-002" in goals
-
-
-def test_local_alpha_0_4_scenario_package_is_discoverable() -> None:
-    docs_index = _text(DOCS_INDEX)
-    task_briefs_index = _text(TASK_BRIEFS_INDEX)
-    scenario = _text(LOCAL_ALPHA_0_4_SCENARIO)
-
-    assert LOCAL_ALPHA_0_4_SCENARIO.exists()
-    assert "local_alpha_0_4_scenario_package.md" in docs_index
-    assert "local_alpha_0_4_scenario_package.md" in task_briefs_index
-    assert "video_script_to_finished_package_local_asr.yaml" in scenario
-    assert "data/processed/local_alpha_0_4/video_script_local_asr_input.json" in scenario
-    assert "AFS-RUN-PACKAGE-001 and AFS-WEB-OPERATOR-002 may run in parallel" in scenario
-
-
-def test_local_alpha_0_4_acceptance_reconciliation_is_discoverable() -> None:
-    docs_index = _text(DOCS_INDEX)
-    task_briefs_index = _text(TASK_BRIEFS_INDEX)
-    acceptance = _text(LOCAL_ALPHA_0_4_ACCEPTANCE)
-
-    assert LOCAL_ALPHA_0_4_ACCEPTANCE.exists()
-    assert "local_alpha_0_4_acceptance_reconciliation.md" in docs_index
-    assert "local_alpha_0_4_acceptance_reconciliation.md" in task_briefs_index
-    for label in [
-        "Structure verification",
-        "runtime verification",
-        "human acceptance",
-        "business validation",
-        "provider smoke",
-        "durable Memory runtime",
-        "Real second-pass run",
-    ]:
-        assert label in acceptance
-    assert "not human-accepted and\nnot business-validated" in acceptance
-
-
-def test_local_alpha_0_4_task_briefs_exist() -> None:
-    for brief in [
-        "AFS-PROD-LOOP-001.md",
-        "AFS-RUN-PACKAGE-001.md",
         "AFS-WEB-OPERATOR-002.md",
-        "AFS-MEMORY-QUALITY-002.md",
-        "AFS-POSTER-LIVE-002.md",
     ]:
-        assert (Path("docs/task_briefs") / brief).exists()
+        assert brief not in task_briefs_index
+        assert not (Path("docs/task_briefs") / brief).exists()
+    for handoff in [
+        "AFS-WEB-UX-001.md",
+        "AFS-WEB-REVIEW-001.md",
+        "AFS-WEB-OPERATOR-002.md",
+        "AFS-WEB-REPLAY.md",
+    ]:
+        assert not (Path("docs/handoff") / handoff).exists()
 
 
 def test_memory_workbench_redesign_is_discoverable_and_loop_focused() -> None:
@@ -256,7 +208,7 @@ def test_memory_workbench_implementation_brief_scopes_static_first_screen() -> N
         "blocked",
         "memory provenance panel",
         "no provider calls",
-        "no apps/web_bridge",
+        "Runtime Service / local artifact only",
         "no automatic directory scanning",
         "no browser persistence",
         "Browser screenshot",

@@ -31,10 +31,6 @@
 ## 本地内测与前端
 
 - [本地内测 runbook](local_internal_test_runbook.md)
-- [Local Alpha 0.3 验证目标旧稿](local_alpha_0_3_validation_goals.md)
-- [Local Alpha 0.4 产品闭环旧稿](local_alpha_0_4_product_loop_goals.md)
-- [Local Alpha 0.4 场景包旧稿](local_alpha_0_4_scenario_package.md)
-- [Local Alpha 0.4 验收对齐旧稿](local_alpha_0_4_acceptance_reconciliation.md)
 - [Memory Workbench 重设计旧稿](workbench/AFS-WORKBENCH-REDESIGN-001.md)
 - [前端对接包](frontend_integration/README.md)
 - [Runtime Service 前端交接](handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md)
@@ -43,9 +39,8 @@
 ## 维护与交接
 
 - [维护性重置账本](maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md)
-- [维护重置历史](maintenance/AFS-MAINTENANCE-RESET-001.md)
-- [CLI 帮助清理](maintenance/AFS-CLI-HELP-CLEANUP-001.md)
-- [主线基础清理](maintenance/AFS-MAINLINE-FOUNDATION-CLEANUP-001.md)
+- [Product Spine Reset 账本](maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md)
+- [Agent 项目开发规范候选](maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md)
 
 ## 开发命令
 

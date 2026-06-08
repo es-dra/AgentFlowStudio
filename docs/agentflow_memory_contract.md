@@ -184,7 +184,7 @@ written.
 `agentflow_memory_evidence_reuse_review` validates whether a run's evidence can
 be traced into the next context pass.
 
-For Local Alpha 0.4 it checks this chain:
+For the current Production Memory loop it checks this chain:
 
 ```text
 runtime evidence

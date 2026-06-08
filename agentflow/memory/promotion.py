@@ -25,10 +25,10 @@ DURABLE_MEMORY_CLAIM_FIELDS = frozenset(
 )
 EVIDENCE_REUSE_REQUIRED_RUNTIME_REFS = frozenset(
     {
-        "local_alpha_0_4_product_loop:run_manifest",
-        "local_alpha_0_4_product_loop:quality_report",
-        "local_alpha_0_4_product_loop:review_report",
-        "local_alpha_0_4_product_loop:package_report",
+        "production_memory_loop:run_manifest",
+        "production_memory_loop:quality_report",
+        "production_memory_loop:review_report",
+        "production_memory_loop:package_report",
     }
 )
 
@@ -116,9 +116,9 @@ def evidence_reuse_review_checks(
             "evidence reuse review artifact_type is agentflow_memory_evidence_reuse_review",
         ),
         _check(
-            "evidence_reuse_scope_local_alpha_0_4",
-            evidence_reuse_review.get("review_scope") == "local_alpha_0_4_evidence_reuse",
-            "evidence reuse review is scoped to Local Alpha 0.4",
+            "evidence_reuse_scope_production_memory",
+            evidence_reuse_review.get("review_scope") == "production_memory_evidence_reuse",
+            "evidence reuse review is scoped to Production Memory",
         ),
         _check(
             "evidence_reuse_review_only",

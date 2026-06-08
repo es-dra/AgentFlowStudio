@@ -35,7 +35,6 @@ export function reviewShellTemplate() {
           <button id="language-toggle" class="ghost-button" type="button">English</button>
           <div class="mode-toggle" aria-label="Workbench mode">
             <button id="mode-review" class="mode-button active" type="button">验收</button>
-            <button id="mode-production" class="mode-button" type="button">生产</button>
             <button id="mode-memory" class="mode-button" type="button">Memory</button>
           </div>
           <label class="primary-import" for="artifact-files">

@@ -98,7 +98,7 @@ Secondary actions:
 - inspect raw JSON;
 - copy feedback JSON;
 - open package report;
-- view bridge health;
+- view Runtime Service or local artifact status;
 - view provider gate status.
 
 Buttons should be tied to one visible state transition. Avoid ambiguous actions
@@ -120,7 +120,7 @@ The workbench remains a local operator surface:
 - no generated media committed to Git.
 
 Review Mode may keep explicit file selection. Production Mode may talk to the
-local bridge only on `127.0.0.1`.
+local Runtime Service only on `127.0.0.1`.
 
 ## Data Flow
 
@@ -186,5 +186,5 @@ design lane does not start a dev server.
 6. Add feedback-event draft display and copy action.
 7. Add a next-pass panel for candidate and promotion decision drafts.
 
-Provider execution buttons should stay disabled until the local bridge route
+Provider execution buttons should stay disabled until the explicit Runtime Service route
 and capability gate are both explicit.

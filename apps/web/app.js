@@ -4,7 +4,6 @@ import { mountAppShell } from "./app-shell-template.js";
 import { renderWorkspace } from "./app-workspace-render.js";
 import { attachFeedbackHandlers } from "./feedback-wiring.js";
 import { getCopy } from "./ui-copy.js";
-import { initializeProductionMode, productionState, recordRunFeedbackCaptured, recordSupervisionIntent, renderProductionState } from "./production-mode.js";
 import { revokeCurrentVideoUrl } from "./video-preview.js";
 import { attachMemoryWorkbenchHandlers, buildMemoryWorkbenchView, memorySourceForArtifacts } from "./memory-workbench-controller.js";
 import { renderMemoryWorkbench } from "./memory-workbench-render.js";
@@ -34,7 +33,6 @@ elements.languageToggle.addEventListener("click", () => {
 });
 
 elements.modeReview.addEventListener("click", () => setMode("review"));
-elements.modeProduction.addEventListener("click", () => setMode("production"));
 elements.modeMemory.addEventListener("click", () => setMode("memory"));
 attachMemoryWorkbenchHandlers(elements, {
   onWorkspaceLoaded: (workspace, source) => {
@@ -43,21 +41,12 @@ attachMemoryWorkbenchHandlers(elements, {
   },
   setMode,
 });
-elements.supervisionActions.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-supervision]");
-  if (!button) return;
-  recordSupervisionIntent(button.dataset.supervision, elements, getCopy(state.language));
-});
-
 attachFeedbackHandlers(elements, {
   getCopyForLanguage: () => getCopy(state.language),
-  productionState,
-  onRunFeedbackCaptured: () => recordRunFeedbackCaptured(elements, getCopy(state.language)),
 });
 
 window.addEventListener("beforeunload", revokeCurrentVideoUrl);
 
-initializeProductionMode(elements, getCopy(state.language));
 render();
 
 function setMode(mode) {
@@ -67,7 +56,7 @@ function setMode(mode) {
 
 function initialMode() {
   const mode = window.location?.hash?.replace("#", "") || "";
-  return ["review", "production", "memory"].includes(mode) ? mode : "review";
+  return ["review", "memory"].includes(mode) ? mode : "review";
 }
 
 function render() {
@@ -77,17 +66,13 @@ function render() {
   renderMode();
   renderWorkspace(elements, state.workspace, copy);
   renderMemoryWorkbench(elements, buildMemoryWorkbenchView(state.workspace, state.memorySource), copy);
-  renderProductionState(elements, copy, state.workspace);
 }
 
 function renderMode() {
   const review = state.mode === "review";
-  const production = state.mode === "production";
   const memory = state.mode === "memory";
   elements.reviewWorkbench.hidden = !review;
-  elements.productionWorkbench.hidden = !production;
   elements.memoryWorkbench.hidden = !memory;
   elements.modeReview.classList.toggle("active", review);
-  elements.modeProduction.classList.toggle("active", production);
   elements.modeMemory.classList.toggle("active", memory);
 }

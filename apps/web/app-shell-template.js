@@ -1,5 +1,4 @@
 import { memoryShellTemplate } from "./app-shell-memory-template.js";
-import { productionShellTemplate } from "./app-shell-production-template.js";
 import { reviewShellTemplate } from "./app-shell-review-template.js";
 
 export function mountAppShell() {
@@ -8,7 +7,6 @@ export function mountAppShell() {
   root.innerHTML = `
     <main class="app-shell" aria-label="AgentFlow Studio static artifact viewer">
       ${reviewShellTemplate()}
-      ${productionShellTemplate()}
       ${memoryShellTemplate()}
     </main>
   `;

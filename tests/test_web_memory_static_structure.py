@@ -6,28 +6,23 @@ from tests.web_static_helpers import (
 )
 
 
-def test_web_declares_review_and_production_modes() -> None:
+def test_web_declares_review_and_memory_modes() -> None:
     html = _read_web_shell_source()
     app = _read_web_file("app.js")
     elements = _read_web_file("app-elements.js")
 
     assert 'id="mode-review"' in html
-    assert 'id="mode-production"' in html
     assert 'id="mode-memory"' in html
-    assert 'id="production-workbench"' in html
     assert 'id="memory-workbench"' in html
-    assert 'id="bridge-health"' in html
-    assert 'id="workflow-select"' in html
-    assert 'id="run-workflow-button"' in html
-    assert 'id="supervision-actions"' in html
     assert 'src="app.js?v=m4-memory-canvas-tools"' in html
     assert "setMode" in app
     assert "initialMode" in app
     assert "window.location?.hash" in app
-    assert "production-workbench" in elements
+    assert "production-workbench" not in elements
     assert "memory-workbench" in elements
     assert 'from "./app-elements.js"' in app
     assert 'from "./feedback-wiring.js"' in app
+    assert "production-mode.js" not in app
 
 def test_web_memory_workbench_declares_canvas_regions_and_states() -> None:
     html = _read_web_shell_source()

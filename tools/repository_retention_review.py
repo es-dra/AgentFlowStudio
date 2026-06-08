@@ -31,7 +31,10 @@ def build_repository_retention_review(root: Path) -> dict[str, Any]:
         if not is_excluded(path)
     ]
     delete_candidates = [
-        item for item in [*directory_reviews, *file_reviews] if item.status == "delete_candidate"
+        item
+        for item in [*directory_reviews, *file_reviews]
+        if item.status != "remove_applied_pending_stage"
+        and (item.status == "delete_candidate" or item.product_surface == "delete_candidate")
     ]
     manual_review_required = [
         item for item in [*directory_reviews, *file_reviews] if item.status == "manual_review_required"
@@ -130,7 +133,9 @@ def _git_paths(root: Path, command: list[str]) -> list[str]:
 
 def _collect_directories(files: dict[str, str]) -> list[str]:
     directories = {"."}
-    for file_path in files:
+    for file_path, git_state in files.items():
+        if git_state == "deleted":
+            continue
         current = Path(file_path).parent
         while str(current) not in ("", "."):
             directories.add(current.as_posix())

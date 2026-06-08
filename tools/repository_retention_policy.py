@@ -51,7 +51,7 @@ def review_directory(path: str) -> ReviewedPath:
     if path.startswith("apps/cli"):
         return _dir(path, "operations_spine", "current", "CLI 是本地运维、测试和 deterministic harness 入口；hidden support 命令会在文件级复审。")
     if path.startswith("apps/web_bridge"):
-        return _dir(path, "quarantine_candidate", "legacy_runtime_surface", "旧 Web bridge 已被 Runtime Service v0.2 替代为主对接面，应隔离或删除。")
+        return _dir(path, "delete_candidate", "legacy_runtime_surface", "旧 Web bridge 已退出当前产品主干，应直接删除。")
     if path.startswith("apps/web"):
         return _dir(path, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台仍被静态测试覆盖，外部前端接管后应退休。")
     if path == "apps":
@@ -84,6 +84,15 @@ def review_directory(path: str) -> ReviewedPath:
 
 
 def review_file(path: str, git_state: str) -> ReviewedPath:
+    if git_state == "deleted":
+        return _file(
+            path,
+            git_state,
+            "delete_candidate",
+            "remove_applied_pending_stage",
+            "已按当前维护账本在工作树删除，等待提交完成退休。",
+            "提交删除后完成退休；如需恢复，必须重新证明其服务当前产品主干。",
+        )
     if path == "README.zh-CN.md":
         if git_state == "deleted":
             return _file(
@@ -134,7 +143,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
     if path.startswith("apps/cli/"):
         return _file(path, git_state, "operations_spine", "current", "本地 CLI 命令入口或 registry。")
     if path.startswith("apps/web_bridge/"):
-        return _file(path, git_state, "quarantine_candidate", "legacy_runtime_surface", "本地 Web bridge 已不是前端主对接面，应隔离或删除。", "确认 Runtime Service 覆盖旧 bridge tests 后删除。")
+        return _file(path, git_state, "delete_candidate", "legacy_runtime_surface", "本地 Web bridge 已退出当前产品主干，应直接删除。", "提交删除并保持 Runtime Service / local artifact 边界后完成退休。")
     if path.startswith("apps/web/"):
         return _file(path, git_state, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台；外部前端上线后按测试覆盖退休。")
     if path.startswith("configs/"):

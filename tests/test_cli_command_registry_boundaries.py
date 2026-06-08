@@ -114,6 +114,13 @@ def test_default_help_keeps_production_memory_product_surface_thin() -> None:
     assert "web-bridge" not in result.output
 
 
+def test_web_bridge_command_is_retired_not_hidden() -> None:
+    result = CliRunner().invoke(app, ["web-bridge", "--help"])
+
+    assert result.exit_code != 0
+    assert "No such command" in result.output
+
+
 def test_visible_product_command_help_avoids_terminal_truncation_glyphs() -> None:
     runner = CliRunner()
 

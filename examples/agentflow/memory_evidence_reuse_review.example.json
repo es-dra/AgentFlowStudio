@@ -1,33 +1,33 @@
 {
   "schema_version": "0.1.0",
   "artifact_type": "agentflow_memory_evidence_reuse_review",
-  "review_id": "af_memory_evidence_reuse_review_local_alpha_0_4_001",
-  "review_scope": "local_alpha_0_4_evidence_reuse",
+  "review_id": "af_memory_evidence_reuse_review_production_memory_001",
+  "review_scope": "production_memory_evidence_reuse",
   "runtime_status": "not_implemented",
   "does_not_execute": true,
   "writes_long_term_memory": false,
-  "run_id": "local_alpha_0_4_product_loop",
+  "run_id": "production_memory_loop",
   "runtime_evidence": {
     "artifact_refs": [
-      "local_alpha_0_4_product_loop:run_manifest",
-      "local_alpha_0_4_product_loop:quality_report",
-      "local_alpha_0_4_product_loop:review_report",
-      "local_alpha_0_4_product_loop:package_report"
+      "production_memory_loop:run_manifest",
+      "production_memory_loop:quality_report",
+      "production_memory_loop:review_report",
+      "production_memory_loop:package_report"
     ],
     "machine_verification": "reported"
   },
   "feedback_source": {
     "source_type": "operator_feedback_event",
     "evidence_refs": [
-      "local_alpha_0_4_product_loop:review_report",
-      "local_alpha_0_4_product_loop:package_report"
+      "production_memory_loop:review_report",
+      "production_memory_loop:package_report"
     ],
     "source_of_truth": "operator_feedback_event_json"
   },
   "memory_candidate_ref": "af_memory_candidate_001",
   "promotion_decision_ref": "af_memory_promotion_decision_001",
   "context_bundle": {
-    "bundle_id": "local_alpha_0_4_context_bundle_review_001",
+    "bundle_id": "production_memory_context_bundle_review_001",
     "source_memory_candidates": [
       "af_memory_candidate_001"
     ],
@@ -35,16 +35,16 @@
       "af_memory_promotion_decision_001"
     ],
     "source_runtime_evidence_refs": [
-      "local_alpha_0_4_product_loop:run_manifest",
-      "local_alpha_0_4_product_loop:quality_report",
-      "local_alpha_0_4_product_loop:review_report",
-      "local_alpha_0_4_product_loop:package_report"
+      "production_memory_loop:run_manifest",
+      "production_memory_loop:quality_report",
+      "production_memory_loop:review_report",
+      "production_memory_loop:package_report"
     ],
     "writes_long_term_memory": false
   },
   "second_pass_prompt": {
-    "prompt_id": "local_alpha_0_4_second_pass_prompt_review_001",
-    "context_bundle_ref": "local_alpha_0_4_context_bundle_review_001",
+    "prompt_id": "production_memory_second_pass_prompt_review_001",
+    "context_bundle_ref": "production_memory_context_bundle_review_001",
     "memory_refs": [
       "af_memory_candidate_001"
     ],

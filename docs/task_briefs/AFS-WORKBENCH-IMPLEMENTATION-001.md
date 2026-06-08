@@ -33,8 +33,8 @@ JSON first.
 - Do not call providers.
 - Boundary keyword: no provider calls.
 - Do not enable live image or video execution.
-- Do not edit `apps/web_bridge/`.
-- Boundary keyword: no apps/web_bridge changes.
+- Do not introduce any legacy Web bridge dependency.
+- Boundary keyword: Runtime Service / local artifact only.
 - Do not add SaaS, auth, accounts, uploads, cookies, localStorage, IndexedDB,
   or cloud sync.
 - Do not add automatic directory scanning.
@@ -50,13 +50,13 @@ Web UI Agent + QA Reviewer
 ## Write Scope
 
 - `apps/web/` for the static first-screen view and local fixture wiring.
-- `tests/test_web_production_mode_static.py` or a focused Web static test.
+- focused Web static tests under `tests/test_web_memory_*`.
 - `apps/web/README.md` only if adding a short pointer to the workbench slice.
 - `TASK_TRACKER.md` and `DEVLOG.md` after verification.
 
 ## Do Not Touch
 
-- `apps/web_bridge/`
+- `docs/frontend_integration/`
 - provider adapters and config files;
 - `.env`, `.dev.vars`, `configs/models.yaml`;
 - `data/processed/`, `data/raw/`, generated media, or local model caches;
@@ -66,8 +66,6 @@ Web UI Agent + QA Reviewer
 
 - `AGENTS.md`
 - `docs/workbench/AFS-WORKBENCH-REDESIGN-001.md`
-- `docs/handoff/AFS-POST-DEMO-PRODUCTIZATION-ROADMAP.md`
-- `docs/handoff/AFS-MEMORY-PIPELINE-MVP-001.md`
 - `examples/agentflow/memory_video_pipeline_package.example.json`
 
 ## Required UI Content
@@ -111,7 +109,7 @@ The fixture must not contain:
 
 ## Acceptance Criteria
 
-- [ ] A static first-screen view renders from the fixture without bridge access.
+- [ ] A static first-screen view renders from the fixture without backend execution.
 - [ ] The view exposes all eight loop regions: Project, Assets, Memory Loaded,
       Baseline Run, Memory-backed Run, Review, Feedback, Next Pass.
 - [ ] The view includes all state labels: no plan, planned, generating, review
@@ -130,7 +128,8 @@ The fixture must not contain:
 
 ```powershell
 node --check apps/web/app.js
-node --check apps/web/production-render.js
+node --check apps/web/app.js
+node --check apps/web/memory-workbench-controller.js
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests/test_web_production_mode_static.py tests/test_agentflow_roadmap_docs.py -q
 git diff --check
 ```
