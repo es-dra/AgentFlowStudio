@@ -42,6 +42,40 @@ D:\Learning materials\Learning_notes\10-Startup
 
 当前目标是本地内测可用，不是 SaaS。
 
+AFS 当前对外和对内主打主题是：
+
+```text
+Harness-first Agentic Delivery System
+```
+
+它在本项目中的含义是：用本地优先的工作台验证 Agent 项目交付方法，把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目执行闭环。
+
+术语分工：
+
+| 术语 | 在 AFS 中的用途 |
+|---|---|
+| AI-Native Company OS | 公司级总系统，源头在 `10-Startup`。 |
+| Harness-first Agentic Delivery System | AFS 当前主打项目交付主题。 |
+| Evidence-backed Context Runtime | 任务执行时的上下文装配层。 |
+| Governed Memory / Memory OS | 记忆、候选经验和知识晋升子系统，不作为当前主标题。 |
+| AgentFlow Studio | 第一条本地验证项目线。 |
+
+核心对象：
+
+```text
+Task Brief
+Project Prefix
+Context Bundle
+Prompt / Skill Pack
+Execution Router
+Tool Contract
+Run Trace
+Quality Report
+Feedback Signal
+Memory Candidate
+Promotion Ledger
+```
+
 已具备：
 
 - deterministic Production Memory asset loop。
@@ -153,3 +187,15 @@ Runtime Service v0.1+
 - `docs/maintenance/`
 
 可复用经验回流 `10-Startup` 时只能进入 candidate/limited 流程。Agent 不能自行把候选规则晋升为 active。
+
+## 外部项目思想协助标准投影
+
+AFS 执行投影采用 `10-Startup/80-Workflow/ai-native-company-workflow/agent-assistance-standard.md` 的 candidate guidance。
+
+项目内执行规则：
+
+- 外部项目只作为机制来源，不默认安装、复刻或引入为依赖。
+- 先在对话中总结核心思想，再映射到 AFS 已有对象：Project Prefix、Context Bundle、Memory Candidate、Feedback Signal、Quality Report、repo map、maintenance audit。
+- 不为外部项目默认创建单独 intake 文档；只有用户明确要求时才创建。
+- 涉及共享 contract、schema、Runtime Service、CLI、provider adapter 或维护清理时，先做仓库结构和影响面理解，再执行修改。
+- 项目经验只能作为 evidence / candidate memory 回流 `10-Startup`，不能在 AFS repo 内直接晋升为 Company OS active rule。

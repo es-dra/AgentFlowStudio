@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelProviderError
-from agentflow_studio.utils import write_json
 
 
 TASK_STATE_SCHEMA_VERSION = "kling_video_task_state.v1"

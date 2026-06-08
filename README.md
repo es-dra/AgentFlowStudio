@@ -1,12 +1,17 @@
 # AgentFlow Studio
 
-AgentFlow Studio 是一个本地优先、面向 Agent 的内容生产与分发工作台。当前阶段的目标是“本地内测可用”：测试人员能跑任务、看 artifact、记录反馈、复用上下文，并清楚地区分验证、验收和商业结论。
+AgentFlow Studio 是一个本地优先的 Agent 工程工作台，用于验证 `Harness-first Agentic Delivery System`：把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目交付闭环。
 
-长期愿景可以称为 `Memory OS`，但当前工程主线更准确地叫：
+当前内容生产与分发链路是第一条真实验证线，不是项目的全部定义。当前阶段目标仍然是“本地内测可用”：测试人员能跑任务、看 artifact、记录反馈、复用上下文，并清楚地区分结构验证、运行验证、人工验收和商业结论。
+
+术语分工：
 
 ```text
-Production Memory Architecture
-Evidence-backed Context Runtime
+AI-Native Company OS                 总系统
+Harness-first Agentic Delivery System 当前主打项目交付主题
+Evidence-backed Context Runtime       上下文运行层
+Governed Memory / Memory OS           记忆和知识晋升子系统 / 长期愿景
+AgentFlow Studio                      第一条本地验证项目线
 ```
 
 ## 当前状态

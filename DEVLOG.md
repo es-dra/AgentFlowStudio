@@ -14,9 +14,38 @@
 - AFS/COS Agent 项目开发规范候选：`docs/maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md`。
 - 深度瘦身审查：`docs/maintenance/AFS-DEEP-CLEANUP-AUDIT-001.zh-CN.md`。
 - 架构审计门禁：`docs/maintenance/AFS-ARCHITECTURE-AUDIT-GATES-001.zh-CN.md`。
+- 实际清理记录：`docs/maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`。
 - 历史英文文档中文摘要索引：`docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`。
 - 历史开发日志归档：`docs/archive/devlog_history_2026_06_03_pre_slimming.md`。
 - 历史任务账本归档：`docs/archive/task_history_2026_06_03_pre_slimming.md`。
+
+## 2026-06-08 - Harness-first Agentic Delivery 定位投影
+
+- 将 AFS 当前主打主题从 memory-first 叙事调整为 `Harness-first Agentic Delivery System`：AFS 是本地优先 Agent 工程工作台，用于验证提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组成的可重复项目交付闭环。
+- 在 `10-Startup/20-Operating-System/05-Harness-First-Agentic-Delivery-System.md` 新增源头定位文档，并更新 `AI-Native-Company-OS-MAP.md` 与 `20-Operating-System/README.md` 的术语分工。
+- 更新 AFS `README.md` 和 `docs/company_operating_model.md`：`AI-Native Company OS` 是总系统，`Harness-first Agentic Delivery System` 是当前主打项目交付主题，`Evidence-backed Context Runtime` 是上下文运行层，`Governed Memory / Memory OS` 是记忆和知识晋升子系统 / 长期愿景。
+- 在 `TASK_TRACKER.md` 登记 `AFS-POSITIONING-HARNESS-FIRST-001`，下一步验证应放到真实开发/维护任务中，而不是另起理论 demo。
+- 边界保持：本次为 docs/rules 投影，未修改 runtime/provider 代码，未调用 provider，未声明 human acceptance、business validation 或 Company OS active-rule promotion。
+
+## 2026-06-08 - 实际清理 002
+
+- 从 `origin/master` 新开 `codex/afs-actual-cleanup-002`，保留已有 COS 执行投影 dirty 变更。
+- 将 `agentflow_studio/model_gateway/kling_video_smoke.py` 中的任务完成、httpx->curl fallback、视频下载、safe state/manifest 写入逻辑拆到 `agentflow_studio/model_gateway/kling_video_completion.py`；公开 smoke 入口保持不变。
+- `kling_video_smoke.py` 从 327 行降到 201 行，退出 `maintenance_audit` 的 oversized warning；新增 completion 模块为 116 行。
+- 将 `kling_video_task_state.py` 的 JSON 写入 helper 从旧 `agentflow_studio.utils` 切到 `agentflow.harness.json_io`。
+- 拆分 `tests/test_kling_video_task_recovery.py`：task recovery / completion fallback / runtime polling 分别进入独立测试文件；原测试文件从 317 行降到 172 行。
+- 拆分 `tests/test_minimax_image_smoke.py` 的 CLI 面到 `tests/test_minimax_image_smoke_cli.py`；原测试文件从 329 行降到 232 行。
+- 拆分 `tests/test_posterflow_provider.py`：OpenAI-compatible provider 测试进入 `tests/test_posterflow_openai_provider.py`，共享 fixture 进入 `tests/posterflow_provider_helpers.py`；原测试文件从 342 行降到 188 行。
+- 验证：Kling focused tests `16 passed`；Kling + 架构门禁 `22 passed`；拆分后 Kling + 架构门禁仍为 `22 passed`；MiniMax CLI focused tests `16 passed`；PosterFlow provider focused tests `13 passed`；最终 provider/CLI/维护聚焦测试 `63 passed`；`maintenance_audit` 为 `failed=0, passed=4, warning=2`，oversized 文件从 33 降到 29；`git diff --check` 退出码 0。
+- 边界保持：未调用 provider，未写入 secret / signed URL / 媒体字节，未声明 human acceptance、business validation 或 durable memory。
+
+## 2026-06-08 - 外部项目思想协助标准投影
+
+- 将 `claude-obsidian` 和 `GitNexus` 的核心思想收敛为 Company OS candidate guidance：外部项目只作为机制来源，先对话总结，再映射到本地知识对象、全局规则和项目开发链路，不默认安装、不默认复刻、不默认创建 intake 文档。
+- 在 `10-Startup/80-Workflow/ai-native-company-workflow/agent-assistance-standard.md` 新增 candidate 标准，并在 `candidate-rule-ledger.md` 登记为 P1 candidate。
+- 在全局 `project-development-workflow` skill 增加 routing hook，未来进入项目时可读取该协助标准。
+- 在 `docs/company_operating_model.md` 增加 AFS 执行投影，只记录项目执行需要的摘要，不复制 Company OS 源头知识。
+- 边界保持：未安装或运行外部工具，未调用 provider，未写入 secret，未晋升 Company OS active rule；后续需要通过 AFS 真实开发/维护任务产生 feedback signal 后再考虑 `limited`。
 
 ## 2026-06-08 - 深度瘦身审查
 

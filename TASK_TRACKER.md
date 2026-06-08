@@ -34,13 +34,15 @@ AFS 仓库只保存执行投影。历史文档如仍出现 `Company` 旧称，�
 | AFS-FRONTEND-ZH-HANDOFF-AND-MAINTAINABILITY-STANDARD-001 | Product Integration Steward + Maintainability Steward | 中文前端交接材料和 AFS/COS Agent 项目开发规范候选 | 已本地记录，作为 candidate guidance | 证据：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`；`docs/maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md`；不代表 COS active-rule promotion |
 | AFS-DEEP-CLEANUP-AUDIT-001 | Maintainability Steward + Full-stack Reviewer | 深度目录/调用关系/入口/文档瘦身审查，删除已被归档摘要覆盖的重复 handoff | 已执行低风险删除，待验证 | 证据：`docs/maintenance/AFS-DEEP-CLEANUP-AUDIT-001.zh-CN.md`；删除 `docs/handoff/AFS-MEM-002.md`、`docs/handoff/AFS-QA-001.md`；编号 demo、旧 Web、旧 bridge 均保留为有条件后续删除候选 |
 | AFS-ARCHITECTURE-AUDIT-GATES-001 | Maintainability Steward | import boundary、hidden CLI surface、禁止新增编号 demo 的自动化门禁；减少旧 bridge 顶层依赖；下沉核心 JSON helper；拆出 provider adapter 边界；清除 `apps.cli` / `apps.web_bridge` 循环依赖 | 已合入 master | 证据：PR #83 squash merge `aa9b1a4`；`tests/test_architecture_audit_gates.py`；`docs/maintenance/AFS-ARCHITECTURE-AUDIT-GATES-001.zh-CN.md`；`apps/cli/command_registry.py` lazy import 旧 bridge；`apps.reporting.run_reports` 接管 report helper；`agentflow.harness.json_io` 接管 `write_json`；`agentflow.memory`、`apps/api`、`apps/cli` 已无 `agentflow_studio.utils` 依赖；`agentflow` 对 `agentflow_studio` 反向依赖已清零；`agentflow_studio.model_gateway.asset_profile_provider_adapter` 承接 live provider smoke；`pytest tests/test_architecture_audit_gates.py -q` 为 `6 passed`；full pytest `1023 passed, 1 warning` |
-| AFS-RUNTIME-SERVICE-V0-2-001 | Runtime/API Integrator + Frontend Contract Steward | project list/import/export、job progress、OpenAPI 固定导出、前端 request fixture | focused regression 通过，待综合验证/PR | 证据：`docs/handoff/AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`；`docs/frontend_integration/openapi/afs-runtime-service.openapi.json`；`examples/frontend_runtime_service/project_import.request.example.json`；`pytest tests/test_api_runtime_service.py tests/test_cli_command_registry_boundaries.py -q` 为 `15 passed, 1 warning`；未调用 provider，未写 secret，未声明 human acceptance、business validation 或 durable memory |
+| AFS-RUNTIME-SERVICE-V0-2-001 | Runtime/API Integrator + Frontend Contract Steward | project list/import/export、job progress、OpenAPI 固定导出、前端 request fixture | 已合入 origin/master | 证据：`origin/master` `e2e528f`；`docs/handoff/AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`；`docs/frontend_integration/openapi/afs-runtime-service.openapi.json`；`examples/frontend_runtime_service/project_import.request.example.json`；`pytest tests/test_api_runtime_service.py tests/test_cli_command_registry_boundaries.py -q` 为 `15 passed, 1 warning`；未调用 provider，未写 secret，未声明 human acceptance、business validation 或 durable memory |
+| AFS-POSITIONING-HARNESS-FIRST-001 | Product/Methodology Steward | 将 AFS 主打主题从 memory-first 叙事调整为 `Harness-first Agentic Delivery System`，并明确 `Evidence-backed Context Runtime` 与 `Memory OS` 的层级关系 | 首轮源头规则和项目投影已完成，待真实任务验证 | 证据：`10-Startup/20-Operating-System/05-Harness-First-Agentic-Delivery-System.md`；`10-Startup/00-Company-OS/AI-Native-Company-OS-MAP.md`；`README.md`；`docs/company_operating_model.md`；`DEVLOG.md`；未声明 business validation、human acceptance 或 Company OS active-rule promotion |
+| AFS-ACTUAL-CLEANUP-002 | Maintainability Steward + Provider Runtime Reviewer | 实际清理第一块：拆分 Kling provider smoke completion、Kling/MiniMax/PosterFlow provider 测试边界，减少 oversized warning，收口 task state JSON helper | 进行中，第一块已验证 | 证据：`docs/maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`；`kling_video_smoke.py` 327 -> 201 行；`test_kling_video_task_recovery.py` 317 -> 172 行；`test_minimax_image_smoke.py` 329 -> 232 行；`test_posterflow_provider.py` 342 -> 188 行；新增 `kling_video_completion.py`、Kling completion/runtime tests、`test_minimax_image_smoke_cli.py`、`posterflow_provider_helpers.py`、`test_posterflow_openai_provider.py`；最终 provider/CLI/维护聚焦测试 `63 passed`；`maintenance_audit` oversized 33 -> 29；`git diff --check` 退出码 0；未调用 provider |
 
 ## 当前主线基线
 
 | 模块 | 状态 | 证据 |
 |---|---|---|
-| Git 主线 | `master` 停在 `98ac418`，当前维护工作在 `codex/afs-maintenance-localization-cleanup-001` | `git branch -vv` |
+| Git 主线 | `origin/master` 停在 `e2e528f`，当前实际清理工作在 `codex/afs-actual-cleanup-002` | `git branch -vv` |
 | Production Memory Asset Loop | deterministic 本地 contract chain 已具备 read-only Web cockpit | `docs/handoff/AFS-PRODUCTION-MEMORY-ASSET-COCKPIT-WEB-001.md` |
 | 本地内测闭环 | Asset Review Screen、真实素材 harness、两轮上下文验证、Project Manifest、Provider Gate 均已实现为本地切片 | `docs/handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md` |
 | Loulan 压力样本 | Round 1 / Round 2 / provider smoke 已产生 runtime evidence | ignored runtime path：`data/processed/runs/local_internal_test/` |
@@ -52,10 +54,10 @@ AFS 仓库只保存执行投影。历史文档如仍出现 `Company` 旧称，�
 | ID | 范围 | 依赖 | 状态 |
 |---|---|---|---|
 | AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001-FINALIZE | 完成活文档中文化、复跑 focused tests、`maintenance_audit`、`repository_retention_review`、`git diff --check`，更新 handoff | 当前维护分支 | 本地验证完成；正在 staging/commit/PR |
-| AFS-RUNTIME-SERVICE-V0-2-QUEUE | 增加 project list/import/export、job progress、OpenAPI 固定导出、前端 client 生成说明、显式 live provider endpoint gate | 维护 PR 已合入 | 进行中：本切片先完成只读/导入导出/OpenAPI；live provider endpoint gate 仍保持后续独立切片 |
+| AFS-RUNTIME-SERVICE-V0-2-QUEUE | 增加 project list/import/export、job progress、OpenAPI 固定导出、前端 client 生成说明、显式 live provider endpoint gate | 维护 PR 已合入 | 只读/导入导出/OpenAPI 已合入；live provider endpoint gate 仍保持后续独立切片 |
 | AFS-FRONTEND-WORKBENCH-INTEGRATION-001 | 外部画布前端接 Runtime Service，首屏只做项目、run、artifact、review safe view | Runtime Service v0.2 和前端团队对齐 | 排队 |
 | AFS-10-STARTUP-DOCS-PROJECTION-001 | 将旧 `Company` 文案统一投影为 `10-Startup` | docs-only，不与 runtime 代码混做 | 排队 |
-| AFS-ARCHITECTURE-SPLIT-001 | 按维护审计结果拆分超 300 行文件，优先 Runtime Service、provider smoke、Web 过渡模块 | 维护 PR 完成后 | 排队 |
+| AFS-ARCHITECTURE-SPLIT-001 | 按维护审计结果拆分超 300 行文件，优先 provider smoke、Web 过渡模块、核心 memory 模块 | 维护 PR 完成后 | 已启动：`AFS-ACTUAL-CLEANUP-002` 完成 provider smoke 第一块 |
 | AFS-CI-MAINTENANCE-GATE-001 | 加入 `maintenance_audit`、secret scan、focused pytest、`git diff --check` 到 CI | GitHub push/PR 后 | 排队 |
 
 ## 当前阻塞和残留
