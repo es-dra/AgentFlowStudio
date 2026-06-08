@@ -30,6 +30,7 @@ def runtime_job(
         "project_id": project_id,
         "action": action,
         "status": status,
+        "progress": job_progress(action, status),
         "artifacts": artifacts or {},
     }
     if error:
@@ -39,6 +40,12 @@ def runtime_job(
 
 def public_job_from_store(store: RuntimeStore, job_id: str) -> dict[str, Any]:
     return public_job(store.load_job(job_id))
+
+
+def job_progress(action: str, status: str) -> dict[str, Any]:
+    terminal = status in {"succeeded", "failed", "blocked", "cancelled"}
+    percent = 100 if terminal else 50 if status == "running" else 0
+    return {"stage": action, "percent": percent, "terminal": terminal}
 
 
 def load_round_1_job(store: RuntimeStore, job_id: str) -> dict[str, Any]:
@@ -57,6 +64,7 @@ def safe_job_id(value: str) -> str:
 
 __all__ = (
     "load_round_1_job",
+    "job_progress",
     "optional_path",
     "presence_ref",
     "public_job_from_store",

@@ -36,6 +36,7 @@ from apps.api.runtime_tracing import (
     write_run_trace,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, runtime_feedback_event
+from apps.api.runtime_v02 import register_runtime_v02_routes
 from agentflow.harness.json_io import write_json
 from agentflow.memory.production_asset_provider_validation_gate import run_provider_validation_gate
 from agentflow.memory.production_asset_test_run_harness import run_real_asset_test_harness
@@ -49,15 +50,15 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     store = RuntimeStore(runtime_root)
     app = FastAPI(
         title="AgentFlow Runtime Service",
-        version="0.1.0",
+        version="0.2.0",
         summary="Local AFS API adapter for frontend canvas/workbench integration.",
     )
-
     @app.get("/health")
     def health() -> dict[str, Any]:
         return {
             "service": "agentflow_runtime_service",
             "status": "ready",
+            "service_version": "0.2.0",
             "schema_version": "0.1.0",
             "runtime_root_persisted": False,
             "boundaries": {
@@ -75,17 +76,20 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         return {
             "actions": [
                 "create_project",
+                "list_projects",
+                "import_project",
+                "export_project",
                 "read_project_manifest",
                 "read_artifact",
                 "asset_test_run",
                 "two_round_validate",
                 "record_feedback",
                 "provider_validation_plan",
+                "export_openapi_schema",
             ],
             "statuses": ["queued", "running", "succeeded", "failed", "blocked", "cancelled"],
             "safe_ref_policy": "frontend receives artifact_id and summaries, not private local paths",
         }
-
     @app.post("/projects")
     def create_project(request: ProjectCreateRequest) -> dict[str, Any]:
         manifest = store.create_project_manifest(
@@ -287,6 +291,8 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         job = runtime_job(job_id, request.project_id, "provider_validation_plan", status, artifacts=artifacts)
         public_job = store.write_job(job)
         return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts}
+
+    register_runtime_v02_routes(app, store)
 
     return app
 

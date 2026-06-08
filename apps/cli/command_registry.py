@@ -20,7 +20,7 @@ from apps.cli.report_commands import (
     delivery_readiness_command,
     package_report_command,
 )
-from apps.cli.runtime_service_command import runtime_service_command
+from apps.cli.runtime_service_command import runtime_service_command, runtime_service_openapi_export_command
 from apps.reporting.run_reports import inspect_run_output, review_run_output
 
 
@@ -49,6 +49,7 @@ def register_product_commands(app: typer.Typer) -> None:
     register_production_memory_commands(app)
     app.command(name="web-bridge")(web_bridge_command)
     app.command(name="runtime-service")(runtime_service_command)
+    app.command(name="runtime-service-openapi-export")(runtime_service_openapi_export_command)
 
 
 def inspect_run_command(

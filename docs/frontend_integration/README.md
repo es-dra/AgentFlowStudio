@@ -1,6 +1,6 @@
 # AFS 前端对接包
 
-状态：Runtime Service v0.1 对接包。
+状态：Runtime Service v0.2 对接包。
 
 这组文档给外部画布/工作台前端团队使用。前端只对接 Runtime Service，不需要理解 CLI 内部实现，也不应读取私有本地路径、provider secret 或浏览器侧执行逻辑。
 
@@ -16,6 +16,18 @@
 
 ```text
 examples/frontend_runtime_service/
+```
+
+OpenAPI 固定导出：
+
+```text
+docs/frontend_integration/openapi/afs-runtime-service.openapi.json
+```
+
+重新导出命令：
+
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\frontend_integration\openapi\afs-runtime-service.openapi.json
 ```
 
 Runtime Service 启动：
@@ -39,6 +51,8 @@ http://127.0.0.1:8790/openapi.json
 - safe summary
 - safe manifest
 - selected JSON payload
+- project summary
+- job progress
 
 前端不能使用：
 

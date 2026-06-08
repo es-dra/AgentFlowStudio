@@ -76,6 +76,25 @@ class RuntimeStore:
         validate_project_manifest(payload)
         return payload
 
+    def import_project_manifest(self, manifest: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(manifest)
+        reject_unsafe_payload(payload)
+        validate_project_manifest(payload)
+        project_id = str(payload["project_id"])
+        path = self.project_manifest_path(project_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, payload)
+        return payload
+
+    def list_project_summaries(self) -> list[dict[str, Any]]:
+        summaries: list[dict[str, Any]] = []
+        for path in sorted(self.projects_dir.glob("*/project_manifest.json")):
+            manifest = read_json(path)
+            validate_project_manifest(manifest)
+            artifact = self.register_artifact(path, role="project_manifest")
+            summaries.append(project_summary(manifest, artifact))
+        return summaries
+
     def update_project_manifest(self, project_id: str, updates: dict[str, list[dict[str, Any]]], status: str) -> dict[str, Any]:
         manifest = self.ensure_project_manifest(project_id)
         for field, refs in updates.items():
@@ -164,6 +183,20 @@ def public_artifact_ref(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def project_summary(manifest: dict[str, Any], artifact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "project_id": manifest["project_id"],
+        "project_type": manifest["project_type"],
+        "goal": manifest["goal"],
+        "status": manifest["status"],
+        "run_count": len(manifest.get("runs", [])),
+        "package_count": len(manifest.get("packages", [])),
+        "feedback_count": len(manifest.get("feedback_refs", [])),
+        "profile_version_count": len(manifest.get("profile_version_refs", [])),
+        "artifact": artifact,
+    }
+
+
 def safe_id(value: str) -> str:
     cleaned = SAFE_ID_PATTERN.sub("-", str(value).strip()).strip("-._")
     return cleaned or "item"
@@ -205,6 +238,7 @@ def runtime_feedback_event(project_id: str, feedback: dict[str, Any], generated_
 
 __all__ = (
     "RuntimeStore",
+    "project_summary",
     "public_job",
     "read_json",
     "runtime_feedback_event",
