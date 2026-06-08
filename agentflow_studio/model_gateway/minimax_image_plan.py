@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlunparse
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelProviderError
-from agentflow_studio.production.posterflow.minimax_provider import (
+from agentflow_studio.provider_contracts import (
     DEFAULT_MINIMAX_BASE_URL,
     DEFAULT_MINIMAX_IMAGE_MODEL,
 )

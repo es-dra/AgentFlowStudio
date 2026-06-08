@@ -10,7 +10,6 @@ KNOWN_AGENTFLOW_STUDIO_IMPORT_DEBT: set[tuple[str, str]] = set()
 
 KNOWN_PACKAGE_CYCLE_DEBT = {
     frozenset({"agentflow_studio.harness", "agentflow_studio.workflow_engine"}),
-    frozenset({"agentflow_studio.model_gateway", "agentflow_studio.production"}),
 }
 
 KNOWN_HIDDEN_COMMAND_DEBT = {

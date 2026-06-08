@@ -1,13 +1,9 @@
 from __future__ import annotations
 
+from agentflow_studio.provider_contracts import (
+    ModelConfigError,
+    ModelGatewayError,
+    ModelProviderError,
+)
 
-class ModelGatewayError(Exception):
-    """Base error for model gateway failures."""
-
-
-class ModelConfigError(ModelGatewayError):
-    """Raised when model gateway configuration is invalid."""
-
-
-class ModelProviderError(ModelGatewayError):
-    """Raised when a provider cannot generate a response."""
+__all__ = ["ModelConfigError", "ModelGatewayError", "ModelProviderError"]

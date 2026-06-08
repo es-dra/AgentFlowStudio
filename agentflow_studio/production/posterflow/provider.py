@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentflow_studio.model_gateway.errors import ModelProviderError
+from agentflow_studio.provider_contracts import ModelProviderError
 from agentflow_studio.production.posterflow.provider_common import ensure_remote_image_calls_allowed, input_hash
 from agentflow_studio.production.posterflow.schemas import (
     PosterCandidate,

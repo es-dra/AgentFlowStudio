@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import json
 import mimetypes
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
 from agentflow_studio.model_gateway.errors import ModelProviderError
-from agentflow_studio.production.posterflow.schemas import PosterPromptPack
+
+
+MINIMAX_MIN_IMAGE_COUNT = 1
+MINIMAX_MAX_IMAGE_COUNT = 9
 
 
 def runtime_subject_reference(image_path: str | Path | None) -> dict[str, Any] | None:
@@ -37,31 +44,100 @@ def image_mime_type(image_path: Path) -> str:
     raise ModelProviderError("MiniMax subject reference image must be JPG, JPEG, or PNG")
 
 
-def prompt_pack(*, prompt: str, aspect_ratio: str, model: str) -> PosterPromptPack:
-    return PosterPromptPack(
-        project_id="agentflow_memory_advantage_demo",
-        run_id="minimax_image_smoke",
-        prompt_id="minimax_image_smoke_prompt",
-        target_model_family="minimax_image",
-        prompt_language="en",
-        positive_prompt=prompt,
-        negative_prompt="",
-        prompt_sections={"source": "cli_prompt"},
-        model_params={"aspect_ratio": aspect_ratio, "model": model},
-        context_usage={"company_provider_config_used": True},
-        source_refs={"provider_config": "local_company_secret_file"},
+def generate_minimax_image_outputs(
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    output_root: Path,
+    candidate_count: int,
+    aspect_ratio: str,
+    timeout_sec: float,
+    subject_reference_image_path: str | Path | None = None,
+    seed: int | None = None,
+) -> list[dict[str, Any]]:
+    _ensure_candidate_count(candidate_count)
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "aspect_ratio": aspect_ratio,
+        "response_format": "base64",
+        "n": candidate_count,
+        "prompt_optimizer": False,
+    }
+    if seed is not None:
+        payload["seed"] = seed
+    if subject_reference_image_path is not None:
+        payload["subject_reference"] = [
+            {
+                "type": "character",
+                "image_file": _subject_reference_data_url(Path(subject_reference_image_path)),
+            }
+        ]
+    response = _send_minimax_image_request(
+        base_url=base_url,
+        api_key=api_key,
+        payload=payload,
+        timeout_sec=timeout_sec,
     )
+    _ensure_success_response(response)
+    return _write_output_summaries(output_root, _base64_images(response), candidate_count)
 
 
-def output_summaries(output_root: Path, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _send_minimax_image_request(
+    *,
+    base_url: str,
+    api_key: str,
+    payload: dict[str, Any],
+    timeout_sec: float,
+) -> dict[str, Any]:
+    request = urllib.request.Request(
+        _image_generation_url(base_url),
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+            body = response.read()
+    except urllib.error.HTTPError as exc:
+        raise ModelProviderError(f"MiniMax image HTTP error {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ModelProviderError(f"MiniMax image request failed: {exc.reason}") from exc
+    try:
+        decoded = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ModelProviderError("MiniMax image response is not valid JSON") from exc
+    if not isinstance(decoded, dict):
+        raise ModelProviderError("MiniMax image response JSON must be an object")
+    return decoded
+
+
+def _write_output_summaries(
+    output_root: Path,
+    encoded_images: list[str],
+    candidate_count: int,
+) -> list[dict[str, Any]]:
+    if len(encoded_images) < candidate_count:
+        raise ModelProviderError("MiniMax image response missing image_base64 entries")
+    image_dir = output_root / "image_candidates"
+    image_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[dict[str, Any]] = []
-    for candidate in candidates:
-        image_ref = str(candidate.get("image_path") or "")
-        image_path = output_root / image_ref
-        image_bytes = image_path.read_bytes()
+    for index, encoded in enumerate(encoded_images[:candidate_count], start=1):
+        candidate_id = f"candidate_{index:03d}"
+        try:
+            image_bytes = base64.b64decode(encoded)
+        except ValueError as exc:
+            raise ModelProviderError("MiniMax image_base64 entry is invalid") from exc
+        image_ref = f"image_candidates/{candidate_id}{_image_extension(image_bytes)}"
+        (output_root / image_ref).write_bytes(image_bytes)
         outputs.append(
             {
-                "candidate_id": candidate.get("candidate_id"),
+                "candidate_id": candidate_id,
                 "image_path": image_ref,
                 "byte_count": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),
@@ -69,3 +145,53 @@ def output_summaries(output_root: Path, candidates: list[dict[str, Any]]) -> lis
             }
         )
     return outputs
+
+
+def _base64_images(response: dict[str, Any]) -> list[str]:
+    data = response.get("data")
+    if not isinstance(data, dict):
+        raise ModelProviderError("MiniMax image response missing data object")
+    images = data.get("image_base64")
+    if not isinstance(images, list):
+        raise ModelProviderError("MiniMax image response missing image_base64 entries")
+    return [item for item in images if isinstance(item, str) and item]
+
+
+def _ensure_success_response(response: dict[str, Any]) -> None:
+    base_resp = response.get("base_resp")
+    if not isinstance(base_resp, dict):
+        return
+    status_code = base_resp.get("status_code")
+    if status_code in {None, 0}:
+        return
+    raise ModelProviderError(f"MiniMax image response status_code {status_code}")
+
+
+def _ensure_candidate_count(candidate_count: int) -> None:
+    if MINIMAX_MIN_IMAGE_COUNT <= candidate_count <= MINIMAX_MAX_IMAGE_COUNT:
+        return
+    raise ModelProviderError(
+        f"MiniMax candidate_count must be between {MINIMAX_MIN_IMAGE_COUNT} and {MINIMAX_MAX_IMAGE_COUNT}"
+    )
+
+
+def _image_generation_url(base_url: str) -> str:
+    clean_base_url = base_url.rstrip("/")
+    if clean_base_url.endswith("/v1"):
+        return f"{clean_base_url}/image_generation"
+    return f"{clean_base_url}/v1/image_generation"
+
+
+def _image_extension(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return ".jpg"
+    raise ModelProviderError("MiniMax image_base64 entry is not a PNG or JPEG image")
+
+
+def _subject_reference_data_url(image_path: Path) -> str:
+    if not image_path.is_file():
+        raise ModelProviderError(f"MiniMax subject reference image not found: {image_path}")
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return f"data:{image_mime_type(image_path)};base64,{encoded}"

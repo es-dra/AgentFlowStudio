@@ -5,7 +5,7 @@ import json
 import os
 from typing import Any
 
-from agentflow_studio.model_gateway.errors import ModelProviderError
+from agentflow_studio.provider_contracts import ModelProviderError
 
 
 ALLOW_REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"

@@ -10,12 +10,10 @@ from agentflow_studio.model_gateway.minimax_image_plan import (
     resolve_image_base_url,
 )
 from agentflow_studio.model_gateway.minimax_image_runtime import (
-    output_summaries,
-    prompt_pack,
+    generate_minimax_image_outputs,
     runtime_subject_reference,
 )
 from agentflow_studio.utils import write_json
-from agentflow_studio.production.posterflow.minimax_provider import MiniMaxImageProvider
 
 
 MANIFEST_NAME = "minimax_image_smoke_manifest.json"
@@ -48,28 +46,21 @@ def run_minimax_image_smoke(
         require_live_gate=True,
     )
     account = store.account(str(store.service(service_id).get("account_ref") or ""))
-    provider = MiniMaxImageProvider(
+    output_root = Path(output_dir)
+    outputs = generate_minimax_image_outputs(
         base_url=resolve_image_base_url(store, account, store.service(service_id)),
         api_key=api_key(account),
         model=str(plan["create_request"]["json"]["model"]),
-        timeout_sec=timeout_sec,
-    )
-    output_root = Path(output_dir)
-    pack = prompt_pack(
         prompt=prompt,
-        aspect_ratio=aspect_ratio,
-        model=str(plan["create_request"]["json"]["model"]),
-    )
-    candidates_manifest, _invocations = provider.generate(
-        pack,
-        output_root,
+        output_root=output_root,
         candidate_count=candidate_count,
+        aspect_ratio=aspect_ratio,
+        timeout_sec=timeout_sec,
         subject_reference_image_path=(
             subject_reference["path"] if subject_reference is not None else None
         ),
         seed=seed,
     )
-    outputs = output_summaries(output_root, candidates_manifest.model_dump(mode="python")["candidates"])
     manifest: dict[str, Any] = {
         "schema_version": "minimax_image_smoke_manifest.v1",
         "status": "succeeded",

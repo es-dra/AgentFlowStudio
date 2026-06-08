@@ -38,3 +38,28 @@
 - `maintenance_audit`：`failed=0, passed=4, warning=2`。
 - `repository_retention_review --summary-only`：`delete_candidate_count=0`，`manual_review_required_count=0`，`remove_applied_pending_stage=132`。
 - 全量 pytest：`992 passed, 1 warning`。
+
+## 2026-06-08 - Model Gateway / Production 循环依赖切片
+
+- 将 provider 边界异常和 MiniMax 默认值下沉到 `agentflow_studio/provider_contracts.py`。
+- `agentflow_studio.model_gateway.errors` 保留兼容导出，避免破坏旧调用面。
+- `production.posterflow` 不再依赖 `model_gateway.errors`。
+- `model_gateway.minimax_image_smoke` 不再调用生产侧 PosterFlow provider/schema，改由 `model_gateway.minimax_image_runtime` 独立完成 smoke 请求和 safe output summary。
+- 架构门禁移除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环豁免。
+
+边界：
+
+- 未调用 live provider。
+- 未写入 secret、signed URL、私有素材或生成媒体字节。
+- 未声明 human acceptance、business validation 或 durable memory。
+
+验证记录：
+
+- 红灯确认：移除循环豁免后，`test_package_level_cycle_debt_is_frozen` 能捕获 `model_gateway/production` 循环。
+- 聚焦 provider/architecture：`20 passed`。
+- 扩展 provider/architecture/CLI：`47 passed`。
+- CLI help 可运行；CLI version 输出 `0.1.0`。
+- `maintenance_audit`：`failed=0, passed=4, warning=2`。
+- 全量 pytest：`992 passed, 1 warning`。
+- `git diff --check` 通过。
+- 静态 import 搜索未发现 `model_gateway` 与 `production` 之间的交叉引用。

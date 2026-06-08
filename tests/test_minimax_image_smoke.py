@@ -11,7 +11,7 @@ from agentflow_studio.model_gateway.minimax_image_smoke import (
     build_minimax_image_request_plan,
     run_minimax_image_smoke,
 )
-from agentflow_studio.production.posterflow import minimax_provider
+from agentflow_studio.model_gateway import minimax_image_runtime
 
 
 PNG_BYTES = base64.b64decode(
@@ -41,7 +41,7 @@ def test_minimax_image_smoke_gate_disabled_fails_before_network(monkeypatch, tmp
     def fake_urlopen(*args, **kwargs):  # pragma: no cover - must not call provider
         raise AssertionError("network should not be called when image gate is disabled")
 
-    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(minimax_image_runtime.urllib.request, "urlopen", fake_urlopen)
 
     try:
         run_minimax_image_smoke(
@@ -76,7 +76,7 @@ def test_minimax_image_smoke_normalizes_account_base_url_and_falls_back_model(mo
             }
         )
 
-    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(minimax_image_runtime.urllib.request, "urlopen", fake_urlopen)
 
     manifest = run_minimax_image_smoke(
         store,
@@ -126,7 +126,7 @@ def test_minimax_image_smoke_model_override_and_candidate_count(monkeypatch, tmp
             }
         )
 
-    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(minimax_image_runtime.urllib.request, "urlopen", fake_urlopen)
 
     manifest = run_minimax_image_smoke(
         store,
@@ -188,7 +188,7 @@ def test_minimax_i2i_smoke_sends_subject_reference_data_url_without_persisting_i
             }
         )
 
-    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(minimax_image_runtime.urllib.request, "urlopen", fake_urlopen)
 
     manifest = run_minimax_image_smoke(
         store,
@@ -239,7 +239,7 @@ def test_minimax_image_smoke_passes_seed_to_provider_payload(monkeypatch, tmp_pa
             }
         )
 
-    monkeypatch.setattr(minimax_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(minimax_image_runtime.urllib.request, "urlopen", fake_urlopen)
 
     run_minimax_image_smoke(
         store,

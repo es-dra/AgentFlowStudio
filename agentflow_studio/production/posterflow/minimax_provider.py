@@ -11,7 +11,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.model_gateway.errors import ModelProviderError
+from agentflow_studio.provider_contracts import (
+    DEFAULT_MINIMAX_BASE_URL,
+    DEFAULT_MINIMAX_IMAGE_MODEL,
+    ModelProviderError,
+)
 from agentflow_studio.production.posterflow.provider_common import ensure_remote_image_calls_allowed, input_hash
 from agentflow_studio.production.posterflow.schemas import (
     PosterCandidate,
@@ -22,8 +26,6 @@ from agentflow_studio.production.posterflow.schemas import (
 )
 
 
-DEFAULT_MINIMAX_BASE_URL = "https://api.minimax.io"
-DEFAULT_MINIMAX_IMAGE_MODEL = "image-01"
 MINIMAX_MIN_IMAGE_COUNT = 1
 MINIMAX_MAX_IMAGE_COUNT = 9
 
