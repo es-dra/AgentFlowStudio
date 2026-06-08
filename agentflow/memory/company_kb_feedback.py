@@ -6,7 +6,7 @@ from typing import Any
 
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.memory.production_session import SESSION_REPORT_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 COMPANY_KB_FEEDBACK_PACKET_KIND = "agentflow_company_kb_feedback_candidate_packet"
 COMPANY_KB_FEEDBACK_PACKET_SCHEMA_VERSION = "company-kb-feedback-candidate-packet/v1"

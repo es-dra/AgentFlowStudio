@@ -70,6 +70,7 @@ def asset_provider_validation_gate_command(
             character_reference_image_path=character_reference_image_path,
             image_service=image_service,
             video_service=video_service,
+            provider_validation_executor=_provider_validation_executor(run_provider_validation),
         )
     except ValueError as exc:
         typer.echo(f"Provider validation gate failed: {exc}", err=True)
@@ -85,3 +86,11 @@ def asset_provider_validation_gate_command(
 
 
 __all__ = ("asset_provider_validation_gate_command",)
+
+
+def _provider_validation_executor(run_provider_validation: bool):
+    if not run_provider_validation:
+        return None
+    from agentflow_studio.model_gateway.asset_profile_provider_adapter import run_asset_profile_provider_validation
+
+    return run_asset_profile_provider_validation

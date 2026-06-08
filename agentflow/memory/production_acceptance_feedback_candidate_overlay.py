@@ -18,7 +18,7 @@ from agentflow.memory.production_loop import (
     build_production_memory_loop_run,
     write_production_memory_loop_run,
 )
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 ACCEPTANCE_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
     "agentflow_production_memory_acceptance_feedback_candidate_promotion_overlay"

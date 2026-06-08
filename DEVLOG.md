@@ -12,9 +12,24 @@
 - 本地内测落地记录：`docs/handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`。
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`。
 - AFS/COS Agent 项目开发规范候选：`docs/maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md`。
+- 深度瘦身审查：`docs/maintenance/AFS-DEEP-CLEANUP-AUDIT-001.zh-CN.md`。
+- 架构审计门禁：`docs/maintenance/AFS-ARCHITECTURE-AUDIT-GATES-001.zh-CN.md`。
 - 历史英文文档中文摘要索引：`docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`。
 - 历史开发日志归档：`docs/archive/devlog_history_2026_06_03_pre_slimming.md`。
 - 历史任务账本归档：`docs/archive/task_history_2026_06_03_pre_slimming.md`。
+
+## 2026-06-08 - 深度瘦身审查
+
+- 重新审查目录体量、Python import 关系、CLI hidden surface、Web 静态模块、handoff 引用关系和文档中文化覆盖。
+- 已确认 2 组循环依赖仍需后续拆分：`agentflow_studio.harness` / `agentflow_studio.workflow_engine`、`agentflow_studio.model_gateway` / `agentflow_studio.production`；`apps.cli` / `apps.web_bridge` 已通过 `apps.reporting.run_reports` 解耦。
+- 已删除两个只自引用且已有 2026-05 归档摘要替代的旧 handoff：`docs/handoff/AFS-MEM-002.md`、`docs/handoff/AFS-QA-001.md`。
+- 编号 demo 012 / 015、旧 `apps/web/` 和 `apps/web_bridge/` 暂不直接删除；它们需要先完成 protocol runner、Runtime Service v0.2 和前端替代路径。
+- 已新增 `tests/test_architecture_audit_gates.py`，冻结 Runtime Service 边界、核心层反向依赖、包级循环依赖、hidden CLI surface 和编号 demo 模块；focused test `5 passed`。
+- `web-bridge` 命令保留，但 `apps/cli/command_registry.py` 改为执行时 lazy import 旧 bridge，减少 CLI 默认静态依赖。
+- 新增 `apps.reporting.run_reports`，CLI 和旧 Web bridge 共同依赖该应用层 helper；`apps.web_bridge` 不再 import `apps.cli.report_commands`，包级循环依赖已清除。
+- 已新增 `agentflow.harness.json_io`，并将 `agentflow.memory` 下 44 个模块从 `agentflow_studio.utils.write_json` 迁移到平台 harness helper。
+- 已将 `apps/api` 与 `apps/cli` 下 5 个 JSON 写入调用迁移到 `agentflow.harness.json_io`，并用架构门禁防止 API/CLI 继续从 Studio utils 获取通用 IO。
+- 已将 `agentflow.memory.production_asset_profile_provider` 的 live provider 调用改为注入式 `ProviderValidationExecutor`，并新增 `agentflow_studio.model_gateway.asset_profile_provider_adapter` 承接 MiniMax/Kling smoke；架构门禁现在要求 `agentflow` 对 `agentflow_studio` 零反向依赖。
 
 ## 2026-06-08 - 维护性重置与中文化
 
@@ -37,10 +52,10 @@
 
 ## 验证记录
 
-- full pytest：`1015 passed, 1 warning`。
-- 中文化后 focused regression：`72 passed, 1 warning`；维护/保留 focused regression：`8 passed`。
-- staging preflight：`status: pass`，仅保留 4 个 oversized warning；staging preflight focused regression：`12 passed`。
-- `repository_retention_review`：覆盖 82 个目录、997 个文件，`delete_candidate_count=0`，`manual_review_required_count=0`。
+- full pytest：`1023 passed, 1 warning`。
+- 中文化后 focused regression：`72 passed, 1 warning`；维护/保留 focused regression：`8 passed`；保留性审查回归：`3 passed`。
+- staging preflight：`status: pass`，仅保留 oversized warning；staging preflight focused regression：`12 passed`。
+- `repository_retention_review`：覆盖 83 个目录、1004 个文件，`delete_candidate_count=0`，`manual_review_required_count=0`；新增 `apps/reporting` 已归类为 `retain_application_reporting`。
 - `maintenance_audit`：`failed=0, passed=4, warning=2`；人类 Markdown 中文覆盖已通过，历史文档摘要豁免 187 份；剩余 warning 来自低置信 secret-like 字段名/测试假值和超 300 行文件。
 - `git diff --check` 通过，仅 Windows LF-to-CRLF warning。
 - 旧 `Company` 源头路径/旧文案扫描无命中。

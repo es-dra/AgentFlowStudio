@@ -5,7 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from agentflow.contracts.agentops import validate_agentops_artifact
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 
 DEFAULT_TOOL_GATE_STATE = {

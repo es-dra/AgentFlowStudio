@@ -5,13 +5,14 @@ from typing import Any
 
 from agentflow.memory.production_asset_profile_constants import PROVIDER_VALIDATION_RESULT_KIND
 from agentflow.memory.production_asset_profile_provider import (
+    ProviderValidationExecutor,
     build_provider_validation_plan,
     provider_validation_blockers,
     run_provider_validation as execute_provider_validation,
 )
 from agentflow.memory.production_asset_profiles import load_asset_profile_seed
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 PROVIDER_SAFE_MANIFEST_KIND = "agentflow_provider_safe_manifest"
 
@@ -28,6 +29,7 @@ def run_provider_validation_gate(
     character_reference_image_path: Path | None = None,
     image_service: str = "minimax_image",
     video_service: str = "kling_i2v",
+    provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:
     if not isinstance(generated_at, str) or not generated_at.strip():
         raise ValueError("generated_at is required")
@@ -59,6 +61,7 @@ def run_provider_validation_gate(
             character_reference_image_path=character_reference_image_path,
             image_service=image_service,
             video_service=video_service,
+            provider_validation_executor=provider_validation_executor,
         )
     effective_blockers = _effective_blockers(blockers, result)
     safe_manifest = build_provider_safe_manifest(plan=plan, result=result, blockers=effective_blockers)

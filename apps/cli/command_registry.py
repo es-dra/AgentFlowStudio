@@ -18,12 +18,10 @@ from apps.cli.production_memory_command_registry import register_production_memo
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.report_commands import (
     delivery_readiness_command,
-    inspect_run_output,
     package_report_command,
-    review_run_output,
 )
 from apps.cli.runtime_service_command import runtime_service_command
-from apps.web_bridge.server import serve as serve_web_bridge
+from apps.reporting.run_reports import inspect_run_output, review_run_output
 
 
 def register_commands(app: typer.Typer) -> None:
@@ -104,4 +102,6 @@ def web_bridge_command(
     ),
 ) -> None:
     """Run the local Web UI bridge for supervised Production Mode."""
+    from apps.web_bridge.server import serve as serve_web_bridge
+
     serve_web_bridge(host=host, port=port)

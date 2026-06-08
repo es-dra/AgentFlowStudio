@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_operator_run_package_check import OPERATOR_RUN_PACKAGE_CHECK_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 ACCEPTANCE_FEEDBACK_EVENT_KIND = "agentflow_production_memory_acceptance_feedback_event"
 SUPPORTED_ACCEPTANCE_DECISIONS = frozenset({"accepted", "rejected", "needs_revision"})

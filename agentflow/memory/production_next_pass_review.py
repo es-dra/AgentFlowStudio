@@ -9,7 +9,7 @@ from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_next_pass_result import NEXT_PASS_RESULT_KIND
 from agentflow.memory.production_next_pass_review_render import render_next_pass_review_markdown
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 NEXT_PASS_REVIEW_KIND = "agentflow_production_memory_next_pass_review"
 

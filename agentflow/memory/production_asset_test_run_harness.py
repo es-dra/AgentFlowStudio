@@ -40,7 +40,7 @@ from agentflow.memory.production_operator_loop import (
     build_production_memory_operator_loop_run,
     write_production_memory_operator_loop_run,
 )
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 
 def run_real_asset_test_harness(

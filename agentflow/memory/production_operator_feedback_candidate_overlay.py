@@ -18,7 +18,7 @@ from agentflow.memory.production_operator_feedback_candidate_promotion import (
     OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_DECISIONS,
     REUSE_ALLOWED_DECISIONS,
 )
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_OVERLAY_KIND = (
     "agentflow_production_memory_operator_feedback_candidate_promotion_overlay"

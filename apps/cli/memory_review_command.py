@@ -6,8 +6,8 @@ from typing import Any
 
 import typer
 
+from agentflow.harness.json_io import write_json
 from agentflow.memory.promotion import validate_evidence_reuse_review
-from agentflow_studio.utils import write_json
 
 
 def memory_evidence_reuse_review_command(

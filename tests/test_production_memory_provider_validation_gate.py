@@ -108,5 +108,52 @@ def test_provider_validation_gate_preserves_live_failure_blockers(tmp_path: Path
     assert "provider_validation_failed" in (tmp_path / "provider_validation_report.md").read_text(encoding="utf-8")
 
 
+def test_provider_validation_gate_blocks_when_live_adapter_is_not_injected(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(provider_gate, "provider_validation_blockers", lambda *args, **kwargs: [])
+
+    result = provider_gate.run_provider_validation_gate(
+        asset_profile_seed_path=EXAMPLE_SEED,
+        output_dir=tmp_path,
+        generated_at=GENERATED_AT,
+        run_provider_validation=True,
+        provider_config_path=tmp_path / "providers.local.json",
+        character_reference_image_path=tmp_path / "character.png",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["provider_calls_started"] is False
+    assert {item["blocker_id"] for item in result["blockers"]} == {"provider_adapter_unregistered"}
+
+
+def test_provider_validation_gate_uses_injected_live_adapter(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(provider_gate, "provider_validation_blockers", lambda *args, **kwargs: [])
+
+    def fake_executor(*args, **kwargs) -> dict:
+        return {
+            "artifact_type": "agentflow_provider_validation_result",
+            "status": "succeeded",
+            "provider_calls_started": True,
+            "image_status": "succeeded",
+            "video_status": "succeeded",
+        }
+
+    result = provider_gate.run_provider_validation_gate(
+        asset_profile_seed_path=EXAMPLE_SEED,
+        output_dir=tmp_path,
+        generated_at=GENERATED_AT,
+        run_provider_validation=True,
+        provider_config_path=tmp_path / "providers.local.json",
+        character_reference_image_path=tmp_path / "character.png",
+        provider_validation_executor=fake_executor,
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    provider_result = _read_json(tmp_path / "provider_validation_result.json")
+    assert provider_result["schema_version"] == "production-memory-loop/v1"
+    assert provider_result["writes_long_term_memory"] is False
+    assert provider_result["writes_company_kb"] is False
+
+
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))

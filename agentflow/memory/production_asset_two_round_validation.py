@@ -15,7 +15,7 @@ from agentflow.memory.production_asset_profile_context_projection import (
     write_asset_profile_context_projection,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 TWO_ROUND_CONTEXT_RUNTIME_REPORT_KIND = "agentflow_two_round_context_runtime_report"
 NO_IMPROVEMENT_REASONS = frozenset(

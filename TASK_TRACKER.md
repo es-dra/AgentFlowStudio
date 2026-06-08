@@ -29,9 +29,11 @@ AFS 仓库只保存执行投影。历史文档如仍出现 `Company` 旧称，�
 
 | ID | Owner role | 范围 | 状态 | 验证 / 证据 |
 |---|---|---|---|---|
-| AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001 | Release Integrator + Maintainability Steward | 维护性重置、活文档中文化、`10-Startup` candidate 规则投影、本地 AgentOps artifact、维护审计脚本、逐文件保留性审查、Runtime Service trace 输出 | 本地验证通过，待 PR 合入 | 证据：`docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md`；`docs/maintenance/AFS-REPOSITORY-RETENTION-REVIEW-001.zh-CN.md`；`docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`；`docs/handoff/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.md`；full pytest `1015 passed, 1 warning`；保留性审查覆盖 82 个目录和 997 个文件，`delete_candidate_count=0`、`manual_review_required_count=0`；`maintenance_audit` 为 `failed=0, passed=4, warning=2`，人类 Markdown 中文覆盖已通过；旧 `Company` 路径扫描无命中；未调用 provider，未写 secret，未声明 human acceptance、business validation 或 durable memory |
+| AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001 | Release Integrator + Maintainability Steward | 维护性重置、活文档中文化、`10-Startup` candidate 规则投影、本地 AgentOps artifact、维护审计脚本、逐文件保留性审查、Runtime Service trace 输出 | 本地验证通过，待 PR 合入 | 证据：`docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md`；`docs/maintenance/AFS-REPOSITORY-RETENTION-REVIEW-001.zh-CN.md`；`docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`；`docs/handoff/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.md`；full pytest `1023 passed, 1 warning`；保留性审查覆盖 83 个目录和 1004 个文件，`delete_candidate_count=0`、`manual_review_required_count=0`；`maintenance_audit` 为 `failed=0, passed=4, warning=2`，人类 Markdown 中文覆盖已通过；旧 `Company` 路径扫描无命中；未调用 provider，未写 secret，未声明 human acceptance、business validation 或 durable memory |
 | AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001 | Runtime/API Integrator + Product Integration Steward | Runtime Service v0.1、safe job/artifact refs、前端对接包、request fixture | 已本地验证，已并入当前维护分支脏工作树 | 证据：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`；`docs/frontend_integration/`；`examples/frontend_runtime_service/`；前端不接触 CLI 内部、secret、私有路径、signed URL 或媒体字节 |
 | AFS-FRONTEND-ZH-HANDOFF-AND-MAINTAINABILITY-STANDARD-001 | Product Integration Steward + Maintainability Steward | 中文前端交接材料和 AFS/COS Agent 项目开发规范候选 | 已本地记录，作为 candidate guidance | 证据：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`；`docs/maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md`；不代表 COS active-rule promotion |
+| AFS-DEEP-CLEANUP-AUDIT-001 | Maintainability Steward + Full-stack Reviewer | 深度目录/调用关系/入口/文档瘦身审查，删除已被归档摘要覆盖的重复 handoff | 已执行低风险删除，待验证 | 证据：`docs/maintenance/AFS-DEEP-CLEANUP-AUDIT-001.zh-CN.md`；删除 `docs/handoff/AFS-MEM-002.md`、`docs/handoff/AFS-QA-001.md`；编号 demo、旧 Web、旧 bridge 均保留为有条件后续删除候选 |
+| AFS-ARCHITECTURE-AUDIT-GATES-001 | Maintainability Steward | import boundary、hidden CLI surface、禁止新增编号 demo 的自动化门禁；减少旧 bridge 顶层依赖；下沉核心 JSON helper；拆出 provider adapter 边界；清除 `apps.cli` / `apps.web_bridge` 循环依赖 | 综合验证通过，待 PR 合入 | 证据：`tests/test_architecture_audit_gates.py`；`docs/maintenance/AFS-ARCHITECTURE-AUDIT-GATES-001.zh-CN.md`；`apps/cli/command_registry.py` lazy import 旧 bridge；`apps.reporting.run_reports` 接管 report helper；`agentflow.harness.json_io` 接管 `write_json`；`agentflow.memory`、`apps/api`、`apps/cli` 已无 `agentflow_studio.utils` 依赖；`agentflow` 对 `agentflow_studio` 反向依赖已清零；`agentflow_studio.model_gateway.asset_profile_provider_adapter` 承接 live provider smoke；`pytest tests/test_architecture_audit_gates.py -q` 为 `6 passed`；full pytest `1023 passed, 1 warning` |
 
 ## 当前主线基线
 
@@ -48,7 +50,7 @@ AFS 仓库只保存执行投影。历史文档如仍出现 `Company` 旧称，�
 
 | ID | 范围 | 依赖 | 状态 |
 |---|---|---|---|
-| AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001-FINALIZE | 完成活文档中文化、复跑 focused tests、`maintenance_audit`、`repository_retention_review`、`git diff --check`，更新 handoff | 当前维护分支 | 本地验证完成；待 staging/commit/PR |
+| AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001-FINALIZE | 完成活文档中文化、复跑 focused tests、`maintenance_audit`、`repository_retention_review`、`git diff --check`，更新 handoff | 当前维护分支 | 本地验证完成；正在 staging/commit/PR |
 | AFS-RUNTIME-SERVICE-V0-2-QUEUE | 增加 project list/import/export、job progress、OpenAPI 固定导出、前端 client 生成说明、显式 live provider endpoint gate | 维护 PR 合入后 | 排队 |
 | AFS-FRONTEND-WORKBENCH-INTEGRATION-001 | 外部画布前端接 Runtime Service，首屏只做项目、run、artifact、review safe view | Runtime Service v0.2 和前端团队对齐 | 排队 |
 | AFS-10-STARTUP-DOCS-PROJECTION-001 | 将旧 `Company` 文案统一投影为 `10-Startup` | docs-only，不与 runtime 代码混做 | 排队 |
@@ -59,7 +61,7 @@ AFS 仓库只保存执行投影。历史文档如仍出现 `Company` 旧称，�
 
 - `data/processed/pytest-basetemp/` 下多个 ignored 历史目录因 Windows 权限拒绝暂未删除，不影响 git tracked 内容。
 - `maintenance_audit` 不再把历史英文长文作为当前中文化 warning；这些文档已由 `docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md` 统一摘要归档。剩余 warning 是低置信 secret-like 字段名/测试假值和超 300 行文件。
-- 旧 worktree `codex/afs-web-asset-review-screen-001` 仍存在。当前维护分支 commit/验证完成前，不删除该 worktree。
+- 旧测试 worktree 已在维护分支提交/PR 后清理；后续如再开清理或架构切片，应使用新的 `codex/*` 分支或明确复用当前维护分支。
 
 ## 归档入口
 

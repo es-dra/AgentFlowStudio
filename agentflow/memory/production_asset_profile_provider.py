@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,10 @@ from agentflow.memory.production_asset_profile_constants import (
     PROVIDER_VALIDATION_RESULT_KIND,
 )
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.model_gateway.company_secrets import COMPANY_PROVIDER_CONFIG_ENV
+
+
+PROVIDER_CONFIG_ENV = "AFS_PROVIDER_CONFIG"
+ProviderValidationExecutor = Callable[..., dict[str, Any]]
 
 
 def build_provider_validation_plan(
@@ -37,7 +41,7 @@ def build_provider_validation_plan(
         "local_inputs": {
             "project_materials_provided": project_materials_path is not None,
             "character_reference_image_provided": character_reference_image_path is not None,
-            "provider_config_provided": provider_config_path is not None or bool(os.environ.get(COMPANY_PROVIDER_CONFIG_ENV)),
+            "provider_config_provided": provider_config_path is not None or bool(os.environ.get(PROVIDER_CONFIG_ENV)),
             "raw_paths_persisted": False,
         },
         "prompts": {
@@ -64,7 +68,7 @@ def provider_validation_blockers(
         blockers.append(_blocker("image_gate_unset", "set AFS_ALLOW_REMOTE_IMAGE=true for live image smoke"))
     if not _env_gate_enabled("AFS_ALLOW_REMOTE_VIDEO"):
         blockers.append(_blocker("video_gate_unset", "set AFS_ALLOW_REMOTE_VIDEO=true for live video smoke"))
-    if provider_config_path is None and not os.environ.get(COMPANY_PROVIDER_CONFIG_ENV):
+    if provider_config_path is None and not os.environ.get(PROVIDER_CONFIG_ENV):
         blockers.append(_blocker("provider_config_missing", "provide --provider-config or AFS_PROVIDER_CONFIG"))
     if character_reference_image_path is None:
         blockers.append(_blocker("character_reference_image_missing", "provide a local ignored character reference image"))
@@ -82,31 +86,31 @@ def run_provider_validation(
     character_reference_image_path: Path | None,
     image_service: str,
     video_service: str,
+    provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:
-    output_root = Path("data/processed/runs/production_memory_loop/asset_provider_validation")
-    image_output = output_root / "image"
-    video_output = output_root / "video"
+    if provider_validation_executor is None:
+        return {
+            "kind": PROVIDER_VALIDATION_RESULT_KIND,
+            "artifact_type": PROVIDER_VALIDATION_RESULT_KIND,
+            "schema_version": SCHEMA_VERSION,
+            "status": "blocked",
+            "provider_calls_started": False,
+            "blockers": [
+                _blocker(
+                    "provider_adapter_unregistered",
+                    "live provider validation requires an injected provider adapter",
+                )
+            ],
+            "writes_long_term_memory": False,
+            "writes_company_kb": False,
+        }
     try:
-        from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
-        from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
-        from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
-
-        store = load_company_provider_secrets(provider_config_path)
-        prompts = _dict(seed.get("provider_validation"))
-        image_manifest = run_minimax_image_smoke(
-            store,
-            service_id=image_service,
-            prompt=str(prompts.get("image_prompt") or "Sanitized character consistency keyframe prompt."),
-            output_dir=image_output,
-            subject_reference_image_path=character_reference_image_path,
-        )
-        source_image = image_output / str(_list(image_manifest.get("outputs"))[0].get("image_path"))
-        video_manifest = run_kling_i2v_smoke(
-            store,
-            service_id=video_service,
-            prompt=str(prompts.get("video_prompt") or "Sanitized scene continuity image-to-video prompt."),
-            image_path=source_image,
-            output_dir=video_output,
+        result = provider_validation_executor(
+            seed,
+            provider_config_path=provider_config_path,
+            character_reference_image_path=character_reference_image_path,
+            image_service=image_service,
+            video_service=video_service,
         )
     except Exception as exc:
         safe_error = _safe_error(exc)
@@ -119,20 +123,25 @@ def run_provider_validation(
             "safe_error": safe_error,
             "blockers": [_blocker("provider_validation_failed", safe_error)],
         }
-    return {
-        "kind": PROVIDER_VALIDATION_RESULT_KIND,
-        "artifact_type": PROVIDER_VALIDATION_RESULT_KIND,
-        "schema_version": SCHEMA_VERSION,
-        "status": "succeeded",
-        "provider_calls_started": True,
-        "image_manifest_ref": "provider_validation/image/minimax_image_smoke_manifest.json",
-        "video_manifest_ref": "provider_validation/video/kling_i2v_smoke_manifest.json",
-        "image_status": str(image_manifest.get("status", "unknown")),
-        "video_status": str(video_manifest.get("status", "unknown")),
-        "claim_boundary": "provider_smoke_only_not_human_acceptance",
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-    }
+    if not isinstance(result, dict):
+        return {
+            "kind": PROVIDER_VALIDATION_RESULT_KIND,
+            "artifact_type": PROVIDER_VALIDATION_RESULT_KIND,
+            "schema_version": SCHEMA_VERSION,
+            "status": "failed",
+            "provider_calls_started": True,
+            "safe_error": "provider validation adapter returned a non-object result",
+            "blockers": [_blocker("provider_validation_failed", "provider validation adapter returned a non-object result")],
+        }
+    normalized = dict(result)
+    normalized.setdefault("kind", PROVIDER_VALIDATION_RESULT_KIND)
+    normalized.setdefault("artifact_type", PROVIDER_VALIDATION_RESULT_KIND)
+    normalized.setdefault("schema_version", SCHEMA_VERSION)
+    normalized.setdefault("status", "succeeded")
+    normalized.setdefault("provider_calls_started", True)
+    normalized.setdefault("writes_long_term_memory", False)
+    normalized.setdefault("writes_company_kb", False)
+    return normalized
 
 
 def provider_status(plan: dict[str, Any], blockers: list[dict[str, str]]) -> str:
@@ -170,6 +179,8 @@ def _list(value: Any) -> list[Any]:
 
 
 __all__ = (
+    "PROVIDER_CONFIG_ENV",
+    "ProviderValidationExecutor",
     "build_provider_validation_plan",
     "provider_status",
     "provider_validation_blockers",

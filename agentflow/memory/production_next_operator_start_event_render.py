@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 
 def write_next_operator_start_event_report(event: dict[str, Any], output_dir: str | Path) -> list[Path]:

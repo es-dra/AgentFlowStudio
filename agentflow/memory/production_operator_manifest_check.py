@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 OPERATOR_MANIFEST_CHECK_KIND = "agentflow_production_memory_operator_manifest_check"
 NODE_FAILURE_STATUSES = frozenset({"blocked", "failed", "missing", "error", "unknown"})

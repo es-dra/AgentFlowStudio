@@ -9,10 +9,10 @@ from apps.cli.artifact_loaders import load_clip_plans, load_hooks, load_scripts
 from apps.cli.command_registry import register_commands
 from apps.cli.plan_commands import write_draft_plan_from_cli
 from apps.cli.workflow_commands import run_workflow_from_cli
+from agentflow.harness.json_io import write_json
 from agentflow_studio import __version__
 from agentflow_studio.roi_sop import analyze_hooks_from_text, generate_scripts_from_hooks
 from agentflow_studio.slicing_sop import generate_clip_plans_from_scripts, mock_slice_clip_plans
-from agentflow_studio.utils import write_json
 
 app = typer.Typer(
     help="AgentFlow Studio command line interface.",

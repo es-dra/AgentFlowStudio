@@ -8,7 +8,7 @@ from agentflow.memory.production_next_operator_action_result import (
     build_next_operator_action_result,
     write_next_operator_action_result_report,
 )
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 
 NEXT_OPERATOR_ACTION_RESULT_ARTIFACTS = [

@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from agentflow.contracts.project_manifest import validate_project_manifest
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
+from agentflow.harness.json_io import write_json
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.utils import write_json
 
 
 SAFE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")

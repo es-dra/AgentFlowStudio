@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 from agentflow.memory.video_pipeline import SCHEMA_VERSION, build_memory_video_pipeline_plan
 

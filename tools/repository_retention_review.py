@@ -170,6 +170,8 @@ def _review_directory(path: str) -> ReviewedPath:
         return _dir(path, "retain_studio_pipeline", "内容生产与分发 pipeline 模块仍被测试和 CLI 覆盖。")
     if path.startswith("apps/api"):
         return _dir(path, "retain_runtime_service", "Runtime Service 是前后端唯一对接面。")
+    if path.startswith("apps/reporting"):
+        return _dir(path, "retain_application_reporting", "CLI 和旧 Web bridge 共用的应用层 report helper。")
     if path.startswith("apps/cli"):
         return _dir(path, "retain_cli_ops", "CLI 是本地运维、测试和 deterministic harness 入口。")
     if path.startswith("apps/web"):
@@ -228,6 +230,8 @@ def _review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(path, git_state, "retain_studio_pipeline", "内容生产与分发 pipeline 代码。")
     if path.startswith("apps/api/"):
         return _file(path, git_state, "retain_runtime_service", "Runtime Service 对接面、模型、job、artifact 或文档。")
+    if path.startswith("apps/reporting/"):
+        return _file(path, git_state, "retain_application_reporting", "CLI 和旧 Web bridge 共用的应用层 report helper。")
     if path.startswith("apps/cli/"):
         return _file(path, git_state, "retain_cli_ops", "本地 CLI 命令入口或 registry。")
     if path.startswith("apps/web/"):
@@ -291,7 +295,6 @@ def _file(
 def _is_excluded(path: str) -> bool:
     parts = Path(path).parts
     return any(part in EXCLUDE_DIRS for part in parts)
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

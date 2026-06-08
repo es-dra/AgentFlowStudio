@@ -36,10 +36,10 @@ from apps.api.runtime_tracing import (
     write_run_trace,
 )
 from apps.api.runtime_store import RuntimeStore, read_json, runtime_feedback_event
+from agentflow.harness.json_io import write_json
 from agentflow.memory.production_asset_provider_validation_gate import run_provider_validation_gate
 from agentflow.memory.production_asset_test_run_harness import run_real_asset_test_harness
 from agentflow.memory.production_asset_two_round_validation import run_two_round_context_runtime_validation
-from agentflow_studio.utils import write_json
 
 
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/runtime_service")

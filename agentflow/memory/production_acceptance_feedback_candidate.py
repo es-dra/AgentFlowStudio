@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.memory.production_acceptance_feedback import ACCEPTANCE_FEEDBACK_EVENT_KIND
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 ACCEPTANCE_FEEDBACK_CANDIDATE_PACKET_KIND = "agentflow_production_memory_acceptance_feedback_candidate_packet"
 UNSAFE_EXTRA_FRAGMENTS = (
