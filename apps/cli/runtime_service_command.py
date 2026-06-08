@@ -25,4 +25,25 @@ def runtime_service_command(
     uvicorn.run(app, host=host, port=port, reload=False)
 
 
-__all__ = ("runtime_service_command",)
+def runtime_service_openapi_export_command(
+    output: Path = typer.Option(
+        Path("docs/frontend_integration/openapi/afs-runtime-service.openapi.json"),
+        "--output",
+        help="Output path for the Runtime Service OpenAPI schema.",
+        show_default=False,
+    ),
+    runtime_root: Path = typer.Option(
+        Path("data/processed/runs/runtime_service_openapi_export"),
+        "--runtime-root",
+        help="Ignored local runtime root used only while building the schema.",
+        show_default=False,
+    ),
+) -> None:
+    """Export Runtime Service OpenAPI JSON for frontend client generation."""
+    from apps.api.openapi_export import export_openapi_schema
+
+    path = export_openapi_schema(output, runtime_root=runtime_root)
+    typer.echo(f"Runtime Service OpenAPI exported: {path.as_posix()}")
+
+
+__all__ = ("runtime_service_command", "runtime_service_openapi_export_command")

@@ -1,0 +1,18 @@
+{
+  "manifest": {
+    "artifact_type": "agentflow_project_manifest",
+    "schema_version": "0.1.0",
+    "project_id": "proj_frontend_import_example",
+    "project_type": "short_video_campaign",
+    "goal": "Import a local project manifest from the frontend workbench.",
+    "source_assets": [],
+    "runs": [],
+    "packages": [],
+    "feedback_refs": [],
+    "profile_version_refs": [],
+    "status": "in_progress",
+    "does_not_store_secrets": true,
+    "does_not_store_private_asset_bytes": true,
+    "does_not_auto_sync": true
+  }
+}

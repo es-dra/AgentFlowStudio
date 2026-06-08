@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -45,6 +46,7 @@ VISIBLE_PRODUCT_COMMANDS = (
     "asset-provider-validation-gate",
     "web-bridge",
     "runtime-service",
+    "runtime-service-openapi-export",
 )
 
 
@@ -61,6 +63,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-video-pipeline-package" in source
     assert "register_production_memory_commands" in source
     assert "runtime-service" in source
+    assert "runtime-service-openapi-export" in source
     assert "production-memory-loop-next-operator-start-packet" not in source
     assert "production-memory-loop-record-next-operator-start" not in source
     assert "production-memory-loop-record-next-operator-action-result" not in source
@@ -119,6 +122,28 @@ def test_visible_product_command_help_avoids_terminal_truncation_glyphs() -> Non
         assert result.exit_code == 0, command
         assert "\u2026" not in result.output, command
         assert "\ufffd" not in result.output, command
+
+
+def test_runtime_service_openapi_export_command_writes_frontend_schema(tmp_path) -> None:
+    output_path = tmp_path / "afs-runtime-service.openapi.json"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "runtime-service-openapi-export",
+            "--output",
+            str(output_path),
+            "--runtime-root",
+            str(tmp_path / "runtime"),
+        ],
+    )
+    schema = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert result.exit_code == 0
+    assert schema["info"]["version"] == "0.2.0"
+    assert "/projects" in schema["paths"]
+    assert "/projects/import" in schema["paths"]
+    assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 
 
 def test_hidden_production_memory_support_commands_remain_callable() -> None:

@@ -15,6 +15,10 @@ class ProjectCreateRequest(BaseModel):
     status: ProjectStatus = "in_progress"
 
 
+class ProjectImportRequest(BaseModel):
+    manifest: dict[str, Any]
+
+
 class AssetTestRunRequest(BaseModel):
     project_id: str = Field(min_length=1)
     asset_profile_seed: str = Field(min_length=1)
@@ -60,6 +64,7 @@ __all__ = (
     "AssetTestRunRequest",
     "FeedbackRecordRequest",
     "ProjectCreateRequest",
+    "ProjectImportRequest",
     "ProviderValidationPlanRequest",
     "ProjectStatus",
     "TwoRoundValidateRequest",
