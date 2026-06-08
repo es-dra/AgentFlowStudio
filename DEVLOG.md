@@ -39,6 +39,18 @@
 - 验证：Kling focused tests `16 passed`；Kling + 架构门禁 `22 passed`；拆分后 Kling + 架构门禁仍为 `22 passed`；MiniMax CLI focused tests `16 passed`；PosterFlow provider focused tests `13 passed`；最终 provider/CLI/维护聚焦测试 `63 passed`；`maintenance_audit` 为 `failed=0, passed=4, warning=2`，oversized 文件从 33 降到 29；`git diff --check` 退出码 0。
 - 边界保持：未调用 provider，未写入 secret / signed URL / 媒体字节，未声明 human acceptance、business validation 或 durable memory。
 
+## 2026-06-08 - Product Spine Reset 003 启动
+
+- 在 `001def9` 封存 provider cleanup baseline 后，新开 `codex/afs-product-spine-reset-003`。
+- 将 `tools/repository_retention_review.py` 从温和保留语义升级为 Product Spine 审查语义，新增 `product_surface` 与 `product_surface_counts`，明确暴露 `transition_surface`、`quarantine_candidate`、`historical_reference` 和 `mixed_docs_surface`。
+- 当前审查显示：`quarantine_candidate=19`，`transition_surface=87`，`historical_reference=120`，`mixed_docs_surface=71`；仓库不再按“无删除候选”理解，而是按旧面/过渡面推进退休。
+- 删除旧编号 memory advantage demo 的 CLI 可执行入口：移除 `apps/cli/memory_demo_commands.py`，`support_command_registry` 不再注册 `memory-advantage-demo-012*` / `memory-advantage-demo-015*` hidden commands。
+- 更新架构门禁：`KNOWN_HIDDEN_COMMAND_DEBT` 不再允许上述 5 个旧 demo hidden CLI。
+- 将 `web-bridge` 从可见产品 CLI 降级为 hidden legacy command，默认 help 不再展示旧 Web bridge；Runtime Service 继续作为前端唯一主对接面。
+- 拆分 `tools/repository_retention_review.py`，将分类策略下沉到 `tools/repository_retention_policy.py`；两个文件分别为 124 / 188 行，避免维护工具自身变成新的超长文件。
+- 验证：旧 demo CLI 删除聚焦测试为 `32 passed`；`web-bridge` 降级聚焦测试为 `22 passed`；最终聚焦回归 `50 passed`；完整 pytest 为 `1023 passed, 1 warning`；`maintenance_audit` 为 `failed=0, passed=4, warning=2`；`repository_retention_review --summary-only` 可直跑；`git diff --check` 退出码 0。
+- 边界保持：旧 demo modules 暂时保留为 quarantine candidate，用于迁移前 evidence 校验；未调用 provider，未声明 human acceptance、business validation 或 durable memory。
+
 ## 2026-06-08 - 外部项目思想协助标准投影
 
 - 将 `claude-obsidian` 和 `GitNexus` 的核心思想收敛为 Company OS candidate guidance：外部项目只作为机制来源，先对话总结，再映射到本地知识对象、全局规则和项目开发链路，不默认安装、不默认复刻、不默认创建 intake 文档。

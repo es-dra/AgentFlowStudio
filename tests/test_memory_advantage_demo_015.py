@@ -3,9 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
-from apps.cli.main import app
 from agentflow_studio.memory_advantage_demo_015 import (
     DEMO_ID,
     build_demo_015_package,
@@ -94,33 +91,6 @@ def test_demo_015_writer_outputs_protocol_package(monkeypatch, tmp_path) -> None
     serialized = "".join(path.read_text(encoding="utf-8") for path in paths)
     assert "fake-secret-key" not in serialized
     assert "Bearer " not in serialized
-
-
-def test_demo_015_cli_writes_no_call_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
-    config_path = tmp_path / "providers.local.json"
-    config_path.write_text(json.dumps(provider_config()), encoding="utf-8")
-
-    result = CliRunner().invoke(
-        app,
-        [
-            "memory-advantage-demo-015-plan",
-            "--provider-config",
-            str(config_path),
-            "--source-keyframe-ref",
-            "candidate_001.jpg",
-            "--output",
-            str(tmp_path / "plan"),
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "AFS-MEMORY-ADVANTAGE-DEMO-015" in result.output
-    assert "Provider calls: not started" in result.output
-    assert "Video requests planned: 2" in result.output
-    assert (tmp_path / "plan" / "generation_projections.json").is_file()
-    assert str(config_path) not in result.output
-    assert "fake-secret-key" not in result.output
 
 
 def test_demo_015_i2v_runtime_uses_same_keyframe_and_two_video_calls(monkeypatch, tmp_path) -> None:

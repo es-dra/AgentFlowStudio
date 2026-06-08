@@ -3,9 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
-from apps.cli.main import app
 from agentflow_studio.memory_advantage_demo_012 import (
     DEMO_ID,
     build_demo_012_package,
@@ -18,7 +15,6 @@ from agentflow_studio.memory_advantage_demo_012_content import MAX_T2I_PROMPT_CH
 from tests.memory_advantage_demo_012_helpers import demo_012_store as _store
 from tests.memory_advantage_demo_012_helpers import write_i2i_manifest as _write_i2i_manifest
 from tests.memory_advantage_demo_012_helpers import write_i2v_manifest as _write_i2v_manifest
-from tests.provider_smoke_helpers import provider_config
 
 
 def test_demo_012_package_locks_six_image_i2i_experiment_without_provider_calls(
@@ -116,42 +112,6 @@ def test_demo_012_writer_outputs_six_image_run_package(monkeypatch, tmp_path) ->
     serialized = "".join(path.read_text(encoding="utf-8") for path in paths)
     assert "fake-minimax-key" not in serialized
     assert "data:image/" not in serialized
-
-
-def test_demo_012_cli_writes_no_call_package(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
-    config_path = tmp_path / "providers.local.json"
-    config_path.write_text(json.dumps(provider_config()), encoding="utf-8")
-
-    result = CliRunner().invoke(
-        app,
-        [
-            "memory-advantage-demo-012-plan",
-            "--provider-config",
-            str(config_path),
-            "--subject-reference-image-ref",
-            "yiqi_front.png",
-            "--output",
-            str(tmp_path / "plan"),
-        ],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "AFS-MEMORY-ADVANTAGE-DEMO-012" in result.output
-    assert "Provider calls: not started" in result.output
-    assert "Images planned: 6" in result.output
-    assert (tmp_path / "plan" / "image_requests.json").is_file()
-    assert str(config_path) not in result.output
-    assert "fake-minimax-key" not in result.output
-
-
-def test_demo_012_i2v_cli_exposes_runtime_command() -> None:
-    result = CliRunner().invoke(app, ["memory-advantage-demo-012-i2v-runtime", "--help"])
-
-    assert result.exit_code == 0, result.output
-    assert "Run gated DEMO-012 Kling I2V storyboards" in result.output
-    assert "--run-dir" in result.output
-    assert "--transport" in result.output
 
 
 def test_demo_012_i2i_runtime_uses_same_reference_and_six_calls(monkeypatch, tmp_path) -> None:

@@ -44,7 +44,6 @@ VISIBLE_PRODUCT_COMMANDS = (
     "asset-test-run-harness",
     "asset-two-round-validate",
     "asset-provider-validation-gate",
-    "web-bridge",
     "runtime-service",
     "runtime-service-openapi-export",
 )
@@ -112,6 +111,7 @@ def test_default_help_keeps_production_memory_product_surface_thin() -> None:
     assert "production-memory-loop-record-next-operator-action-result" not in result.output
     assert "production-memory-loop-record-action-result-acceptance-feedback" not in result.output
     assert "production-memory-loop-next-operator-start-packet" not in result.output
+    assert "web-bridge" not in result.output
 
 
 def test_visible_product_command_help_avoids_terminal_truncation_glyphs() -> None:
@@ -159,5 +159,5 @@ def test_support_command_registry_keeps_hidden_provider_and_demo_surface() -> No
     assert "hidden=True" in source
     assert "kling-i2v-smoke" in source
     assert "minimax-image-smoke" in source
-    assert "memory-advantage-demo-012" in source
-    assert "memory-advantage-demo-015" in source
+    assert "memory-advantage-demo-012" not in source
+    assert "memory-advantage-demo-015" not in source

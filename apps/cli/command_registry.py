@@ -47,7 +47,7 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="memory-video-pipeline-package")(memory_video_pipeline_package_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
     register_production_memory_commands(app)
-    app.command(name="web-bridge")(web_bridge_command)
+    app.command(name="web-bridge", hidden=True)(web_bridge_command)
     app.command(name="runtime-service")(runtime_service_command)
     app.command(name="runtime-service-openapi-export")(runtime_service_openapi_export_command)
 
