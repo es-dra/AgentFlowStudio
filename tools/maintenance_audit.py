@@ -16,13 +16,11 @@ try:
         HISTORICAL_DOC_GLOBS,
         HISTORICAL_DOC_PREFIXES,
         HISTORICAL_SUMMARY_PATH,
-        HIGH_CONFIDENCE_SECRET_PATTERNS,
-        KNOWN_SAFE_SECRET_FIXTURES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
-        SECRET_FIELD_PATTERNS,
         TEXT_SUFFIXES,
     )
+    from tools.maintenance_audit_secret_scan import check_secret_like_fragments
 except ModuleNotFoundError:
     from maintenance_audit_policy import (  # type: ignore[no-redef]
         ARTIFACT_TYPE,
@@ -30,13 +28,11 @@ except ModuleNotFoundError:
         HISTORICAL_DOC_GLOBS,
         HISTORICAL_DOC_PREFIXES,
         HISTORICAL_SUMMARY_PATH,
-        HIGH_CONFIDENCE_SECRET_PATTERNS,
-        KNOWN_SAFE_SECRET_FIXTURES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
-        SECRET_FIELD_PATTERNS,
         TEXT_SUFFIXES,
     )
+    from maintenance_audit_secret_scan import check_secret_like_fragments  # type: ignore[no-redef]
 
 
 @dataclass(frozen=True)
@@ -59,7 +55,7 @@ def build_maintenance_audit(root: Path) -> dict[str, Any]:
         _check_contract_shape(),
         _check_legacy_company_paths(root, files),
         _check_chinese_doc_coverage(root, files),
-        _check_secret_like_fragments(root, files),
+        check_secret_like_fragments(root, files),
         _check_oversized_files(root, files),
         _check_tracked_runtime_artifacts(root),
     ]
@@ -140,25 +136,6 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]
         "historical_docs_exempted_count": exempted_historical,
         "warning_limit_applied": len(findings) > 80,
     }
-
-
-def _check_secret_like_fragments(root: Path, files: list[Path]) -> dict[str, Any]:
-    findings: list[Finding] = []
-    high_confidence = 0
-    for path in files:
-        if path.as_posix().endswith("tests/provider_smoke_helpers.py"):
-            continue
-        for line_no, line in _read_lines(path):
-            if _is_known_safe_secret_fixture(line):
-                continue
-            if any(pattern.search(line) for pattern in HIGH_CONFIDENCE_SECRET_PATTERNS):
-                high_confidence += 1
-                findings.append(Finding(_rel(root, path), "high-confidence secret-like fragment", line_no))
-            elif any(pattern.search(line) for pattern in SECRET_FIELD_PATTERNS):
-                findings.append(Finding(_rel(root, path), "secret-like or signed-url-like fragment", line_no))
-    check = _check("secret_like_fragments", "warning" if findings else "passed", findings[:80])
-    check["high_confidence_count"] = high_confidence
-    return check
 
 
 def _check_oversized_files(root: Path, files: list[Path]) -> dict[str, Any]:
@@ -246,10 +223,6 @@ def _is_historical_doc_with_summary(root: Path, path: Path) -> bool:
     if any(relative.startswith(prefix) for prefix in HISTORICAL_DOC_PREFIXES):
         return True
     return any(fnmatch.fnmatch(relative, pattern) for pattern in HISTORICAL_DOC_GLOBS)
-
-
-def _is_known_safe_secret_fixture(line: str) -> bool:
-    return any(value in line for value in KNOWN_SAFE_SECRET_FIXTURES)
 
 
 def _git_ls_files(root: Path) -> list[str]:

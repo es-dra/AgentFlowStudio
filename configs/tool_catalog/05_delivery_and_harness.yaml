@@ -1,0 +1,240 @@
+tools:
+- name: export_cover
+  description: Export a single cover image from an existing final video with FFmpeg.
+  category: cover_export_execution
+  entrypoints:
+    cli: null
+    workflow_node: export_cover
+    python: agentflow_studio.cover_sop.export_cover_from_video
+  input_artifacts:
+  - final_video.mp4
+  output_artifacts:
+  - cover.jpg
+  - cover_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - source_video_missing
+  - unsafe_output_name
+  - ffmpeg_unavailable
+  - ffmpeg_cover_export_failed
+  - cover_output_missing
+  quality_checks:
+  - cover_manifest_exists
+  - cover_manifest_status
+  - cover_image_file_exists
+  - cover_image_file_size_positive
+  - cover_ffmpeg_returncode
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: mix_bgm
+  description: Mix a local BGM audio file into an existing final video with FFmpeg.
+  category: bgm_mix_execution
+  entrypoints:
+    cli: null
+    workflow_node: mix_bgm
+    python: agentflow_studio.bgm_sop.mix_bgm_into_video
+  input_artifacts:
+  - final_video.mp4
+  - bgm.mp3
+  output_artifacts:
+  - final_video_with_bgm.mp4
+  - audio_mix_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - source_video_missing
+  - bgm_missing
+  - unsafe_output_name
+  - ffmpeg_unavailable
+  - ffmpeg_bgm_mix_failed
+  - bgm_mix_output_missing
+  - volume_out_of_range
+  - unsupported_mix_strategy
+  quality_checks:
+  - audio_mix_manifest_exists
+  - bgm_mix_manifest_status
+  - bgm_mix_output_file_exists
+  - bgm_mix_output_file_size_positive
+  - bgm_mix_ffmpeg_returncode
+  - bgm_mix_ffmpeg_warnings
+  - bgm_mix_duration_tolerance
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: probe_bgm_mix
+  description: Probe the BGM-mixed output video and enrich audio_mix_manifest.json.
+  category: bgm_mix_metadata
+  entrypoints:
+    cli: null
+    workflow_node: probe_bgm_mix
+    python: agentflow_studio.slicing_sop.probe_video_metadata
+  input_artifacts:
+  - final_video_with_bgm.mp4
+  - audio_mix_manifest.json
+  output_artifacts:
+  - audio_mix_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - ffprobe_unavailable
+  - bgm_mix_video_probe_failed
+  quality_checks:
+  - bgm_mix_video_stream_present
+  - bgm_mix_output_file_size_positive
+  - bgm_mix_duration_tolerance
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: write_finished_package
+  description: Write a finished package manifest that indexes existing final video artifacts.
+  category: finished_package_manifest
+  entrypoints:
+    cli: null
+    workflow_node: write_finished_package
+    python: agentflow_studio.package_sop.build_finished_package_manifest
+  input_artifacts:
+  - final_video.mp4
+  - final_video_with_subtitles.mp4
+  - final_video_with_bgm.mp4
+  - cover.jpg
+  - review_report.json
+  output_artifacts:
+  - finished_package_manifest.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - final_video_missing
+  - package_manifest_write_failed
+  - declared_asset_missing
+  quality_checks:
+  - finished_package_manifest_exists
+  - finished_package_manifest_status
+  - finished_package_assets_non_empty
+  - finished_package_asset_final_video_exists
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: write_package_report
+  description: Write a human- and agent-readable Markdown report for a finished package run.
+  category: finished_package_report
+  entrypoints:
+    cli: afs package-report
+    workflow_node: write_package_report
+    python: agentflow_studio.package_sop.write_package_report
+  input_artifacts:
+  - finished_package_manifest.json
+  - run_manifest.json
+  - quality_report.json
+  - review_report.json
+  - clip_plan.json
+  - highlight_score_report.json
+  - selection_diagnostics.json
+  output_artifacts:
+  - package_report.md
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - package_manifest_missing
+  - score_report_missing
+  - package_report_write_failed
+  quality_checks:
+  - package_report_exists
+  - selected_clips_documented
+  - quality_gates_documented
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: delivery_readiness
+  description: Summarize one or more product runs into a final delivery readiness report.
+  category: delivery_readiness
+  entrypoints:
+    cli: afs delivery-readiness
+    workflow_node: null
+    python: agentflow_studio.package_sop.write_delivery_readiness
+  input_artifacts:
+  - run_dir
+  - finished_package_manifest.json
+  - quality_report.json
+  - review_report.json
+  - package_report.md
+  - highlight_score_report.json
+  - selection_diagnostics.json
+  output_artifacts:
+  - delivery_readiness.json
+  - delivery_readiness.md
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - run_dir_missing
+  - required_product_artifact_missing
+  - quality_gate_failed
+  - review_gate_failed
+  - no_selected_candidates
+  quality_checks:
+  - delivery_readiness_report_exists
+  - product_runs_summarized
+  - quality_and_review_status_recorded
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: inspect_run
+  description: Inspect a workflow run directory and write quality_report.json.
+  category: harness_inspection
+  entrypoints:
+    cli: afs inspect-run
+    workflow_node: null
+    python: agentflow_studio.harness.inspect_run
+  input_artifacts:
+  - run_dir
+  output_artifacts:
+  - quality_report.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - run_dir_missing
+  - required_artifact_missing
+  - quality_check_failed
+  quality_checks:
+  - run_manifest_file_exists
+  - trace_file_exists
+  - mock_clips_count_matches_manifest
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false

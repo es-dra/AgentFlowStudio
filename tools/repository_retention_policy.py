@@ -151,8 +151,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
     if path.startswith("apps/web/"):
         return _file(path, git_state, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台；外部前端上线后按测试覆盖退休。")
     if path.startswith("configs/"):
-        status = "split_candidate" if path == "configs/tool_catalog.yaml" else "current"
-        return _file(path, git_state, "supporting_contract", status, "配置 template、platform profile 或 tool catalog；不含本地 secret。")
+        return _file(path, git_state, "supporting_contract", "current", "配置 template、platform profile 或 tool catalog；不含本地 secret。")
     if path.startswith("docs/archive/"):
         return _file(path, git_state, "historical_reference", "archive_only", "历史执行证据，后续用中文摘要继续瘦身。")
     if path.startswith("docs/frontend_integration/"):

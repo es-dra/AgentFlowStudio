@@ -73,9 +73,10 @@ Catalog file:
 configs/tool_catalog.yaml
 ```
 
-The catalog describes existing tools by name, entry point, input artifacts,
-output artifacts, dependencies, failure modes, quality checks, and agent usage
-constraints.
+`configs/tool_catalog.yaml` 现在是小索引。实际工具条目位于
+`configs/tool_catalog/*.yaml`，workflow planner 会把这些分片作为一个
+contract 读取。该 catalog 描述已有工具的名称、入口、输入 artifact、
+输出 artifact、依赖、失败模式、质量检查和 agent 使用约束。
 
 ## Boundary
 
@@ -112,7 +113,7 @@ Not allowed:
 
 ## Required Contract Fields
 
-Each tool in `configs/tool_catalog.yaml` includes:
+每个工具条目包含：
 
 - `name`
 - `description`

@@ -1,0 +1,275 @@
+tools:
+- name: generate_candidate_windows
+  description: Generate adjacent transcript-window candidates with optional script/media evidence and safe audio boundary cut-point refinement for later highlight scoring and selection.
+  category: candidate_generation
+  entrypoints:
+    cli: null
+    workflow_node: generate_candidate_windows
+    python: agentflow_studio.candidate_sop.generate_candidate_windows
+  input_artifacts:
+  - transcript.json
+  - workflow_state.transcript
+  - workflow_state.boundary_signal_manifest
+  output_artifacts:
+  - candidate_windows.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - transcript_missing
+  - invalid_window_size
+  - invalid_duration_bounds
+  - candidate_manifest_write_failed
+  quality_checks:
+  - candidate_windows_manifest_exists
+  - candidate_count_positive
+  - candidate_timestamps_valid
+  - candidate_duration_bounds
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: build_ocr_transcript
+  description: Build a timestamped OCR subtitle Transcript from frame-level OCR results.
+  category: ocr_timeline
+  entrypoints:
+    cli: null
+    workflow_node: build_ocr_transcript
+    python: agentflow_studio.ocr_sop.build_ocr_transcript_from_frames
+  input_artifacts:
+  - ocr_frames.json
+  - input_video_path
+  output_artifacts:
+  - workflow_state.ocr_transcript
+  - workflow_state.ocr_transcript_manifest
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - ocr_frames_missing
+  - ocr_frames_invalid_json
+  - ocr_transcript_empty
+  quality_checks:
+  - ocr_transcript_channel
+  - ocr_segments_non_empty
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: write_ocr_transcript
+  description: Write OCR subtitle Transcript and manifest artifacts.
+  category: ocr_timeline
+  entrypoints:
+    cli: null
+    workflow_node: write_ocr_transcript
+    python: agentflow_studio.workflow_engine.ocr_nodes.write_ocr_transcript_node
+  input_artifacts:
+  - workflow_state.ocr_transcript
+  - workflow_state.ocr_transcript_manifest
+  output_artifacts:
+  - ocr_transcript.json
+  - ocr_transcript_manifest.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - ocr_transcript_missing
+  - ocr_transcript_write_failed
+  quality_checks:
+  - ocr_transcript_exists
+  - ocr_transcript_manifest_exists
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: score_candidate_windows
+  description: Score candidate windows with deterministic viral-selection heuristics and select highlights.
+  category: candidate_scoring
+  entrypoints:
+    cli: null
+    workflow_node: score_candidate_windows
+    python: agentflow_studio.candidate_sop.score_candidate_windows
+  input_artifacts:
+  - candidate_windows.json
+  - workflow_state.candidate_windows
+  output_artifacts:
+  - workflow_state.highlight_score_report
+  - workflow_state.highlight_plan
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - candidate_windows_empty
+  - invalid_selection_limit
+  - no_candidate_selected
+  quality_checks:
+  - score_report_selected_positive
+  - selected_candidates_have_scores
+  - highlight_plan_has_candidate_ids
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: write_highlight_score_report
+  description: Write the candidate scoring report to highlight_score_report.json.
+  category: candidate_scoring
+  entrypoints:
+    cli: null
+    workflow_node: write_highlight_score_report
+    python: agentflow_studio.workflow_engine.ocr_nodes.write_highlight_score_report_node
+  input_artifacts:
+  - workflow_state.highlight_score_report
+  output_artifacts:
+  - highlight_score_report.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - highlight_score_report_missing
+  - highlight_score_report_write_failed
+  quality_checks:
+  - highlight_score_report_exists
+  - score_report_succeeded
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: write_selection_diagnostics
+  description: Write selection diagnostics from the candidate scoring report.
+  category: candidate_scoring
+  entrypoints:
+    cli: null
+    workflow_node: write_selection_diagnostics
+    python: agentflow_studio.workflow_engine.ocr_nodes.write_selection_diagnostics_node
+  input_artifacts:
+  - workflow_state.highlight_score_report
+  - highlight_score_report.json
+  output_artifacts:
+  - selection_diagnostics.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - highlight_score_report_missing
+  - selection_diagnostics_write_failed
+  quality_checks:
+  - selection_diagnostics_exists
+  - selection_diagnostics_status
+  - near_misses_documented
+  - rejection_reason_counts_documented
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: write_subtitles
+  description: Export a timestamped Transcript to subtitles.srt and subtitle_manifest.json.
+  category: subtitle_export
+  entrypoints:
+    cli: null
+    workflow_node: write_subtitles
+    python: agentflow_studio.subtitle_sop.build_subtitle_export
+  input_artifacts:
+  - workflow_state.transcript
+  output_artifacts:
+  - subtitles.srt
+  - subtitle_manifest.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - transcript_missing
+  - subtitle_segments_not_monotonic
+  - subtitle_text_empty
+  - subtitle_write_failed
+  quality_checks:
+  - subtitle_manifest_exists
+  - subtitle_manifest_status
+  - subtitle_file_exists
+  - subtitle_cue_count_matches_manifest
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: burn_subtitles
+  description: Burn an existing subtitles.srt file into an existing final video with FFmpeg.
+  category: subtitle_burn_execution
+  entrypoints:
+    cli: null
+    workflow_node: burn_subtitles
+    python: agentflow_studio.subtitle_burn_sop.burn_subtitles_into_video
+  input_artifacts:
+  - final_video.mp4
+  - subtitles.srt
+  output_artifacts:
+  - final_video_with_subtitles.mp4
+  - subtitle_burn_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - source_video_missing
+  - subtitles_missing
+  - unsafe_output_name
+  - ffmpeg_unavailable
+  - ffmpeg_subtitle_burn_failed
+  quality_checks:
+  - subtitle_burn_manifest_exists
+  - subtitle_burn_manifest_status
+  - subtitle_burn_output_file_exists
+  - subtitle_burn_ffmpeg_returncode
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: probe_subtitle_burn
+  description: Probe the subtitle-burned output video and enrich subtitle_burn_manifest.json.
+  category: subtitle_burn_metadata
+  entrypoints:
+    cli: null
+    workflow_node: probe_subtitle_burn
+    python: agentflow_studio.slicing_sop.probe_video_metadata
+  input_artifacts:
+  - final_video_with_subtitles.mp4
+  - subtitle_burn_manifest.json
+  output_artifacts:
+  - subtitle_burn_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - ffprobe_unavailable
+  - subtitle_burn_video_probe_failed
+  quality_checks:
+  - subtitle_burn_video_stream_present
+  - subtitle_burn_output_file_size_positive
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true

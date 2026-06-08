@@ -4,10 +4,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from agentflow_studio.utils import write_json
 from agentflow_studio.workflow_engine.loader import load_workflow
+from agentflow_studio.workflow_engine.tool_catalog import load_workflow_tool_catalog
 
 
 SCHEMA_VERSION = "0.1"
@@ -132,41 +131,7 @@ def _expected_artifacts(steps: list[dict[str, Any]]) -> list[str]:
 
 
 def _load_tool_catalog(tool_catalog_path: str | Path | None) -> dict[str, dict[str, Any]]:
-    if tool_catalog_path is None:
-        return {}
-
-    path = Path(tool_catalog_path)
-    if not path.is_file():
-        return {}
-
-    try:
-        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-
-    tools = payload.get("tools")
-    if not isinstance(tools, list):
-        return {}
-
-    catalog: dict[str, dict[str, Any]] = {}
-    for tool in tools:
-        if not isinstance(tool, dict):
-            continue
-        node_name = _workflow_node_name(tool)
-        if node_name:
-            catalog[node_name] = tool
-    return catalog
-
-
-def _workflow_node_name(tool: dict[str, Any]) -> str | None:
-    entrypoints = tool.get("entrypoints")
-    if isinstance(entrypoints, dict) and entrypoints.get("workflow_node"):
-        return str(entrypoints["workflow_node"])
-    if tool.get("name"):
-        return str(tool["name"])
-    return None
+    return load_workflow_tool_catalog(tool_catalog_path)
 
 
 def _plan_id(workflow_name: str) -> str:

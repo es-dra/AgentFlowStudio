@@ -105,8 +105,9 @@ def test_static_viewer_real_fixture_covers_supported_artifact_shapes() -> None:
 
 def test_static_viewer_declares_m11_artifact_classes_and_schema_warnings() -> None:
     artifact_workspace = _read_web_file("artifact-workspace.js")
+    artifact_workspace_artifacts = _read_web_file("artifact-workspace-artifacts.js")
     artifact_contracts = _read_web_file("artifact-contracts.js")
-    combined_source = artifact_workspace + artifact_contracts
+    combined_source = artifact_workspace + artifact_workspace_artifacts + artifact_contracts
     workspace_render = _read_web_file("app-workspace-render.js")
 
     for source_token in [

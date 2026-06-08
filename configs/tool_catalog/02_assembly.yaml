@@ -1,0 +1,111 @@
+tools:
+- name: load_real_slice_manifest
+  description: Load a real slicing manifest for final video assembly.
+  category: video_assembly_input
+  entrypoints:
+    cli: null
+    workflow_node: load_real_slice_manifest
+    python: agentflow_studio.workflow_engine.assembly_nodes.load_real_slice_manifest_node
+  input_artifacts:
+  - real_slice_manifest.json
+  output_artifacts:
+  - real_slice_manifest.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - real_slice_manifest_missing
+  - real_slice_manifest_invalid_json
+  quality_checks:
+  - real_slice_manifest_exists
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: generate_assembly_plan
+  description: Generate a simple ordered assembly plan from successful real clips.
+  category: video_assembly_planning
+  entrypoints:
+    cli: null
+    workflow_node: generate_assembly_plan
+    python: agentflow_studio.assembly_sop.build_assembly_plan
+  input_artifacts:
+  - real_slice_manifest.json
+  output_artifacts:
+  - assembly_plan.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - real_slice_manifest_has_no_successful_clips
+  quality_checks:
+  - assembly_plan_exists
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: concat_clips
+  description: Concatenate ordered clip files into final_video.mp4 with FFmpeg.
+  category: video_assembly_execution
+  entrypoints:
+    cli: null
+    workflow_node: concat_clips
+    python: agentflow_studio.assembly_sop.concat_clips
+  input_artifacts:
+  - assembly_plan.json
+  - clips/*.mp4
+  output_artifacts:
+  - concat_list.txt
+  - final_video.mp4
+  - final_video_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - input_clip_missing
+  - ffmpeg_unavailable
+  - ffmpeg_concat_failed
+  quality_checks:
+  - final_video_manifest_exists
+  - final_video_manifest_status
+  - final_video_file_exists
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: probe_final_video
+  description: Probe the assembled final video and enrich final_video_manifest.json.
+  category: video_assembly_metadata
+  entrypoints:
+    cli: null
+    workflow_node: probe_final_video
+    python: agentflow_studio.slicing_sop.probe_video_metadata
+  input_artifacts:
+  - final_video.mp4
+  - final_video_manifest.json
+  output_artifacts:
+  - final_video_manifest.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - ffprobe_unavailable
+  - final_video_probe_failed
+  quality_checks:
+  - final_video_duration_tolerance
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true

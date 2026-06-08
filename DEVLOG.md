@@ -5,10 +5,37 @@
 ## 当前证据入口
 
 - 当前任务账本：`TASK_TRACKER.md`
+- 低成本维护收口：`docs/maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md`
 - Product Spine Reset 账本：`docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md`
 - 本地内测落地记录：`docs/handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`
 - Runtime Service 前端对接：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`
+
+## 2026-06-09 - 低成本维护收口 001
+
+- 将 `secret_like_fragments` 审计从粗粒度字段扫描改为区分高置信 secret、schema 字段、环境变量引用、参数引用和测试 fixture。
+- 新增 `tools/maintenance_audit_secret_scan.py`，避免维护审计主文件继续膨胀。
+- 将 `configs/tool_catalog.yaml` 从 1100+ 行单文件改为索引文件，实际工具条目拆入 `configs/tool_catalog/` 分片。
+- 新增 `agentflow_studio/workflow_engine/tool_catalog.py`，让 workflow planner 和测试共享 tool catalog contract 加载路径。
+- 拆分过渡 Web 的 artifact workspace、memory inspector、production inspector facts 映射文件；这些文件仍是 read-only / local-only 过渡面，不作为未来正式 Web 架构。
+- 更新 retention policy：tool catalog 索引和分片作为当前 supporting contract，不再作为 split candidate。
+
+边界：
+
+- 未启动 provider。
+- 未写入 secret、signed URL、本地私有素材或生成媒体字节。
+- 未声明 human acceptance、business validation 或 durable memory。
+- 未写入或晋升 `10-Startup` / COS active rule。
+
+局部验证：
+
+- 维护 / tool catalog / retention 聚焦测试：`29 passed`。
+- Web artifact workspace / inspector 聚焦测试：`26 passed`。
+- Web facts JS 语法检查通过。
+- `maintenance_audit`：`failed=0, passed=5, warning=1`；`secret_like_fragments count=0`；`oversized_files=24`。
+- `repository_retention_review --summary-only`：`delete_candidate_count=0`，`manual_review_required_count=0`。
+- 全量 pytest：`997 passed, 1 warning`。
+- `git diff --check` 通过。
 
 ## 2026-06-08 - Product Spine Reset 003 强删除切片
 

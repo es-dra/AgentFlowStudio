@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from agentflow_studio.workflow_engine.tool_catalog import load_tool_catalog_contract
+
 
 CATALOG_PATH = Path("configs/tool_catalog.yaml")
 DOCS_PATH = Path("docs/tool_contracts.md")
@@ -53,7 +55,17 @@ FORBIDDEN_TOOLS = {
 
 
 def _load_catalog() -> dict:
-    return yaml.safe_load(CATALOG_PATH.read_text(encoding="utf-8"))
+    return load_tool_catalog_contract(CATALOG_PATH)
+
+
+def test_tool_catalog_uses_split_index_contract() -> None:
+    index = yaml.safe_load(CATALOG_PATH.read_text(encoding="utf-8"))
+
+    assert index["catalog_kind"] == "static_tool_contracts"
+    assert "tool_catalog_parts" in index
+    assert "tools" not in index
+    for relative_part in index["tool_catalog_parts"]:
+        assert (CATALOG_PATH.parent / relative_part).is_file()
 
 
 def test_tool_catalog_declares_current_static_tools() -> None:

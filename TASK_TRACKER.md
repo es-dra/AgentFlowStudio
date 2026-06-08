@@ -25,6 +25,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | ID | Owner role | 范围 | 状态 | 证据 |
 |---|---|---|---|---|
+| AFS-MAINTENANCE-CLOSEOUT-001 | Maintainability Steward + Frontend Contract Steward | 调精维护审计、拆分 tool catalog 和过渡 Web 大文件、冻结 hidden CLI 迁移边界 | 进行中 | `docs/maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md` |
 | AFS-MAINTENANCE-DEBT-CLOSURE-001 | Architecture Reset Lead + QA / Release Gatekeeper | 解除剩余包级循环、收紧架构门禁、新增 CI 维护门禁 | 已完成 | `docs/maintenance/AFS-MAINTENANCE-DEBT-CLOSURE-001.zh-CN.md` |
 | AFS-MODEL-GATEWAY-CYCLE-001 | Architecture Reset Lead | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 | `docs/maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md` |
 | AFS-PRODUCT-SPINE-RESET-003 | Maintainability Steward + Architecture Reset Lead | 删除旧入口、压缩历史文档面、强化 retention review、消除旧包/CLI/Web surface | 已提交 | `docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md` |
@@ -51,7 +52,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 ## 当前阻塞和残留
 
-- `maintenance_audit` 预计仍会保留低置信 secret-like warning 和 300 行以上文件 warning；只要 `failed=0` 即可继续。
+- `maintenance_audit` 的 secret-like warning 已在收口切片中降为 0；预计仍会保留 300 行以上文件 warning，后续触碰对应模块时继续拆分。
 - `docs/archive/` 中仍有历史引用；它们不是当前任务入口。
 - Hidden CLI support commands 仍是兼容支持面；删除前必须做独立 CLI 协议迁移。
 - Provider validation 默认关闭，除非显式授权对应 capability gate。

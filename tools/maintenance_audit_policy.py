@@ -45,14 +45,27 @@ HIGH_CONFIDENCE_SECRET_PATTERNS = (
 )
 
 SECRET_FIELD_PATTERNS = (
-    re.compile(r"api[_-]?key\s*[:=]", re.IGNORECASE),
-    re.compile(r"token\s*[:=]", re.IGNORECASE),
-    re.compile(r"cookie\s*[:=]", re.IGNORECASE),
-    re.compile(r"signed_url\s*[:=]", re.IGNORECASE),
+    re.compile(r"api[_-]?key\s*(?::|=(?!=))", re.IGNORECASE),
+    re.compile(r"token\s*(?::|=(?!=))", re.IGNORECASE),
+    re.compile(r"cookie\s*(?::|=(?!=))", re.IGNORECASE),
+    re.compile(r"signed_url\s*(?::|=(?!=))", re.IGNORECASE),
 )
 
 KNOWN_SAFE_SECRET_FIXTURES = {
+    "<local-provider-key>",
+    "<your-local-key>",
+    "?token=secret",
+    "abc123",
+    "fake",
+    "fake-key",
+    "fake-secret-key",
+    "fake-token",
+    "fk-mm-key",
+    "provider-secret-url",
+    "signed_url=abc",
+    "secret-key",
     "sk-test-secret-value",
+    "token=abc",
 }
 
 HISTORICAL_SUMMARY_PATH = "docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md"

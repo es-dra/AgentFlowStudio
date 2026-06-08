@@ -8,7 +8,8 @@
 - `models.yaml`：本地覆盖配置，已被 `.gitignore` 忽略。
 - `ffmpeg.example.yaml`：提交到 Git 的 FFmpeg 配置模板。
 - `ffmpeg.yaml`：本地覆盖配置，已被 `.gitignore` 忽略。
-- `tool_catalog.yaml`：工具目录契约，字段名可能包含 `api_key` / `token` 这类 schema 名称，但不得写入真实值。
+- `tool_catalog.yaml`：工具目录契约索引，引用 `tool_catalog/` 下的分片；字段名可能包含 `api_key` / `token` 这类 schema 名称，但不得写入真实值。
+- `tool_catalog/`：工具目录契约分片，按 workflow 领域拆分，避免单个配置文件膨胀。
 - `platform_profiles/`：平台 profile 示例和约束。
 
 ## Provider Gate

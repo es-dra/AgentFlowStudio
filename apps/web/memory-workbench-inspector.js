@@ -32,51 +32,10 @@ import {
   productionOperatorRunPackageFacts,
   productionSessionFacts,
 } from "./memory-workbench-production-inspector-facts.js";
-import { artifactFocusTargetsFor, artifactLabelFor } from "./artifact-registry.js?v=m4-memory-canvas-tools";
-
-const TYPE_LABELS = {
-  agentflow_memory_video_pipeline_package: "Pipeline package",
-  agentflow_memory_video_pipeline_protocol: "Pipeline protocol",
-  agentflow_memory_video_pipeline_review: "Review artifact",
-  agentflow_memory_video_pipeline_human_observation: "Human observation",
-  agentflow_memory_video_pipeline_presentation_package: "Presentation package",
-  agentflow_feedback_event: "Feedback draft",
-  agentflow_production_memory_loop: "Production memory loop",
-  agentflow_production_memory_session_report: "Production memory session",
-  agentflow_production_memory_operator_loop_run: "Production memory operator loop",
-  agentflow_production_memory_operator_manifest_check: "Production memory operator manifest check",
-  agentflow_production_memory_operator_handoff_packet: "Production memory operator handoff packet",
-  agentflow_production_memory_operator_run_package: "Production memory operator run package",
-  agentflow_production_memory_operator_run_package_check: "Production memory operator run package check",
-  agentflow_production_memory_next_operator_start_packet: "Production memory next operator start packet",
-  agentflow_production_memory_next_operator_start_event: "Production memory next operator start event",
-  agentflow_production_memory_next_operator_action_result: "Production memory next operator action result",
-  agentflow_production_memory_acceptance_feedback_event: "Production memory acceptance feedback",
-  agentflow_production_memory_acceptance_feedback_candidate_packet: "Production memory acceptance feedback candidate",
-  agentflow_production_memory_acceptance_feedback_candidate_promotion_decision: "Production memory acceptance feedback candidate promotion",
-  agentflow_production_memory_next_context_handoff: "Production memory next context handoff",
-  agentflow_production_memory_next_task_packet: "Production memory next task packet",
-  agentflow_production_memory_next_pass_result: "Production memory next pass result",
-  agentflow_production_memory_next_pass_review: "Production memory next pass review",
-  agentflow_production_memory_next_pass_promotion_decision: "Production memory next pass promotion decision",
-  agentflow_production_memory_next_pass_promotion_overlay: "Production memory next pass promotion overlay",
-  agentflow_production_memory_operator_feedback_event: "Production memory operator feedback",
-  agentflow_production_memory_operator_feedback_candidate_packet: "Production memory operator feedback candidate",
-  agentflow_production_memory_asset_profile_seed: "Production memory asset profile seed",
-  agentflow_production_memory_asset_profile: "Production memory asset profile",
-  agentflow_production_memory_asset_profile_readiness: "Production memory asset profile readiness",
-  agentflow_production_memory_asset_test_package: "Production memory asset test package",
-  agentflow_production_memory_asset_provider_validation_plan: "Production memory asset provider validation plan",
-  agentflow_production_memory_asset_provider_validation_blockers: "Production memory asset provider validation blockers",
-  agentflow_production_memory_asset_provider_validation_result: "Production memory asset provider validation result",
-  agentflow_production_memory_asset_feedback_event: "Production memory asset feedback",
-  agentflow_production_memory_asset_profile_update_candidate: "Production memory asset profile update candidate",
-  agentflow_production_memory_asset_profile_promotion_decision: "Production memory asset profile promotion decision",
-  agentflow_production_memory_asset_profile_version: "Production memory asset profile version",
-  agentflow_production_memory_asset_profile_context_projection: "Production memory asset profile context projection",
-  agentflow_production_memory_asset_consistency_review: "Production memory asset consistency review",
-  agentflow_company_kb_feedback_candidate_packet: "Company KB candidate packet",
-};
+import { artifactLabelFor } from "./artifact-registry.js?v=m4-memory-canvas-tools";
+import { TYPE_LABELS } from "./memory-workbench-inspector-labels.js";
+import { focusTargetsFor } from "./memory-workbench-inspector-focus.js";
+import { statusFor } from "./memory-workbench-inspector-status.js";
 
 export function buildMemoryArtifactInspector(workspace, fallback = []) {
   const artifacts = Array.isArray(workspace?.memoryBundle) ? workspace.memoryBundle : [];
@@ -96,41 +55,6 @@ function summarizeArtifact(artifact) {
     detail: `${artifact.fileName} | ${payload.protocol_id || payload.feedback_id || payload.schema_version || "selected JSON"}`,
     facts: factsFor(type, payload),
   };
-}
-
-function focusTargetsFor(type) {
-  const registryTargets = artifactFocusTargetsFor(type);
-  if (registryTargets.length) return registryTargets;
-  if (type === "agentflow_memory_video_pipeline_protocol") return ["project", "assets", "memory-loaded"];
-  if (type === "agentflow_memory_video_pipeline_package") return ["project", "next-pass"];
-  if (type === "agentflow_memory_video_pipeline_review") return ["baseline-run", "memory-backed-run", "review"];
-  if (type === "agentflow_memory_video_pipeline_human_observation") return ["assets", "review"];
-  if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
-  if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
-  if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
-  if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_loop_run") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_manifest_check") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_handoff_packet") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_run_package") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_run_package_check") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_operator_start_packet") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_operator_start_event") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_operator_action_result") return ["project", "assets", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_acceptance_feedback_event") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
-  if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_context_handoff") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_task_packet") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_pass_result") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
-  if (type === "agentflow_production_memory_next_pass_review") return ["project", "memory-loaded", "review", "feedback", "next-pass"];
-  if (type === "agentflow_production_memory_next_pass_promotion_decision") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_next_pass_promotion_overlay") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type === "agentflow_production_memory_operator_feedback_event") return ["project", "memory-loaded", "review", "feedback"];
-  if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
-  if (type.startsWith("agentflow_production_memory_asset_")) return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
-  if (type === "agentflow_company_kb_feedback_candidate_packet") return ["project", "memory-loaded", "review", "next-pass"];
-  return [];
 }
 
 function factsFor(type, payload) {
@@ -244,37 +168,6 @@ function feedbackFacts(payload) {
     fact("reason_tags", arrayValue(payload.reason_tags).join(", ") || "none"),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
-}
-
-function statusFor(type, payload) {
-  if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
-  if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
-  if (type === "agentflow_production_memory_next_pass_result") return payload.result_status || "review ready";
-  if (type === "agentflow_production_memory_next_pass_review") return payload.review_status || "review ready";
-  if (type === "agentflow_production_memory_next_pass_promotion_overlay" || type === "agentflow_production_memory_next_pass_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
-  if (type === "agentflow_production_memory_operator_manifest_check") return payload.check_status || "review ready";
-  if (type === "agentflow_production_memory_operator_handoff_packet") return payload.handoff_status || "review ready";
-  if (type === "agentflow_production_memory_operator_run_package") return payload.package_status || "review ready";
-  if (type === "agentflow_production_memory_operator_run_package_check") return payload.check_status || "review ready";
-  if (type === "agentflow_production_memory_next_operator_start_packet") return payload.start_packet_status || "review ready";
-  if (type === "agentflow_production_memory_next_operator_start_event") return payload.event_status || "review ready";
-  if (type === "agentflow_production_memory_next_operator_action_result") return payload.result_status || "review ready";
-  if (type === "agentflow_production_memory_acceptance_feedback_event") return payload.status || "review ready";
-  if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
-  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
-  if (type === "agentflow_production_memory_operator_feedback_event") return payload.status || "review ready";
-  if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
-  if (type === "agentflow_production_memory_asset_profile_readiness") return payload.readiness_status || "review ready";
-  if (type === "agentflow_production_memory_asset_feedback_event") return payload.parse_status || "review ready";
-  if (type === "agentflow_production_memory_asset_profile_update_candidate") return payload.candidate_generation_status || "review ready";
-  if (type === "agentflow_production_memory_asset_profile_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
-  if (type === "agentflow_production_memory_asset_profile_version") return payload.usable_for_next_context === true ? "review ready" : "blocked";
-  if (type === "agentflow_production_memory_asset_profile_context_projection") return payload.projection_status || "review ready";
-  if (type === "agentflow_production_memory_asset_consistency_review") return payload.review_status || "review ready";
-  if (type.startsWith("agentflow_production_memory_asset_provider_validation_")) return payload.validation_status || payload.status || "review ready";
-  if (type.startsWith("agentflow_production_memory_asset_")) return payload.profile_status || payload.package_status || "review ready";
-  if (payload.writes_long_term_memory === true) return "blocked";
-  return "review ready";
 }
 
 function verdictCounts(observations) {

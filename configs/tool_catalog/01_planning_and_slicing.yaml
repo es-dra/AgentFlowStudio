@@ -1,0 +1,272 @@
+tools:
+- name: analyze_hooks
+  description: Analyze a UTF-8 source text file and produce hook candidates.
+  category: roi_analysis
+  entrypoints:
+    cli: afs analyze-hooks
+    workflow_node: analyze_hooks
+    python: agentflow_studio.roi_sop.analyze_hooks_from_text
+  input_artifacts:
+  - text_file
+  output_artifacts:
+  - hooks.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - input_text_missing
+  - empty_text
+  - hooks_schema_invalid
+  quality_checks:
+  - hooks_file_exists
+  - hooks_non_empty
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: generate_scripts
+  description: Generate mock short-video scripts from hook candidates.
+  category: script_generation
+  entrypoints:
+    cli: afs generate-scripts
+    workflow_node: generate_scripts
+    python: agentflow_studio.roi_sop.generate_scripts_from_hooks
+  input_artifacts:
+  - hooks.json
+  output_artifacts:
+  - scripts.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - hooks_missing
+  - hooks_schema_invalid
+  - scripts_schema_invalid
+  quality_checks:
+  - scripts_file_exists
+  - scripts_non_empty
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: generate_clip_plans
+  description: Generate deterministic clip planning contracts from scripts.
+  category: clip_planning
+  entrypoints:
+    cli: afs generate-clip-plans
+    workflow_node: generate_clip_plans
+    python: agentflow_studio.slicing_sop.generate_clip_plans_from_scripts
+  input_artifacts:
+  - scripts.json
+  output_artifacts:
+  - clip_plans.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - scripts_missing
+  - scripts_schema_invalid
+  - clip_plan_time_range_invalid
+  quality_checks:
+  - clip_plans_file_exists
+  - clip_plans_non_empty
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: mock_slice
+  description: Generate mock clip text files and a slice manifest from clip plans.
+  category: mock_slicing
+  entrypoints:
+    cli: afs mock-slice
+    workflow_node: mock_slice
+    python: agentflow_studio.slicing_sop.mock_slice_clip_plans
+  input_artifacts:
+  - clip_plans.json
+  output_artifacts:
+  - slice_manifest.json
+  - clips/
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - clip_plans_missing
+  - clip_plans_schema_invalid
+  - mock_clip_write_failed
+  quality_checks:
+  - slice_manifest_exists
+  - clips_dir_exists
+  - mock_clips_count_matches_manifest
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: build_ffmpeg_command_contract
+  description: Build a minimal FFmpeg slicing command list without executing FFmpeg.
+  category: real_slicing_contract
+  entrypoints:
+    cli: null
+    workflow_node: null
+    python: agentflow_studio.slicing_sop.build_ffmpeg_slice_command
+  input_artifacts:
+  - input_video_path
+  - start_sec
+  - duration_sec
+  - output_video_path
+  output_artifacts:
+  - ffmpeg_command
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - invalid_input_path
+  - invalid_time_range
+  - invalid_output_extension
+  quality_checks:
+  - ffmpeg_command_has_expected_args
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: slice_real
+  description: Execute minimal local FFmpeg slicing from clip plans.
+  category: real_slicing_poc
+  entrypoints:
+    cli: afs slice-real
+    workflow_node: null
+    python: agentflow_studio.slicing_sop.slice_clip_plans_real
+  input_artifacts:
+  - input_video_path
+  - clip_plans.json
+  output_artifacts:
+  - real_slice_manifest.json
+  - clips/*.mp4
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - input_video_missing
+  - clip_plans_missing
+  - clip_plans_schema_invalid
+  - ffmpeg_executable_not_found
+  - ffmpeg_execution_failed
+  quality_checks:
+  - real_slice_manifest_exists
+  - real_clips_written
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: probe_video_metadata
+  description: Read local video metadata through FFprobe and write video_metadata.json.
+  category: real_video_metadata
+  entrypoints:
+    cli: null
+    workflow_node: probe_video_metadata
+    python: agentflow_studio.slicing_sop.probe_video_metadata
+  input_artifacts:
+  - input_video_path
+  - ffprobe_executable
+  output_artifacts:
+  - video_metadata.json
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - input_video_missing
+  - ffprobe_unavailable
+  - ffprobe_execution_failed
+  - video_metadata_parse_failed
+  quality_checks:
+  - video_metadata_exists
+  - video_metadata_status
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true
+- name: validate_clip_plan
+  description: Validate one ClipPlan against ROISettings, video metadata, and FFmpeg availability.
+  category: real_video_validation
+  entrypoints:
+    cli: null
+    workflow_node: validate_clip_plan
+    python: agentflow_studio.slicing_sop.validate_clip_plan
+  input_artifacts:
+  - clip_plan.json
+  - roi_config.json
+  - video_metadata.json
+  output_artifacts:
+  - clip_plan_validation.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - empty_clip_plan
+  - invalid_segment_time_range
+  - segment_outside_video_duration
+  - unsafe_output_filename
+  - ffmpeg_unavailable
+  quality_checks:
+  - clip_plan_validation_exists
+  - clip_plan_validation_status
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false
+- name: real_slice_video
+  description: Execute the real-video workflow slicing node after validation succeeds.
+  category: real_video_workflow_node
+  entrypoints:
+    cli: null
+    workflow_node: real_slice_video
+    python: agentflow_studio.slicing_sop.slice_clip_plans_real
+  input_artifacts:
+  - input_video_path
+  - clip_plan.json
+  - clip_plan_validation.json
+  output_artifacts:
+  - real_slice_manifest.json
+  - clips/*.mp4
+  requires:
+    ffmpeg: true
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - clip_plan_validation_failed
+  - ffmpeg_unavailable
+  - ffmpeg_execution_failed
+  - real_clip_write_failed
+  quality_checks:
+  - real_slice_manifest_exists
+  - real_slice_manifest_status
+  - real_clips_written
+  agent_usage:
+    safe_for_auto_execute: false
+    requires_human_review: true
+    mutates_workflow: false
+    executes_external_process: true

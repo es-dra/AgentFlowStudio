@@ -49,7 +49,9 @@ def test_web_artifact_registry_is_consumed_by_core_static_modules() -> None:
     consumers = [
         Path("apps/web/artifact-contracts.js"),
         Path("apps/web/artifact-workspace.js"),
+        Path("apps/web/artifact-workspace-artifacts.js"),
         Path("apps/web/memory-workbench-inspector.js"),
+        Path("apps/web/memory-workbench-inspector-focus.js"),
     ]
     combined = "\n".join(path.read_text(encoding="utf-8") for path in consumers)
 

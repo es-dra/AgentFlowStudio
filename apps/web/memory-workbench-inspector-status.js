@@ -1,0 +1,30 @@
+export function statusFor(type, payload) {
+  if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
+  if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
+  if (type === "agentflow_production_memory_next_pass_result") return payload.result_status || "review ready";
+  if (type === "agentflow_production_memory_next_pass_review") return payload.review_status || "review ready";
+  if (type === "agentflow_production_memory_next_pass_promotion_overlay" || type === "agentflow_production_memory_next_pass_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
+  if (type === "agentflow_production_memory_operator_manifest_check") return payload.check_status || "review ready";
+  if (type === "agentflow_production_memory_operator_handoff_packet") return payload.handoff_status || "review ready";
+  if (type === "agentflow_production_memory_operator_run_package") return payload.package_status || "review ready";
+  if (type === "agentflow_production_memory_operator_run_package_check") return payload.check_status || "review ready";
+  if (type === "agentflow_production_memory_next_operator_start_packet") return payload.start_packet_status || "review ready";
+  if (type === "agentflow_production_memory_next_operator_start_event") return payload.event_status || "review ready";
+  if (type === "agentflow_production_memory_next_operator_action_result") return payload.result_status || "review ready";
+  if (type === "agentflow_production_memory_acceptance_feedback_event") return payload.status || "review ready";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_acceptance_feedback_candidate_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
+  if (type === "agentflow_production_memory_operator_feedback_event") return payload.status || "review ready";
+  if (type === "agentflow_production_memory_operator_feedback_candidate_packet") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_readiness") return payload.readiness_status || "review ready";
+  if (type === "agentflow_production_memory_asset_feedback_event") return payload.parse_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_update_candidate") return payload.candidate_generation_status || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_promotion_decision") return payload.decision_effect || payload.decision || "review ready";
+  if (type === "agentflow_production_memory_asset_profile_version") return payload.usable_for_next_context === true ? "review ready" : "blocked";
+  if (type === "agentflow_production_memory_asset_profile_context_projection") return payload.projection_status || "review ready";
+  if (type === "agentflow_production_memory_asset_consistency_review") return payload.review_status || "review ready";
+  if (type.startsWith("agentflow_production_memory_asset_provider_validation_")) return payload.validation_status || payload.status || "review ready";
+  if (type.startsWith("agentflow_production_memory_asset_")) return payload.profile_status || payload.package_status || "review ready";
+  if (payload.writes_long_term_memory === true) return "blocked";
+  return "review ready";
+}

@@ -49,6 +49,48 @@ def test_maintenance_audit_does_not_count_named_fake_secret_fixture(tmp_path) ->
     assert checks["secret_like_fragments"]["high_confidence_count"] == 0
 
 
+def test_maintenance_audit_ignores_schema_fields_and_safe_fixture_values(tmp_path) -> None:
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "configs" / "tool_catalog.yaml").write_text(
+        """
+tools:
+  - name: remote_asr
+    requires:
+      api_key: true
+    failure_modes:
+      - api_key_missing
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests" / "provider_fixture.py").write_text(
+        '\n'.join(
+            [
+                'provider = Provider(api_key="fake-key")',
+                'token_url = "https://signed.example/video.mp4?token=provider-secret-url"',
+                '$env:AFS_IMAGE_API_KEY="<local-provider-key>"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["secret_like_fragments"]["status"] == "passed"
+
+
+def test_maintenance_audit_still_flags_real_high_confidence_secret(tmp_path) -> None:
+    secret_value = "sk-" + "live-secret-value-123456"
+    (tmp_path / "bad.py").write_text(f'value = "{secret_value}"\n', encoding="utf-8")
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["secret_like_fragments"]["status"] == "warning"
+    assert checks["secret_like_fragments"]["high_confidence_count"] == 1
+
+
 def test_chinese_doc_coverage_ignores_machine_contract_blocks(tmp_path) -> None:
     (tmp_path / "README.md").write_text(
         """# 中文说明
