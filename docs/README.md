@@ -16,28 +16,22 @@
 ## 产品与架构
 
 - [当前架构](current_architecture.md)
-- [产品路线](product_roadmap.md)
-- [Artifact 对照表](agentflow_artifact_map.md)
-- [Phase 15 路线旧稿](agentflow_phase15_roadmap.md)
-- [Runtime readiness 旧稿](agentflow_runtime_readiness.md)
-- [架构重构计划旧稿](agentflow_architecture_refactor_plan.md)
-- [PR 审查清单旧稿](agentflow_pr_review_checklist.md)
-- [Production Memory 架构旧稿](architecture/production_memory_architecture.md)
 - [Project Manifest contract](project_manifest_contract.md)
-- [Memory contract](agentflow_memory_contract.md)
+- [Production Memory 架构](architecture/production_memory_architecture.md)
+- [Production Memory Asset Profile](architecture/production_memory_asset_profiles.md)
 - [Skill contract](agentflow_skill_contract.md)
 - [Router contract](agentflow_router_contract.md)
 
 ## 本地内测与前端
 
 - [本地内测 runbook](local_internal_test_runbook.md)
-- [Memory Workbench 重设计旧稿](workbench/AFS-WORKBENCH-REDESIGN-001.md)
 - [前端对接包](frontend_integration/README.md)
 - [Runtime Service 前端交接](handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md)
 - [本地内测落地交接](handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md)
 
 ## 维护与交接
 
+- [低成本维护收口](maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md)
 - [维护性重置账本](maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md)
 - [Product Spine Reset 账本](maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md)
 - [Agent 项目开发规范候选](maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md)
@@ -74,7 +68,9 @@ http://127.0.0.1:8790/openapi.json
 
 ## 历史文档处理原则
 
-历史 phase 文档仍可作为实现背景，但不应成为新任务入口。后续清理时优先做中文摘要归档：
+历史 phase、alpha、golden path、旧 demo 和旧 smoke 文档不再作为当前任务入口。当前仓库优先保留能直接支撑代码、contract、runbook、Runtime Service、deterministic harness 和维护门禁的文档。
+
+仍需保留历史信息时，优先写入中文摘要：
 
 - 做了什么。
 - 当前是否仍有效。

@@ -1,7 +1,5 @@
 import { clearNode, metaLine, node, row, statusPill } from "./render-helpers.js";
 import { renderAssetReviewScreen } from "./memory-workbench-asset-review-render.js";
-import { renderDemoReadyChecklist } from "./memory-workbench-demo-checklist-render.js";
-import { renderDemoEvidenceSummary } from "./memory-workbench-demo-render.js";
 import { renderActionStrip, renderOperatorDock, renderStudioStatus, renderToolbar } from "./memory-workbench-studio-render.js";
 
 const LOOP_NODES = [
@@ -28,8 +26,6 @@ export function renderMemoryWorkbench(elements, fixture, copy) {
   renderToolbar(elements);
   renderOperatorDock(elements, fixture, copy, focusMemoryInspector);
   renderActionStrip(elements, fixture, copy, focusMemoryInspector);
-  renderDemoReadyChecklist(elements, fixture.demo_checklist, copy);
-  renderDemoEvidenceSummary(elements, fixture.demo_summary, copy);
   renderStateStrip(elements, fixture, copy);
   renderCanvas(elements, fixture, copy);
   renderProtocolSummary(elements, fixture, copy);

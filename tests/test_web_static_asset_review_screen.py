@@ -166,8 +166,6 @@ const elements = {{
   memoryFeedbackStatus: element("p"),
   memoryFeedbackCopy: element("button"),
   memoryFocusSummary: element("div"),
-  memoryDemoChecklist: element("div"),
-  memoryDemoSummary: element("div"),
   memoryActionStrip: element("div"),
   memoryOperatorDock: element("div"),
   memoryStateStrip: element("div"),

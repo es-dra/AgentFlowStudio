@@ -9,8 +9,6 @@ from agentflow.harness.agentflow_router import validate_router_decision_dry_run
 
 ROUTER_DECISION_EXAMPLE = Path("examples/agentflow/router_decision.example.json")
 ROUTER_CONTRACT = Path("docs/agentflow_router_contract.md")
-RUNTIME_READINESS = Path("docs/agentflow_runtime_readiness.md")
-PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 KNOWN_SKILL_IDS = {
     "agentflow_studio.production.production_handoff",
     "agentflow_studio.short_highlight_package",
@@ -114,11 +112,6 @@ def test_router_dry_run_validator_rejects_private_paths_and_secrets() -> None:
 
 def test_router_dry_run_validator_is_documented_as_non_runtime() -> None:
     router_contract = _text(ROUTER_CONTRACT)
-    runtime_readiness = _text(RUNTIME_READINESS)
-    phase15 = _text(PHASE15_ROADMAP)
 
     assert "agentflow_router_dry_run_validation" in router_contract
     assert "does not implement Router runtime" in router_contract
-    assert "Router dry-run decision validation" in runtime_readiness
-    assert "Phase 15.11" in phase15
-    assert "Router dry-run decision validator" in phase15

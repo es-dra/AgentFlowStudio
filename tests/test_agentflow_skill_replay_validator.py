@@ -9,8 +9,6 @@ from agentflow.harness.agentflow_skill import validate_skill_invocation_result_r
 SKILL_INVOCATION_EXAMPLE = Path("examples/agentflow/skill_invocation.example.json")
 SKILL_RESULT_EXAMPLE = Path("examples/agentflow/skill_result.example.json")
 SKILL_CONTRACT = Path("docs/agentflow_skill_contract.md")
-RUNTIME_READINESS = Path("docs/agentflow_runtime_readiness.md")
-PHASE15_ROADMAP = Path("docs/agentflow_phase15_roadmap.md")
 
 
 def _json(path: Path) -> dict:
@@ -124,14 +122,9 @@ def test_skill_replay_validator_rejects_private_paths_and_secrets() -> None:
 
 def test_skill_replay_validator_is_documented_as_non_runtime() -> None:
     skill_contract = _text(SKILL_CONTRACT)
-    runtime_readiness = _text(RUNTIME_READINESS)
-    phase15 = _text(PHASE15_ROADMAP)
 
     assert "agentflow_skill_replay_validation" in skill_contract
     assert "does not implement a skill runtime" in skill_contract
-    assert "skill invocation/result replay" in runtime_readiness
-    assert "Phase 15.12" in phase15
-    assert "Skill Invocation / Result Replay Validator" in phase15
 
 
 def _failed_check_ids(validation: dict) -> set[str]:

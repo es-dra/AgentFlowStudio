@@ -67,33 +67,30 @@ export function renderToolbar(elements) {
 }
 
 function studioStatusCards(fixture) {
-  const checklist = fixture.demo_checklist || {};
-  if (Array.isArray(checklist.status_cards) && checklist.status_cards.length) {
-    return checklist.status_cards;
-  }
-  const summary = checklist.summary || {};
-  const groups = Array.isArray(checklist.groups) ? checklist.groups : [];
-  const speakable = groups.find((item) => item.id === "speakable");
-  const gaps = groups.find((item) => item.id === "gaps");
-  const nonClaims = groups.find((item) => item.id === "non-claims");
+  const assets = Array.isArray(fixture.assets) ? fixture.assets : [];
+  const memories = Array.isArray(fixture.memory_loaded) ? fixture.memory_loaded : [];
+  const blockedAssets = assets.filter((item) => item.status === "blocked").length;
+  const boundaryCount = Array.isArray(fixture.protocol_summary?.boundaries)
+    ? fixture.protocol_summary.boundaries.length
+    : 0;
   return [
     {
-      label: "Can present",
-      value: `${summary.ready_count ?? 0}/${summary.total_count ?? 0}`,
-      status: speakable?.status || checklist.status || "planned",
-      detail: summary.headline || "Load a package or sample bundle.",
+      label: "Current view",
+      value: fixture.state || "empty",
+      status: fixture.state === "blocked" ? "blocked" : "review ready",
+      detail: fixture.project?.format || "select explicit local JSON",
     },
     {
-      label: "Evidence gaps",
-      value: String(summary.gap_count ?? 0),
-      status: summary.gap_count ? "warning" : "review ready",
-      detail: gaps?.detail || "Review, observation, and presentation evidence.",
+      label: "Assets",
+      value: String(assets.length),
+      status: blockedAssets ? "blocked" : "review ready",
+      detail: blockedAssets ? `${blockedAssets} blocked assets` : "no blocked assets in current view",
     },
     {
       label: "Do not claim",
-      value: `${summary.boundary_count ?? 0} boundaries`,
-      status: nonClaims?.status || "blocked",
-      detail: nonClaims?.detail || "Acceptance, business validation, and durable memory remain separate.",
+      value: `${boundaryCount} boundaries`,
+      status: "blocked",
+      detail: `${memories.length} context refs; acceptance, business validation, and durable memory remain separate.`,
     },
   ];
 }

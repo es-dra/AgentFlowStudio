@@ -13,7 +13,6 @@ def test_static_viewer_html_declares_local_artifact_workbench() -> None:
 
     assert 'href="styles.css"' in html
     assert 'href="memory-workbench.css?v=m4-memory-canvas-tools"' in html
-    assert 'href="memory-workbench-demo.css?v=m4-memory-demo-summary"' in html
     assert 'href="memory-workbench-studio.css?v=m5-studio-canvas"' in html
     assert 'src="app.js?v=m4-memory-canvas-tools"' in html
     assert 'type="module"' in html

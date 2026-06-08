@@ -85,7 +85,6 @@ HISTORICAL_DOC_GLOBS = (
     "docs/afs_delivery_checklist.md",
     "docs/agent_*.md",
     "docs/agentflow_*.md",
-    "docs/alpha_readiness_report.md",
     "docs/asset_lifecycle.md",
     "docs/current_architecture.md",
     "docs/feedback_contract.md",

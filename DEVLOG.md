@@ -11,6 +11,33 @@
 - Runtime Service 前端对接：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`
 
+## 2026-06-09 - 低成本维护强删收口
+
+- 直接退休旧编号式 `memory_advantage_demo_*` 模块、旧 Alpha smoke CLI、旧 `memory-video-pipeline` CLI/core/examples/tests。
+- 删除不再服务当前主线的大批旧文档、长历史归档、旧 workbench/task brief/company-kb-feedback 子目录文档。
+- 过渡 Web 继续保留为 read-only/local-only artifact viewer，但删除旧内置 sample bundle、demo evidence、browser feedback draft 和旧 memory video package 视图。
+- `contract_registry.example.json` 与 `contract_audit_report.example.json` 已移除退休 artifact type，并把仍有效 contract 指向当前中文架构/资产 profile 文档。
+- 当前 product spine 收敛为：Runtime Service / Production Memory asset loop / Project Manifest / Provider Gate / read-only artifact viewer / maintenance audit。
+
+边界：
+
+- 未启动 provider。
+- 未写入 secret、signed URL、本地私有素材、生成媒体字节或 runtime artifact。
+- 未声明 human acceptance、business validation 或 durable memory。
+- 未写入或晋升 `10-Startup` / COS active rule。
+
+局部验证：
+
+- 契约 / CLI focused：`41 passed`。
+- Web static focused：`26 passed`。
+- 全部 Web static：`83 passed`。
+- 维护 / 架构 / retention focused：`38 passed`。
+- Web JS 语法检查通过：`memory-workbench-controller.js`、`memory-workbench-render.js`、`memory-workbench-studio-render.js`、`artifact-contracts.js`、`artifact-workspace.js`。
+- `maintenance_audit`：`failed=0, passed=5, warning=1`；`secret_like_fragments high_confidence_count=0`；`oversized_files=24`。
+- `repository_retention_review --summary-only`：`delete_candidate_count=0`，`manual_review_required_count=0`；当前未提交删除仍显示为 `remove_applied_pending_stage=108`，提交后应消失。
+- 全量 pytest：`901 passed, 1 warning`。
+- `git diff --check` 通过。
+
 ## 2026-06-09 - 低成本维护收口 001
 
 - 将 `secret_like_fragments` 审计从粗粒度字段扫描改为区分高置信 secret、schema 字段、环境变量引用、参数引用和测试 fixture。

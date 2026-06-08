@@ -4,16 +4,8 @@ from pathlib import Path
 
 import typer
 
-from apps.cli.alpha_commands import alpha_smoke_command
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.memory_review_command import memory_evidence_reuse_review_command
-from apps.cli.memory_video_pipeline_command import (
-    memory_video_pipeline_observe_command,
-    memory_video_pipeline_package_command,
-    memory_video_pipeline_plan_command,
-    memory_video_pipeline_present_command,
-    memory_video_pipeline_review_command,
-)
 from apps.cli.production_memory_command_registry import register_production_memory_commands
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.report_commands import (
@@ -39,12 +31,6 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="review-run")(review_run_command)
     app.command(name="package-report")(package_report_command)
     app.command(name="delivery-readiness")(delivery_readiness_command)
-    app.command(name="alpha-smoke")(alpha_smoke_command)
-    app.command(name="memory-video-pipeline-plan")(memory_video_pipeline_plan_command)
-    app.command(name="memory-video-pipeline-review")(memory_video_pipeline_review_command)
-    app.command(name="memory-video-pipeline-observe")(memory_video_pipeline_observe_command)
-    app.command(name="memory-video-pipeline-present")(memory_video_pipeline_present_command)
-    app.command(name="memory-video-pipeline-package")(memory_video_pipeline_package_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
     register_production_memory_commands(app)
     app.command(name="runtime-service")(runtime_service_command)

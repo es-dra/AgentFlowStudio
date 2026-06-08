@@ -17,12 +17,7 @@ export const ARTIFACT_ALIASES = {
   subtitle_manifest: ["subtitle_manifest.json"],
   audio_mix_manifest: ["audio_mix_manifest.json"],
   cover_manifest: ["cover_manifest.json"],
-  agentflow_memory_video_pipeline_protocol: ["memory_video_pipeline_protocol.json", "memory_video_pipeline_protocol.example.json"],
-  agentflow_memory_video_pipeline_package: ["memory_video_pipeline_package.json", "memory_video_pipeline_package.example.json"],
-  agentflow_memory_video_pipeline_review: ["memory_video_pipeline_review.json", "memory_video_pipeline_review.example.json"],
-  agentflow_memory_video_pipeline_human_observation: ["memory_video_pipeline_human_observation.json", "memory_video_pipeline_human_observation.example.json"],
-  agentflow_memory_video_pipeline_presentation_package: ["memory_video_pipeline_presentation_package.json", "memory_video_pipeline_presentation_package.example.json"],
-  agentflow_feedback_event: ["memory_video_pipeline_feedback_event_draft.json", "feedback_event.json"],
+  agentflow_feedback_event: ["feedback_event.json"],
   agentflow_production_memory_loop: ["production_memory_loop.json", "production_memory_loop.example.json"],
   agentflow_production_memory_session_report: ["production_memory_session_report.json"],
   agentflow_production_memory_operator_loop_run: ["production_memory_operator_loop_run.json"],
@@ -88,12 +83,7 @@ export function sourceRoleFor(type, fileName) {
   if (type === "subtitle_manifest") return "subtitle asset manifest";
   if (type === "audio_mix_manifest") return "audio mix manifest";
   if (type === "cover_manifest") return "cover asset manifest";
-  if (type === "agentflow_memory_video_pipeline_protocol") return "memory video pipeline protocol";
-  if (type === "agentflow_memory_video_pipeline_package") return "memory video pipeline package";
-  if (type === "agentflow_memory_video_pipeline_review") return "memory video pipeline review";
-  if (type === "agentflow_memory_video_pipeline_human_observation") return "memory video pipeline human observation";
-  if (type === "agentflow_memory_video_pipeline_presentation_package") return "memory video pipeline presentation package";
-  if (type === "agentflow_feedback_event") return "memory feedback event draft";
+  if (type === "agentflow_feedback_event") return "feedback event";
   if (type === "agentflow_production_memory_loop") return "production memory loop";
   if (type === "agentflow_production_memory_session_report") return "production memory session report";
   if (type === "agentflow_production_memory_operator_loop_run") return "production memory operator loop run";

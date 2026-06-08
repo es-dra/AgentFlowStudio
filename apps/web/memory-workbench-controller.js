@@ -1,11 +1,5 @@
-import { normalizeWorkspace, parseFiles } from "./artifact-workspace.js?v=m4-memory-canvas-tools";
-import { buildDemoReadyChecklist } from "./memory-workbench-demo-checklist.js";
-import { buildDemoEvidenceSummary } from "./memory-workbench-demo-summary.js";
-import { buildMemoryFeedbackDraft } from "./memory-workbench-feedback.js";
-import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
 import { buildCompanyKbFeedbackCandidatePacketView } from "./memory-workbench-company-kb-feedback.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
-import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
 import { buildProjectManifestView } from "./memory-workbench-project-manifest.js";
 import { buildProductionMemoryAcceptanceFeedbackCandidateView } from "./memory-workbench-production-acceptance-feedback-candidate.js";
 import { buildProductionMemoryAcceptanceFeedbackCandidatePromotionView } from "./memory-workbench-production-acceptance-feedback-candidate-promotion.js";
@@ -28,14 +22,9 @@ import { buildProductionMemoryOperatorManifestCheckView } from "./memory-workben
 import { buildProductionMemoryOperatorRunPackageCheckView } from "./memory-workbench-production-operator-run-package-check.js";
 import { buildProductionMemoryOperatorRunPackageView } from "./memory-workbench-production-operator-run-package.js";
 import { buildProductionMemorySessionReportView } from "./memory-workbench-production-session.js";
-import { memoryWorkbenchSampleFiles } from "./memory-workbench-sample.js";
 
-export function attachMemoryWorkbenchHandlers(elements, { onWorkspaceLoaded, setMode }) {
-  elements.memorySampleBundle.addEventListener("click", async () => {
-    const artifacts = await parseFiles(memoryWorkbenchSampleFiles());
-    onWorkspaceLoaded(normalizeWorkspace(artifacts), "sample_bundle");
-    setMode("memory");
-  });
+export function attachMemoryWorkbenchHandlers(_elements, _handlers) {
+  // Sample-bundle loading was retired; keep the hook so app wiring stays stable.
 }
 
 export function memorySourceForArtifacts(artifacts) {
@@ -43,8 +32,7 @@ export function memorySourceForArtifacts(artifacts) {
 }
 
 export function buildMemoryWorkbenchView(workspace, source) {
-  const packageView = buildMemoryWorkbenchPackageView(workspace, memoryWorkbenchFixture);
-  const memoryView = buildProductionMemoryLoopView(workspace, packageView);
+  const memoryView = buildProductionMemoryLoopView(workspace, emptyMemoryWorkbenchView());
   const sessionView = buildProductionMemorySessionReportView(workspace, memoryView);
   const companyKbView = buildCompanyKbFeedbackCandidatePacketView(workspace, sessionView);
   const operatorLoopView = buildProductionMemoryOperatorLoopView(workspace, companyKbView);
@@ -69,9 +57,7 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const projectManifestView = buildProjectManifestView(workspace, assetCockpitView);
   projectManifestView.source_status = memorySourceStatus(source, workspace);
   projectManifestView.artifact_inspector = buildMemoryArtifactInspector(workspace, projectManifestView.artifact_inspector);
-  projectManifestView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  projectManifestView.demo_summary = buildDemoEvidenceSummary(projectManifestView);
-  projectManifestView.demo_checklist = buildDemoReadyChecklist(projectManifestView);
+  projectManifestView.feedback_draft = emptyFeedbackDraft();
   return projectManifestView;
 }
 
@@ -93,7 +79,59 @@ function memorySourceStatus(source, workspace) {
   }
   return {
     label: "Fixture",
-    detail: "Built-in static fixture only; select files or load the sample bundle for evidence-backed inspection.",
+    detail: "No embedded sample bundle. Select explicit local JSON artifacts for read-only inspection.",
     status: "planned",
+  };
+}
+
+function emptyMemoryWorkbenchView() {
+  return {
+    state: "empty",
+    project: {
+      title: "No selected artifact",
+      brief: "Select Project Manifest or Production Memory JSON to inspect the local runtime state.",
+      format: "local JSON only",
+      route: "read-only artifact viewer",
+    },
+    workflow_actions: [],
+    assets: [],
+    bundle_summary: [],
+    memory_loaded: [],
+    lanes: [],
+    protocol_summary: {
+      title: "No runtime artifact loaded",
+      status: "planned",
+      controls: [],
+      boundaries: [
+        { label: "no provider call", status: "blocked", detail: "this view cannot start remote providers" },
+        { label: "not acceptance", status: "blocked", detail: "runtime inspection is not human acceptance" },
+        { label: "not durable memory", status: "blocked", detail: "selected JSON does not promote Company/COS memory" },
+      ],
+    },
+    review: {
+      storyboard_adherence: "not loaded",
+      visual_consistency: "not loaded",
+      boundary: "read-only selected JSON only",
+    },
+    feedback: {
+      status: "planned",
+      summary: "Feedback must be recorded by explicit deterministic CLI/runtime artifacts.",
+    },
+    next_pass: {
+      status: "planned",
+      action: "select_project_manifest_or_production_memory_artifact",
+    },
+    timeline: [],
+    state_labels: ["empty", "review ready", "blocked"],
+  };
+}
+
+function emptyFeedbackDraft() {
+  return {
+    title: "Feedback Draft Disabled",
+    status: "blocked",
+    detail: "Browser-generated feedback drafts were retired. Use explicit CLI/runtime feedback artifacts.",
+    json_text: "",
+    copy_enabled: false,
   };
 }

@@ -69,11 +69,3 @@ def test_agentflow_contract_helpers_do_not_expose_runtime_execution() -> None:
         "write_memory",
     }
     assert not (forbidden_names & set(dir(examples)))
-
-
-def test_agentflow_contract_helpers_are_recorded_in_phase15_roadmap() -> None:
-    phase15 = Path("docs/agentflow_phase15_roadmap.md").read_text(encoding="utf-8")
-
-    assert "Phase 15.16" in phase15
-    assert "AgentFlow Contract Example Helpers" in phase15
-    assert "does not move validators" in phase15

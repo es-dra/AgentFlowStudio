@@ -58,11 +58,6 @@ function summarizeArtifact(artifact) {
 }
 
 function factsFor(type, payload) {
-  if (type === "agentflow_memory_video_pipeline_package") return packageFacts(payload);
-  if (type === "agentflow_memory_video_pipeline_protocol") return protocolFacts(payload);
-  if (type === "agentflow_memory_video_pipeline_review") return reviewFacts(payload);
-  if (type === "agentflow_memory_video_pipeline_human_observation") return observationFacts(payload);
-  if (type === "agentflow_memory_video_pipeline_presentation_package") return presentationFacts(payload);
   if (type === "agentflow_feedback_event") return feedbackFacts(payload);
   if (type === "agentflow_production_memory_loop") return productionLoopFacts(payload);
   if (type === "agentflow_production_memory_session_report") return productionSessionFacts(payload);
@@ -105,62 +100,6 @@ function factsFor(type, payload) {
   ];
 }
 
-function packageFacts(payload) {
-  const refs = ["plan_ref", "review_ref", "observation_ref", "presentation_ref", "feedback_event_draft_ref"].filter((key) => payload[key]);
-  return [
-    fact("refs", `${refs.length} linked refs`),
-    fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
-    fact("provider_calls_started", yesNo(payload.provider_calls_started)),
-    fact("claim_boundary", claimBoundary(payload.claim_boundaries)),
-  ];
-}
-
-function protocolFacts(payload) {
-  const cards = arrayValue(payload.memory_context?.cards);
-  const lanes = arrayValue(payload.lanes);
-  const checkpoints = arrayValue(payload.storyboard?.shot_checkpoints);
-  return [
-    fact("memory_cards", String(cards.length)),
-    fact("lanes", lanes.map((lane) => lane.lane_id).filter(Boolean).join(" / ") || "none"),
-    fact("checkpoints", String(checkpoints.length)),
-    fact("provider_route", payload.provider_route?.video_service_id || "not selected"),
-  ];
-}
-
-function reviewFacts(payload) {
-  const artifacts = arrayValue(payload.video_artifacts);
-  const checkpoints = arrayValue(payload.storyboard?.shot_checkpoints);
-  const parity = objectValue(payload.lane_parity);
-  const parityPass = Object.values(parity).filter((value) => value === true).length;
-  return [
-    fact("video_artifacts", String(artifacts.length)),
-    fact("lane_parity", `${parityPass}/${Object.keys(parity).length} true`),
-    fact("storyboard", `${payload.storyboard?.scene_id || "storyboard"} | ${checkpoints.length} checkpoints`),
-    fact("machine_judgement", payload.cross_run_stability?.machine_judgement || "not_performed"),
-  ];
-}
-
-function observationFacts(payload) {
-  const observations = arrayValue(payload.observations);
-  return [
-    fact("observations", String(observations.length)),
-    fact("verdicts", verdictCounts(observations)),
-    fact("signal", signalSummary(payload.observed_signal_summary)),
-    fact("claim_boundary", claimBoundary(payload.claim_boundaries)),
-  ];
-}
-
-function presentationFacts(payload) {
-  const setup = objectValue(payload.experiment_setup);
-  const result = objectValue(payload.result_summary);
-  return [
-    fact("takeaway", payload.one_sentence_takeaway || "not provided"),
-    fact("same_for_both_lanes", arrayValue(setup.same_for_both_lanes).length),
-    fact("run_count", result.run_count ?? "unknown"),
-    fact("residual_risk", result.residual_risk || "unknown"),
-  ];
-}
-
 function feedbackFacts(payload) {
   return [
     fact("decision", payload.decision || "unknown"),
@@ -168,31 +107,6 @@ function feedbackFacts(payload) {
     fact("reason_tags", arrayValue(payload.reason_tags).join(", ") || "none"),
     fact("writes_long_term_memory", yesNo(payload.writes_long_term_memory)),
   ];
-}
-
-function verdictCounts(observations) {
-  const counts = {};
-  for (const item of observations) {
-    const verdict = item?.verdict || "unknown";
-    counts[verdict] = (counts[verdict] || 0) + 1;
-  }
-  return Object.entries(counts).map(([verdict, count]) => `${verdict}: ${count}`).join(", ") || "none";
-}
-
-function signalSummary(signal) {
-  const data = objectValue(signal);
-  return Object.entries(data)
-    .map(([key, value]) => `${key}: ${String(value)}`)
-    .join(", ") || "not recorded";
-}
-
-function claimBoundary(boundaries) {
-  const data = objectValue(boundaries);
-  return [
-    data.human_acceptance || "not_acceptance",
-    data.business_validation || "not_validated",
-    data.durable_memory_runtime || "not_implemented",
-  ].join(" / ");
 }
 
 function fact(label, value) {
@@ -219,7 +133,7 @@ function emptyInspector() {
       focus_targets: ["project", "assets", "memory-loaded", "baseline-run", "memory-backed-run", "review", "feedback", "next-pass"],
       title: "No selected memory artifacts",
       status: "planned",
-      detail: "Select memory package, review, observation, presentation, protocol, or feedback JSON to inspect structure.",
+      detail: "Select Project Manifest or Production Memory JSON to inspect structure.",
       facts: [
         fact("scope", "explicit selected files only"),
         fact("auto_follow_refs", "false"),

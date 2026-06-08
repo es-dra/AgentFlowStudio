@@ -1,6 +1,5 @@
 export function statusFor(type, payload) {
   if (type === "agentflow_feedback_event") return payload.draft_status || "feedback captured";
-  if (type === "agentflow_memory_video_pipeline_human_observation") return payload.observation_status || "review ready";
   if (type === "agentflow_production_memory_next_pass_result") return payload.result_status || "review ready";
   if (type === "agentflow_production_memory_next_pass_review") return payload.review_status || "review ready";
   if (type === "agentflow_production_memory_next_pass_promotion_overlay" || type === "agentflow_production_memory_next_pass_promotion_decision") return payload.decision_effect || payload.decision || "review ready";

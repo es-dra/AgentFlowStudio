@@ -77,6 +77,27 @@ high_confidence_count: 0
 - 不作为后续正式 Web 架构。
 - 后续自研轻量 Web 应优先接 Runtime Service，而不是继续扩展这些过渡文件。
 
+### 4. 旧 demo / Alpha / memory video pipeline 退休
+
+原问题：
+
+- 编号式 `memory_advantage_demo_*`、旧 Alpha smoke、旧 `memory-video-pipeline` 与当前 Production Memory asset loop 平行存在。
+- 旧 Web 内置 sample bundle、demo evidence、browser feedback draft 继续暗示可以走旧演示链路。
+- 多份旧文档和 doc-only tests 维护成本高，但不再服务本地内测可用主线。
+
+处理：
+
+- 删除旧 demo / Alpha / memory video pipeline 的 CLI、core、examples、tests 和 recording script。
+- 删除旧 Web sample/demo/package/feedback 模块，只保留当前 Project Manifest、Production Memory、Asset Review 的只读 artifact viewer。
+- 删除旧长文档、历史归档和不再作为入口的 task brief/workbench/company-kb-feedback 子目录文档。
+- 更新 `contract_registry.example.json` 和 `contract_audit_report.example.json`，退休旧 artifact type，修正仍有效 contract 的中文文档路径。
+
+边界：
+
+- 不删除 Runtime Service、Production Memory asset loop、Provider Gate、Project Manifest、当前 contract fixtures。
+- 不启动 provider。
+- 不把 feedback 自动晋升为 durable memory。
+
 ## Hidden CLI 边界
 
 当前 hidden CLI 仍保留两类：
@@ -107,8 +128,15 @@ high_confidence_count: 0
 ## 验证命令
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_maintenance_audit.py tests\test_tool_catalog.py tests\test_workflow_plan_draft.py tests\test_repository_retention_review.py -q
-.\.venv\Scripts\python.exe -m pytest tests\test_web_static_artifact_workspace.py tests\test_web_static_artifact_registry.py tests\test_web_static_artifact_boundaries.py tests\test_web_static_artifact_viewer.py tests\test_web_memory_static_structure.py tests\test_web_memory_artifact_summary_static.py -q
+.\.venv\Scripts\python.exe -m pytest tests\test_contract_examples.py tests\test_agentflow_contract_helpers.py tests\test_agentflow_contract_audit.py tests\test_cli_command_registry_boundaries.py -q
+.\.venv\Scripts\python.exe -m pytest tests\test_web_static_artifact_registry.py tests\test_web_static_artifact_boundaries.py tests\test_web_static_artifact_workspace.py tests\test_web_static_artifact_viewer.py tests\test_web_static_asset_review_screen.py tests\test_web_static_project_manifest.py tests\test_web_static_production_memory_operator_loop.py tests\test_web_static_production_memory_operator_readiness_cockpit.py -q
+.\.venv\Scripts\python.exe -m pytest tests\test_architecture_audit_gates.py tests\test_repository_retention_review.py tests\test_ci_maintenance_workflow.py tests\test_maintenance_audit.py tests\test_tool_catalog.py tests\test_workflow_plan_draft.py -q
+.\.venv\Scripts\python.exe -m pytest <all test_web_static_*.py> -q
+node --check apps\web\memory-workbench-controller.js
+node --check apps\web\memory-workbench-render.js
+node --check apps\web\memory-workbench-studio-render.js
+node --check apps\web\artifact-contracts.js
+node --check apps\web\artifact-workspace.js
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
 .\.venv\Scripts\python.exe tools\repository_retention_review.py --root . --summary-only
 ```
@@ -118,13 +146,17 @@ high_confidence_count: 0
 已完成的局部验证：
 
 ```text
-maintenance/tool catalog/retention focused tests: 29 passed
-Web artifact workspace / inspector focused tests: 26 passed
+contract / CLI focused tests: 41 passed
+Web static focused tests: 26 passed
+all Web static tests: 83 passed
+maintenance / architecture / retention focused tests: 38 passed
+Web JS syntax checks: passed
 maintenance_audit: failed=0, passed=5, warning=1
 secret_like_fragments: passed, count=0, high_confidence_count=0
 oversized_files: 24
 repository_retention_review: delete_candidate_count=0, manual_review_required_count=0
-full pytest: 997 passed, 1 warning
+remove_applied_pending_stage: 108 before staging/commit
+full pytest: 901 passed, 1 warning
 git diff --check: passed
 ```
 

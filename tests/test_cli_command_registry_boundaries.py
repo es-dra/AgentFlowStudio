@@ -25,12 +25,6 @@ VISIBLE_PRODUCT_COMMANDS = (
     "review-run",
     "package-report",
     "delivery-readiness",
-    "alpha-smoke",
-    "memory-video-pipeline-plan",
-    "memory-video-pipeline-review",
-    "memory-video-pipeline-observe",
-    "memory-video-pipeline-present",
-    "memory-video-pipeline-package",
     "memory-evidence-reuse-review",
     "memory-loop-validate",
     "memory-loop-run-no-provider",
@@ -59,7 +53,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "minimax-image-smoke" not in source
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source
-    assert "memory-video-pipeline-package" in source
+    assert "memory_video_pipeline_command" not in source
     assert "register_production_memory_commands" in source
     assert "runtime-service" in source
     assert "runtime-service-openapi-export" in source

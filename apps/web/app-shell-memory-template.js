@@ -34,7 +34,6 @@ export function memoryShellTemplate() {
             </div>
             <div class="memory-load-actions">
               <label class="memory-primary-action" for="artifact-files">选择 Memory JSON</label>
-              <button id="memory-sample-bundle" class="ghost-button memory-sample-bundle" type="button">Load sample bundle</button>
             </div>
             <div id="memory-source-status" class="memory-source-status"></div>
             <div id="memory-project-summary" class="memory-project-summary"></div>
@@ -101,32 +100,12 @@ export function memoryShellTemplate() {
             </div>
             <div id="memory-operator-dock" class="memory-operator-dock"></div>
           </section>
-          <section class="panel memory-demo-panel" aria-labelledby="memory-demo-summary-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Demo Evidence</p>
-                <h2 id="memory-demo-summary-title">Demo Evidence Summary</h2>
-              </div>
-              <span class="chip">talk track</span>
-            </div>
-            <div id="memory-demo-summary" class="memory-demo-summary"></div>
-          </section>
           <section class="panel memory-action-panel" aria-labelledby="memory-action-title">
             <div class="panel-heading">
               <h2 id="memory-action-title">Workflow Actions</h2>
               <span class="chip">read-only</span>
             </div>
             <div id="memory-action-strip" class="memory-action-strip"></div>
-          </section>
-          <section class="panel memory-checklist-panel" aria-labelledby="memory-demo-checklist-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Operator Gate</p>
-                <h2 id="memory-demo-checklist-title">Demo-ready checklist</h2>
-              </div>
-              <span class="chip">no execution</span>
-            </div>
-            <div id="memory-demo-checklist" class="memory-demo-checklist"></div>
           </section>
           <section class="memory-canvas" aria-label="memory canvas">
             <div class="memory-canvas-caption">

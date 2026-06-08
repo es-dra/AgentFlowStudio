@@ -1,218 +1,103 @@
-# Current Architecture
+# 当前架构
 
-This document summarizes the AgentFlow Studio architecture for the `v0.1.0` delivery
-closeout. AgentFlow Studio is the distribution-side short video highlight workflow
-module of AgentFlow Studio. It is a reference for productization work, Golden
-Sample runs, and future UI/API or agent integration.
+本文是 AFS 当前工程基线的中文架构入口。旧 Alpha、Phase、Golden Path、编号 demo 和历史路线图不再作为当前任务入口。
 
-## Current Position
+## 当前定位
 
-AgentFlow Studio is a CLI-first technical MVP for short-video distribution workflows.
-It is designed around readable artifacts, deterministic workflow execution,
-package reports, and post-run inspection/review.
+AgentFlow Studio 是本地优先的 Agent-native 内容生产工作台验证线。近期目标是本地内测可用，而不是 SaaS、商业试点或大规模 provider 平台。
 
-AgentFlow Production is now added as a sibling MVP module inside this repository for
-production-side validation. It is a local-first structured production handoff
-generator, not a replacement or rename of AgentFlow Studio.
-
-AgentFlow Studio is represented here by local-first module contracts only. The
-top-level platform architecture, module boundary, artifact map, memory
-contract, and skill contract are documented separately under the contract docs.
-
-Current product path:
+当前工程主线：
 
 ```text
-video / transcript / clip_plan
-  -> highlight_plan
-  -> clip_plan.json
-  -> real clips
-  -> final_video.mp4
-  -> subtitles.srt
-  -> final_video_with_subtitles.mp4
-  -> cover.jpg
-  -> final_video_with_bgm.mp4
-  -> finished_package_manifest.json
-  -> inspect/review
+Runtime Service / CLI
+  -> deterministic asset loop
+  -> run trace / quality report / safe manifest
+  -> read-only artifact review
+  -> tester feedback
+  -> candidate / promotion / context projection
+  -> two-round runtime validation
 ```
 
-## Architecture Principles
+所有通过项只代表结构验证或运行验证，不自动代表 human acceptance、business validation 或 durable memory。
 
-- Schema-first: Pydantic schemas define contracts for major artifacts.
-- Workflow-driven: YAML workflows define execution order.
-- Artifact-readable: each major step writes JSON or media outputs.
-- Inspectable/reviewable: `inspect-run` writes quality reports; `review-run`
-  writes agent-readable review reports.
-- Mock-first by default: remote providers are opt-in.
-- CLI stays thin: business logic lives in `agentflow_studio/*`, `workflow_engine`, or
-  `harness`.
-
-## Main Layers
+## 代码分层
 
 ```text
-apps/cli
-  -> thin Typer command layer
-
-workflow_engine
-  -> workflow loading, context, node registry, runner, draft planner
-
-schemas
-  -> data contracts for clips, transcripts, highlights, video metadata,
-     subtitles, packages, validation, and workflow runs
-
-*_sop modules
-  -> domain logic for slicing, assembly, subtitles, covers, BGM, ASR,
-     highlights, packages, and audio extraction
-
-harness
-  -> run manifests, trace, inspect-run quality checks, review-run reports
-
-agentflow_production
-  -> production-side contracts and deterministic handoff SOP logic
-
-agentflow contract docs
-  -> platform architecture, module boundaries, artifact map, memory contract,
-     and skill contract drafts
-
-workflows
-  -> YAML workflow definitions
-
-examples
-  -> committed input fixtures and local-media path examples
-
-data
-  -> ignored local media, runs, reports, and generated artifacts
+apps/api/              Runtime Service，对前端的唯一正式后端对接面
+apps/cli/              本地运维、deterministic harness 和 smoke 入口
+apps/web/              过渡 read-only artifact viewer，不作为新 Web 基础
+agentflow/             平台 contract、memory loop、harness、router、skills
+agentflow_studio/      内容生产、分发、workflow、provider adapter
+configs/               示例配置和 tool catalog contract
+examples/              可提交 contract fixture
+workflows/             YAML workflow definition
+docs/                  当前中文入口、runbook、contract、维护账本
+tests/                 自动化验证面
+data/                  ignored runtime data，只保留 .gitkeep
 ```
 
-## Workflow Families
+## 正式对接面
 
-Planning workflows:
+前端只对接 Runtime Service：
 
-- `script_to_highlight_plan.yaml`
-- `transcript_to_highlight_clip_plan.yaml`
-- `video_to_transcript.yaml`
-- `video_to_transcript_real_asr.yaml`
-- `video_to_highlight_clip_plan.yaml`
-- `video_to_highlight_clip_plan_real_asr.yaml`
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
+```
 
-Execution workflows:
+OpenAPI：
 
-- `clip_plan_to_real_clips.yaml`
-- `video_to_real_clips.yaml`
-- `clips_to_final_video.yaml`
+```text
+http://127.0.0.1:8790/docs
+http://127.0.0.1:8790/openapi.json
+```
 
-Final artifact workflows:
+前端可使用：
 
-- `transcript_to_subtitles.yaml`
-- `final_video_with_subtitles.yaml`
-- `final_video_to_cover.yaml`
-- `final_video_with_bgm.yaml`
-- `final_video_package.yaml`
+- `project_id`
+- `job_id`
+- `artifact_id`
+- safe summary
+- safe manifest
+- OpenAPI request / response fixture
 
-Production-side MVP workflow:
+前端不应接触：
 
-- `agentflow_production_brief_to_production_handoff.yaml`
+- CLI 内部编排。
+- provider secret。
+- 本地素材绝对路径。
+- signed URL。
+- provider 原始响应。
+- 私有素材字节或生成媒体字节。
 
-## Important Artifacts
+## 当前核心能力
 
-Run-level artifacts:
+- Production Memory asset loop。
+- Asset Profile Review Screen。
+- Real Asset Test Run Harness。
+- Two-Round Context Runtime Validation。
+- Project Manifest v0.1。
+- Provider Validation Gate。
+- Runtime Service v0.2 前端 contract。
+- 本地轻量 AgentOps artifact：run trace、quality report、guardrail result、handoff record、maintenance audit report。
 
-- `manifest.json`
-- `run_manifest.json`
-- `trace.json`
-- `quality_report.json`
-- `review_report.json`
-- `delivery_readiness.json`
-- `delivery_readiness.md`
+## 质量与治理边界
 
-`run_manifest.json` keeps a backward-compatible `artifacts` map and an expanded
-`artifact_index` for agents and future Web UI code. `review_report.json`
-includes `quality_level` and `delivery_status` so callers do not need to infer
-handoff state only from raw check counts.
+- provider 默认关闭，按能力显式 gate。
+- feedback 是 raw evidence，不自动成为 memory。
+- candidate 不是 durable memory。
+- blocked refs 必须保留原因，并且不能进入下一轮 context。
+- Runtime Service 输出 safe refs，不暴露私有路径或 secret。
+- 维护清理先记录账本，再删除；已验证退出主线的旧 demo 和旧文档直接删除。
 
-Planning artifacts:
+## 下一阶段
 
-- `transcript.json`
-- `highlight_plan.json`
-- `clip_plan.json`
+进入轻量 Web 和完整流程跑通前，应先完成低成本维护基线：
 
-Execution artifacts:
-
-- `video_metadata.json`
-- `clip_plan_validation.json`
-- `real_slice_manifest.json`
-- `clips/`
-- `assembly_plan.json`
-- `concat_list.txt`
-- `final_video_manifest.json`
-- `final_video.mp4`
-
-Enhancement/package artifacts:
-
-- `subtitle_manifest.json`
-- `subtitles.srt`
-- `subtitle_burn_manifest.json`
-- `final_video_with_subtitles.mp4`
-- `cover_manifest.json`
-- `cover.jpg`
-- `audio_mix_manifest.json`
-- `final_video_with_bgm.mp4`
-- `finished_package_manifest.json`
-
-AgentFlow Production production handoff artifacts:
-
-- `creative_brief.json`
-- `story_bible.json`
-- `episode_outline.json`
-- `scene_plan.json`
-- `shot_plan.json`
-- `prompt_pack.json`
-- `production_handoff.json`
-- `production_report.md`
-- `memory_candidates.json`
-- `cost_quality_trace.json`
-- `feedback_signal_log.json`
-- `execution_trace.json`
-
-## Quality Profiles
-
-Quality profiles route `inspect-run` and `review-run` to the right checks.
-Important profiles include:
-
-- `real_clips`
-- `video_real_clips`
-- `final_video`
-- `subtitle_export`
-- `subtitle_burn`
-- `cover_export`
-- `bgm_mix`
-- `finished_package`
-- `agentflow_production_handoff`
-- video transcript and highlight profiles
-
-## Current Boundaries
-
-The system does not yet provide:
-
-- physical package directory or zip export
-- Web UI
-- hosted AgentFlow Production runtime or Web UI
-- AgentFlow Router runtime
-- AgentFlow Memory runtime
-- AgentFlow skill runtime
-- cross-module execution
-- automatic music selection
-- publishing/upload
-- transition templates
-- automatic visual highlight detection from video frames
-- default remote ASR or LLM calls
-
-## Productization Risks
-
-- `README.md` and roadmap must stay aligned with the implemented workflow
-  surface.
-- `workflow_engine/nodes.py` is a registration hotspot and should not absorb
-  more business logic.
-- More workflows increase discoverability burden; a documented Golden Path and
-  one-command orchestration are needed before Web UI work.
-- `finished_package_manifest.json` is currently an index, not a physical
-  deliverable package.
+```text
+维护门禁通过
+  -> repository retention review 无 delete/manual blocker
+  -> deterministic Loulan/fixture full loop
+  -> Runtime Service/OpenAPI 对齐
+  -> 简单 Web 工作台
+  -> provider smoke gate
+```

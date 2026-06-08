@@ -1,9 +1,4 @@
 export const TYPE_LABELS = {
-  agentflow_memory_video_pipeline_package: "Pipeline package",
-  agentflow_memory_video_pipeline_protocol: "Pipeline protocol",
-  agentflow_memory_video_pipeline_review: "Review artifact",
-  agentflow_memory_video_pipeline_human_observation: "Human observation",
-  agentflow_memory_video_pipeline_presentation_package: "Presentation package",
   agentflow_feedback_event: "Feedback draft",
   agentflow_production_memory_loop: "Production memory loop",
   agentflow_production_memory_session_report: "Production memory session",

@@ -8,7 +8,6 @@ from agentflow_studio.workflow_engine.tool_catalog import load_tool_catalog_cont
 
 
 CATALOG_PATH = Path("configs/tool_catalog.yaml")
-DOCS_PATH = Path("docs/tool_contracts.md")
 EXPECTED_TOOLS = {
     "analyze_hooks",
     "generate_scripts",
@@ -121,11 +120,9 @@ def test_tool_catalog_keeps_phase_7_5b_safety_boundary() -> None:
     assert slice_real["agent_usage"]["executes_external_process"] is True
 
 
-def test_tool_contract_docs_cover_catalog_tools() -> None:
-    catalog = _load_catalog()
-    docs = DOCS_PATH.read_text(encoding="utf-8")
+def test_tool_contract_docs_point_to_split_catalog_as_source_of_truth() -> None:
+    docs = Path("docs/tool_contracts.md").read_text(encoding="utf-8")
 
-    assert "Phase 7.5B" in docs
-    assert "no runtime registry" in docs
-    for tool in catalog["tools"]:
-        assert f"### `{tool['name']}`" in docs
+    assert "configs/tool_catalog.yaml" in docs
+    assert "configs/tool_catalog/*.yaml" in docs
+    assert "不再逐项复制工具条目" in docs

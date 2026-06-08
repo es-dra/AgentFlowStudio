@@ -55,18 +55,6 @@ KNOWN_HIDDEN_COMMAND_DEBT = {
     "production-memory-loop-validate",
 }
 
-KNOWN_MEMORY_ADVANTAGE_MODULES = {
-    Path("agentflow_studio/memory_advantage_demo_011_content.py"),
-    Path("agentflow_studio/memory_advantage_demo_012.py"),
-    Path("agentflow_studio/memory_advantage_demo_012_content.py"),
-    Path("agentflow_studio/memory_advantage_demo_012_review.py"),
-    Path("agentflow_studio/memory_advantage_demo_012_review_html.py"),
-    Path("agentflow_studio/memory_advantage_demo_015.py"),
-    Path("agentflow_studio/memory_advantage_demo_015_content.py"),
-    Path("agentflow_studio/memory_advantage_demo_015_review.py"),
-}
-
-
 def test_runtime_service_does_not_depend_on_cli_or_legacy_web_bridge() -> None:
     forbidden = _import_pairs(Path("apps/api"), ("apps.cli", "apps.web_bridge"))
 
@@ -104,7 +92,7 @@ def test_hidden_cli_surface_debt_is_frozen() -> None:
 def test_no_new_numbered_memory_advantage_demo_modules() -> None:
     actual = set(Path("agentflow_studio").glob("memory_advantage_demo_*.py"))
 
-    assert actual <= KNOWN_MEMORY_ADVANTAGE_MODULES
+    assert actual == set()
 
 
 def _module_name(path: Path) -> str:

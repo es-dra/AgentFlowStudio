@@ -1,6 +1,6 @@
 # AgentFlow Studio 任务账本
 
-最后更新：2026-06-08 by Codex
+最后更新：2026-06-09 by Codex
 
 本文件只保留当前工作、下一步队列、阻塞项和证据入口。旧 Alpha、旧 Web
 bridge、旧 demo 和旧逐节点 handoff 不再作为当前任务入口。
@@ -25,7 +25,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | ID | Owner role | 范围 | 状态 | 证据 |
 |---|---|---|---|---|
-| AFS-MAINTENANCE-CLOSEOUT-001 | Maintainability Steward + Frontend Contract Steward | 调精维护审计、拆分 tool catalog 和过渡 Web 大文件、冻结 hidden CLI 迁移边界 | 进行中 | `docs/maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md` |
+| AFS-MAINTENANCE-CLOSEOUT-001 | Maintainability Steward + Frontend Contract Steward | 强删旧 demo / Alpha / memory video pipeline / 旧 Web sample，调精维护审计，收紧当前 product spine | 已完成 | `docs/maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md` |
 | AFS-MAINTENANCE-DEBT-CLOSURE-001 | Architecture Reset Lead + QA / Release Gatekeeper | 解除剩余包级循环、收紧架构门禁、新增 CI 维护门禁 | 已完成 | `docs/maintenance/AFS-MAINTENANCE-DEBT-CLOSURE-001.zh-CN.md` |
 | AFS-MODEL-GATEWAY-CYCLE-001 | Architecture Reset Lead | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 | `docs/maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md` |
 | AFS-PRODUCT-SPINE-RESET-003 | Maintainability Steward + Architecture Reset Lead | 删除旧入口、压缩历史文档面、强化 retention review、消除旧包/CLI/Web surface | 已提交 | `docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md` |
@@ -46,13 +46,12 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | ID | 范围 | 状态 |
 |---|---|---|
-| AFS-MODEL-GATEWAY-CYCLE-001 | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 |
-| AFS-WORKFLOW-HARNESS-CYCLE-001 | 解除 `agentflow_studio.harness <-> agentflow_studio.workflow_engine` 循环 | 已完成 |
-| AFS-CI-MAINTENANCE-GATE-001 | 加入 `maintenance_audit`、focused pytest、`git diff --check` 到 CI | 已完成 |
+| AFS-FLOW-RUN-READY-001 | 基于当前低成本维护基线，进入自研轻量 Web 前的流程跑通准备 | 待启动 |
+| AFS-LIGHTWEIGHT-WEB-001 | 后续自研轻量 Web，只接 Runtime Service / OpenAPI / safe artifact refs | 待启动 |
 
 ## 当前阻塞和残留
 
 - `maintenance_audit` 的 secret-like warning 已在收口切片中降为 0；预计仍会保留 300 行以上文件 warning，后续触碰对应模块时继续拆分。
-- `docs/archive/` 中仍有历史引用；它们不是当前任务入口。
 - Hidden CLI support commands 仍是兼容支持面；删除前必须做独立 CLI 协议迁移。
 - Provider validation 默认关闭，除非显式授权对应 capability gate。
+- 维护审计仍保留 300 行以上文件 warning；这些是后续触碰对应模块时顺手拆分的工程债，不阻塞当前低成本维护基线。

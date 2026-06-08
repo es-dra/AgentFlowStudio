@@ -33,7 +33,6 @@ export function normalizeWorkspace(artifacts) {
   const run = normalizeRun(byType("run_manifest"));
   const packageSummary = normalizePackage(byType("package_manifest"));
   const memoryBundle = summaryArtifacts.filter((artifact) => artifact.artifactType.startsWith("agentflow_"));
-  const memoryPackage = byType("agentflow_memory_video_pipeline_package") || null;
   const productionMemoryLoop = byType("agentflow_production_memory_loop") || null;
   const productionMemorySessionReport = byType("agentflow_production_memory_session_report") || null;
   const productionMemoryOperatorLoopRun = byType("agentflow_production_memory_operator_loop_run") || null;
@@ -69,7 +68,6 @@ export function normalizeWorkspace(artifacts) {
     artifacts,
     run,
     package: packageSummary,
-    memoryPackage,
     productionMemoryLoop,
     productionMemorySessionReport,
     productionMemoryOperatorLoopRun,

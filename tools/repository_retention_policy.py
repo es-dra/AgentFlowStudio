@@ -120,10 +120,10 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(
             path,
             git_state,
-            "quarantine_candidate",
+            "delete_candidate",
             "legacy_demo_runtime",
-            "编号式 memory advantage demo 是历史实验入口，已不属于当前产品脊柱。",
-            "迁移仍有价值的 evidence 到 archive summary / generic memory video pipeline 后删除 importable module。",
+            "编号式 memory advantage demo 是历史实验入口，已退出当前产品脊柱，应直接删除。",
+            "删除后如需恢复，必须重新证明其服务 Runtime Service、deterministic harness 或当前产品主线。",
         )
     if path.startswith("agentflow_studio/"):
         return _file(path, git_state, "production_spine", "current", "内容生产与分发 pipeline 代码。")
@@ -167,7 +167,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
     if path.startswith("examples/"):
         return _file(path, git_state, "supporting_contract", "current", "示例输入、contract registry 或前端 request fixture。")
     if path in {"tests/test_memory_advantage_demo_012.py", "tests/test_memory_advantage_demo_015.py"} or path.startswith("tests/memory_advantage_demo_"):
-        return _file(path, git_state, "quarantine_candidate", "legacy_demo_verification", "只覆盖编号式历史 demo；旧 demo 退休时应同步删除或迁移为 generic pipeline 测试。", "generic memory video pipeline 覆盖同等 evidence 后删除。")
+        return _file(path, git_state, "delete_candidate", "legacy_demo_verification", "只覆盖编号式历史 demo；旧 demo 已退出当前产品脊柱，应同步删除。", "删除后如需恢复，必须重新证明其服务当前产品主线。")
     if path.startswith("tests/"):
         return _file(path, git_state, "verification_surface", "current", "自动化测试或 fixture。")
     if path.startswith("tools/"):

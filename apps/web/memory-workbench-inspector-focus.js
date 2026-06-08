@@ -3,11 +3,6 @@ import { artifactFocusTargetsFor } from "./artifact-registry.js?v=m4-memory-canv
 export function focusTargetsFor(type) {
   const registryTargets = artifactFocusTargetsFor(type);
   if (registryTargets.length) return registryTargets;
-  if (type === "agentflow_memory_video_pipeline_protocol") return ["project", "assets", "memory-loaded"];
-  if (type === "agentflow_memory_video_pipeline_package") return ["project", "next-pass"];
-  if (type === "agentflow_memory_video_pipeline_review") return ["baseline-run", "memory-backed-run", "review"];
-  if (type === "agentflow_memory_video_pipeline_human_observation") return ["assets", "review"];
-  if (type === "agentflow_memory_video_pipeline_presentation_package") return ["memory-loaded", "review"];
   if (type === "agentflow_feedback_event") return ["feedback", "next-pass"];
   if (type === "agentflow_production_memory_loop") return ["project", "assets", "memory-loaded", "review", "feedback", "next-pass"];
   if (type === "agentflow_production_memory_session_report") return ["project", "memory-loaded", "review", "next-pass"];
