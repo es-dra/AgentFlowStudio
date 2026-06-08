@@ -5,26 +5,20 @@ from pathlib import Path
 from typing import Any
 
 from agentflow.harness.constants import FAILED, PASSED
-from agentflow.memory.production_asset_feedback import (
-    FAILURE_ATTRIBUTIONS,
-    REVIEW_DIMENSIONS,
-    REVIEW_RESULTS,
-    SUGGESTED_NEXT_STATES,
-    SUPPORTED_FEEDBACK_INPUT_TYPES,
-)
-from agentflow.memory.production_asset_profile_constants import PROFILE_KINDS
-from agentflow.memory.production_asset_profile_context_projection import ASSET_PROFILE_CONTEXT_PROJECTION_KIND
-from agentflow.memory.production_asset_profile_promotion_utils import (
-    list_value,
-    reject_unsafe_asset_profile_promotion,
-)
-from agentflow.memory.production_asset_consistency_review_render import render_asset_consistency_review_markdown
-from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.harness.json_io import write_json
+from agentflow.memory.production_asset_consistency_review_render import render_asset_consistency_review_markdown
+from agentflow.memory.production_asset_consistency_review_validation import (
+    ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND,
+    dict_value,
+    reject_unsafe,
+    require_text,
+    validate_asset_consistency_review_fixture,
+    validate_asset_profile_context_projection,
+)
+from agentflow.memory.production_asset_profile_promotion_utils import list_value
+from agentflow.memory.production_loop import SCHEMA_VERSION
 
-ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND = "agentflow_production_memory_asset_consistency_review_fixture"
 ASSET_CONSISTENCY_REVIEW_KIND = "agentflow_production_memory_asset_consistency_review"
-COMPARISON_SCOPES = frozenset({"single_scene", "cross_scene", "cross_shot", "cross_scene_or_shot"})
 
 
 def load_asset_consistency_review_fixture(path: Path) -> dict[str, Any]:
@@ -51,7 +45,7 @@ def build_asset_consistency_review(
 ) -> dict[str, Any]:
     validate_asset_profile_context_projection(asset_profile_context_projection)
     validate_asset_consistency_review_fixture(consistency_fixture)
-    _require_text({"reviewed_at": reviewed_at}, "reviewed_at")
+    require_text({"reviewed_at": reviewed_at}, "reviewed_at")
     if consistency_fixture["source_context_projection_ref"] != asset_profile_context_projection["projection_id"]:
         raise ValueError("asset consistency review source_context_projection_ref does not match projection_id")
     if consistency_fixture["project_id"] != asset_profile_context_projection["project_id"]:
@@ -62,7 +56,7 @@ def build_asset_consistency_review(
     findings: list[dict[str, Any]] = []
     blocked_findings: list[dict[str, Any]] = []
     for item in list_value(consistency_fixture.get("review_items")):
-        item_obj = _dict_value(item)
+        item_obj = dict_value(item)
         profile_ref = str(item_obj.get("profile_ref", "unknown"))
         if profile_ref in included_by_ref:
             finding = _finding(item_obj, included_by_ref[profile_ref])
@@ -101,7 +95,7 @@ def build_asset_consistency_review(
         "consistency_findings": findings,
         "blocked_findings": blocked_findings,
         "context_trace": {
-            "projection_policy": _dict_value(asset_profile_context_projection.get("context_payload")).get(
+            "projection_policy": dict_value(asset_profile_context_projection.get("context_payload")).get(
                 "context_projection_policy",
                 "unknown",
             ),
@@ -125,7 +119,7 @@ def build_asset_consistency_review(
         "claim_boundaries": _claim_boundaries(),
         "non_claims": _non_claims(),
     }
-    _reject_unsafe(review)
+    reject_unsafe(review)
     return review
 
 
@@ -136,58 +130,6 @@ def write_asset_consistency_review(review: dict[str, Any], output_dir: str | Pat
     md_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(render_asset_consistency_review_markdown(review), encoding="utf-8")
     return [json_path, md_path]
-
-
-def validate_asset_profile_context_projection(projection: dict[str, Any]) -> None:
-    if projection.get("kind") != ASSET_PROFILE_CONTEXT_PROJECTION_KIND:
-        raise ValueError(f"asset consistency review requires projection kind {ASSET_PROFILE_CONTEXT_PROJECTION_KIND}")
-    if projection.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(f"asset consistency review requires projection schema_version {SCHEMA_VERSION}")
-    _require_text(projection, "projection_id")
-    _require_text(projection, "project_id")
-    if projection.get("provider_mode") != "no-provider" or projection.get("provider_calls_started") is not False:
-        raise ValueError("asset consistency review projection must be no-provider")
-    if projection.get("writes_long_term_memory") is not False or projection.get("writes_company_kb") is not False:
-        raise ValueError("asset consistency review projection must not write memory or Company KB")
-    _reject_unsafe(projection)
-
-
-def validate_asset_consistency_review_fixture(fixture: dict[str, Any]) -> None:
-    if fixture.get("kind") != ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND:
-        raise ValueError(f"asset consistency review fixture requires kind {ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND}")
-    if fixture.get("artifact_type") != ASSET_CONSISTENCY_REVIEW_FIXTURE_KIND:
-        raise ValueError("asset consistency review fixture artifact_type must match kind")
-    if fixture.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(f"asset consistency review fixture requires schema_version {SCHEMA_VERSION}")
-    for field in ("fixture_id", "project_id", "source_context_projection_ref", "source_result_ref"):
-        _require_text(fixture, field)
-    if fixture.get("source_feedback_input_type") not in SUPPORTED_FEEDBACK_INPUT_TYPES:
-        raise ValueError("asset consistency review fixture source_feedback_input_type is unsupported")
-    if fixture.get("comparison_scope") not in COMPARISON_SCOPES:
-        raise ValueError("asset consistency review fixture comparison_scope is unsupported")
-    items = list_value(fixture.get("review_items"))
-    if not items:
-        raise ValueError("asset consistency review fixture requires review_items")
-    for item in items:
-        _validate_review_item(_dict_value(item))
-    _reject_unsafe(fixture)
-
-
-def _validate_review_item(item: dict[str, Any]) -> None:
-    for field in ("profile_ref", "profile_kind"):
-        _require_text(item, field)
-    if item.get("profile_kind") not in PROFILE_KINDS:
-        raise ValueError("asset consistency review item profile_kind is unsupported")
-    if not list_value(item.get("output_refs")):
-        raise ValueError("asset consistency review item requires output_refs")
-    if item.get("review_dimension") not in REVIEW_DIMENSIONS:
-        raise ValueError("asset consistency review item review_dimension is unsupported")
-    if item.get("review_result") not in REVIEW_RESULTS:
-        raise ValueError("asset consistency review item review_result is unsupported")
-    if item.get("failure_attribution") not in FAILURE_ATTRIBUTIONS:
-        raise ValueError("asset consistency review item failure_attribution is unsupported")
-    if item.get("suggested_next_state") not in SUGGESTED_NEXT_STATES:
-        raise ValueError("asset consistency review item suggested_next_state is unsupported")
 
 
 def _finding(item: dict[str, Any], included_ref: dict[str, Any]) -> dict[str, Any]:
@@ -293,23 +235,6 @@ def _non_claims() -> list[str]:
         "not automatic asset feedback",
         "not automatic profile update",
     ]
-
-
-def _reject_unsafe(value: Any) -> None:
-    try:
-        reject_unsafe_asset_profile_promotion(value)
-    except ValueError as exc:
-        raise ValueError("asset consistency review contains unsafe private path, media, provider URL, or secret") from exc
-
-
-def _require_text(payload: dict[str, Any], field: str) -> None:
-    value = payload.get(field)
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"asset consistency review requires {field}")
-
-
-def _dict_value(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
 
 
 def _control(control_id: str, passed: bool) -> dict[str, str]:

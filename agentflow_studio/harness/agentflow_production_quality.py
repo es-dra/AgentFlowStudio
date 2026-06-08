@@ -100,16 +100,6 @@ def _add_json_parse_checks(run_dir: Path, checks: list[dict[str, Any]]) -> None:
         )
 
 
-def build_agentflow_production_review_section(root: str | Path) -> dict[str, Any]:
-    report = build_agentflow_production_quality_report(root)
-    checks = [_review_check(check) for check in report["checks"]]
-    return {
-        "name": "agentflow_production_artifacts",
-        "status": _review_status(checks),
-        "checks": checks,
-    }
-
-
 def _add_schema_checks(artifacts: dict[str, dict[str, Any] | None], checks: list[dict[str, Any]]) -> None:
     for name, payload in artifacts.items():
         if payload is None:
@@ -273,23 +263,6 @@ def _add_check(checks: list[dict[str, Any]], name: str, status: str, details: di
     if details is not None:
         check["details"] = details
     checks.append(check)
-
-
-def _review_check(check: dict[str, Any]) -> dict[str, Any]:
-    status = check["status"]
-    mapped = "passed" if status == "pass" else "warning" if status == "warning" else "failed"
-    result = {"id": check["name"], "status": mapped, "message": f"{check['name']} {status}"}
-    if "details" in check:
-        result["details"] = check["details"]
-    return result
-
-
-def _review_status(checks: list[dict[str, Any]]) -> str:
-    if any(check["status"] == "failed" for check in checks):
-        return "failed"
-    if any(check["status"] == "warning" for check in checks):
-        return "warning"
-    return "passed"
 
 
 def _ids(items: object, key: str) -> set[str]:

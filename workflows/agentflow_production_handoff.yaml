@@ -4,8 +4,11 @@ mode: local_deterministic
 quality_profile: agentflow_production_handoff
 metadata:
   module: AgentFlow Production
+  kind: production
+  audience:
+    - agent
   content_mode: episodic_story_production
-  description: Local-first structured production handoff generator.
+  description: Provider-gated structured production handoff generator.
 steps:
   - id: load_creative_brief
     type: agentflow_production_load_creative_brief

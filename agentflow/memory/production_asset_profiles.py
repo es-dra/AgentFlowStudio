@@ -4,15 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, FAILED, PASSED
+from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_asset_profile_constants import (
     ASSET_PROFILE_KIND,
     ASSET_PROFILE_READINESS_KIND,
     ASSET_PROFILE_SEED_KIND,
     ASSET_TEST_PACKAGE_KIND,
-    CONTEXT_ELIGIBILITY,
-    PROFILE_KINDS,
-    PROFILE_STATUSES,
 )
 from agentflow.memory.production_asset_profile_context import (
     context_index,
@@ -28,6 +25,11 @@ from agentflow.memory.production_asset_profile_provider import (
     provider_validation_blockers,
     run_provider_validation as execute_provider_validation,
 )
+from agentflow.memory.production_asset_profile_seed_validation import (
+    dict_value,
+    list_value,
+    validate_asset_profile_seed,
+)
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_operator_outputs import OPERATOR_LOOP_KIND
 from agentflow.memory.production_operator_run_package import OPERATOR_RUN_PACKAGE_KIND
@@ -39,20 +41,6 @@ def load_asset_profile_seed(path: Path) -> dict[str, Any]:
         raise ValueError("asset profile seed must be a JSON object")
     validate_asset_profile_seed(payload)
     return payload
-
-
-def validate_asset_profile_seed(seed: dict[str, Any]) -> None:
-    if seed.get("kind") != ASSET_PROFILE_SEED_KIND:
-        raise ValueError(f"asset profile seed requires kind {ASSET_PROFILE_SEED_KIND}")
-    if seed.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError(f"asset profile seed requires schema_version {SCHEMA_VERSION}")
-    if _has_private_fragment(seed):
-        raise ValueError("asset profile seed must not include private paths or secrets")
-    profiles = _list(seed.get("profiles"))
-    if not profiles:
-        raise ValueError("asset profile seed requires at least one profile")
-    for profile in profiles:
-        _validate_profile_seed(_dict(profile))
 
 
 def build_asset_profile_test_package(
@@ -70,7 +58,10 @@ def build_asset_profile_test_package(
 ) -> dict[str, Any]:
     validate_asset_profile_seed(asset_profile_seed)
     operator_context = load_operator_context(operator_artifact_path)
-    profiles = [_build_profile(_dict(item), asset_profile_seed, operator_context) for item in asset_profile_seed["profiles"]]
+    profiles = [
+        _build_profile(dict_value(item), asset_profile_seed, operator_context)
+        for item in asset_profile_seed["profiles"]
+    ]
     readiness = _build_readiness(asset_profile_seed, operator_context, profiles, generated_at=generated_at)
     provider_plan = build_provider_validation_plan(
         asset_profile_seed,
@@ -139,10 +130,10 @@ def _build_profile(seed_profile: dict[str, Any], seed: dict[str, Any], operator_
         "profile_status": seed_profile.get("profile_status", "candidate"),
         "context_eligibility": seed_profile.get("context_eligibility", "not_requested"),
         "usable_for_next_context": usable,
-        "allowed_variations": list(_list(seed_profile.get("allowed_variations"))),
-        "negative_constraints": list(_list(seed_profile.get("negative_constraints"))),
-        "evidence_refs": list(_list(seed_profile.get("evidence_refs"))),
-        "promotion_decision_refs": list(_list(seed_profile.get("promotion_decision_refs"))),
+        "allowed_variations": list(list_value(seed_profile.get("allowed_variations"))),
+        "negative_constraints": list(list_value(seed_profile.get("negative_constraints"))),
+        "evidence_refs": list(list_value(seed_profile.get("evidence_refs"))),
+        "promotion_decision_refs": list(list_value(seed_profile.get("promotion_decision_refs"))),
         "blockers": blocked_refs,
         "confidence": seed_profile.get("confidence", "tester_review_required"),
         "evidence_strength": seed_profile.get("evidence_strength", "unknown"),
@@ -158,7 +149,7 @@ def _build_readiness(
     *,
     generated_at: str,
 ) -> dict[str, Any]:
-    blocked_refs = _dedupe_blockers([item for profile in profiles for item in _list(profile.get("blockers"))])
+    blocked_refs = _dedupe_blockers([item for profile in profiles for item in list_value(profile.get("blockers"))])
     controls = _readiness_controls(seed, operator_context, profiles, blocked_refs)
     failed = any(item["status"] == FAILED for item in controls)
     status = "blocked_invalid_refs" if blocked_refs else "blocked_invalid_profile_seed" if failed else "ready_for_tester_review"
@@ -253,23 +244,6 @@ def _readiness_controls(
     ]
 
 
-def _validate_profile_seed(profile: dict[str, Any]) -> None:
-    if not profile.get("profile_id"):
-        raise ValueError("asset profile seed profile requires profile_id")
-    if profile.get("profile_kind") not in PROFILE_KINDS:
-        raise ValueError("asset profile seed profile_kind must be character or scene")
-    if profile.get("profile_status") not in PROFILE_STATUSES:
-        raise ValueError("asset profile seed profile_status is unsupported")
-    if profile.get("context_eligibility") not in CONTEXT_ELIGIBILITY:
-        raise ValueError("asset profile seed context_eligibility is unsupported")
-    if not _list(profile.get("allowed_variations")):
-        raise ValueError("asset profile seed requires allowed_variations")
-    if not _list(profile.get("negative_constraints")):
-        raise ValueError("asset profile seed requires negative_constraints")
-    if not _list(profile.get("evidence_refs")):
-        raise ValueError("asset profile seed requires evidence_refs")
-
-
 def _dedupe_blockers(items: list[dict[str, str]]) -> list[dict[str, str]]:
     seen: set[tuple[str, str]] = set()
     result: list[dict[str, str]] = []
@@ -282,21 +256,8 @@ def _dedupe_blockers(items: list[dict[str, str]]) -> list[dict[str, str]]:
     return result
 
 
-def _has_private_fragment(payload: Any) -> bool:
-    raw_text = str(payload).lower()
-    return any(fragment.lower() in raw_text for fragment in AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS)
-
-
 def _control(control_id: str, passed: bool) -> dict[str, str]:
     return {"control_id": control_id, "status": PASSED if passed else FAILED}
-
-
-def _dict(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
 
 
 __all__ = (

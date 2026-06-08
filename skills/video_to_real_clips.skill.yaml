@@ -1,0 +1,43 @@
+id: agentflow_studio.slicing.video_to_real_clips
+name: Video to Real Clips
+version: 1
+status: stable
+description: Generate a deterministic highlight clip plan from a source video and execute provider-gated real slicing.
+primary_workflow: workflows/video_to_real_clips.yaml
+input_contract:
+  required:
+    - video_path
+    - source_video
+    - roi_config_path
+    - asr_fixture_path
+  optional:
+    - language
+    - max_highlights
+    - audio_extraction_mode
+    - output_clips_dir
+output_artifacts:
+  - transcript.json
+  - highlight_plan.json
+  - clip_plan.json
+  - clip_plan_validation.json
+  - real_slice_manifest.json
+  - clips/
+quality_gates:
+  - inspect-run
+  - review-run
+  - real_clip_quality
+dependencies:
+  local:
+    - ffmpeg
+    - ffprobe
+  network: false
+when_to_use:
+  - The user has a source video and wants reviewed real clip artifacts, not a finished video package.
+  - The run should stay deterministic and keep remote providers behind explicit gates.
+when_not_to_use:
+  - The user needs a production-side creative handoff from a brief.
+  - The user expects subtitle burn, BGM mix, cover export, or finished package generation.
+failure_recovery:
+  ffmpeg_unavailable: Install FFmpeg or configure NCUT_FFMPEG_PATH and NCUT_FFPROBE_PATH.
+  clip_plan_validation_failed: Review clip_plan_validation.json before rerunning.
+  weak_highlight_quality: Review highlight_plan.json and clip_plan.json before slicing again.

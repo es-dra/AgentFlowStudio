@@ -4,8 +4,26 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, FAILED, PASSED
+from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_next_pass import NEXT_PASS_BUNDLE_KIND, build_next_pass_bundle
+from agentflow.memory.production_loop_support import (
+    check as _check,
+    dict_value as _dict,
+    has_private_fragment as _has_private_fragment,
+    indexes as _indexes,
+    list_value as _list,
+    missing_references as _missing_references,
+    project_id as _project_id,
+    promoted_memory_has_decision as _promoted_memory_has_decision,
+    promotion_decisions_supported as _promotion_decisions_supported,
+    provider_mode as _provider_mode,
+    record_ids_unique as _record_ids_unique,
+    reference_message as _reference_message,
+    remote_provider_required as _remote_provider_required,
+    requested_refs as _requested_refs,
+    source_sections_present as _source_sections_present,
+    source_sections_typed as _source_sections_typed,
+)
 from agentflow.harness.json_io import write_json
 
 KIND = "agentflow_production_memory_loop"
@@ -14,17 +32,9 @@ RUN_KIND = "agentflow_production_memory_loop_run"
 CONTEXT_BUNDLE_KIND = "agentflow_production_memory_context_bundle"
 PASS_READINESS_KIND = "agentflow_production_memory_pass_readiness"
 
-SOURCE_SECTIONS = (
-    "project_input",
-    "artifact_ledger",
-    "feedback_events",
-    "memory_candidates",
-    "promotion_decisions",
-)
 INCLUDABLE_ARTIFACT_STATUSES = frozenset({"approved", "accepted", "ready", "promoted"})
 BLOCKED_STATUSES = frozenset({"rejected", "pending", "blocked", "expired"})
 PROMOTION_DECISIONS_ALLOWING_CONTEXT = frozenset({"promoted", "merged"})
-SUPPORTED_PROMOTION_DECISIONS = frozenset({"promoted", "merged", "rejected", "expired", "blocked", "pending"})
 
 
 def load_production_memory_loop(path: Path) -> dict[str, Any]:
@@ -228,110 +238,6 @@ def _included_memory(ref_id: str, candidate: dict[str, Any], decision: dict[str,
 
 def _blocked(ref_id: str, source_type: str, reason: str, status: Any) -> dict[str, Any]:
     return {"ref_id": ref_id, "source_record_type": source_type, "reason": reason, "status": str(status)}
-
-
-def _indexes(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    artifacts = {str(item.get("ref_id")): item for item in _list(payload.get("artifact_ledger")) if item.get("ref_id")}
-    feedback = {str(item.get("feedback_id")): item for item in _list(payload.get("feedback_events")) if item.get("feedback_id")}
-    candidates = {str(item.get("candidate_id")): item for item in _list(payload.get("memory_candidates")) if item.get("candidate_id")}
-    decisions = {str(item.get("decision_id")): item for item in _list(payload.get("promotion_decisions")) if item.get("decision_id")}
-    decisions_by_candidate = {
-        str(item.get("candidate_id")): item for item in decisions.values() if item.get("candidate_id")
-    }
-    return {
-        "artifacts": artifacts,
-        "feedback": feedback,
-        "candidates": candidates,
-        "decisions": decisions,
-        "decisions_by_candidate": decisions_by_candidate,
-    }
-
-
-def _missing_references(payload: dict[str, Any]) -> list[str]:
-    indexes = _indexes(payload)
-    known = set().union(indexes["artifacts"], indexes["feedback"], indexes["candidates"], indexes["decisions"])
-    missing: list[str] = []
-    missing.extend(ref for ref in _list(_dict(payload.get("project_input")).get("input_refs")) if ref not in indexes["artifacts"])
-    for artifact in indexes["artifacts"].values():
-        missing.extend(ref for ref in _list(artifact.get("source_refs")) if ref not in known)
-    missing.extend(event.get("target_ref") for event in indexes["feedback"].values() if event.get("target_ref") not in indexes["artifacts"])
-    for candidate in indexes["candidates"].values():
-        missing.extend(ref for ref in _list(candidate.get("source_feedback_ids")) if ref not in indexes["feedback"])
-    missing.extend(decision.get("candidate_id") for decision in indexes["decisions"].values() if decision.get("candidate_id") not in indexes["candidates"])
-    missing.extend(ref for ref in _requested_refs(payload) if ref not in known)
-    return sorted({str(ref) for ref in missing if ref})
-
-
-def _requested_refs(payload: dict[str, Any]) -> list[str]:
-    refs = _list(_dict(payload.get("next_pass_request")).get("requested_refs"))
-    return [str(ref) for ref in refs if ref]
-
-
-def _source_sections_present(payload: dict[str, Any]) -> bool:
-    return all(section in payload for section in SOURCE_SECTIONS)
-
-
-def _source_sections_typed(payload: dict[str, Any]) -> bool:
-    return isinstance(payload.get("project_input"), dict) and all(
-        isinstance(payload.get(section), list) for section in SOURCE_SECTIONS if section != "project_input"
-    )
-
-
-def _record_ids_unique(payload: dict[str, Any]) -> bool:
-    id_fields = {
-        "artifact_ledger": "ref_id",
-        "feedback_events": "feedback_id",
-        "memory_candidates": "candidate_id",
-        "promotion_decisions": "decision_id",
-    }
-    for section, field in id_fields.items():
-        values = [item.get(field) for item in _list(payload.get(section)) if item.get(field)]
-        if len(values) != len(set(values)):
-            return False
-    return True
-
-
-def _promoted_memory_has_decision(payload: dict[str, Any]) -> bool:
-    decisions = _indexes(payload)["decisions_by_candidate"]
-    return all(candidate.get("candidate_id") in decisions for candidate in _list(payload.get("memory_candidates")) if candidate.get("status") == "promoted")
-
-
-def _promotion_decisions_supported(payload: dict[str, Any]) -> bool:
-    return all(item.get("decision") in SUPPORTED_PROMOTION_DECISIONS for item in _list(payload.get("promotion_decisions")))
-
-
-def _provider_mode(payload: dict[str, Any]) -> str:
-    return str(payload.get("provider_mode", "no-provider"))
-
-
-def _remote_provider_required(payload: dict[str, Any]) -> bool:
-    return bool(payload.get("provider_route") or payload.get("requires_remote_provider"))
-
-
-def _has_private_fragment(payload: dict[str, Any]) -> bool:
-    raw = json.dumps(payload, ensure_ascii=False).lower()
-    return any(fragment.lower() in raw for fragment in AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS)
-
-
-def _reference_message(payload: dict[str, Any]) -> str:
-    missing = _missing_references(payload)
-    return "all source refs resolve" if not missing else f"missing refs: {', '.join(missing)}"
-
-
-def _project_id(payload: dict[str, Any]) -> str:
-    return str(_dict(payload.get("project_input")).get("project_id", "unknown"))
-
-
-def _dict(value: Any) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _check(check_id: str, passed: bool, message: str) -> dict[str, str]:
-    return {"check_id": check_id, "status": PASSED if passed else FAILED, "message": message}
 
 
 __all__ = (

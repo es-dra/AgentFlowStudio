@@ -8,10 +8,6 @@ from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.memory_review_command import memory_evidence_reuse_review_command
 from apps.cli.production_memory_command_registry import register_production_memory_commands
 from apps.cli.real_slicing_commands import slice_real_command
-from apps.cli.report_commands import (
-    delivery_readiness_command,
-    package_report_command,
-)
 from apps.cli.runtime_service_command import runtime_service_command, runtime_service_openapi_export_command
 from apps.reporting.run_reports import inspect_run_output, review_run_output
 
@@ -29,8 +25,6 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="ffmpeg-check")(ffmpeg_check_command)
     app.command(name="inspect-run")(inspect_run_command)
     app.command(name="review-run")(review_run_command)
-    app.command(name="package-report")(package_report_command)
-    app.command(name="delivery-readiness")(delivery_readiness_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
     register_production_memory_commands(app)
     app.command(name="runtime-service")(runtime_service_command)

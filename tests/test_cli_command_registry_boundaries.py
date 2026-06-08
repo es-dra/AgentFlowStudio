@@ -23,8 +23,6 @@ VISIBLE_PRODUCT_COMMANDS = (
     "ffmpeg-check",
     "inspect-run",
     "review-run",
-    "package-report",
-    "delivery-readiness",
     "memory-evidence-reuse-review",
     "memory-loop-validate",
     "memory-loop-run-no-provider",

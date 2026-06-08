@@ -10,6 +10,20 @@ from agentflow_studio.candidate_sop.signals import (
     keyword_score,
     specificity_score,
 )
+from agentflow_studio.candidate_sop.scoring_features import (
+    clarity_score,
+    content_channel as _content_channel,
+    coverage_penalty,
+    duration_fit,
+    highlight_type,
+    overlap_ratio,
+    platform_fit,
+    reasons,
+    script_alignment_confidence,
+    source_window_key,
+    source_window_position_penalty,
+    transcript_confidence,
+)
 from agentflow_studio.schemas import HighlightPlan
 
 
@@ -36,8 +50,8 @@ def score_candidate_windows(
     selected: list[dict[str, Any]] = []
     selected_source_windows: set[tuple[float, float]] = set()
     for item in scored:
-        overlap = max((_overlap_ratio(item, picked) for picked in selected), default=0.0)
-        source_window = _source_window_key(item)
+        overlap = max((overlap_ratio(item, picked) for picked in selected), default=0.0)
+        source_window = source_window_key(item)
         if overlap > max_overlap_ratio:
             item["decision"] = "rejected"
             item["rejection_reasons"].append("overlap")
@@ -79,18 +93,18 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
     text = str(candidate.get("text") or "")
     content_channel = _content_channel(candidate, manifest)
     duration = float(candidate.get("duration_sec") or 0.0)
-    transcript_confidence = _transcript_confidence(candidate.get("asr_confidence"))
+    transcript_confidence_value = transcript_confidence(candidate.get("asr_confidence"))
     breakdown = {
         "hook_strength": keyword_score(text, HOOK_TERMS),
         "conflict_intensity": keyword_score(text, CONFLICT_TERMS),
-        "clarity_without_context": _clarity_score(text),
+        "clarity_without_context": clarity_score(text),
         "payoff_or_reversal": keyword_score(text, PAYOFF_TERMS),
-        "duration_fit": _duration_fit(duration),
-        "transcript_confidence": transcript_confidence,
+        "duration_fit": duration_fit(duration),
+        "transcript_confidence": transcript_confidence_value,
         "on_screen_hook_strength": keyword_score(text, HOOK_TERMS) if content_channel == "ocr_subtitle" else 0.0,
         "asr_ocr_consistency": 0.5,
-        "script_alignment_confidence": _script_alignment_confidence(candidate),
-        "platform_fit": _platform_fit(duration),
+        "script_alignment_confidence": script_alignment_confidence(candidate),
+        "platform_fit": platform_fit(duration),
         "specificity_or_novelty": specificity_score(text),
     }
     total = round(
@@ -107,7 +121,7 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
         + 0.02 * breakdown["specificity_or_novelty"],
         6,
     )
-    source_position_penalty = _source_window_position_penalty(candidate)
+    source_position_penalty = source_window_position_penalty(candidate)
     return {
         "candidate_id": str(candidate.get("candidate_id") or ""),
         "decision": "pending",
@@ -119,9 +133,9 @@ def _score_candidate(candidate: dict[str, Any], manifest: dict[str, Any]) -> dic
         "text": text,
         "content_channel": content_channel,
         "total_score": total,
-        "selection_score": round(total - _coverage_penalty(duration) - source_position_penalty, 6),
+        "selection_score": round(total - coverage_penalty(duration) - source_position_penalty, 6),
         "score_breakdown": breakdown,
-        "reasons": _reasons(breakdown, content_channel),
+        "reasons": reasons(breakdown, content_channel),
         "script_alignment": candidate.get("script_alignment") if isinstance(candidate.get("script_alignment"), dict) else None,
         "source_candidate": candidate,
     }
@@ -137,7 +151,7 @@ def _highlight_plan_from_selected(report: dict[str, Any], selected: list[dict[st
             {
                 "highlight_id": f"hl_candidate_{index:03d}",
                 "source_type": "transcript",
-                "highlight_type": _highlight_type(item),
+                "highlight_type": highlight_type(item),
                 "title": "Scored candidate",
                 "text": item["text"],
                 "reason": "; ".join(item["reasons"]) or "Selected by deterministic candidate scoring.",
@@ -176,145 +190,3 @@ def _highlight_plan_from_selected(report: dict[str, Any], selected: list[dict[st
             },
         }
     )
-
-
-def _content_channel(candidate: dict[str, Any], manifest: dict[str, Any]) -> str:
-    evidence = candidate.get("evidence")
-    if isinstance(evidence, dict) and isinstance(evidence.get("content_channel"), str):
-        return evidence["content_channel"]
-    if isinstance(manifest.get("content_channel"), str):
-        return manifest["content_channel"]
-    return "transcript"
-
-
-def _transcript_confidence(value: Any) -> float:
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return min(max(float(value), 0.0), 1.0)
-    return 0.7
-
-
-def _clarity_score(text: str) -> float:
-    length = len(text.strip())
-    if length <= 0:
-        return 0.0
-    if 12 <= length <= 80:
-        return 0.85
-    if 6 <= length < 12 or 80 < length <= 140:
-        return 0.65
-    return 0.4
-
-
-def _duration_fit(duration: float) -> float:
-    if 4 <= duration <= 6:
-        return 1.0
-    if 3 <= duration < 4 or 6 < duration <= 8:
-        return 0.65
-    if 8 < duration <= 12:
-        return 0.25
-    return 0.05
-
-
-def _platform_fit(duration: float) -> float:
-    return 0.9 if 4 <= duration <= 8 else 0.35
-
-
-def _coverage_penalty(duration: float) -> float:
-    if 4 <= duration <= 6:
-        return 0.0
-    if duration < 4:
-        return 0.06
-    if duration <= 8:
-        return 0.08
-    if duration <= 12:
-        return 0.24
-    return 0.36
-
-
-def _source_window_position_penalty(candidate: dict[str, Any]) -> float:
-    evidence = candidate.get("evidence")
-    if not isinstance(evidence, dict):
-        return 0.0
-    source_start = _optional_float(evidence.get("source_window_start_sec"))
-    source_end = _optional_float(evidence.get("source_window_end_sec"))
-    start_sec = _optional_float(candidate.get("start_sec"))
-    if source_start is None or source_end is None or start_sec is None or source_end <= source_start:
-        return 0.0
-    ratio = max(0.0, min((start_sec - source_start) / (source_end - source_start), 1.0))
-    if ratio < 0.05:
-        return 0.0
-    return round(0.03 * ratio, 6)
-
-
-def _script_alignment_confidence(candidate: dict[str, Any]) -> float:
-    alignment = candidate.get("script_alignment")
-    if isinstance(alignment, dict) and isinstance(alignment.get("confidence"), int | float):
-        return min(max(float(alignment["confidence"]), 0.0), 1.0)
-    return 0.0
-
-
-def _reasons(breakdown: dict[str, float], content_channel: str) -> list[str]:
-    reasons: list[str] = []
-    if breakdown["hook_strength"] >= 0.5:
-        reasons.append("strong_hook")
-    if breakdown["conflict_intensity"] >= 0.5:
-        reasons.append("conflict")
-    if breakdown["payoff_or_reversal"] >= 0.5:
-        reasons.append("payoff_or_reversal")
-    if breakdown["on_screen_hook_strength"] >= 0.5 and content_channel == "ocr_subtitle":
-        reasons.append("ocr_hook")
-    if breakdown.get("specificity_or_novelty", 0.0) >= 0.5:
-        reasons.append("specificity")
-    if breakdown["duration_fit"] >= 0.8:
-        reasons.append("duration_fit")
-    return reasons
-
-
-def _highlight_type(item: dict[str, Any]) -> str:
-    breakdown = item["score_breakdown"]
-    if breakdown["hook_strength"] >= 0.5:
-        return "hook"
-    if breakdown["conflict_intensity"] >= 0.5:
-        return "conflict"
-    if breakdown["payoff_or_reversal"] >= 0.5:
-        return "reversal"
-    return "other"
-
-
-def _overlap_ratio(left: dict[str, Any], right: dict[str, Any]) -> float:
-    start = max(left["start_sec"], right["start_sec"])
-    end = min(left["end_sec"], right["end_sec"])
-    overlap = max(0.0, end - start)
-    shortest = max(min(left["duration_sec"], right["duration_sec"]), 0.000001)
-    return overlap / shortest
-
-
-def _source_window_key(item: dict[str, Any]) -> tuple[float, float] | None:
-    source_candidate = item.get("source_candidate")
-    if not isinstance(source_candidate, dict):
-        return None
-    evidence = source_candidate.get("evidence")
-    if not isinstance(evidence, dict):
-        return None
-    boundary_strategy = evidence.get("boundary_strategy")
-    base_boundary_strategy = evidence.get("base_boundary_strategy")
-    if boundary_strategy not in {
-        "fixed_duration_split",
-        "elastic_duration_split",
-        "elastic_duration_trim",
-    } and not (
-        boundary_strategy == "audio_boundary_refined"
-        and base_boundary_strategy in {"fixed_duration_split", "elastic_duration_split", "elastic_duration_trim"}
-    ):
-        return None
-    start = _optional_float(evidence.get("source_window_start_sec"))
-    end = _optional_float(evidence.get("source_window_end_sec"))
-    if start is None or end is None or end <= start:
-        return None
-    return (round(start, 3), round(end, 3))
-
-
-def _optional_float(value: Any) -> float | None:
-    try:
-        return float(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None

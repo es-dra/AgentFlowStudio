@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from typer.testing import CliRunner
 
@@ -50,45 +49,3 @@ def test_review_run_command_returns_failure_for_broken_run(tmp_path) -> None:
     assert result.exit_code == 1, result.output
     assert "Status: failed" in result.output
     assert (run_dir / "review_report.json").is_file()
-
-
-def test_package_report_command_refreshes_report_after_review(tmp_path) -> None:
-    output_dir = tmp_path / "workflow_run"
-    runner = CliRunner()
-    run_result = runner.invoke(
-        app,
-        [
-            "run-workflow",
-            "--workflow",
-            "workflows/final_video_package.yaml",
-            "--input",
-            str(_write_package_input(tmp_path)),
-            "--output",
-            str(output_dir),
-        ],
-    )
-    assert run_result.exit_code == 0, run_result.output
-
-    inspect_result = runner.invoke(app, ["inspect-run", "--run-dir", str(output_dir)])
-    assert inspect_result.exit_code == 0, inspect_result.output
-    review_result = runner.invoke(app, ["review-run", "--run-dir", str(output_dir)])
-    assert review_result.exit_code == 0, review_result.output
-
-    report_result = runner.invoke(app, ["package-report", "--run-dir", str(output_dir)])
-
-    assert report_result.exit_code == 0, report_result.output
-    assert "Package report:" in report_result.output
-    report_text = (output_dir / "package_report.md").read_text(encoding="utf-8")
-    assert "- Quality status: pass" in report_text
-    assert "- Review status: passed" in report_text
-
-
-def _write_package_input(tmp_path) -> Path:
-    final_video = tmp_path / "final_video.mp4"
-    final_video.write_bytes(b"fake final video")
-    input_path = tmp_path / "package_input.json"
-    input_path.write_text(
-        json.dumps({"package_id": "pkg", "final_video_path": str(final_video)}),
-        encoding="utf-8",
-    )
-    return input_path

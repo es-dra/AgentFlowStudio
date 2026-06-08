@@ -32,16 +32,16 @@
       "status": "draft"
     },
     {
-      "artifact_id": "distribution_package_demo",
-      "artifact_type": "finished_package_manifest",
+      "artifact_id": "real_slice_manifest_demo",
+      "artifact_type": "real_slice_manifest",
       "module_owner": "AgentFlow Studio",
       "artifact_class": "contract",
-      "path": "finished_package_manifest.json",
-      "produced_by": "workflows/video_to_finished_package_local_asr.yaml",
+      "path": "real_slice_manifest.json",
+      "produced_by": "workflows/video_to_real_clips.yaml",
       "consumed_by": [
         "inspect-run",
         "review-run",
-        "future_package_viewer"
+        "read_only_artifact_viewer"
       ],
       "source_refs": [],
       "status": "draft"

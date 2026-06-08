@@ -6,44 +6,11 @@ from pathlib import Path
 
 from agentflow.memory.production_loop import load_production_memory_loop
 from agentflow.memory.production_next_pass_promotion import build_next_pass_promotion_decision
-from agentflow.memory.production_next_pass_review import NEXT_PASS_RESULT_KIND
 from agentflow.memory.production_operator_loop import (
     build_production_memory_operator_loop_run,
     write_production_memory_operator_loop_run,
 )
-
-
-EXAMPLE_PATH = Path("examples/agentflow/production_memory_loop.example.json")
-
-
-def _next_pass_result_for(packet: dict) -> dict:
-    used_refs = [ref["ref_id"] for ref in packet["allowed_context_refs"][:2]]
-    return {
-        "kind": NEXT_PASS_RESULT_KIND,
-        "artifact_type": NEXT_PASS_RESULT_KIND,
-        "schema_version": packet["schema_version"],
-        "task_packet_id": packet["task_packet_id"],
-        "provider_mode": "no-provider",
-        "provider_calls_started": False,
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-        "output_artifacts": [
-            {
-                "ref_id": "next-pass:artifact:draft-001",
-                "title": "Second pass draft",
-                "status": "draft",
-                "used_context_refs": used_refs,
-            }
-        ],
-        "feedback_events": [
-            {
-                "feedback_id": "feedback:next-pass-001",
-                "target_ref": "next-pass:artifact:draft-001",
-                "decision": "needs_revision",
-                "summary": "Second pass needs operator review before memory promotion.",
-            }
-        ],
-    }
+from tests.fixtures.production_memory_operator_loop import EXAMPLE_PATH, next_pass_result_for
 
 
 def test_web_static_view_renders_production_memory_operator_loop_run(tmp_path: Path) -> None:
@@ -136,7 +103,7 @@ def test_web_static_operator_loop_renders_embedded_next_pass_promotion(tmp_path:
         generated_at="2026-06-02T06:30:00+08:00",
         source_kb_status="restructuring_or_unknown",
     )
-    next_pass_result = _next_pass_result_for(seed["next_task_packet"])
+    next_pass_result = next_pass_result_for(seed["next_task_packet"])
     reviewed = build_production_memory_operator_loop_run(
         loop,
         generated_at="2026-06-02T06:30:00+08:00",

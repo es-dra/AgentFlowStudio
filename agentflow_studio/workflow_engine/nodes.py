@@ -30,12 +30,6 @@ from agentflow_studio.workflow_engine.node_artifacts import (
     state_or_load_clip_plan,
     state_or_load_video_metadata,
 )
-from agentflow_studio.workflow_engine.assembly_nodes import (
-    concat_clips_node,
-    generate_assembly_plan_node,
-    load_real_slice_manifest_node,
-    probe_final_video_node,
-)
 from agentflow_studio.workflow_engine.highlight_nodes import (
     align_script_highlights_to_transcript_node,
     detect_highlights_node,
@@ -56,10 +50,6 @@ from agentflow_studio.workflow_engine.transcription_nodes import (
     transcribe_audio_mock_node,
     write_transcript_node,
 )
-from agentflow_studio.workflow_engine.subtitle_nodes import write_clip_timeline_subtitles_node, write_subtitles_node
-from agentflow_studio.workflow_engine.subtitle_burn_nodes import burn_subtitles_node, probe_subtitle_burn_node
-from agentflow_studio.workflow_engine.cover_nodes import export_cover_node
-from agentflow_studio.workflow_engine.bgm_nodes import mix_bgm_node, probe_bgm_mix_node
 from agentflow_studio.workflow_engine.ocr_nodes import (
     build_ocr_transcript_node,
     score_candidate_windows_node,
@@ -67,7 +57,6 @@ from agentflow_studio.workflow_engine.ocr_nodes import (
     write_selection_diagnostics_node,
     write_ocr_transcript_node,
 )
-from agentflow_studio.workflow_engine.package_nodes import write_finished_package_node, write_package_report_node
 from agentflow_studio.workflow_engine.agentflow_production_nodes import register_agentflow_production_nodes
 from agentflow_studio.workflow_engine.posterflow_nodes import register_posterflow_nodes
 from agentflow_studio.workflow_engine.registry import NodeRegistry
@@ -257,19 +246,6 @@ def default_node_registry() -> NodeRegistry:
     registry.register("transcribe_audio_openai_compatible", transcribe_audio_openai_compatible_node)
     registry.register("transcribe_audio_faster_whisper", transcribe_audio_faster_whisper_node)
     registry.register("write_transcript", write_transcript_node)
-    registry.register("load_real_slice_manifest", load_real_slice_manifest_node)
-    registry.register("generate_assembly_plan", generate_assembly_plan_node)
-    registry.register("concat_clips", concat_clips_node)
-    registry.register("probe_final_video", probe_final_video_node)
-    registry.register("write_subtitles", write_subtitles_node)
-    registry.register("write_clip_timeline_subtitles", write_clip_timeline_subtitles_node)
-    registry.register("burn_subtitles", burn_subtitles_node)
-    registry.register("probe_subtitle_burn", probe_subtitle_burn_node)
-    registry.register("export_cover", export_cover_node)
-    registry.register("mix_bgm", mix_bgm_node)
-    registry.register("probe_bgm_mix", probe_bgm_mix_node)
-    registry.register("write_finished_package", write_finished_package_node)
-    registry.register("write_package_report", write_package_report_node)
     register_agentflow_production_nodes(registry)
     register_posterflow_nodes(registry)
     return registry

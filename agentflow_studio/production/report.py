@@ -25,7 +25,7 @@ def render_production_report(
             "",
             "## Positioning",
             "",
-            "AgentFlow Production MVP is a local-first structured production handoff generator.",
+            "AgentFlow Production MVP is a provider-gated structured production handoff generator.",
             "",
             f"- Content mode: {brief.content_mode}",
             f"- Target audience: {brief.target_audience}",

@@ -62,7 +62,7 @@
     },
     {
       "module_id": "agentflow_studio",
-      "role": "distribution_package",
+      "role": "slicing_and_runtime_artifact_projection",
       "status": "available"
     }
   ],

@@ -4,7 +4,6 @@ catalog_kind: static_tool_contracts
 scope: phase_7_5b_agent_readable_catalog
 tool_catalog_parts:
 - tool_catalog/01_planning_and_slicing.yaml
-- tool_catalog/02_assembly.yaml
 - tool_catalog/03_transcription.yaml
 - tool_catalog/04_highlight_and_subtitles.yaml
-- tool_catalog/05_delivery_and_harness.yaml
+- tool_catalog/05_harness.yaml

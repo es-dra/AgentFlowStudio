@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-AgentFlow Studio 是本地优先的 Agent-native 内容生产工作台验证线。近期目标是本地内测可用，而不是 SaaS、商业试点或大规模 provider 平台。
+AgentFlow Studio 是 provider-gated 的 Agent-native 内容生产与执行投影验证线。近期目标是形成低维护成本工程基线，而不是保留历史 demo 面或无治理的大规模 provider 平台。
 
 当前工程主线：
 

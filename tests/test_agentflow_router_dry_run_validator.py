@@ -11,8 +11,7 @@ ROUTER_DECISION_EXAMPLE = Path("examples/agentflow/router_decision.example.json"
 ROUTER_CONTRACT = Path("docs/agentflow_router_contract.md")
 KNOWN_SKILL_IDS = {
     "agentflow_studio.production.production_handoff",
-    "agentflow_studio.short_highlight_package",
-    "agentflow_studio.video_script_highlight_package",
+    "agentflow_studio.slicing.video_to_real_clips",
 }
 
 

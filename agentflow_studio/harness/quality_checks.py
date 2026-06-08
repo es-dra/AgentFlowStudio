@@ -5,25 +5,15 @@ from pathlib import Path
 from typing import Any
 
 from agentflow.harness.evidence_summary import build_evidence_summary
-from agentflow_studio.harness.bgm_quality import build_bgm_quality_report
 from agentflow_studio.harness.candidate_quality import build_candidate_quality_report
 from agentflow_studio.harness.candidate_scoring_quality import build_candidate_scoring_quality_report
 from agentflow_studio.harness.highlight_artifacts import build_highlight_quality_report, is_highlight_quality_profile
-from agentflow_studio.harness.cover_quality import build_cover_quality_report
-from agentflow_studio.harness.final_video_quality import build_final_video_quality_report
-from agentflow_studio.harness.package_quality import build_package_quality_report
 from agentflow_studio.harness.quality_profiles import (
-    COVER_EXPORT_PROFILE,
-    BGM_MIX_PROFILE,
-    FINISHED_PACKAGE_PROFILE,
-    FINAL_VIDEO_PROFILE,
     CANDIDATE_WINDOWS_PROFILE,
     CANDIDATE_SCORING_PROFILE,
     AGENTFLOW_PRODUCTION_HANDOFF_PROFILE,
     POSTERFLOW_MEMORY_DEMO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
-    SUBTITLE_BURN_PROFILE,
-    SUBTITLE_EXPORT_PROFILE,
     VIDEO_REAL_CLIPS_PROFILE,
 )
 from agentflow_studio.harness.agentflow_production_quality import build_agentflow_production_quality_report
@@ -32,8 +22,6 @@ from agentflow_studio.harness.real_clip_quality import (
     build_real_video_quality_report,
     build_video_real_clips_quality_report,
 )
-from agentflow_studio.harness.subtitle_quality import build_subtitle_quality_report
-from agentflow_studio.harness.subtitle_burn_quality import build_subtitle_burn_quality_report
 from agentflow_studio.harness.video_artifacts import build_video_quality_report, is_video_quality_profile
 
 
@@ -46,18 +34,6 @@ def build_quality_report(run_dir: str | Path) -> dict[str, Any]:
             return _with_evidence_summary(build_real_video_quality_report(root, str(quality_profile)))
         if quality_profile == VIDEO_REAL_CLIPS_PROFILE:
             return _with_evidence_summary(build_video_real_clips_quality_report(root))
-        if quality_profile == FINAL_VIDEO_PROFILE:
-            return _with_evidence_summary(build_final_video_quality_report(root))
-        if quality_profile == SUBTITLE_EXPORT_PROFILE:
-            return _with_evidence_summary(build_subtitle_quality_report(root))
-        if quality_profile == SUBTITLE_BURN_PROFILE:
-            return _with_evidence_summary(build_subtitle_burn_quality_report(root))
-        if quality_profile == COVER_EXPORT_PROFILE:
-            return _with_evidence_summary(build_cover_quality_report(root))
-        if quality_profile == BGM_MIX_PROFILE:
-            return _with_evidence_summary(build_bgm_quality_report(root))
-        if quality_profile == FINISHED_PACKAGE_PROFILE:
-            return _with_evidence_summary(build_package_quality_report(root))
         if quality_profile == CANDIDATE_WINDOWS_PROFILE:
             return _with_evidence_summary(build_candidate_quality_report(root))
         if quality_profile == CANDIDATE_SCORING_PROFILE:

@@ -292,14 +292,8 @@
       "status": "passed",
       "note": "Local AgentOps artifacts declare non-claims for human acceptance, business validation, and durable memory."
     },
-    {
-      "check_id": "local_agentops_no_company_write",
-      "status": "passed",
-      "note": "Local AgentOps artifacts keep writes_company_kb false and remain project evidence."
-    }
+    { "check_id": "local_agentops_no_company_write", "status": "passed", "note": "Local AgentOps artifacts keep writes_company_kb false and remain project evidence." }
   ],
   "validated_runtime_capabilities": [],
-  "metadata": {
-    "example": true
-  }
+  "metadata": {"example": true}
 }

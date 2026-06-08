@@ -1,0 +1,30 @@
+tools:
+- name: inspect_run
+  description: Inspect a workflow run directory and write quality_report.json.
+  category: harness_inspection
+  entrypoints:
+    cli: afs inspect-run
+    workflow_node: null
+    python: agentflow_studio.harness.inspect_run
+  input_artifacts:
+  - run_dir
+  output_artifacts:
+  - quality_report.json
+  requires:
+    ffmpeg: false
+    network: false
+    model_provider: false
+    api_key: false
+  failure_modes:
+  - run_dir_missing
+  - required_artifact_missing
+  - quality_check_failed
+  quality_checks:
+  - run_manifest_file_exists
+  - trace_file_exists
+  - mock_clips_count_matches_manifest
+  agent_usage:
+    safe_for_auto_execute: true
+    requires_human_review: false
+    mutates_workflow: false
+    executes_external_process: false

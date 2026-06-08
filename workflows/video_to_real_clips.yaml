@@ -2,6 +2,10 @@ name: video_to_real_clips
 version: 1
 mode: video_to_real_clips
 quality_profile: video_real_clips
+metadata:
+  kind: slicing
+  audience:
+    - agent
 steps:
   - id: load_video
     type: load_video

@@ -12,8 +12,7 @@ from agentflow_studio.harness.agentflow_router import (
 ROUTER_DECISION_EXAMPLE = Path("examples/agentflow/router_decision.example.json")
 KNOWN_SKILL_IDS = {
     "agentflow_studio.production.production_handoff",
-    "agentflow_studio.short_highlight_package",
-    "agentflow_studio.video_script_highlight_package",
+    "agentflow_studio.slicing.video_to_real_clips",
 }
 
 

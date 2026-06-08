@@ -8,12 +8,8 @@
   "selection_reason": "The request is production-side structured handoff generation from a creative brief.",
   "rejected_candidate_skills": [
     {
-      "skill_id": "agentflow_studio.short_highlight_package",
-      "reason": "Distribution-side video packaging is not requested."
-    },
-    {
-      "skill_id": "agentflow_studio.video_script_highlight_package",
-      "reason": "No source video plus script packaging task is requested."
+      "skill_id": "agentflow_studio.slicing.video_to_real_clips",
+      "reason": "The request starts from a creative brief, not a source video that needs slicing."
     }
   ],
   "execution_status": "decision_only",

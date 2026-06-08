@@ -1,6 +1,6 @@
 # AgentFlow Studio
 
-AgentFlow Studio 是一个本地优先的 Agent 工程工作台，用于验证 `Harness-first Agentic Delivery System`：把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目交付闭环。
+AgentFlow Studio 是一个 provider-gated 的 Agent-native 工程工作台，用于验证 `Harness-first Agentic Delivery System`：把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目交付闭环。
 
 当前内容生产与分发链路是第一条真实验证线，不是项目的全部定义。当前阶段目标仍然是“本地内测可用”：测试人员能跑任务、看 artifact、记录反馈、复用上下文，并清楚地区分结构验证、运行验证、人工验收和商业结论。
 
@@ -135,24 +135,18 @@ video / transcript / clip_plan
   -> highlight_plan
   -> clip_plan.json
   -> real clips
-  -> final_video.mp4
-  -> subtitles.srt
-  -> final_video_with_subtitles.mp4
-  -> cover.jpg
-  -> final_video_with_bgm.mp4
-  -> finished_package_manifest.json
   -> inspect/review
 ```
 
 Production Memory asset loop：
 
 ```text
-Round 1 package
+Round 1 execution artifact
   -> tester feedback
   -> update candidate
   -> promotion decision / profile version
   -> context projection
-  -> Round 2 package
+  -> Round 2 execution artifact
   -> consistency review
   -> before/after report
 ```

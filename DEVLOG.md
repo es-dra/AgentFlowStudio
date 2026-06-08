@@ -144,3 +144,21 @@
 - `repository_retention_review --summary-only`：`delete_candidate_count=0`，`manual_review_required_count=0`。
 - 全量 pytest：`994 passed, 1 warning`。
 - `git diff --check` 通过。
+## 2026-06-09 - Oversized Maintenance Closure 001
+
+- 删除已退休的成片后处理工作流面：assembly、subtitle export/burn、BGM、cover、finished package、delivery readiness，以及只服务这些链路的 demo、SOP、workflow node、tool catalog entry、CLI 命令和测试。
+- 保留当前主线：Runtime Service、Production Memory Asset Loop、Project Manifest、Provider Gate、maintenance audit、read-only artifact viewer、纯切片和内容制作 workflow。
+- 将剩余超长核心文件按职责拆分为更小模块：workflow 输入解析、video artifact review、review recommendations、operator run package render、promotion checks、asset validation、acceptance overlay validation、asset consistency validation、asset profile seed validation、production quality review、production memory operator runner。
+- 将 `examples/agentflow/contract_audit_report.example.json` 做无语义排版压缩，避免 schema 示例继续触发 oversized warning。
+- 新增 project-local Company OS feedback candidate packet：`docs/maintenance/AFS-COMPANY-OS-FEEDBACK-PACKET-OVERSIZED-CLOSURE-001.zh-CN.md`；未写入或晋升 `10-Startup` / COS active rule。
+
+边界：
+
+- 未启动 provider。
+- 未写入 secret、signed URL、本地私有素材、provider 原始响应或生成媒体字节。
+- 未声明 human acceptance、business validation 或 durable memory。
+
+验证状态：
+
+- `maintenance_audit`: `failed=0, passed=6, warning=0`。
+- 完整 CLI、focused pytest、full pytest 和 `git diff --check` 在最终提交前执行。

@@ -55,3 +55,16 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 - Hidden CLI support commands 仍是兼容支持面；删除前必须做独立 CLI 协议迁移。
 - Provider validation 默认关闭，除非显式授权对应 capability gate。
 - 维护审计仍保留 300 行以上文件 warning；这些是后续触碰对应模块时顺手拆分的工程债，不阻塞当前低成本维护基线。
+## 2026-06-09 - Oversized Maintenance Closure 001
+
+| ID | Owner role | 范围 | 状态 | 证据 |
+|---|---|---|---|---|
+| AFS-OVERSIZED-MAINTENANCE-CLOSURE-001 | Maintainability Steward + Architecture Reset Lead | 删除退休成片后处理 surfaces，拆分剩余超长核心文件，清零 `maintenance_audit` oversized warning | 验证中 | `docs/maintenance/AFS-OVERSIZED-MAINTENANCE-CLOSURE-001.zh-CN.md` |
+
+当前边界：
+
+- 保留 Runtime Service、Production Memory Asset Loop、Project Manifest、Provider Gate、maintenance audit、read-only artifact viewer、纯切片与内容制作 workflow。
+- 直接删除不再服务主线的 BGM、cover、subtitle burn、final package、delivery readiness 等后处理 pipeline、demo、SOP、旧测试。
+- 本轮不写入 COS active rule；只生成 project-local Company OS feedback candidate packet。
+- provider 默认关闭；未写入 secret、signed URL、本地私有素材、provider 原始响应或生成媒体字节。
+最终验证：CLI help/version、`maintenance_audit`、focused pytest、full pytest、`git diff --check` 已通过；`oversized_files=0`。

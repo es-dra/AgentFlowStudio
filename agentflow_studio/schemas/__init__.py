@@ -6,12 +6,10 @@ from agentflow_studio.schemas.compliance import ComplianceResult
 from agentflow_studio.schemas.cost import CostRecord
 from agentflow_studio.schemas.harness import EvidenceCard, GateResult, TaskPacket
 from agentflow_studio.schemas.highlight import HighlightPlan, HighlightSegment
-from agentflow_studio.schemas.package import FinishedPackageAsset, FinishedPackageManifest
 from agentflow_studio.schemas.project import Project
 from agentflow_studio.schemas.roi import Hook, TimeRange
 from agentflow_studio.schemas.script import ScriptSegment, ShortVideoScript
 from agentflow_studio.schemas.roi import ROISettings
-from agentflow_studio.schemas.subtitle import SubtitleCue, SubtitleManifest
 from agentflow_studio.schemas.transcript import Transcript, TranscriptSegment
 from agentflow_studio.schemas.validation import (
     ClipPlanValidationReport,
@@ -30,8 +28,6 @@ __all__ = [
     "CostRecord",
     "EvidenceCard",
     "ExportPackage",
-    "FinishedPackageAsset",
-    "FinishedPackageManifest",
     "GateResult",
     "GeneratedVideo",
     "Hook",
@@ -44,8 +40,6 @@ __all__ = [
     "ShortVideoScript",
     "StepResult",
     "SubtitleStyle",
-    "SubtitleCue",
-    "SubtitleManifest",
     "TaskPacket",
     "TimeRange",
     "Transcript",

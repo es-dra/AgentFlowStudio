@@ -52,7 +52,7 @@ def test_skill_replay_validator_rejects_invocation_id_mismatch() -> None:
 def test_skill_replay_validator_rejects_skill_id_mismatch() -> None:
     invocation = _json(SKILL_INVOCATION_EXAMPLE)
     result = _json(SKILL_RESULT_EXAMPLE)
-    result["skill_id"] = "agentflow_studio.short_highlight_package"
+    result["skill_id"] = "agentflow_studio.slicing.video_to_real_clips"
 
     validation = validate_skill_invocation_result_replay(invocation, result)
 

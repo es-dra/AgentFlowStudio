@@ -8,28 +8,16 @@ from agentflow_studio.harness.highlight_artifacts import (
     highlight_artifacts_to_inspect,
     is_highlight_quality_profile,
 )
-from agentflow_studio.harness.bgm_quality import bgm_artifacts_to_inspect
 from agentflow_studio.harness.candidate_quality import candidate_artifacts_to_inspect
-from agentflow_studio.harness.cover_quality import cover_artifacts_to_inspect
-from agentflow_studio.harness.final_video_quality import final_video_artifacts_to_inspect
-from agentflow_studio.harness.package_quality import package_artifacts_to_inspect
 from agentflow_studio.harness.quality_checks import build_quality_report
 from agentflow_studio.harness.quality_profiles import (
-    COVER_EXPORT_PROFILE,
-    BGM_MIX_PROFILE,
     CANDIDATE_WINDOWS_PROFILE,
-    FINISHED_PACKAGE_PROFILE,
-    FINAL_VIDEO_PROFILE,
     AGENTFLOW_PRODUCTION_HANDOFF_PROFILE,
     POSTERFLOW_MEMORY_DEMO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
-    SUBTITLE_BURN_PROFILE,
-    SUBTITLE_EXPORT_PROFILE,
 )
 from agentflow_studio.harness.agentflow_production_quality import agentflow_production_artifacts_to_inspect
 from agentflow_studio.harness.posterflow_quality import posterflow_artifacts_to_inspect
-from agentflow_studio.harness.subtitle_burn_quality import subtitle_burn_artifacts_to_inspect
-from agentflow_studio.harness.subtitle_quality import subtitle_artifacts_to_inspect
 from agentflow_studio.harness.video_artifacts import (
     is_video_quality_profile,
     video_artifacts_to_inspect,
@@ -106,30 +94,6 @@ def _artifact_statuses(root: Path, run_manifest: dict[str, Any] | None) -> list[
         artifacts = highlight_artifacts_to_inspect(quality_profile)
     elif quality_profile in REAL_CLIP_QUALITY_PROFILES:
         artifacts = REAL_VIDEO_ARTIFACTS_TO_INSPECT
-    elif quality_profile == FINAL_VIDEO_PROFILE:
-        artifacts = final_video_artifacts_to_inspect()
-    elif quality_profile == SUBTITLE_EXPORT_PROFILE:
-        artifacts = subtitle_artifacts_to_inspect()
-    elif quality_profile == SUBTITLE_BURN_PROFILE:
-        artifacts = subtitle_burn_artifacts_to_inspect()
-        if run_manifest:
-            output_ref = _run_artifact_ref(run_manifest, "subtitled_video")
-            if output_ref and output_ref not in artifacts:
-                artifacts.append(output_ref)
-    elif quality_profile == COVER_EXPORT_PROFILE:
-        artifacts = cover_artifacts_to_inspect()
-        if run_manifest:
-            output_ref = _run_artifact_ref(run_manifest, "cover_image")
-            if output_ref and output_ref not in artifacts:
-                artifacts.append(output_ref)
-    elif quality_profile == BGM_MIX_PROFILE:
-        artifacts = bgm_artifacts_to_inspect()
-        if run_manifest:
-            output_ref = _run_artifact_ref(run_manifest, "bgm_video")
-            if output_ref and output_ref not in artifacts:
-                artifacts.append(output_ref)
-    elif quality_profile == FINISHED_PACKAGE_PROFILE:
-        artifacts = package_artifacts_to_inspect()
     elif quality_profile == CANDIDATE_WINDOWS_PROFILE:
         artifacts = candidate_artifacts_to_inspect()
     elif quality_profile == AGENTFLOW_PRODUCTION_HANDOFF_PROFILE:
@@ -153,11 +117,3 @@ def _load_json_object(path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
-
-
-def _run_artifact_ref(run_manifest: dict[str, Any], key: str) -> str | None:
-    artifacts = run_manifest.get("artifacts")
-    if not isinstance(artifacts, dict):
-        return None
-    value = artifacts.get(key)
-    return value if isinstance(value, str) and value else None

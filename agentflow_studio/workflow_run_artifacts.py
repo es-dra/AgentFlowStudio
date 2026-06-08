@@ -51,21 +51,6 @@ POSTERFLOW_ARTIFACT_DEFAULTS = {
     "poster_preview": ("poster_preview.html", True),
     "image_candidates": ("image_candidates/", True),
 }
-PRODUCT_ARTIFACT_DEFAULTS = {
-    "transcript": ("transcript.json", False),
-    "candidate_windows": ("candidate_windows.json", False),
-    "highlight_score_report": ("highlight_score_report.json", False),
-    "selection_diagnostics": ("selection_diagnostics.json", False),
-    "highlight_plan": ("highlight_plan.json", False),
-    "clip_plan": ("clip_plan.json", False),
-    "real_slice_manifest": ("real_slice_manifest.json", False),
-    "final_video_manifest": ("final_video_manifest.json", False),
-    "finished_package_manifest": ("finished_package_manifest.json", False),
-    "package_report": ("package_report.md", False),
-    "quality_report": ("quality_report.json", False),
-    "review_report": ("review_report.json", False),
-}
-
 
 def write_trace(definition: Any, run: WorkflowRun, context: Any) -> dict[str, Any]:
     trace = build_trace(definition, run, context)
@@ -195,20 +180,9 @@ def _contract_artifacts(artifacts: dict[str, str], context: Any) -> dict[str, st
     if context.quality_profile == POSTERFLOW_PROFILE:
         for name, (path, _required) in POSTERFLOW_ARTIFACT_DEFAULTS.items():
             normalized.setdefault(name, path)
-    if _is_product_package_context(context):
-        for name, (path, _required) in PRODUCT_ARTIFACT_DEFAULTS.items():
-            normalized.setdefault(name, path)
     if "clips" in normalized:
         normalized["clips_dir"] = _as_directory_ref(normalized["clips"])
     return normalized
-
-
-def _is_product_package_context(context: Any) -> bool:
-    return (
-        context.quality_profile == "finished_package"
-        or "finished_package_manifest" in context.artifacts
-        or "package_report" in context.artifacts
-    )
 
 
 def _artifact_index(artifacts: dict[str, str], context: Any) -> dict[str, dict[str, Any]]:

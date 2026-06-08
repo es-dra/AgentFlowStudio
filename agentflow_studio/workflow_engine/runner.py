@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from agentflow_studio.package_sop import write_package_report
 from agentflow_studio.schemas import StepResult, WorkflowRun
 from agentflow_studio.utils import write_json
 from agentflow_studio.workflow_run_artifacts import write_run_manifest, write_trace
@@ -86,6 +85,3 @@ class WorkflowRunner:
         self._write_manifest(run, context)
         write_trace(definition, run, context)
         write_run_manifest(run, context)
-        report_ref = context.artifacts.get("package_report")
-        if report_ref:
-            write_package_report(context.output_dir, report_ref)

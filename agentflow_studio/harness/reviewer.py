@@ -10,35 +10,25 @@ from agentflow_studio.harness.highlight_artifacts import (
     build_highlight_review_section,
     is_highlight_quality_profile,
 )
-from agentflow_studio.harness.bgm_quality import build_bgm_review_section
 from agentflow_studio.harness.candidate_quality import build_candidate_review_section
 from agentflow_studio.harness.candidate_scoring_quality import build_candidate_scoring_review_section
-from agentflow_studio.harness.cover_quality import build_cover_review_section
-from agentflow_studio.harness.package_quality import build_package_review_section
 from agentflow_studio.harness.quality_profiles import (
-    COVER_EXPORT_PROFILE,
-    BGM_MIX_PROFILE,
     CANDIDATE_WINDOWS_PROFILE,
     CANDIDATE_SCORING_PROFILE,
-    FINISHED_PACKAGE_PROFILE,
-    FINAL_VIDEO_PROFILE,
     AGENTFLOW_PRODUCTION_HANDOFF_PROFILE,
     POSTERFLOW_MEMORY_DEMO_PROFILE,
     REAL_CLIP_QUALITY_PROFILES,
-    SUBTITLE_BURN_PROFILE,
-    SUBTITLE_EXPORT_PROFILE,
     VIDEO_REAL_CLIPS_PROFILE,
 )
-from agentflow_studio.harness.agentflow_production_quality import build_agentflow_production_review_section
+from agentflow_studio.harness.agentflow_production_quality_review import build_agentflow_production_review_section
 from agentflow_studio.harness.posterflow_quality import build_posterflow_review_section
 from agentflow_studio.harness.review_checks import build_quality_report_check
-from agentflow_studio.harness.subtitle_burn_quality import build_subtitle_burn_review_section
-from agentflow_studio.harness.subtitle_quality import build_subtitle_review_section
+from agentflow_studio.harness.review_recommendations import build_review_recommendations
 from agentflow_studio.harness.video_artifacts import (
-    build_video_review_section,
     is_video_highlight_quality_profile,
     is_video_quality_profile,
 )
+from agentflow_studio.harness.video_artifact_review import build_video_review_section
 from agentflow_studio.utils import write_json
 
 
@@ -57,18 +47,6 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
     ]
     if run_manifest and run_manifest.get("quality_profile") in REAL_CLIP_QUALITY_PROFILES | {VIDEO_REAL_CLIPS_PROFILE}:
         sections.append(_real_video_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == FINAL_VIDEO_PROFILE:
-        sections.append(_final_video_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == SUBTITLE_EXPORT_PROFILE:
-        sections.append(build_subtitle_review_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == SUBTITLE_BURN_PROFILE:
-        sections.append(build_subtitle_burn_review_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == COVER_EXPORT_PROFILE:
-        sections.append(build_cover_review_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == BGM_MIX_PROFILE:
-        sections.append(build_bgm_review_section(root))
-    if run_manifest and run_manifest.get("quality_profile") == FINISHED_PACKAGE_PROFILE:
-        sections.append(build_package_review_section(root))
     if run_manifest and run_manifest.get("quality_profile") == CANDIDATE_WINDOWS_PROFILE:
         sections.append(build_candidate_review_section(root))
     if run_manifest and run_manifest.get("quality_profile") == CANDIDATE_SCORING_PROFILE:
@@ -103,7 +81,7 @@ def review_run(run_dir: str | Path) -> dict[str, Any]:
         },
         "sections": sections,
         "evidence_summary": build_review_evidence_summary(status=status, sections=sections),
-        "recommendations": _recommendations(root, run_manifest, quality_report),
+        "recommendations": build_review_recommendations(root, run_manifest, quality_report),
     }
 
 
@@ -184,20 +162,6 @@ def _real_video_section(root: Path) -> dict[str, Any]:
         _artifact_check(root, "real_slice_manifest", "real_slice_manifest.json"),
     ]
     return _section("real_video_outputs", checks)
-
-
-def _final_video_section(root: Path) -> dict[str, Any]:
-    final_manifest = _load_json_object(root / "final_video_manifest.json")
-    final_video = "final_video.mp4"
-    if final_manifest and isinstance(final_manifest.get("final_video"), str) and final_manifest["final_video"]:
-        final_video = str(final_manifest["final_video"])
-    checks = [
-        _artifact_check(root, "assembly_plan", "assembly_plan.json"),
-        _artifact_check(root, "concat_list", "concat_list.txt"),
-        _artifact_check(root, "final_video_manifest", "final_video_manifest.json"),
-        _artifact_check(root, "final_video", final_video),
-    ]
-    return _section("final_video_outputs", checks)
 
 
 def _file_check(path: Path, check_id: str, message: str) -> dict[str, Any]:
@@ -282,9 +246,6 @@ def _quality_level(status: str, run_manifest: dict[str, Any] | None) -> str:
         return "needs_review"
     if status == WARNING:
         return "needs_review"
-    profile = str(run_manifest.get("quality_profile") if run_manifest else "")
-    if profile == FINISHED_PACKAGE_PROFILE:
-        return "product_mvp"
     return "engineering_pass"
 
 
@@ -310,43 +271,6 @@ def _load_json_object(path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
     return payload if isinstance(payload, dict) else None
-
-
-def _recommendations(
-    root: Path,
-    run_manifest: dict[str, Any] | None,
-    quality_report: dict[str, Any] | None,
-) -> list[str]:
-    if not run_manifest or run_manifest.get("quality_profile") not in REAL_CLIP_QUALITY_PROFILES | {VIDEO_REAL_CLIPS_PROFILE}:
-        return []
-
-    recommendation_set: list[str] = []
-    real_manifest = _load_json_object(root / "real_slice_manifest.json")
-    validation = _load_json_object(root / "clip_plan_validation.json")
-    metadata = _load_json_object(root / "video_metadata.json")
-    all_errors = " ".join(
-        str(item)
-        for source in [
-            quality_report.get("errors", []) if quality_report else [],
-            real_manifest.get("errors", []) if real_manifest else [],
-            validation.get("hard_errors", []) if validation else [],
-            metadata.get("errors", []) if metadata else [],
-        ]
-        for item in source
-    )
-    reason = str(real_manifest.get("reason") if real_manifest else "")
-
-    if "ffmpeg_unavailable" in all_errors or "ffmpeg_unavailable" in reason:
-        recommendation_set.append("Install FFmpeg or set NCUT_FFMPEG_PATH to a valid ffmpeg executable.")
-    if "ffprobe" in all_errors or "video_duration_unavailable" in all_errors:
-        recommendation_set.append("Install FFprobe or set NCUT_FFPROBE_PATH so video duration can be validated.")
-    if "segment_exceeds_video_duration" in all_errors:
-        recommendation_set.append("Adjust the ClipPlan segment end times so they stay within video duration.")
-    if "unsafe_output_name" in all_errors:
-        recommendation_set.append("Use a plain output file name without directories or path traversal.")
-    if "clip_plan_validation_failed" in reason:
-        recommendation_set.append("Review clip_plan_validation.json before rerunning real slicing.")
-    return recommendation_set
 
 
 def _display_ref(value: str | Path) -> str:

@@ -1,40 +1,52 @@
 {
   "schema_version": "0.1",
-  "project_id": "proj_demo_distribution",
-  "project_type": "short_video_distribution",
-  "name": "Demo short highlight package",
-  "goal": "Generate a local-first short promotional package from one source video.",
+  "project_id": "proj_demo_agent_native_baseline",
+  "project_type": "agent_native_execution_baseline",
+  "name": "Demo Agent-native execution baseline",
+  "goal": "Track safe execution-facing references for slicing, production handoff, and memory-loop review without storing private media bytes.",
   "source_assets": [
     {
       "asset_id": "asset_source_video",
-      "asset_type": "raw_video",
-      "path": "data/raw/product_acceptance/video_only/input.mp4",
-      "lifecycle_state": "raw"
+      "asset_type": "raw_video_ref",
+      "ref": "artifact:source_video:demo",
+      "lifecycle_state": "raw_ref_only"
+    },
+    {
+      "asset_id": "asset_creative_brief",
+      "asset_type": "creative_brief",
+      "ref": "examples/agentflow_production/creative_brief.example.json",
+      "lifecycle_state": "example_contract"
     }
   ],
   "workflows": [
     {
-      "workflow": "workflows/video_to_finished_package_local_asr.yaml",
-      "status": "recommended"
+      "workflow": "workflows/video_to_real_clips.yaml",
+      "status": "stable_slicing"
+    },
+    {
+      "workflow": "workflows/agentflow_production_handoff.yaml",
+      "status": "stable_production_handoff"
     }
   ],
   "runs": [
     {
-      "run_id": "product_acceptance_video_only_phase14_6_selection_quality",
-      "path": "data/processed/runs/product_acceptance_video_only_phase14_6_selection_quality",
-      "status": "pass"
-    }
-  ],
-  "packages": [
+      "run_id": "run:demo:slicing",
+      "ref": "artifact:real_slice_manifest:demo",
+      "status": "planned"
+    },
     {
-      "package_id": "pkg_demo_video_only",
-      "manifest_path": "data/processed/runs/product_acceptance_video_only_phase14_6_selection_quality/finished_package_manifest.json",
-      "status": "product_mvp"
+      "run_id": "run:demo:production_handoff",
+      "ref": "artifact:production_handoff:demo",
+      "status": "planned"
     }
   ],
+  "packages": [],
   "user_preferences": {
-    "target_platform": "douyin",
+    "target_platform": "internal_review",
     "target_duration_sec": 20
   },
+  "does_not_store_private_asset_bytes": true,
+  "does_not_store_secrets": true,
+  "does_not_store_provider_responses": true,
   "status": "in_progress"
 }
