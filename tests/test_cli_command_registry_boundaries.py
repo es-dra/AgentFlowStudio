@@ -40,7 +40,11 @@ VISIBLE_PRODUCT_COMMANDS = (
     "asset-profile-update-review",
     "asset-context-project",
     "asset-consistency-review",
+    "asset-test-run-harness",
+    "asset-two-round-validate",
+    "asset-provider-validation-gate",
     "web-bridge",
+    "runtime-service",
 )
 
 
@@ -56,6 +60,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-advantage-demo-015" not in source
     assert "memory-video-pipeline-package" in source
     assert "register_production_memory_commands" in source
+    assert "runtime-service" in source
     assert "production-memory-loop-next-operator-start-packet" not in source
     assert "production-memory-loop-record-next-operator-start" not in source
     assert "production-memory-loop-record-next-operator-action-result" not in source
@@ -72,9 +77,15 @@ def test_production_memory_registry_layers_public_and_hidden_commands() -> None:
     assert "asset-profile-update-review" in source
     assert "asset-context-project" in source
     assert "asset-consistency-review" in source
+    assert "asset-test-run-harness" in source
+    assert "asset-two-round-validate" in source
+    assert "asset-provider-validation-gate" in source
     assert "production-memory-loop-asset-profile-readiness" in source
     assert "production-memory-loop-run-asset-test-package" in source
     assert "production-memory-loop-record-asset-feedback" in source
+    assert "production-memory-loop-run-real-asset-test-harness" in source
+    assert "production-memory-loop-two-round-context-runtime-validation" in source
+    assert "production-memory-loop-provider-validation-gate" in source
     assert "production-memory-loop-next-operator-start-packet" in source
     assert "production-memory-loop-record-next-operator-action-result" in source
     assert "production-memory-loop-record-action-result-acceptance-feedback" in source
@@ -88,6 +99,9 @@ def test_default_help_keeps_production_memory_product_surface_thin() -> None:
 
     assert result.exit_code == 0
     assert "asset-test-package-run" in result.output
+    assert "asset-test-run-harness" in result.output
+    assert "asset-two-round-validate" in result.output
+    assert "asset-provider-validation-gate" in result.output
     assert "asset-feedback-record" in result.output
     assert "asset-profile-update-review" in result.output
     assert "production-memory-loop-run-asset-test-package" not in result.output

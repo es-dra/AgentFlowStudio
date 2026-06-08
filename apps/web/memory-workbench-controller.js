@@ -6,6 +6,7 @@ import { memoryWorkbenchFixture } from "./memory-workbench-fixture.js";
 import { buildCompanyKbFeedbackCandidatePacketView } from "./memory-workbench-company-kb-feedback.js";
 import { buildMemoryArtifactInspector } from "./memory-workbench-inspector.js";
 import { buildMemoryWorkbenchPackageView } from "./memory-workbench-package.js";
+import { buildProjectManifestView } from "./memory-workbench-project-manifest.js";
 import { buildProductionMemoryAcceptanceFeedbackCandidateView } from "./memory-workbench-production-acceptance-feedback-candidate.js";
 import { buildProductionMemoryAcceptanceFeedbackCandidatePromotionView } from "./memory-workbench-production-acceptance-feedback-candidate-promotion.js";
 import { buildProductionMemoryAcceptanceFeedbackView } from "./memory-workbench-production-acceptance-feedback.js";
@@ -65,12 +66,13 @@ export function buildMemoryWorkbenchView(workspace, source) {
   const nextOperatorStartEventView = buildProductionMemoryNextOperatorStartEventView(workspace, nextOperatorStartPacketView);
   const nextOperatorActionResultView = buildProductionMemoryNextOperatorActionResultView(workspace, nextOperatorStartEventView);
   const assetCockpitView = buildProductionMemoryAssetCockpitView(workspace, nextOperatorActionResultView);
-  assetCockpitView.source_status = memorySourceStatus(source, workspace);
-  assetCockpitView.artifact_inspector = buildMemoryArtifactInspector(workspace, assetCockpitView.artifact_inspector);
-  assetCockpitView.feedback_draft = buildMemoryFeedbackDraft(workspace);
-  assetCockpitView.demo_summary = buildDemoEvidenceSummary(assetCockpitView);
-  assetCockpitView.demo_checklist = buildDemoReadyChecklist(assetCockpitView);
-  return assetCockpitView;
+  const projectManifestView = buildProjectManifestView(workspace, assetCockpitView);
+  projectManifestView.source_status = memorySourceStatus(source, workspace);
+  projectManifestView.artifact_inspector = buildMemoryArtifactInspector(workspace, projectManifestView.artifact_inspector);
+  projectManifestView.feedback_draft = buildMemoryFeedbackDraft(workspace);
+  projectManifestView.demo_summary = buildDemoEvidenceSummary(projectManifestView);
+  projectManifestView.demo_checklist = buildDemoReadyChecklist(projectManifestView);
+  return projectManifestView;
 }
 
 function memorySourceStatus(source, workspace) {

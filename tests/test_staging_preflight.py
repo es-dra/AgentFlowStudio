@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tools.staging_preflight import (
-    COMPANY_SECRET_PATH,
+    STARTUP_SECRET_PATH,
     format_report,
     parse_status,
     run_preflight,
@@ -37,7 +37,7 @@ def test_preflight_blocks_local_only_paths(tmp_path: Path) -> None:
     assert {finding.code for finding in report.findings} == {"local-only-path"}
 
 
-def test_preflight_expands_dirs_and_fails_oversized_files(tmp_path: Path) -> None:
+def test_preflight_expands_dirs_and_warns_on_oversized_files(tmp_path: Path) -> None:
     repo = tmp_path
     docs = repo / "docs" / "maintenance"
     docs.mkdir(parents=True)
@@ -45,20 +45,21 @@ def test_preflight_expands_dirs_and_fails_oversized_files(tmp_path: Path) -> Non
 
     report = run_preflight(repo, "?? docs/maintenance/\n")
 
-    assert not report.ok
+    assert report.ok
     assert any(finding.code == "oversized-file" and finding.path == "docs/maintenance/too_big.md" for finding in report.findings)
 
 
-def test_preflight_rejects_hardcoded_company_secret_path(tmp_path: Path) -> None:
+def test_preflight_rejects_hardcoded_startup_secret_path(tmp_path: Path) -> None:
     repo = tmp_path
     source = repo / "agentflow_studio" / "model_gateway"
     source.mkdir(parents=True)
-    (source / "company_secrets.py").write_text(f'path = "{COMPANY_SECRET_PATH}"\n', encoding="utf-8")
+    (source / "company_secrets.py").write_text(f'path = "{STARTUP_SECRET_PATH}"\n', encoding="utf-8")
 
     report = run_preflight(repo, " M agentflow_studio/model_gateway/company_secrets.py\n")
 
     assert not report.ok
-    assert {finding.code for finding in report.findings} == {"hardcoded-company-secret-path"}
+    assert {finding.code for finding in report.findings} == {"hardcoded-startup-secret-path"}
+    assert {finding.severity for finding in report.findings} == {"block"}
 
 
 def test_preflight_formats_passing_report(tmp_path: Path) -> None:

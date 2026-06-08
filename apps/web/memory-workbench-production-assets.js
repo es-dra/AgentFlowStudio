@@ -12,6 +12,7 @@ import {
   memoryFromIncluded,
   step,
 } from "./memory-workbench-production-assets-shared.js";
+import { buildAssetReviewScreen } from "./memory-workbench-production-asset-review-screen.js";
 
 const ASSET_TYPES = {
   seed: "agentflow_production_memory_asset_profile_seed",
@@ -118,6 +119,7 @@ function contextProjectionView(artifact, fallback) {
       status: "review ready",
       summary: "Use as next-task asset context only; do not treat as acceptance or durable memory.",
     },
+    asset_review_screen: buildAssetReviewScreen(payload),
     next_pass: {
       status: ready ? "ready" : "blocked",
       action: ready ? "use_asset_profiles_for_next_task_context" : "resolve_asset_context_blockers",
@@ -209,6 +211,7 @@ function consistencyReviewView(artifact, fallback) {
       status: "review ready",
       summary: "Tester feedback can be recorded later as a separate feedback event.",
     },
+    asset_review_screen: buildAssetReviewScreen(payload),
     next_pass: {
       status: ready ? "ready" : "blocked",
       action: ready ? "record_tester_feedback_or_continue_next_context" : "resolve_asset_review_blockers",

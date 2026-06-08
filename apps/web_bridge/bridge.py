@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from apps.cli.report_commands import (
+from apps.reporting.run_reports import (
     inspect_run_output,
     package_report_output,
     review_run_output,

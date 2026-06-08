@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_handoff_record",
+  "handoff_id": "handoff_runtime_demo_001",
+  "project_id": "proj_runtime_demo",
+  "source_trace_id": "trace_runtime_demo_001",
+  "owner_role": "Runtime/API Integrator",
+  "summary": "Runtime Service run produced safe artifact refs and stayed local-only.",
+  "completed_items": [
+    "created local project manifest",
+    "registered safe frontend artifact refs"
+  ],
+  "remaining_items": [
+    "run live provider smoke only after explicit capability gate"
+  ],
+  "verification_refs": [
+    "tests/test_api_runtime_service.py"
+  ],
+  "non_claims": [
+    "not human acceptance",
+    "not business validation",
+    "not durable memory"
+  ],
+  "writes_long_term_memory": false,
+  "writes_company_kb": false,
+  "metadata": {
+    "example": true
+  }
+}

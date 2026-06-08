@@ -154,6 +154,7 @@ def production_memory_loop_run_asset_test_package_command(
             run_provider_validation=run_provider_validation,
             image_service=image_service,
             video_service=video_service,
+            provider_validation_executor=_provider_validation_executor(run_provider_validation),
         )
         written_paths = write_asset_profile_test_package(bundle, output_dir)
     except ValueError as exc:
@@ -177,6 +178,14 @@ def _echo_bundle(bundle: dict, written_paths: list[Path]) -> None:
     typer.echo(f"Blocked refs: {len(readiness['blocked_refs'])}")
     for path in written_paths:
         typer.echo(f"Wrote: {str(path).replace('\\', '/')}")
+
+
+def _provider_validation_executor(run_provider_validation: bool):
+    if not run_provider_validation:
+        return None
+    from agentflow_studio.model_gateway.asset_profile_provider_adapter import run_asset_profile_provider_validation
+
+    return run_asset_profile_provider_validation
 
 
 __all__ = (

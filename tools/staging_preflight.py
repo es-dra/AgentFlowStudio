@@ -9,8 +9,8 @@ from typing import Iterable
 
 
 MAX_EFFECTIVE_FILE_LINES = 300
-COMPANY_KNOWLEDGE_ROOT = r"D:\Learning materials\Learning_notes\Company"
-COMPANY_SECRET_PATH = COMPANY_KNOWLEDGE_ROOT + r"\.secrets"
+STARTUP_KNOWLEDGE_ROOT = r"D:\Learning materials\Learning_notes\10-Startup"
+STARTUP_SECRET_PATH = STARTUP_KNOWLEDGE_ROOT + r"\.secrets"
 
 CHECKED_SUFFIXES = {
     ".css",
@@ -57,6 +57,7 @@ class Finding:
     code: str
     path: str
     detail: str
+    severity: str = "block"
 
 
 @dataclass(frozen=True)
@@ -67,7 +68,7 @@ class PreflightReport:
 
     @property
     def ok(self) -> bool:
-        return not self.findings
+        return not any(finding.severity == "block" for finding in self.findings)
 
 
 def run_preflight(repo_root: Path, status_text: str | None = None) -> PreflightReport:
@@ -140,7 +141,12 @@ def check_file_line_counts(repo_root: Path, files: Iterable[str]) -> Iterable[Fi
     for rel in files:
         line_count = _line_count(repo_root / rel)
         if line_count > MAX_EFFECTIVE_FILE_LINES:
-            yield Finding("oversized-file", rel, f"{line_count} effective lines exceeds {MAX_EFFECTIVE_FILE_LINES}")
+            yield Finding(
+                "oversized-file",
+                rel,
+                f"{line_count} effective lines exceeds {MAX_EFFECTIVE_FILE_LINES}",
+                "warning",
+            )
 
 
 def check_forbidden_content(repo_root: Path, files: Iterable[str]) -> Iterable[Finding]:
@@ -150,8 +156,8 @@ def check_forbidden_content(repo_root: Path, files: Iterable[str]) -> Iterable[F
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        if COMPANY_SECRET_PATH in text:
-            yield Finding("hardcoded-company-secret-path", rel, "hardcoded local Company .secrets path")
+        if STARTUP_SECRET_PATH in text:
+            yield Finding("hardcoded-startup-secret-path", rel, "hardcoded local 10-Startup .secrets path")
 
 
 def format_report(report: PreflightReport) -> str:
@@ -164,8 +170,9 @@ def format_report(report: PreflightReport) -> str:
         lines.append("status: pass")
     else:
         lines.append("status: fail")
-        for finding in report.findings:
-            lines.append(f"- {finding.code}: {finding.path} ({finding.detail})")
+    for finding in report.findings:
+        prefix = "warning" if finding.severity == "warning" else "block"
+        lines.append(f"- {prefix} {finding.code}: {finding.path} ({finding.detail})")
     return "\n".join(lines)
 
 

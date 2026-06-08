@@ -12,8 +12,8 @@ this record.
 
 ## Source Rules
 
-- Company source knowledge base remains outside this repository:
-  `D:\Learning materials\Learning_notes\Company`.
+- 10-Startup source knowledge base remains outside this repository:
+  `D:\Learning materials\Learning_notes\10-Startup`.
 - This repository keeps only execution-facing projection for AgentFlow Studio.
 - `memory-video-pipeline-*` is the visible product CLI surface.
 - Numbered memory-advantage demos and direct provider smoke commands are
@@ -86,7 +86,7 @@ imports, tests, and docs for the affected area.
   `D:\Projects\AgentFlowStudio`, and each relative path was confirmed ignored
   by Git with `git check-ignore`.
 - No tracked source file, test file, evidence document, provider adapter,
-  generated run evidence, secret, local configuration, or Company knowledge-base
+  generated run evidence, secret, local configuration, or 10-Startup knowledge-base
   file was deleted.
 - Verification after cleanup:
   - `python -B -m apps.cli.main --help` -> passed; visible product CLI surface
@@ -110,7 +110,7 @@ imports, tests, and docs for the affected area.
 - Line-count result: root `DEVLOG.md` and the committed DEVLOG archive index
   are both under the 300-line target.
 - Boundary kept: no source code, tests, provider adapters, evidence runbooks,
-  generated run evidence, secrets, local configuration, or Company
+  generated run evidence, secrets, local configuration, or 10-Startup
   knowledge-base files were changed.
 - Verification after compression:
   - `python -B -m apps.cli.main --help` -> passed.
@@ -131,13 +131,13 @@ imports, tests, and docs for the affected area.
 - The ledger separates mainline staging candidates, evidence/runbook
   preservation, provider/operator quarantine, numbered-demo legacy, and
   local-only ignored runtime artifacts.
-- The full rule hierarchy is explicitly applied: Company source knowledge base
+- The full rule hierarchy is explicitly applied: 10-Startup source knowledge base
   -> global workflow skills -> project `AGENTS.md` ->
   `docs/company_operating_model.md` -> `TASK_TRACKER.md` / branch handoff ->
   current task.
 - Provider config bridge issue captured and addressed:
   `agentflow_studio/model_gateway/company_secrets.py` no longer hardcodes a local
-  Company `.secrets` path as a default. Provider/operator staging still needs
+  10-Startup `.secrets` path as a default. Provider/operator staging still needs
   separate no-secret and capability-gate review. Focused provider/operator
   tests now cover explicit path, `AFS_PROVIDER_CONFIG`, and hidden CLI
   help fallback wording.
@@ -200,8 +200,8 @@ imports, tests, and docs for the affected area.
 3. Once protocol live execution exists, remove hidden numbered demo commands
    and then the bespoke DEMO-012/015 modules.
 4. Run a dedicated provider/operator staging review before including hidden live
-   tooling in a branch commit; the config bridge no longer carries the local
-   Company `.secrets` default.
+  tooling in a branch commit; the config bridge no longer carries the local
+  10-Startup `.secrets` default.
 5. Use `docs/maintenance/AFS-STAGING-CANDIDATE-001.md` as the staging checklist
    before any branch commit.
 

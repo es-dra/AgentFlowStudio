@@ -1,0 +1,31 @@
+{
+  "schema_version": "0.1.0",
+  "artifact_type": "agentflow_quality_report",
+  "report_id": "quality_runtime_demo_001",
+  "project_id": "proj_runtime_demo",
+  "source_trace_id": "trace_runtime_demo_001",
+  "verification_scope": "structure_and_runtime",
+  "checks": [
+    {
+      "check_id": "safe_artifact_refs",
+      "status": "passed",
+      "summary": "frontend-facing refs use artifact_id instead of private local paths"
+    },
+    {
+      "check_id": "provider_gate_default",
+      "status": "passed",
+      "summary": "provider calls are blocked by default"
+    }
+  ],
+  "overall_status": "passed",
+  "non_claims": [
+    "not human acceptance",
+    "not business validation",
+    "not durable memory"
+  ],
+  "writes_long_term_memory": false,
+  "writes_company_kb": false,
+  "metadata": {
+    "example": true
+  }
+}

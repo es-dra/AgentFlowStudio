@@ -110,7 +110,7 @@ Reviewed support/evidence layer:
   tokens, signed URLs, real API keys, or private credential material.
 - Python `__pycache__` and other generated caches.
 - Any copied source content from
-  `D:\Learning materials\Learning_notes\Company`.
+  `D:\Learning materials\Learning_notes\10-Startup`.
 
 ## Verification
 

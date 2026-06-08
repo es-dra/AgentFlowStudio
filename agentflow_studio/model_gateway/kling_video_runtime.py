@@ -117,12 +117,20 @@ def poll_video_task(
     query_url = url_template.format(id=task_id)
     last_status = ""
     for attempt in range(max_polls):
-        response = request_json(
-            query_url,
-            method="GET",
-            authorization=authorization,
-            timeout_sec=timeout_sec,
-        )
+        try:
+            response = request_json(
+                query_url,
+                method="GET",
+                authorization=authorization,
+                timeout_sec=timeout_sec,
+            )
+        except ModelProviderError as exc:
+            if attempt < max_polls - 1 and _is_transient_poll_error(str(exc)):
+                last_status = "transient_transport_error"
+                if poll_interval_sec > 0:
+                    time.sleep(poll_interval_sec)
+                continue
+            raise
         data = response_data(response)
         status = str(data.get("task_status") or "").lower()
         last_status = status
@@ -195,6 +203,22 @@ def video_extension(content_type: str) -> str:
 
 def _safe_http_error(exc: httpx.HTTPError) -> str:
     return exc.__class__.__name__
+
+
+def _is_transient_poll_error(message: str) -> bool:
+    normalized = message.lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "connecterror",
+            "curlerror(35)",
+            "curlerror(28)",
+            "failed to receive handshake",
+            "ssl/tls connection failed",
+            "timed out",
+            "temporarily unavailable",
+        )
+    )
 
 
 def _safe_http_status_message(prefix: str, response: httpx.Response) -> str:

@@ -1,0 +1,9 @@
+{
+  "project_id": "proj_runtime_demo",
+  "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
+  "promotion_decision": "promoted",
+  "promotion_rationale": "Frontend integration fixture; explicit runtime-only decision for Round 2 context projection.",
+  "generated_at": "2026-06-04T08:00:00+08:00",
+  "decided_at": "2026-06-04T08:20:00+08:00",
+  "reviewed_at": "2026-06-04T08:30:00+08:00"
+}

@@ -22,6 +22,7 @@ from agentflow.memory.production_asset_profile_context import (
 )
 from agentflow.memory.production_asset_profile_io import write_asset_profile_test_package
 from agentflow.memory.production_asset_profile_provider import (
+    ProviderValidationExecutor,
     build_provider_validation_plan,
     provider_status,
     provider_validation_blockers,
@@ -65,6 +66,7 @@ def build_asset_profile_test_package(
     run_provider_validation: bool = False,
     image_service: str = "minimax_image",
     video_service: str = "kling_i2v",
+    provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:
     validate_asset_profile_seed(asset_profile_seed)
     operator_context = load_operator_context(operator_artifact_path)
@@ -94,6 +96,7 @@ def build_asset_profile_test_package(
             character_reference_image_path=character_reference_image_path,
             image_service=image_service,
             video_service=video_service,
+            provider_validation_executor=provider_validation_executor,
         )
         if result.get("status") != "succeeded":
             blockers = result.get("blockers", [])

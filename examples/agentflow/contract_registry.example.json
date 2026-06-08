@@ -85,6 +85,36 @@
       "contract_surface": "company_kb_feedback_candidates"
     },
     {
+      "artifact_type": "agentflow_run_trace",
+      "example_path": "examples/agentflow/agentops_run_trace.example.json",
+      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "contract_surface": "local_agentops_trace"
+    },
+    {
+      "artifact_type": "agentflow_quality_report",
+      "example_path": "examples/agentflow/agentops_quality_report.example.json",
+      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "contract_surface": "local_agentops_quality_report"
+    },
+    {
+      "artifact_type": "agentflow_guardrail_result",
+      "example_path": "examples/agentflow/agentops_guardrail_result.example.json",
+      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "contract_surface": "local_agentops_guardrail"
+    },
+    {
+      "artifact_type": "agentflow_handoff_record",
+      "example_path": "examples/agentflow/agentops_handoff_record.example.json",
+      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "contract_surface": "local_agentops_handoff"
+    },
+    {
+      "artifact_type": "agentflow_maintenance_audit_report",
+      "example_path": "examples/agentflow/agentops_maintenance_audit_report.example.json",
+      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "contract_surface": "local_agentops_maintenance_audit"
+    },
+    {
       "artifact_type": "agentflow_skill_invocation",
       "example_path": "examples/agentflow/skill_invocation.example.json",
       "doc_path": "docs/agentflow_skill_contract.md",
@@ -211,6 +241,14 @@
     {
       "rule_id": "company_kb_feedback_candidates_not_written",
       "description": "Company KB feedback candidate packets summarize project lessons without writing source Company knowledge or promoting company memory."
+    },
+    {
+      "rule_id": "local_agentops_non_claims",
+      "description": "Local AgentOps artifacts must include non-claims for human acceptance, business validation, and durable memory."
+    },
+    {
+      "rule_id": "local_agentops_no_company_write",
+      "description": "Local AgentOps artifacts are evidence surfaces and must not write Company/COS memory."
     },
     {
       "rule_id": "asset_reuse_decision_only",

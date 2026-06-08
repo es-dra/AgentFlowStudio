@@ -5,7 +5,7 @@ from typing import Any
 
 from agentflow.harness.constants import FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 NEXT_CONTEXT_HANDOFF_KIND = "agentflow_production_memory_next_context_handoff"
 

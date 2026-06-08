@@ -1,54 +1,129 @@
 # AgentFlow Studio
 
-[中文 README](README.zh-CN.md)
+AgentFlow Studio 是一个本地优先、面向 Agent 的内容生产与分发工作台。当前阶段的目标是“本地内测可用”：测试人员能跑任务、看 artifact、记录反馈、复用上下文，并清楚地区分验证、验收和商业结论。
 
-AgentFlow Studio is an agent-native content production and distribution
-workflow platform. The repository container is now `AgentFlowStudio`; the
-existing Python package names, CLI commands, workflow files, and artifact
-contracts are intentionally unchanged in this phase.
-
-Current top-level modules:
-
-- `agentflow/`: platform contracts, harness helpers, router, memory, and skill
-  boundaries as they are gradually migrated into the platform layer.
-- `agentflow_production/`: production-side structured content handoff MVP.
-- `agentflow_studio/`: distribution-side short video highlight, packaging, report,
-  and review MVP.
-
-AgentFlow Studio remains the Python-based, local-first CLI/Agent MVP for AI-assisted
-short video packaging: each major step writes readable JSON or media artifacts,
-and those artifacts can be inspected and reviewed after a run.
-
-The project is clean-room. The previous AVP workspace is reference material
-only and is not used as a source-code base.
-
-## Current Status
-
-AgentFlow Studio is currently a local-first platform repository with working
-MVP modules, contract-layer AgentFlow helpers, and a deterministic Production
-Memory Architecture slice. It is positioned as a memory-driven AI content
-production workbench, with `Memory OS` kept as the long-term product vision.
-
-The repository includes a local read-only Web Memory Workbench for selected
-artifact files. That workbench can inspect local JSON/Markdown artifacts and
-render the Production Memory asset loop, but it does not scan directories,
-persist browser state, execute workflows, call providers, or act as a hosted
-Web product.
-
-AgentFlow Production's current production-side workflow is:
+长期愿景可以称为 `Memory OS`，但当前工程主线更准确地叫：
 
 ```text
-creative_brief
-  -> story_bible
-  -> episode_outline
-  -> scene_plan
-  -> shot_plan
-  -> prompt_pack
-  -> production_handoff
-  -> production_report
+Production Memory Architecture
+Evidence-backed Context Runtime
 ```
 
-AgentFlow Studio's current distribution-side product path is:
+## 当前状态
+
+AFS 已具备以下基础：
+
+- deterministic Production Memory asset loop。
+- 本地 read-only Web Memory Workbench。
+- Asset Profile Review Screen。
+- Real Asset Test Run Harness。
+- Two-Round Context Runtime Validation。
+- Project Manifest v0.1。
+- Provider Validation Gate。
+- FastAPI Runtime Service v0.1，供外部前端工作台对接。
+- 本地轻量 AgentOps contract：run trace、quality report、guardrail result、handoff record、maintenance audit report。
+
+这些通过项只代表 structure/runtime verification，不代表 human acceptance、business validation 或 durable memory。
+
+## 仓库分层
+
+```text
+apps/                  CLI、Runtime Service、过渡 Web 工作台
+agentflow/             平台 contract、harness、router、memory、skills
+examples/agentflow_production/  内容生产侧结构化 handoff 示例输入
+agentflow_studio/      短视频分发侧包装、审查、报告
+workflows/             YAML workflow definitions
+prompts/               可审计 prompt templates
+configs/               示例配置和工具目录
+examples/              可提交的最小示例输入
+data/                  本地 runtime data；生成内容默认 ignore
+docs/                  架构、contract、runbook、handoff、维护账本
+tests/                 自动化测试和 fixture
+```
+
+## 后端对接面
+
+前端团队只需要对接 Runtime Service：
+
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
+```
+
+启动后：
+
+```text
+http://127.0.0.1:8790/docs
+http://127.0.0.1:8790/openapi.json
+```
+
+前端应使用：
+
+- `project_id`
+- `job_id`
+- `artifact_id`
+- safe summary
+- safe manifest
+
+前端不应读取：
+
+- provider secret
+- 本地素材绝对路径
+- signed URL
+- 生成媒体字节
+- CLI 内部实现
+
+前端对接材料见：
+
+```text
+docs/frontend_integration/
+examples/frontend_runtime_service/
+```
+
+## 本地开发
+
+PowerShell：
+
+```powershell
+cd D:\Projects\AgentFlowStudio
+python -m venv .venv
+.\.venv\Scripts\pip.exe install -e .[dev]
+.\.venv\Scripts\python.exe -m apps.cli.main version
+```
+
+基础验证：
+
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+.\.venv\Scripts\python.exe -m apps.cli.main version
+.\.venv\Scripts\python.exe -m pytest
+git diff --check
+```
+
+维护审计：
+
+```powershell
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+```
+
+## Provider 边界
+
+默认不调用远程 provider。
+
+能力 gate：
+
+```powershell
+$env:AFS_ALLOW_REMOTE_LLM="true"
+$env:AFS_ALLOW_REMOTE_ASR="true"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+```
+
+Video provider 仍需要任务级显式授权或后续独立 gate。一个能力的授权不代表另一个能力也被授权。
+
+本地 provider config、secret、真实素材、生成媒体都不能提交。
+
+## 当前产品路径
+
+内容分发侧基础链路：
 
 ```text
 video / transcript / clip_plan
@@ -64,225 +139,30 @@ video / transcript / clip_plan
   -> inspect/review
 ```
 
-Supported today:
-
-- deterministic script/transcript highlight workflows
-- OCR-subtitle timeline from frame-level OCR results
-- explainable candidate-window scoring to selected highlights
-- mock and explicit opt-in OpenAI-compatible ASR paths
-- local faster-whisper ASR path for offline product smokes
-- ClipPlan validation against probed video metadata
-- real FFmpeg slicing from existing ClipPlans
-- simple final-video assembly from real clips
-- final video quality hardening with FFmpeg warning classification
-- subtitle export to SRT
-- subtitle burn-in for existing videos and SRT files
-- cover image export from an existing final video
-- local BGM mixing with bounded volume settings
-- finished package manifest indexing
-- PosterFlow Memory Demo with explicit remote-image opt-in and local preview
-- `inspect-run` and `review-run` reports for generated run artifacts
-- `package_report.md` and delivery-readiness reports for handoff
-- `draft-plan` for static workflow plans
-
-Not included yet:
-
-- hosted Web UI, desktop UI, SaaS runtime, or workflow execution UI
-- automatic music selection or licensing management
-- transition templates or multi-track timeline editing
-- visual highlight detection from video frames
-- real OCR frame extraction/provider integration
-- publishing/upload integrations
-- physical package directory or zip export
-- hosted API, database, queue, or SaaS runtime
-
-## Project Layout
+Production Memory asset loop：
 
 ```text
-apps/                 CLI, API, and future web entrypoints
-agentflow/            Platform contract and harness migration layer
-agentflow_production/        Production-side structured handoff module
-agentflow_studio/           Distribution-side media workflow module
-workflows/            YAML workflow definitions
-prompts/              Auditable prompt templates
-configs/              Example configuration and tool catalog files
-examples/             User-facing demo inputs
-data/                 Local runtime data; generated files are ignored
-docs/                 Architecture, contracts, roadmap, and smoke docs
-tests/                Automated tests and fixtures
+Round 1 package
+  -> tester feedback
+  -> update candidate
+  -> promotion decision / profile version
+  -> context projection
+  -> Round 2 package
+  -> consistency review
+  -> before/after report
 ```
 
-## Requirements
+## 关键文档
 
-- Python 3.12 is recommended.
-- The project declares `>=3.11,<3.13`.
-- Python 3.13 is not recommended yet because media, ASR, and model-adjacent
-  dependencies may lag the newest runtime.
-- FFmpeg and FFprobe are required for real slicing, final video assembly,
-  subtitle burn-in, cover export, and BGM mix workflows.
-- Remote LLM and ASR calls are disabled by default.
-
-## Quick Start
-
-PowerShell:
-
-```powershell
-cd D:\Projects\AgentFlowStudio
-python -m venv .venv
-.venv\Scripts\pip install -e .[dev]
-.venv\Scripts\python -m pytest
-.venv\Scripts\afs version
-```
-
-Run the default mock workflow:
-
-```powershell
-.venv\Scripts\afs run-workflow --workflow workflows/mock_text_to_slices.yaml --input examples/demo_text/story.txt --output data/processed/runs/demo_full_mock
-.venv\Scripts\afs inspect-run --run-dir data/processed/runs/demo_full_mock
-.venv\Scripts\afs review-run --run-dir data/processed/runs/demo_full_mock
-```
-
-Expected generated files include:
-
-```text
-manifest.json
-run_manifest.json
-trace.json
-quality_report.json
-review_report.json
-hooks.json
-scripts.json
-clip_plans.json
-slice_manifest.json
-clips/
-```
-
-Generated files under `data/processed/`, `data/reports/`, and local media under
-`data/raw/` are ignored by git.
-
-## Product Golden Path
-
-For a product-level local smoke after Phase 13, use the Golden Path:
-
-```text
-source video + clip_plan
-  -> real clips
-  -> final_video.mp4
-  -> subtitles.srt
-  -> final_video_with_subtitles.mp4
-  -> cover.jpg
-  -> final_video_with_bgm.mp4
-  -> finished_package_manifest.json
-  -> inspect/review
-```
-
-See [`docs/golden_path.md`](docs/golden_path.md) for the required local files,
-commands, expected artifacts, and acceptance criteria.
-
-## Main Workflows
-
-Planning and transcript workflows:
-
-- `workflows/script_to_highlight_plan.yaml`
-- `workflows/transcript_to_candidate_windows.yaml`
-- `workflows/video_subtitle_ocr_to_highlight_plan.yaml`
-- `workflows/transcript_to_highlight_clip_plan.yaml`
-- `workflows/video_to_transcript.yaml`
-- `workflows/video_to_transcript_real_asr.yaml`
-- `workflows/video_to_highlight_clip_plan.yaml`
-- `workflows/video_to_highlight_clip_plan_real_asr.yaml`
-- `workflows/video_to_finished_package_local_asr.yaml`
-- `workflows/video_script_to_finished_package_local_asr.yaml`
-
-Execution and product artifact workflows:
-
-- `workflows/clip_plan_to_real_clips.yaml`
-- `workflows/video_to_real_clips.yaml`
-- `workflows/clips_to_final_video.yaml`
-- `workflows/transcript_to_subtitles.yaml`
-- `workflows/final_video_with_subtitles.yaml`
-- `workflows/final_video_to_cover.yaml`
-- `workflows/final_video_with_bgm.yaml`
-- `workflows/final_video_package.yaml`
-
-Workflow details are documented in [`workflows/README.md`](workflows/README.md).
-
-## Artifact and Review Model
-
-AgentFlow Studio treats generated files as first-class contracts. Important artifacts
-include:
-
-```text
-run_manifest.json
-trace.json
-quality_report.json
-review_report.json
-ocr_transcript.json
-candidate_windows.json
-highlight_score_report.json
-real_slice_manifest.json
-final_video_manifest.json
-subtitle_manifest.json
-subtitle_burn_manifest.json
-cover_manifest.json
-audio_mix_manifest.json
-finished_package_manifest.json
-```
-
-`inspect-run` writes `quality_report.json`.
-`review-run` reads the run artifacts and writes `review_report.json`.
-
-Contract references:
-
-- [`docs/run_contract.md`](docs/run_contract.md)
-- [`docs/workflow_plan_contract.md`](docs/workflow_plan_contract.md)
-- [`docs/agent_reviewer_contract.md`](docs/agent_reviewer_contract.md)
-- [`docs/tool_contracts.md`](docs/tool_contracts.md)
-- [`docs/agent_usage_guide.md`](docs/agent_usage_guide.md)
-- [`docs/agentflow_studio_delivery_checklist.md`](docs/agentflow_studio_delivery_checklist.md)
-- [`docs/current_architecture.md`](docs/current_architecture.md)
-
-## Remote Provider Boundary
-
-The default model and ASR paths are local/mock. Standard CLI and workflow
-commands do not need API keys and do not access the network.
-
-Remote LLM calls require:
-
-```powershell
-$env:AFS_ALLOW_REMOTE_LLM="true"
-```
-
-Remote ASR calls require:
-
-```powershell
-$env:AFS_ALLOW_REMOTE_ASR="true"
-```
-
-Local model settings belong in `configs/models.yaml`, which is ignored by git.
-Commit only example configuration files such as `configs/models.example.yaml`.
-
-## FFmpeg Boundary
-
-Check local FFmpeg and FFprobe availability:
-
-```powershell
-.venv\Scripts\afs ffmpeg-check --json
-```
-
-If FFmpeg is missing, mock workflows can still run. Real media workflows need
-FFmpeg/FFprobe.
-
-## Development Checks
-
-```powershell
-.venv\Scripts\python -m pytest
-.venv\Scripts\python -m compileall apps agentflow agentflow_studio agentflow_production tests
-git diff --check
-.venv\Scripts\python -m apps.cli.main --help
-.venv\Scripts\python -m apps.cli.main version
-```
+- `AGENTS.md`：本仓库 Agent 工作规则。
+- `TASK_TRACKER.md`：当前任务账本。
+- `DEVLOG.md`：短开发日志。
+- `docs/company_operating_model.md`：公司规则在本项目的执行投影。
+- `docs/local_internal_test_runbook.md`：本地内测 runbook。
+- `docs/project_manifest_contract.md`：Project Manifest v0.1。
+- `docs/frontend_integration/`：前端对接包。
+- `docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md`：维护性重置账本。
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT License. See `LICENSE`.

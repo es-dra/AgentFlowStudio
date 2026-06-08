@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS, FAILED, PASSED
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_next_task import NEXT_TASK_PACKET_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 NEXT_PASS_RESULT_KIND = "agentflow_production_memory_next_pass_result"
 

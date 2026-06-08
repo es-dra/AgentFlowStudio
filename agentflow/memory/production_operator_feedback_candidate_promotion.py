@@ -7,7 +7,7 @@ from typing import Any
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.memory.production_loop import SCHEMA_VERSION
 from agentflow.memory.production_operator_feedback_candidate import OPERATOR_FEEDBACK_CANDIDATE_PACKET_KIND
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 OPERATOR_FEEDBACK_CANDIDATE_PROMOTION_DECISION_KIND = (
     "agentflow_production_memory_operator_feedback_candidate_promotion_decision"

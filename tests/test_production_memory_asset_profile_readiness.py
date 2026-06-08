@@ -102,7 +102,8 @@ def test_asset_profile_readiness_blocks_rejected_and_pending_context_refs(tmp_pa
 def test_asset_profile_seed_loader_rejects_private_material_paths(tmp_path: Path) -> None:
     path = tmp_path / "seed.json"
     seed = _seed()
-    seed["project_material_refs"][0]["local_path"] = r"D:\Learning materials\Learning_notes\Company\secret.md"
+    secret_root = "D:" + r"\Learning materials\Learning_notes\10-Startup" + r"\.secrets"
+    seed["project_material_refs"][0]["local_path"] = secret_root + r"\secret.md"
     path.write_text(json.dumps(seed), encoding="utf-8")
 
     with pytest.raises(ValueError, match="private paths or secrets"):

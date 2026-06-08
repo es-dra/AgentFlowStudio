@@ -67,7 +67,6 @@ def run_kling_i2v_smoke(
     started = time.perf_counter()
     payload = build_runtime_payload(plan["create_request"]["json"], source_image)
     request_json = request_json_with_transport(transport)
-    download = download_with_transport(transport)
     create_response = request_json(
         str(plan["create_request"]["url"]),
         method="POST",
@@ -85,13 +84,12 @@ def run_kling_i2v_smoke(
         status="submitted",
     )
     write_task_state(output_root, state)
-    return _complete_video_task(
+    return _complete_video_task_with_transport_fallback(
         output_root,
         state=state,
         query_url_template=str(plan["query_request"]["url_template"]),
         authorization=authorization,
-        request_json=request_json,
-        download=download,
+        transport=transport,
         poll_interval_sec=poll_interval_sec,
         max_polls=max_polls,
         timeout_sec=timeout_sec,
@@ -130,7 +128,6 @@ def run_kling_t2v_smoke(
     started = time.perf_counter()
     payload = dict(plan["create_request"]["json"])
     request_json = request_json_with_transport(transport)
-    download = download_with_transport(transport)
     create_response = request_json(
         str(plan["create_request"]["url"]),
         method="POST",
@@ -147,13 +144,12 @@ def run_kling_t2v_smoke(
         status="submitted",
     )
     write_task_state(output_root, state)
-    return _complete_video_task(
+    return _complete_video_task_with_transport_fallback(
         output_root,
         state=state,
         query_url_template=str(plan["query_request"]["url_template"]),
         authorization=authorization,
-        request_json=request_json,
-        download=download,
+        transport=transport,
         poll_interval_sec=poll_interval_sec,
         max_polls=max_polls,
         timeout_sec=timeout_sec,
@@ -183,19 +179,63 @@ def resume_kling_video_task(
     authorization = f"Bearer {build_runtime_token(account)}"
     query_url_template = _resume_query_url_template(store, service, account)
     started = time.perf_counter()
-    return _complete_video_task(
+    return _complete_video_task_with_transport_fallback(
         state_path.parent,
         state=state,
         query_url_template=query_url_template,
         authorization=authorization,
-        request_json=request_json_with_transport(transport),
-        download=download_with_transport(transport),
+        transport=transport,
         poll_interval_sec=poll_interval_sec,
         max_polls=max_polls,
         timeout_sec=timeout_sec,
         started=started,
         resumed_from_task_state=True,
     )
+
+
+def _complete_video_task_with_transport_fallback(
+    output_root: Path,
+    *,
+    state: dict[str, Any],
+    query_url_template: str,
+    authorization: str,
+    transport: str,
+    poll_interval_sec: float,
+    max_polls: int,
+    timeout_sec: float,
+    started: float,
+    resumed_from_task_state: bool,
+) -> dict[str, Any]:
+    try:
+        return _complete_video_task(
+            output_root,
+            state=state,
+            query_url_template=query_url_template,
+            authorization=authorization,
+            request_json=request_json_with_transport(transport),
+            download=download_with_transport(transport),
+            poll_interval_sec=poll_interval_sec,
+            max_polls=max_polls,
+            timeout_sec=timeout_sec,
+            started=started,
+            resumed_from_task_state=resumed_from_task_state,
+        )
+    except ModelProviderError:
+        if transport != "httpx":
+            raise
+        return _complete_video_task(
+            output_root,
+            state=state,
+            query_url_template=query_url_template,
+            authorization=authorization,
+            request_json=request_json_with_transport("curl"),
+            download=download_with_transport("curl"),
+            poll_interval_sec=poll_interval_sec,
+            max_polls=max_polls,
+            timeout_sec=timeout_sec,
+            started=started,
+            resumed_from_task_state=resumed_from_task_state,
+        )
 
 
 def _complete_video_task(

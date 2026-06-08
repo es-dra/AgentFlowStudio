@@ -38,6 +38,9 @@ from apps.cli.production_memory_asset_profile_promotion_command import (
 from apps.cli.production_memory_asset_profile_update_candidate_command import (
     production_memory_loop_draft_asset_profile_update_candidate_command,
 )
+from apps.cli.production_memory_asset_provider_validation_gate_command import asset_provider_validation_gate_command
+from apps.cli.production_memory_asset_test_run_harness_command import asset_test_run_harness_command
+from apps.cli.production_memory_asset_two_round_validation_command import asset_two_round_validate_command
 from apps.cli.production_memory_loop_command import (
     production_memory_loop_draft_feedback_command,
     production_memory_loop_review_promotion_command,
@@ -127,6 +130,9 @@ def register_production_memory_commands(app: typer.Typer) -> None:
         "asset-consistency-review",
         asset_consistency_review_command,
     )
+    _visible(app, "asset-test-run-harness", asset_test_run_harness_command)
+    _visible(app, "asset-two-round-validate", asset_two_round_validate_command)
+    _visible(app, "asset-provider-validation-gate", asset_provider_validation_gate_command)
 
     _hidden(app, "production-memory-loop-validate", production_memory_loop_validate_command)
     _hidden(app, "production-memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
@@ -161,6 +167,21 @@ def register_production_memory_commands(app: typer.Typer) -> None:
         app,
         "production-memory-loop-review-asset-consistency",
         production_memory_loop_review_asset_consistency_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-run-real-asset-test-harness",
+        asset_test_run_harness_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-two-round-context-runtime-validation",
+        asset_two_round_validate_command,
+    )
+    _hidden(
+        app,
+        "production-memory-loop-provider-validation-gate",
+        asset_provider_validation_gate_command,
     )
     _hidden(app, "production-memory-loop-draft-feedback", production_memory_loop_draft_feedback_command)
     _hidden(app, "production-memory-loop-review-promotion", production_memory_loop_review_promotion_command)

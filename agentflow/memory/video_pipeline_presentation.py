@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.utils import write_json
+from agentflow.harness.json_io import write_json
 
 from agentflow.memory.video_pipeline import PROTOCOL_TYPE, SCHEMA_VERSION
 from agentflow.memory.video_pipeline_observation import OBSERVATION_TYPE
