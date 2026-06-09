@@ -5,6 +5,7 @@ from typing import Any
 from apps.api.runtime_store import RuntimeStore, project_summary
 from apps.api.runtime_workbench_activity import build_activity_timeline
 from apps.api.runtime_workbench_assets import build_asset_library
+from apps.api.runtime_workbench_board import build_production_board
 from apps.api.runtime_workbench_content import build_filmstrip
 from apps.api.runtime_workbench_jobs import build_job_center
 from apps.api.runtime_workbench_readiness import build_project_readiness
@@ -57,6 +58,7 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
         "style_memory": build_style_memory(store, manifest),
         "job_center": build_job_center(jobs),
         "activity_timeline": build_activity_timeline(jobs),
+        "production_board": build_production_board(manifest, jobs, provider_gate, project_readiness),
         "events": build_workbench_events(jobs),
         "provider_gate": provider_gate,
         "advanced_evidence": {

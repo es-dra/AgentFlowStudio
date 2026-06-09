@@ -125,6 +125,7 @@ adds it to project feedback refs, and does not promote it to durable memory.
 读取前端可直接消费的项目工作台状态。该 endpoint 把 manifest、jobs、artifact refs、provider gate 和 blockers 翻译成用户语言：
 
 - project summary；
+- production board lanes；
 - navigation labels；
 - canvas cards；
 - asset library；
@@ -139,7 +140,7 @@ adds it to project feedback refs, and does not promote it to durable memory.
 
 前端应优先用它驱动画布、项目中心、任务状态和审片入口，不应在浏览器端自行拼接底层 artifact 图谱。
 
-`workbench-state` also includes `project_readiness` for the current safe next action and workflow gate statuses, and `activity_timeline` for product-facing runtime trace navigation.
+`workbench-state` also includes `project_readiness` for the current safe next action and workflow gate statuses, `production_board` for the product-facing flow board, and `activity_timeline` for runtime trace navigation.
 
 ### `GET /artifacts/{artifact_id}`
 

@@ -1,4 +1,5 @@
 import { normalizeActivityTimeline } from "./activity-state.js";
+import { normalizeProductionBoard } from "./production-board-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
 
 export const EMPTY_WORKBENCH_STATE = {
@@ -13,6 +14,7 @@ export const EMPTY_WORKBENCH_STATE = {
   style_memory: null,
   job_center: null,
   activity_timeline: null,
+  production_board: null,
   events: [],
   provider_gate: null,
   advanced_evidence: {
@@ -46,6 +48,7 @@ export function normalizeWorkbenchState(payload) {
     style_memory: normalizeStyleMemory(source.style_memory),
     job_center: normalizeJobCenter(source.job_center),
     activity_timeline: normalizeActivityTimeline(source.activity_timeline),
+    production_board: normalizeProductionBoard(source.production_board),
     events: asArray(source.events).map(normalizeEvent),
     provider_gate: source.provider_gate ? normalizeCard(source.provider_gate) : null,
     advanced_evidence: {

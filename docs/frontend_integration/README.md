@@ -61,7 +61,7 @@ Current local frontend foundation:
 apps/workbench/
 ```
 
-这个 endpoint 返回 UI 语义状态：project summary、project readiness、asset library、canvas cards、filmstrip、review room、style memory、job center、activity timeline、events、provider gate、advanced evidence refs。前端不需要自己拼接 manifest、job 和 artifact payload。
+这个 endpoint 返回 UI 语义状态：project summary、project readiness、production board、asset library、canvas cards、filmstrip、review room、style memory、job center、activity timeline、events、provider gate、advanced evidence refs。前端不需要自己拼接 manifest、job 和 artifact payload。
 
 前端可以使用：
 

@@ -97,6 +97,7 @@ Current Web/API queue state:
 | AFS-WEB-PROJECT-READINESS-001 | Project readiness, next action, and visible workflow gates | Landed: backend `project_readiness`, frontend Project Readiness panel, action mapping, and split readiness CSS |
 | AFS-WEB-STAGE-NAVIGATION-001 | Stage-based Workbench navigation and view-specific control groups | Landed: `activeView`, functional rail navigation, and grouped action panel rendering |
 | AFS-WEB-ACTIVITY-TIMELINE-001 | Runtime activity timeline, blocker visibility, and safe artifact navigation | Landed: backend `activity_timeline`, frontend Activity Timeline panel, safe primary artifact refs, and split activity modules |
+| AFS-WEB-PRODUCTION-BOARD-001 | Product-facing source -> draft -> check -> review -> style memory -> next round -> provider gate board | Landed: backend `production_board`, frontend Production Board panel, 7-lane flow state, and split board modules |
 
 Verification so far:
 
@@ -120,6 +121,10 @@ Verification so far:
   CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`;
   retention review `delete_candidate_count=0`, `manual_review_required_count=0`;
   Runtime-hosted Activity Timeline HTTP smoke passed; full pytest `837 passed, 1 warning`.
+- Production Board slice verification:
+  red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
+  focused Runtime/Web/API `26 passed, 1 warning`; Runtime-hosted Production Board HTTP smoke passed;
+  full pytest `837 passed, 1 warning`.
 - Draft Canvas HTTP smoke on port 8792: `draft_canvas succeeded`, 3 generated
   cards, 3 filmstrip items, `/workbench/` returned `200`.
 - Runtime HTTP smoke on port 8791: `/health`, `/workbench/`, and

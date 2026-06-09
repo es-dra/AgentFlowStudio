@@ -17,11 +17,13 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "input-sync.js",
     WORKBENCH_ROOT / "src" / "polling.js",
     WORKBENCH_ROOT / "src" / "activity-state.js",
+    WORKBENCH_ROOT / "src" / "production-board-state.js",
     WORKBENCH_ROOT / "src" / "readiness-state.js",
     WORKBENCH_ROOT / "src" / "state.js",
     WORKBENCH_ROOT / "src" / "workbench-state.js",
     WORKBENCH_ROOT / "src" / "render-actions.js",
     WORKBENCH_ROOT / "src" / "render-activity.js",
+    WORKBENCH_ROOT / "src" / "render-production-board.js",
     WORKBENCH_ROOT / "src" / "render-assets.js",
     WORKBENCH_ROOT / "src" / "render-artifact.js",
     WORKBENCH_ROOT / "src" / "render-jobs.js",
@@ -43,6 +45,7 @@ def _all_workbench_source() -> str:
         WORKBENCH_ROOT / "styles.css",
         WORKBENCH_ROOT / "styles-components.css",
         WORKBENCH_ROOT / "styles-activity.css",
+        WORKBENCH_ROOT / "styles-production-board.css",
         WORKBENCH_ROOT / "styles-readiness.css",
         WORKBENCH_ROOT / "styles-workflow.css",
         *WORKBENCH_JS,
@@ -57,6 +60,7 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert '<script type="module" src="./src/app.js"></script>' in index
     assert '<link rel="stylesheet" href="./styles-components.css" />' in index
     assert '<link rel="stylesheet" href="./styles-activity.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-production-board.css" />' in index
     assert '<link rel="stylesheet" href="./styles-readiness.css" />' in index
     assert '<link rel="stylesheet" href="./styles-workflow.css" />' in index
     assert "http://127.0.0.1:8790" in source
@@ -127,6 +131,9 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     assert "Activity Timeline" in source
     assert "activity_timeline" in source
     assert "activity-row" in source
+    assert "Production Board" in source
+    assert "production_board" in source
+    assert "production-lane" in source
     assert "Project Readiness" in source
     assert "project_readiness" in source
     assert "current_action_label" in source
@@ -156,6 +163,7 @@ def test_workbench_normalizes_backend_state_shape() -> None:
     assert "source.review_room" in source
     assert "source.job_center" in source
     assert "source.activity_timeline" in source
+    assert "source.production_board" in source
     assert "source.project_readiness" in source
     assert "source.inspector" in source
     assert "source.card_id" in source

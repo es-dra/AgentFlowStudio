@@ -58,7 +58,7 @@ http://127.0.0.1:8790
 | `/projects/{project_id}/canvas-draft` | implemented | draft Hook/Proof/CTA canvas cards from safe source summaries |
 | `/projects/{project_id}/scene-inspector` | implemented | save selected scene prompt/reference/style/retry summaries |
 | `/projects/{project_id}/review-decisions` | implemented | record keep/revise/reject decisions as evidence, optionally bound to a safe candidate/artifact ref |
-| `/projects/{project_id}/workbench-state` | implemented | 读取前端可直接消费的 project/asset library/canvas/cards/review room/style memory/job center/provider state |
+| `/projects/{project_id}/workbench-state` | implemented | 读取前端可直接消费的 project/production board/asset library/canvas/cards/review room/style memory/job center/provider state |
 | `/artifacts/{artifact_id}` | implemented | safe artifact read |
 | `/runs/asset-test` | implemented | 运行 Round 1 deterministic asset loop |
 | `/runs/two-round-validate` | implemented | 运行 Round 2 context validation |
@@ -87,6 +87,7 @@ Project
 `workbench-state` also includes product-facing panels:
 
 - `project_readiness`: current action, safe workflow gate statuses, and non-claim badges.
+- `production_board`: product-facing source, draft, first-check, review, style-memory, next-round, and provider-gate lanes.
 - `review_room`: planned scene, first-check, and next-round candidates with comparison points.
 - `style_memory`: reusable style preferences and next-pass usage language.
 - `job_center`: runtime job counts, progress, guidance, polling policy, and safe artifact refs.

@@ -31,14 +31,15 @@ only and does not execute CLI internals or providers from the browser.
 - Job Center Polling: auto-refresh current-project runtime state through Runtime Service.
 - Project Readiness: render current action, workflow gate statuses, and non-claim badges from backend state.
 - Activity Timeline: render runtime activity counts, latest jobs, blocked actions, and safe primary artifact refs.
+- Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
 - Runtime-hosted Entry: Runtime Service serves the Workbench at `/workbench/`
   for browser QA and frontend/backend integration.
-- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - Frontend readiness adapter: normalizes `project_readiness` and maps backend workflow actions to existing UI action ids.
-- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render.js`, `app.js`.
+- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render.js`, `app.js`.
 - View-specific controls: `renderActionPanel` accepts control groups so each stage can avoid showing every operation at once.
 
 ## Runtime Contract Added
@@ -48,7 +49,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -111,6 +112,14 @@ Result:
   Activity state/Web foundation `10 passed, 1 warning`; Web foundation after
   artifact-ref handler fix `9 passed`; focused Runtime/Web/API `26 passed, 1
   warning`.
+- Latest focused verification after Production Board integration:
+  Production Board state/Web foundation `11 passed, 1 warning`; focused
+  Runtime/Web/API `26 passed, 1 warning`.
+- Production Board HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/src/render-production-board.js`, and
+  `/workbench/styles-production-board.css` returned `200`; a temporary project
+  returned `production_board.status = needs_assets` and 7 lanes.
+- Full pytest after Production Board integration: `837 passed, 1 warning`.
 - Activity Timeline HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/src/render-activity.js`, and `/workbench/styles-activity.css`
   returned `200`; a temporary project returned `activity_timeline.counts.total =

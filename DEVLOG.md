@@ -260,3 +260,11 @@ Boundaries:
 - Boundaries preserved: no provider calls, no secrets, no signed URLs, no private local paths, no provider raw responses, no generated media bytes, no human acceptance/business validation/durable-memory claim.
 - Focused verification during the slice: `tests/test_api_runtime_workbench_state.py tests/test_web_workbench_foundation.py` -> `10 passed, 1 warning`; Web foundation after handler fix -> `9 passed`; broader Runtime/Web/API focused suite -> `26 passed, 1 warning`.
 - Final verification after records: CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; Runtime-hosted Activity Timeline HTTP smoke passed; full pytest `837 passed, 1 warning`.
+
+## 2026-06-09 - Web Workbench Production Board Slice
+
+- Committed the verified Runtime/Web Workbench baseline as `7d803c4 feat(workbench): add runtime-backed production workbench`.
+- Added backend `production_board` projection to `GET /projects/{project_id}/workbench-state`, mapping source, draft, first check, review, style memory, next round, and provider gate into product-facing lanes.
+- Added frontend Production Board normalization, rendering, and split CSS so the workbench can show the complete content/memory flow without exposing internal CLI orchestration.
+- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
+- Verification during the slice: backend/Web red tests failed before implementation; Production Board focused state/Web tests `11 passed, 1 warning`; Runtime/Web/API focused suite `26 passed, 1 warning`; Runtime-hosted Production Board HTTP smoke passed; full pytest `837 passed, 1 warning`.

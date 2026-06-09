@@ -39,7 +39,7 @@ http://127.0.0.1:8790
 - 连接 Runtime Service。
 - 由 Runtime Service 通过 `/workbench/` 提供静态入口，便于前后端联调和浏览器 QA。
 - 读取 `/health`、`/capabilities`、`/projects` 和 `GET /projects/{project_id}/workbench-state`。
-- 渲染项目工作台、Reference Library、创作画布卡片、检查区、Review Room、Style Memory、Job Center、provider preflight 和 filmstrip。
+- 渲染项目工作台、Production Board、Reference Library、创作画布卡片、检查区、Review Room、Style Memory、Job Center、provider preflight 和 filmstrip。
 - 创建、打开、导入、导出 project manifest。
 - 使用 Project Hub 模板预填 project type、goal 和 safe manifest import JSON。
 - 登记 safe asset/reference summary 和 safe scene/content card。
@@ -51,6 +51,7 @@ http://127.0.0.1:8790
 - 通过 Style Memory 查看已形成的风格偏好、profile version 数量和下一轮复用提示。
 - 通过 Job Center 查看 runtime job 进度、阻塞指导和可打开的 safe artifact ref。
 - 通过 Activity Timeline 查看当前 project 的运行活动、阻塞动作和可打开的 safe primary artifact ref。
+- 通过 Production Board 查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
 - Job Center 会对当前 project 做自动刷新，不启动 provider。
 - 触发首轮 deterministic asset test、记录 raw feedback、触发 two-round validation。
 - 触发 provider preflight，但不启动 live provider。
@@ -77,6 +78,13 @@ The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workben
 It renders project runtime activity as a product-facing history: status counts,
 latest actions, blockers, and safe primary artifact refs. It is trace navigation,
 not approval logic.
+
+## Production Board
+
+The Workbench reads `production_board` from `GET /projects/{project_id}/workbench-state`.
+It renders the whole content and memory flow as product-facing lanes: source,
+draft, first check, review, style memory, next round, and provider gate. The
+board is a workflow surface, not a provider execution path.
 
 ## 边界
 

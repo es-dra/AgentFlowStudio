@@ -47,6 +47,19 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert state["activity_timeline"]["status"] == "not_started"
     assert state["activity_timeline"]["counts"]["total"] == 0
     assert state["activity_timeline"]["items"] == []
+    assert state["production_board"]["status"] == "needs_assets"
+    assert [lane["lane_id"] for lane in state["production_board"]["lanes"]] == [
+        "source",
+        "draft",
+        "first_check",
+        "review",
+        "style_memory",
+        "next_round",
+        "provider_gate",
+    ]
+    assert _lane(state, "source")["status"] == "blocked"
+    assert _lane(state, "draft")["status"] == "not_started"
+    assert _lane(state, "first_check")["action"] == "start_first_generation_check"
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
     assert state["project_readiness"]["current_action_label"] == "Add source materials"
@@ -115,6 +128,15 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["activity_timeline"]["counts"]["blocked"] == 2
     assert state["activity_timeline"]["items"][0]["action"] == "provider_validation_plan"
     assert state["activity_timeline"]["items"][0]["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
+    assert state["production_board"]["status"] == "blocked"
+    assert state["production_board"]["current_action"] == "resolve_provider_preflight"
+    assert _lane(state, "source")["status"] == "succeeded"
+    assert _lane(state, "first_check")["status"] == "blocked"
+    assert _lane(state, "review")["status"] == "succeeded"
+    assert _lane(state, "style_memory")["status"] == "succeeded"
+    assert _lane(state, "next_round")["status"] == "succeeded"
+    assert _lane(state, "provider_gate")["status"] == "blocked"
+    assert _lane(state, "provider_gate")["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
     assert _card(state, "next-round")["status"] == "succeeded"
     assert _card(state, "next-round")["primary_artifact_id"] == round_2["artifacts"]["two_round_context_runtime_report"]["artifact_id"]
     assert state["provider_gate"]["status"] == "blocked"
@@ -143,6 +165,12 @@ def _card(state: dict, card_id: str) -> dict:
 
 def _step(state: dict, step_id: str) -> dict:
     matches = [step for step in state["project_readiness"]["steps"] if step["step_id"] == step_id]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _lane(state: dict, lane_id: str) -> dict:
+    matches = [lane for lane in state["production_board"]["lanes"] if lane["lane_id"] == lane_id]
     assert len(matches) == 1
     return matches[0]
 
