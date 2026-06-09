@@ -277,4 +277,5 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Normalized Workbench cache-bust markers from the older stage label to `stage7-rc` and verified Runtime-hosted index/app/render module responses use `Cache-Control: no-store`.
 - Hardened the browser Runtime client so failed API responses and malformed JSON show safe Chinese status messages instead of raw response bodies.
 - Added `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html` as a local visual index over the Stage 7 screenshots, acceptance path, and provider/human-acceptance boundaries.
+- Added `docs/handoff/AFS-WEB-RC-DRAFT-PR-001.md` with a ready-to-copy draft PR body after local `gh` was unavailable and the GitHub connector token was expired.
 - Boundaries unchanged: provider remains closed; no secret, private media, provider raw response, signed URL, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
