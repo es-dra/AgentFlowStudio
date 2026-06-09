@@ -56,6 +56,7 @@ async function loadWorkbench() {
 
 async function refreshWorkbench() {
   await connectRuntime();
+  selectAvailableProject();
   await loadWorkbench();
 }
 
@@ -75,6 +76,15 @@ async function refreshWorkbenchSilently() {
 }
 
 const actionHandlers = createActionHandlers({ state, client, refreshWorkbench });
+
+function selectAvailableProject() {
+  if (!state.projects.length) return;
+  const selected = state.projects.some((project) => project.project_id === state.projectId);
+  if (!selected) {
+    state.projectId = state.projects[0].project_id || state.projectId;
+    syncProjectInputs(state.projectId);
+  }
+}
 
 function syncProjectInputs(projectId) {
   root.querySelectorAll("#project-id-action, #project-id").forEach((node) => {
@@ -148,3 +158,4 @@ function paint() {
 }
 
 paint();
+run(refreshWorkbench);

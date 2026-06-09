@@ -55,7 +55,7 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 | AFS-WEB-REVIEW-STYLE-MEMORY-001 | 审片反馈与 Project Style Memory：keep/revise/reject、raw feedback、下一轮复用 | 进行中：raw feedback、keep/revise/reject、candidate-bound review decisions、Style Memory product view 和 next-round controls 已落地 |
 | AFS-PROVIDER-GATED-REAL-SMOKE-001 | deterministic Web flow 稳定后，再按 capability gate 接真实模型 smoke | readiness-only gate 已跑通并写入 ignored runtime evidence：`data/processed/runs/web_rc_provider_gate_readiness/`；provider calls 未启动；仍需先完成人工验收，再由用户显式授权 image/video gate |
 | AFS-WEB-QA-RELEASE-GATE-001 | 浏览器截图、响应式检查、HTTP smoke、focused tests、maintenance audit、diff check | 发布候选 QA 已完成：Stage 7 浏览器主路径、1440x900 / 1366x768 / 390x844 截图、console/internal-leak/text-overflow 检查和 provider-gated 边界记录已落地 |
-| AFS-WEB-HUMAN-ACCEPTANCE-001 | 人工验收当前 Web release candidate，确认项目 -> 素材 -> 画布 -> 分镜 -> 审片 -> 记忆 -> 任务路径是否符合低学习成本创作工作台定位 | 待人工验收：验收包已落地到 `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`，可视化演示索引已落地到 `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`，draft PR handoff 已落地到 `docs/handoff/AFS-WEB-RC-DRAFT-PR-001.md` |
+| AFS-WEB-HUMAN-ACCEPTANCE-001 | 人工验收当前 Web release candidate，确认项目 -> 素材 -> 画布 -> 分镜 -> 审片 -> 记忆 -> 任务路径是否符合低学习成本创作工作台定位 | 待人工验收：验收包、可视化演示索引、draft PR handoff 已落地；验收前浏览器演练已通过自动连接和 8 个工作区切换，但仍不等于人工验收 |
 
 ## 当前阻塞和残留
 

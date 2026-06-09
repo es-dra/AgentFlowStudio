@@ -39,7 +39,7 @@ function renderRefs(refs) {
     el("div", { className: "ref-row" }, [
       el("span", { text: displayText(ref.label) }),
       el("code", { text: displayText(ref.artifact_type || "artifact") }),
-      el("code", { text: ref.artifact_id || "pending" }),
+      badge(ref.artifact_id ? "安全引用" : "待生成", ref.artifact_id ? "quiet" : "blocked"),
     ]),
   ));
 }

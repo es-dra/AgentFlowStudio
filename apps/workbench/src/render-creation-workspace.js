@@ -1,4 +1,5 @@
 import { badge, button, el, sectionTitle, textareaField } from "./dom.js";
+import { displayText } from "./display-labels.js";
 import { statusTone } from "./workbench-state.js";
 
 export function renderCreationWorkspace(workspace, state) {
@@ -88,9 +89,9 @@ function renderRefs(refs) {
   if (!refs.length) return el("p", { className: "muted", text: "没有预览引用。" });
   return el("div", { className: "ref-list" }, refs.map((ref) =>
     el("div", { className: "ref-row" }, [
-      el("span", { text: ref.label }),
-      el("code", { text: ref.artifact_type || "artifact" }),
-      el("code", { text: ref.artifact_id || "pending" }),
+      el("span", { text: displayText(ref.label) }),
+      el("code", { text: displayText(ref.artifact_type || "artifact") }),
+      badge(ref.artifact_id ? "安全引用" : "待生成", ref.artifact_id ? "quiet" : "blocked"),
     ]),
   ));
 }

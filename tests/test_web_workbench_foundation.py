@@ -53,7 +53,6 @@ WORKBENCH_JS = [
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
-
 def _all_workbench_source() -> str:
     files = [
         WORKBENCH_ROOT / "README.md",
@@ -118,7 +117,6 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert "/artifacts/" in source
     assert "createRuntimeClient" in source
     assert "normalizeWorkbenchState" in source
-
 
 def test_workbench_keeps_frontend_safety_boundary() -> None:
     source = _all_workbench_source()
@@ -214,6 +212,8 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert 'activeView: "Projects"' in state_source
     assert "state.activeView = node.dataset.view" in app
     assert "function syncProjectInputs(projectId)" in app
+    assert "function selectAvailableProject()" in app
+    assert "run(refreshWorkbench);" in app
     assert 'root.querySelectorAll("#project-id-action, #project-id")' in app
     assert "syncProjectInputs(state.projectId)" in app
     assert "workspaceItems(items)" in render

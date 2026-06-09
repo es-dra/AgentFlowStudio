@@ -60,11 +60,13 @@
 - Stage 7 QA 项目：`proj_stage7_rc_1781016167554`。
 - 可视化演示索引：`docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`。
 - 浏览器 QA：console error `0`，主视图可见英文 `false`，主视图内部 id 泄漏 `false`，文字溢出 `0`。
+- 人工验收前演练：刷新 `/workbench/` 后自动连接 Runtime Service，8 个工作区均可切换；console error `0`，列出的英文残留/内部 id/本地路径残留 `0`，文字溢出 `0`。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-1366x768.png`
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-390x844.png`
+  - `data/processed/runs/workbench_live_demo/qa/acceptance-rehearsal-auto-connect-clean-1440x900.png`
 - 结构化证据：`data/processed/runs/workbench_live_demo/qa/stage7-rc-browser-qa.json`。
 
 ## 当前边界
@@ -74,6 +76,7 @@
 - Runtime verification 不等于 human acceptance。
 - Provider smoke 不等于 business validation。
 - 反馈和候选记忆不自动晋升为 durable memory。
+- 本演练仍不等于人工验收结论。
 
 ## 验收后的下一步
 

@@ -285,3 +285,10 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Registered the handoff in `docs/handoff/INDEX.md` and updated `AFS-PROVIDER-GATED-REAL-SMOKE-001` in `TASK_TRACKER.md`.
 - Ran readiness-only provider gate without `--run-provider-validation`; it wrote ignored evidence under `data/processed/runs/web_rc_provider_gate_readiness/` with `status=blocked` and `provider_calls_started=false`.
 - Boundaries unchanged: provider not executed; no secret, local private material, provider raw response, signed URL, generated media byte, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
+
+## 2026-06-09 - Web Workbench Acceptance Rehearsal
+- Made `/workbench/` auto-connect to Runtime Service and load the default project on cold start so the first screen is a usable workspace instead of an empty disconnected shell.
+- Tightened user-facing display mappings for provider gate, activity, review, and storyboard reference surfaces; safe artifact ids remain hidden from main creative views.
+- Browser rehearsal covered Projects, Create, Assets, Storyboard, Review, Style Memory, Jobs, and Settings: console errors `0`, checked English/internal-id/local-path leaks `0`, text overflow `0`.
+- Evidence screenshot: `data/processed/runs/workbench_live_demo/qa/acceptance-rehearsal-auto-connect-clean-1440x900.png`.
+- Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and this rehearsal is still not human acceptance, business validation, or durable memory promotion.
