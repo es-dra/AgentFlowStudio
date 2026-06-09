@@ -56,15 +56,18 @@ function renderRuntimeActions(state) {
   const lastRoundOne = state.latestAssetTestJobId ? "首轮证据已记录" : "待运行";
   return el("section", { className: "action-group" }, [
     sectionTitle("制作运行控制", lastRoundOne),
-    field("资产 profile seed", "asset-profile-seed", state.assetProfileSeed),
-    field("晋升决定", "promotion-decision", state.promotionDecision),
-    textareaField("晋升理由", "promotion-rationale", state.promotionRationale, { rows: "3" }),
-    textareaField("审片反馈", "feedback-note", state.feedbackNote, { rows: "4" }),
     el("div", { className: "action-stack" }, [
       button("首轮检查", "run-asset-test", "primary"),
       button("记录反馈", "record-feedback", "secondary"),
       button("进入下一轮", "run-two-round", "secondary"),
       button("Provider 预检", "run-provider-preflight", "ghost"),
+    ]),
+    el("details", { className: "advanced" }, [
+      el("summary", { text: "高级运行参数" }),
+      field("资产档案种子", "asset-profile-seed", state.assetProfileSeed),
+      field("晋升决定", "promotion-decision", state.promotionDecision),
+      textareaField("晋升理由", "promotion-rationale", state.promotionRationale, { rows: "3" }),
+      textareaField("审片反馈", "feedback-note", state.feedbackNote, { rows: "4" }),
     ]),
   ]);
 }

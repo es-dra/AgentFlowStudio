@@ -205,6 +205,7 @@ const STATUS_MAP = {
   ready: "就绪",
   ready_for_first_check: "可首轮检查",
   ready_for_provider_preflight: "可做 Provider 预检",
+  ready_for_next_round: "可进入下一轮",
   ready_not_run: "就绪未运行",
   ready_to_draft: "可生成草稿",
   provider_blocked: "Provider 阻塞",

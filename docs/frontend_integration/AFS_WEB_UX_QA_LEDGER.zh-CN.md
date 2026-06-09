@@ -76,6 +76,14 @@
 - Runtime-hosted HTTP smoke：`/workbench/` 返回 `200`，`Cache-Control: no-store`，页面包含应用根节点和中文标题。
 - `git diff --check` 通过，仅有 Windows 换行提示。
 
+## 2026-06-10 浏览器主路径复核
+
+- `tools/workbench_vertical_flow_browser_smoke.py` 已适配当前中文多工作区外壳：先展开诊断设置临时 Runtime URL，再显式切换到创作画布，不再依赖旧英文按钮文案。
+- 最新浏览器 smoke 项目：`proj_browser_vertical_1781023264`。
+- 结果：`project_status = ready_for_next_round`，`readiness_status = ready_for_provider_preflight`，`current_action = run_provider_preflight`。
+- Provider 边界：`provider_calls_started = false`，`writes_long_term_memory = false`，`writes_company_kb = false`。
+- 最新截图：`data/processed/runs/workbench_browser_smoke/browser_evidence/workbench-ready-for-next-round.png`。
+
 ## 当前残留风险
 
 - 第一轮仍沿用轻量 JS/CSS 模块，暂不引入 React Flow；如果后续需要复杂拖拽连线，应单独做技术 spike。

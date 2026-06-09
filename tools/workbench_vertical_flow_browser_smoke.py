@@ -89,37 +89,51 @@ def main() -> int:
 
 def _run_browser_flow(page: Any, *, base_url: str, project_id: str) -> None:
     page.goto(f"{base_url}/workbench/", wait_until="networkidle")
+    _open_diagnostics(page)
     _fill_if_present(page, "#runtime-url", base_url)
     _fill_if_present(page, "#project-id", project_id)
     _fill_if_present(page, "#project-id-action", project_id)
-    _fill_if_present(page, "#project-goal", "Browser-click deterministic Workbench vertical flow.")
+    _fill_if_present(page, "#project-goal", "通过浏览器点击完成确定性工作台主路径。")
     _click_action(page, "create-project")
+    _click_view(page, "Create")
     page.locator(".studio-workspace").wait_for(state="visible", timeout=10_000)
 
     _click_view(page, "Assets")
     _fill_if_present(page, "#source-asset-id", "brief-browser")
     _fill_if_present(page, "#source-asset-type", "brief")
-    _fill_if_present(page, "#source-asset-label", "Browser brief")
-    _fill_if_present(page, "#source-asset-summary", "Browser-driven safe brief summary for a deterministic content pass.")
+    _fill_if_present(page, "#source-asset-label", "浏览器主路径需求")
+    _fill_if_present(page, "#source-asset-summary", "通过浏览器录入的安全需求摘要，用于确定性内容制作主路径。")
     _click_action(page, "register-source-asset")
-    _expect_text(page, "Draft Canvas")
+    _wait_for_action(page, "draft-canvas")
 
     _click_action(page, "draft-canvas")
-    _expect_text(page, "Run first generation check")
+    _wait_for_action(page, "run-asset-test")
 
     _click_action(page, "run-asset-test", timeout=30_000)
-    _expect_text(page, "Start next round")
+    _wait_for_action(page, "run-two-round")
 
     _click_view(page, "Review")
     _click_action(page, "record-review-decision")
-    _expect_text(page, "Start next round")
+    _wait_for_action(page, "run-two-round")
 
     _click_action(page, "run-two-round", timeout=30_000)
-    _expect_text(page, "ready_for_next_round")
-    _expect_text(page, "Run provider preflight")
+    _wait_for_project_status(base_url, project_id, "ready_for_next_round")
 
     if page.locator(".toast.error").count():
         raise AssertionError(page.locator(".toast.error").first.text_content() or "Workbench showed an error toast.")
+
+
+def _open_diagnostics(page: Any) -> None:
+    panel = page.locator(".diagnostic-panel").first
+    if not panel.count():
+        return
+    if not panel.evaluate("node => node.open"):
+        page.locator(".diagnostic-panel summary").first.click()
+        page.locator("#runtime-url").first.wait_for(state="visible", timeout=10_000)
+
+
+def _wait_for_action(page: Any, action: str, *, timeout: int = 20_000) -> None:
+    page.locator(f"[data-action='{action}']").first.wait_for(state="visible", timeout=timeout)
 
 
 def _click_action(page: Any, action: str, *, timeout: int = 10_000) -> None:
@@ -145,8 +159,14 @@ def _fill_if_present(page: Any, selector: str, value: str) -> None:
         locator.first.fill(value)
 
 
-def _expect_text(page: Any, text: str) -> None:
-    page.get_by_text(text).first.wait_for(state="visible", timeout=20_000)
+def _wait_for_project_status(base_url: str, project_id: str, status: str) -> None:
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        state = _json_get(f"{base_url}/projects/{project_id}/workbench-state")
+        if state.get("project", {}).get("status") == status:
+            return
+        time.sleep(0.2)
+    raise AssertionError(f"Project did not reach {status}.")
 
 
 def _assert_final_state(state: dict[str, Any], console_errors: list[str]) -> None:
