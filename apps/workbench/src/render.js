@@ -76,7 +76,7 @@ function viewActionGroups(activeView) {
     Review: ["review", "runtime", "result"],
     "Style Memory": ["review", "runtime", "result"],
     Jobs: ["runtime", "result"],
-    Settings: ["project", "assets", "scene", "review", "runtime", "result"],
+    Settings: ["project", "import", "assets", "scene", "review", "runtime", "result"],
   }[activeView] || ["scene", "runtime", "result"];
 }
 
@@ -136,7 +136,8 @@ function renderWorkspace(state) {
   if (!workbench) {
     return el("main", { className: "empty-workspace" }, [
       el("h2", { text: "Open a project" }),
-      el("p", { text: "Runtime connection required." }),
+      el("p", { text: "Connect to Runtime Service, then create or open a project." }),
+      renderActionPanel(state, ["project", "result"]),
     ]);
   }
   const activeView = state.activeView || "Create";

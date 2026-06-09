@@ -35,6 +35,12 @@ function renderProjectHub(state) {
       button("Export", "export-project", "ghost"),
     ]),
     el("div", { className: "project-list" }, projectRows(state.projects, state.projectId)),
+  ]);
+}
+
+function renderProjectImport(state) {
+  return el("section", { className: "action-group" }, [
+    sectionTitle("Project Import", "advanced"),
     textareaField("Import manifest JSON", "import-manifest-json", state.importManifestJson, { rows: "5" }),
     button("Import", "import-project", "secondary"),
   ]);
@@ -104,15 +110,23 @@ function renderScenePlanner(state) {
 function renderLastResult(result) {
   if (!result) return el("p", { className: "muted", text: "No action result yet." });
   const title = result.job && result.job.action ? `${result.job.action}: ${result.job.status}` : result.kind || "result";
+  const flow = result.flow || null;
   return el("div", { className: "result-box" }, [
     el("strong", { text: title }),
     result.job && result.job.job_id ? el("code", { text: result.job.job_id }) : null,
+    flow
+      ? el("div", { className: "result-flow" }, [
+          badge(flow.project_status || "in_progress", flow.target_achieved ? "ready" : "quiet"),
+          badge(`Next: ${flow.current_action_label || flow.current_action || "Continue"}`, "active"),
+        ])
+      : null,
   ]);
 }
 
 export function renderActionPanel(state, groups = ["project", "assets", "scene", "review", "runtime", "result"]) {
   return el("aside", { className: "action-panel" }, [
     groups.includes("project") ? renderProjectHub(state) : null,
+    groups.includes("import") ? renderProjectImport(state) : null,
     groups.includes("assets") ? renderAssetLibrary(state) : null,
     groups.includes("scene") ? renderScenePlanner(state) : null,
     groups.includes("review") ? renderReviewRoom(state) : null,

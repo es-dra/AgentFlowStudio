@@ -44,6 +44,7 @@ function renderCommandStrip(workspace) {
   const command = workspace.primary_command || {};
   const counts = workspace.counts || {};
   const canRunHere = command.ui_action && command.enabled && (!command.view || command.view === "Create");
+  const canOpenView = command.enabled && command.view && command.view !== "Create" && !command.blocked_reason;
   return el("div", { className: "studio-command-strip" }, [
     el("div", { className: "studio-project-lockup" }, [
       el("span", { text: "Studio Workspace" }),
@@ -58,7 +59,9 @@ function renderCommandStrip(workspace) {
     ]),
     canRunHere
       ? button(command.label || "Continue", command.ui_action, "primary")
-      : el("button", { className: "btn ghost disabled", text: commandLabel(command), attrs: { disabled: "disabled" } }),
+      : canOpenView
+        ? el("button", { className: "btn ghost", text: commandLabel(command), dataset: { view: command.view } })
+        : el("button", { className: "btn ghost disabled", text: commandLabel(command), attrs: { disabled: "disabled" } }),
   ]);
 }
 

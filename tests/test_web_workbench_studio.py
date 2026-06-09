@@ -31,5 +31,9 @@ def test_studio_workspace_frontend_contract_is_wired() -> None:
     assert "studio-inspector" in renderer
     assert "studio-side-rail" in renderer
     assert "studio-filmstrip" in renderer
+    assert "canOpenView" in renderer
+    assert "dataset: { view: command.view }" in renderer
+    assert "Open ${command.view}" in renderer
+    assert "command.blocked_reason" in renderer
     assert "primary_command" in normalizer
     assert "operations_summary" in normalizer

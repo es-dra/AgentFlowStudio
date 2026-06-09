@@ -12,6 +12,14 @@
 - Runtime Service 前端对接：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`
 
+## 2026-06-09 - Web Vertical Flow 001
+
+- Started `AFS-WEB-VERTICAL-FLOW-001`: deterministic Workbench path from empty project toward `ready_for_next_round`.
+- Added API-level vertical flow coverage for create project -> source summaries -> Draft Canvas -> inspector -> first deterministic check -> review decision -> two-round validation -> provider preflight readiness.
+- Added compact `flow` summaries to Runtime mutation responses so the frontend can show target status, current action, next command, Studio status, provider status, and non-claims without re-inferring the workflow.
+- Improved Workbench startup and navigation: empty workspace now exposes project create/open controls; Studio cross-stage commands navigate to the matching view; Project Hub no longer renders an empty-action Pending button.
+- Boundaries preserved: no live provider call, no secret, no signed URL, no private media bytes, no provider raw response, no durable-memory or human-acceptance claim.
+
 ## 2026-06-09 - Web Foundation 001
 
 - Added Runtime Service workbench-state projection for frontend-facing project/canvas/events/provider status.

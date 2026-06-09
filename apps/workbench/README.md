@@ -105,8 +105,8 @@ The Workbench reads `studio_workspace` from `GET /projects/{project_id}/workbenc
 The Create view uses it as the primary product surface: command strip, reference
 rail, production canvas, selected-card inspector, filmstrip, style memory,
 review queue, runtime summary, and safe artifact navigation. Commands that
-belong to another stage remain visible but disabled in Create rather than firing
-without the right inputs.
+belong to another stage navigate to the matching view before execution, so users
+can continue the deterministic flow without learning backend action names.
 
 ## Memory Workspace
 

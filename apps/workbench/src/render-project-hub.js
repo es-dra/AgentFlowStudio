@@ -52,7 +52,7 @@ function renderNextCommand(command) {
       ? badge(value.blocked_reason, "blocked")
       : value.enabled && value.ui_action
         ? button("Run", value.ui_action, "primary", { commandId: value.command_id || "" })
-        : button("Pending", "", "ghost"),
+        : el("button", { className: "btn ghost disabled", text: "Pending", attrs: { disabled: "disabled" } }),
   ]);
 }
 

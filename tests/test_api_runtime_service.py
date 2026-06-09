@@ -21,6 +21,18 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "asset_test_run" in capabilities["actions"]
     assert "two_round_validate" in capabilities["actions"]
     assert "provider_validation_plan" in capabilities["actions"]
+    assert "register_source_asset" in capabilities["actions"]
+    assert "draft_canvas" in capabilities["actions"]
+    assert "record_review_decision" in capabilities["actions"]
+    assert capabilities["workbench_flow"]["target_status"] == "ready_for_next_round"
+    assert capabilities["workbench_flow"]["actions"] == [
+        "add_reference",
+        "draft_canvas",
+        "start_first_generation_check",
+        "record_review_note",
+        "start_next_round",
+        "run_provider_preflight",
+    ]
     assert "api_key" not in serialized
     assert "token" not in serialized
     assert "d:\\" not in serialized

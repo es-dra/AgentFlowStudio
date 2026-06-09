@@ -37,6 +37,9 @@ only and does not execute CLI internals or providers from the browser.
 - Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
 - Command Hub: translate backend workflow actions into user-facing primary and stage commands.
 - Project Hub Overview: render active project, safe counts, next command, recent jobs, and the manifest artifact ref.
+- Vertical Flow Response: Runtime mutations now return a compact `flow` summary with target status, current action, next command, Studio status, provider status, and non-claims.
+- Empty Workspace Start: when no project is loaded, the Workbench still exposes project create/open controls instead of a dead "open project" page.
+- Cross-stage Command Navigation: Studio Workspace can navigate to Assets, Review, or Jobs for the current primary command instead of disabling cross-stage steps.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
@@ -55,6 +58,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
 - `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `memory_workspace`, `operations_workspace`, `studio_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- Mutating Runtime responses on the Workbench main path include `flow`, a compact safe summary for frontend navigation and "next action" rendering.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -76,6 +80,7 @@ paths, media bytes, signed URLs, provider raw responses, or secrets.
   expose an in-app Browser controller, Playwright, or Edge/Chrome headless
   binary.
 - Provider-gated real model smoke is intentionally deferred until deterministic Web flow is stable.
+- Browser click-through proof for the full vertical flow is still pending; current proof is API-level deterministic flow plus static frontend contract tests and HTTP/static resource smoke.
 
 ## Next Implementation Order
 
@@ -154,6 +159,15 @@ Result:
 - Latest focused verification after Studio Workspace integration:
   Studio Workspace state/Web `3 passed, 1 warning`; focused Runtime/Web/API/Web
   suite `23 passed, 1 warning`.
+- Latest focused verification after Vertical Flow slice:
+  focused Runtime/Web/API/Web vertical-flow suite `31 passed, 1 warning`;
+  full pytest `844 passed, 1 warning`; maintenance audit `failed=0,
+  warning=0`; `git diff --check` passed.
+- Vertical Flow HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/src/render.js`, and
+  `/workbench/src/render-studio-workspace.js` returned `200`; deterministic
+  Runtime posts reached `draft_canvas` after project creation and source asset
+  registration.
 - Studio Workspace HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/src/render-studio-workspace.js`, and
   `/workbench/styles-studio-workspace.css` returned `200`; a temporary project

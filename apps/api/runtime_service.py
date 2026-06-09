@@ -16,6 +16,7 @@ from apps.api.runtime_artifacts import (
     update_project_after_asset_run,
 )
 from apps.api.runtime_events import runtime_feedback_event
+from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import (
     load_round_1_job,
     optional_path,
@@ -76,7 +77,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
             status=request.status,
         )
         ref = store.register_artifact(store.project_manifest_path(request.project_id), role="project_manifest")
-        return {"project_id": request.project_id, "manifest": manifest, "artifact": ref}
+        return {"project_id": request.project_id, "manifest": manifest, "artifact": ref, "flow": build_flow_summary(store, request.project_id)}
 
     @app.get("/projects/{project_id}/manifest")
     def project_manifest(project_id: str) -> dict[str, Any]:
@@ -151,7 +152,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         job["_output_dir"] = output_dir.as_posix()
         public_job = store.write_job(job)
         update_project_after_asset_run(store, request.project_id, job_id, report, artifacts)
-        return {"job": public_job, "report": report, "artifacts": artifacts}
+        return {"job": public_job, "report": report, "artifacts": artifacts, "flow": build_flow_summary(store, request.project_id)}
 
     @app.post("/runs/two-round-validate")
     def two_round_validate(request: TwoRoundValidateRequest) -> dict[str, Any]:
@@ -194,7 +195,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
             {"runs": [round_2_run_ref(job_id, status, artifacts["two_round_context_runtime_report"])]},
             status="ready_for_next_round" if status == "succeeded" else "blocked",
         )
-        return {"job": public_job, "report": report, "artifacts": artifacts}
+        return {"job": public_job, "report": report, "artifacts": artifacts, "flow": build_flow_summary(store, request.project_id)}
 
     @app.post("/feedback")
     def record_feedback(request: FeedbackRecordRequest) -> dict[str, Any]:
@@ -224,7 +225,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
             {"feedback_refs": [feedback_ref(artifact_ref, event.get("feedback_id", job_id))]},
             status="in_progress",
         )
-        return {"job": public_job, "feedback_event": event, "artifact": artifact_ref}
+        return {"job": public_job, "feedback_event": event, "artifact": artifact_ref, "flow": build_flow_summary(store, request.project_id)}
 
     @app.post("/provider/validation-plan")
     def provider_validation_plan(request: ProviderValidationPlanRequest) -> dict[str, Any]:
@@ -274,7 +275,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
             }
         }
         public_job = store.write_job(job)
-        return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts}
+        return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts, "flow": build_flow_summary(store, request.project_id)}
 
     register_runtime_v02_routes(app, store)
     configure_workbench_static(app)

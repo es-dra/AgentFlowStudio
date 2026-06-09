@@ -102,6 +102,7 @@ Current Web/API queue state:
 | AFS-WEB-COMMAND-HUB-001 | User-facing next command, action mapping, required input hints, and provider gate blocker visibility | Landed: backend `command_hub`, frontend Command Hub panel, action mapping, and split command modules |
 | AFS-WEB-PROJECT-HUB-001 | Product-facing active project summary, safe counts, next command, and recent job navigation | Landed in current branch: backend `project_hub`, frontend Project Hub panel, state adapter, and split CSS |
 | AFS-WEB-STUDIO-WORKSPACE-001 | 将 Create 视图改为产品化 Studio Workspace：统一承载画布、素材参考、风格记忆、审片队列、runtime 摘要和 safe artifact 导航 | 已在当前分支落地：后端 `studio_workspace`、前端 Studio Workspace 面板、state adapter 和独立 CSS |
+| AFS-WEB-VERTICAL-FLOW-001 | Workbench deterministic 纵向主路径：从空项目到 ready_for_next_round，不接触 CLI 或手写 JSON | 进行中：新增端到端 API 纵向证据、mutation `flow` summary、空工作区创建入口、Studio 跨视图主命令导航 |
 
 Verification so far:
 

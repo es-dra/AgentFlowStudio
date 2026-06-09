@@ -9,6 +9,7 @@ from agentflow.harness.json_io import write_json
 from apps.api.runtime_artifacts import feedback_ref
 from apps.api.runtime_canvas_draft import build_canvas_draft
 from apps.api.runtime_events import runtime_review_decision_event
+from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job, safe_job_id
 from apps.api.runtime_models import (
     CanvasDraftRequest,
@@ -47,6 +48,7 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "manifest": manifest,
             "summary": project_summary(manifest, artifact),
             "artifact": artifact,
+            "flow": build_flow_summary(store, str(manifest["project_id"])),
             "non_claims": NON_CLAIMS,
         }
 
@@ -71,6 +73,7 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "manifest": manifest,
             "summary": project_summary(manifest, artifact),
             "artifact": artifact,
+            "flow": build_flow_summary(store, project_id),
             "non_claims": NON_CLAIMS,
         }
 
@@ -97,6 +100,7 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "manifest": manifest,
             "summary": project_summary(manifest, artifact),
             "artifact": artifact,
+            "flow": build_flow_summary(store, project_id),
             "non_claims": NON_CLAIMS,
         }
 
@@ -146,6 +150,7 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "manifest": updated,
             "artifact": artifact,
             "artifacts": artifacts,
+            "flow": build_flow_summary(store, project_id),
             "non_claims": NON_CLAIMS,
         }
 
@@ -170,6 +175,7 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "manifest": manifest,
             "summary": project_summary(manifest, artifact),
             "artifact": artifact,
+            "flow": build_flow_summary(store, project_id),
             "non_claims": NON_CLAIMS,
         }
 
@@ -212,7 +218,13 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             {"feedback_refs": [feedback_ref(artifact_ref, event.get("review_id", job_id))]},
             status="in_progress",
         )
-        return {"job": public_job, "review_decision": event, "artifact": artifact_ref, "manifest": manifest}
+        return {
+            "job": public_job,
+            "review_decision": event,
+            "artifact": artifact_ref,
+            "manifest": manifest,
+            "flow": build_flow_summary(store, project_id),
+        }
 
     @app.get("/projects/{project_id}/export")
     def export_project(project_id: str) -> dict[str, Any]:
