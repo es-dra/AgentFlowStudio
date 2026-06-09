@@ -16,8 +16,8 @@ def build_project_hub(
 ) -> dict[str, Any]:
     return {
         "status": str(command_hub.get("status") or project.get("status") or "not_started"),
-        "title": "Project hub",
-        "summary": str(project.get("goal") or "Runtime project."),
+        "title": "项目中心",
+        "summary": str(project.get("goal") or "运行项目。"),
         "active_project": {
             "project_id": str(project.get("project_id") or manifest.get("project_id") or ""),
             "project_type": str(project.get("project_type") or manifest.get("project_type") or ""),
@@ -43,7 +43,7 @@ def _safe_command(value: Any) -> dict[str, Any]:
     command = value if isinstance(value, dict) else {}
     return {
         "command_id": str(command.get("command_id") or ""),
-        "label": str(command.get("label") or "Continue"),
+        "label": str(command.get("label") or "继续"),
         "backend_action": str(command.get("backend_action") or ""),
         "ui_action": str(command.get("ui_action") or ""),
         "view": str(command.get("view") or "Create"),

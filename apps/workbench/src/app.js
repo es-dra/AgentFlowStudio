@@ -81,9 +81,26 @@ function selectAvailableProject() {
   if (!state.projects.length) return;
   const selected = state.projects.some((project) => project.project_id === state.projectId);
   if (!selected) {
-    state.projectId = state.projects[0].project_id || state.projectId;
+    state.projectId = preferredProject(state.projects)?.project_id || state.projectId;
     syncProjectInputs(state.projectId);
   }
+}
+
+function preferredProject(projects) {
+  return [...projects].sort((left, right) => {
+    const score = projectScore(right) - projectScore(left);
+    if (score) return score;
+    return String(right.project_id || "").localeCompare(String(left.project_id || ""));
+  })[0];
+}
+
+function projectScore(project) {
+  const ready = project.status === "ready_for_next_round" ? 10000 : 0;
+  const profile = Number(project.profile_version_count || 0) * 1000;
+  const feedback = Number(project.feedback_count || 0) * 100;
+  const runs = Number(project.run_count || 0) * 10;
+  const cards = Number(project.content_card_count || 0);
+  return ready + profile + feedback + runs + cards;
 }
 
 function syncProjectInputs(projectId) {

@@ -65,9 +65,9 @@ def _project_card(project: dict[str, Any]) -> dict[str, Any]:
     return _card(
         "project",
         "project",
-        "Project",
+        "项目",
         "succeeded",
-        project.get("goal") or "Project is ready.",
+        project.get("goal") or "项目已就绪。",
         project.get("artifact_id"),
         ["open_project"],
         evidence={"artifact_ids": [project.get("artifact_id")]},
@@ -80,9 +80,9 @@ def _source_assets_card(manifest: dict[str, Any]) -> dict[str, Any]:
         return _card(
             "source-assets",
             "asset_collection",
-            "Assets and references",
+            "素材与参考",
             "succeeded",
-            f"{len(assets)} source asset refs are attached.",
+            f"已附加 {len(assets)} 条素材摘要。",
             None,
             ["add_reference"],
             refs=[
@@ -99,15 +99,15 @@ def _source_assets_card(manifest: dict[str, Any]) -> dict[str, Any]:
     return _card(
         "source-assets",
         "asset_collection",
-        "Assets and references",
+        "素材与参考",
         "blocked",
-        "Add script, brief, references, or project materials before real generation.",
+        "真实生成前先添加脚本、需求、参考或项目素材摘要。",
         None,
         ["add_reference"],
         blockers=[
             _blocker(
                 "source_assets_missing",
-                "Add project assets, references, script, or brief.",
+                "添加项目素材、参考、脚本或需求摘要。",
                 user_action="add_reference",
                 source="project_setup",
             )
@@ -119,9 +119,9 @@ def _asset_test_card(job: dict[str, Any] | None, store: RuntimeStore) -> dict[st
         return _card(
             "first-generation-check",
             "generation_check",
-            "First generation check",
+            "首轮检查",
             "ready_not_run",
-            "Ready to run the first deterministic content check.",
+            "可以运行首轮确定性内容检查。",
             None,
             ["start_first_generation_check"],
         )
@@ -131,9 +131,9 @@ def _asset_test_card(job: dict[str, Any] | None, store: RuntimeStore) -> dict[st
     return _card(
         "first-generation-check",
         "generation_check",
-        "First generation check",
+        "首轮检查",
         _status(job),
-        _summary(report, "First generation check has runtime evidence."),
+        _summary(report, "首轮检查已有运行证据。"),
         _artifact_id(report_ref),
         ["add_project_materials", "open_advanced_details"] if blocked else ["record_review_note"],
         blockers=_blockers(report.get("blocks"), source="first_generation_check"),
@@ -144,13 +144,13 @@ def _asset_test_card(job: dict[str, Any] | None, store: RuntimeStore) -> dict[st
 def _review_card(manifest: dict[str, Any], feedback_job: dict[str, Any] | None) -> dict[str, Any]:
     refs = _list(manifest.get("feedback_refs"))
     if not refs:
-        return _card("review", "review", "Review notes", "not_started", "No review notes recorded yet.", None, ["record_review_note"])
+        return _card("review", "review", "审片记录", "not_started", "尚未记录审片反馈。", None, ["record_review_note"])
     return _card(
         "review",
         "review",
-        "Review notes",
+        "审片记录",
         "succeeded",
-        f"{len(refs)} review evidence refs are recorded.",
+        f"已记录 {len(refs)} 条审片证据引用。",
         refs[-1].get("artifact_id"),
         ["record_review_note", "start_next_round"],
         evidence=_evidence(feedback_job) if feedback_job else {"artifact_ids": [item.get("artifact_id") for item in refs]},
@@ -160,13 +160,13 @@ def _review_card(manifest: dict[str, Any], feedback_job: dict[str, Any] | None) 
 def _style_memory_card(manifest: dict[str, Any]) -> dict[str, Any]:
     refs = _list(manifest.get("profile_version_refs"))
     if not refs:
-        return _card("style-memory", "style_memory", "Project style memory", "not_started", "No applied project style memory yet.", None, [])
+        return _card("style-memory", "style_memory", "项目风格记忆", "not_started", "尚未应用项目风格记忆。", None, [])
     return _card(
         "style-memory",
         "style_memory",
-        "Project style memory",
+        "项目风格记忆",
         "succeeded",
-        "A reviewed project style profile is ready for reuse.",
+        "已审片的项目风格档案可用于复用。",
         refs[-1].get("artifact_id"),
         ["start_next_round"],
         evidence={"artifact_ids": [item.get("artifact_id") for item in refs]},
@@ -175,15 +175,15 @@ def _style_memory_card(manifest: dict[str, Any]) -> dict[str, Any]:
 
 def _next_round_card(job: dict[str, Any] | None, store: RuntimeStore) -> dict[str, Any]:
     if not job:
-        return _card("next-round", "next_round", "Next round", "not_started", "No next-round validation has run yet.", None, ["start_next_round"])
+        return _card("next-round", "next_round", "下一轮", "not_started", "尚未运行下一轮验证。", None, ["start_next_round"])
     report_ref = _artifact(job, "two_round_context_runtime_report")
     report = _payload(store, report_ref)
     return _card(
         "next-round",
         "next_round",
-        "Next round",
+        "下一轮",
         _status(job),
-        _summary(report, "Next round has runtime evidence."),
+        _summary(report, "下一轮已有运行证据。"),
         _artifact_id(report_ref),
         ["open_advanced_details"],
         blockers=_blockers(report.get("blocked_refs"), source="next_round"),
@@ -195,8 +195,8 @@ def _provider_gate(job: dict[str, Any] | None, store: RuntimeStore) -> dict[str,
     if not job:
         return {
             "status": "ready_not_run",
-            "title": "Provider preflight",
-            "summary": "Provider preflight has not run.",
+            "title": "Provider 预检",
+            "summary": "Provider 预检尚未运行。",
             "primary_artifact_id": None,
             "blockers": [],
             "actions": ["run_provider_preflight"],
@@ -208,8 +208,8 @@ def _provider_gate(job: dict[str, Any] | None, store: RuntimeStore) -> dict[str,
     blockers = gate_summary.get("blockers") or manifest.get("blockers") or manifest.get("blocks")
     return {
         "status": _status(job),
-        "title": "Provider preflight",
-        "summary": "Provider preflight returned safe gate evidence.",
+        "title": "Provider 预检",
+        "summary": "Provider 预检已返回安全闸门证据。",
         "primary_artifact_id": _artifact_id(manifest_ref),
         "blockers": _blockers(blockers, source="provider_preflight"),
         "actions": ["run_provider_preflight", "open_advanced_details"],
@@ -221,7 +221,7 @@ def _provider_card(provider_gate: dict[str, Any]) -> dict[str, Any]:
     return _card(
         "provider-preflight",
         "provider_gate",
-        "Provider preflight",
+        "Provider 预检",
         str(provider_gate["status"]),
         str(provider_gate["summary"]),
         provider_gate.get("primary_artifact_id"),

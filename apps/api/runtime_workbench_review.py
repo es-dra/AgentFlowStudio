@@ -14,7 +14,7 @@ def build_review_room(store: RuntimeStore, manifest: dict[str, Any], jobs: list[
     ]
     return {
         "status": "ready" if candidates else "not_started",
-        "title": "Review room",
+        "title": "审片室",
         "summary": _summary(candidates, decisions),
         "candidates": [_with_decision(candidate, decisions) for candidate in candidates],
         "decision_counts": _decision_counts(decisions),
@@ -34,15 +34,15 @@ def _planned_candidates(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                 "candidate_id": f"{card_id}:planned",
                 "card_id": card_id,
                 "stage": "planned_scene",
-                "label": "Plan",
-                "title": str(item.get("title") or f"Scene {index}"),
+                "label": "规划",
+                "title": str(item.get("title") or f"场景 {index}"),
                 "status": str(item.get("status") or "ready_not_run"),
-                "summary": str(item.get("summary") or "Scene card is ready for review."),
+                "summary": str(item.get("summary") or "场景卡片已可审片。"),
                 "artifact_id": "",
                 "artifact_type": str(item.get("card_type") or "scene"),
                 "compare_points": [
-                    f"Target: {item.get('target_platform') or 'short_video'}",
-                    "Editable through the scene inspector before generation.",
+                    f"目标：{_target_platform(item.get('target_platform'))}",
+                    "生成前可通过场景检查器继续编辑。",
                 ],
             }
         )
@@ -56,16 +56,16 @@ def _runtime_candidates(store: RuntimeStore, jobs: list[dict[str, Any]]) -> list
         latest(grouped, "asset_test_run"),
         role="real_asset_test_report",
         stage="first_generation_check",
-        label="Round 1",
-        title="First generation check",
+        label="首轮",
+        title="首轮检查",
     )
     round_2 = _candidate_from_job(
         store,
         latest(grouped, "two_round_validate"),
         role="two_round_context_runtime_report",
         stage="next_round",
-        label="Round 2",
-        title="Next round",
+        label="第二轮",
+        title="下一轮",
     )
     return [candidate for candidate in (round_1, round_2) if candidate]
 
@@ -91,7 +91,7 @@ def _candidate_from_job(
         "label": label,
         "title": title,
         "status": status(job),
-        "summary": summary(artifact_payload, f"{title} has runtime evidence."),
+        "summary": summary(artifact_payload, f"{title}已有运行证据。"),
         "artifact_id": artifact_id(ref) or "",
         "artifact_type": str((ref or {}).get("artifact_type") or role),
         "compare_points": _compare_points(stage, artifact_payload, blockers),
@@ -101,14 +101,20 @@ def _candidate_from_job(
 def _compare_points(stage: str, artifact_payload: dict[str, Any], blockers: Any) -> list[str]:
     points = []
     if stage == "first_generation_check":
-        provider_state = "not started" if artifact_payload.get("provider_calls_started") is not True else "started"
-        points.append(f"Provider calls: {provider_state}")
+        provider_state = "未启动" if artifact_payload.get("provider_calls_started") is not True else "已启动"
+        points.append(f"Provider 调用：{provider_state}")
     if stage == "next_round":
-        points.append(f"Verification: {artifact_payload.get('runtime_verification_status') or 'unknown'}")
-        points.append(f"Assessment: {artifact_payload.get('improvement_assessment') or 'unknown'}")
+        points.append(f"验证：{artifact_payload.get('runtime_verification_status') or '未知'}")
+        points.append(f"评估：{artifact_payload.get('improvement_assessment') or '未知'}")
     blocker_count = len(blockers) if isinstance(blockers, list) else 0
-    points.append(f"Blockers: {blocker_count}")
+    points.append(f"阻塞项：{blocker_count}")
     return points
+
+
+def _target_platform(value: Any) -> str:
+    labels = {"short_video": "短视频", "product_launch": "产品发布"}
+    text = str(value or "short_video")
+    return labels.get(text, text)
 
 
 def _review_decisions(store: RuntimeStore, manifest: dict[str, Any]) -> list[dict[str, Any]]:
@@ -156,10 +162,10 @@ def _decision_counts(decisions: list[dict[str, Any]]) -> dict[str, int]:
 
 def _summary(candidates: list[dict[str, Any]], decisions: list[dict[str, Any]]) -> str:
     if not candidates:
-        return "Add scene cards and run checks before review."
+        return "先添加场景卡片并运行检查，再进入审片。"
     if decisions:
-        return f"{len(candidates)} candidates with {len(decisions)} recorded decisions."
-    return f"{len(candidates)} candidates are ready for review."
+        return f"{len(candidates)} 个候选结果，已记录 {len(decisions)} 条审片决定。"
+    return f"{len(candidates)} 个候选结果可审片。"
 
 
 __all__ = ("build_review_room",)

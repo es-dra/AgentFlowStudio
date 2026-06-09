@@ -23,7 +23,7 @@ def build_operations_workspace(
     provider_blockers = _list(provider_gate.get("blockers"))
     return {
         "status": _status(job_center, provider_gate),
-        "title": "Operations workspace",
+        "title": "任务与 Provider",
         "summary": _summary(job_center, provider_blockers),
         "selected_job_id": selected_job_id,
         "counts": _counts(job_center, activity_timeline, jobs, provider_blockers),
@@ -54,10 +54,10 @@ def _summary(job_center: dict[str, Any], provider_blockers: list[dict[str, Any]]
     job_counts = dict(job_center.get("counts", {})) if isinstance(job_center.get("counts"), dict) else {}
     total = int(job_counts.get("total") or 0)
     if not total:
-        return "No runtime jobs yet. Provider preflight is available when project material is ready."
+        return "暂无运行任务；项目素材准备后可进行 Provider 预检。"
     if provider_blockers:
-        return f"{total} runtime jobs tracked; provider preflight has {len(provider_blockers)} blockers."
-    return f"{total} runtime jobs tracked with no provider preflight blockers."
+        return f"已跟踪 {total} 个运行任务；Provider 预检有 {len(provider_blockers)} 个阻塞项。"
+    return f"已跟踪 {total} 个运行任务，Provider 预检暂无阻塞项。"
 
 
 def _counts(
@@ -90,8 +90,8 @@ def _selected_job_id(jobs: list[dict[str, Any]], activity: list[dict[str, Any]])
 def _provider_gate(provider_gate: dict[str, Any]) -> dict[str, Any]:
     return {
         "status": str(provider_gate.get("status") or "ready_not_run"),
-        "title": str(provider_gate.get("title") or "Provider preflight"),
-        "summary": str(provider_gate.get("summary") or "Provider preflight has not run."),
+        "title": str(provider_gate.get("title") or "Provider 预检"),
+        "summary": str(provider_gate.get("summary") or "Provider 预检尚未运行。"),
         "primary_artifact_id": str(provider_gate.get("primary_artifact_id") or ""),
         "blockers": [_blocker(item) for item in _list(provider_gate.get("blockers"))],
         "actions": [str(item) for item in _list(provider_gate.get("actions"))],
@@ -102,11 +102,11 @@ def _provider_controls(provider_gate: dict[str, Any], command_hub: dict[str, Any
     command = _provider_command(provider_gate, command_hub)
     return {
         "primary_action": str(command.get("backend_action") or "run_provider_preflight"),
-        "primary_label": str(command.get("label") or "Run provider preflight"),
+        "primary_label": str(command.get("label") or "运行 Provider 预检"),
         "ui_action": str(command.get("ui_action") or ""),
         "enabled": command.get("enabled") is True,
         "handoff_view": str(command.get("view") or "Jobs"),
-        "summary": str(command.get("summary") or "Provider preflight remains gated."),
+        "summary": str(command.get("summary") or "Provider 预检仍处于闸门控制下。"),
         "blocked_reason": str(command.get("blocked_reason") or ""),
         "requires_input": [str(item) for item in _list(command.get("requires_input"))],
     }

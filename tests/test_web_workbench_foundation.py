@@ -211,7 +211,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert 'activeView: "Projects"' in state_source
     assert "state.activeView = node.dataset.view" in app
     assert "function syncProjectInputs(projectId)" in app
-    assert "function selectAvailableProject()" in app
+    assert all(marker in app for marker in ["function selectAvailableProject()", "function preferredProject(projects)", 'project.status === "ready_for_next_round" ? 10000'])
     assert "run(refreshWorkbench);" in app
     assert 'root.querySelectorAll("#project-id-action, #project-id")' in app
     assert "syncProjectInputs(state.projectId)" in app
@@ -230,7 +230,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "...common" not in jobs_block
     assert '"set-review-intent": () =>' in app
     assert "state.selectedVariantId = dataset.variantId || state.selectedVariantId" in app
-    assert 'displayStatus(project.status || "in_progress")' in actions
+    assert all(marker in actions for marker in ["function projectTitle(project)", "project.goal || project.project_type"]) and 'el("strong", { text: project.project_id || "project" })' not in actions
     assert 'id: "Storyboard"' in workspace_config
     assert 'label: "项目记忆"' in workspace_config
     assert "groups.includes(\"project\")" in actions

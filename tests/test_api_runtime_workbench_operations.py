@@ -23,7 +23,7 @@ def test_operations_workspace_starts_from_empty_project(tmp_path) -> None:
     operations = state["operations_workspace"]
 
     assert operations["status"] == "not_started"
-    assert operations["title"] == "Operations workspace"
+    assert operations["title"] == "任务与 Provider"
     assert operations["selected_job_id"] == ""
     assert operations["counts"] == {
         "jobs": 0,
@@ -66,7 +66,7 @@ def test_operations_workspace_summarizes_provider_blocked_flow(tmp_path) -> None
     assert operations["provider_gate"]["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
     assert operations["provider_controls"]["primary_action"] == "resolve_provider_preflight"
     assert operations["provider_controls"]["enabled"] is False
-    assert operations["provider_controls"]["blocked_reason"] == "Provider capability gate is still blocked."
+    assert operations["provider_controls"]["blocked_reason"] == "Provider 能力闸门仍处于阻塞状态。"
 
 
 def _load_fixture(path: Path) -> dict:

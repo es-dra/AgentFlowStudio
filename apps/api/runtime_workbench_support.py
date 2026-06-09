@@ -12,13 +12,13 @@ SAFE_REF_POLICY = "frontend stores ids and summaries only; content is read throu
 
 def event_title(job: dict[str, Any]) -> str:
     labels = {
-        "asset_test_run": "First generation check",
-        "record_feedback": "Review note recorded",
-        "record_review_decision": "Review decision recorded",
-        "two_round_validate": "Next round prepared",
-        "provider_validation_plan": "Provider preflight",
+        "asset_test_run": "首轮检查",
+        "record_feedback": "审片反馈已记录",
+        "record_review_decision": "审片决定已记录",
+        "two_round_validate": "下一轮已准备",
+        "provider_validation_plan": "Provider 预检",
     }
-    return labels.get(str(job.get("action")), str(job.get("action") or "Runtime event"))
+    return labels.get(str(job.get("action")), str(job.get("action") or "运行事件"))
 
 
 def jobs_by_action(jobs: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:

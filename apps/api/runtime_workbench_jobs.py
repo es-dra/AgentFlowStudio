@@ -10,7 +10,7 @@ def build_job_center(jobs: list[dict[str, Any]]) -> dict[str, Any]:
     counts = _counts(items)
     return {
         "status": _center_status(counts),
-        "title": "Job center",
+        "title": "任务中心",
         "summary": _summary(counts),
         "counts": counts,
         "items": items,
@@ -66,29 +66,29 @@ def _center_status(counts: dict[str, int]) -> str:
 
 def _summary(counts: dict[str, int]) -> str:
     if not counts["total"]:
-        return "No runtime jobs yet."
+        return "暂无运行任务。"
     return (
-        f"{counts['total']} jobs: {counts['succeeded']} succeeded, "
-        f"{counts['blocked']} blocked, {counts['failed']} failed."
+        f"{counts['total']} 个任务：{counts['succeeded']} 个已完成，"
+        f"{counts['blocked']} 个阻塞，{counts['failed']} 个失败。"
     )
 
 
 def _guidance(action: str, item_status: str, error: str) -> str:
     if item_status == "failed":
-        return error or "Open the run details and inspect the error before retrying."
+        return error or "重试前先打开运行详情并检查错误。"
     if action == "provider_validation_plan" and item_status == "blocked":
-        return "Provider remains gated; authorize the exact capability before real smoke."
+        return "Provider 仍处于闸门关闭状态；真实模型试跑前必须显式授权对应能力。"
     if action == "asset_test_run" and item_status == "blocked":
-        return "Open the first-check report, add missing project material, then retry."
+        return "打开首轮检查报告，补齐缺失的项目素材后再重试。"
     if action == "two_round_validate" and item_status == "blocked":
-        return "Open the next-round report and resolve blocked context refs."
+        return "打开下一轮报告，处理被阻塞的上下文引用。"
     if action == "record_review_decision":
-        return "Decision is evidence only; it does not become durable memory."
+        return "审片决定只是证据，不会自动成为长期记忆。"
     if action == "record_feedback":
-        return "Raw feedback is stored as evidence for later review."
+        return "原始反馈会作为证据保存，供后续审查。"
     if item_status == "succeeded":
-        return "Open the safe artifact to inspect the generated evidence."
-    return "Refresh the workbench to update runtime state."
+        return "打开安全 artifact 查看生成证据。"
+    return "刷新工作台以更新运行状态。"
 
 
 __all__ = ("build_job_center",)

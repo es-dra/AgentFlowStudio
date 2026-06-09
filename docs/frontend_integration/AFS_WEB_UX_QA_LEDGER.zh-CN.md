@@ -84,6 +84,14 @@
 - Provider 边界：`provider_calls_started = false`，`writes_long_term_memory = false`，`writes_company_kb = false`。
 - 最新截图：`data/processed/runs/workbench_browser_smoke/browser_evidence/workbench-ready-for-next-round.png`。
 
+## 2026-06-10 首屏中文体验复核
+
+- 问题：刷新 `http://127.0.0.1:8790/workbench/` 后，项目列表和部分 Runtime projection 仍可能显示旧英文 demo 文案、raw project id、乱码标题或内部 Stage 7 命名。
+- 修补：默认项目选择改为优先选择 `ready_for_next_round` 且证据更完整的项目；项目列表主标题改为项目目标/类型/计数，不再用 raw project id；明显乱码标题归一为“历史演练项目”，Stage 7 内部项目归一为“验收演练项目”。
+- 修补：素材库、项目就绪度、操作指令、制作进度、任务中心、任务与 Provider、审片室、内容卡片等用户可见 projection 文案中文化；保留 action/status/non-claims 等合同枚举边界。
+- 浏览器复核：项目列表 `oldIdsVisible = false`，`questionMarkRuns = 0`，`stageRcVisible = false`，`toastErrors = []`；主视图英文残留扫描命中 `0`。
+- 边界：本轮仍为工程验收前复核，不等于 human acceptance、business validation 或 durable memory promotion；Provider 未启动。
+
 ## 当前残留风险
 
 - 第一轮仍沿用轻量 JS/CSS 模块，暂不引入 React Flow；如果后续需要复杂拖拽连线，应单独做技术 spike。

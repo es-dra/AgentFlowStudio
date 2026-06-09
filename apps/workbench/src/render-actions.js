@@ -9,14 +9,30 @@ function projectRows(projects, currentProjectId) {
   return projects.map((project) =>
     el("div", { className: "project-row" }, [
       el("div", {}, [
-        el("strong", { text: project.project_id || "project" }),
+        el("strong", { text: projectTitle(project) }),
         el("span", { text: displayStatus(project.status || "in_progress") }),
+        el("span", { className: "muted", text: projectMeta(project) }),
       ]),
       button(project.project_id === currentProjectId ? "已选中" : "打开", "select-project", "ghost", {
         projectId: project.project_id,
       }),
     ]),
   );
+}
+
+function projectTitle(project) {
+  const title = displayText(project.goal || project.project_type || "内容项目");
+  const questionMarks = (title.match(/\?/g) || []).length;
+  if (questionMarks >= 6) return "历史演练项目";
+  return title.includes("Stage 7 RC") ? "验收演练项目" : title;
+}
+
+function projectMeta(project) {
+  const type = displayText(project.project_type || "short_video_campaign");
+  const runs = Number(project.run_count || 0);
+  const feedback = Number(project.feedback_count || 0);
+  const memory = Number(project.profile_version_count || 0);
+  return `${type} · ${runs} 次运行 · ${feedback} 条审片 · ${memory} 个记忆版本`;
 }
 
 function renderProjectHub(state) {

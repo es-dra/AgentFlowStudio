@@ -35,7 +35,7 @@ def test_runtime_service_registers_safe_source_asset_summary(tmp_path) -> None:
     assert registered["summary"]["project_id"] == "proj_asset_library"
     assert state["asset_library"]["status"] == "ready"
     assert state["asset_library"]["counts"]["brief"] == 1
-    assert state["asset_library"]["items"][0]["usage"] == "Project setup"
+    assert state["asset_library"]["items"][0]["usage"] == "项目设置"
     assert state["project_readiness"]["status"] == "ready_to_draft"
     assert state["project_readiness"]["current_action"] == "draft_canvas"
     assert _step(state, "source_materials")["status"] == "succeeded"

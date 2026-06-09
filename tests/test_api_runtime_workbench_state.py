@@ -61,7 +61,7 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert _lane(state, "draft")["status"] == "not_started"
     assert _lane(state, "first_check")["action"] == "start_first_generation_check"
     assert state["command_hub"]["status"] == "needs_assets"
-    assert state["command_hub"]["title"] == "Command hub"
+    assert state["command_hub"]["title"] == "操作指令"
     assert state["command_hub"]["primary_command"]["backend_action"] == "add_reference"
     assert state["command_hub"]["primary_command"]["ui_action"] == "register-source-asset"
     assert state["command_hub"]["primary_command"]["view"] == "Assets"
@@ -75,7 +75,7 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert _command(state, "start_first_generation_check")["ui_action"] == "run-asset-test"
     assert _command(state, "record_review_note")["ui_action"] == "record-review-decision"
     assert state["project_hub"]["status"] == "needs_assets"
-    assert state["project_hub"]["title"] == "Project hub"
+    assert state["project_hub"]["title"] == "项目中心"
     assert state["project_hub"]["active_project"]["project_id"] == "proj_workbench_demo"
     assert state["project_hub"]["active_project"]["artifact_id"] == created["artifact"]["artifact_id"]
     assert state["project_hub"]["counts"] == {
@@ -123,7 +123,7 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert state["memory_workspace"]["style_profile"]["status"] == "not_started"
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
-    assert state["project_readiness"]["current_action_label"] == "Add source materials"
+    assert state["project_readiness"]["current_action_label"] == "添加素材摘要"
     assert _step(state, "source_materials")["status"] == "blocked"
     assert _step(state, "canvas_draft")["status"] == "not_started"
     assert _step(state, "first_generation_check")["status"] == "not_started"
@@ -195,7 +195,7 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["command_hub"]["primary_command"]["backend_action"] == "resolve_provider_preflight"
     assert state["command_hub"]["primary_command"]["ui_action"] == ""
     assert state["command_hub"]["primary_command"]["enabled"] is False
-    assert state["command_hub"]["primary_command"]["blocked_reason"] == "Provider capability gate is still blocked."
+    assert state["command_hub"]["primary_command"]["blocked_reason"] == "Provider 能力闸门仍处于阻塞状态。"
     assert _command(state, "start_next_round")["ui_action"] == "run-two-round"
     assert _command(state, "run_provider_preflight")["ui_action"] == "run-provider-preflight"
     assert state["project_hub"]["status"] == "blocked"

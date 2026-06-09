@@ -14,15 +14,15 @@ def build_content_cards(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             _card(
                 "content-cards",
                 "content_board",
-                "Scene cards",
+                "场景卡片",
                 "blocked",
-                "Add scene cards so the creation canvas has user-facing work items.",
+                "添加场景卡片，让创作画布拥有面向用户的工作项。",
                 None,
                 ["add_scene_card"],
                 blockers=[
                     _blocker(
                         "content_cards_missing",
-                        "Add at least one scene or content card.",
+                        "至少添加一张场景或内容卡片。",
                         user_action="add_scene_card",
                         source="creation_canvas",
                     )
@@ -33,14 +33,14 @@ def build_content_cards(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         _card(
             str(item.get("card_id") or f"scene-{index}"),
             "scene_card",
-            str(item.get("title") or f"Scene {index}"),
+            str(item.get("title") or f"场景 {index}"),
             str(item.get("status") or "ready_not_run"),
-            str(item.get("summary") or "Scene card is ready for planning."),
+            str(item.get("summary") or "场景卡片已可用于规划。"),
             None,
             ["edit_scene_card", "start_first_generation_check", "record_review_note"],
             refs=[
                 {
-                    "label": str(item.get("target_platform") or "target"),
+                    "label": str(item.get("target_platform") or "目标"),
                     "artifact_id": str(item.get("card_id") or ""),
                     "artifact_type": str(item.get("card_type") or "scene"),
                     "summary": str(item.get("summary") or ""),
@@ -56,7 +56,7 @@ def build_filmstrip(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         {
             "card_id": str(item.get("card_id") or ""),
-            "title": str(item.get("title") or item.get("card_id") or "Scene"),
+            "title": str(item.get("title") or item.get("card_id") or "场景"),
             "status": str(item.get("status") or "ready_not_run"),
             "summary": str(item.get("summary") or ""),
         }

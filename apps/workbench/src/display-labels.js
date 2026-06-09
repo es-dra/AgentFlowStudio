@@ -35,6 +35,7 @@ const TEXT_MAP = {
   Candidate: "候选",
   project: "项目",
   short_video_campaign: "短视频内容项目",
+  product_launch: "产品发布",
   planned_scene: "分镜计划",
   first_generation_check: "首轮检查",
   next_round: "下一轮复用",

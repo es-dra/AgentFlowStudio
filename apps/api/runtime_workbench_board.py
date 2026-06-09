@@ -30,34 +30,34 @@ def build_production_board(
     current_action = str(project_readiness.get("current_action") or "add_reference")
 
     lanes = [
-        _lane("source", "Source", "succeeded" if source_ready else "blocked", "add_reference", "Safe materials", None),
-        _lane("draft", "Draft", _draft_status(source_ready, draft_ready), "draft_canvas", "Reviewable canvas", draft_job),
+        _lane("source", "素材", "succeeded" if source_ready else "blocked", "add_reference", "安全素材", None),
+        _lane("draft", "画布", _draft_status(source_ready, draft_ready), "draft_canvas", "可审片画布", draft_job),
         _lane(
             "first_check",
-            "First Check",
+            "首轮检查",
             status(asset_job) if asset_job else ("ready_not_run" if draft_ready else "not_started"),
             "start_first_generation_check",
-            "Deterministic asset check",
+            "确定性素材检查",
             asset_job,
         ),
-        _lane("review", "Review", _review_status(asset_job, feedback_ready), "record_review_note", "Human feedback evidence", feedback_job),
-        _lane("style_memory", "Style Memory", "succeeded" if style_ready else "not_started", "open_style_memory", "Reusable project preference", None),
+        _lane("review", "审片", _review_status(asset_job, feedback_ready), "record_review_note", "审片反馈证据", feedback_job),
+        _lane("style_memory", "项目记忆", "succeeded" if style_ready else "not_started", "open_style_memory", "可复用项目偏好", None),
         _lane(
             "next_round",
-            "Next Round",
+            "下一轮",
             status(next_round_job) if next_round_job else ("ready_not_run" if feedback_ready else "not_started"),
             "start_next_round",
-            "Context reuse check",
+            "上下文复用检查",
             next_round_job,
         ),
-        _lane("provider_gate", "Provider Gate", provider_status, "run_provider_preflight", "Capability preflight", provider_job),
+        _lane("provider_gate", "Provider 闸门", provider_status, "run_provider_preflight", "能力预检", provider_job),
     ]
     return {
         "status": _board_status(current_action, lanes),
-        "title": "Production board",
+        "title": "制作进度",
         "summary": _summary(current_action),
         "current_action": current_action,
-        "current_action_label": ACTION_LABELS.get(current_action, "Continue"),
+        "current_action_label": ACTION_LABELS.get(current_action, "继续"),
         "lanes": lanes,
         "non_claims": NON_CLAIMS,
     }
@@ -78,7 +78,7 @@ def _lane(
         "status": lane_status,
         "summary": summary,
         "action": action,
-        "action_label": ACTION_LABELS.get(action, "Continue"),
+        "action_label": ACTION_LABELS.get(action, "继续"),
         "primary_artifact_id": _primary_artifact_id(job, ids),
         "artifact_count": len(ids),
     }
@@ -123,14 +123,14 @@ def _board_status(current_action: str, lanes: list[dict[str, Any]]) -> str:
 
 def _summary(current_action: str) -> str:
     return {
-        "add_reference": "Start with safe source summaries.",
-        "draft_canvas": "Turn source material into a reviewable canvas.",
-        "start_first_generation_check": "Run the first deterministic content check.",
-        "record_review_note": "Capture review evidence before the next pass.",
-        "start_next_round": "Reuse accepted context in the next round.",
-        "run_provider_preflight": "Check provider readiness before real model smoke.",
-        "resolve_provider_preflight": "Provider remains blocked by explicit capability gates.",
-    }.get(current_action, "Continue the production flow.")
+        "add_reference": "从安全素材摘要开始。",
+        "draft_canvas": "将素材转成可审片画布。",
+        "start_first_generation_check": "运行首轮确定性内容检查。",
+        "record_review_note": "下一轮前先记录审片证据。",
+        "start_next_round": "在下一轮复用已接受的上下文。",
+        "run_provider_preflight": "真实模型试跑前检查 Provider 准备状态。",
+        "resolve_provider_preflight": "Provider 仍被显式能力闸门阻塞。",
+    }.get(current_action, "继续推进制作流程。")
 
 
 __all__ = ("build_production_board",)
