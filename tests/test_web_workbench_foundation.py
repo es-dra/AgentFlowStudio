@@ -20,6 +20,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "project-hub-state.js",
     WORKBENCH_ROOT / "src" / "creation-workspace-state.js",
     WORKBENCH_ROOT / "src" / "memory-workspace-state.js",
+    WORKBENCH_ROOT / "src" / "operations-workspace-state.js",
     WORKBENCH_ROOT / "src" / "activity-state.js",
     WORKBENCH_ROOT / "src" / "production-board-state.js",
     WORKBENCH_ROOT / "src" / "readiness-state.js",
@@ -30,6 +31,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "render-project-hub.js",
     WORKBENCH_ROOT / "src" / "render-creation-workspace.js",
     WORKBENCH_ROOT / "src" / "render-memory-workspace.js",
+    WORKBENCH_ROOT / "src" / "render-operations-workspace.js",
     WORKBENCH_ROOT / "src" / "render-activity.js",
     WORKBENCH_ROOT / "src" / "render-production-board.js",
     WORKBENCH_ROOT / "src" / "render-assets.js",
@@ -171,6 +173,11 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     assert "memory-controls" in source
     assert "memory-profile-panel" in source
     assert "selected_candidate_id" in source
+    assert "Operations Workspace" in source
+    assert "operations_workspace" in source
+    assert "operations-provider-gate" in source
+    assert "operations-job-list" in source
+    assert "selected_job_id" in source
     assert "Project Readiness" in source
     assert "project_readiness" in source
     assert "current_action_label" in source
@@ -205,6 +212,7 @@ def test_workbench_normalizes_backend_state_shape() -> None:
     assert "source.project_hub" in source
     assert "source.creation_workspace" in source
     assert "source.memory_workspace" in source
+    assert "source.operations_workspace" in source
     assert "source.project_readiness" in source
     assert "source.inspector" in source
     assert "source.card_id" in source
@@ -227,6 +235,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "renderProjectHub(workbench.project_hub)" in render
     assert "renderCreationWorkspace(workbench.creation_workspace, state)" in render
     assert "renderMemoryWorkspace(workbench.memory_workspace, state)" in render
+    assert "renderOperationsWorkspace(workbench.operations_workspace)" in render
     assert "groups.includes(\"project\")" in actions
     assert "groups.includes(\"runtime\")" in actions
 

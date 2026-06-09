@@ -51,6 +51,7 @@ http://127.0.0.1:8790
 - 通过 Style Memory 查看已形成的风格偏好、profile version 数量和下一轮复用提示。
 - 通过 Job Center 查看 runtime job 进度、阻塞指导和可打开的 safe artifact ref。
 - 通过 Activity Timeline 查看当前 project 的运行活动、阻塞动作和可打开的 safe primary artifact ref。
+- 通过 Operations Workspace 统一查看 job queue、latest activity、provider preflight、provider controls 和 blocker counts。
 - 通过 Production Board 查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
 - 通过 Command Hub 查看当前主命令、阶段命令、所需输入和 provider gate 阻塞原因。
 - Job Center 会对当前 project 做自动刷新，不启动 provider。
@@ -110,6 +111,14 @@ The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workben
 It renders project runtime activity as a product-facing history: status counts,
 latest actions, blockers, and safe primary artifact refs. It is trace navigation,
 not approval logic.
+
+## Operations Workspace
+
+The Workbench reads `operations_workspace` from `GET /projects/{project_id}/workbench-state`.
+It renders the Jobs view as one operations surface: job queue, latest activity,
+provider preflight, provider controls, polling state, blocker counts, and safe
+artifact refs. It is a runtime control and evidence navigation surface; it does
+not start live providers or bypass capability gates.
 
 ## Production Board
 

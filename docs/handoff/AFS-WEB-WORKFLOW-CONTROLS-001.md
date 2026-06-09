@@ -30,6 +30,7 @@ only and does not execute CLI internals or providers from the browser.
 - Memory Workspace: combine review candidates, feedback controls, style profile reuse, and next-round controls from backend `memory_workspace`.
 - Job Center: render runtime job progress, safe artifact refs, and blocked-action guidance.
 - Job Center Polling: auto-refresh current-project runtime state through Runtime Service.
+- Operations Workspace: combine runtime job queue, latest activity, provider preflight, provider controls, polling, and blocker counts from backend `operations_workspace`.
 - Project Readiness: render current action, workflow gate statuses, and non-claim badges from backend state.
 - Activity Timeline: render runtime activity counts, latest jobs, blocked actions, and safe primary artifact refs.
 - Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
@@ -40,9 +41,9 @@ only and does not execute CLI internals or providers from the browser.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
 - Runtime-hosted Entry: Runtime Service serves the Workbench at `/workbench/`
   for browser QA and frontend/backend integration.
-- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `creation_workspace`, `memory_workspace`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `creation_workspace`, `memory_workspace`, `operations_workspace`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - Frontend readiness adapter: normalizes `project_readiness` and maps backend workflow actions to existing UI action ids.
-- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `project-hub-state.js`, `creation-workspace-state.js`, `memory-workspace-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render-project-hub.js`, `render-creation-workspace.js`, `render-memory-workspace.js`, `render.js`, `app.js`.
+- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `project-hub-state.js`, `creation-workspace-state.js`, `memory-workspace-state.js`, `operations-workspace-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render-project-hub.js`, `render-creation-workspace.js`, `render-memory-workspace.js`, `render-operations-workspace.js`, `render.js`, `app.js`.
 - View-specific controls: `renderActionPanel` accepts control groups so each stage can avoid showing every operation at once.
 
 ## Runtime Contract Added
@@ -52,7 +53,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `memory_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `memory_workspace`, `operations_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -141,6 +142,14 @@ Result:
   `/workbench/src/memory-workspace-state.js` returned `200`; deterministic
   smoke returned `memory_workspace.status = ready`, 2 candidates, 1 profile
   version, and enabled feedback controls.
+- Latest focused verification after Operations Workspace projection:
+  Operations Workspace state/Web foundation `11 passed, 1 warning`; focused
+  Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Operations Workspace HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/src/render-operations-workspace.js`, and
+  `/workbench/src/operations-workspace-state.js` returned `200`; deterministic
+  smoke returned `operations_workspace.status = blocked`, 4 jobs, and provider
+  action `resolve_provider_preflight`.
 - Project Hub HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/styles-project-hub.css`, and
   `/workbench/src/render-project-hub.js` returned `200`; a temporary project

@@ -1,12 +1,12 @@
-import { badge, button, el, field, sectionTitle } from "./dom.js";
+import { badge, button, el, field } from "./dom.js";
 import { renderActionPanel } from "./render-actions.js";
 import { renderArtifactPanel } from "./render-artifact.js";
 import { renderActivityTimeline } from "./render-activity.js";
 import { renderAssetLibrary } from "./render-assets.js";
 import { renderCommandHub } from "./render-command-hub.js";
 import { renderCreationWorkspace } from "./render-creation-workspace.js";
-import { renderJobCenter } from "./render-jobs.js";
 import { renderMemoryWorkspace } from "./render-memory-workspace.js";
+import { renderOperationsWorkspace } from "./render-operations-workspace.js";
 import { renderProductionBoard } from "./render-production-board.js";
 import { renderProjectHub } from "./render-project-hub.js";
 import { renderProjectReadiness } from "./render-readiness.js";
@@ -56,15 +56,6 @@ function renderConnectPanel(state) {
       button("Load Project", "load-project", "secondary"),
       button("Refresh", "refresh", "ghost"),
     ]),
-  ]);
-}
-
-function renderProviderGate(card) {
-  if (!card) return el("section", { className: "provider-gate" }, [sectionTitle("Provider Gate", "not requested")]);
-  return el("section", { className: "provider-gate" }, [
-    sectionTitle("Provider Gate", card.status),
-    el("p", { className: "card-summary", text: card.summary || "Preflight only." }),
-    el("div", { className: "chips" }, card.blockers.map((item) => badge(item.message || item.blocker_id, "blocked"))),
   ]);
 }
 
@@ -121,9 +112,7 @@ function viewPanels(activeView, workbench, state) {
   if (activeView === "Jobs") {
     return [
       ...common,
-      renderJobCenter(workbench.job_center),
-      renderActivityTimeline(workbench.activity_timeline),
-      renderProviderGate(workbench.provider_gate),
+      renderOperationsWorkspace(workbench.operations_workspace),
       renderActionPanel(state, viewActionGroups(activeView)),
       renderAdvanced(workbench),
     ];
@@ -133,7 +122,6 @@ function viewPanels(activeView, workbench, state) {
       ...common,
       renderActionPanel(state, viewActionGroups(activeView)),
       renderActivityTimeline(workbench.activity_timeline),
-      renderProviderGate(workbench.provider_gate),
       renderAdvanced(workbench),
     ];
   }

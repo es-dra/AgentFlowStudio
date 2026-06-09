@@ -11,6 +11,7 @@ from apps.api.runtime_workbench_creation import build_creation_workspace
 from apps.api.runtime_workbench_content import build_filmstrip
 from apps.api.runtime_workbench_jobs import build_job_center
 from apps.api.runtime_workbench_memory import build_memory_workspace
+from apps.api.runtime_workbench_operations import build_operations_workspace
 from apps.api.runtime_workbench_project_hub import build_project_hub
 from apps.api.runtime_workbench_readiness import build_project_readiness
 from apps.api.runtime_workbench_review import build_review_room
@@ -39,6 +40,8 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
     command_hub = build_command_hub(project_readiness, production_board)
     review_room = build_review_room(store, manifest, jobs)
     style_memory = build_style_memory(store, manifest)
+    job_center = build_job_center(jobs)
+    activity_timeline = build_activity_timeline(jobs)
     return {
         "artifact_type": "agentflow_runtime_workbench_state",
         "schema_version": "0.1.0",
@@ -78,8 +81,14 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
             style_memory=style_memory,
             command_hub=command_hub,
         ),
-        "job_center": build_job_center(jobs),
-        "activity_timeline": build_activity_timeline(jobs),
+        "job_center": job_center,
+        "activity_timeline": activity_timeline,
+        "operations_workspace": build_operations_workspace(
+            job_center=job_center,
+            activity_timeline=activity_timeline,
+            provider_gate=provider_gate,
+            command_hub=command_hub,
+        ),
         "production_board": production_board,
         "command_hub": command_hub,
         "project_hub": build_project_hub(manifest, jobs, project, command_hub),

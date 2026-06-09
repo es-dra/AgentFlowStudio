@@ -2,6 +2,7 @@ import { normalizeActivityTimeline } from "./activity-state.js";
 import { normalizeCommandHub } from "./command-hub-state.js";
 import { normalizeCreationWorkspace } from "./creation-workspace-state.js";
 import { normalizeMemoryWorkspace, normalizeReviewRoom, normalizeStyleMemory } from "./memory-workspace-state.js";
+import { normalizeJobCenter, normalizeOperationsWorkspace } from "./operations-workspace-state.js";
 import { normalizeProductionBoard } from "./production-board-state.js";
 import { normalizeProjectHub } from "./project-hub-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
@@ -16,6 +17,7 @@ export const EMPTY_WORKBENCH_STATE = {
   review_room: null,
   style_memory: null,
   memory_workspace: null,
+  operations_workspace: null,
   job_center: null,
   activity_timeline: null,
   production_board: null,
@@ -51,6 +53,7 @@ export function normalizeWorkbenchState(payload) {
     review_room: normalizeReviewRoom(source.review_room),
     style_memory: normalizeStyleMemory(source.style_memory),
     memory_workspace: normalizeMemoryWorkspace(source.memory_workspace),
+    operations_workspace: normalizeOperationsWorkspace(source.operations_workspace),
     job_center: normalizeJobCenter(source.job_center),
     activity_timeline: normalizeActivityTimeline(source.activity_timeline),
     production_board: normalizeProductionBoard(source.production_board),
@@ -100,51 +103,6 @@ export function normalizeAssetItem(value) {
     summary: String(source.summary || ""),
     usage: String(source.usage || "Supporting context"),
     safety: String(source.safety || "safe_summary"),
-  };
-}
-
-export function normalizeJobCenter(value) {
-  const source = asObject(value);
-  return {
-    status: String(source.status || "not_started"),
-    title: String(source.title || "Job center"),
-    summary: String(source.summary || ""),
-    counts: normalizeJobCounts(source.counts),
-    items: asArray(source.items).map(normalizeJobItem),
-    polling: {
-      enabled: asObject(source.polling).enabled === true,
-      manual_refresh_action: String(asObject(source.polling).manual_refresh_action || "refresh"),
-      suggested_interval_ms: Number(asObject(source.polling).suggested_interval_ms || 5000),
-    },
-    non_claims: asArray(source.non_claims).map(String),
-  };
-}
-
-export function normalizeJobCounts(value) {
-  const source = asObject(value);
-  return {
-    total: Number(source.total || 0),
-    running: Number(source.running || 0),
-    blocked: Number(source.blocked || 0),
-    failed: Number(source.failed || 0),
-    succeeded: Number(source.succeeded || 0),
-  };
-}
-
-export function normalizeJobItem(value) {
-  const source = asObject(value);
-  return {
-    job_id: String(source.job_id || ""),
-    action: String(source.action || ""),
-    title: String(source.title || "Runtime job"),
-    status: String(source.status || "not_started"),
-    stage: String(source.stage || ""),
-    percent: Number(source.percent || 0),
-    terminal: source.terminal === true,
-    primary_artifact_id: String(source.primary_artifact_id || ""),
-    artifact_ids: asArray(source.artifact_ids).map(String),
-    artifact_count: Number(source.artifact_count || 0),
-    guidance: String(source.guidance || ""),
   };
 }
 

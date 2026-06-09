@@ -61,6 +61,14 @@ Boundaries:
 - Split Create and Memory frontend state/render modules, removed obsolete `render-review.js`, and reduced `workbench-state.js` below the 300-line threshold.
 - Runtime HTTP smoke passed for the new static modules and deterministic projection states; no live provider, secret, signed URL, private media, provider raw response, or generated media bytes were written.
 
+## 2026-06-09 - Workbench Operations Workspace Slice
+
+- Added backend-driven `operations_workspace` projection, combining job queue, latest activity, provider preflight, provider controls, polling, and blocker counts into one Runtime Service-safe contract.
+- Added frontend Operations Workspace state/render modules and moved Job Center normalization out of `workbench-state.js`, reducing the total adapter to 184 lines.
+- Replaced the Jobs view's parallel Job Center / Activity / Provider Gate panels with one Operations Workspace product surface.
+- Boundaries preserved: no provider calls, no secrets, no private paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
+- Focused verification: state/Web foundation `11 passed, 1 warning`; Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Operations Workspace HTTP smoke passed.
+
 ## 2026-06-09 - Landing Prep Content / Memory / Web 001
 
 - 重新按 COS / 全局映射规则定位本轮：先跑通内容制作 / 记忆链路，再规划 Web workbench；纯切片链路暂不进入下一阶段开发。
@@ -231,63 +239,3 @@ Boundaries:
 
 - `maintenance_audit`: `failed=0, passed=6, warning=0`。
 - 完整 CLI、focused pytest、full pytest 和 `git diff --check` 在最终提交前执行。
-
-## 2026-06-09 - Web Workbench Industrialization Slices
-
-- Extended Runtime Service v0.2 and `apps/workbench` from a basic shell into a fuller production workbench: safe source assets, scene/content cards, Scene Inspector, Filmstrip, Review Room, Style Memory, Job Center, Reference Library, project templates, source presets, and safe artifact views.
-- Added frontend-safe `workbench-state` projections for `asset_library`, `review_room`, `style_memory`, and `job_center`; details are tracked in `docs/handoff/AFS-WEB-WORKFLOW-CONTROLS-001.md`.
-- Split frontend modules to keep the baseline maintainable: `app-actions.js`, `app-selection.js`, `input-sync.js`, `presets.js`, `polling.js`, `render-assets.js`, `render-review.js`, and `render-jobs.js`.
-- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private asset locations, no media bytes, no provider raw responses, no human acceptance/business validation/durable memory claims.
-- Latest focused Runtime/Web/API verification: `22 passed, 1 warning`; `maintenance_audit`: `failed=0, passed=6, warning=0`.
-
-## 2026-06-09 - Web Workbench Project Readiness Slice
-
-- Added backend `project_readiness` projection to `GET /projects/{project_id}/workbench-state`, summarizing safe source materials, Draft Canvas, first generation check, review feedback, next round, and provider preflight gates.
-- Wired `workspace.primary_action` to the readiness projection so the frontend has one safe next-action source instead of parallel UI-only state logic.
-- Added frontend Project Readiness panel, readiness state normalization, action mapping, and a split `styles-readiness.css` file to keep Web files below the maintenance threshold.
-- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private asset paths, no generated media bytes, no provider raw responses, and no durable-memory or human-acceptance claim.
-- Focused verification during the slice: `tests/test_api_runtime_workbench_state.py tests/test_api_runtime_workbench_actions.py` -> `7 passed, 1 warning`; `tests/test_web_workbench_foundation.py` -> `7 passed`.
-- Final verification after records: focused Runtime/Web/API `24 passed, 1 warning`; CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; Runtime-hosted HTTP smoke passed; full pytest `835 passed, 1 warning`.
-
-## 2026-06-09 - Web Workbench Stage Navigation Slice
-
-- Added in-memory `activeView` routing for the Workbench rail so users can switch between Projects, Create, Assets, Review, Style Memory, Jobs, and Settings without seeing every panel at once.
-- Updated the rail to emit explicit `data-view` buttons and render active navigation state from the current view.
-- Made `renderActionPanel` group-aware so each view can show only the relevant project, asset, scene, review, runtime, and result controls.
-- Boundaries preserved: browser state remains memory-only, no provider calls were started, and no local private paths, signed URLs, provider raw responses, or media bytes are exposed.
-- Focused verification: Web foundation `8 passed`; Runtime/Web/API focused suite `25 passed, 1 warning`; Runtime-hosted HTTP smoke passed for `/workbench/` and `/workbench/src/render.js`; full pytest `836 passed, 1 warning`.
-
-## 2026-06-09 - Web Workbench Activity Timeline Slice
-
-- Added backend `activity_timeline` projection to `GET /projects/{project_id}/workbench-state`, summarizing runtime activity counts, latest jobs, blocked actions, safe primary artifact refs, and non-claim boundaries.
-- Added frontend Activity Timeline normalization and rendering so Review, Style Memory, Jobs, and Settings views can expose project execution history without exposing CLI internals or provider details.
-- Split the slice into maintainable modules: `runtime_workbench_activity.py`, `activity-state.js`, `render-activity.js`, and `styles-activity.css`.
-- Fixed the `open-artifact-ref` click path to use the registered `open-selected-artifact` handler, with a Web foundation regression test covering the binding.
-- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private local paths, no provider raw responses, no generated media bytes, no human acceptance/business validation/durable-memory claim.
-- Focused verification during the slice: `tests/test_api_runtime_workbench_state.py tests/test_web_workbench_foundation.py` -> `10 passed, 1 warning`; Web foundation after handler fix -> `9 passed`; broader Runtime/Web/API focused suite -> `26 passed, 1 warning`.
-- Final verification after records: CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; Runtime-hosted Activity Timeline HTTP smoke passed; full pytest `837 passed, 1 warning`.
-
-## 2026-06-09 - Web Workbench Production Board Slice
-
-- Committed the verified Runtime/Web Workbench baseline as `7d803c4 feat(workbench): add runtime-backed production workbench`.
-- Added backend `production_board` projection to `GET /projects/{project_id}/workbench-state`, mapping source, draft, first check, review, style memory, next round, and provider gate into product-facing lanes.
-- Added frontend Production Board normalization, rendering, and split CSS so the workbench can show the complete content/memory flow without exposing internal CLI orchestration.
-- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
-- Verification during the slice: backend/Web red tests failed before implementation; Production Board focused state/Web tests `11 passed, 1 warning`; Runtime/Web/API focused suite `26 passed, 1 warning`; Runtime-hosted Production Board HTTP smoke passed; full pytest `837 passed, 1 warning`.
-
-## 2026-06-09 - Web Workbench Command Hub Slice
-
-- Added backend `command_hub` projection to `GET /projects/{project_id}/workbench-state`, translating workflow actions into user-facing commands and required-input hints.
-- Added frontend Command Hub normalization, rendering, and split CSS so users see one primary next command plus stage commands without learning backend action names.
-- Provider gate resolution remains non-executable in the browser: blocked provider preflight surfaces as a disabled command with a blocked reason.
-- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
-- Red tests failed before implementation; focused Command Hub state/Web tests `11 passed, 1 warning`; focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Command Hub HTTP smoke passed.
-
-## 2026-06-09 - Web Workbench Project Hub Slice
-
-- Added backend `project_hub` projection to `GET /projects/{project_id}/workbench-state`, summarizing the active project, safe counts, next command, recent runtime jobs, and the manifest artifact ref.
-- Added frontend Project Hub normalization, rendering, and split CSS so the Projects view becomes a product-facing project control surface instead of only a setup form.
-- Recent job navigation keeps using safe artifact refs and prioritizes provider preflight manifests, next-round reports, feedback events, review decisions, and first-check reports without exposing provider raw responses.
-- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
-- Red tests failed before implementation; focused Project Hub state/Web tests `11 passed, 1 warning`.
-- Final verification after records: focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Project Hub HTTP smoke passed; CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; full pytest `837 passed, 1 warning`; `git diff --check` passed with CRLF normalization warnings only.
