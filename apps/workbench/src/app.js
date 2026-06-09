@@ -146,6 +146,12 @@ function bindEvents() {
       paint();
     });
   });
+  root.querySelectorAll("[data-studio-focus]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.studioFocus = node.dataset.studioFocus || state.studioFocus;
+      paint();
+    });
+  });
   root.querySelectorAll("[data-card-id]").forEach((node) => {
     node.addEventListener("click", () => {
       state.selectedCardId = node.dataset.cardId || "";

@@ -161,7 +161,7 @@ function viewPanels(activeView, workbench, state) {
   }
   return withWindow("Create", [
     renderStudioWorkspace(workbench.studio_workspace, state),
-    renderArtifactPanel(state),
+    state.artifact ? renderArtifactPanel(state) : null,
   ]);
 }
 

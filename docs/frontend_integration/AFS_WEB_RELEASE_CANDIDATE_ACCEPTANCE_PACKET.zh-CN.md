@@ -70,6 +70,7 @@
 - 2026-06-10 工作区主任务优先复核：Projects 首屏先显示项目中心与项目操作，Assets 首屏先显示素材库，Settings 首屏先显示高级诊断与活动时间线，不再把通用生产状态面板置于诊断页顶部。
 - 2026-06-10 首屏中文体验复核已纳入自动 smoke 硬断言：`old_project_ids_visible=false`，`question_mark_runs=0`，`stage_rc_visible=false`，`toast_errors=[]`；旧英文 projection 文案扫描命中 `0`。
 - 2026-06-10 Canvas V2 工程复核：Create 视图已切到暗色媒体画布，旧窗口头隐藏，节点预览/素材缩略/检查器预览/分镜条均可见；可见 `Provider` 文案命中 `0`，文字溢出 `0`。
+- 2026-06-10 Canvas V2 聚焦窗口复核：Create 内部可切换画布、素材、审片、检查器和运行窗口；未打开安全产物前不再显示空 artifact panel。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`
@@ -78,6 +79,9 @@
   - `data/processed/runs/workbench_live_demo/qa/acceptance-rehearsal-auto-connect-clean-1440x900.png`
   - `data/processed/runs/workbench_browser_smoke/browser_evidence/workbench-ready-for-next-round.png`
   - `data/processed/runs/workbench_canvas_v2_qa/canvas-v2-create-1440x900-visual-final.png`
+  - `data/processed/runs/workbench_canvas_v2_focus_qa/focus-canvas-1440x900-no-empty-artifact.png`
+  - `data/processed/runs/workbench_canvas_v2_focus_qa/focus-review-1440x900-no-empty-artifact.png`
+  - `data/processed/runs/workbench_canvas_v2_focus_qa/focus-ops-1440x900-no-empty-artifact.png`
 - 结构化证据：`data/processed/runs/workbench_live_demo/qa/stage7-rc-browser-qa.json`。
 
 ## 当前边界

@@ -31,6 +31,7 @@ export const state = {
   projects: [],
   workbench: null,
   activeView: "Projects",
+  studioFocus: "canvas",
   selectedCardId: "",
   selectedVariantId: "",
   selectedArtifactId: "",

@@ -6,14 +6,24 @@ export function renderStudioSideRail(sideRail, counts) {
   const candidates = Array.isArray(sideRail.review_candidates) ? sideRail.review_candidates : [];
   const styleProfile = sideRail.style_profile || {};
   return el("aside", { className: "studio-side-rail" }, [
-    sectionTitle("参考素材", `${counts.assets || 0}`),
-    assets.length ? el("div", { className: "studio-asset-list" }, assets.map(renderAsset)) : el("p", { className: "muted", text: "先添加安全素材摘要。" }),
-    sectionTitle("项目记忆", displayStatus(styleProfile.status || "not_started")),
-    styleProfile.summary ? el("p", { className: "card-summary", text: displayText(styleProfile.summary) }) : el("p", { className: "muted", text: "审片决定会影响下一轮复用。" }),
-    renderPreferences(styleProfile.reusable_preferences || []),
-    sectionTitle("审片队列", `${candidates.length}`),
-    candidates.length ? el("div", { className: "studio-review-list" }, candidates.map(renderCandidate)) : el("p", { className: "muted", text: "还没有审片候选。" }),
+    renderSideSection("assets", [
+      sectionTitle("参考素材", `${counts.assets || 0}`),
+      assets.length ? el("div", { className: "studio-asset-list" }, assets.map(renderAsset)) : el("p", { className: "muted", text: "先添加安全素材摘要。" }),
+    ]),
+    renderSideSection("memory", [
+      sectionTitle("项目记忆", displayStatus(styleProfile.status || "not_started")),
+      styleProfile.summary ? el("p", { className: "card-summary", text: displayText(styleProfile.summary) }) : el("p", { className: "muted", text: "审片决定会影响下一轮复用。" }),
+      renderPreferences(styleProfile.reusable_preferences || []),
+    ]),
+    renderSideSection("review", [
+      sectionTitle("审片队列", `${candidates.length}`),
+      candidates.length ? el("div", { className: "studio-review-list" }, candidates.map(renderCandidate)) : el("p", { className: "muted", text: "还没有审片候选。" }),
+    ]),
   ]);
+}
+
+function renderSideSection(kind, children) {
+  return el("div", { className: `studio-side-section studio-side-${kind}` }, children);
 }
 
 function renderAsset(asset) {

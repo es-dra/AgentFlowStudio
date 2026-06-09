@@ -64,6 +64,7 @@ def _all_workbench_source() -> str:
         WORKBENCH_ROOT / "styles-creation-workspace.css",
         WORKBENCH_ROOT / "styles-studio-workspace.css",
         WORKBENCH_ROOT / "styles-studio-canvas-v2.css",
+        WORKBENCH_ROOT / "styles-studio-canvas-focus.css",
         WORKBENCH_ROOT / "styles-storyboard.css",
         WORKBENCH_ROOT / "styles-review-memory.css",
         WORKBENCH_ROOT / "styles-activity.css",
@@ -88,6 +89,7 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert '<link rel="stylesheet" href="./styles-assets.css" />' in index
     assert '<link rel="stylesheet" href="./styles-creation-workspace.css" />' in index
     assert '<link rel="stylesheet" href="./styles-studio-canvas-v2.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-canvas-focus.css" />' in index
     assert '<link rel="stylesheet" href="./styles-storyboard.css" />' in index
     assert '<link rel="stylesheet" href="./styles-review-memory.css" />' in index
     assert '<link rel="stylesheet" href="./styles-activity.css" />' in index
@@ -174,7 +176,6 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     assert "ref_kind" not in js_source
     assert "provider_config" not in js_source
 
-
 def test_workbench_normalizes_backend_state_shape() -> None:
     source = _read(WORKBENCH_ROOT / "src" / "workbench-state.js")
 
@@ -237,7 +238,6 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "groups.includes(\"project\")" in actions
     assert "groups.includes(\"runtime\")" in actions
 
-
 def test_workbench_renders_artifact_specific_report_views() -> None:
     source = _read(WORKBENCH_ROOT / "src" / "render-artifact.js")
 
@@ -272,6 +272,7 @@ def test_workbench_files_stay_below_maintenance_threshold() -> None:
         WORKBENCH_ROOT / "styles-project-setup.css",
         WORKBENCH_ROOT / "styles-assets.css",
         WORKBENCH_ROOT / "styles-studio-canvas-v2.css",
+        WORKBENCH_ROOT / "styles-studio-canvas-focus.css",
         WORKBENCH_ROOT / "styles-storyboard.css",
         WORKBENCH_ROOT / "styles-review-memory.css",
         WORKBENCH_ROOT / "styles-activity.css",
@@ -282,7 +283,6 @@ def test_workbench_files_stay_below_maintenance_threshold() -> None:
     ]:
         lines = _read(path).splitlines()
         assert len(lines) <= 300, path
-
 
 def test_workbench_uses_multi_tone_product_palette() -> None:
     css = _read(WORKBENCH_ROOT / "styles.css") + _read(WORKBENCH_ROOT / "styles-components.css") + _read(WORKBENCH_ROOT / "styles-app-shell.css")

@@ -96,6 +96,8 @@
 - 2026-06-10 工作区主任务优先复核：Projects 首屏从项目中心开始，Assets 首屏从素材库开始，Settings 首屏从高级诊断和活动时间线开始；该顺序已在 `tests/test_web_workbench_foundation.py` 固化，避免回退成“一个窗口塞满所有状态面板”。
 - 2026-06-10 Canvas V2 工程复核：Create 视图改为暗色媒体优先画布，包含节点预览、素材缩略、检查器预览、分镜条和生成能力术语清洗；Playwright 复核 `headerHidden=true`、`mediaFrames=4`、`sideThumbs=5`、`inspectorHero=true`、`filmstripPreviews=3`、`providerMatches=0`、`textOverflow=0`。
 - Canvas V2 截图：`data/processed/runs/workbench_canvas_v2_qa/canvas-v2-create-1440x900-visual-final.png`；结构化证据：`data/processed/runs/workbench_canvas_v2_qa/canvas-v2-create-1440x900-visual-final.json`。
+- 2026-06-10 Canvas V2 聚焦窗口复核：Create 内部支持 `画布 / 素材 / 审片 / 检查器 / 运行` 切换；Playwright 复核每个窗口 `providerMatches=0`、`textOverflow=0`、`bodyHeight=viewportHeight=900`，未加载产物时不显示空 artifact panel。
+- 聚焦窗口证据：`data/processed/runs/workbench_canvas_v2_focus_qa/focus-switch-1440x900-no-empty-artifact.json`；截图：`focus-canvas-1440x900-no-empty-artifact.png`、`focus-review-1440x900-no-empty-artifact.png`、`focus-ops-1440x900-no-empty-artifact.png`。
 - 边界：本轮仍为工程验收前复核，不等于 human acceptance、business validation 或 durable memory promotion；Provider 未启动。
 
 ## 当前残留风险

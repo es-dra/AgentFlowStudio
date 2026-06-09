@@ -10,8 +10,10 @@ export function renderStudioWorkspace(workspace, state) {
   const cards = Array.isArray(value.canvas?.cards) ? value.canvas.cards : [];
   const selectedCardId = selectedStudioCardId(cards, value, state);
   const inspector = selectedStudioInspector(cards, selectedCardId, value.inspector || {});
-  return el("section", { className: "studio-workspace canvas-v2" }, [
+  const focus = studioFocus(state);
+  return el("section", { className: `studio-workspace canvas-v2 studio-focus-${focus}` }, [
     renderCommandStrip(value),
+    renderStudioFocusTabs(focus, value),
     el("div", { className: "studio-layout" }, [
       renderStudioSideRail(value.side_rail || {}, value.counts || {}),
       renderStudioCanvas(value, selectedCardId),
@@ -20,6 +22,32 @@ export function renderStudioWorkspace(workspace, state) {
     renderStudioFilmstrip(value.filmstrip || []),
     renderOperationsSummary(value.operations_summary || {}, value.provider_status),
   ]);
+}
+
+function studioFocus(state) {
+  const allowed = ["canvas", "assets", "review", "inspector", "ops"];
+  return allowed.includes(state?.studioFocus) ? state.studioFocus : "canvas";
+}
+
+function renderStudioFocusTabs(focus, workspace) {
+  const counts = workspace.counts || {};
+  const operationCounts = workspace.operations_summary?.counts || {};
+  const items = [
+    { id: "canvas", label: "画布", meta: `${counts.canvas_cards || 0} 节点` },
+    { id: "assets", label: "素材", meta: `${counts.assets || 0} 项` },
+    { id: "review", label: "审片", meta: `${counts.review_candidates || 0} 候选` },
+    { id: "inspector", label: "检查器", meta: "当前节点" },
+    { id: "ops", label: "运行", meta: `${operationCounts.jobs || 0} 任务` },
+  ];
+  return el("div", { className: "studio-focus-tabs" }, items.map((item) =>
+    el("button", {
+      className: `studio-focus-tab${item.id === focus ? " active" : ""}`,
+      attrs: { "data-studio-focus": item.id, "aria-pressed": item.id === focus ? "true" : "false" },
+    }, [
+      el("span", { text: item.label }),
+      el("small", { text: item.meta }),
+    ]),
+  ));
 }
 
 function renderCommandStrip(workspace) {
