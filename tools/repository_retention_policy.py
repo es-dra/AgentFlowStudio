@@ -48,6 +48,8 @@ def review_directory(path: str) -> ReviewedPath:
         return _dir(path, "production_spine", "current", "内容生产与分发 pipeline 模块仍被测试和 CLI 覆盖；旧 demo 文件会在文件级降级。")
     if path.startswith("apps/api"):
         return _dir(path, "production_spine", "current", "Runtime Service 是前后端唯一对接面。")
+    if path.startswith("apps/workbench"):
+        return _dir(path, "production_spine", "current", "Runtime Service backed product Web workbench foundation.")
     if path.startswith("apps/reporting"):
         return _dir(path, "production_spine", "current", "CLI、Runtime 和过渡面共用的应用层 report helper。")
     if path.startswith("apps/cli"):
@@ -148,6 +150,8 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(path, git_state, "operations_spine", "current", "本地 CLI 命令入口或 registry。")
     if path.startswith("apps/web_bridge/"):
         return _file(path, git_state, "delete_candidate", "legacy_runtime_surface", "本地 Web bridge 已退出当前产品主干，应直接删除。", "提交删除并保持 Runtime Service / local artifact 边界后完成退休。")
+    if path.startswith("apps/workbench/"):
+        return _file(path, git_state, "production_spine", "current", "Runtime Service backed product Web workbench foundation.")
     if path.startswith("apps/web/"):
         return _file(path, git_state, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台；外部前端上线后按测试覆盖退休。")
     if path.startswith("configs/"):

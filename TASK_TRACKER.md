@@ -30,13 +30,14 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 | AFS-MODEL-GATEWAY-CYCLE-001 | Architecture Reset Lead | 解除 `agentflow_studio.model_gateway <-> agentflow_studio.production` 循环 | 已完成 | `docs/maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md` |
 | AFS-PRODUCT-SPINE-RESET-003 | Maintainability Steward + Architecture Reset Lead | 删除旧入口、压缩历史文档面、强化 retention review、消除旧包/CLI/Web surface | 已提交 | `docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md` |
 | AFS-RUNTIME-SERVICE-V0-2-001 | Runtime/API Integrator + Frontend Contract Steward | Runtime Service、OpenAPI、frontend-safe refs、request fixture | 已合入基线 | `docs/frontend_integration/`；`docs/handoff/AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md` |
+| AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001 | AI-Native Operating Architect + Product / Engineering Orchestrator | 内容制作 / 记忆链路 Runtime Service 跑通证据、外部画布参考、Web 与后端协同开发规划 | 规划完成 | `docs/handoff/AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001.md` |
 | AFS-FRONTEND-WORKBENCH-INTEGRATION-001 | Product Integration Steward + Runtime/API Integrator | 外部画布前端接 Runtime Service，首屏只做 project、run、artifact、review safe view | 排队 | 前端不接触 CLI 内部、secret、私有路径、signed URL 或媒体字节 |
 
 ## 当前基线
 
 | 模块 | 状态 | 证据 |
 |---|---|---|
-| Git | 当前分支 `codex/afs-maintenance-debt-closure-001` | `git status --short --branch` |
+| Git | 当前分支 `codex/afs-landing-prep-web-plan-001` | `git status --short --branch` |
 | Production Memory Asset Loop | deterministic 本地 contract chain 已具备 | `agentflow/memory/`；`apps/cli/production_memory_command_registry.py` |
 | Runtime Service | 前端主对接面 | `apps/api/`；`apps/cli/runtime_service_command.py` |
 | 过渡 Web | 只保留 read-only / local-only artifact viewer | `apps/web/README.md` |
@@ -46,8 +47,14 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 
 | ID | 范围 | 状态 |
 |---|---|---|
-| AFS-FLOW-RUN-READY-001 | 基于当前低成本维护基线，进入自研轻量 Web 前的流程跑通准备 | 待启动 |
-| AFS-LIGHTWEIGHT-WEB-001 | 后续自研轻量 Web，只接 Runtime Service / OpenAPI / safe artifact refs | 待启动 |
+| AFS-FLOW-RUN-READY-001 | 基于当前低成本维护基线，进入自研轻量 Web 前的流程跑通准备 | 已完成首轮 Runtime Service 链路证据；下一步补 workbench-state adapter |
+| AFS-WORKBENCH-STATE-ADAPTER-001 | Web 实现前补 Runtime Service UI state、canvas card、blocker、action vocabulary、event history 和 safe preview contract | 已完成首轮实现；`tests/test_api_runtime_workbench_state.py` |
+| AFS-WEB-FOUNDATION-001 | 新自研轻量 Web 基础：runtime client、state adapter、app shell、project hub、workspace layout、Runtime-hosted entry | 已完成基础壳；`apps/workbench`、`/workbench/`、`tests/test_web_workbench_foundation.py` |
+| AFS-WEB-PROJECT-SETUP-001 | Project Hub / setup / asset-reference library：项目创建、导入导出、目标平台、素材和参考入口 | 进行中：create/open/import/export、asset/reference library、source presets 和 Draft Canvas 入口已落地 |
+| AFS-WEB-CREATION-WORKSPACE-001 | 创作画布主工作区：scene/content cards、inspector、filmstrip、first generation check | 进行中：Draft Canvas、scene/content cards、Inspector、filmstrip、first generation check control、safe artifact panel 和 Review Room candidate comparison 已落地 |
+| AFS-WEB-REVIEW-STYLE-MEMORY-001 | 审片反馈与 Project Style Memory：keep/revise/reject、raw feedback、下一轮复用 | 进行中：raw feedback、keep/revise/reject、candidate-bound review decisions、Style Memory product view 和 next-round controls 已落地 |
+| AFS-PROVIDER-GATED-REAL-SMOKE-001 | deterministic Web flow 稳定后，再按 capability gate 接真实模型 smoke | 待启动 |
+| AFS-WEB-QA-RELEASE-GATE-001 | 浏览器截图、响应式检查、HTTP smoke、focused tests、maintenance audit、diff check | 进行中：Runtime-hosted `/workbench/` HTTP smoke 已通过；截图 QA 待浏览器运行时 |
 
 ## 当前阻塞和残留
 
@@ -68,3 +75,65 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 - 本轮不写入 COS active rule；只生成 project-local Company OS feedback candidate packet。
 - provider 默认关闭；未写入 secret、signed URL、本地私有素材、provider 原始响应或生成媒体字节。
 最终验证：CLI help/version、`maintenance_audit`、focused pytest、full pytest、`git diff --check` 已通过；`oversized_files=0`。
+
+## 2026-06-09 - Web Workbench Industrialization Update
+
+Current branch:
+
+```text
+codex/afs-landing-prep-web-plan-001
+```
+
+Current Web/API queue state:
+
+| ID | Scope | Status |
+|---|---|---|
+| AFS-WEB-RUNTIME-HOSTED-ENTRY-001 | Serve Workbench through Runtime Service for same-origin frontend/backend integration | Landed: `/workbench/` and `/workbench/src/app.js` served from a temporary Runtime Service smoke |
+| AFS-WEB-DRAFT-CANVAS-001 | Draft Hook / Proof / CTA canvas cards from safe source summaries | Landed: `POST /projects/{project_id}/canvas-draft`, Workbench `Draft Canvas`, OpenAPI export |
+| AFS-WEB-PROJECT-SETUP-001 | Project Hub, setup, asset/reference library | In progress: create/open/import/export, safe asset/reference summary registration, Reference Library panel, Project Hub templates, and source-type presets landed |
+| AFS-WEB-CREATION-WORKSPACE-001 | Creation workspace, scene/content cards, inspector, filmstrip, first generation check | In progress: safe scene/content card registration, canvas projection, right-side inspector editing, filmstrip, first generation control, safe artifact report panel, and Review Room candidate comparison landed |
+| AFS-WEB-REVIEW-STYLE-MEMORY-001 | Review feedback into project style memory | In progress: raw feedback, keep/revise/reject decisions, candidate-bound review evidence, Style Memory product view, and next-round controls landed |
+| AFS-WEB-JOB-CENTER-001 | Runtime job progress, blocker guidance, and artifact navigation | In progress: backend `job_center` projection, frontend Job Center view, artifact navigation, and auto-refresh polling landed |
+| AFS-WEB-PROJECT-READINESS-001 | Project readiness, next action, and visible workflow gates | Landed: backend `project_readiness`, frontend Project Readiness panel, action mapping, and split readiness CSS |
+| AFS-WEB-STAGE-NAVIGATION-001 | Stage-based Workbench navigation and view-specific control groups | Landed: `activeView`, functional rail navigation, and grouped action panel rendering |
+| AFS-WEB-ACTIVITY-TIMELINE-001 | Runtime activity timeline, blocker visibility, and safe artifact navigation | Landed: backend `activity_timeline`, frontend Activity Timeline panel, safe primary artifact refs, and split activity modules |
+
+Verification so far:
+
+- Latest focused Web/API verification after Reference Library and polling extension:
+  `.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_service_v02.py tests\test_api_runtime_workbench_state.py tests\test_web_workbench_foundation.py -q`
+- Result after Reference Library / polling slice: `22 passed, 1 warning`.
+- Latest focused Web/API verification after Project Hub template / module split slice: `22 passed, 1 warning`.
+- Latest focused Web/API verification after Runtime-hosted Workbench entry:
+  `23 passed, 1 warning`.
+- Latest focused Web/API verification after Draft Canvas integration:
+  `24 passed, 1 warning`.
+- Latest focused Web/API verification after Project Readiness integration:
+  API readiness/action tests `7 passed, 1 warning`; Web foundation `7 passed`.
+- Final Project Readiness slice verification:
+  focused Runtime/Web/API `24 passed, 1 warning`; Runtime-hosted HTTP smoke passed; full pytest `835 passed, 1 warning`.
+- Latest focused Web/API verification after Stage Navigation integration:
+  Web foundation `8 passed`; focused Runtime/Web/API `25 passed, 1 warning`; Runtime-hosted HTTP smoke passed; full pytest `836 passed, 1 warning`.
+- Latest focused Web/API verification after Activity Timeline integration:
+  Activity state/Web foundation `10 passed, 1 warning`; Web foundation after artifact-ref handler fix `9 passed`; focused Runtime/Web/API `26 passed, 1 warning`.
+- Final Activity Timeline slice verification:
+  CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`;
+  retention review `delete_candidate_count=0`, `manual_review_required_count=0`;
+  Runtime-hosted Activity Timeline HTTP smoke passed; full pytest `837 passed, 1 warning`.
+- Draft Canvas HTTP smoke on port 8792: `draft_canvas succeeded`, 3 generated
+  cards, 3 filmstrip items, `/workbench/` returned `200`.
+- Runtime HTTP smoke on port 8791: `/health`, `/workbench/`, and
+  `/workbench/src/app.js` returned `200` with expected shell/module content.
+- Broader focused Runtime/Web/API verification: `22 passed, 1 warning`.
+- CLI help/version passed; version output: `0.1.0`.
+- `maintenance_audit`: `failed=0`, `passed=6`, `warning=0`.
+- `repository_retention_review --summary-only`: `delete_candidate_count=0`, `manual_review_required_count=0`.
+- Full pytest: `833 passed, 1 warning`.
+- Earlier foundation verification before the Review Room / Job Center extension:
+  `.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_service.py tests\test_api_runtime_workbench_state.py tests\test_web_workbench_foundation.py -q`
+- Earlier result: `21 passed, 1 warning`.
+- CLI help/version passed.
+- `maintenance_audit`: `failed=0, passed=6, warning=0`.
+- `repository_retention_review --summary-only`: `delete_candidate_count=0`, `manual_review_required_count=0`.
+- Full pytest: `832 passed, 1 warning`.
+- `git diff --check` passed with CRLF normalization warnings only.

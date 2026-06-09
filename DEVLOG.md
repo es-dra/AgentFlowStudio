@@ -5,11 +5,74 @@
 ## 当前证据入口
 
 - 当前任务账本：`TASK_TRACKER.md`
+- 落地前内容制作 / 记忆链路与 Web 规划：`docs/handoff/AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001.md`
 - 低成本维护收口：`docs/maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md`
 - Product Spine Reset 账本：`docs/maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md`
 - 本地内测落地记录：`docs/handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`
 - Runtime Service 前端对接：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`
+
+## 2026-06-09 - Web Foundation 001
+
+- Added Runtime Service workbench-state projection for frontend-facing project/canvas/events/provider status.
+- Kept provider execution backend-gated and surfaced only safe UI summary for provider preflight state.
+- Added `apps/workbench` as the new Runtime Service-backed product frontend foundation, separate from transitional `apps/web`.
+- Implemented runtime client, workbench-state normalizer, DOM renderer, canvas workspace shell, inspector, jobs lane, provider gate panel, and collapsed advanced diagnostics.
+- Added local Runtime Service CORS for localhost and direct file-origin workbench use.
+- Classified `apps/workbench` in retention policy as current production spine.
+- Added focused frontend boundary tests to prevent browser persistence, old bridge/CLI coupling, private local data references, and oversized new frontend files.
+- Added implementation handoff: `docs/handoff/AFS-WEB-FOUNDATION-001.md`.
+
+Boundaries:
+
+- No live provider call was started.
+- No secret, signed URL, private media, provider raw response, or generated media bytes were written.
+- This is not human acceptance, business validation, or durable memory.
+- `apps/workbench` is still a foundation; project-create/run/feedback actions are the next slice.
+
+## 2026-06-09 - Web Workflow Controls 001
+
+- Advanced `apps/workbench` from a read-only state shell to Runtime Service workflow controls.
+- Added project create/open/import/export actions, deterministic Round 1 asset-test trigger, raw feedback recording, Round 2 validation trigger, provider preflight trigger, and safe artifact loading.
+- Split frontend rendering into smaller modules: `dom.js`, `render-actions.js`, and `render-artifact.js`.
+- Updated the frontend state adapter to consume backend `cards/card_id/primary_artifact_id` workbench-state payloads.
+- Added workflow-control assertions to `tests/test_web_workbench_foundation.py`.
+- Added handoff: `docs/handoff/AFS-WEB-WORKFLOW-CONTROLS-001.md`.
+- Added Runtime Service static hosting for the Workbench at `/workbench/`, so
+  frontend/backend integration can start from the same service origin instead
+  of a file-only shell.
+- Added deterministic Draft Canvas flow: Runtime Service now turns safe
+  brief/reference/script summaries into Hook / Proof / CTA canvas cards, and
+  Workbench exposes this as a one-click Scene Planner action.
+
+Boundaries:
+
+- No live provider call was started.
+- Browser-side workflow execution was not introduced; all execution still goes through Runtime Service.
+- No secret, signed URL, private media, provider raw response, or generated media bytes were written.
+- HTTP smoke for `/workbench/` passed through a temporary Runtime Service;
+  Draft Canvas HTTP smoke created 3 canvas cards and a 3-item filmstrip;
+  browser screenshot QA is still pending because no Browser/Playwright/headless
+  browser runtime is available in the current environment.
+
+## 2026-06-09 - Landing Prep Content / Memory / Web 001
+
+- 重新按 COS / 全局映射规则定位本轮：先跑通内容制作 / 记忆链路，再规划 Web workbench；纯切片链路暂不进入下一阶段开发。
+- 调研 LibTV、RHTV、芒果灵创等外部画布/影视 AIGC 工作台，提炼为 AFS 的 evidence-native operator workbench，而不是照搬通用媒体画布。
+- 审计 Runtime Service v0.2 前端 contract：当前已覆盖 project manifest、asset-test、feedback、two-round validation、provider validation plan、safe artifact read、project import/export。
+- 使用 `examples/frontend_runtime_service/` 请求 fixture 跑通 deterministic Runtime Service 链路，runtime 输出保存在 ignored 目录 `data/processed/runs/landing_prep_001_runtime_service_20260609`。
+- 形成后端协同开发判断：第一版 Web 实现前应补一个 normalized workbench state adapter，并统一 blocker/node status 形状。
+- 新增规划 handoff：`docs/handoff/AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001.md`。
+- 根据用户反馈修正 Web 定位：默认界面应接近现有画布类工具的低学习成本体验，AFS 的 evidence / memory / harness 细节进入后台能力和高级检查抽屉，不作为主界面默认心智模型。
+- 进一步将 Web 规划从单一画布扩展为完整工业化前端：Project Hub、Project Setup、Asset Library、Creation Canvas、Review Room、Project Style Memory、Generation Queue、Advanced Diagnostics，并将下一阶段任务拆成 backend adapter、frontend foundation、project/setup、creation workspace、review/style memory、provider smoke 和 QA release gate。
+
+边界：
+
+- 未实现 Web UI。
+- 未启动 provider。
+- 未写入 secret、signed URL、本地私有素材、provider 原始响应或生成媒体字节。
+- 未声明 human acceptance、business validation 或 durable memory。
+- 未写入或晋升 `10-Startup` / COS active rule。
 
 ## 2026-06-09 - 低成本维护强删收口
 
@@ -162,3 +225,38 @@
 
 - `maintenance_audit`: `failed=0, passed=6, warning=0`。
 - 完整 CLI、focused pytest、full pytest 和 `git diff --check` 在最终提交前执行。
+
+## 2026-06-09 - Web Workbench Industrialization Slices
+
+- Extended Runtime Service v0.2 and `apps/workbench` from a basic shell into a fuller production workbench: safe source assets, scene/content cards, Scene Inspector, Filmstrip, Review Room, Style Memory, Job Center, Reference Library, project templates, source presets, and safe artifact views.
+- Added frontend-safe `workbench-state` projections for `asset_library`, `review_room`, `style_memory`, and `job_center`; details are tracked in `docs/handoff/AFS-WEB-WORKFLOW-CONTROLS-001.md`.
+- Split frontend modules to keep the baseline maintainable: `app-actions.js`, `app-selection.js`, `input-sync.js`, `presets.js`, `polling.js`, `render-assets.js`, `render-review.js`, and `render-jobs.js`.
+- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private asset locations, no media bytes, no provider raw responses, no human acceptance/business validation/durable memory claims.
+- Latest focused Runtime/Web/API verification: `22 passed, 1 warning`; `maintenance_audit`: `failed=0, passed=6, warning=0`.
+
+## 2026-06-09 - Web Workbench Project Readiness Slice
+
+- Added backend `project_readiness` projection to `GET /projects/{project_id}/workbench-state`, summarizing safe source materials, Draft Canvas, first generation check, review feedback, next round, and provider preflight gates.
+- Wired `workspace.primary_action` to the readiness projection so the frontend has one safe next-action source instead of parallel UI-only state logic.
+- Added frontend Project Readiness panel, readiness state normalization, action mapping, and a split `styles-readiness.css` file to keep Web files below the maintenance threshold.
+- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private asset paths, no generated media bytes, no provider raw responses, and no durable-memory or human-acceptance claim.
+- Focused verification during the slice: `tests/test_api_runtime_workbench_state.py tests/test_api_runtime_workbench_actions.py` -> `7 passed, 1 warning`; `tests/test_web_workbench_foundation.py` -> `7 passed`.
+- Final verification after records: focused Runtime/Web/API `24 passed, 1 warning`; CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; Runtime-hosted HTTP smoke passed; full pytest `835 passed, 1 warning`.
+
+## 2026-06-09 - Web Workbench Stage Navigation Slice
+
+- Added in-memory `activeView` routing for the Workbench rail so users can switch between Projects, Create, Assets, Review, Style Memory, Jobs, and Settings without seeing every panel at once.
+- Updated the rail to emit explicit `data-view` buttons and render active navigation state from the current view.
+- Made `renderActionPanel` group-aware so each view can show only the relevant project, asset, scene, review, runtime, and result controls.
+- Boundaries preserved: browser state remains memory-only, no provider calls were started, and no local private paths, signed URLs, provider raw responses, or media bytes are exposed.
+- Focused verification: Web foundation `8 passed`; Runtime/Web/API focused suite `25 passed, 1 warning`; Runtime-hosted HTTP smoke passed for `/workbench/` and `/workbench/src/render.js`; full pytest `836 passed, 1 warning`.
+
+## 2026-06-09 - Web Workbench Activity Timeline Slice
+
+- Added backend `activity_timeline` projection to `GET /projects/{project_id}/workbench-state`, summarizing runtime activity counts, latest jobs, blocked actions, safe primary artifact refs, and non-claim boundaries.
+- Added frontend Activity Timeline normalization and rendering so Review, Style Memory, Jobs, and Settings views can expose project execution history without exposing CLI internals or provider details.
+- Split the slice into maintainable modules: `runtime_workbench_activity.py`, `activity-state.js`, `render-activity.js`, and `styles-activity.css`.
+- Fixed the `open-artifact-ref` click path to use the registered `open-selected-artifact` handler, with a Web foundation regression test covering the binding.
+- Boundaries preserved: no provider calls, no secrets, no signed URLs, no private local paths, no provider raw responses, no generated media bytes, no human acceptance/business validation/durable-memory claim.
+- Focused verification during the slice: `tests/test_api_runtime_workbench_state.py tests/test_web_workbench_foundation.py` -> `10 passed, 1 warning`; Web foundation after handler fix -> `9 passed`; broader Runtime/Web/API focused suite -> `26 passed, 1 warning`.
+- Final verification after records: CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; Runtime-hosted Activity Timeline HTTP smoke passed; full pytest `837 passed, 1 warning`.

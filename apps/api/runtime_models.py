@@ -19,6 +19,42 @@ class ProjectImportRequest(BaseModel):
     manifest: dict[str, Any]
 
 
+class SourceAssetRegisterRequest(BaseModel):
+    asset_id: str = Field(min_length=1)
+    asset_type: str = "reference"
+    label: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+
+
+class ContentCardRegisterRequest(BaseModel):
+    card_id: str = Field(min_length=1)
+    card_type: str = "scene"
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    target_platform: str = "short_video"
+
+
+class ReviewDecisionRecordRequest(BaseModel):
+    card_id: str = Field(min_length=1)
+    candidate_id: str | None = None
+    artifact_id: str | None = None
+    decision: Literal["keep", "revise", "reject"]
+    note: str = Field(min_length=1)
+    generated_at: str = Field(min_length=1)
+
+
+class SceneInspectorUpdateRequest(BaseModel):
+    card_id: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    reference_summary: str = Field(min_length=1)
+    style_direction: str = Field(min_length=1)
+    retry_intent: str = Field(min_length=1)
+
+
+class CanvasDraftRequest(BaseModel):
+    generated_at: str = Field(min_length=1)
+
+
 class AssetTestRunRequest(BaseModel):
     project_id: str = Field(min_length=1)
     asset_profile_seed: str = Field(min_length=1)
@@ -62,10 +98,15 @@ class FeedbackRecordRequest(BaseModel):
 
 __all__ = (
     "AssetTestRunRequest",
+    "CanvasDraftRequest",
+    "ContentCardRegisterRequest",
     "FeedbackRecordRequest",
     "ProjectCreateRequest",
     "ProjectImportRequest",
     "ProviderValidationPlanRequest",
     "ProjectStatus",
+    "ReviewDecisionRecordRequest",
+    "SceneInspectorUpdateRequest",
+    "SourceAssetRegisterRequest",
     "TwoRoundValidateRequest",
 )

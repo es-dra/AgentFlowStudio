@@ -31,6 +31,9 @@ asset profile package
 
 ## Runtime Service / Frontend Handoff
 
+- `AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001.md`
+- `AFS-WEB-FOUNDATION-001.md`
+- `AFS-WEB-WORKFLOW-CONTROLS-001.md`
 - `AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
 
@@ -57,6 +60,6 @@ Deleted from current handoff surface:
 ## Routing Rule
 
 - Product/tester handoff: start with the asset loop current evidence.
-- Frontend integration: start with Runtime Service / frontend contract handoffs.
+- Frontend integration: start with the landing prep plan, then Runtime Service / frontend contract handoffs.
 - New Web work: start from the read-only asset cockpit handoff and current Web tests.
 - Provider work: start from provider-gated docs and never infer authorization from deterministic test success.

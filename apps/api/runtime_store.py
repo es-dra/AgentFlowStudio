@@ -9,7 +9,6 @@ from uuid import uuid4
 from agentflow.contracts.project_manifest import validate_project_manifest
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
 from agentflow.harness.json_io import write_json
-from agentflow.memory.production_loop import SCHEMA_VERSION
 
 
 SAFE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
@@ -48,6 +47,7 @@ class RuntimeStore:
             "project_type": project_type,
             "goal": goal,
             "source_assets": [],
+            "content_cards": [],
             "runs": [],
             "packages": [],
             "feedback_refs": [],
@@ -108,6 +108,29 @@ class RuntimeStore:
         write_json(self.project_manifest_path(project_id), manifest)
         return manifest
 
+    def add_source_asset(self, project_id: str, asset_ref: dict[str, Any]) -> dict[str, Any]:
+        reject_unsafe_payload(asset_ref)
+        return self.update_project_manifest(project_id, {"source_assets": [asset_ref]}, status="in_progress")
+
+    def add_content_card(self, project_id: str, content_card: dict[str, Any]) -> dict[str, Any]:
+        reject_unsafe_payload(content_card)
+        return self.update_project_manifest(project_id, {"content_cards": [content_card]}, status="in_progress")
+
+    def update_content_card(self, project_id: str, card_id: str, updates: dict[str, Any]) -> dict[str, Any]:
+        manifest = self.ensure_project_manifest(project_id)
+        cards = list(manifest.get("content_cards", []))
+        for index, item in enumerate(cards):
+            if isinstance(item, dict) and item.get("card_id") == card_id:
+                merged = {**item, **updates}
+                reject_unsafe_payload(merged)
+                cards[index] = merged
+                manifest["content_cards"] = cards
+                manifest["status"] = "in_progress"
+                validate_project_manifest(manifest)
+                write_json(self.project_manifest_path(project_id), manifest)
+                return manifest
+        raise ValueError("content card not found")
+
     def new_job_id(self, action: str, project_id: str) -> str:
         return f"{safe_id(project_id)}-{safe_id(action)}-{uuid4().hex[:12]}"
 
@@ -123,6 +146,14 @@ class RuntimeStore:
         if not path.exists():
             raise KeyError(job_id)
         return read_json(path)
+
+    def list_project_jobs(self, project_id: str) -> list[dict[str, Any]]:
+        jobs: list[dict[str, Any]] = []
+        for path in sorted(self.jobs_dir.glob("*.json"), key=lambda item: item.stat().st_mtime):
+            job = read_json(path)
+            if job.get("project_id") == project_id:
+                jobs.append(public_job(job))
+        return jobs
 
     def register_artifact(self, path: Path, *, role: str) -> dict[str, Any]:
         resolved = Path(path).resolve()
@@ -193,6 +224,7 @@ def project_summary(manifest: dict[str, Any], artifact: dict[str, Any]) -> dict[
         "package_count": len(manifest.get("packages", [])),
         "feedback_count": len(manifest.get("feedback_refs", [])),
         "profile_version_count": len(manifest.get("profile_version_refs", [])),
+        "content_card_count": len(manifest.get("content_cards", [])) if isinstance(manifest.get("content_cards"), list) else 0,
         "artifact": artifact,
     }
 
@@ -221,26 +253,10 @@ def _is_within(path: Path, root: Path) -> bool:
         return False
 
 
-def runtime_feedback_event(project_id: str, feedback: dict[str, Any], generated_at: str) -> dict[str, Any]:
-    return {
-        "artifact_type": "agentflow_runtime_feedback_event",
-        "schema_version": SCHEMA_VERSION,
-        "feedback_id": f"runtime-feedback:{project_id}:{uuid4().hex[:12]}",
-        "project_id": project_id,
-        "generated_at": generated_at,
-        "feedback": feedback,
-        "feedback_is_memory": False,
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-        "non_claims": ["not durable memory", "not human acceptance", "not business validation"],
-    }
-
-
 __all__ = (
     "RuntimeStore",
     "project_summary",
     "public_job",
     "read_json",
-    "runtime_feedback_event",
     "safe_id",
 )

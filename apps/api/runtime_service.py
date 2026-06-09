@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from apps.api.runtime_cors import configure_runtime_cors
+from apps.api.runtime_info import runtime_capabilities_payload, runtime_health_payload
 from apps.api.runtime_artifacts import (
     asset_run_artifacts,
     feedback_ref,
@@ -13,6 +15,7 @@ from apps.api.runtime_artifacts import (
     two_round_artifacts,
     update_project_after_asset_run,
 )
+from apps.api.runtime_events import runtime_feedback_event
 from apps.api.runtime_jobs import (
     load_round_1_job,
     optional_path,
@@ -35,8 +38,9 @@ from apps.api.runtime_tracing import (
     safe_request_ref,
     write_run_trace,
 )
-from apps.api.runtime_store import RuntimeStore, read_json, runtime_feedback_event
+from apps.api.runtime_store import RuntimeStore, read_json
 from apps.api.runtime_v02 import register_runtime_v02_routes
+from apps.api.runtime_workbench_static import configure_workbench_static
 from agentflow.harness.json_io import write_json
 from agentflow.memory.production_asset_provider_validation_gate import run_provider_validation_gate
 from agentflow.memory.production_asset_test_run_harness import run_real_asset_test_harness
@@ -53,43 +57,16 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         version="0.2.0",
         summary="Local AFS API adapter for frontend canvas/workbench integration.",
     )
+    configure_runtime_cors(app)
+
     @app.get("/health")
     def health() -> dict[str, Any]:
-        return {
-            "service": "agentflow_runtime_service",
-            "status": "ready",
-            "service_version": "0.2.0",
-            "schema_version": "0.1.0",
-            "runtime_root_persisted": False,
-            "boundaries": {
-                "local_only": True,
-                "no_database": True,
-                "no_account_system": True,
-                "no_browser_persistence": True,
-                "no_provider_call_by_default": True,
-                "no_durable_memory_write": True,
-            },
-        }
+        return runtime_health_payload()
 
     @app.get("/capabilities")
     def capabilities() -> dict[str, Any]:
-        return {
-            "actions": [
-                "create_project",
-                "list_projects",
-                "import_project",
-                "export_project",
-                "read_project_manifest",
-                "read_artifact",
-                "asset_test_run",
-                "two_round_validate",
-                "record_feedback",
-                "provider_validation_plan",
-                "export_openapi_schema",
-            ],
-            "statuses": ["queued", "running", "succeeded", "failed", "blocked", "cancelled"],
-            "safe_ref_policy": "frontend receives artifact_id and summaries, not private local paths",
-        }
+        return runtime_capabilities_payload()
+
     @app.post("/projects")
     def create_project(request: ProjectCreateRequest) -> dict[str, Any]:
         manifest = store.create_project_manifest(
@@ -289,10 +266,18 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         )
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         job = runtime_job(job_id, request.project_id, "provider_validation_plan", status, artifacts=artifacts)
+        job["ui_summary"] = {
+            "provider_gate": {
+                "status": safe_manifest.get("status", status),
+                "provider_calls_started": safe_manifest.get("provider_calls_started") is True,
+                "blockers": safe_manifest.get("blockers") or safe_manifest.get("blocks") or [],
+            }
+        }
         public_job = store.write_job(job)
         return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts}
 
     register_runtime_v02_routes(app, store)
+    configure_workbench_static(app)
 
     return app
 

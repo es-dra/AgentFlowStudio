@@ -1,6 +1,6 @@
 # AFS API Adapter 计划
 
-状态：Runtime Service v0.1。
+状态：Runtime Service v0.2。
 
 ## 目的
 
@@ -20,6 +20,12 @@ frontend action
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
+```
+
+Workbench 静态入口由 Runtime Service 提供：
+
+```text
+http://127.0.0.1:8790/workbench/
 ```
 
 可选 runtime root：
@@ -52,6 +58,11 @@ blocked
 cancelled
 ```
 
+### `GET /workbench/`
+
+返回 `apps/workbench` 静态前端入口。该入口只服务浏览器工作台文件；
+执行仍必须通过 Runtime Service API，不允许浏览器直接调用 CLI、扫描本地目录或读取私有素材。
+
 ### `POST /projects`
 
 创建本地 `agentflow_project_manifest`。
@@ -71,6 +82,64 @@ Response includes：
 ### `GET /projects/{project_id}/manifest`
 
 读取或创建 project manifest。前端应把它当作项目入口，不要通过扫描 runtime 目录重建项目。
+
+### `POST /projects/{project_id}/source-assets`
+
+Registers source assets or references as safe summaries. The browser sends
+only `asset_id`, `asset_type`, `label`, and `summary`; the Runtime Service
+stores a manifest ref with `ref_kind= safe_summary` and does not persist local
+media paths or bytes.
+
+### `POST /projects/{project_id}/content-cards`
+
+Registers user-facing content or scene cards for the creation canvas. The
+browser sends `card_id`, `card_type`, `title`, `summary`, and
+`target_platform`. The Runtime Service stores a safe content-card summary and
+projects it into workbench canvas cards plus the filmstrip.
+
+### `POST /projects/{project_id}/canvas-draft`
+
+Drafts a first Hook / Proof / CTA creation canvas from the project's safe
+source summaries. The Runtime Service reads only Project Manifest summaries,
+writes `agentflow_runtime_canvas_draft`, appends safe content cards to the
+manifest, and records a `draft_canvas` job for the Job Center. It does not call
+providers, persist private asset locations, or promote memory.
+
+### `POST /projects/{project_id}/scene-inspector`
+
+Updates the selected scene/content card with safe inspector summaries:
+`prompt`, `reference_summary`, `style_direction`, and `retry_intent`.
+This endpoint stores planning text only. It does not persist private paths,
+media bytes, provider raw responses, or generated outputs.
+
+### `POST /projects/{project_id}/review-decisions`
+
+Records a user-facing review decision for a canvas card or concrete review
+candidate. The browser sends `card_id`, optional `candidate_id`, optional
+`artifact_id`, `decision` (`keep`, `revise`, or `reject`), `note`, and
+`generated_at`. The Runtime Service writes a safe review-decision artifact,
+adds it to project feedback refs, and does not promote it to durable memory.
+
+### `GET /projects/{project_id}/workbench-state`
+
+读取前端可直接消费的项目工作台状态。该 endpoint 把 manifest、jobs、artifact refs、provider gate 和 blockers 翻译成用户语言：
+
+- project summary；
+- navigation labels；
+- canvas cards；
+- asset library；
+- filmstrip；
+- review room candidates and decision counts；
+- style memory product summary；
+- job center progress, polling policy, and blocked-action guidance；
+- activity timeline counts, blockers, latest actions, and safe primary artifact refs；
+- project event history；
+- provider preflight state；
+- advanced evidence refs。
+
+前端应优先用它驱动画布、项目中心、任务状态和审片入口，不应在浏览器端自行拼接底层 artifact 图谱。
+
+`workbench-state` also includes `project_readiness` for the current safe next action and workflow gate statuses, and `activity_timeline` for product-facing runtime trace navigation.
 
 ### `GET /artifacts/{artifact_id}`
 

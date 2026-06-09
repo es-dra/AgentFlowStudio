@@ -30,7 +30,7 @@ Project Manifest
 前端只对接：
 
 ```text
-AFS Runtime Service v0.1
+AFS Runtime Service v0.2
 ```
 
 默认本地 URL：
@@ -53,6 +53,12 @@ http://127.0.0.1:8790
 | `/capabilities` | implemented | action/status discovery |
 | `/projects` | implemented | 创建本地 project manifest |
 | `/projects/{project_id}/manifest` | implemented | project workbench entrypoint |
+| `/projects/{project_id}/source-assets` | implemented | register safe asset/reference summaries |
+| `/projects/{project_id}/content-cards` | implemented | register user-facing scene/content cards for canvas and filmstrip |
+| `/projects/{project_id}/canvas-draft` | implemented | draft Hook/Proof/CTA canvas cards from safe source summaries |
+| `/projects/{project_id}/scene-inspector` | implemented | save selected scene prompt/reference/style/retry summaries |
+| `/projects/{project_id}/review-decisions` | implemented | record keep/revise/reject decisions as evidence, optionally bound to a safe candidate/artifact ref |
+| `/projects/{project_id}/workbench-state` | implemented | 读取前端可直接消费的 project/asset library/canvas/cards/review room/style memory/job center/provider state |
 | `/artifacts/{artifact_id}` | implemented | safe artifact read |
 | `/runs/asset-test` | implemented | 运行 Round 1 deterministic asset loop |
 | `/runs/two-round-validate` | implemented | 运行 Round 2 context validation |
@@ -77,6 +83,15 @@ Project
 ```
 
 边只指向 `artifact_id` 和 status，不指向本地文件路径。
+
+`workbench-state` also includes product-facing panels:
+
+- `project_readiness`: current action, safe workflow gate statuses, and non-claim badges.
+- `review_room`: planned scene, first-check, and next-round candidates with comparison points.
+- `style_memory`: reusable style preferences and next-pass usage language.
+- `job_center`: runtime job counts, progress, guidance, polling policy, and safe artifact refs.
+- `activity_timeline`: runtime activity history, blockers, status counts, and safe primary artifact refs.
+- `asset_library`: safe brief/reference/script summaries for the Reference Library panel.
 
 ## 硬边界
 
@@ -109,11 +124,14 @@ Project
 构建本地项目工作台，至少支持：
 
 1. 创建或打开 project manifest。
-2. 从表单启动 Round 1 asset test run。
-3. 渲染返回的 `real_asset_test_report`。
-4. 记录 raw tester feedback。
-5. 从 Round 1 job 启动 Round 2 validation。
-6. 渲染 included refs、blocked refs、improvement assessment。
-7. 渲染 provider readiness / blocker state。
+2. 通过 Project Hub templates 和 source presets 快速建立安全项目输入。
+3. 从 safe source summaries 一键生成 Hook / Proof / CTA 首版画布草稿。
+4. 从表单启动 Round 1 asset test run。
+5. 渲染返回的 `real_asset_test_report`。
+6. 记录 raw tester feedback。
+7. 从 Round 1 job 启动 Round 2 validation。
+8. 渲染 included refs、blocked refs、improvement assessment。
+9. 渲染 provider readiness / blocker state。
+10. 渲染 Reference Library、Review Room、Style Memory 和 Job Center，形成接近完整的内容制作工作台。
 
 第一版保持 local-only、single-user。
