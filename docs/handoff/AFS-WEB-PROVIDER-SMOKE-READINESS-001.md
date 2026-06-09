@@ -23,6 +23,7 @@ durable memory promotion.
 
 - Web release candidate exists at `/workbench/`.
 - Stage 7 browser QA completed on `proj_stage7_rc_1781016167554`.
+- Latest acceptance-first-screen cleanup is `c13681e fix(workbench): localize acceptance first screen`; it updates user-facing Runtime projection copy and project-list labeling without changing provider behavior.
 - Acceptance packet exists at
   `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`.
 - Visual demo index exists at

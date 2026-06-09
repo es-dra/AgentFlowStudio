@@ -105,11 +105,12 @@
     <header>
       <h1>AFS Web Workbench 发布候选演示索引</h1>
       <p>用途：在正式接入 provider 之前，快速查看当前中文 Workbench release candidate 的主路径截图、工程证据和验收边界。</p>
-      <p>当前分支：<code>codex/afs-landing-prep-web-plan-001</code>；提交：<code>b706dd5</code>。</p>
+      <p>当前分支：<code>codex/afs-landing-prep-web-plan-001</code>；提交：<code>c13681e</code>。</p>
       <div class="facts">
         <div class="fact"><strong>QA 项目</strong><span>proj_stage7_rc_1781016167554</span></div>
+        <div class="fact"><strong>最新 smoke</strong><span>proj_browser_vertical_1781025409</span></div>
         <div class="fact"><strong>浏览器错误</strong><span>console error = 0</span></div>
-        <div class="fact"><strong>主视图泄漏</strong><span>internal leak = false</span></div>
+        <div class="fact"><strong>首屏泄漏</strong><span>project id / Stage 7 / 乱码标题 = 0</span></div>
         <div class="fact"><strong>文本溢出</strong><span>overflow = 0</span></div>
       </div>
     </header>
@@ -118,6 +119,7 @@
         <h2>验收路径</h2>
         <div class="path">
           <div class="step">项目入口</div>
+          <div class="step">首屏中文复核</div>
           <div class="step">素材摘要</div>
           <div class="step">创作画布</div>
           <div class="step">分镜台</div>
@@ -159,7 +161,7 @@
 
       <section>
         <h2>下一步</h2>
-        <p>请按 <a href="./AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md">发布候选验收包</a> 在 <code>http://127.0.0.1:8790/workbench/</code> 做人工体验确认。确认通过后，再进入 capability-gated provider smoke。</p>
+        <p><a href="http://127.0.0.1:8790/workbench/">打开当前 Workbench</a>，并按 <a href="./AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md">发布候选验收包</a> 做人工体验确认。确认通过后，再进入 capability-gated provider smoke。</p>
       </section>
     </main>
   </body>

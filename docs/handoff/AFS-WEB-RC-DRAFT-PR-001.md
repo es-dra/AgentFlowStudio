@@ -23,7 +23,7 @@ master
 Current head:
 
 ```text
-3654419 docs(workbench): add release candidate demo index
+c13681e fix(workbench): localize acceptance first screen
 ```
 
 ## Draft PR Title
@@ -40,6 +40,7 @@ feat(workbench): add Chinese release candidate workspace
 - Adds a Runtime Service-backed Chinese Web Workbench release candidate for the content production / project memory path.
 - Splits the frontend into product workspaces: Projects, Create, Assets, Storyboard, Review, Style Memory, Jobs, and Settings/Diagnostics.
 - Adds user-facing Chinese display mappings, safe Runtime error messages, no-store Workbench static serving, Stage 7 browser QA ledger, acceptance packet, and visual demo index.
+- Localizes the acceptance first screen so the project list no longer exposes raw project ids, mojibake titles, old English demo text, or internal Stage 7 project names as primary user-facing labels.
 - Keeps provider execution gated; this PR does not start provider calls and does not claim human acceptance, business validation, or durable memory promotion.
 
 ## Evidence
@@ -48,6 +49,7 @@ feat(workbench): add Chinese release candidate workspace
 - Demo index: `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`
 - Acceptance packet: `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`
 - QA ledger: `docs/frontend_integration/AFS_WEB_UX_QA_LEDGER.zh-CN.md`
+- Latest browser vertical smoke project: `proj_browser_vertical_1781025409`
 
 ## Verification
 
@@ -60,6 +62,7 @@ Latest local results:
 
 - full pytest: `844 passed, 1 warning`
 - maintenance audit: `failed=0, passed=6, warning=0`
+- browser vertical flow smoke: `ready_for_next_round`, `provider_calls_started=false`
 - Runtime HTTP smoke: `/workbench/`, `app.js`, and `render.js` return `Cache-Control: no-store`
 
 ## Human Acceptance Gate

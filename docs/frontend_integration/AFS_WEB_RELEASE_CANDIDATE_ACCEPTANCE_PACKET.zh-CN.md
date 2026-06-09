@@ -1,7 +1,8 @@
 # AFS Web Workbench 发布候选验收包
 
-日期：2026-06-09
+日期：2026-06-10
 分支：`codex/afs-landing-prep-web-plan-001`
+当前 head：`c13681e fix(workbench): localize acceptance first screen`
 验收对象：Runtime Service 托管的 `/workbench/` 中文创作工作台 release candidate
 
 ## 定位
@@ -21,21 +22,23 @@
 
 1. 打开 `/workbench/`，确认首屏是中文工作台，而不是工程调试面板。
 2. 连接 Runtime Service，能看到项目入口和工作区导航。
-3. 从项目列表打开一个项目，或使用当前 QA 项目 `proj_stage7_rc_1781016167554`。
-4. 进入素材库，确认素材/参考只展示摘要，不展示本地绝对路径或媒体字节。
-5. 生成或加载画布草稿，确认画布节点、节点状态、右侧检查器和底部操作区能联动。
-6. 切换到分镜台，确认镜头序列、当前镜头、安全预览、引用/阻塞事实和审片入口可理解。
-7. 切换到审片室，执行一次保留 / 修改 / 拒绝类审片决定。
-8. 执行首轮素材检查，记录反馈，再执行下一轮验证。
-9. 切换到项目记忆，确认它展示的是“候选复用状态”和“下一轮约束”，没有声称已进入 durable memory。
-10. 切换到任务中心，确认任务、阻塞原因和 Provider 预检是独立工作区，不再压在创作主界面上。
-11. 打开设置/诊断，确认内部 id、action、job、artifact ref 只在诊断层出现。
-12. 在 1366x768、1440x900 和移动宽度下快速查看页面，确认没有严重错位、按钮不可见或文本溢出。
+3. 从项目列表打开一个项目，优先使用列表里的“验收演练项目”或当前 QA 项目 `proj_stage7_rc_1781016167554`。
+4. 检查项目列表：主标题应是项目目标、项目类型或中文归一标题，不应把 raw `project_id`、乱码标题或内部 Stage 7 命名作为主标题。
+5. 进入素材库，确认素材/参考只展示摘要，不展示本地绝对路径或媒体字节。
+6. 生成或加载画布草稿，确认画布节点、节点状态、右侧检查器和底部操作区能联动。
+7. 切换到分镜台，确认镜头序列、当前镜头、安全预览、引用/阻塞事实和审片入口可理解。
+8. 切换到审片室，执行一次保留 / 修改 / 拒绝类审片决定。
+9. 执行首轮素材检查，记录反馈，再执行下一轮验证。
+10. 切换到项目记忆，确认它展示的是“候选复用状态”和“下一轮约束”，没有声称已进入 durable memory。
+11. 切换到任务中心，确认任务、阻塞原因和 Provider 预检是独立工作区，不再压在创作主界面上。
+12. 打开设置/诊断，确认内部 id、action、job、artifact ref 只在诊断层出现。
+13. 在 1366x768、1440x900 和移动宽度下快速查看页面，确认没有严重错位、按钮不可见或文本溢出。
 
 ## 通过标准
 
 - 用户能用“项目 -> 素材 -> 画布 -> 分镜 -> 审片 -> 记忆 -> 任务”的心智完成一轮操作。
 - 主界面默认语言是中文，不需要理解 `project_id`、`job_id`、`artifact_id` 或 action 枚举才能继续。
+- 首屏项目列表不把历史演练 id、乱码标题、英文 demo 文案或内部 Stage 7 命名暴露为用户主标题。
 - 诊断信息存在，但不压过创作工作流。
 - Provider Gate 明确显示阻塞和预检状态，没有暗示已经调用真实模型。
 - 所有关键动作都有可见的成功、失败、阻塞或禁用反馈。
@@ -61,7 +64,8 @@
 - 可视化演示索引：`docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`。
 - 浏览器 QA：console error `0`，主视图可见英文 `false`，主视图内部 id 泄漏 `false`，文字溢出 `0`。
 - 人工验收前演练：刷新 `/workbench/` 后自动连接 Runtime Service，8 个工作区均可切换；console error `0`，列出的英文残留/内部 id/本地路径残留 `0`，文字溢出 `0`。
-- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781023264` 达到 `ready_for_next_round`，Provider 调用仍未启动。
+- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781025409` 达到 `ready_for_next_round`，Provider 调用仍未启动。
+- 2026-06-10 首屏中文体验复核：项目列表 `oldIdsVisible=false`，`questionMarkRuns=0`，`stageRcVisible=false`，`toastErrors=[]`；主视图英文残留扫描命中 `0`。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`
