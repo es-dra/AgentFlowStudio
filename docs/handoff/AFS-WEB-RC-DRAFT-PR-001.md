@@ -49,7 +49,7 @@ feat(workbench): add Chinese release candidate workspace
 - Demo index: `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`
 - Acceptance packet: `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`
 - QA ledger: `docs/frontend_integration/AFS_WEB_UX_QA_LEDGER.zh-CN.md`
-- Latest browser vertical smoke project: `proj_browser_vertical_1781029184`
+- Latest browser vertical smoke project: `proj_browser_vertical_1781030077`
 
 ## Verification
 
@@ -62,7 +62,7 @@ Latest local results:
 
 - full pytest: `844 passed, 1 warning`
 - maintenance audit: `failed=0, passed=6, warning=0`
-- browser vertical flow smoke: `ready_for_next_round`, `provider_calls_started=false`; latest default-root project `proj_browser_vertical_1781029184`
+- browser vertical flow smoke: `ready_for_next_round`, `provider_calls_started=false`; latest default-root project `proj_browser_vertical_1781030077`
 - acceptance first-screen and Create-view smoke assertions: no raw project ids, mojibake title runs, internal Stage 7 labels, legacy English projection copy, `completed_with_blocks`, English project-materials blocker, or error toasts
 - RuntimeStore corrupt `artifact_index.json` recovery: covered by focused Runtime API regression test
 - Runtime HTTP smoke: `/workbench/`, `app.js`, and `render.js` return `Cache-Control: no-store`

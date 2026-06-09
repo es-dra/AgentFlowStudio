@@ -79,7 +79,7 @@
 ## 2026-06-10 浏览器主路径复核
 
 - `tools/workbench_vertical_flow_browser_smoke.py` 已适配当前中文多工作区外壳：先展开诊断设置临时 Runtime URL，再显式切换到创作画布，不再依赖旧英文按钮文案。
-- 最新浏览器 smoke 项目：`proj_browser_vertical_1781029184`。
+- 最新浏览器 smoke 项目：`proj_browser_vertical_1781030077`。
 - 结果：`project_status = ready_for_next_round`，`readiness_status = ready_for_provider_preflight`，`current_action = run_provider_preflight`。
 - Provider 边界：`provider_calls_started = false`，`writes_long_term_memory = false`，`writes_company_kb = false`。
 - 最新截图：`data/processed/runs/workbench_browser_smoke/browser_evidence/workbench-ready-for-next-round.png`。
@@ -90,8 +90,9 @@
 - 修补：默认项目选择改为优先选择 `ready_for_next_round` 且证据更完整的项目；项目列表主标题改为项目目标/类型/计数，不再用 raw project id；明显乱码标题归一为“历史演练项目”，Stage 7 内部项目归一为“验收演练项目”。
 - 修补：素材库、项目就绪度、操作指令、制作进度、任务中心、任务与 Provider、审片室、内容卡片等用户可见 projection 文案中文化；保留 action/status/non-claims 等合同枚举边界。
 - 浏览器复核：项目列表 `old_project_ids_visible = false`，`question_mark_runs = 0`，`stage_rc_visible = false`，`toast_errors = []`；旧英文 projection 文案扫描命中 `0`。
-- 自动化固化：`tools/workbench_vertical_flow_browser_smoke.py` 已将上述首屏检查升级为硬断言；最新 smoke 项目 `proj_browser_vertical_1781029184` 到达 `ready_for_next_round`，且 `provider_calls_started = false`。
+- 自动化固化：`tools/workbench_vertical_flow_browser_smoke.py` 已将上述首屏检查升级为硬断言；最新 smoke 项目 `proj_browser_vertical_1781030077` 到达 `ready_for_next_round`，且 `provider_calls_started = false`。
 - 2026-06-10 PM 复核补充：Create 视图中的内部状态 `completed_with_blocks` 和英文 blocker `Add project materials before running a real generation pass.` 已改为中文用户文案，并纳入可见文本泄漏断言；默认 smoke 根目录中损坏的 `artifact_index.json` 已由 RuntimeStore 自动修复路径覆盖。
+- 2026-06-10 视口工作台复核：`/workbench/` 已从整页长滚动改为视口锁定应用壳；917x791 浏览器下 Projects/Create/Jobs/Settings 的 `documentElement.scrollHeight = 791`，长内容进入 `.workspace` 内部滚动，旧英文/内部枚举泄漏为 `0`。
 - 边界：本轮仍为工程验收前复核，不等于 human acceptance、business validation 或 durable memory promotion；Provider 未启动。
 
 ## 当前残留风险

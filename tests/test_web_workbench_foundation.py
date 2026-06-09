@@ -283,12 +283,10 @@ def test_workbench_files_stay_below_maintenance_threshold() -> None:
 
 
 def test_workbench_uses_multi_tone_product_palette() -> None:
-    css = _read(WORKBENCH_ROOT / "styles.css") + _read(WORKBENCH_ROOT / "styles-components.css")
+    css = _read(WORKBENCH_ROOT / "styles.css") + _read(WORKBENCH_ROOT / "styles-components.css") + _read(WORKBENCH_ROOT / "styles-app-shell.css")
 
-    assert "--accent: #1f6f5b" in css
-    assert "--accent-2: #b45b39" in css
-    assert "--ready: #315f99" in css
-    assert "--blocked: #a83b32" in css
+    assert all(token in css for token in ["--accent: #1f6f5b", "--accent-2: #b45b39", "--ready: #315f99", "--blocked: #a83b32"])
+    assert all(token in css for token in ["height: 100vh", "overflow: hidden", "overflow-y: auto", "overscroll-behavior: contain"])
 
 
 def test_workbench_javascript_syntax() -> None:
