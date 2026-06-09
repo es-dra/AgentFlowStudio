@@ -58,7 +58,7 @@ http://127.0.0.1:8790
 - 通过创作画布统一查看主命令、素材参考、创作画布、检查器、分镜条、审片队列、风格记忆和 runtime 摘要。
 - 通过制作流程查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
 - 通过下一步操作查看当前主命令、阶段命令、所需输入和 provider gate 阻塞原因。
-- Job Center 会对当前 project 做自动刷新，不启动 provider。
+- 任务中心会对当前 project 做自动刷新，不启动 provider。
 - 前端对 Runtime action/status/stage 做中文显示适配，内部 id 不直接变成用户操作语言。
 - 触发首轮 deterministic asset test、记录 raw feedback、触发 two-round validation。
 - 触发 provider preflight，但不启动 live provider。
@@ -90,6 +90,8 @@ Workbench 读取 `review_room`、`style_memory` 和 `memory_workspace`。审片�
 ## 任务中心与诊断
 
 Workbench 读取 `operations_workspace`、`activity_timeline` 和 `advanced_evidence`。任务中心展示 job queue、latest activity、provider preflight、provider controls 和 blocker counts；诊断区用于连接运行服务、查看内部引用和安全边界。它不会启动 live provider，也不会绕过 capability gate。
+
+当前任务中心只通过 `render-operations-workspace.js` 渲染；旧 `render-jobs.js` 已删除，避免恢复英文 Job Center 面板和重复维护路径。审片与项目记忆也分别由 `render-review-workspace.js`、`render-style-memory-workspace.js` 承担，不再保留旧的混合记忆面板。
 
 ## 制作流程与下一步操作
 

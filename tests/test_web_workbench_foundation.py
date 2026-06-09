@@ -30,8 +30,6 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "render-actions.js",
     WORKBENCH_ROOT / "src" / "render-command-hub.js",
     WORKBENCH_ROOT / "src" / "render-project-hub.js",
-    WORKBENCH_ROOT / "src" / "render-creation-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-memory-workspace.js",
     WORKBENCH_ROOT / "src" / "render-review-workspace.js",
     WORKBENCH_ROOT / "src" / "render-style-memory-workspace.js",
     WORKBENCH_ROOT / "src" / "render-operations-workspace.js",
@@ -44,7 +42,6 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "render-production-board.js",
     WORKBENCH_ROOT / "src" / "render-assets.js",
     WORKBENCH_ROOT / "src" / "render-artifact.js",
-    WORKBENCH_ROOT / "src" / "render-jobs.js",
     WORKBENCH_ROOT / "src" / "render-readiness.js",
     WORKBENCH_ROOT / "src" / "render.js",
     WORKBENCH_ROOT / "src" / "app.js",
@@ -122,6 +119,8 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     source = _all_workbench_source()
     js_source = "\n".join(_read(path) for path in WORKBENCH_JS)
 
+    for retired in ["render-jobs.js", "render-creation-workspace.js", "render-memory-workspace.js"]:
+        assert not (WORKBENCH_ROOT / "src" / retired).exists()
     forbidden_patterns = [
         "localStorage",
         "indexedDB",
@@ -166,7 +165,7 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
         "set-review-intent",
         "candidateSummary(candidate)", "isEnglishFallback", "查看证据",
         "selected_card_id", "selected_candidate_id", "selected_job_id",
-        "viewActionGroups", "configureJobPolling", "auto refresh", "保存检查器",
+        "viewActionGroups", "configureJobPolling", "自动刷新", "保存检查器",
         "inspector-prompt", "reusable_preferences", "next_pass_usage",
         "保留方向", "标记修改", "拒绝候选", "record-review-decision",
     ]:
@@ -225,8 +224,9 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "renderReviewWorkspace(workbench.review_room, workbench.memory_workspace, state)" in render
     assert "renderStyleMemoryWorkspace(workbench.style_memory, workbench.memory_workspace)" in render
     assert "renderActivityTimeline" not in style_memory_block
-    assert "renderMemoryWorkspace(workbench.memory_workspace, state)" not in render
     assert "renderOperationsWorkspace(workbench.operations_workspace)" in render
+    for retired in ["renderMemoryWorkspace", "renderJobCenter", "renderCreationWorkspace"]:
+        assert retired not in render
     assert "...common" not in jobs_block
     assert '"set-review-intent": () =>' in app
     assert "state.selectedVariantId = dataset.variantId || state.selectedVariantId" in app

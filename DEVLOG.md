@@ -292,3 +292,9 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Browser rehearsal covered Projects, Create, Assets, Storyboard, Review, Style Memory, Jobs, and Settings: console errors `0`, checked English/internal-id/local-path leaks `0`, text overflow `0`.
 - Evidence screenshot: `data/processed/runs/workbench_live_demo/qa/acceptance-rehearsal-auto-connect-clean-1440x900.png`.
 - Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and this rehearsal is still not human acceptance, business validation, or durable memory promotion.
+
+## 2026-06-10 - Web Workbench Dead Renderer Cleanup
+- Deleted retired Workbench renderers that no longer feed the stage-based app shell: old Job Center, old Creation Workspace, and old mixed Memory Workspace.
+- Kept the current product paths fixed on `render-operations-workspace.js`, `render-studio-workspace.js`, `render-storyboard-workspace.js`, `render-review-workspace.js`, and `render-style-memory-workspace.js`.
+- Updated Web foundation tests and README so future work does not accidentally restore the old English/internal UI surfaces.
+- Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
