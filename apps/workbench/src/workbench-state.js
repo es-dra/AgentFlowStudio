@@ -6,6 +6,7 @@ import { normalizeJobCenter, normalizeOperationsWorkspace } from "./operations-w
 import { normalizeProductionBoard } from "./production-board-state.js";
 import { normalizeProjectHub } from "./project-hub-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
+import { normalizeStudioWorkspace } from "./studio-workspace-state.js";
 export const EMPTY_WORKBENCH_STATE = {
   artifact_type: "agentflow_runtime_workbench_state",
   project_id: "",
@@ -18,6 +19,7 @@ export const EMPTY_WORKBENCH_STATE = {
   style_memory: null,
   memory_workspace: null,
   operations_workspace: null,
+  studio_workspace: null,
   job_center: null,
   activity_timeline: null,
   production_board: null,
@@ -54,6 +56,7 @@ export function normalizeWorkbenchState(payload) {
     style_memory: normalizeStyleMemory(source.style_memory),
     memory_workspace: normalizeMemoryWorkspace(source.memory_workspace),
     operations_workspace: normalizeOperationsWorkspace(source.operations_workspace),
+    studio_workspace: normalizeStudioWorkspace(source.studio_workspace),
     job_center: normalizeJobCenter(source.job_center),
     activity_timeline: normalizeActivityTimeline(source.activity_timeline),
     production_board: normalizeProductionBoard(source.production_board),

@@ -15,6 +15,7 @@ from apps.api.runtime_workbench_operations import build_operations_workspace
 from apps.api.runtime_workbench_project_hub import build_project_hub
 from apps.api.runtime_workbench_readiness import build_project_readiness
 from apps.api.runtime_workbench_review import build_review_room
+from apps.api.runtime_workbench_studio import build_studio_workspace
 from apps.api.runtime_workbench_style import build_style_memory
 from apps.api.runtime_workbench_cards import (
     NAVIGATION,
@@ -42,6 +43,26 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
     style_memory = build_style_memory(store, manifest)
     job_center = build_job_center(jobs)
     activity_timeline = build_activity_timeline(jobs)
+    asset_library = build_asset_library(manifest)
+    creation_workspace = build_creation_workspace(
+        manifest=manifest,
+        cards=cards,
+        filmstrip=filmstrip,
+        project_readiness=project_readiness,
+        command_hub=command_hub,
+    )
+    memory_workspace = build_memory_workspace(
+        manifest=manifest,
+        review_room=review_room,
+        style_memory=style_memory,
+        command_hub=command_hub,
+    )
+    operations_workspace = build_operations_workspace(
+        job_center=job_center,
+        activity_timeline=activity_timeline,
+        provider_gate=provider_gate,
+        command_hub=command_hub,
+    )
     return {
         "artifact_type": "agentflow_runtime_workbench_state",
         "schema_version": "0.1.0",
@@ -63,30 +84,22 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
                 "needs_review",
             ],
         },
-        "asset_library": build_asset_library(manifest),
+        "asset_library": asset_library,
         "cards": cards,
         "filmstrip": filmstrip,
-        "creation_workspace": build_creation_workspace(
-            manifest=manifest,
-            cards=cards,
-            filmstrip=filmstrip,
-            project_readiness=project_readiness,
-            command_hub=command_hub,
-        ),
+        "creation_workspace": creation_workspace,
         "review_room": review_room,
         "style_memory": style_memory,
-        "memory_workspace": build_memory_workspace(
-            manifest=manifest,
-            review_room=review_room,
-            style_memory=style_memory,
-            command_hub=command_hub,
-        ),
+        "memory_workspace": memory_workspace,
         "job_center": job_center,
         "activity_timeline": activity_timeline,
-        "operations_workspace": build_operations_workspace(
-            job_center=job_center,
-            activity_timeline=activity_timeline,
-            provider_gate=provider_gate,
+        "operations_workspace": operations_workspace,
+        "studio_workspace": build_studio_workspace(
+            project=project,
+            asset_library=asset_library,
+            creation_workspace=creation_workspace,
+            memory_workspace=memory_workspace,
+            operations_workspace=operations_workspace,
             command_hub=command_hub,
         ),
         "production_board": production_board,

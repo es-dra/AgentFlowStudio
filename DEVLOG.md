@@ -239,3 +239,35 @@ Boundaries:
 
 - `maintenance_audit`: `failed=0, passed=6, warning=0`。
 - 完整 CLI、focused pytest、full pytest 和 `git diff --check` 在最终提交前执行。
+## 2026-06-09 - Studio Workspace Integration
+
+- Added backend `studio_workspace` as a safe Runtime Service projection that
+  combines active project, primary command, provider status, creation canvas,
+  inspector, filmstrip, reference rail, style memory, review queue, and runtime
+  summary without exposing CLI internals, private paths, provider config, signed
+  URLs, or media bytes.
+- Added frontend Studio Workspace state, renderer, and CSS modules. The Create
+  view now renders one product-facing workbench instead of stacking readiness,
+  command, production-board, action-panel, and creation panels.
+- Kept cross-stage commands visible but disabled inside Create when the required
+  inputs belong to another view, avoiding misleading one-click actions.
+- Added focused API/Web tests for `studio_workspace` and updated Workbench
+  static coverage to include the new JS/CSS modules.
+
+Boundaries:
+
+- No live provider call.
+- No secret, signed URL, private local asset path, provider raw response, or
+  generated media byte was written.
+- Runtime verification is not human acceptance, business validation, or durable
+  memory.
+
+Verification so far:
+
+- Studio Workspace focused tests: `3 passed, 1 warning`.
+- Focused Runtime/Web/API/Web suite: `23 passed, 1 warning`.
+- Runtime-hosted HTTP smoke: `/workbench/`,
+  `/workbench/src/render-studio-workspace.js`, and
+  `/workbench/styles-studio-workspace.css` returned `200`; a temporary project
+  returned `studio_workspace.status = needs_assets`, 2 canvas cards, and
+  provider status `ready_not_run`.

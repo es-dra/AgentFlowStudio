@@ -31,6 +31,7 @@ only and does not execute CLI internals or providers from the browser.
 - Job Center: render runtime job progress, safe artifact refs, and blocked-action guidance.
 - Job Center Polling: auto-refresh current-project runtime state through Runtime Service.
 - Operations Workspace: combine runtime job queue, latest activity, provider preflight, provider controls, polling, and blocker counts from backend `operations_workspace`.
+- Studio Workspace: render the Create view as one product-facing workbench that combines command strip, reference rail, production canvas, inspector, filmstrip, style memory, review queue, runtime summary, and safe artifact navigation from backend `studio_workspace`.
 - Project Readiness: render current action, workflow gate statuses, and non-claim badges from backend state.
 - Activity Timeline: render runtime activity counts, latest jobs, blocked actions, and safe primary artifact refs.
 - Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
@@ -53,7 +54,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `memory_workspace`, `operations_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `memory_workspace`, `operations_workspace`, `studio_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -87,7 +88,7 @@ paths, media bytes, signed URLs, provider raw responses, or secrets.
 Verification after this slice:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_service.py tests\test_api_runtime_service_v02.py tests\test_api_runtime_workbench_actions.py tests\test_api_runtime_workbench_state.py tests\test_web_workbench_foundation.py -q
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_service.py tests\test_api_runtime_service_v02.py tests\test_api_runtime_workbench_actions.py tests\test_api_runtime_workbench_state.py tests\test_api_runtime_workbench_studio.py tests\test_web_workbench_foundation.py tests\test_web_workbench_studio.py -q
 .\.venv\Scripts\python.exe -m apps.cli.main --help
 .\.venv\Scripts\python.exe -m apps.cli.main version
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
@@ -150,6 +151,14 @@ Result:
   `/workbench/src/operations-workspace-state.js` returned `200`; deterministic
   smoke returned `operations_workspace.status = blocked`, 4 jobs, and provider
   action `resolve_provider_preflight`.
+- Latest focused verification after Studio Workspace integration:
+  Studio Workspace state/Web `3 passed, 1 warning`; focused Runtime/Web/API/Web
+  suite `23 passed, 1 warning`.
+- Studio Workspace HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/src/render-studio-workspace.js`, and
+  `/workbench/styles-studio-workspace.css` returned `200`; a temporary project
+  returned `studio_workspace.status = needs_assets`, 2 canvas cards, and
+  provider status `ready_not_run`.
 - Project Hub HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/styles-project-hub.css`, and
   `/workbench/src/render-project-hub.js` returned `200`; a temporary project

@@ -101,6 +101,7 @@ Current Web/API queue state:
 | AFS-WEB-PRODUCTION-BOARD-001 | Product-facing source -> draft -> check -> review -> style memory -> next round -> provider gate board | Landed: backend `production_board`, frontend Production Board panel, 7-lane flow state, and split board modules |
 | AFS-WEB-COMMAND-HUB-001 | User-facing next command, action mapping, required input hints, and provider gate blocker visibility | Landed: backend `command_hub`, frontend Command Hub panel, action mapping, and split command modules |
 | AFS-WEB-PROJECT-HUB-001 | Product-facing active project summary, safe counts, next command, and recent job navigation | Landed in current branch: backend `project_hub`, frontend Project Hub panel, state adapter, and split CSS |
+| AFS-WEB-STUDIO-WORKSPACE-001 | 将 Create 视图改为产品化 Studio Workspace：统一承载画布、素材参考、风格记忆、审片队列、runtime 摘要和 safe artifact 导航 | 已在当前分支落地：后端 `studio_workspace`、前端 Studio Workspace 面板、state adapter 和独立 CSS |
 
 Verification so far:
 

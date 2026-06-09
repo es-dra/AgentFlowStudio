@@ -4,12 +4,12 @@ import { renderArtifactPanel } from "./render-artifact.js";
 import { renderActivityTimeline } from "./render-activity.js";
 import { renderAssetLibrary } from "./render-assets.js";
 import { renderCommandHub } from "./render-command-hub.js";
-import { renderCreationWorkspace } from "./render-creation-workspace.js";
 import { renderMemoryWorkspace } from "./render-memory-workspace.js";
 import { renderOperationsWorkspace } from "./render-operations-workspace.js";
 import { renderProductionBoard } from "./render-production-board.js";
 import { renderProjectHub } from "./render-project-hub.js";
 import { renderProjectReadiness } from "./render-readiness.js";
+import { renderStudioWorkspace } from "./render-studio-workspace.js";
 
 function renderNav(items, activeView) {
   const list = items.length ? items : ["Projects", "Create", "Assets", "Review", "Style Memory", "Jobs", "Settings"];
@@ -126,9 +126,7 @@ function viewPanels(activeView, workbench, state) {
     ];
   }
   return [
-    ...common,
-    ...renderCreationWorkspace(workbench.creation_workspace, state),
-    renderActionPanel(state, viewActionGroups(activeView)),
+    renderStudioWorkspace(workbench.studio_workspace, state),
     renderArtifactPanel(state),
   ];
 }

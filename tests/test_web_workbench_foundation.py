@@ -21,6 +21,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "creation-workspace-state.js",
     WORKBENCH_ROOT / "src" / "memory-workspace-state.js",
     WORKBENCH_ROOT / "src" / "operations-workspace-state.js",
+    WORKBENCH_ROOT / "src" / "studio-workspace-state.js",
     WORKBENCH_ROOT / "src" / "activity-state.js",
     WORKBENCH_ROOT / "src" / "production-board-state.js",
     WORKBENCH_ROOT / "src" / "readiness-state.js",
@@ -32,6 +33,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "render-creation-workspace.js",
     WORKBENCH_ROOT / "src" / "render-memory-workspace.js",
     WORKBENCH_ROOT / "src" / "render-operations-workspace.js",
+    WORKBENCH_ROOT / "src" / "render-studio-workspace.js",
     WORKBENCH_ROOT / "src" / "render-activity.js",
     WORKBENCH_ROOT / "src" / "render-production-board.js",
     WORKBENCH_ROOT / "src" / "render-assets.js",
@@ -56,6 +58,7 @@ def _all_workbench_source() -> str:
         WORKBENCH_ROOT / "styles-command-hub.css",
         WORKBENCH_ROOT / "styles-project-hub.css",
         WORKBENCH_ROOT / "styles-creation-workspace.css",
+        WORKBENCH_ROOT / "styles-studio-workspace.css",
         WORKBENCH_ROOT / "styles-activity.css",
         WORKBENCH_ROOT / "styles-production-board.css",
         WORKBENCH_ROOT / "styles-readiness.css",
@@ -233,7 +236,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "viewActionGroups" in render
     assert "renderActionPanel(state, viewActionGroups(activeView))" in render
     assert "renderProjectHub(workbench.project_hub)" in render
-    assert "renderCreationWorkspace(workbench.creation_workspace, state)" in render
+    assert "renderStudioWorkspace(workbench.studio_workspace, state)" in render
     assert "renderMemoryWorkspace(workbench.memory_workspace, state)" in render
     assert "renderOperationsWorkspace(workbench.operations_workspace)" in render
     assert "groups.includes(\"project\")" in actions
