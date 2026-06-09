@@ -88,3 +88,23 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path) 
     assert "/projects/{project_id}/workbench-state" in schema["paths"]
     assert "/runs/{job_id}" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
+
+
+def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post(
+        "/projects",
+        json={
+            "project_id": "proj_recover_index",
+            "project_type": "short_video_campaign",
+            "goal": "Recover a local artifact index after an interrupted write.",
+        },
+    )
+    (tmp_path / "artifact_index.json").write_text("", encoding="utf-8")
+
+    project_list = client.get("/projects")
+    index = json.loads((tmp_path / "artifact_index.json").read_text(encoding="utf-8"))
+
+    assert project_list.status_code == 200
+    assert project_list.json()["projects"][0]["project_id"] == "proj_recover_index"
+    assert index["artifacts"]

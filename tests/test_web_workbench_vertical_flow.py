@@ -42,6 +42,9 @@ def test_workbench_vertical_flow_has_empty_project_start_and_next_action_feedbac
     assert "old_project_ids_visible" in browser_smoke
     assert "visible_english_matches" in browser_smoke
     assert "LEGACY_FIRST_SCREEN_PATTERNS" in browser_smoke
+    assert "_assert_no_visible_leaks(page)" in browser_smoke
+    assert "completed_with_blocks" in browser_smoke
+    assert "Add project materials before running a real generation pass." in browser_smoke
     assert "_wait_for_action(page, \"run-asset-test\")" in browser_smoke
     assert "Browser-driven safe brief summary" not in browser_smoke
     assert "Run first generation check" not in browser_smoke

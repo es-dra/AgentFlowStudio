@@ -12,6 +12,7 @@ export function createActionHandlers({ state, client, refreshWorkbench }) {
       goal: state.projectGoal || "Runtime Service workbench project.",
       status: "in_progress",
     });
+    state.projectId = state.lastResult.project_id || state.projectId;
     await refreshWorkbench();
   }
 

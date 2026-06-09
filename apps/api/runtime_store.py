@@ -27,6 +27,8 @@ class RuntimeStore:
         self.index_path = self.root / "artifact_index.json"
         if not self.index_path.exists():
             write_json(self.index_path, {"artifacts": {}})
+        else:
+            write_json(self.index_path, self._artifact_index())
 
     def project_manifest_path(self, project_id: str) -> Path:
         safe = safe_id(project_id)
@@ -170,13 +172,13 @@ class RuntimeStore:
             "role": role,
             "media_type": "application/json" if resolved.suffix.lower() == ".json" else "text/markdown",
         }
-        index = read_json(self.index_path)
+        index = self._artifact_index()
         index.setdefault("artifacts", {})[artifact_id] = entry
         write_json(self.index_path, index)
         return public_artifact_ref(entry)
 
     def read_artifact(self, artifact_id: str) -> dict[str, Any]:
-        index = read_json(self.index_path)
+        index = self._artifact_index()
         entry = dict(index.get("artifacts", {}).get(artifact_id) or {})
         if not entry:
             raise KeyError(artifact_id)
@@ -191,6 +193,16 @@ class RuntimeStore:
         text = path.read_text(encoding="utf-8")
         reject_unsafe_text(text)
         return {**ref, "text": text}
+
+    def _artifact_index(self) -> dict[str, Any]:
+        try:
+            index = read_json(self.index_path)
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+            index = {}
+        artifacts = index.get("artifacts")
+        if not isinstance(artifacts, dict):
+            index["artifacts"] = {}
+        return index
 
 
 def read_json(path: Path) -> dict[str, Any]:

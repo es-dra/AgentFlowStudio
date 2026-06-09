@@ -147,8 +147,8 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     assert "visible_by_default" in source
     assert "feedback_is_memory: false" in source
     assert "safe summaries" in source
-    assert "content card" in source.lower()
-    assert "filmstrip" in source.lower()
+    assert all(marker in source for marker in ["STATUS_MAP[value]", "Add project materials before running a real generation pass."])
+    assert all(marker in source.lower() for marker in ["content card", "filmstrip"])
     for marker in [
         "生成画布草稿", "draft-canvas", "项目设置向导", "创作画布", "分镜台",
         "素材库", "审片室", "项目记忆", "任务中心", "诊断", "产品发布", "脚本提纲",
@@ -210,7 +210,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
 
     assert 'activeView: "Projects"' in state_source
     assert "state.activeView = node.dataset.view" in app
-    assert "function syncProjectInputs(projectId)" in app
+    assert "function syncProjectInputs(projectId)" in app and "state.projectId = state.lastResult.project_id || state.projectId" in _read(WORKBENCH_ROOT / "src" / "app-actions.js")
     assert all(marker in app for marker in ["function selectAvailableProject()", "function preferredProject(projects)", 'project.status === "ready_for_next_round" ? 10000'])
     assert "run(refreshWorkbench);" in app
     assert 'root.querySelectorAll("#project-id-action, #project-id")' in app

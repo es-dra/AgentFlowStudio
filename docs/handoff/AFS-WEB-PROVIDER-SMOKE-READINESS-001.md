@@ -23,7 +23,7 @@ durable memory promotion.
 
 - Web release candidate exists at `/workbench/`.
 - Stage 7 browser QA completed on `proj_stage7_rc_1781016167554`.
-- Latest acceptance-first-screen cleanup is covered by the current `codex/afs-landing-prep-web-plan-001` Workbench acceptance-prep commits; the latest browser smoke evidence is `proj_browser_vertical_1781026731`.
+- Latest acceptance-first-screen cleanup is covered by the current `codex/afs-landing-prep-web-plan-001` Workbench acceptance-prep commits; the latest browser smoke evidence is `proj_browser_vertical_1781029184`.
 - Acceptance packet exists at
   `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`.
 - Visual demo index exists at

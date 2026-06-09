@@ -25,6 +25,7 @@ LEGACY_FIRST_SCREEN_PATTERNS = (
     "Command hub",
     "Production board",
     "First generation check",
+    "completed_with_blocks", "Add project materials before running a real generation pass.",
 )
 
 
@@ -130,6 +131,7 @@ def _run_browser_flow(page: Any, *, base_url: str, project_id: str) -> dict[str,
 
     _click_action(page, "run-asset-test", timeout=30_000)
     _wait_for_action(page, "run-two-round")
+    _assert_no_visible_leaks(page)
 
     _click_view(page, "Review")
     _click_action(page, "record-review-decision")
@@ -169,6 +171,12 @@ def _assert_acceptance_first_screen(first_screen: dict[str, Any]) -> None:
     assert first_screen["stage_rc_visible"] is False, first_screen
     assert first_screen["visible_english_matches"] == [], first_screen
     assert first_screen["toast_errors"] == [], first_screen
+
+
+def _assert_no_visible_leaks(page: Any) -> None:
+    visible_text = page.locator("body").inner_text(timeout=10_000)
+    matches = [text for text in LEGACY_FIRST_SCREEN_PATTERNS if re.search(re.escape(text), visible_text, flags=re.IGNORECASE)]
+    assert matches == [], matches
 
 
 def _open_diagnostics(page: Any) -> None:

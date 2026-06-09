@@ -172,6 +172,7 @@ const TEXT_MAP = {
   "Enable the video provider gate before live video smoke.": "真实视频试跑前必须先开启视频 Provider 闸门。",
   "Configure provider credentials before live provider smoke.": "真实 Provider 试跑前必须先完成凭据配置；凭据不能进入前端或仓库。",
   "Add a character reference image before live provider smoke.": "真实 Provider 试跑前需要先提供角色参考图。",
+  "Add project materials before running a real generation pass.": "补充项目素材摘要后再运行真实生成。",
 };
 
 const SUMMARY_MAP = {
@@ -265,7 +266,7 @@ export function displayText(value, fallback = "") {
   if (typeof value === "string" && value.startsWith("Verification: ")) return `验证：${displayStatus(value.slice(14), value.slice(14))}`;
   if (typeof value === "string" && value.startsWith("Assessment: ")) return `评估：${TEXT_MAP[value.slice(12)] || value.slice(12)}`;
   if (typeof value === "string" && value.startsWith("Blockers: ")) return `阻塞项：${value.slice(10)}`;
-  return TEXT_MAP[value] || SUMMARY_MAP[value] || value || fallback;
+  return TEXT_MAP[value] || SUMMARY_MAP[value] || STATUS_MAP[value] || value || fallback;
 }
 
 export function displayStatus(value, fallback = "未开始") {
