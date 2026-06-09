@@ -283,4 +283,5 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 ## 2026-06-09 - Web Provider Smoke Readiness Prep
 - Added `docs/handoff/AFS-WEB-PROVIDER-SMOKE-READINESS-001.md` to separate Web RC human acceptance from later capability-gated provider smoke.
 - Registered the handoff in `docs/handoff/INDEX.md` and updated `AFS-PROVIDER-GATED-REAL-SMOKE-001` in `TASK_TRACKER.md`.
+- Ran readiness-only provider gate without `--run-provider-validation`; it wrote ignored evidence under `data/processed/runs/web_rc_provider_gate_readiness/` with `status=blocked` and `provider_calls_started=false`.
 - Boundaries unchanged: provider not executed; no secret, local private material, provider raw response, signed URL, generated media byte, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.

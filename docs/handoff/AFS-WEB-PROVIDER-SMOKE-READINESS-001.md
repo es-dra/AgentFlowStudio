@@ -30,6 +30,46 @@ durable memory promotion.
 - Draft PR handoff exists at `docs/handoff/AFS-WEB-RC-DRAFT-PR-001.md`.
 - Provider remains closed by default.
 
+## Readiness Evidence
+
+Readiness-only provider gate was run without `--run-provider-validation`:
+
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main asset-provider-validation-gate --request-validation --asset-profile-seed examples\agentflow\production_memory_asset_profile_seed.example.json --output data\processed\runs\web_rc_provider_gate_readiness
+```
+
+Observed console boundary:
+
+```text
+Provider validation gate: blocked
+Provider calls: not started
+Business validation: not claimed
+Human acceptance: not claimed
+Writes long-term memory: false
+Writes Company KB: false
+```
+
+Generated ignored runtime evidence:
+
+```text
+data/processed/runs/web_rc_provider_gate_readiness/provider_safe_manifest.json
+data/processed/runs/web_rc_provider_gate_readiness/provider_validation_plan.json
+data/processed/runs/web_rc_provider_gate_readiness/provider_validation_result.json
+data/processed/runs/web_rc_provider_gate_readiness/provider_validation_report.md
+```
+
+The safe manifest reports `status=blocked`, `provider_calls_started=false`,
+and these expected blockers:
+
+- `image_gate_unset`
+- `video_gate_unset`
+- `provider_config_missing`
+- `character_reference_image_missing`
+
+The manifest also reports `private_paths_persisted=false`,
+`media_bytes_persisted=false`, `signed_urls_persisted=false`, and
+`provider_response_persisted=false`.
+
 ## Required Order
 
 1. Human accepts or rejects the Web RC experience using the acceptance packet.
