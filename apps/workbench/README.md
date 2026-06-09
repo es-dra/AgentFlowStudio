@@ -81,6 +81,13 @@ registration, Draft Canvas, first check, review feedback, next round, and
 provider preflight. Disabled commands remain visible with blocked reasons rather
 than bypassing provider gates.
 
+## Project Hub
+
+The Workbench reads `project_hub` from `GET /projects/{project_id}/workbench-state`.
+It renders the active project, source/card/run/job/review/profile counts, the
+next command, recent jobs, and the safe manifest artifact ref. This is the
+product-facing project control surface for the Workbench.
+
 ## Activity Timeline
 
 The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workbench-state`.

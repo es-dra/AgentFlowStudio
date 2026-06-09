@@ -33,6 +33,7 @@ only and does not execute CLI internals or providers from the browser.
 - Activity Timeline: render runtime activity counts, latest jobs, blocked actions, and safe primary artifact refs.
 - Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
 - Command Hub: translate backend workflow actions into user-facing primary and stage commands.
+- Project Hub Overview: render active project, safe counts, next command, recent jobs, and the manifest artifact ref.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
@@ -40,7 +41,7 @@ only and does not execute CLI internals or providers from the browser.
   for browser QA and frontend/backend integration.
 - Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - Frontend readiness adapter: normalizes `project_readiness` and maps backend workflow actions to existing UI action ids.
-- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render.js`, `app.js`.
+- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `project-hub-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render-project-hub.js`, `render.js`, `app.js`.
 - View-specific controls: `renderActionPanel` accepts control groups so each stage can avoid showing every operation at once.
 
 ## Runtime Contract Added
@@ -50,7 +51,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `command_hub`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -119,6 +120,14 @@ Result:
 - Latest focused verification after Command Hub integration:
   Command Hub state/Web foundation `11 passed, 1 warning`; focused
   Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Latest focused verification after Project Hub overview integration:
+  Project Hub state/Web foundation `11 passed, 1 warning`; focused
+  Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Project Hub HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/styles-project-hub.css`, and
+  `/workbench/src/render-project-hub.js` returned `200`; a temporary project
+  returned `project_hub.title = Project hub` and next command
+  `add_reference -> register-source-asset`.
 - Command Hub HTTP smoke on a temporary port: `/workbench/` and
   `/workbench/styles-command-hub.css` returned `200`; a temporary project
   returned `command_hub.primary_command = add_reference ->

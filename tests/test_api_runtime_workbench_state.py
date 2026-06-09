@@ -73,6 +73,20 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     ]
     assert _command(state, "draft_canvas")["ui_action"] == "draft-canvas"
     assert _command(state, "start_first_generation_check")["ui_action"] == "run-asset-test"
+    assert state["project_hub"]["status"] == "needs_assets"
+    assert state["project_hub"]["title"] == "Project hub"
+    assert state["project_hub"]["active_project"]["project_id"] == "proj_workbench_demo"
+    assert state["project_hub"]["active_project"]["artifact_id"] == created["artifact"]["artifact_id"]
+    assert state["project_hub"]["counts"] == {
+        "source_assets": 0,
+        "content_cards": 0,
+        "runs": 0,
+        "jobs": 0,
+        "feedback_refs": 0,
+        "profile_versions": 0,
+    }
+    assert state["project_hub"]["next_command"]["ui_action"] == "register-source-asset"
+    assert state["project_hub"]["recent_jobs"] == []
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
     assert state["project_readiness"]["current_action_label"] == "Add source materials"
@@ -150,6 +164,16 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["command_hub"]["primary_command"]["blocked_reason"] == "Provider capability gate is still blocked."
     assert _command(state, "start_next_round")["ui_action"] == "run-two-round"
     assert _command(state, "run_provider_preflight")["ui_action"] == "run-provider-preflight"
+    assert state["project_hub"]["status"] == "blocked"
+    assert state["project_hub"]["active_project"]["project_id"] == "proj_runtime_demo"
+    assert state["project_hub"]["counts"]["jobs"] == 4
+    assert state["project_hub"]["counts"]["runs"] >= 1
+    assert state["project_hub"]["counts"]["feedback_refs"] >= 1
+    assert state["project_hub"]["counts"]["profile_versions"] == 1
+    assert state["project_hub"]["next_command"]["backend_action"] == "resolve_provider_preflight"
+    assert state["project_hub"]["next_command"]["enabled"] is False
+    assert state["project_hub"]["recent_jobs"][0]["action"] == "provider_validation_plan"
+    assert state["project_hub"]["recent_jobs"][0]["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
     assert _lane(state, "source")["status"] == "succeeded"
     assert _lane(state, "first_check")["status"] == "blocked"
     assert _lane(state, "review")["status"] == "succeeded"

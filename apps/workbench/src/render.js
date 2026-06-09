@@ -7,6 +7,7 @@ import { renderAssetLibrary } from "./render-assets.js";
 import { renderCommandHub } from "./render-command-hub.js";
 import { renderJobCenter } from "./render-jobs.js";
 import { renderProductionBoard } from "./render-production-board.js";
+import { renderProjectHub } from "./render-project-hub.js";
 import { renderProjectReadiness } from "./render-readiness.js";
 import { renderReviewRoom } from "./render-review.js";
 
@@ -199,7 +200,7 @@ function viewPanels(activeView, workbench, state) {
     renderProductionBoard(workbench.production_board),
   ];
   if (activeView === "Projects") {
-    return [...common, renderActionPanel(state, viewActionGroups(activeView)), renderArtifactPanel(state)];
+    return [...common, renderProjectHub(workbench.project_hub), renderActionPanel(state, viewActionGroups(activeView)), renderArtifactPanel(state)];
   }
   if (activeView === "Assets") {
     return [...common, renderActionPanel(state, viewActionGroups(activeView)), renderAssetLibrary(workbench.asset_library), renderArtifactPanel(state)];

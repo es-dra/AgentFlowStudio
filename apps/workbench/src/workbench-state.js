@@ -1,8 +1,8 @@
 import { normalizeActivityTimeline } from "./activity-state.js";
 import { normalizeCommandHub } from "./command-hub-state.js";
 import { normalizeProductionBoard } from "./production-board-state.js";
+import { normalizeProjectHub } from "./project-hub-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
-
 export const EMPTY_WORKBENCH_STATE = {
   artifact_type: "agentflow_runtime_workbench_state",
   project_id: "",
@@ -17,6 +17,7 @@ export const EMPTY_WORKBENCH_STATE = {
   activity_timeline: null,
   production_board: null,
   command_hub: null,
+  project_hub: null,
   events: [],
   provider_gate: null,
   advanced_evidence: {
@@ -52,6 +53,7 @@ export function normalizeWorkbenchState(payload) {
     activity_timeline: normalizeActivityTimeline(source.activity_timeline),
     production_board: normalizeProductionBoard(source.production_board),
     command_hub: normalizeCommandHub(source.command_hub),
+    project_hub: normalizeProjectHub(source.project_hub),
     events: asArray(source.events).map(normalizeEvent),
     provider_gate: source.provider_gate ? normalizeCard(source.provider_gate) : null,
     advanced_evidence: {

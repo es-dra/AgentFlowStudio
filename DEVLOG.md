@@ -276,3 +276,12 @@ Boundaries:
 - Provider gate resolution remains non-executable in the browser: blocked provider preflight surfaces as a disabled command with a blocked reason.
 - Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
 - Red tests failed before implementation; focused Command Hub state/Web tests `11 passed, 1 warning`; focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Command Hub HTTP smoke passed.
+
+## 2026-06-09 - Web Workbench Project Hub Slice
+
+- Added backend `project_hub` projection to `GET /projects/{project_id}/workbench-state`, summarizing the active project, safe counts, next command, recent runtime jobs, and the manifest artifact ref.
+- Added frontend Project Hub normalization, rendering, and split CSS so the Projects view becomes a product-facing project control surface instead of only a setup form.
+- Recent job navigation keeps using safe artifact refs and prioritizes provider preflight manifests, next-round reports, feedback events, review decisions, and first-check reports without exposing provider raw responses.
+- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
+- Red tests failed before implementation; focused Project Hub state/Web tests `11 passed, 1 warning`.
+- Final verification after records: focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Project Hub HTTP smoke passed; CLI help/version passed; `maintenance_audit` `failed=0, passed=6, warning=0`; retention review `delete_candidate_count=0`, `manual_review_required_count=0`; full pytest `837 passed, 1 warning`; `git diff --check` passed with CRLF normalization warnings only.

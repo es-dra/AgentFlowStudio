@@ -99,6 +99,7 @@ Current Web/API queue state:
 | AFS-WEB-ACTIVITY-TIMELINE-001 | Runtime activity timeline, blocker visibility, and safe artifact navigation | Landed: backend `activity_timeline`, frontend Activity Timeline panel, safe primary artifact refs, and split activity modules |
 | AFS-WEB-PRODUCTION-BOARD-001 | Product-facing source -> draft -> check -> review -> style memory -> next round -> provider gate board | Landed: backend `production_board`, frontend Production Board panel, 7-lane flow state, and split board modules |
 | AFS-WEB-COMMAND-HUB-001 | User-facing next command, action mapping, required input hints, and provider gate blocker visibility | Landed: backend `command_hub`, frontend Command Hub panel, action mapping, and split command modules |
+| AFS-WEB-PROJECT-HUB-001 | Product-facing active project summary, safe counts, next command, and recent job navigation | Landed in current branch: backend `project_hub`, frontend Project Hub panel, state adapter, and split CSS |
 
 Verification so far:
 
@@ -129,6 +130,10 @@ Verification so far:
 - Command Hub slice verification:
   red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
   focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Command Hub HTTP smoke passed.
+- Project Hub slice verification:
+  red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
+  focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Project Hub HTTP smoke passed;
+  full pytest `837 passed, 1 warning`.
 - Draft Canvas HTTP smoke on port 8792: `draft_canvas succeeded`, 3 generated
   cards, 3 filmstrip items, `/workbench/` returned `200`.
 - Runtime HTTP smoke on port 8791: `/health`, `/workbench/`, and

@@ -17,6 +17,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "input-sync.js",
     WORKBENCH_ROOT / "src" / "polling.js",
     WORKBENCH_ROOT / "src" / "command-hub-state.js",
+    WORKBENCH_ROOT / "src" / "project-hub-state.js",
     WORKBENCH_ROOT / "src" / "activity-state.js",
     WORKBENCH_ROOT / "src" / "production-board-state.js",
     WORKBENCH_ROOT / "src" / "readiness-state.js",
@@ -24,6 +25,7 @@ WORKBENCH_JS = [
     WORKBENCH_ROOT / "src" / "workbench-state.js",
     WORKBENCH_ROOT / "src" / "render-actions.js",
     WORKBENCH_ROOT / "src" / "render-command-hub.js",
+    WORKBENCH_ROOT / "src" / "render-project-hub.js",
     WORKBENCH_ROOT / "src" / "render-activity.js",
     WORKBENCH_ROOT / "src" / "render-production-board.js",
     WORKBENCH_ROOT / "src" / "render-assets.js",
@@ -47,6 +49,7 @@ def _all_workbench_source() -> str:
         WORKBENCH_ROOT / "styles.css",
         WORKBENCH_ROOT / "styles-components.css",
         WORKBENCH_ROOT / "styles-command-hub.css",
+        WORKBENCH_ROOT / "styles-project-hub.css",
         WORKBENCH_ROOT / "styles-activity.css",
         WORKBENCH_ROOT / "styles-production-board.css",
         WORKBENCH_ROOT / "styles-readiness.css",
@@ -63,6 +66,7 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert '<script type="module" src="./src/app.js"></script>' in index
     assert '<link rel="stylesheet" href="./styles-components.css" />' in index
     assert '<link rel="stylesheet" href="./styles-command-hub.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-project-hub.css" />' in index
     assert '<link rel="stylesheet" href="./styles-activity.css" />' in index
     assert '<link rel="stylesheet" href="./styles-production-board.css" />' in index
     assert '<link rel="stylesheet" href="./styles-readiness.css" />' in index
@@ -143,6 +147,11 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
     assert "command-card" in source
     assert "primary_command" in source
     assert "requires_input" in source
+    assert "Project Hub" in source
+    assert "project_hub" in source
+    assert "project-hub-panel" in source
+    assert "project-metric-grid" in source
+    assert "recent_jobs" in source
     assert "Project Readiness" in source
     assert "project_readiness" in source
     assert "current_action_label" in source
@@ -174,6 +183,7 @@ def test_workbench_normalizes_backend_state_shape() -> None:
     assert "source.activity_timeline" in source
     assert "source.production_board" in source
     assert "source.command_hub" in source
+    assert "source.project_hub" in source
     assert "source.project_readiness" in source
     assert "source.inspector" in source
     assert "source.card_id" in source
@@ -193,6 +203,7 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "renderNav(state.workbench ? state.workbench.navigation : [], state.activeView)" in render
     assert "viewActionGroups" in render
     assert "renderActionPanel(state, viewActionGroups(activeView))" in render
+    assert "renderProjectHub(workbench.project_hub)" in render
     assert "groups.includes(\"project\")" in actions
     assert "groups.includes(\"runtime\")" in actions
 

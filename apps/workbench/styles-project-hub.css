@@ -1,0 +1,126 @@
+.project-hub-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(237, 242, 236, 0.86));
+  padding: 18px;
+}
+
+.project-hub-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.project-hub-copy,
+.project-next-command {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 14px;
+}
+
+.project-hub-copy {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.project-hub-copy h3 {
+  font-size: 1.4rem;
+  line-height: 1.15;
+}
+
+.project-hub-copy p,
+.project-next-command p {
+  color: var(--muted);
+}
+
+.project-next-command {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.project-next-command.good {
+  border-color: rgba(31, 111, 91, 0.35);
+}
+
+.project-next-command.blocked {
+  border-color: rgba(168, 59, 50, 0.38);
+}
+
+.project-next-command.active,
+.project-next-command.ready {
+  border-color: rgba(49, 95, 153, 0.36);
+}
+
+.project-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.project-metric {
+  border: 1px solid var(--line);
+  background: #fbfcfa;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.project-metric span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.project-metric strong {
+  font-size: 1.35rem;
+}
+
+.project-job-list {
+  display: grid;
+  gap: 8px;
+}
+
+.project-job-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.project-job-row span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.project-job-row.blocked {
+  border-color: rgba(168, 59, 50, 0.36);
+}
+
+.project-job-row.good {
+  border-color: rgba(31, 111, 91, 0.34);
+}
+
+@media (max-width: 1120px) {
+  .project-hub-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .project-metric-grid {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .project-metric-grid,
+  .project-job-row {
+    grid-template-columns: 1fr;
+  }
+}
