@@ -88,6 +88,15 @@ It renders the active project, source/card/run/job/review/profile counts, the
 next command, recent jobs, and the safe manifest artifact ref. This is the
 product-facing project control surface for the Workbench.
 
+## Creation Workspace
+
+The Workbench reads `creation_workspace` from `GET /projects/{project_id}/workbench-state`.
+It renders the Create view as a backend-driven workspace: canvas cards,
+selected-card inspector, run controls, safe artifact refs, blocker badges, and
+the filmstrip sequence. The browser only edits safe inspector summaries and
+dispatches mapped Runtime Service actions; it does not execute provider or CLI
+internals.
+
 ## Activity Timeline
 
 The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workbench-state`.

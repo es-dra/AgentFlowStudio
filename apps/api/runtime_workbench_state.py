@@ -7,6 +7,7 @@ from apps.api.runtime_workbench_activity import build_activity_timeline
 from apps.api.runtime_workbench_assets import build_asset_library
 from apps.api.runtime_workbench_board import build_production_board
 from apps.api.runtime_workbench_commands import build_command_hub
+from apps.api.runtime_workbench_creation import build_creation_workspace
 from apps.api.runtime_workbench_content import build_filmstrip
 from apps.api.runtime_workbench_jobs import build_job_center
 from apps.api.runtime_workbench_project_hub import build_project_hub
@@ -31,6 +32,7 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
         "artifact_id": manifest_artifact["artifact_id"],
     }
     cards, provider_gate = build_workbench_cards(store, manifest=manifest, jobs=jobs, project=project)
+    filmstrip = build_filmstrip(manifest)
     project_readiness = build_project_readiness(manifest, jobs, provider_gate)
     production_board = build_production_board(manifest, jobs, provider_gate, project_readiness)
     command_hub = build_command_hub(project_readiness, production_board)
@@ -57,7 +59,14 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
         },
         "asset_library": build_asset_library(manifest),
         "cards": cards,
-        "filmstrip": build_filmstrip(manifest),
+        "filmstrip": filmstrip,
+        "creation_workspace": build_creation_workspace(
+            manifest=manifest,
+            cards=cards,
+            filmstrip=filmstrip,
+            project_readiness=project_readiness,
+            command_hub=command_hub,
+        ),
         "review_room": build_review_room(store, manifest, jobs),
         "style_memory": build_style_memory(store, manifest),
         "job_center": build_job_center(jobs),

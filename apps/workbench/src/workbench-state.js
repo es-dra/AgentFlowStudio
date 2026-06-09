@@ -1,5 +1,6 @@
 import { normalizeActivityTimeline } from "./activity-state.js";
 import { normalizeCommandHub } from "./command-hub-state.js";
+import { normalizeCreationWorkspace } from "./creation-workspace-state.js";
 import { normalizeProductionBoard } from "./production-board-state.js";
 import { normalizeProjectHub } from "./project-hub-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
@@ -18,6 +19,7 @@ export const EMPTY_WORKBENCH_STATE = {
   production_board: null,
   command_hub: null,
   project_hub: null,
+  creation_workspace: null,
   events: [],
   provider_gate: null,
   advanced_evidence: {
@@ -26,15 +28,12 @@ export const EMPTY_WORKBENCH_STATE = {
     safe_ref_policy: "",
   },
 };
-
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
-
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-
 export function normalizeWorkbenchState(payload) {
   const source = asObject(payload);
   const evidence = asObject(source.advanced_evidence);
@@ -54,6 +53,7 @@ export function normalizeWorkbenchState(payload) {
     production_board: normalizeProductionBoard(source.production_board),
     command_hub: normalizeCommandHub(source.command_hub),
     project_hub: normalizeProjectHub(source.project_hub),
+    creation_workspace: normalizeCreationWorkspace(source.creation_workspace),
     events: asArray(source.events).map(normalizeEvent),
     provider_gate: source.provider_gate ? normalizeCard(source.provider_gate) : null,
     advanced_evidence: {

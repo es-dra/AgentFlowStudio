@@ -20,7 +20,7 @@ only and does not execute CLI internals or providers from the browser.
 - Reference Library: render attached brief/reference/script safe summaries as product-facing cards.
 - Draft Canvas: generate Hook / Proof / CTA scene cards from safe source summaries.
 - Scene Planner: register safe scene/content cards through Runtime Service.
-- Creation Canvas: render user-facing cards from `workbench-state`.
+- Creation Workspace: render user-facing Create canvas from backend `creation_workspace`.
 - Scene / Shot Inspector: edit prompt, reference summary, style direction, and retry intent for the selected scene card.
 - Filmstrip: render the content-card production sequence.
 - Run Controls: trigger the deterministic first asset check.
@@ -39,9 +39,9 @@ only and does not execute CLI internals or providers from the browser.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
 - Runtime-hosted Entry: Runtime Service serves the Workbench at `/workbench/`
   for browser QA and frontend/backend integration.
-- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- Frontend state adapter: accepts backend `cards/card_id/primary_artifact_id` shape plus `project_readiness`, `production_board`, `creation_workspace`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - Frontend readiness adapter: normalizes `project_readiness` and maps backend workflow actions to existing UI action ids.
-- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `project-hub-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render-project-hub.js`, `render.js`, `app.js`.
+- UI module split: `dom.js`, `runtime-client.js`, `presets.js`, `input-sync.js`, `app-selection.js`, `app-actions.js`, `workbench-state.js`, `readiness-state.js`, `activity-state.js`, `production-board-state.js`, `project-hub-state.js`, `creation-workspace-state.js`, `render-actions.js`, `render-assets.js`, `render-artifact.js`, `render-review.js`, `render-jobs.js`, `render-readiness.js`, `render-activity.js`, `render-production-board.js`, `render-project-hub.js`, `render-creation-workspace.js`, `render.js`, `app.js`.
 - View-specific controls: `renderActionPanel` accepts control groups so each stage can avoid showing every operation at once.
 
 ## Runtime Contract Added
@@ -51,7 +51,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `project_hub`, `command_hub`, `production_board`, `creation_workspace`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -123,6 +123,15 @@ Result:
 - Latest focused verification after Project Hub overview integration:
   Project Hub state/Web foundation `11 passed, 1 warning`; focused
   Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Latest focused verification after Creation Workspace projection:
+  Creation Workspace state/Web foundation `11 passed, 1 warning`; focused
+  Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Creation Workspace HTTP smoke on a temporary port: `/workbench/`,
+  `/workbench/styles-creation-workspace.css`, and
+  `/workbench/src/render-creation-workspace.js` returned `200`; a drafted
+  temporary project returned `creation_workspace.status =
+  ready_for_first_check`, `selected_card_id = draft-hook`, `canvas_cards = 4`,
+  `filmstrip_items = 3`, and `primary_action = start_first_generation_check`.
 - Project Hub HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/styles-project-hub.css`, and
   `/workbench/src/render-project-hub.js` returned `200`; a temporary project

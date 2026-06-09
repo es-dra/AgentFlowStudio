@@ -87,6 +87,21 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     }
     assert state["project_hub"]["next_command"]["ui_action"] == "register-source-asset"
     assert state["project_hub"]["recent_jobs"] == []
+    assert state["creation_workspace"]["status"] == "needs_assets"
+    assert state["creation_workspace"]["title"] == "Creation workspace"
+    assert state["creation_workspace"]["selected_card_id"] == "content-cards"
+    assert state["creation_workspace"]["counts"] == {
+        "canvas_cards": 2,
+        "filmstrip_items": 0,
+        "editable_scene_cards": 0,
+        "artifact_refs": 0,
+    }
+    assert state["creation_workspace"]["run_controls"]["primary_action"] == "add_reference"
+    assert state["creation_workspace"]["run_controls"]["enabled"] is False
+    assert state["creation_workspace"]["run_controls"]["handoff_view"] == "Assets"
+    assert state["creation_workspace"]["inspector"]["card_id"] == "content-cards"
+    assert state["creation_workspace"]["inspector"]["mode"] == "setup"
+    assert state["creation_workspace"]["filmstrip"] == []
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
     assert state["project_readiness"]["current_action_label"] == "Add source materials"
@@ -174,6 +189,15 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["project_hub"]["next_command"]["enabled"] is False
     assert state["project_hub"]["recent_jobs"][0]["action"] == "provider_validation_plan"
     assert state["project_hub"]["recent_jobs"][0]["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
+    assert state["creation_workspace"]["status"] == "blocked"
+    assert state["creation_workspace"]["selected_card_id"] == "first-generation-check"
+    assert state["creation_workspace"]["counts"]["canvas_cards"] == 2
+    assert state["creation_workspace"]["counts"]["artifact_refs"] >= 1
+    assert state["creation_workspace"]["run_controls"]["primary_action"] == "resolve_provider_preflight"
+    assert state["creation_workspace"]["run_controls"]["enabled"] is False
+    assert state["creation_workspace"]["run_controls"]["handoff_view"] == "Jobs"
+    assert state["creation_workspace"]["inspector"]["card_id"] == "first-generation-check"
+    assert state["creation_workspace"]["inspector"]["primary_artifact_id"] == round_1["artifacts"]["real_asset_test_report"]["artifact_id"]
     assert _lane(state, "source")["status"] == "succeeded"
     assert _lane(state, "first_check")["status"] == "blocked"
     assert _lane(state, "review")["status"] == "succeeded"

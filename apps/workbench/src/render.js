@@ -1,10 +1,10 @@
-import { statusTone } from "./workbench-state.js";
-import { badge, button, el, field, sectionTitle, textareaField } from "./dom.js";
+import { badge, button, el, field, sectionTitle } from "./dom.js";
 import { renderActionPanel } from "./render-actions.js";
 import { renderArtifactPanel } from "./render-artifact.js";
 import { renderActivityTimeline } from "./render-activity.js";
 import { renderAssetLibrary } from "./render-assets.js";
 import { renderCommandHub } from "./render-command-hub.js";
+import { renderCreationWorkspace } from "./render-creation-workspace.js";
 import { renderJobCenter } from "./render-jobs.js";
 import { renderProductionBoard } from "./render-production-board.js";
 import { renderProjectHub } from "./render-project-hub.js";
@@ -59,92 +59,6 @@ function renderConnectPanel(state) {
   ]);
 }
 
-function renderCard(card, selectedCardId) {
-  const tone = statusTone(card.status);
-  const body = [el("div", { className: "card-head" }, [el("h3", { text: card.title }), badge(card.status, tone)])];
-  if (card.summary) body.push(el("p", { className: "card-summary", text: card.summary }));
-  if (card.blockers.length) {
-    body.push(el("div", { className: "chips" }, card.blockers.map((item) => badge(item.message || item.blocker_id, "blocked"))));
-  }
-  return el("article", {
-    className: `canvas-card ${tone}${card.id === selectedCardId ? " selected" : ""}`,
-    dataset: { cardId: card.id },
-  }, body);
-}
-
-function renderCanvas(workbench, selectedCardId) {
-  return el("section", { className: "canvas-area" }, [
-    sectionTitle("Create", "canvas"),
-    el("div", { className: "canvas-grid" }, workbench.canvas_cards.map((card) => renderCard(card, selectedCardId))),
-  ]);
-}
-
-function renderRefs(card) {
-  if (!card || !card.refs.length) return el("p", { className: "muted", text: "No preview refs." });
-  return el(
-    "div",
-    { className: "ref-list" },
-    card.refs.map((ref) =>
-      el("div", { className: "ref-row" }, [
-        el("span", { text: ref.label }),
-        el("code", { text: ref.artifact_type || "artifact" }),
-        el("code", { text: ref.artifact_id || "pending" }),
-      ]),
-    ),
-  );
-}
-
-function selectedCard(workbench, selectedCardId) {
-  return workbench.canvas_cards.find((item) => item.id === selectedCardId) || workbench.canvas_cards[0] || null;
-}
-
-function inspectorValue(card, state, key, fallbackKey) {
-  return (card && card.inspector && card.inspector[key]) || state[fallbackKey] || "";
-}
-
-function renderInspector(workbench, selectedCardId, state) {
-  const card = selectedCard(workbench, selectedCardId);
-  return el("aside", { className: "inspector" }, [
-    sectionTitle("Inspector", card ? card.status : "empty"),
-    card ? el("h3", { text: card.title }) : el("h3", { text: "No card selected" }),
-    card && card.summary ? el("p", { className: "card-summary", text: card.summary }) : null,
-    card && card.actions.length
-      ? el("div", { className: "action-list" }, card.actions.map((item) => badge(item, "ready")))
-      : el("p", { className: "muted", text: "No queued action." }),
-    renderRefs(card),
-    card && card.primary_artifact_id ? button("Open Artifact", "open-selected-artifact", "secondary") : null,
-    card && card.kind === "scene_card"
-      ? el("div", { className: "inspector-editor" }, [
-          textareaField("Prompt", "inspector-prompt", inspectorValue(card, state, "prompt", "inspectorPrompt"), { rows: "4" }),
-          textareaField("Reference summary", "inspector-reference-summary", inspectorValue(card, state, "reference_summary", "inspectorReferenceSummary"), { rows: "3" }),
-          textareaField("Style direction", "inspector-style-direction", inspectorValue(card, state, "style_direction", "inspectorStyleDirection"), { rows: "3" }),
-          textareaField("Retry intent", "inspector-retry-intent", inspectorValue(card, state, "retry_intent", "inspectorRetryIntent"), { rows: "3" }),
-          button("Save Inspector", "update-scene-inspector", "primary"),
-        ])
-      : null,
-  ]);
-}
-
-function renderFilmstrip(filmstrip) {
-  const items = Array.isArray(filmstrip) ? filmstrip : [];
-  return el("section", { className: "filmstrip" }, [
-    sectionTitle("Filmstrip", `${items.length} scenes`),
-    items.length
-      ? el(
-          "div",
-          { className: "filmstrip-row" },
-          items.map((item, index) =>
-            el("button", { className: "filmstrip-item", dataset: { cardId: item.card_id } }, [
-              el("span", { text: String(index + 1).padStart(2, "0") }),
-              el("strong", { text: item.title }),
-              el("small", { text: item.summary || item.status }),
-            ]),
-          ),
-        )
-      : el("p", { className: "muted", text: "Add scene cards to build the production sequence." }),
-  ]);
-}
-
 function renderStyleMemory(styleMemory) {
   const value = styleMemory || {};
   const preferences = Array.isArray(value.reusable_preferences) ? value.reusable_preferences : [];
@@ -193,7 +107,6 @@ function viewActionGroups(activeView) {
 }
 
 function viewPanels(activeView, workbench, state) {
-  const selectedCardId = state.selectedCardId;
   const common = [
     renderProjectReadiness(workbench.project_readiness),
     renderCommandHub(workbench.command_hub),
@@ -245,11 +158,9 @@ function viewPanels(activeView, workbench, state) {
   }
   return [
     ...common,
-    renderCanvas(workbench, selectedCardId),
-    renderInspector(workbench, selectedCardId, state),
+    ...renderCreationWorkspace(workbench.creation_workspace, state),
     renderActionPanel(state, viewActionGroups(activeView)),
     renderArtifactPanel(state),
-    renderFilmstrip(workbench.filmstrip),
   ];
 }
 
