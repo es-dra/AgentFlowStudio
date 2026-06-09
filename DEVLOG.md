@@ -55,16 +55,11 @@ Boundaries:
   browser screenshot QA is still pending because no Browser/Playwright/headless
   browser runtime is available in the current environment.
 
-## 2026-06-09 - Creation Workspace Projection 001
+## 2026-06-09 - Workbench Projection Slices
 
-- Added backend `creation_workspace` projection to `GET /projects/{project_id}/workbench-state`.
-- Split Create view rendering into `creation-workspace-state.js`, `render-creation-workspace.js`, and `styles-creation-workspace.css`.
-- Reduced `render.js` by moving canvas, inspector, run controls, and filmstrip rendering into the Creation Workspace module.
-- Kept the Web boundary Runtime Service-only: browser receives safe summaries, safe artifact refs, workflow commands, and non-claim badges.
-- HTTP smoke through a temporary Runtime Service returned `200` for `/workbench/`, `styles-creation-workspace.css`, and `render-creation-workspace.js`; a drafted project returned `creation_workspace.status = ready_for_first_check`, `selected_card_id = draft-hook`, `canvas_cards = 4`, `filmstrip_items = 3`, and `primary_action = start_first_generation_check`.
-- No live provider call was started.
-- No secret, signed URL, private media, provider raw response, or generated media bytes were written.
-- This is runtime verification, not human acceptance, business validation, production readiness, or durable memory.
+- Added backend-driven `creation_workspace` and `memory_workspace` projections for Create and Review/Style Memory views.
+- Split Create and Memory frontend state/render modules, removed obsolete `render-review.js`, and reduced `workbench-state.js` below the 300-line threshold.
+- Runtime HTTP smoke passed for the new static modules and deterministic projection states; no live provider, secret, signed URL, private media, provider raw response, or generated media bytes were written.
 
 ## 2026-06-09 - Landing Prep Content / Memory / Web 001
 

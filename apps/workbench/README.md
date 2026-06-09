@@ -97,6 +97,13 @@ the filmstrip sequence. The browser only edits safe inspector summaries and
 dispatches mapped Runtime Service actions; it does not execute provider or CLI
 internals.
 
+## Memory Workspace
+
+The Workbench reads `memory_workspace` from `GET /projects/{project_id}/workbench-state`.
+It renders review candidates, feedback controls, style profile reuse, and
+next-round controls as one product surface. Feedback remains runtime evidence;
+the browser does not promote durable memory or bypass provider gates.
+
 ## Activity Timeline
 
 The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workbench-state`.

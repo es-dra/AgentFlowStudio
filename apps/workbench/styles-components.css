@@ -100,6 +100,22 @@ code {
   grid-column: 1 / 3;
 }
 
+.memory-workspace {
+  grid-column: 1 / 3;
+  display: grid;
+  gap: 12px;
+}
+
+.memory-controls,
+.memory-profile-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.memory-controls {
+  align-content: start;
+}
+
 .variant-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(170px, 1fr));
@@ -256,11 +272,12 @@ code {
 
   .provider-gate,
   .advanced,
-  .filmstrip,
-  .reference-library,
-  .review-room,
-  .style-memory-panel,
-  .job-center {
+    .filmstrip,
+    .reference-library,
+    .review-room,
+    .style-memory-panel,
+    .memory-workspace,
+    .job-center {
     grid-column: auto;
   }
 

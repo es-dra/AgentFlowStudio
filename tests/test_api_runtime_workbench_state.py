@@ -102,6 +102,20 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert state["creation_workspace"]["inspector"]["card_id"] == "content-cards"
     assert state["creation_workspace"]["inspector"]["mode"] == "setup"
     assert state["creation_workspace"]["filmstrip"] == []
+    assert state["memory_workspace"]["status"] == "not_started"
+    assert state["memory_workspace"]["title"] == "Memory workspace"
+    assert state["memory_workspace"]["selected_candidate_id"] == ""
+    assert state["memory_workspace"]["counts"] == {
+        "candidates": 0,
+        "decisions": 0,
+        "feedback_refs": 0,
+        "profile_versions": 0,
+        "reusable_preferences": 0,
+    }
+    assert state["memory_workspace"]["feedback_controls"]["primary_action"] == "record_review_note"
+    assert state["memory_workspace"]["feedback_controls"]["enabled"] is False
+    assert state["memory_workspace"]["feedback_controls"]["requires_input"] == ["feedback_note"]
+    assert state["memory_workspace"]["style_profile"]["status"] == "not_started"
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
     assert state["project_readiness"]["current_action_label"] == "Add source materials"
@@ -198,6 +212,16 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["creation_workspace"]["run_controls"]["handoff_view"] == "Jobs"
     assert state["creation_workspace"]["inspector"]["card_id"] == "first-generation-check"
     assert state["creation_workspace"]["inspector"]["primary_artifact_id"] == round_1["artifacts"]["real_asset_test_report"]["artifact_id"]
+    assert state["memory_workspace"]["status"] == "ready"
+    assert state["memory_workspace"]["selected_candidate_id"] == state["review_room"]["candidates"][0]["candidate_id"]
+    assert state["memory_workspace"]["counts"]["candidates"] == 2
+    assert state["memory_workspace"]["counts"]["feedback_refs"] >= 1
+    assert state["memory_workspace"]["counts"]["profile_versions"] == 1
+    assert state["memory_workspace"]["style_profile"]["latest_profile_artifact_id"] == state["style_memory"]["latest_profile_artifact_id"]
+    assert state["memory_workspace"]["style_profile"]["next_pass_usage"] == state["style_memory"]["next_pass_usage"]
+    assert state["memory_workspace"]["feedback_controls"]["primary_action"] == "record_review_note"
+    assert state["memory_workspace"]["feedback_controls"]["enabled"] is True
+    assert state["memory_workspace"]["next_round_controls"]["primary_action"] == "start_next_round"
     assert _lane(state, "source")["status"] == "succeeded"
     assert _lane(state, "first_check")["status"] == "blocked"
     assert _lane(state, "review")["status"] == "succeeded"

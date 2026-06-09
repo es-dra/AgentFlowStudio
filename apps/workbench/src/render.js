@@ -6,10 +6,10 @@ import { renderAssetLibrary } from "./render-assets.js";
 import { renderCommandHub } from "./render-command-hub.js";
 import { renderCreationWorkspace } from "./render-creation-workspace.js";
 import { renderJobCenter } from "./render-jobs.js";
+import { renderMemoryWorkspace } from "./render-memory-workspace.js";
 import { renderProductionBoard } from "./render-production-board.js";
 import { renderProjectHub } from "./render-project-hub.js";
 import { renderProjectReadiness } from "./render-readiness.js";
-import { renderReviewRoom } from "./render-review.js";
 
 function renderNav(items, activeView) {
   const list = items.length ? items : ["Projects", "Create", "Assets", "Review", "Style Memory", "Jobs", "Settings"];
@@ -59,23 +59,6 @@ function renderConnectPanel(state) {
   ]);
 }
 
-function renderStyleMemory(styleMemory) {
-  const value = styleMemory || {};
-  const preferences = Array.isArray(value.reusable_preferences) ? value.reusable_preferences : [];
-  return el("section", { className: "style-memory-panel" }, [
-    sectionTitle("Style Memory", value.status || "not_started"),
-    el("p", { className: "card-summary", text: value.summary || "No project style memory yet." }),
-    el("div", { className: "memory-facts" }, [
-      badge(`${value.profile_version_count || 0} profiles`, value.profile_version_count ? "ready" : "quiet"),
-      badge(`${value.feedback_count || 0} reviews`, value.feedback_count ? "active" : "quiet"),
-    ]),
-    preferences.length
-      ? el("ul", { className: "memory-list" }, preferences.map((item) => el("li", { text: item })))
-      : el("p", { className: "muted", text: "Review a first pass to create reusable preferences." }),
-    value.next_pass_usage ? el("p", { className: "artifact-note", text: value.next_pass_usage }) : null,
-  ]);
-}
-
 function renderProviderGate(card) {
   if (!card) return el("section", { className: "provider-gate" }, [sectionTitle("Provider Gate", "not requested")]);
   return el("section", { className: "provider-gate" }, [
@@ -121,8 +104,7 @@ function viewPanels(activeView, workbench, state) {
   if (activeView === "Review") {
     return [
       ...common,
-      renderReviewRoom(workbench.review_room, state.selectedVariantId),
-      renderStyleMemory(workbench.style_memory),
+      renderMemoryWorkspace(workbench.memory_workspace, state),
       renderActivityTimeline(workbench.activity_timeline),
       renderActionPanel(state, viewActionGroups(activeView)),
       renderArtifactPanel(state),
@@ -131,8 +113,7 @@ function viewPanels(activeView, workbench, state) {
   if (activeView === "Style Memory") {
     return [
       ...common,
-      renderStyleMemory(workbench.style_memory),
-      renderReviewRoom(workbench.review_room, state.selectedVariantId),
+      renderMemoryWorkspace(workbench.memory_workspace, state),
       renderActivityTimeline(workbench.activity_timeline),
       renderArtifactPanel(state),
     ];

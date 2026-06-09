@@ -1,6 +1,7 @@
 import { normalizeActivityTimeline } from "./activity-state.js";
 import { normalizeCommandHub } from "./command-hub-state.js";
 import { normalizeCreationWorkspace } from "./creation-workspace-state.js";
+import { normalizeMemoryWorkspace, normalizeReviewRoom, normalizeStyleMemory } from "./memory-workspace-state.js";
 import { normalizeProductionBoard } from "./production-board-state.js";
 import { normalizeProjectHub } from "./project-hub-state.js";
 import { normalizeProjectReadiness } from "./readiness-state.js";
@@ -14,6 +15,7 @@ export const EMPTY_WORKBENCH_STATE = {
   filmstrip: [],
   review_room: null,
   style_memory: null,
+  memory_workspace: null,
   job_center: null,
   activity_timeline: null,
   production_board: null,
@@ -48,6 +50,7 @@ export function normalizeWorkbenchState(payload) {
     filmstrip: asArray(source.filmstrip).map(normalizeFilmstripItem),
     review_room: normalizeReviewRoom(source.review_room),
     style_memory: normalizeStyleMemory(source.style_memory),
+    memory_workspace: normalizeMemoryWorkspace(source.memory_workspace),
     job_center: normalizeJobCenter(source.job_center),
     activity_timeline: normalizeActivityTimeline(source.activity_timeline),
     production_board: normalizeProductionBoard(source.production_board),
@@ -97,74 +100,6 @@ export function normalizeAssetItem(value) {
     summary: String(source.summary || ""),
     usage: String(source.usage || "Supporting context"),
     safety: String(source.safety || "safe_summary"),
-  };
-}
-
-export function normalizeReviewRoom(value) {
-  const source = asObject(value);
-  return {
-    status: String(source.status || "not_started"),
-    title: String(source.title || "Review room"),
-    summary: String(source.summary || ""),
-    candidates: asArray(source.candidates).map(normalizeReviewCandidate),
-    decision_counts: normalizeDecisionCounts(source.decision_counts),
-    latest_decisions: asArray(source.latest_decisions).map(normalizeReviewDecision),
-    non_claims: asArray(source.non_claims).map(String),
-  };
-}
-
-export function normalizeReviewCandidate(value) {
-  const source = asObject(value);
-  return {
-    candidate_id: String(source.candidate_id || ""),
-    card_id: String(source.card_id || ""),
-    stage: String(source.stage || ""),
-    label: String(source.label || "Candidate"),
-    title: String(source.title || "Candidate"),
-    status: String(source.status || "not_started"),
-    summary: String(source.summary || ""),
-    artifact_id: String(source.artifact_id || ""),
-    artifact_type: String(source.artifact_type || ""),
-    compare_points: asArray(source.compare_points).map(String),
-    latest_decision: String(source.latest_decision || ""),
-    latest_decision_note: String(source.latest_decision_note || ""),
-  };
-}
-
-export function normalizeReviewDecision(value) {
-  const source = asObject(value);
-  return {
-    review_id: String(source.review_id || ""),
-    card_id: String(source.card_id || ""),
-    candidate_id: String(source.candidate_id || ""),
-    artifact_id: String(source.artifact_id || ""),
-    decision: String(source.decision || ""),
-    note: String(source.note || ""),
-    generated_at: String(source.generated_at || ""),
-  };
-}
-
-export function normalizeDecisionCounts(value) {
-  const source = asObject(value);
-  return {
-    keep: Number(source.keep || 0),
-    revise: Number(source.revise || 0),
-    reject: Number(source.reject || 0),
-  };
-}
-
-export function normalizeStyleMemory(value) {
-  const source = asObject(value);
-  return {
-    status: String(source.status || "not_started"),
-    title: String(source.title || "Project style memory"),
-    summary: String(source.summary || ""),
-    profile_version_count: Number(source.profile_version_count || 0),
-    feedback_count: Number(source.feedback_count || 0),
-    latest_profile_artifact_id: String(source.latest_profile_artifact_id || ""),
-    reusable_preferences: asArray(source.reusable_preferences).map(String),
-    next_pass_usage: String(source.next_pass_usage || ""),
-    non_claims: asArray(source.non_claims).map(String),
   };
 }
 

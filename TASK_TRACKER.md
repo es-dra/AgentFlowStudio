@@ -92,7 +92,7 @@ Current Web/API queue state:
 | AFS-WEB-DRAFT-CANVAS-001 | Draft Hook / Proof / CTA canvas cards from safe source summaries | Landed: `POST /projects/{project_id}/canvas-draft`, Workbench `Draft Canvas`, OpenAPI export |
 | AFS-WEB-PROJECT-SETUP-001 | Project Hub, setup, asset/reference library | In progress: create/open/import/export, safe asset/reference summary registration, Reference Library panel, Project Hub templates, and source-type presets landed |
 | AFS-WEB-CREATION-WORKSPACE-001 | Creation workspace, scene/content cards, inspector, filmstrip, first generation check | In progress: safe scene/content card registration, backend `creation_workspace` projection, split Creation Workspace renderer/state/CSS, inspector, filmstrip, first generation control, safe artifact report panel, and Review Room candidate comparison landed |
-| AFS-WEB-REVIEW-STYLE-MEMORY-001 | Review feedback into project style memory | In progress: raw feedback, keep/revise/reject decisions, candidate-bound review evidence, Style Memory product view, and next-round controls landed |
+| AFS-WEB-REVIEW-STYLE-MEMORY-001 | Review feedback into project style memory | In progress: backend `memory_workspace` projection, review candidates, feedback controls, style profile reuse, next-round controls, and split memory renderer/state landed |
 | AFS-WEB-JOB-CENTER-001 | Runtime job progress, blocker guidance, and artifact navigation | In progress: backend `job_center` projection, frontend Job Center view, artifact navigation, and auto-refresh polling landed |
 | AFS-WEB-PROJECT-READINESS-001 | Project readiness, next action, and visible workflow gates | Landed: backend `project_readiness`, frontend Project Readiness panel, action mapping, and split readiness CSS |
 | AFS-WEB-STAGE-NAVIGATION-001 | Stage-based Workbench navigation and view-specific control groups | Landed: `activeView`, functional rail navigation, and grouped action panel rendering |
@@ -137,6 +137,9 @@ Verification so far:
 - Creation Workspace projection slice verification:
   red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
   focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Creation Workspace HTTP smoke passed with `creation_workspace.status = ready_for_first_check`, `selected_card_id = draft-hook`, `canvas_cards = 4`, `filmstrip_items = 3`, and `primary_action = start_first_generation_check`.
+- Memory Workspace projection slice verification:
+  red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
+  focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Memory Workspace HTTP smoke passed with `memory_workspace.status = ready`, 2 candidates, 1 profile version, and enabled feedback controls.
 - Draft Canvas HTTP smoke on port 8792: `draft_canvas succeeded`, 3 generated
   cards, 3 filmstrip items, `/workbench/` returned `200`.
 - Runtime HTTP smoke on port 8791: `/health`, `/workbench/`, and
