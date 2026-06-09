@@ -13,22 +13,22 @@ const TEXT_MAP = {
   "Run first generation check": "运行首轮检查",
   "Record review feedback": "记录审片反馈",
   "Start next round": "进入下一轮",
-  "Run provider preflight": "Provider 预检",
+  "Run provider preflight": "生成能力预检",
   "Record Review": "记录审片",
   "Run Next Round": "运行下一轮",
-  "Run provider preflight": "运行 Provider 预检",
+  "Run provider preflight": "运行生成能力预检",
   "Source materials": "素材准备",
   "Draft canvas": "画布草稿",
   "First generation check": "首轮检查",
   "Review feedback": "审片反馈",
   "Next round": "下一轮复用",
   "Next Round": "下一轮复用",
-  "Provider preflight": "Provider 预检",
+  "Provider preflight": "生成能力预检",
   "Safe materials": "安全素材",
   Source: "素材准备",
   Draft: "画布草稿",
   "First Check": "首轮检查",
-  "Provider Gate": "Provider 闸门",
+  "Provider Gate": "生成能力门",
   Plan: "计划",
   "Round 1": "首轮",
   "Round 2": "第二轮",
@@ -57,26 +57,26 @@ const TEXT_MAP = {
   "First generation check": "首轮检查",
   "Open Artifact": "打开证据",
   "Open Result": "打开结果证据",
-  "Provider preflight has not run.": "Provider 预检尚未运行。",
-  "Provider preflight returned safe gate evidence.": "Provider 预检已返回安全闸门证据。",
-  "Provider preflight remains gated.": "Provider 仍保持闸门关闭。",
-  "Runtime jobs and provider preflight appear here.": "运行任务和 Provider 预检状态会显示在这里。",
+  "Provider preflight has not run.": "生成能力预检尚未运行。",
+  "Provider preflight returned safe gate evidence.": "生成能力预检已返回安全闸门证据。",
+  "Provider preflight remains gated.": "生成能力仍保持闸门关闭。",
+  "Runtime jobs and provider preflight appear here.": "运行任务和生成能力预检状态会显示在这里。",
   "No runtime activity yet.": "还没有运行记录。",
   "No runtime jobs yet.": "还没有运行任务。",
   "No review notes recorded yet.": "还没有记录审片反馈。",
-  "Run a first check or provider preflight to create jobs.": "运行首轮检查或 Provider 预检后，这里会出现任务。",
+  "Run a first check or provider preflight to create jobs.": "运行首轮检查或生成能力预检后，这里会出现任务。",
   "Runtime events will appear after deterministic checks or review actions.": "确定性检查或审片操作后，这里会出现运行事件。",
   "Open the run details and inspect the error before retrying.": "先查看运行详情和错误，再决定是否重试。",
-  "Provider remains gated; authorize the exact capability before real smoke.": "Provider 仍处于闸门关闭状态；真实模型试跑前必须显式授权对应能力。",
-  "Provider remains blocked by explicit capability gates.": "Provider 仍被显式能力闸门阻塞。",
+  "Provider remains gated; authorize the exact capability before real smoke.": "生成能力仍处于闸门关闭状态；真实模型试跑前必须显式授权对应能力。",
+  "Provider remains blocked by explicit capability gates.": "生成能力仍被显式能力门阻塞。",
   "Open the first-check report, add missing project material, then retry.": "先查看首轮检查报告，补齐缺失项目材料后再重试。",
   "Open the next-round report and resolve blocked context refs.": "先查看下一轮报告，解决被阻塞的上下文引用。",
   "Decision is evidence only; it does not become durable memory.": "审片决定只是运行证据，不会自动成为长期记忆。",
   "Raw feedback is stored as evidence for later review.": "原始反馈只作为后续复查证据保存。",
   "Open the safe artifact to inspect the generated evidence.": "打开安全产物查看生成证据。",
   "Refresh the workbench to update runtime state.": "刷新工作台以更新运行状态。",
-  "Deterministic work is ready; run provider preflight before real smoke.": "确定性链路已准备好；真实模型试跑前先运行 Provider 预检。",
-  "Check provider readiness before real model smoke.": "真实模型试跑前先检查 Provider 就绪度。",
+  "Deterministic work is ready; run provider preflight before real smoke.": "确定性链路已准备好；真实模型试跑前先运行生成能力预检。",
+  "Check provider readiness before real model smoke.": "真实模型试跑前先检查生成能力就绪度。",
   "Reviewed project style profile is available for the next pass.": "已形成可用于下一轮的项目风格记忆。",
   "No project style memory has been applied yet.": "还没有形成可复用的项目记忆。",
   "Use this profile in the next round context.": "下一轮将复用当前项目风格记忆。",
@@ -87,15 +87,15 @@ const TEXT_MAP = {
   start_first_generation_check: "运行首轮检查",
   record_review_note: "记录审片反馈",
   start_next_round: "进入下一轮",
-  run_provider_preflight: "Provider 预检",
-  resolve_provider_preflight: "Provider 预检",
-  configure_provider: "配置 Provider 凭据",
-  enable_provider_gate: "开启对应 Provider 能力闸门",
+  run_provider_preflight: "生成能力预检",
+  resolve_provider_preflight: "生成能力预检",
+  configure_provider: "配置生成能力凭据",
+  enable_provider_gate: "开启对应生成能力门",
   add_project_materials: "补充项目素材摘要",
   open_advanced_details: "查看高级诊断",
   ready_to_draft: "可生成草稿",
-  provider_blocked: "Provider 阻塞",
-  ["provider" + "_config_missing"]: "Provider 配置缺失",
+  provider_blocked: "生成能力阻塞",
+  ["provider" + "_config_missing"]: "生成能力配置缺失",
   image_gate_unset: "图像能力闸门未开启",
   video_gate_unset: "视频能力闸门未开启",
   character_reference_image_missing: "缺少角色参考图",
@@ -105,7 +105,7 @@ const TEXT_MAP = {
   runtime_event: "运行事件",
   asset_test_run: "首轮检查",
   two_round_validate: "下一轮复用",
-  provider_validation_plan: "Provider 预检",
+  provider_validation_plan: "生成能力预检",
   open_style_memory: "打开项目记忆",
   safe_summary: "安全摘要",
   "safe summaries": "安全摘要",
@@ -116,7 +116,7 @@ const TEXT_MAP = {
   Asset: "素材",
   "Review candidate": "审片候选",
   "Project setup": "项目设置",
-  "Build a provider-gated content memory workbench.": "构建一个受 Provider 闸门保护的内容制作与项目记忆工作台。",
+  "Build a provider-gated content memory workbench.": "构建一个受生成能力门保护的内容制作与项目记忆工作台。",
   "Demo: browser walkthrough of AFS content memory workbench.": "演示：内容制作与项目记忆工作台浏览器走查。",
   "Plan, inspect, and run the current production canvas from safe project summaries.": "基于安全项目摘要规划、检查并运行当前制作画布。",
   "Plan, inspect, and run the current production canvas from safe project refs.": "基于安全项目引用规划、检查并运行当前制作画布。",
@@ -126,8 +126,8 @@ const TEXT_MAP = {
   CTA: "行动引导",
   "Use approved safe reference summaries.": "使用已确认的安全参考摘要。",
   "Shape the story into hook, proof, and close.": "将内容组织为开场、证明和收束。",
-  "Product workbench draft; refine before provider smoke.": "工作台草稿；真实 Provider 试跑前继续细化。",
-  "Establish the first three seconds before any provider smoke.": "真实 Provider 试跑前先确认前三秒开场。",
+  "Product workbench draft; refine before provider smoke.": "工作台草稿；真实模型试跑前继续细化。",
+  "Establish the first three seconds before any provider smoke.": "真实模型试跑前先确认前三秒开场。",
   "Check clarity and visual continuity before next round.": "下一轮前先检查清晰度和视觉连续性。",
   "Keep the ending calm, specific, and reviewable.": "结尾保持克制、具体，并可审片。",
   "Visual reference": "视觉参考",
@@ -140,7 +140,7 @@ const TEXT_MAP = {
   agentflow_two_round_context_runtime_report: "二轮上下文验证报告",
   agentflow_runtime_feedback_event: "运行反馈事件",
   agentflow_runtime_review_decision: "审片决定",
-  agentflow_provider_safe_manifest: "Provider 安全档案",
+  agentflow_provider_safe_manifest: "生成能力安全档案",
   artifact: "产物",
   unknown: "未知",
   keep: "保留",
@@ -160,18 +160,18 @@ const TEXT_MAP = {
   "not durable memory": "非长期记忆晋升",
   "not durable company memory": "非公司长期记忆",
   "runtime verification is not human acceptance": "运行验证不等于人工验收",
-  "provider preflight is not provider smoke": "Provider 预检不等于真实模型试跑",
-  "blocked provider gates require explicit capability authorization": "被阻塞的 Provider 闸门需要显式能力授权",
+  "provider preflight is not provider smoke": "生成能力预检不等于真实模型试跑",
+  "blocked provider gates require explicit capability authorization": "被阻塞的生成能力门需要显式能力授权",
   "Keep this direction for the next pass.": "保留这个方向，用于下一轮复用。",
-  "Resolve provider gate": "处理 Provider 闸门",
-  "Provider capability": "Provider 能力",
-  "Provider capability gate is still blocked.": "Provider 能力闸门仍处于阻塞状态。",
-  "Provider capability gates remain blocked until explicitly authorized.": "Provider 能力闸门在显式授权前保持阻塞。",
-  "Provider remains gated; resolve the exact blocked capability before real smoke.": "Provider 仍处于闸门关闭状态；真实模型试跑前先处理被阻塞的具体能力。",
-  "Enable the image provider gate before live image smoke.": "真实图像试跑前必须先开启图像 Provider 闸门。",
-  "Enable the video provider gate before live video smoke.": "真实视频试跑前必须先开启视频 Provider 闸门。",
-  "Configure provider credentials before live provider smoke.": "真实 Provider 试跑前必须先完成凭据配置；凭据不能进入前端或仓库。",
-  "Add a character reference image before live provider smoke.": "真实 Provider 试跑前需要先提供角色参考图。",
+  "Resolve provider gate": "处理生成能力门",
+  "Provider capability": "生成能力",
+  "Provider capability gate is still blocked.": "生成能力门仍处于阻塞状态。",
+  "Provider capability gates remain blocked until explicitly authorized.": "生成能力门在显式授权前保持阻塞。",
+  "Provider remains gated; resolve the exact blocked capability before real smoke.": "生成能力仍处于闸门关闭状态；真实模型试跑前先处理被阻塞的具体能力。",
+  "Enable the image provider gate before live image smoke.": "真实图像试跑前必须先开启图像生成能力门。",
+  "Enable the video provider gate before live video smoke.": "真实视频试跑前必须先开启视频生成能力门。",
+  "Configure provider credentials before live provider smoke.": "真实模型试跑前必须先完成凭据配置；凭据不能进入前端或仓库。",
+  "Add a character reference image before live provider smoke.": "真实模型试跑前需要先提供角色参考图。",
   "Add project materials before running a real generation pass.": "补充项目素材摘要后再运行真实生成。",
 };
 
@@ -180,10 +180,10 @@ const SUMMARY_MAP = {
   "Add safe source summaries before drafting the production canvas.": "先添加安全素材摘要，再生成制作画布。",
   "Source material is ready; draft a first reviewable canvas.": "素材已就绪，可以生成第一版可审片画布。",
   "Create a first reviewable canvas from the current safe source material.": "基于当前安全素材生成第一版可审片画布。",
-  "Run deterministic checks before any real provider smoke.": "在任何真实 Provider 试跑前先运行确定性检查。",
+  "Run deterministic checks before any real provider smoke.": "在任何真实模型试跑前先运行确定性检查。",
   "Record a candidate-bound review decision for the next pass.": "为下一轮记录绑定候选的审片决定。",
   "Reuse accepted context and review evidence in a second pass.": "在第二轮复用已接受的上下文和审片证据。",
-  "Check provider readiness without starting a real model run.": "只检查 provider 就绪度，不启动真实模型调用。",
+  "Check provider readiness without starting a real model run.": "只检查生成能力就绪度，不启动真实模型调用。",
   "Start with safe source summaries.": "从安全素材摘要开始。",
   "Run the first deterministic content check.": "运行第一轮确定性内容检查。",
   "Canvas content is ready for the first deterministic check.": "画布内容已就绪，可以运行首轮确定性检查。",
@@ -206,16 +206,29 @@ const STATUS_MAP = {
   not_started: "未开始",
   ready: "就绪",
   ready_for_first_check: "可首轮检查",
-  ready_for_provider_preflight: "可做 Provider 预检",
+  ready_for_provider_preflight: "可做生成能力预检",
   ready_for_next_round: "可进入下一轮",
   ready_not_run: "就绪未运行",
   ready_to_draft: "可生成草稿",
-  provider_blocked: "Provider 阻塞",
+  provider_blocked: "生成能力阻塞",
   running: "运行中",
   succeeded: "已完成",
   completed_with_blocks: "完成但有阻塞",
   verified: "已验证",
 };
+
+function productizeProviderText(value) {
+  return String(value)
+    .replaceAll("Provider 能力闸门", "生成能力门")
+    .replaceAll("Provider 能力", "生成能力")
+    .replaceAll("Provider 闸门", "生成能力门")
+    .replaceAll("Provider 预检", "生成能力预检")
+    .replaceAll("Provider 阻塞", "生成能力阻塞")
+    .replaceAll("Provider 配置", "生成能力配置")
+    .replaceAll("Provider 调用", "生成能力调用")
+    .replaceAll("Provider", "生成能力")
+    .replaceAll("受 生成能力门", "受生成能力门");
+}
 
 export function displayText(value, fallback = "") {
   if (typeof value === "string" && value.endsWith(" safe source summaries are attached.")) {
@@ -234,10 +247,10 @@ export function displayText(value, fallback = "") {
     return value.replace(" candidates with ", " 个候选，已有 ").replace(" recorded decisions.", " 条审片决定。");
   }
   if (typeof value === "string" && value.includes(" runtime jobs tracked; provider preflight has ") && value.includes(" blockers.")) {
-    return value.replace(" runtime jobs tracked; provider preflight has ", " 个运行任务，Provider 预检还有 ").replace(" blockers.", " 个阻塞。");
+    return value.replace(" runtime jobs tracked; provider preflight has ", " 个运行任务，生成能力预检还有 ").replace(" blockers.", " 个阻塞。");
   }
   if (typeof value === "string" && value.includes(" runtime jobs tracked with no provider preflight blockers.")) {
-    return value.replace(" runtime jobs tracked with no provider preflight blockers.", " 个运行任务，Provider 预检没有阻塞。");
+    return value.replace(" runtime jobs tracked with no provider preflight blockers.", " 个运行任务，生成能力预检没有阻塞。");
   }
   if (typeof value === "string" && value.match(/^\d+ jobs: /)) {
     return value
@@ -262,11 +275,14 @@ export function displayText(value, fallback = "") {
   if (typeof value === "string" && value.startsWith("Close with a simple next step that matches the project goal: ")) {
     return `用匹配项目目标的简单下一步收束：${displayText(value.slice(60).trim())}`;
   }
-  if (typeof value === "string" && value.startsWith("Provider calls: ")) return `Provider 调用：${TEXT_MAP[value.slice(16)] || value.slice(16)}`;
+  if (typeof value === "string" && value.startsWith("Provider calls: ")) return `生成能力调用：${TEXT_MAP[value.slice(16)] || value.slice(16)}`;
   if (typeof value === "string" && value.startsWith("Verification: ")) return `验证：${displayStatus(value.slice(14), value.slice(14))}`;
   if (typeof value === "string" && value.startsWith("Assessment: ")) return `评估：${TEXT_MAP[value.slice(12)] || value.slice(12)}`;
   if (typeof value === "string" && value.startsWith("Blockers: ")) return `阻塞项：${value.slice(10)}`;
-  return TEXT_MAP[value] || SUMMARY_MAP[value] || STATUS_MAP[value] || value || fallback;
+  const mapped = TEXT_MAP[value] || SUMMARY_MAP[value] || STATUS_MAP[value];
+  if (mapped) return mapped;
+  if (typeof value === "string") return productizeProviderText(value);
+  return value || fallback;
 }
 
 export function displayStatus(value, fallback = "未开始") {

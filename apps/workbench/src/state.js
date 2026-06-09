@@ -4,7 +4,7 @@ import { DEFAULT_RUNTIME_BASE_URL } from "./runtime-client.js";
 export const state = {
   baseUrl: DEFAULT_RUNTIME_BASE_URL,
   projectId: "proj_runtime_demo",
-  projectGoal: "构建一个受 Provider 闸门保护的内容制作与项目记忆工作台。",
+  projectGoal: "构建一个受生成能力门保护的内容制作与项目记忆工作台。",
   projectType: "short_video_campaign",
   importManifestJson: "",
   sourceAssetId: "brief-main",

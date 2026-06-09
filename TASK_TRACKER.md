@@ -108,6 +108,7 @@ Current Web/API queue state:
 | AFS-WEB-STUDIO-WORKSPACE-001 | 将 Create 视图改为产品化 Studio Workspace：统一承载画布、素材参考、风格记忆、审片队列、runtime 摘要和 safe artifact 导航 | 已在当前分支落地：后端 `studio_workspace`、前端 Studio Workspace 面板、state adapter 和独立 CSS |
 | AFS-WEB-VERTICAL-FLOW-001 | Workbench deterministic 纵向主路径：从空项目到 ready_for_next_round，不接触 CLI 或手写 JSON | 已完成浏览器级主路径证据：API vertical flow、mutation `flow` summary、空工作区创建入口、Review decision 主入口、Production Board 全宽布局、Playwright browser smoke 到 `ready_for_next_round` |
 | AFS-WEB-UX-REFOUNDATION-001 | 将 Workbench 从工程状态面板重构为中文多工作区创作应用：项目、创作画布、素材库、分镜台、审片室、项目记忆、任务中心、诊断 | 阶段 0-7 已落地到发布候选：中文 IA/术语/QA 账本、多工作区外壳、项目设置向导、创作画布节点流、素材库分组、独立分镜台、独立审片室、独立项目记忆、任务中心、Provider Gate、Runtime 中文显示适配、no-store 静态入口、浏览器主路径和响应式截图 QA 已完成；下一步进入人工验收和 provider-gated smoke 前置整理 |
+| AFS-WEB-CANVAS-V2-001 | 将 Create 从状态卡片式 Studio Workspace 推进为媒体优先画布：暗色舞台、节点预览、素材缩略、检查器预览、分镜条和生成能力术语清洗 | 当前分支已落地第一阶段：`styles-studio-canvas-v2.css`、Canvas V2 渲染元素、Create 旧窗口头隐藏、主视图 Provider 可见泄漏归零；等待人工体验复核后进入下一轮交互/窗口细化 |
 
 Verification so far:
 

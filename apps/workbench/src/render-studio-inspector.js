@@ -5,6 +5,11 @@ export function renderStudioInspector(inspector, state) {
   const fields = inspector.fields || {};
   return el("aside", { className: "studio-inspector" }, [
     sectionTitle("节点检查器", displayStatus(inspector.status || "empty", "空")),
+    el("div", { className: "studio-inspector-hero" }, [
+      el("span", { text: displayText(inspector.mode || "node") }),
+      el("strong", { text: displayText(inspector.title || "未选择卡片") }),
+      inspector.primary_artifact_id ? badge("有安全产物", "ready") : badge("待生成预览", "quiet"),
+    ]),
     el("h3", { text: displayText(inspector.title || "未选择卡片") }),
     inspector.summary ? el("p", { className: "card-summary", text: displayText(inspector.summary) }) : null,
     renderInspectorFacts(inspector),

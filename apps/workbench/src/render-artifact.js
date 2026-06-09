@@ -43,7 +43,7 @@ function projectManifestView(payload) {
 function assetTestView(payload) {
   return [
     fact("运行", displayStatus(payload.run_status || payload.status), payload.blocks?.length ? "blocked" : "good"),
-    fact("Provider 调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
+    fact("生成能力调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
     fact("长期记忆", payload.writes_long_term_memory === true ? "已写入" : "未写入", "quiet"),
     listItems("阻塞项", payload.blocks || [], "block_id"),
   ];
@@ -79,8 +79,8 @@ function reviewDecisionView(payload) {
 function providerView(payload) {
   return [
     fact("状态", displayStatus(payload.status || "unknown"), payload.status === "blocked" ? "blocked" : "good"),
-    fact("Provider 调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
-    listItems("Provider 阻塞", payload.blockers || payload.blocks || [], "blocker_id"),
+    fact("生成能力调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
+    listItems("生成能力阻塞", payload.blockers || payload.blocks || [], "blocker_id"),
   ];
 }
 

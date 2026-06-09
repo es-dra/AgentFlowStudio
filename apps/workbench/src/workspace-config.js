@@ -41,7 +41,7 @@ export const WORKSPACES = [
     id: "Jobs",
     label: "任务中心",
     kicker: "任务",
-    summary: "查看运行任务、阻塞原因和 Provider 预检。",
+    summary: "查看运行任务、阻塞原因和生成能力预检。",
   },
   {
     id: "Settings",

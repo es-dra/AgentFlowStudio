@@ -29,6 +29,7 @@ export function renderStudioCanvas(workspace, selectedCardId) {
   const cards = Array.isArray(workspace.canvas?.cards) ? workspace.canvas.cards : [];
   return el("div", { className: "studio-canvas" }, [
     renderCanvasToolbar(workspace, cards),
+    renderStageHeader(cards),
     cards.length
       ? el("div", { className: "studio-node-flow" }, cards.map((card, index) => renderNode(card, selectedCardId, index, cards.length)))
       : renderEmptyCanvas(),
@@ -48,7 +49,7 @@ function renderCanvasToolbar(workspace, cards) {
   return el("div", { className: "studio-canvas-toolbar" }, [
     el("div", {}, [
       sectionTitle("创作画布", displayStatus(workspace.status || "not_started")),
-      el("p", { className: "card-summary", text: "按节点推进需求、素材、分镜、审片和记忆复用。" }),
+      el("p", { className: "card-summary", text: "把需求、素材、分镜、候选和项目记忆放在同一张制作画布上推进。" }),
     ]),
     el("div", { className: "studio-canvas-tools" }, [
       badge(`${cards.length} 个节点`, cards.length ? "ready" : "quiet"),
@@ -60,10 +61,18 @@ function renderCanvasToolbar(workspace, cards) {
   ]);
 }
 
+function renderStageHeader(cards) {
+  const labels = ["需求", "素材", "分镜", "候选", "审片", "记忆"];
+  return el("div", { className: "studio-stage" }, labels.map((label, index) =>
+    el("span", { className: index < Math.max(cards.length, 1) ? "active" : "", text: label }),
+  ));
+}
+
 function renderNode(card, selectedCardId, index, total) {
   const tone = statusTone(card.status);
   return el("div", { className: "studio-node-wrap" }, [
     el("article", { className: `studio-node ${tone}${card.card_id === selectedCardId ? " selected" : ""}`, dataset: { cardId: card.card_id } }, [
+      renderMediaFrame(card, index),
       el("div", { className: "studio-node-top" }, [
         badge(nodeLabel(card, index), tone),
         badge(displayStatus(card.status || "not_started"), tone),
@@ -74,6 +83,14 @@ function renderNode(card, selectedCardId, index, total) {
       card.blockers?.length ? el("div", { className: "chips" }, card.blockers.map((item) => badge(displayText(item.message || item.blocker_id), "blocked"))) : null,
     ]),
     index < total - 1 ? el("span", { className: "studio-node-connector", text: "→" }) : null,
+  ]);
+}
+
+function renderMediaFrame(card, index) {
+  return el("div", { className: `studio-media-frame ${mediaFrameTone(card, index)}` }, [
+    el("span", { text: mediaFrameLabel(card, index) }),
+    el("strong", { text: String(index + 1).padStart(2, "0") }),
+    el("small", { text: displayText(card.kind || "canvas node") }),
   ]);
 }
 
@@ -89,7 +106,7 @@ function renderEmptyCanvas() {
   const starters = ["需求", "素材", "分镜", "审片", "记忆"];
   return el("div", { className: "studio-empty-flow" }, starters.map((item, index) =>
     el("div", { className: "studio-empty-node" }, [
-      badge(String(index + 1).padStart(2, "0"), "quiet"),
+      el("div", { className: "studio-node-preview" }, [el("span", { text: String(index + 1).padStart(2, "0") })]),
       el("strong", { text: item }),
     ]),
   ));
@@ -97,6 +114,7 @@ function renderEmptyCanvas() {
 
 function renderFilmstripItem(item, index) {
   return el("button", { className: "studio-filmstrip-item", dataset: { cardId: item.card_id } }, [
+    el("span", { className: "studio-filmstrip-preview", text: String(index + 1).padStart(2, "0") }),
     el("span", { text: String(index + 1).padStart(2, "0") }),
     el("strong", { text: displayText(item.title) }),
     el("small", { text: displayText(item.summary || item.status) }),
@@ -109,4 +127,19 @@ function nodeLabel(card, index) {
   if (card.kind === "review") return "审片";
   if (card.kind === "memory") return "记忆";
   return ["需求", "素材", "分镜", "镜头", "审片", "记忆"][index] || "节点";
+}
+
+function mediaFrameLabel(card, index) {
+  if (card.primary_artifact_id) return "产物";
+  if (card.kind === "scene_card") return "镜头";
+  if (card.kind === "source") return "素材";
+  if (card.kind === "review") return "候选";
+  if (card.kind === "memory") return "记忆";
+  return ["需求", "素材", "画布", "镜头", "审片", "记忆"][index] || "节点";
+}
+
+function mediaFrameTone(card, index) {
+  if (card.status === "blocked") return "blocked";
+  if (card.primary_artifact_id) return "artifact";
+  return ["brief", "asset", "board", "shot", "review", "memory"][index] || "node";
 }

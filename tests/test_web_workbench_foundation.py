@@ -63,6 +63,7 @@ def _all_workbench_source() -> str:
         WORKBENCH_ROOT / "styles-assets.css",
         WORKBENCH_ROOT / "styles-creation-workspace.css",
         WORKBENCH_ROOT / "styles-studio-workspace.css",
+        WORKBENCH_ROOT / "styles-studio-canvas-v2.css",
         WORKBENCH_ROOT / "styles-storyboard.css",
         WORKBENCH_ROOT / "styles-review-memory.css",
         WORKBENCH_ROOT / "styles-activity.css",
@@ -73,7 +74,6 @@ def _all_workbench_source() -> str:
         *WORKBENCH_JS,
     ]
     return "\n".join(_read(path) for path in files)
-
 def test_workbench_shell_targets_runtime_service_contract() -> None:
     index = _read(WORKBENCH_ROOT / "index.html")
     source = _all_workbench_source()
@@ -87,6 +87,7 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert '<link rel="stylesheet" href="./styles-project-setup.css" />' in index
     assert '<link rel="stylesheet" href="./styles-assets.css" />' in index
     assert '<link rel="stylesheet" href="./styles-creation-workspace.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-canvas-v2.css" />' in index
     assert '<link rel="stylesheet" href="./styles-storyboard.css" />' in index
     assert '<link rel="stylesheet" href="./styles-review-memory.css" />' in index
     assert '<link rel="stylesheet" href="./styles-activity.css" />' in index
@@ -114,7 +115,6 @@ def test_workbench_shell_targets_runtime_service_contract() -> None:
     assert "/artifacts/" in source
     assert "createRuntimeClient" in source
     assert "normalizeWorkbenchState" in source
-
 def test_workbench_keeps_frontend_safety_boundary() -> None:
     source = _all_workbench_source()
     js_source = "\n".join(_read(path) for path in WORKBENCH_JS)
@@ -157,6 +157,7 @@ def test_workbench_keeps_frontend_safety_boundary() -> None:
         "operations_workspace", "project_readiness", "production_board", "command_hub",
         "reference-grid", "variant-grid", "job-progress", "activity_timeline",
         "studio-canvas-toolbar", "studio-node-flow", "studio-node-connector",
+        "studio-media-frame", "studio-node-preview", "studio-inspector-hero",
         "studio-inspector-facts", "studio-empty-flow", "asset-groups",
         "asset-next-actions", "asset-empty-state", "storyboard-workspace",
         "storyboard-strip", "storyboard-preview", "storyboard-inspector",
@@ -196,8 +197,6 @@ def test_workbench_normalizes_backend_state_shape() -> None:
     assert "source.primary_artifact_id" in source
     assert "evidence.artifact_ids" in source
     assert "source.event_id" in source
-
-
 def test_workbench_navigation_drives_stage_views() -> None:
     app = _read(WORKBENCH_ROOT / "src" / "app.js")
     render = _read(WORKBENCH_ROOT / "src" / "render.js")
@@ -272,6 +271,7 @@ def test_workbench_files_stay_below_maintenance_threshold() -> None:
         WORKBENCH_ROOT / "styles-components.css",
         WORKBENCH_ROOT / "styles-project-setup.css",
         WORKBENCH_ROOT / "styles-assets.css",
+        WORKBENCH_ROOT / "styles-studio-canvas-v2.css",
         WORKBENCH_ROOT / "styles-storyboard.css",
         WORKBENCH_ROOT / "styles-review-memory.css",
         WORKBENCH_ROOT / "styles-activity.css",

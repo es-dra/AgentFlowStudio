@@ -176,7 +176,8 @@ function renderWorkspace(state) {
     ]);
   }
   const activeView = state.activeView || DEFAULT_WORKSPACE_ID;
-  return el("main", { className: "workspace" }, viewPanels(activeView, workbench, state));
+  const workspaceClass = activeView === "Create" ? "workspace workspace-canvas-v2" : "workspace";
+  return el("main", { className: workspaceClass }, viewPanels(activeView, workbench, state));
 }
 
 export function renderApp(root, state) {

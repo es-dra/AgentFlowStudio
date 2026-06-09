@@ -76,7 +76,7 @@ function renderRuntimeActions(state) {
       button("首轮检查", "run-asset-test", "primary"),
       button("记录反馈", "record-feedback", "secondary"),
       button("进入下一轮", "run-two-round", "secondary"),
-      button("Provider 预检", "run-provider-preflight", "ghost"),
+      button("生成能力预检", "run-provider-preflight", "ghost"),
     ]),
     el("details", { className: "advanced" }, [
       el("summary", { text: "高级运行参数" }),

@@ -18,7 +18,7 @@ function renderProviderControls(controls) {
   const value = controls || {};
   const action = el("button", {
     className: `btn ${value.enabled ? "primary" : "secondary"}`,
-    text: displayText(value.primary_label, "Provider 预检"),
+    text: displayText(value.primary_label, "生成能力预检"),
     dataset: { action: value.ui_action || "refresh" },
     attrs: value.enabled ? {} : { disabled: "disabled" },
   });
@@ -35,12 +35,12 @@ function renderProviderGate(providerGate) {
   const value = providerGate || { blockers: [] };
   const blockers = Array.isArray(value.blockers) ? value.blockers : [];
   return el("section", { className: "operations-provider-gate provider-gate" }, [
-    sectionTitle("Provider 预检", displayStatus(value.status || "ready_not_run")),
+    sectionTitle("生成能力预检", displayStatus(value.status || "ready_not_run")),
     el("p", { className: "card-summary", text: displayText(value.summary || "Provider preflight has not run.") }),
     value.primary_artifact_id ? button("查看预检证据", "open-artifact-ref", "ghost", { artifactId: value.primary_artifact_id }) : null,
     blockers.length
       ? el("div", { className: "provider-blockers" }, blockers.map(renderProviderBlocker))
-      : el("p", { className: "muted", text: "当前没有 Provider 预检阻塞。" }),
+      : el("p", { className: "muted", text: "当前没有生成能力预检阻塞。" }),
   ]);
 }
 
@@ -79,7 +79,7 @@ function renderJobs(operations) {
   const jobs = Array.isArray(operations.job_queue) ? operations.job_queue : [];
   return jobs.length
     ? el("div", { className: "operations-job-list job-list" }, jobs.map((item) => renderJob(item, operations.selected_job_id)))
-    : el("p", { className: "muted", text: "运行首轮检查或 Provider 预检后，这里会出现任务。" });
+    : el("p", { className: "muted", text: "运行首轮检查或生成能力预检后，这里会出现任务。" });
 }
 
 function renderActivity(activity) {

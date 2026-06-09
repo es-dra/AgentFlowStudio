@@ -10,7 +10,7 @@ export function renderStudioWorkspace(workspace, state) {
   const cards = Array.isArray(value.canvas?.cards) ? value.canvas.cards : [];
   const selectedCardId = selectedStudioCardId(cards, value, state);
   const inspector = selectedStudioInspector(cards, selectedCardId, value.inspector || {});
-  return el("section", { className: "studio-workspace" }, [
+  return el("section", { className: "studio-workspace canvas-v2" }, [
     renderCommandStrip(value),
     el("div", { className: "studio-layout" }, [
       renderStudioSideRail(value.side_rail || {}, value.counts || {}),
@@ -37,13 +37,17 @@ function renderCommandStrip(workspace) {
       badge(displayStatus(workspace.status || "not_started"), statusTone(workspace.status)),
       badge(`${counts.canvas_cards || 0} 张卡片`, counts.canvas_cards ? "ready" : "quiet"),
       badge(`${counts.review_candidates || 0} 个审片候选`, counts.review_candidates ? "active" : "quiet"),
-      badge(`Provider ${displayStatus(workspace.provider_status || "ready_not_run")}`, workspace.provider_status === "blocked" ? "blocked" : "quiet"),
+      badge(`生成能力 ${displayStatus(workspace.provider_status || "ready_not_run")}`, workspace.provider_status === "blocked" ? "blocked" : "quiet"),
     ]),
     canRunHere
       ? button(displayText(command.label || "Continue", "继续"), command.ui_action, "primary")
       : canOpenView
         ? el("button", { className: "btn ghost", text: commandLabel(command), dataset: { view: command.view } })
-        : el("button", { className: "btn ghost disabled", text: commandLabel(command), attrs: { disabled: "disabled" } }),
+        : el("button", {
+            className: "btn ghost disabled",
+            text: command.blocked_reason ? "等待处理阻塞" : commandLabel(command),
+            attrs: { disabled: "disabled", title: displayText(command.blocked_reason || "") },
+          }),
   ]);
 }
 
@@ -61,8 +65,8 @@ function renderOperationsSummary(summary, providerStatus) {
     el("div", { className: "studio-strip-metrics" }, [
       badge(`${counts.jobs || 0} 个任务`, counts.jobs ? "ready" : "quiet"),
       badge(`${counts.blocked || 0} 个阻塞`, counts.blocked ? "blocked" : "quiet"),
-      badge(`Provider ${displayStatus(providerStatus || "ready_not_run")}`, providerStatus === "blocked" ? "blocked" : "quiet"),
+      badge(`生成能力 ${displayStatus(providerStatus || "ready_not_run")}`, providerStatus === "blocked" ? "blocked" : "quiet"),
     ]),
-    summary.primary_artifact_id ? button("打开 Provider 产物", "open-artifact-ref", "ghost", { artifactId: summary.primary_artifact_id }) : null,
+    summary.primary_artifact_id ? button("打开生成能力证据", "open-artifact-ref", "ghost", { artifactId: summary.primary_artifact_id }) : null,
   ]);
 }
