@@ -279,3 +279,8 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Added `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html` as a local visual index over the Stage 7 screenshots, acceptance path, and provider/human-acceptance boundaries.
 - Added `docs/handoff/AFS-WEB-RC-DRAFT-PR-001.md` with a ready-to-copy draft PR body after local `gh` was unavailable and the GitHub connector token was expired.
 - Boundaries unchanged: provider remains closed; no secret, private media, provider raw response, signed URL, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
+
+## 2026-06-09 - Web Provider Smoke Readiness Prep
+- Added `docs/handoff/AFS-WEB-PROVIDER-SMOKE-READINESS-001.md` to separate Web RC human acceptance from later capability-gated provider smoke.
+- Registered the handoff in `docs/handoff/INDEX.md` and updated `AFS-PROVIDER-GATED-REAL-SMOKE-001` in `TASK_TRACKER.md`.
+- Boundaries unchanged: provider not executed; no secret, local private material, provider raw response, signed URL, generated media byte, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
