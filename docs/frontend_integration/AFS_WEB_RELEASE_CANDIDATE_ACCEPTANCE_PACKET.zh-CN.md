@@ -64,9 +64,10 @@
 - 可视化演示索引：`docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`。
 - 浏览器 QA：console error `0`，主视图可见英文 `false`，主视图内部 id 泄漏 `false`，文字溢出 `0`。
 - 人工验收前演练：刷新 `/workbench/` 后自动连接 Runtime Service，8 个工作区均可切换；console error `0`，列出的英文残留/内部 id/本地路径残留 `0`，文字溢出 `0`。
-- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781030077` 达到 `ready_for_next_round`，Provider 调用仍未启动。
+- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781030891` 达到 `ready_for_next_round`，Provider 调用仍未启动。
 - 2026-06-10 PM 复核补充：Create 视图不再暴露 `completed_with_blocks` 或英文 project-materials blocker；这些可见泄漏已纳入 smoke 硬断言，且 RuntimeStore 已覆盖损坏 `artifact_index.json` 的本地恢复路径。
 - 2026-06-10 视口工作台复核：页面不再作为整页长报表滚动；当前应用壳锁定在视口内，导航区和工作区分别内部滚动，Projects/Create/Jobs/Settings 在 917x791 浏览器下页面高度均等于视口高度。
+- 2026-06-10 工作区主任务优先复核：Projects 首屏先显示项目中心与项目操作，Assets 首屏先显示素材库，Settings 首屏先显示高级诊断与活动时间线，不再把通用生产状态面板置于诊断页顶部。
 - 2026-06-10 首屏中文体验复核已纳入自动 smoke 硬断言：`old_project_ids_visible=false`，`question_mark_runs=0`，`stage_rc_visible=false`，`toast_errors=[]`；旧英文 projection 文案扫描命中 `0`。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：

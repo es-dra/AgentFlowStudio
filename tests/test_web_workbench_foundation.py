@@ -203,8 +203,8 @@ def test_workbench_navigation_drives_stage_views() -> None:
     render = _read(WORKBENCH_ROOT / "src" / "render.js")
     actions = _read(WORKBENCH_ROOT / "src" / "render-actions.js")
     state_source = _read(WORKBENCH_ROOT / "src" / "state.js")
-
     workspace_config = _read(WORKBENCH_ROOT / "src" / "workspace-config.js")
+    projects_block = render.split('if (activeView === "Projects") {', 1)[1].split('if (activeView === "Assets")', 1)[0]; assets_block = render.split('if (activeView === "Assets") {', 1)[1].split('if (activeView === "Storyboard")', 1)[0]; settings_block = render.split('if (activeView === "Settings") {', 1)[1].split('return withWindow("Create"', 1)[0]
     style_memory_block = render.split('if (activeView === "Style Memory") {', 1)[1].split('if (activeView === "Jobs")', 1)[0]
     jobs_block = render.split('if (activeView === "Jobs") {', 1)[1].split('if (activeView === "Settings")', 1)[0]
 
@@ -218,7 +218,9 @@ def test_workbench_navigation_drives_stage_views() -> None:
     assert "workspaceItems(items)" in render
     assert "viewActionGroups" in render
     assert "renderActionPanel(state, viewActionGroups(activeView))" in render
-    assert "renderProjectHub(workbench.project_hub)" in render
+    assert projects_block.index("renderProjectHub") < projects_block.index("...common")
+    assert assets_block.index("renderAssetLibrary") < assets_block.index("...common")
+    assert "renderProjectReadiness" not in settings_block and "...common" not in settings_block
     assert "renderStudioWorkspace(workbench.studio_workspace, state)" in render
     assert "renderStoryboardWorkspace(workbench.studio_workspace, workbench.creation_workspace, state)" in render
     assert "renderReviewWorkspace(workbench.review_room, workbench.memory_workspace, state)" in render

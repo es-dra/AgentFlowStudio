@@ -114,10 +114,20 @@ function viewPanels(activeView, workbench, state) {
     renderProductionBoard(workbench.production_board),
   ];
   if (activeView === "Projects") {
-    return withWindow(activeView, [...common, renderProjectHub(workbench.project_hub), renderActionPanel(state, viewActionGroups(activeView)), renderArtifactPanel(state)]);
+    return withWindow(activeView, [
+      renderProjectHub(workbench.project_hub),
+      renderActionPanel(state, viewActionGroups(activeView)),
+      ...common,
+      renderArtifactPanel(state),
+    ]);
   }
   if (activeView === "Assets") {
-    return withWindow(activeView, [...common, renderActionPanel(state, viewActionGroups(activeView)), renderAssetLibrary(workbench.asset_library), renderArtifactPanel(state)]);
+    return withWindow(activeView, [
+      renderAssetLibrary(workbench.asset_library),
+      renderActionPanel(state, viewActionGroups(activeView)),
+      ...common,
+      renderArtifactPanel(state),
+    ]);
   }
   if (activeView === "Storyboard") {
     return withWindow(activeView, [renderStoryboardWorkspace(workbench.studio_workspace, workbench.creation_workspace, state), renderArtifactPanel(state)]);
@@ -144,10 +154,9 @@ function viewPanels(activeView, workbench, state) {
   }
   if (activeView === "Settings") {
     return withWindow(activeView, [
-      ...common,
-      renderActionPanel(state, viewActionGroups(activeView)),
-      renderActivityTimeline(workbench.activity_timeline),
       renderAdvanced(workbench),
+      renderActivityTimeline(workbench.activity_timeline),
+      renderActionPanel(state, viewActionGroups(activeView)),
     ]);
   }
   return withWindow("Create", [
