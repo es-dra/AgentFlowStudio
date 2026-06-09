@@ -6,6 +6,7 @@ from apps.api.runtime_store import RuntimeStore, project_summary
 from apps.api.runtime_workbench_activity import build_activity_timeline
 from apps.api.runtime_workbench_assets import build_asset_library
 from apps.api.runtime_workbench_board import build_production_board
+from apps.api.runtime_workbench_commands import build_command_hub
 from apps.api.runtime_workbench_content import build_filmstrip
 from apps.api.runtime_workbench_jobs import build_job_center
 from apps.api.runtime_workbench_readiness import build_project_readiness
@@ -30,6 +31,7 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
     }
     cards, provider_gate = build_workbench_cards(store, manifest=manifest, jobs=jobs, project=project)
     project_readiness = build_project_readiness(manifest, jobs, provider_gate)
+    production_board = build_production_board(manifest, jobs, provider_gate, project_readiness)
     return {
         "artifact_type": "agentflow_runtime_workbench_state",
         "schema_version": "0.1.0",
@@ -58,7 +60,8 @@ def build_workbench_state(store: RuntimeStore, project_id: str) -> dict[str, Any
         "style_memory": build_style_memory(store, manifest),
         "job_center": build_job_center(jobs),
         "activity_timeline": build_activity_timeline(jobs),
-        "production_board": build_production_board(manifest, jobs, provider_gate, project_readiness),
+        "production_board": production_board,
+        "command_hub": build_command_hub(project_readiness, production_board),
         "events": build_workbench_events(jobs),
         "provider_gate": provider_gate,
         "advanced_evidence": {

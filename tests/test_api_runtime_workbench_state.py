@@ -60,6 +60,19 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     assert _lane(state, "source")["status"] == "blocked"
     assert _lane(state, "draft")["status"] == "not_started"
     assert _lane(state, "first_check")["action"] == "start_first_generation_check"
+    assert state["command_hub"]["status"] == "needs_assets"
+    assert state["command_hub"]["title"] == "Command hub"
+    assert state["command_hub"]["primary_command"]["backend_action"] == "add_reference"
+    assert state["command_hub"]["primary_command"]["ui_action"] == "register-source-asset"
+    assert state["command_hub"]["primary_command"]["view"] == "Assets"
+    assert state["command_hub"]["primary_command"]["enabled"] is True
+    assert state["command_hub"]["primary_command"]["requires_input"] == [
+        "source_asset_id",
+        "source_asset_label",
+        "source_asset_summary",
+    ]
+    assert _command(state, "draft_canvas")["ui_action"] == "draft-canvas"
+    assert _command(state, "start_first_generation_check")["ui_action"] == "run-asset-test"
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"
     assert state["project_readiness"]["current_action_label"] == "Add source materials"
@@ -130,6 +143,13 @@ def test_runtime_service_workbench_state_summarizes_full_deterministic_flow(tmp_
     assert state["activity_timeline"]["items"][0]["primary_artifact_id"] == provider["artifacts"]["provider_safe_manifest"]["artifact_id"]
     assert state["production_board"]["status"] == "blocked"
     assert state["production_board"]["current_action"] == "resolve_provider_preflight"
+    assert state["command_hub"]["status"] == "blocked"
+    assert state["command_hub"]["primary_command"]["backend_action"] == "resolve_provider_preflight"
+    assert state["command_hub"]["primary_command"]["ui_action"] == ""
+    assert state["command_hub"]["primary_command"]["enabled"] is False
+    assert state["command_hub"]["primary_command"]["blocked_reason"] == "Provider capability gate is still blocked."
+    assert _command(state, "start_next_round")["ui_action"] == "run-two-round"
+    assert _command(state, "run_provider_preflight")["ui_action"] == "run-provider-preflight"
     assert _lane(state, "source")["status"] == "succeeded"
     assert _lane(state, "first_check")["status"] == "blocked"
     assert _lane(state, "review")["status"] == "succeeded"
@@ -171,6 +191,12 @@ def _step(state: dict, step_id: str) -> dict:
 
 def _lane(state: dict, lane_id: str) -> dict:
     matches = [lane for lane in state["production_board"]["lanes"] if lane["lane_id"] == lane_id]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _command(state: dict, backend_action: str) -> dict:
+    matches = [command for command in state["command_hub"]["commands"] if command["backend_action"] == backend_action]
     assert len(matches) == 1
     return matches[0]
 

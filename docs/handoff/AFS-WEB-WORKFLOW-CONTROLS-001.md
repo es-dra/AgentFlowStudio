@@ -32,6 +32,7 @@ only and does not execute CLI internals or providers from the browser.
 - Project Readiness: render current action, workflow gate statuses, and non-claim badges from backend state.
 - Activity Timeline: render runtime activity counts, latest jobs, blocked actions, and safe primary artifact refs.
 - Production Board: render source, draft, first check, review, style memory, next round, and provider gate as product-facing lanes.
+- Command Hub: translate backend workflow actions into user-facing primary and stage commands.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
@@ -49,7 +50,7 @@ only and does not execute CLI internals or providers from the browser.
 - `POST /projects/{project_id}/canvas-draft`
 - `POST /projects/{project_id}/scene-inspector`
 - `POST /projects/{project_id}/review-decisions`
-- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
+- `GET /projects/{project_id}/workbench-state` now includes `project_readiness`, `command_hub`, `production_board`, `asset_library`, `filmstrip`, `review_room`, `style_memory`, `job_center`, and `activity_timeline`.
 - `GET /workbench/` serves the static Workbench shell from Runtime Service.
 
 Write paths store safe summaries and safe review evidence only. They do not persist private local
@@ -115,6 +116,13 @@ Result:
 - Latest focused verification after Production Board integration:
   Production Board state/Web foundation `11 passed, 1 warning`; focused
   Runtime/Web/API `26 passed, 1 warning`.
+- Latest focused verification after Command Hub integration:
+  Command Hub state/Web foundation `11 passed, 1 warning`; focused
+  Runtime/Web/API/action suite `18 passed, 1 warning`.
+- Command Hub HTTP smoke on a temporary port: `/workbench/` and
+  `/workbench/styles-command-hub.css` returned `200`; a temporary project
+  returned `command_hub.primary_command = add_reference ->
+  register-source-asset`.
 - Production Board HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/src/render-production-board.js`, and
   `/workbench/styles-production-board.css` returned `200`; a temporary project

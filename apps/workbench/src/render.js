@@ -4,6 +4,7 @@ import { renderActionPanel } from "./render-actions.js";
 import { renderArtifactPanel } from "./render-artifact.js";
 import { renderActivityTimeline } from "./render-activity.js";
 import { renderAssetLibrary } from "./render-assets.js";
+import { renderCommandHub } from "./render-command-hub.js";
 import { renderJobCenter } from "./render-jobs.js";
 import { renderProductionBoard } from "./render-production-board.js";
 import { renderProjectReadiness } from "./render-readiness.js";
@@ -192,7 +193,11 @@ function viewActionGroups(activeView) {
 
 function viewPanels(activeView, workbench, state) {
   const selectedCardId = state.selectedCardId;
-  const common = [renderProjectReadiness(workbench.project_readiness), renderProductionBoard(workbench.production_board)];
+  const common = [
+    renderProjectReadiness(workbench.project_readiness),
+    renderCommandHub(workbench.command_hub),
+    renderProductionBoard(workbench.production_board),
+  ];
   if (activeView === "Projects") {
     return [...common, renderActionPanel(state, viewActionGroups(activeView)), renderArtifactPanel(state)];
   }

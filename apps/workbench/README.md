@@ -39,7 +39,7 @@ http://127.0.0.1:8790
 - 连接 Runtime Service。
 - 由 Runtime Service 通过 `/workbench/` 提供静态入口，便于前后端联调和浏览器 QA。
 - 读取 `/health`、`/capabilities`、`/projects` 和 `GET /projects/{project_id}/workbench-state`。
-- 渲染项目工作台、Production Board、Reference Library、创作画布卡片、检查区、Review Room、Style Memory、Job Center、provider preflight 和 filmstrip。
+- 渲染项目工作台、Command Hub、Production Board、Reference Library、创作画布卡片、检查区、Review Room、Style Memory、Job Center、provider preflight 和 filmstrip。
 - 创建、打开、导入、导出 project manifest。
 - 使用 Project Hub 模板预填 project type、goal 和 safe manifest import JSON。
 - 登记 safe asset/reference summary 和 safe scene/content card。
@@ -52,6 +52,7 @@ http://127.0.0.1:8790
 - 通过 Job Center 查看 runtime job 进度、阻塞指导和可打开的 safe artifact ref。
 - 通过 Activity Timeline 查看当前 project 的运行活动、阻塞动作和可打开的 safe primary artifact ref。
 - 通过 Production Board 查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
+- 通过 Command Hub 查看当前主命令、阶段命令、所需输入和 provider gate 阻塞原因。
 - Job Center 会对当前 project 做自动刷新，不启动 provider。
 - 触发首轮 deterministic asset test、记录 raw feedback、触发 two-round validation。
 - 触发 provider preflight，但不启动 live provider。
@@ -71,6 +72,14 @@ It renders a compact Project Readiness panel with the current action, safe workf
 gates, and non-claim badges. This panel is a user-facing workflow guide only: it
 does not execute CLI internals, does not bypass provider gates, and does not
 promote feedback into durable memory.
+
+## Command Hub
+
+The Workbench reads `command_hub` from `GET /projects/{project_id}/workbench-state`.
+It translates backend workflow actions into user-facing commands such as source
+registration, Draft Canvas, first check, review feedback, next round, and
+provider preflight. Disabled commands remain visible with blocked reasons rather
+than bypassing provider gates.
 
 ## Activity Timeline
 

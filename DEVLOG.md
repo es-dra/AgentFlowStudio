@@ -268,3 +268,11 @@ Boundaries:
 - Added frontend Production Board normalization, rendering, and split CSS so the workbench can show the complete content/memory flow without exposing internal CLI orchestration.
 - Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
 - Verification during the slice: backend/Web red tests failed before implementation; Production Board focused state/Web tests `11 passed, 1 warning`; Runtime/Web/API focused suite `26 passed, 1 warning`; Runtime-hosted Production Board HTTP smoke passed; full pytest `837 passed, 1 warning`.
+
+## 2026-06-09 - Web Workbench Command Hub Slice
+
+- Added backend `command_hub` projection to `GET /projects/{project_id}/workbench-state`, translating workflow actions into user-facing commands and required-input hints.
+- Added frontend Command Hub normalization, rendering, and split CSS so users see one primary next command plus stage commands without learning backend action names.
+- Provider gate resolution remains non-executable in the browser: blocked provider preflight surfaces as a disabled command with a blocked reason.
+- Boundaries preserved: no provider calls, no secrets, no private local paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
+- Red tests failed before implementation; focused Command Hub state/Web tests `11 passed, 1 warning`; focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Command Hub HTTP smoke passed.
