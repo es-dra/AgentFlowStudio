@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -13,6 +14,18 @@ from typing import Any
 
 
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/workbench_browser_smoke")
+LEGACY_FIRST_SCREEN_PATTERNS = (
+    "Demo brief",
+    "Safe campaign brief summary",
+    "Reference library",
+    "Project readiness",
+    "Run provider preflight",
+    "Operations workspace",
+    "Job center",
+    "Command hub",
+    "Production board",
+    "First generation check",
+)
 
 
 def main() -> int:
@@ -41,6 +54,7 @@ def main() -> int:
     server = _start_runtime_service(port=port, runtime_root=runtime_root)
     console_errors: list[str] = []
     final_state: dict[str, Any] | None = None
+    first_screen: dict[str, Any] | None = None
     try:
         _wait_for_health(base_url)
         with sync_playwright() as playwright:
@@ -51,7 +65,7 @@ def main() -> int:
                 lambda msg: console_errors.append(msg.text) if msg.type == "error" else None,
             )
             try:
-                _run_browser_flow(page, base_url=base_url, project_id=project_id)
+                first_screen = _run_browser_flow(page, base_url=base_url, project_id=project_id)
                 screenshot_path = output_dir / "workbench-ready-for-next-round.png"
                 page.screenshot(path=screenshot_path, full_page=True)
             finally:
@@ -66,6 +80,8 @@ def main() -> int:
 
     if final_state is None:
         raise SystemExit("Browser smoke did not produce final Workbench state.")
+    if first_screen is None:
+        raise SystemExit("Browser smoke did not inspect the acceptance first screen.")
     _assert_final_state(final_state, console_errors)
     report = {
         "artifact_type": "agentflow_workbench_vertical_flow_browser_smoke",
@@ -76,6 +92,7 @@ def main() -> int:
         "project_status": final_state["project"]["status"],
         "readiness_status": final_state["project_readiness"]["status"],
         "current_action": final_state["project_readiness"]["current_action"],
+        "acceptance_first_screen": first_screen,
         "provider_calls_started": False,
         "writes_long_term_memory": False,
         "writes_company_kb": False,
@@ -87,8 +104,10 @@ def main() -> int:
     return 0
 
 
-def _run_browser_flow(page: Any, *, base_url: str, project_id: str) -> None:
+def _run_browser_flow(page: Any, *, base_url: str, project_id: str) -> dict[str, Any]:
     page.goto(f"{base_url}/workbench/", wait_until="networkidle")
+    first_screen = _capture_acceptance_first_screen(page)
+    _assert_acceptance_first_screen(first_screen)
     _open_diagnostics(page)
     _fill_if_present(page, "#runtime-url", base_url)
     _fill_if_present(page, "#project-id", project_id)
@@ -121,6 +140,35 @@ def _run_browser_flow(page: Any, *, base_url: str, project_id: str) -> None:
 
     if page.locator(".toast.error").count():
         raise AssertionError(page.locator(".toast.error").first.text_content() or "Workbench showed an error toast.")
+    return first_screen
+
+
+def _capture_acceptance_first_screen(page: Any) -> dict[str, Any]:
+    page.locator(".app-shell").first.wait_for(state="visible", timeout=10_000)
+    page.wait_for_function(
+        "() => document.querySelector('.project-row') || document.querySelector('.empty-workspace') || document.querySelector('.workspace')",
+        timeout=10_000,
+    )
+    visible_text = page.locator("body").inner_text(timeout=10_000)
+    project_list_text = page.evaluate("() => Array.from(document.querySelectorAll('.project-row')).map((node) => node.innerText).join('\\n')")
+    old_ids = sorted(set(re.findall(r"\bproj_[a-z0-9_]+\b", project_list_text, flags=re.IGNORECASE)))
+    english_matches = [text for text in LEGACY_FIRST_SCREEN_PATTERNS if re.search(re.escape(text), visible_text, flags=re.IGNORECASE)]
+    return {
+        "old_project_ids_visible": bool(old_ids),
+        "old_project_ids": old_ids[:10],
+        "question_mark_runs": len(re.findall(r"\?{6,}", project_list_text)),
+        "stage_rc_visible": bool(re.search(r"Stage\s*7|stage7", project_list_text, flags=re.IGNORECASE)),
+        "visible_english_matches": english_matches,
+        "toast_errors": [text for text in page.locator(".toast.error").all_text_contents() if text.strip()],
+    }
+
+
+def _assert_acceptance_first_screen(first_screen: dict[str, Any]) -> None:
+    assert not first_screen["old_project_ids_visible"], first_screen
+    assert first_screen["question_mark_runs"] == 0, first_screen
+    assert first_screen["stage_rc_visible"] is False, first_screen
+    assert first_screen["visible_english_matches"] == [], first_screen
+    assert first_screen["toast_errors"] == [], first_screen
 
 
 def _open_diagnostics(page: Any) -> None:

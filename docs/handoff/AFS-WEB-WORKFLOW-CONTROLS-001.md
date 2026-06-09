@@ -40,7 +40,7 @@ only and does not execute CLI internals or providers from the browser.
 - Vertical Flow Response: Runtime mutations now return a compact `flow` summary with target status, current action, next command, Studio status, provider status, and non-claims.
 - Empty Workspace Start: when no project is loaded, the Workbench still exposes project create/open controls instead of a dead "open project" page.
 - Cross-stage Command Navigation: Studio Workspace can navigate to Assets, Review, or Jobs for the current primary command instead of disabling cross-stage steps.
-- Browser Vertical Smoke: `tools/workbench_vertical_flow_browser_smoke.py` starts a temporary Runtime Service and drives Chromium through create -> source summary -> draft -> first check -> Review decision -> next round.
+- Browser Vertical Smoke: `tools/workbench_vertical_flow_browser_smoke.py` starts a temporary Runtime Service, asserts the acceptance first screen has no raw project ids / mojibake title runs / internal Stage 7 labels / legacy English projection copy / error toasts, and then drives Chromium through create -> source summary -> draft -> first check -> Review decision -> next round.
 - Layout QA Fix: Command Hub and Production Board now span the workbench width; Production Board lanes wrap instead of clipping in a narrow side column.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.

@@ -37,6 +37,11 @@ def test_workbench_vertical_flow_has_empty_project_start_and_next_action_feedbac
     assert "repeat(auto-fit, minmax(150px, 1fr))" in board_css
     assert ".command-hub {\n  grid-column: 1 / 3;" in command_css
     assert "_open_diagnostics(page)" in browser_smoke
+    assert "_capture_acceptance_first_screen(page)" in browser_smoke
+    assert '"acceptance_first_screen": first_screen' in browser_smoke
+    assert "old_project_ids_visible" in browser_smoke
+    assert "visible_english_matches" in browser_smoke
+    assert "LEGACY_FIRST_SCREEN_PATTERNS" in browser_smoke
     assert "_wait_for_action(page, \"run-asset-test\")" in browser_smoke
     assert "Browser-driven safe brief summary" not in browser_smoke
     assert "Run first generation check" not in browser_smoke

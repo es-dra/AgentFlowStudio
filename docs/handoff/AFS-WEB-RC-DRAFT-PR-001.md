@@ -20,10 +20,10 @@ Base branch:
 master
 ```
 
-Current head:
+Current branch head:
 
 ```text
-c13681e fix(workbench): localize acceptance first screen
+Run `git log -1 --oneline` before creating the PR.
 ```
 
 ## Draft PR Title
@@ -49,7 +49,7 @@ feat(workbench): add Chinese release candidate workspace
 - Demo index: `docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`
 - Acceptance packet: `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md`
 - QA ledger: `docs/frontend_integration/AFS_WEB_UX_QA_LEDGER.zh-CN.md`
-- Latest browser vertical smoke project: `proj_browser_vertical_1781025409`
+- Latest browser vertical smoke project: `proj_browser_vertical_1781026731`
 
 ## Verification
 
@@ -63,6 +63,7 @@ Latest local results:
 - full pytest: `844 passed, 1 warning`
 - maintenance audit: `failed=0, passed=6, warning=0`
 - browser vertical flow smoke: `ready_for_next_round`, `provider_calls_started=false`
+- acceptance first-screen smoke assertions: no raw project ids, mojibake title runs, internal Stage 7 labels, legacy English projection copy, or error toasts
 - Runtime HTTP smoke: `/workbench/`, `app.js`, and `render.js` return `Cache-Control: no-store`
 
 ## Human Acceptance Gate

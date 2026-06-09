@@ -89,7 +89,8 @@
 - 问题：刷新 `http://127.0.0.1:8790/workbench/` 后，项目列表和部分 Runtime projection 仍可能显示旧英文 demo 文案、raw project id、乱码标题或内部 Stage 7 命名。
 - 修补：默认项目选择改为优先选择 `ready_for_next_round` 且证据更完整的项目；项目列表主标题改为项目目标/类型/计数，不再用 raw project id；明显乱码标题归一为“历史演练项目”，Stage 7 内部项目归一为“验收演练项目”。
 - 修补：素材库、项目就绪度、操作指令、制作进度、任务中心、任务与 Provider、审片室、内容卡片等用户可见 projection 文案中文化；保留 action/status/non-claims 等合同枚举边界。
-- 浏览器复核：项目列表 `oldIdsVisible = false`，`questionMarkRuns = 0`，`stageRcVisible = false`，`toastErrors = []`；主视图英文残留扫描命中 `0`。
+- 浏览器复核：项目列表 `old_project_ids_visible = false`，`question_mark_runs = 0`，`stage_rc_visible = false`，`toast_errors = []`；旧英文 projection 文案扫描命中 `0`。
+- 自动化固化：`tools/workbench_vertical_flow_browser_smoke.py` 已将上述首屏检查升级为硬断言；最新 smoke 项目 `proj_browser_vertical_1781026731` 到达 `ready_for_next_round`，且 `provider_calls_started = false`。
 - 边界：本轮仍为工程验收前复核，不等于 human acceptance、business validation 或 durable memory promotion；Provider 未启动。
 
 ## 当前残留风险

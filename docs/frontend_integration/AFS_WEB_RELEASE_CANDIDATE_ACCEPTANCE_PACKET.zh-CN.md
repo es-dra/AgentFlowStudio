@@ -2,7 +2,7 @@
 
 日期：2026-06-10
 分支：`codex/afs-landing-prep-web-plan-001`
-当前 head：`c13681e fix(workbench): localize acceptance first screen`
+当前 head：以 `git log -1 --oneline` 为准；本验收包跟随分支更新，不固定单个提交。
 验收对象：Runtime Service 托管的 `/workbench/` 中文创作工作台 release candidate
 
 ## 定位
@@ -64,8 +64,8 @@
 - 可视化演示索引：`docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`。
 - 浏览器 QA：console error `0`，主视图可见英文 `false`，主视图内部 id 泄漏 `false`，文字溢出 `0`。
 - 人工验收前演练：刷新 `/workbench/` 后自动连接 Runtime Service，8 个工作区均可切换；console error `0`，列出的英文残留/内部 id/本地路径残留 `0`，文字溢出 `0`。
-- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781025409` 达到 `ready_for_next_round`，Provider 调用仍未启动。
-- 2026-06-10 首屏中文体验复核：项目列表 `oldIdsVisible=false`，`questionMarkRuns=0`，`stageRcVisible=false`，`toastErrors=[]`；主视图英文残留扫描命中 `0`。
+- 2026-06-10 浏览器主路径复核：`tools/workbench_vertical_flow_browser_smoke.py` 已适配中文多工作区外壳，最新项目 `proj_browser_vertical_1781026731` 达到 `ready_for_next_round`，Provider 调用仍未启动。
+- 2026-06-10 首屏中文体验复核已纳入自动 smoke 硬断言：`old_project_ids_visible=false`，`question_mark_runs=0`，`stage_rc_visible=false`，`toast_errors=[]`；旧英文 projection 文案扫描命中 `0`。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：
   - `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`
