@@ -28,7 +28,7 @@ function uiAction(action) {
     add_reference: "register-source-asset",
     draft_canvas: "draft-canvas",
     start_first_generation_check: "run-asset-test",
-    record_review_note: "record-feedback",
+    record_review_note: "record-review-decision",
     start_next_round: "run-two-round",
     run_provider_preflight: "run-provider-preflight",
     resolve_provider_preflight: "run-provider-preflight",

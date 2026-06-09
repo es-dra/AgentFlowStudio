@@ -56,7 +56,7 @@ function renderRuntimeActions(state) {
     textareaField("Review note", "feedback-note", state.feedbackNote, { rows: "4" }),
     el("div", { className: "action-stack" }, [
       button("First Check", "run-asset-test", "primary"),
-      button("Record Review", "record-feedback", "secondary"),
+      button("Record Feedback", "record-feedback", "secondary"),
       button("Next Round", "run-two-round", "secondary"),
       button("Provider Preflight", "run-provider-preflight", "ghost"),
     ]),

@@ -18,6 +18,9 @@
 - Added API-level vertical flow coverage for create project -> source summaries -> Draft Canvas -> inspector -> first deterministic check -> review decision -> two-round validation -> provider preflight readiness.
 - Added compact `flow` summaries to Runtime mutation responses so the frontend can show target status, current action, next command, Studio status, provider status, and non-claims without re-inferring the workflow.
 - Improved Workbench startup and navigation: empty workspace now exposes project create/open controls; Studio cross-stage commands navigate to the matching view; Project Hub no longer renders an empty-action Pending button.
+- Added browser-level Workbench smoke: Runtime Service starts on a temporary port, Chromium clicks create -> source summary -> draft -> first check -> Review decision -> next round, and reaches `ready_for_next_round`.
+- Tightened the main review action toward candidate-bound `record-review-decision`; generic `record-feedback` remains an auxiliary runtime control.
+- Fixed Production Board layout after screenshot QA exposed right-column clipping; command/board surfaces now span the workbench width and board lanes wrap.
 - Boundaries preserved: no live provider call, no secret, no signed URL, no private media bytes, no provider raw response, no durable-memory or human-acceptance claim.
 
 ## 2026-06-09 - Web Foundation 001

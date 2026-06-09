@@ -73,6 +73,7 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     ]
     assert _command(state, "draft_canvas")["ui_action"] == "draft-canvas"
     assert _command(state, "start_first_generation_check")["ui_action"] == "run-asset-test"
+    assert _command(state, "record_review_note")["ui_action"] == "record-review-decision"
     assert state["project_hub"]["status"] == "needs_assets"
     assert state["project_hub"]["title"] == "Project hub"
     assert state["project_hub"]["active_project"]["project_id"] == "proj_workbench_demo"
@@ -114,7 +115,11 @@ def test_runtime_service_workbench_state_starts_from_user_facing_project_state(t
     }
     assert state["memory_workspace"]["feedback_controls"]["primary_action"] == "record_review_note"
     assert state["memory_workspace"]["feedback_controls"]["enabled"] is False
-    assert state["memory_workspace"]["feedback_controls"]["requires_input"] == ["feedback_note"]
+    assert state["memory_workspace"]["feedback_controls"]["requires_input"] == [
+        "selected_review_candidate",
+        "review_decision",
+        "review_decision_note",
+    ]
     assert state["memory_workspace"]["style_profile"]["status"] == "not_started"
     assert state["project_readiness"]["status"] == "needs_assets"
     assert state["project_readiness"]["current_action"] == "add_reference"

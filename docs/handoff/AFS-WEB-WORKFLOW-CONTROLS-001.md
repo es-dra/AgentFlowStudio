@@ -40,6 +40,8 @@ only and does not execute CLI internals or providers from the browser.
 - Vertical Flow Response: Runtime mutations now return a compact `flow` summary with target status, current action, next command, Studio status, provider status, and non-claims.
 - Empty Workspace Start: when no project is loaded, the Workbench still exposes project create/open controls instead of a dead "open project" page.
 - Cross-stage Command Navigation: Studio Workspace can navigate to Assets, Review, or Jobs for the current primary command instead of disabling cross-stage steps.
+- Browser Vertical Smoke: `tools/workbench_vertical_flow_browser_smoke.py` starts a temporary Runtime Service and drives Chromium through create -> source summary -> draft -> first check -> Review decision -> next round.
+- Layout QA Fix: Command Hub and Production Board now span the workbench width; Production Board lanes wrap instead of clipping in a narrow side column.
 - Next Round: trigger two-round validation from the latest Round 1 job.
 - Provider Preflight: create provider validation-plan evidence without live calls.
 - Safe Artifact Panel: render artifact-specific report views with collapsed JSON Detail.
@@ -76,16 +78,12 @@ paths, media bytes, signed URLs, provider raw responses, or secrets.
 
 ## Current Gaps
 
-- Browser screenshot QA is still pending. Current execution environment did not
-  expose an in-app Browser controller, Playwright, or Edge/Chrome headless
-  binary.
-- Provider-gated real model smoke is intentionally deferred until deterministic Web flow is stable.
-- Browser click-through proof for the full vertical flow is still pending; current proof is API-level deterministic flow plus static frontend contract tests and HTTP/static resource smoke.
+- Provider-gated real model smoke is intentionally deferred until deterministic Web flow is stable and capability gates are explicitly authorized.
+- Browser smoke uses local Playwright/Chromium as a QA dependency. It is not a Runtime Service or Workbench production dependency.
 
 ## Next Implementation Order
 
-1. Add browser screenshot QA once a Browser or Playwright runtime is available.
-2. Add provider-gated real model smoke only after the deterministic Web flow is
+1. Add provider-gated real model smoke only after the deterministic Web flow is
    stable and capability gates are explicitly authorized.
 
 ## Verification
@@ -98,6 +96,7 @@ Verification after this slice:
 .\.venv\Scripts\python.exe -m apps.cli.main version
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
 .\.venv\Scripts\python.exe tools\repository_retention_review.py --summary-only
+.\.venv\Scripts\python.exe tools\workbench_vertical_flow_browser_smoke.py
 .\.venv\Scripts\python.exe -m pytest
 git diff --check
 ```
@@ -168,6 +167,12 @@ Result:
   `/workbench/src/render-studio-workspace.js` returned `200`; deterministic
   Runtime posts reached `draft_canvas` after project creation and source asset
   registration.
+- Vertical Flow browser smoke with Playwright/Chromium: clicked create ->
+  source summary -> Draft Canvas -> First Check -> Review decision -> Next
+  Round and reached `project_status = ready_for_next_round`,
+  `readiness_status = ready_for_provider_preflight`, and
+  `current_action = run_provider_preflight`. Screenshot/report:
+  `data/processed/runs/workbench_browser_smoke/browser_evidence/`.
 - Studio Workspace HTTP smoke on a temporary port: `/workbench/`,
   `/workbench/src/render-studio-workspace.js`, and
   `/workbench/styles-studio-workspace.css` returned `200`; a temporary project

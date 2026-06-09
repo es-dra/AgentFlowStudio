@@ -27,10 +27,10 @@ ACTION_UI_MAP = {
         "requires_input": [],
     },
     "record_review_note": {
-        "ui_action": "record-feedback",
+        "ui_action": "record-review-decision",
         "view": "Review",
-        "summary": "Record raw review evidence for the next pass.",
-        "requires_input": ["feedback_note"],
+        "summary": "Record a candidate-bound review decision for the next pass.",
+        "requires_input": ["selected_review_candidate", "review_decision", "review_decision_note"],
     },
     "start_next_round": {
         "ui_action": "run-two-round",
