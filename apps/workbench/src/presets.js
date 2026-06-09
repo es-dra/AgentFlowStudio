@@ -1,21 +1,21 @@
 export const PROJECT_TEMPLATES = [
   {
     id: "short-video",
-    label: "Short Video",
+    label: "短视频内容",
     projectType: "short_video_campaign",
-    goal: "Create a short-video content production pass with review and style reuse.",
+    goal: "完成一轮短视频内容制作、审片反馈和风格记忆复用。",
   },
   {
     id: "product-launch",
-    label: "Product Launch",
+    label: "产品发布",
     projectType: "product_launch_clip",
-    goal: "Prepare launch content with references, first check, review, and next-pass reuse.",
+    goal: "基于参考素材准备产品发布内容，并完成首轮检查、审片和下一轮复用。",
   },
   {
     id: "knowledge-clip",
-    label: "Knowledge Clip",
+    label: "知识切片",
     projectType: "knowledge_clip",
-    goal: "Turn source notes into a reviewed content sequence with reusable style memory.",
+    goal: "把源笔记转成可审片的内容序列，并沉淀可复用的项目风格记忆。",
   },
 ];
 
@@ -23,20 +23,20 @@ export const SOURCE_PRESETS = [
   {
     id: "brief",
     assetType: "brief",
-    label: "Campaign brief",
-    summary: "Audience, offer, tone, constraints, and success criteria summary.",
+    label: "内容需求",
+    summary: "受众、目标、语气、约束和成功标准摘要。",
   },
   {
     id: "reference",
     assetType: "reference",
-    label: "Visual reference",
-    summary: "Approved visual style, framing, palette, and quality bar summary.",
+    label: "视觉参考",
+    summary: "已确认的视觉风格、构图、色彩和质量标准摘要。",
   },
   {
     id: "script",
     assetType: "script",
-    label: "Script outline",
-    summary: "Scene outline, voice, key claims, and required beats summary.",
+    label: "脚本提纲",
+    summary: "场景结构、表达语气、关键主张和必要节奏摘要。",
   },
 ];
 

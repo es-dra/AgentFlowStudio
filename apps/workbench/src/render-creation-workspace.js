@@ -39,11 +39,11 @@ function selectedInspector(cards, selectedCardId, fallback) {
 function renderCanvas(workspace, selectedCardId) {
   const cards = Array.isArray(workspace.canvas_cards) ? workspace.canvas_cards : [];
   return el("section", { className: "creation-canvas" }, [
-    sectionTitle("Creation Workspace", workspace.status || "not_started"),
+    sectionTitle("创作工作区", workspace.status || "not_started"),
     workspace.summary ? el("p", { className: "card-summary", text: workspace.summary }) : null,
     cards.length
       ? el("div", { className: "creation-card-grid" }, cards.map((card) => renderCard(card, workspace.selected_card_id)))
-      : el("p", { className: "muted", text: "No creation cards yet." }),
+      : el("p", { className: "muted", text: "还没有创作卡片。" }),
     workspace.non_claims && workspace.non_claims.length ? el("div", { className: "chips" }, workspace.non_claims.map((item) => badge(item, "quiet"))) : null,
   ]);
 }
@@ -57,35 +57,35 @@ function renderCard(card, selectedCardId) {
     ]),
     card.summary ? el("p", { className: "card-summary", text: card.summary }) : null,
     card.blockers && card.blockers.length ? el("div", { className: "chips" }, card.blockers.map((item) => badge(item.message || item.blocker_id, "blocked"))) : null,
-    card.primary_artifact_id ? button("Open Artifact", "open-artifact-ref", "ghost", { artifactId: card.primary_artifact_id }) : null,
+    card.primary_artifact_id ? button("打开产物", "open-artifact-ref", "ghost", { artifactId: card.primary_artifact_id }) : null,
   ]);
 }
 
 function renderInspector(inspector, state) {
   const fields = inspector.fields || {};
   return el("aside", { className: "creation-inspector" }, [
-    sectionTitle("Inspector", inspector.status || "empty"),
-    el("h3", { text: inspector.title || "No card selected" }),
+    sectionTitle("检查器", inspector.status || "empty"),
+    el("h3", { text: inspector.title || "未选择卡片" }),
     inspector.summary ? el("p", { className: "card-summary", text: inspector.summary }) : null,
     inspector.actions && inspector.actions.length
       ? el("div", { className: "action-list" }, inspector.actions.map((item) => badge(item, "ready")))
-      : el("p", { className: "muted", text: "No queued action." }),
+      : el("p", { className: "muted", text: "没有排队中的操作。" }),
     renderRefs(inspector.refs || []),
-    inspector.primary_artifact_id ? button("Open Artifact", "open-artifact-ref", "secondary", { artifactId: inspector.primary_artifact_id }) : null,
+    inspector.primary_artifact_id ? button("打开产物", "open-artifact-ref", "secondary", { artifactId: inspector.primary_artifact_id }) : null,
     inspector.mode === "scene"
       ? el("div", { className: "inspector-editor" }, [
-          textareaField("Prompt", "inspector-prompt", fields.prompt || state.inspectorPrompt, { rows: "4" }),
-          textareaField("Reference summary", "inspector-reference-summary", fields.reference_summary || state.inspectorReferenceSummary, { rows: "3" }),
-          textareaField("Style direction", "inspector-style-direction", fields.style_direction || state.inspectorStyleDirection, { rows: "3" }),
-          textareaField("Retry intent", "inspector-retry-intent", fields.retry_intent || state.inspectorRetryIntent, { rows: "3" }),
-          button("Save Inspector", "update-scene-inspector", "primary"),
+          textareaField("提示词", "inspector-prompt", fields.prompt || state.inspectorPrompt, { rows: "4" }),
+          textareaField("参考摘要", "inspector-reference-summary", fields.reference_summary || state.inspectorReferenceSummary, { rows: "3" }),
+          textareaField("风格方向", "inspector-style-direction", fields.style_direction || state.inspectorStyleDirection, { rows: "3" }),
+          textareaField("重试意图", "inspector-retry-intent", fields.retry_intent || state.inspectorRetryIntent, { rows: "3" }),
+          button("保存检查器", "update-scene-inspector", "primary"),
         ])
       : null,
   ]);
 }
 
 function renderRefs(refs) {
-  if (!refs.length) return el("p", { className: "muted", text: "No preview refs." });
+  if (!refs.length) return el("p", { className: "muted", text: "没有预览引用。" });
   return el("div", { className: "ref-list" }, refs.map((ref) =>
     el("div", { className: "ref-row" }, [
       el("span", { text: ref.label }),
@@ -98,24 +98,24 @@ function renderRefs(refs) {
 function renderRunControls(runControls, counts) {
   const tone = runControls.blocked_reason ? "blocked" : statusTone(runControls.enabled ? "running" : "ready_not_run");
   return el("section", { className: "creation-run-controls" }, [
-    sectionTitle("Run Controls", runControls.handoff_view || "Create"),
-    el("p", { className: "card-summary", text: runControls.summary || "Continue the current creation step." }),
+    sectionTitle("运行控制", runControls.handoff_view || "Create"),
+    el("p", { className: "card-summary", text: runControls.summary || "继续当前创作步骤。" }),
     el("div", { className: "creation-metrics" }, [
-      badge(`${counts.canvas_cards || 0} cards`, counts.canvas_cards ? "ready" : "quiet"),
-      badge(`${counts.filmstrip_items || 0} scenes`, counts.filmstrip_items ? "ready" : "quiet"),
-      badge(`${counts.artifact_refs || 0} refs`, counts.artifact_refs ? "active" : "quiet"),
+      badge(`${counts.canvas_cards || 0} 张卡片`, counts.canvas_cards ? "ready" : "quiet"),
+      badge(`${counts.filmstrip_items || 0} 个镜头`, counts.filmstrip_items ? "ready" : "quiet"),
+      badge(`${counts.artifact_refs || 0} 个引用`, counts.artifact_refs ? "active" : "quiet"),
     ]),
     runControls.blocked_reason ? badge(runControls.blocked_reason, "blocked") : null,
     runControls.enabled && runControls.ui_action
-      ? button(runControls.primary_label || "Run", runControls.ui_action, "primary")
-      : el("button", { className: `btn ghost disabled ${tone}`, text: runControls.primary_label || "Pending", attrs: { disabled: "disabled" } }),
+      ? button(runControls.primary_label || "执行", runControls.ui_action, "primary")
+      : el("button", { className: `btn ghost disabled ${tone}`, text: runControls.primary_label || "等待输入", attrs: { disabled: "disabled" } }),
   ]);
 }
 
 function renderFilmstrip(filmstrip) {
   const items = Array.isArray(filmstrip) ? filmstrip : [];
   return el("section", { className: "creation-filmstrip" }, [
-    sectionTitle("Filmstrip", `${items.length} scenes`),
+    sectionTitle("分镜条", `${items.length} 个镜头`),
     items.length
       ? el("div", { className: "creation-filmstrip-row" }, items.map((item, index) =>
           el("button", { className: "creation-filmstrip-item", dataset: { cardId: item.card_id } }, [
@@ -124,6 +124,6 @@ function renderFilmstrip(filmstrip) {
             el("small", { text: item.summary || item.status }),
           ]),
         ))
-      : el("p", { className: "muted", text: "Add scene cards to build the production sequence." }),
+      : el("p", { className: "muted", text: "添加分镜卡后生成制作序列。" }),
   ]);
 }

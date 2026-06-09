@@ -1,12 +1,13 @@
 import { badge, button, el, sectionTitle } from "./dom.js";
+import { displayStatus, displayText } from "./display-labels.js";
 
 function payloadOf(artifact) {
   return artifact ? artifact.payload ?? artifact.text ?? artifact : null;
 }
 
 function artifactTitle(artifact) {
-  if (!artifact) return "No artifact loaded";
-  return artifact.artifact_type || artifact.role || "artifact";
+  if (!artifact) return displayText("No artifact loaded");
+  return displayText(artifact.artifact_type || artifact.role || "artifact");
 }
 
 function artifactMeta(artifact) {
@@ -19,67 +20,67 @@ function artifactMeta(artifact) {
 }
 
 function fact(label, value, tone = "quiet") {
-  return el("div", { className: "fact-row" }, [el("span", { text: label }), badge(value ?? "unknown", tone)]);
+  return el("div", { className: "fact-row" }, [el("span", { text: displayText(label) }), badge(displayText(value ?? "unknown"), tone)]);
 }
 
 function listItems(title, items, key = "block_id") {
   const rows = Array.isArray(items) && items.length
     ? items.map((item) => el("li", { text: typeof item === "object" ? item[key] || item.reason || item.ref || JSON.stringify(item) : item }))
-    : [el("li", { text: "none" })];
+    : [el("li", { text: "无" })];
   return el("div", { className: "report-section" }, [el("h3", { text: title }), el("ul", {}, rows)]);
 }
 
 function projectManifestView(payload) {
   return [
-    fact("status", payload.status, payload.status === "blocked" ? "blocked" : "good"),
-    fact("source assets", Array.isArray(payload.source_assets) ? payload.source_assets.length : 0, "ready"),
-    fact("content cards", Array.isArray(payload.content_cards) ? payload.content_cards.length : 0, "ready"),
-    fact("runs", Array.isArray(payload.runs) ? payload.runs.length : 0, "ready"),
-    fact("feedback", Array.isArray(payload.feedback_refs) ? payload.feedback_refs.length : 0, "ready"),
+    fact("状态", displayStatus(payload.status), payload.status === "blocked" ? "blocked" : "good"),
+    fact("素材", Array.isArray(payload.source_assets) ? payload.source_assets.length : 0, "ready"),
+    fact("内容卡片", Array.isArray(payload.content_cards) ? payload.content_cards.length : 0, "ready"),
+    fact("运行记录", Array.isArray(payload.runs) ? payload.runs.length : 0, "ready"),
+    fact("反馈", Array.isArray(payload.feedback_refs) ? payload.feedback_refs.length : 0, "ready"),
   ];
 }
 
 function assetTestView(payload) {
   return [
-    fact("run", payload.run_status || payload.status, payload.blocks?.length ? "blocked" : "good"),
-    fact("provider calls", payload.provider_calls_started === true ? "started" : "not started", "quiet"),
-    fact("long-term memory", payload.writes_long_term_memory === true ? "written" : "not written", "quiet"),
-    listItems("Blocks", payload.blocks || [], "block_id"),
+    fact("运行", displayStatus(payload.run_status || payload.status), payload.blocks?.length ? "blocked" : "good"),
+    fact("Provider 调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
+    fact("长期记忆", payload.writes_long_term_memory === true ? "已写入" : "未写入", "quiet"),
+    listItems("阻塞项", payload.blocks || [], "block_id"),
   ];
 }
 
 function twoRoundView(payload) {
   return [
-    fact("verification", payload.runtime_verification_status || payload.status, "good"),
-    fact("assessment", payload.improvement_assessment || "unknown", "ready"),
-    listItems("Included refs", payload.included_refs || [], "ref"),
-    listItems("Blocked refs", payload.blocked_refs || [], "ref"),
+    fact("验证", displayStatus(payload.runtime_verification_status || payload.status), "good"),
+    fact("评估", payload.improvement_assessment || "unknown", "ready"),
+    listItems("已纳入引用", payload.included_refs || [], "ref"),
+    listItems("阻塞引用", payload.blocked_refs || [], "ref"),
   ];
 }
 
 function feedbackView(payload) {
   const feedback = payload.feedback || {};
   return [
-    fact("feedback is memory", payload.feedback_is_memory === true ? "yes" : "no", "quiet"),
-    fact("result", feedback.result || "unknown", "ready"),
+    fact("反馈是否记忆", payload.feedback_is_memory === true ? "是" : "否", "quiet"),
+    fact("结果", feedback.result || "unknown", "ready"),
     el("p", { className: "artifact-note", text: feedback.note || "" }),
   ];
 }
 
 function reviewDecisionView(payload) {
   return [
-    fact("decision", payload.decision || "unknown", payload.decision === "reject" ? "blocked" : "ready"),
-    fact("card", payload.card_id || "unknown", "quiet"),
-    fact("long-term memory", payload.writes_long_term_memory === true ? "written" : "not written", "quiet"),
+    fact("决定", payload.decision || "unknown", payload.decision === "reject" ? "blocked" : "ready"),
+    fact("卡片", payload.card_id || "unknown", "quiet"),
+    fact("长期记忆", payload.writes_long_term_memory === true ? "已写入" : "未写入", "quiet"),
     el("p", { className: "artifact-note", text: payload.note || "" }),
   ];
 }
 
 function providerView(payload) {
   return [
-    fact("status", payload.status || "unknown", payload.status === "blocked" ? "blocked" : "good"),
-    fact("provider calls", payload.provider_calls_started === true ? "started" : "not started", "quiet"),
-    listItems("Provider blockers", payload.blockers || payload.blocks || [], "blocker_id"),
+    fact("状态", displayStatus(payload.status || "unknown"), payload.status === "blocked" ? "blocked" : "good"),
+    fact("Provider 调用", payload.provider_calls_started === true ? "已启动" : "未启动", "quiet"),
+    listItems("Provider 阻塞", payload.blockers || payload.blocks || [], "blocker_id"),
   ];
 }
 
@@ -97,21 +98,21 @@ function reportView(artifact) {
 }
 
 function artifactBody(artifact) {
-  if (!artifact) return el("p", { className: "muted", text: "Select a card with a safe artifact ref." });
+  if (!artifact) return el("p", { className: "muted", text: displayText("Select a card with a safe artifact ref.") });
   const payload = payloadOf(artifact);
   const serialized = JSON.stringify(payload, null, 2);
   return el("details", { className: "artifact-details" }, [
-    el("summary", { text: "JSON Detail" }),
+    el("summary", { text: "JSON 详情" }),
     el("pre", { className: "artifact-json", text: serialized.slice(0, 6000) }),
   ]);
 }
 
 export function renderArtifactPanel(state) {
   return el("section", { className: "artifact-panel" }, [
-    sectionTitle("Safe Artifact", artifactTitle(state.artifact)),
+    sectionTitle("安全产物", artifactTitle(state.artifact)),
     el("div", { className: "chips" }, artifactMeta(state.artifact)),
     el("div", { className: "report-view" }, reportView(state.artifact)),
     artifactBody(state.artifact),
-    state.selectedArtifactId ? button("Reload Artifact", "open-selected-artifact", "ghost") : null,
+    state.selectedArtifactId ? button(displayText("Reload Artifact"), "open-selected-artifact", "ghost") : null,
   ]);
 }

@@ -38,7 +38,7 @@
 }
 
 .studio-project-lockup strong,
-.studio-card-head h3,
+.studio-node h3,
 .studio-inspector h3 {
   overflow-wrap: anywhere;
 }
@@ -79,7 +79,7 @@
 
 .studio-asset-card,
 .studio-review-card,
-.studio-card,
+.studio-node,
 .studio-filmstrip-item {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -107,44 +107,97 @@
   line-height: 1.45;
 }
 
-.studio-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
-  gap: 12px;
+.studio-canvas-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
-.studio-card {
-  min-height: 158px;
+.studio-canvas-tools,
+.studio-node-meta,
+.studio-inspector-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-node-flow {
+  min-height: 320px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 280px);
+  gap: 18px;
+  overflow-x: auto;
+  padding: 10px 2px 14px;
+}
+
+.studio-node-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-node {
+  min-height: 190px;
   display: grid;
   align-content: start;
   gap: 12px;
   padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
   cursor: pointer;
 }
 
-.studio-card.selected {
+.studio-node.selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(31, 111, 91, 0.12);
 }
 
-.studio-card.blocked {
+.studio-node.blocked {
   border-color: rgba(168, 59, 50, 0.36);
 }
 
-.studio-card.ready,
-.studio-card.active {
+.studio-node.ready,
+.studio-node.active {
   border-color: rgba(49, 95, 153, 0.36);
 }
 
-.studio-card.good {
+.studio-node.good {
   border-color: rgba(31, 111, 91, 0.34);
 }
 
-.studio-card-head {
+.studio-node-top {
   display: flex;
   justify-content: space-between;
   align-items: start;
   gap: 10px;
+}
+
+.studio-node-connector {
+  color: var(--accent-2);
+  font-weight: 800;
+}
+
+.studio-empty-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.studio-empty-node {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcfa;
 }
 
 .studio-filmstrip-row {
@@ -193,8 +246,10 @@
 @media (max-width: 860px) {
   .studio-command-strip,
   .studio-layout,
-  .studio-card-grid,
+  .studio-node-flow,
+  .studio-empty-flow,
   .studio-ops-summary {
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
   }
 }

@@ -1,17 +1,18 @@
 import { badge, button, el, field, sectionTitle, selectField, textareaField } from "./dom.js";
+import { displayStatus, displayText } from "./display-labels.js";
 import { PROJECT_TEMPLATES, SOURCE_PRESETS } from "./presets.js";
 
 function projectRows(projects, currentProjectId) {
   if (!Array.isArray(projects) || !projects.length) {
-    return [el("p", { className: "muted", text: "No projects loaded." })];
+    return [el("p", { className: "muted", text: "还没有从运行服务读取到项目。" })];
   }
   return projects.map((project) =>
     el("div", { className: "project-row" }, [
       el("div", {}, [
         el("strong", { text: project.project_id || "project" }),
-        el("span", { text: project.status || "in_progress" }),
+        el("span", { text: displayStatus(project.status || "in_progress") }),
       ]),
-      button(project.project_id === currentProjectId ? "Open" : "Load", "select-project", "ghost", {
+      button(project.project_id === currentProjectId ? "已选中" : "打开", "select-project", "ghost", {
         projectId: project.project_id,
       }),
     ]),
@@ -20,19 +21,24 @@ function projectRows(projects, currentProjectId) {
 
 function renderProjectHub(state) {
   return el("section", { className: "action-group" }, [
-    sectionTitle("Project Hub", `${state.projects.length || 0} loaded`),
+    sectionTitle("项目设置向导", `${state.projects.length || 0} 个已加载项目`),
+    el("ol", { className: "wizard-steps" }, [
+      el("li", { text: "选择内容项目类型" }),
+      el("li", { text: "确认本轮制作目标" }),
+      el("li", { text: "创建项目并进入创作画布" }),
+    ]),
     el(
       "div",
       { className: "preset-row" },
       PROJECT_TEMPLATES.map((item) => button(item.label, "apply-project-template", "ghost", { templateId: item.id })),
     ),
-    field("Project id", "project-id-action", state.projectId),
-    field("Goal", "project-goal", state.projectGoal),
-    field("Type", "project-type", state.projectType),
+    field("项目 ID", "project-id-action", state.projectId),
+    field("本轮目标", "project-goal", state.projectGoal),
+    field("项目类型", "project-type", state.projectType),
     el("div", { className: "connect-actions" }, [
-      button("Create", "create-project", "primary"),
-      button("Open", "load-project", "secondary"),
-      button("Export", "export-project", "ghost"),
+      button("创建项目", "create-project", "primary"),
+      button("打开项目", "load-project", "secondary"),
+      button("导出档案", "export-project", "ghost"),
     ]),
     el("div", { className: "project-list" }, projectRows(state.projects, state.projectId)),
   ]);
@@ -40,84 +46,86 @@ function renderProjectHub(state) {
 
 function renderProjectImport(state) {
   return el("section", { className: "action-group" }, [
-    sectionTitle("Project Import", "advanced"),
-    textareaField("Import manifest JSON", "import-manifest-json", state.importManifestJson, { rows: "5" }),
-    button("Import", "import-project", "secondary"),
+    sectionTitle("导入项目档案", "诊断入口"),
+    textareaField("Manifest JSON", "import-manifest-json", state.importManifestJson, { rows: "5" }),
+    button("导入", "import-project", "secondary"),
   ]);
 }
 
 function renderRuntimeActions(state) {
-  const lastRoundOne = state.latestAssetTestJobId || "pending";
+  const lastRoundOne = state.latestAssetTestJobId ? "首轮证据已记录" : "待运行";
   return el("section", { className: "action-group" }, [
-    sectionTitle("Run Controls", lastRoundOne),
-    field("Asset profile seed", "asset-profile-seed", state.assetProfileSeed),
-    field("Promotion decision", "promotion-decision", state.promotionDecision),
-    textareaField("Promotion rationale", "promotion-rationale", state.promotionRationale, { rows: "3" }),
-    textareaField("Review note", "feedback-note", state.feedbackNote, { rows: "4" }),
+    sectionTitle("制作运行控制", lastRoundOne),
+    field("资产 profile seed", "asset-profile-seed", state.assetProfileSeed),
+    field("晋升决定", "promotion-decision", state.promotionDecision),
+    textareaField("晋升理由", "promotion-rationale", state.promotionRationale, { rows: "3" }),
+    textareaField("审片反馈", "feedback-note", state.feedbackNote, { rows: "4" }),
     el("div", { className: "action-stack" }, [
-      button("First Check", "run-asset-test", "primary"),
-      button("Record Feedback", "record-feedback", "secondary"),
-      button("Next Round", "run-two-round", "secondary"),
-      button("Provider Preflight", "run-provider-preflight", "ghost"),
+      button("首轮检查", "run-asset-test", "primary"),
+      button("记录反馈", "record-feedback", "secondary"),
+      button("进入下一轮", "run-two-round", "secondary"),
+      button("Provider 预检", "run-provider-preflight", "ghost"),
     ]),
   ]);
 }
 
 function renderReviewRoom(state) {
   return el("section", { className: "action-group" }, [
-    sectionTitle("Decision Controls", "keep / revise / reject"),
-    selectField("Decision", "review-decision", state.reviewDecision, [
-      { value: "keep", label: "Keep" },
-      { value: "revise", label: "Revise" },
-      { value: "reject", label: "Reject" },
+    sectionTitle("审片决定", "保留 / 修改 / 拒绝"),
+    selectField("决定", "review-decision", state.reviewDecision, [
+      { value: "keep", label: "保留" },
+      { value: "revise", label: "修改" },
+      { value: "reject", label: "拒绝" },
     ]),
-    textareaField("Decision note", "review-decision-note", state.reviewDecisionNote, { rows: "3" }),
-    button("Mark Selected", "record-review-decision", "secondary"),
+    textareaField("决定说明", "review-decision-note", state.reviewDecisionNote, { rows: "3" }),
+    button("标记当前候选", "record-review-decision", "secondary"),
   ]);
 }
 
 function renderAssetLibrary(state) {
   return el("section", { className: "action-group" }, [
-    sectionTitle("Asset Library", "safe summaries"),
+    sectionTitle("素材摘要", "安全摘要"),
     el(
       "div",
       { className: "preset-row" },
       SOURCE_PRESETS.map((item) => button(item.label, "apply-source-preset", "ghost", { sourcePresetId: item.id })),
     ),
-    field("Asset id", "source-asset-id", state.sourceAssetId),
-    field("Asset type", "source-asset-type", state.sourceAssetType),
-    field("Label", "source-asset-label", state.sourceAssetLabel),
-    textareaField("Summary", "source-asset-summary", state.sourceAssetSummary, { rows: "3" }),
-    button("Add Asset", "register-source-asset", "secondary"),
+    field("素材 ID", "source-asset-id", state.sourceAssetId),
+    field("素材类型", "source-asset-type", state.sourceAssetType),
+    field("素材名称", "source-asset-label", state.sourceAssetLabel),
+    textareaField("摘要", "source-asset-summary", state.sourceAssetSummary, { rows: "3" }),
+    button("添加素材摘要", "register-source-asset", "secondary"),
   ]);
 }
 
 function renderScenePlanner(state) {
   return el("section", { className: "action-group" }, [
-    sectionTitle("Scene Planner", "content cards"),
-    field("Card id", "scene-card-id", state.sceneCardId),
-    field("Card type", "scene-card-type", state.sceneCardType),
-    field("Title", "scene-title", state.sceneTitle),
-    field("Target", "scene-target-platform", state.sceneTargetPlatform),
-    textareaField("Summary", "scene-summary", state.sceneSummary, { rows: "3" }),
+    sectionTitle("分镜草稿", "内容卡片"),
+    field("卡片 ID", "scene-card-id", state.sceneCardId),
+    field("卡片类型", "scene-card-type", state.sceneCardType),
+    field("标题", "scene-title", state.sceneTitle),
+    field("目标平台", "scene-target-platform", state.sceneTargetPlatform),
+    textareaField("摘要", "scene-summary", state.sceneSummary, { rows: "3" }),
     el("div", { className: "connect-actions" }, [
-      button("Draft Canvas", "draft-canvas", "primary"),
-      button("Add Scene", "register-content-card", "secondary"),
+      button("生成画布草稿", "draft-canvas", "primary"),
+      button("添加分镜卡", "register-content-card", "secondary"),
     ]),
   ]);
 }
 
 function renderLastResult(result) {
-  if (!result) return el("p", { className: "muted", text: "No action result yet." });
-  const title = result.job && result.job.action ? `${result.job.action}: ${result.job.status}` : result.kind || "result";
+  if (!result) return el("p", { className: "muted", text: "还没有操作结果。" });
+  const title = result.job && result.job.action
+    ? `${displayText(result.job.action)}：${displayStatus(result.job.status)}`
+    : displayText(result.kind || "result");
   const flow = result.flow || null;
   return el("div", { className: "result-box" }, [
     el("strong", { text: title }),
-    result.job && result.job.job_id ? el("code", { text: result.job.job_id }) : null,
+    result.job && result.job.job_id ? badge("运行证据已记录", "ready") : null,
     flow
       ? el("div", { className: "result-flow" }, [
-          badge(flow.project_status || "in_progress", flow.target_achieved ? "ready" : "quiet"),
-          badge(`Next: ${flow.current_action_label || flow.current_action || "Continue"}`, "active"),
+          badge(displayStatus(flow.project_status || "in_progress"), flow.target_achieved ? "ready" : "quiet"),
+          badge(`下一步：${displayText(flow.current_action_label || flow.current_action, "继续")}`, "active"),
         ])
       : null,
   ]);
@@ -133,9 +141,9 @@ export function renderActionPanel(state, groups = ["project", "assets", "scene",
     groups.includes("runtime") ? renderRuntimeActions(state) : null,
     groups.includes("result")
       ? el("section", { className: "action-group" }, [
-          sectionTitle("Last Result", state.lastResult ? "ready" : "empty"),
+          sectionTitle("最近结果", state.lastResult ? displayStatus("ready") : "empty"),
           renderLastResult(state.lastResult),
-          state.selectedArtifactId ? badge(`artifact ${state.selectedArtifactId}`, "ready") : null,
+          state.selectedArtifactId ? badge("已选择安全产物", "ready") : null,
         ])
       : null,
   ]);

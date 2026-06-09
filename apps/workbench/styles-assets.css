@@ -1,0 +1,35 @@
+.asset-library-head,
+.asset-next-actions,
+.asset-group,
+.asset-empty-state {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.asset-library-head,
+.asset-next-actions,
+.asset-empty-state {
+  padding: 16px;
+}
+
+.asset-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.asset-group {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.asset-group .reference-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.asset-empty-state {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}

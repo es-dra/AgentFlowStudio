@@ -15,9 +15,15 @@ async function requestJson(baseUrl, route, options = {}) {
   });
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(body || `${response.status} ${response.statusText}`);
+    const statusText = response.statusText ? ` ${response.statusText}` : "";
+    throw new Error(`运行服务请求失败（${response.status}${statusText}）`);
   }
-  return body ? JSON.parse(body) : {};
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error("运行服务返回了无法解析的 JSON。");
+  }
 }
 
 function postJson(baseUrl, route, payload) {

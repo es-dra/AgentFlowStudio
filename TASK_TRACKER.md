@@ -54,14 +54,16 @@ AFS 仓库只保存执行投影：代码、contract、测试、runbook、维护�
 | AFS-WEB-CREATION-WORKSPACE-001 | 创作画布主工作区：scene/content cards、inspector、filmstrip、first generation check | 进行中：Draft Canvas、scene/content cards、Inspector、filmstrip、first generation check control、safe artifact panel 和 Review Room candidate comparison 已落地 |
 | AFS-WEB-REVIEW-STYLE-MEMORY-001 | 审片反馈与 Project Style Memory：keep/revise/reject、raw feedback、下一轮复用 | 进行中：raw feedback、keep/revise/reject、candidate-bound review decisions、Style Memory product view 和 next-round controls 已落地 |
 | AFS-PROVIDER-GATED-REAL-SMOKE-001 | deterministic Web flow 稳定后，再按 capability gate 接真实模型 smoke | 待启动 |
-| AFS-WEB-QA-RELEASE-GATE-001 | 浏览器截图、响应式检查、HTTP smoke、focused tests、maintenance audit、diff check | 进行中：Runtime-hosted `/workbench/` HTTP smoke 已通过；截图 QA 待浏览器运行时 |
+| AFS-WEB-QA-RELEASE-GATE-001 | 浏览器截图、响应式检查、HTTP smoke、focused tests、maintenance audit、diff check | 发布候选 QA 已完成：Stage 7 浏览器主路径、1440x900 / 1366x768 / 390x844 截图、console/internal-leak/text-overflow 检查和 provider-gated 边界记录已落地 |
+| AFS-WEB-HUMAN-ACCEPTANCE-001 | 人工验收当前 Web release candidate，确认项目 -> 素材 -> 画布 -> 分镜 -> 审片 -> 记忆 -> 任务路径是否符合低学习成本创作工作台定位 | 待人工验收：验收包已落地到 `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md` |
 
 ## 当前阻塞和残留
 
-- `maintenance_audit` 的 secret-like warning 已在收口切片中降为 0；预计仍会保留 300 行以上文件 warning，后续触碰对应模块时继续拆分。
+- `maintenance_audit` 的 secret-like warning 和 oversized warning 已清零；后续触碰模块时仍按 300 行理想线继续拆分。
 - Hidden CLI support commands 仍是兼容支持面；删除前必须做独立 CLI 协议迁移。
 - Provider validation 默认关闭，除非显式授权对应 capability gate。
-- 维护审计仍保留 300 行以上文件 warning；这些是后续触碰对应模块时顺手拆分的工程债，不阻塞当前低成本维护基线。
+- 维护审计当前为通过状态；新的前端模块仍按单职责和 300 行理想线维护。
+- 当前 Web release candidate 还没有人工验收结论；不得把 Stage 7 浏览器 QA 说成 human acceptance。
 ## 2026-06-09 - Oversized Maintenance Closure 001
 
 | ID | Owner role | 范围 | 状态 | 证据 |
@@ -103,6 +105,7 @@ Current Web/API queue state:
 | AFS-WEB-PROJECT-HUB-001 | Product-facing active project summary, safe counts, next command, and recent job navigation | Landed in current branch: backend `project_hub`, frontend Project Hub panel, state adapter, and split CSS |
 | AFS-WEB-STUDIO-WORKSPACE-001 | 将 Create 视图改为产品化 Studio Workspace：统一承载画布、素材参考、风格记忆、审片队列、runtime 摘要和 safe artifact 导航 | 已在当前分支落地：后端 `studio_workspace`、前端 Studio Workspace 面板、state adapter 和独立 CSS |
 | AFS-WEB-VERTICAL-FLOW-001 | Workbench deterministic 纵向主路径：从空项目到 ready_for_next_round，不接触 CLI 或手写 JSON | 已完成浏览器级主路径证据：API vertical flow、mutation `flow` summary、空工作区创建入口、Review decision 主入口、Production Board 全宽布局、Playwright browser smoke 到 `ready_for_next_round` |
+| AFS-WEB-UX-REFOUNDATION-001 | 将 Workbench 从工程状态面板重构为中文多工作区创作应用：项目、创作画布、素材库、分镜台、审片室、项目记忆、任务中心、诊断 | 阶段 0-7 已落地到发布候选：中文 IA/术语/QA 账本、多工作区外壳、项目设置向导、创作画布节点流、素材库分组、独立分镜台、独立审片室、独立项目记忆、任务中心、Provider Gate、Runtime 中文显示适配、no-store 静态入口、浏览器主路径和响应式截图 QA 已完成；下一步进入人工验收和 provider-gated smoke 前置整理 |
 
 Verification so far:
 
@@ -143,6 +146,14 @@ Verification so far:
 - Memory Workspace projection slice verification:
   red tests failed before implementation; focused state/Web tests `11 passed, 1 warning`;
   focused Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Memory Workspace HTTP smoke passed with `memory_workspace.status = ready`, 2 candidates, 1 profile version, and enabled feedback controls.
+- UX Refoundation Stage 5 verification:
+  focused Web/API tests `11 passed, 1 warning`; browser smoke opened `proj_demo_reference_flow_1781004364` from the project list, verified Review Room with 5 candidates and 3 recorded review decisions, verified Project Memory with profile version / reusable preference / evidence ledger / next-round reuse, and confirmed no checked internal action/job id leaks, local path leaks, or provider secret leaks in those two views. Screenshot: `data/processed/runs/workbench_live_demo/qa/stage5-review-memory-smoke.png`.
+- UX Refoundation Stage 6 verification:
+  focused Web/API tests `11 passed, 1 warning`; browser smoke verified Jobs as a focused Task Center with 6 job cards, Provider Gate visible, no shared readiness/command/production panels in the task window, and no checked internal action/job id, local path, or provider secret leaks. Screenshot: `data/processed/runs/workbench_live_demo/qa/stage6-jobs-provider-smoke.png`.
+- UX Refoundation Stage 0-6 final verification:
+  CLI help/version passed; focused Runtime/Web/API `23 passed, 1 warning`; full pytest `844 passed, 1 warning`; `maintenance_audit` `failed=0, passed=6, warning=0`; `git diff --check` passed with line-ending warnings only.
+- UX Refoundation Stage 7 release-candidate browser QA:
+  project `proj_stage7_rc_1781016167554` completed the UI path through Assets -> Draft Canvas -> Create -> Storyboard -> Review -> first check -> feedback -> next round -> Style Memory -> Jobs -> Provider preflight -> Settings/Diagnostics. Browser QA recorded `consoleErrorCount=0`, visible English `false`, main-view internal leak `false`, text overflow `0`, 1 asset, 4 canvas nodes, 3 storyboard shots, 1 style preference, 6 jobs, and 4 provider blockers. Screenshots: `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`, `data/processed/runs/workbench_live_demo/qa/stage7-rc-1366x768.png`, `data/processed/runs/workbench_live_demo/qa/stage7-rc-390x844.png`.
 - Draft Canvas HTTP smoke on port 8792: `draft_canvas succeeded`, 3 generated
   cards, 3 filmstrip items, `/workbench/` returned `200`.
 - Runtime HTTP smoke on port 8791: `/health`, `/workbench/`, and

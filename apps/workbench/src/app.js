@@ -3,7 +3,7 @@ import { createActionHandlers } from "./app-actions.js";
 import { latestJobId, selectedCard } from "./app-selection.js";
 import { syncInputs } from "./input-sync.js";
 import { normalizeWorkbenchState } from "./workbench-state.js";
-import { renderApp } from "./render.js";
+import { renderApp } from "./render.js?v=stage7-rc";
 import { state } from "./state.js";
 import { configureJobPolling } from "./polling.js";
 import { applyProjectTemplate, applySourcePreset } from "./presets.js";
@@ -76,12 +76,25 @@ async function refreshWorkbenchSilently() {
 
 const actionHandlers = createActionHandlers({ state, client, refreshWorkbench });
 
+function syncProjectInputs(projectId) {
+  root.querySelectorAll("#project-id-action, #project-id").forEach((node) => {
+    node.value = projectId;
+  });
+}
+
 function runAction(action, dataset = {}) {
   const handlers = {
     "apply-project-template": () => applyProjectTemplate(state, dataset.templateId),
     "apply-source-preset": () => applySourcePreset(state, dataset.sourcePresetId),
+    "set-review-intent": () => {
+      state.selectedCardId = dataset.cardId || state.selectedCardId;
+      state.selectedVariantId = dataset.variantId || state.selectedVariantId;
+      state.selectedArtifactId = dataset.artifactId || state.selectedArtifactId;
+      state.reviewDecision = dataset.decision || state.reviewDecision;
+      state.activeView = dataset.nextView || "Review";
+    },
     connect: connectRuntime,
-    "load-project": loadWorkbench,
+    "load-project": refreshWorkbench,
     refresh: refreshWorkbench,
     ...actionHandlers,
   };
@@ -93,7 +106,8 @@ function bindEvents() {
     node.addEventListener("click", () => {
       if (node.dataset.action === "select-project") {
         state.projectId = node.dataset.projectId || state.projectId;
-        run(loadWorkbench);
+        syncProjectInputs(state.projectId);
+        run(refreshWorkbench);
       } else {
         runAction(node.dataset.action, node.dataset);
       }

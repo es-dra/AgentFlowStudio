@@ -38,104 +38,62 @@ http://127.0.0.1:8790
 
 - 连接 Runtime Service。
 - 由 Runtime Service 通过 `/workbench/` 提供静态入口，便于前后端联调和浏览器 QA。
+- Runtime-hosted Workbench 静态资源使用 no-store，避免浏览器调试时复用旧模块。
 - 读取 `/health`、`/capabilities`、`/projects` 和 `GET /projects/{project_id}/workbench-state`。
-- 渲染项目工作台、Studio Workspace、Command Hub、Production Board、Reference Library、创作画布卡片、检查区、Review Room、Style Memory、Job Center、provider preflight 和 filmstrip。
+- 渲染中文项目工作台：项目、创作画布、素材库、分镜台、审片室、项目记忆、任务中心和诊断。
 - 创建、打开、导入、导出 project manifest。
-- 使用 Project Hub 模板预填 project type、goal 和 safe manifest import JSON。
+- 使用项目设置向导预填 project type、goal 和 safe manifest import JSON。
 - 登记 safe asset/reference summary 和 safe scene/content card。
-- 使用 source preset 预填 brief、reference、script outline 摘要。
+- 使用 source preset 预填内容需求、视觉参考和脚本提纲摘要。
 - 从 safe source summaries 一键生成 Hook / Proof / CTA 首版创作画布草稿。
 - 以产品面板展示 brief、reference、script 等 safe source summary，不展示本地素材位置或媒体字节。
+- 按内容需求、视觉参考、脚本提纲和其他素材分组管理 safe source summary。
 - 在右侧 Inspector 保存选中 scene/card 的 prompt、reference summary、style direction 和 retry intent。
-- 通过 Review Room 比较计划、首轮检查和下一轮候选，再记录 keep / revise / reject 决策。
-- 通过 Style Memory 查看已形成的风格偏好、profile version 数量和下一轮复用提示。
-- 通过 Job Center 查看 runtime job 进度、阻塞指导和可打开的 safe artifact ref。
-- 通过 Activity Timeline 查看当前 project 的运行活动、阻塞动作和可打开的 safe primary artifact ref。
-- 通过 Operations Workspace 统一查看 job queue、latest activity、provider preflight、provider controls 和 blocker counts。
-- 通过 Studio Workspace 在 Create 页统一查看主命令、素材参考、创作画布、Inspector、filmstrip、审片队列、风格记忆和 runtime 摘要。
-- 通过 Production Board 查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
-- 通过 Command Hub 查看当前主命令、阶段命令、所需输入和 provider gate 阻塞原因。
+- 通过分镜台查看镜头序列、当前镜头安全预览、引用/阻塞事实和审片入口。
+- 通过审片室比较计划、首轮检查和下一轮候选，在候选卡上直接选择保留、修改或拒绝。
+- 通过项目记忆查看已形成的风格偏好、profile version 数量、记忆证据和下一轮复用入口。
+- 通过任务中心查看 runtime job 进度、阻塞指导和可打开的 safe artifact ref。
+- 通过诊断查看当前 project 的运行活动、阻塞动作和可打开的 safe primary artifact ref。
+- 通过任务中心统一查看 job queue、latest activity、provider preflight、provider controls 和 blocker counts。
+- 通过创作画布统一查看主命令、素材参考、创作画布、检查器、分镜条、审片队列、风格记忆和 runtime 摘要。
+- 通过制作流程查看 source、draft、first check、review、style memory、next round 和 provider gate 的一屏流程状态。
+- 通过下一步操作查看当前主命令、阶段命令、所需输入和 provider gate 阻塞原因。
 - Job Center 会对当前 project 做自动刷新，不启动 provider。
+- 前端对 Runtime action/status/stage 做中文显示适配，内部 id 不直接变成用户操作语言。
 - 触发首轮 deterministic asset test、记录 raw feedback、触发 two-round validation。
 - 触发 provider preflight，但不启动 live provider。
-- 读取 safe artifact，并渲染 artifact-specific report view，同时保留折叠的 JSON Detail。
+- 读取 safe artifact，并渲染 artifact-specific report view，同时保留折叠的 JSON 详情。
 - 默认隐藏 Advanced Diagnostics，把 evidence refs、non-claims 和 safe-ref policy 放到高级区。
 
-## Stage Navigation
+## 工作区导航
 
-The rail items switch the Workbench between Projects, Create, Assets, Review,
-Style Memory, Jobs, and Settings. Each view renders a narrower control group so
-users do not have to learn every internal workflow surface at once.
+左侧工作区把 Workbench 切成项目、创作画布、素材库、分镜台、审片室、项目记忆、任务中心和诊断。内部仍然兼容 Runtime Service 返回的 view id，但主界面显示中文产品语言，避免用户学习 `project_id`、`job_id`、`artifact_id` 等工程对象。
 
-## Project Readiness
+## 项目与就绪度
 
-The Workbench reads `project_readiness` from `GET /projects/{project_id}/workbench-state`.
-It renders a compact Project Readiness panel with the current action, safe workflow
-gates, and non-claim badges. This panel is a user-facing workflow guide only: it
-does not execute CLI internals, does not bypass provider gates, and does not
-promote feedback into durable memory.
+Workbench 从 `GET /projects/{project_id}/workbench-state` 读取 `project_hub` 和 `project_readiness`。项目页展示当前项目、计数、下一步、最近任务和 safe manifest artifact ref；就绪度面板只作为工作流提示，不执行 CLI、不绕过 provider gate、不把 feedback 晋升为 durable memory。
 
-## Command Hub
+## 创作画布与分镜台
 
-The Workbench reads `command_hub` from `GET /projects/{project_id}/workbench-state`.
-It translates backend workflow actions into user-facing commands such as source
-registration, Draft Canvas, first check, review feedback, next round, and
-provider preflight. Disabled commands remain visible with blocked reasons rather
-than bypassing provider gates.
+Workbench 读取 `studio_workspace` 和 `creation_workspace`。创作画布承载主命令、素材参考、节点流、节点检查器、分镜条、审片队列、项目记忆和 runtime 摘要；分镜台使用独立工作区呈现镜头序列、当前镜头、安全预览、引用/阻塞事实和审片入口。
 
-## Project Hub
+画布第一轮使用轻量节点流，不引入拖拽框架。节点展示状态、摘要、引用数、阻塞项和产物入口；右侧检查器展示安全引用、阻塞、动作和可编辑的提示词/风格摘要。
 
-The Workbench reads `project_hub` from `GET /projects/{project_id}/workbench-state`.
-It renders the active project, source/card/run/job/review/profile counts, the
-next command, recent jobs, and the safe manifest artifact ref. This is the
-product-facing project control surface for the Workbench.
+## 素材库
 
-## Creation Workspace
+Workbench 读取 `asset_library`，按 brief、reference、script 和其他素材分组展示 safe summary。浏览器不读取本地私有路径，也不保存媒体字节。
 
-The Workbench reads `creation_workspace` from `GET /projects/{project_id}/workbench-state`.
-It renders the Create view as a backend-driven workspace: canvas cards,
-selected-card inspector, run controls, safe artifact refs, blocker badges, and
-the filmstrip sequence. The browser only edits safe inspector summaries and
-dispatches mapped Runtime Service actions; it does not execute provider or CLI
-internals.
+## 审片室与项目记忆
 
-## Studio Workspace
+Workbench 读取 `review_room`、`style_memory` 和 `memory_workspace`。审片室专注候选队列、当前候选、对比点、审片决定和最近审片历史；项目记忆专注可复用偏好、profile version、记忆证据和下一轮复用入口。反馈仍然是 runtime evidence，不是 durable memory。
 
-The Workbench reads `studio_workspace` from `GET /projects/{project_id}/workbench-state`.
-The Create view uses it as the primary product surface: command strip, reference
-rail, production canvas, selected-card inspector, filmstrip, style memory,
-review queue, runtime summary, and safe artifact navigation. Commands that
-belong to another stage navigate to the matching view before execution, so users
-can continue the deterministic flow without learning backend action names.
+## 任务中心与诊断
 
-## Memory Workspace
+Workbench 读取 `operations_workspace`、`activity_timeline` 和 `advanced_evidence`。任务中心展示 job queue、latest activity、provider preflight、provider controls 和 blocker counts；诊断区用于连接运行服务、查看内部引用和安全边界。它不会启动 live provider，也不会绕过 capability gate。
 
-The Workbench reads `memory_workspace` from `GET /projects/{project_id}/workbench-state`.
-It renders review candidates, feedback controls, style profile reuse, and
-next-round controls as one product surface. Feedback remains runtime evidence;
-the browser does not promote durable memory or bypass provider gates.
+## 制作流程与下一步操作
 
-## Activity Timeline
-
-The Workbench reads `activity_timeline` from `GET /projects/{project_id}/workbench-state`.
-It renders project runtime activity as a product-facing history: status counts,
-latest actions, blockers, and safe primary artifact refs. It is trace navigation,
-not approval logic.
-
-## Operations Workspace
-
-The Workbench reads `operations_workspace` from `GET /projects/{project_id}/workbench-state`.
-It renders the Jobs view as one operations surface: job queue, latest activity,
-provider preflight, provider controls, polling state, blocker counts, and safe
-artifact refs. It is a runtime control and evidence navigation surface; it does
-not start live providers or bypass capability gates.
-
-## Production Board
-
-The Workbench reads `production_board` from `GET /projects/{project_id}/workbench-state`.
-It renders the whole content and memory flow as product-facing lanes: source,
-draft, first check, review, style memory, next round, and provider gate. The
-board is a workflow surface, not a provider execution path.
+Workbench 读取 `production_board` 和 `command_hub`。制作流程展示 source、draft、first check、review、style memory、next round 和 provider gate 的阶段状态；下一步操作把后端 action 映射成用户可理解的命令，禁用命令必须显示阻塞原因。
 
 ## 边界
 

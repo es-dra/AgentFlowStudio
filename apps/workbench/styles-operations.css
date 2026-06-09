@@ -1,0 +1,19 @@
+.provider-blockers {
+  display: grid;
+  gap: 8px;
+}
+
+.provider-blocker {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(168, 59, 50, 0.22);
+  border-radius: 7px;
+  background: #fff8f6;
+}
+
+.provider-blocker span,
+.provider-blocker small {
+  color: var(--muted);
+  line-height: 1.45;
+}

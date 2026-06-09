@@ -252,33 +252,28 @@ Boundaries:
 - 完整 CLI、focused pytest、full pytest 和 `git diff --check` 在最终提交前执行。
 ## 2026-06-09 - Studio Workspace Integration
 
-- Added backend `studio_workspace` as a safe Runtime Service projection that
-  combines active project, primary command, provider status, creation canvas,
-  inspector, filmstrip, reference rail, style memory, review queue, and runtime
-  summary without exposing CLI internals, private paths, provider config, signed
-  URLs, or media bytes.
-- Added frontend Studio Workspace state, renderer, and CSS modules. The Create
-  view now renders one product-facing workbench instead of stacking readiness,
-  command, production-board, action-panel, and creation panels.
-- Kept cross-stage commands visible but disabled inside Create when the required
-  inputs belong to another view, avoiding misleading one-click actions.
-- Added focused API/Web tests for `studio_workspace` and updated Workbench
-  static coverage to include the new JS/CSS modules.
+- Added backend `studio_workspace` as a safe Runtime Service projection and replaced the stacked Create view with one product-facing Studio Workspace module.
+- Added frontend state/render/CSS coverage for the workspace and kept cross-stage commands disabled when their required inputs belong to another view.
+- Boundaries preserved: no provider call, no secret/signed URL/private path/provider raw response/media byte, and no human acceptance/business validation/durable memory claim.
+- Verification: Studio Workspace focused tests `3 passed, 1 warning`; focused Runtime/Web/API/Web suite `23 passed, 1 warning`; Runtime-hosted smoke for the workspace JS/CSS returned `200`.
 
-Boundaries:
+## 2026-06-09 - Web Workbench UX Refoundation Stage 0-7
+- Added the long-cycle roadmap, Chinese UI terms, and UX QA ledger under `docs/frontend_integration/`.
+- Added `workspace-config.js`, Chinese multi-workspace shell, project setup wizard, collapsed diagnostics, and split shell/setup CSS while preserving Runtime Service action ids.
+- Split Studio Workspace into side rail, canvas, and inspector modules; added node-flow canvas, connectors, toolbar, empty flow, and inspector facts.
+- Added grouped Asset Library and independent Storyboard Workspace with shot sequence, safe preview, refs/blockers, and Review entry actions.
+- Split Review Room and Project Memory into separate product workspaces: candidate review queue / decision dock vs style profile / next-round reuse.
+- Productized the Jobs view into a focused Task Center / Provider Gate workspace, removed common workflow panels from the task window, hid internal action/job ids from the main task surface, and moved Provider blocker styling into a dedicated operations stylesheet.
+- Added frontend display-label mapping and no-store Runtime-hosted static responses to keep user-facing Workbench copy Chinese and fresh during browser QA.
+- Completed Stage 7 release-candidate browser QA on `proj_stage7_rc_1781016167554`: Assets -> Draft Canvas -> Create -> Storyboard -> Review -> first check -> feedback -> next round -> Style Memory -> Jobs -> Provider preflight -> Settings/Diagnostics.
+- Tightened user-facing Chinese display mappings after QA exposed English/default Runtime terms in main views; diagnostics remain the place for internal ids and raw safe refs.
+- Updated Workbench README and tracker so the next frontend line is project -> canvas -> assets/storyboard -> review/memory -> jobs/diagnostics.
+Boundaries: no live provider call; no secret, signed URL, private path, provider raw response, generated media byte, or COS active rule; not human acceptance, business validation, or durable memory promotion.
+Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 warning`; full pytest `844 passed, 1 warning`; maintenance audit `failed=0, passed=6, warning=0`; `git diff --check` passed with line-ending warnings only; Runtime-hosted `/workbench/`, app entry, asset/storyboard/artifact modules returned HTTP `200` with `Cache-Control: no-store`; browser smoke on `proj_ui_stage4_browser_smoke` reached Assets/Storyboard with `englishLeaks=[]`, 4 asset groups, 3 storyboard shots, no local path exposure, and provider still gated. Stage 5 browser smoke on `proj_demo_reference_flow_1781004364` opened the reference project from the project list, rendered 5 review candidates, recorded review decisions through the Review Room, and verified Review Room / Project Memory with no checked internal action/job id leaks, no local path exposure, and no provider secret exposure. Stage 6 browser smoke verified Jobs as a focused Task Center with 6 job cards, Provider Gate visible, no common workflow panels, and no checked internal action/job id leaks. Stage 7 browser QA on `proj_stage7_rc_1781016167554` recorded console errors `0`, visible English `false`, main-view internal leak `false`, text overflow `0`, 1 asset, 4 canvas nodes, 3 storyboard shots, 1 style preference, 6 jobs, and 4 provider blockers. Final Stage 7 verification: Workbench frontend `11 passed`; full pytest `844 passed, 1 warning`; maintenance audit `failed=0, passed=6, warning=0`; Runtime HTTP smoke returned `200` and `Cache-Control: no-store`; `git diff --check` passed with line-ending warnings only. Screenshots: `data/processed/runs/workbench_live_demo/qa/stage5-review-memory-smoke.png`, `data/processed/runs/workbench_live_demo/qa/stage6-jobs-provider-smoke.png`, `data/processed/runs/workbench_live_demo/qa/stage7-rc-1440x900-diagnostics.png`, `data/processed/runs/workbench_live_demo/qa/stage7-rc-1366x768.png`, `data/processed/runs/workbench_live_demo/qa/stage7-rc-390x844.png`.
 
-- No live provider call.
-- No secret, signed URL, private local asset path, provider raw response, or
-  generated media byte was written.
-- Runtime verification is not human acceptance, business validation, or durable
-  memory.
-
-Verification so far:
-
-- Studio Workspace focused tests: `3 passed, 1 warning`.
-- Focused Runtime/Web/API/Web suite: `23 passed, 1 warning`.
-- Runtime-hosted HTTP smoke: `/workbench/`,
-  `/workbench/src/render-studio-workspace.js`, and
-  `/workbench/styles-studio-workspace.css` returned `200`; a temporary project
-  returned `studio_workspace.status = needs_assets`, 2 canvas cards, and
-  provider status `ready_not_run`.
+## 2026-06-09 - Web Workbench Human Acceptance Prep
+- Added `docs/frontend_integration/AFS_WEB_RELEASE_CANDIDATE_ACCEPTANCE_PACKET.zh-CN.md` so the current `/workbench/` release candidate can be judged through a concrete Chinese operator path instead of informal impressions.
+- Added `AFS-WEB-HUMAN-ACCEPTANCE-001` to `TASK_TRACKER.md`; this explicitly keeps Stage 7 browser QA separate from human acceptance and from provider smoke.
+- Normalized Workbench cache-bust markers from the older stage label to `stage7-rc` and verified Runtime-hosted index/app/render module responses use `Cache-Control: no-store`.
+- Hardened the browser Runtime client so failed API responses and malformed JSON show safe Chinese status messages instead of raw response bodies.
+- Boundaries unchanged: provider remains closed; no secret, private media, provider raw response, signed URL, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.

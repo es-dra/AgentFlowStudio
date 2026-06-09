@@ -3,11 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 
 DEFAULT_WORKBENCH_ROOT = Path(__file__).resolve().parents[1] / "workbench"
+
+
+class NoStoreStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: dict) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 def configure_workbench_static(app: FastAPI, workbench_root: Path = DEFAULT_WORKBENCH_ROOT) -> None:
@@ -21,9 +28,9 @@ def configure_workbench_static(app: FastAPI, workbench_root: Path = DEFAULT_WORK
 
     app.mount(
         "/workbench",
-        StaticFiles(directory=root, html=True),
+        NoStoreStaticFiles(directory=root, html=True),
         name="afs_workbench",
     )
 
 
-__all__ = ("DEFAULT_WORKBENCH_ROOT", "configure_workbench_static")
+__all__ = ("DEFAULT_WORKBENCH_ROOT", "NoStoreStaticFiles", "configure_workbench_static")

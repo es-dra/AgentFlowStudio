@@ -1,0 +1,135 @@
+.review-workspace,
+.style-memory-workspace {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+
+.review-queue,
+.review-stage,
+.review-decision-dock,
+.review-history,
+.style-memory-hero,
+.style-preference-board,
+.style-next-round-panel,
+.style-evidence-ledger {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.review-queue,
+.style-memory-hero {
+  grid-column: 1 / 3;
+}
+
+.review-candidate-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 240px);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.review-candidate-chip {
+  min-height: 98px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 10px;
+  text-align: left;
+}
+
+.review-candidate-chip.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(31, 111, 91, 0.12);
+}
+
+.review-stage,
+.style-preference-board,
+.style-evidence-ledger {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.review-stage-head,
+.review-counts,
+.review-decision-buttons,
+.style-memory-metrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-stage h3 {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.review-points,
+.style-preference-list,
+.review-history-list,
+.style-evidence-list {
+  display: grid;
+  gap: 10px;
+}
+
+.review-points {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.review-decision-dock,
+.style-next-round-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.review-history,
+.style-evidence-ledger {
+  grid-column: 1 / 3;
+}
+
+.review-history-row,
+.style-evidence-row,
+.style-preference-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 10px;
+}
+
+.style-memory-hero {
+  display: grid;
+  gap: 12px;
+}
+
+.style-preference-card {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+}
+
+@media (max-width: 1120px) {
+  .review-workspace,
+  .style-memory-workspace,
+  .review-queue,
+  .style-memory-hero,
+  .review-history,
+  .style-evidence-ledger {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+}
