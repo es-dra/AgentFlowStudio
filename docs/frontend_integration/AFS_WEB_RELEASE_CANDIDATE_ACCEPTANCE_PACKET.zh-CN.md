@@ -58,6 +58,7 @@
 ## 当前工程证据
 
 - Stage 7 QA 项目：`proj_stage7_rc_1781016167554`。
+- 可视化演示索引：`docs/frontend_integration/AFS_WEB_RC_DEMO_INDEX.zh-CN.html`。
 - 浏览器 QA：console error `0`，主视图可见英文 `false`，主视图内部 id 泄漏 `false`，文字溢出 `0`。
 - 主路径计数：素材 `1` 个，画布节点 `4` 个，分镜镜头 `3` 个，项目风格偏好 `1` 条，任务 `6` 个，Provider blocker `4` 个。
 - 截图：
