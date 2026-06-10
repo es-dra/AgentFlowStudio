@@ -7,14 +7,14 @@ import { renderApp } from "./render.js?v=stage7-rc";
 import { state } from "./state.js";
 import { configureJobPolling } from "./polling.js";
 import { applyProjectTemplate, applySourcePreset } from "./presets.js";
+import { bindCanvasInteractions } from "./canvas-interactions.js";
+import { bindCanvasHeaderEvents } from "./studio-canvas-header-events.js";
 
 const root = document.querySelector("#app-root");
 let silentRefreshInFlight = false;
-
 function client() {
   return createRuntimeClient(state.baseUrl);
 }
-
 async function run(action) {
   syncInputs(root, state);
   state.loading = true;
@@ -53,7 +53,6 @@ async function loadWorkbench() {
   state.latestAssetTestJobId = latestJobId(state, "asset_test_run");
   state.selectedArtifactId = selectedCard(state)?.primary_artifact_id || state.selectedArtifactId;
 }
-
 async function refreshWorkbench() {
   await connectRuntime();
   selectAvailableProject();
@@ -143,12 +142,122 @@ function bindEvents() {
   root.querySelectorAll("[data-view]").forEach((node) => {
     node.addEventListener("click", () => {
       state.activeView = node.dataset.view || state.activeView;
+      if (node.dataset.studioStarter === "open") {
+        state.studioStarterMode = true;
+        state.studioAddedNodeKind = "";
+      }
       paint();
     });
   });
-  root.querySelectorAll("[data-studio-focus]").forEach((node) => {
+  root.querySelectorAll("[data-studio-starter-kind]").forEach((node) => {
     node.addEventListener("click", () => {
-      state.studioFocus = node.dataset.studioFocus || state.studioFocus;
+      state.studioStarterKind = node.dataset.studioStarterKind || "";
+      state.studioAddedNodeKind = "";
+      state.studioPanel = ["script", "character", "image", "audio"].includes(state.studioStarterKind) ? "" : "inspector";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-studio-starter]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.studioStarterMode = node.dataset.studioStarter === "open";
+      state.studioAddedNodeKind = "";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-project-portal]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.projectPortalMode = node.dataset.projectPortal || "home";
+      state.selectedShowcaseId = node.dataset.showcaseId || state.selectedShowcaseId;
+      state.portalMenuOpen = false;
+      if (state.projectPortalMode !== "showcase-detail") state.showcaseProcessOpen = false;
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-portal-menu]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.portalMenuOpen = node.dataset.portalMenu === "open";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-showcase-process]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const intent = node.dataset.showcaseProcess || "";
+      if (intent === "open") state.showcaseProcessOpen = true;
+      if (intent === "close") state.showcaseProcessOpen = false;
+      if (intent === "copy") {
+        state.showcaseProcessOpen = false;
+        state.projectPortalMode = "home";
+        state.activeView = "Create";
+      }
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-showcase-filter]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.showcaseFilter = node.dataset.showcaseFilter || "全部";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-showcase-search]").forEach((node) => {
+    node.addEventListener("input", () => {
+      state.showcaseQuery = node.value || "";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-process-node]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.showcaseProcessNode = node.dataset.processNode || state.showcaseProcessNode;
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-studio-tool]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const panel = node.dataset.studioTool || "";
+      if (panel === "add") {
+        state.studioAddedNodeKind = "";
+        state.studioResourceMode = "";
+        state.studioStarterMode = false;
+        state.studioStarterKind = "";
+      }
+      state.studioPanel = state.studioPanel === panel ? "" : panel;
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-add-node-kind]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const cards = state.workbench?.studio_workspace?.canvas?.cards || [];
+      const match = cards.find((card) => String(card.kind || "").includes(node.dataset.addNodeKind || ""));
+      state.studioAddedNodeKind = node.dataset.addNodeKind || "";
+      state.studioResourceMode = "";
+      state.studioStarterMode = false;
+      state.studioStarterKind = "";
+      if (match) {
+        state.selectedCardId = match.card_id;
+        state.selectedArtifactId = match.primary_artifact_id || "";
+      }
+      state.studioPanel = "";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-add-resource-kind]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.studioAddedNodeKind = "";
+      state.studioStarterMode = false;
+      state.studioStarterKind = "";
+      state.studioResourceMode = node.dataset.addResourceKind || "";
+      state.studioPanel = "resource";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-execution-intent]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.studioExecutionIntent = node.dataset.executionIntent || "";
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-toolbox-intent]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.studioToolIntent = node.dataset.toolboxIntent || "";
       paint();
     });
   });
@@ -172,11 +281,18 @@ function bindEvents() {
       run(actionHandlers["open-selected-artifact"]);
     });
   });
+  bindCanvasHeaderEvents(root, state, paint);
+  bindCanvasInteractions(root, state, paint);
 }
 
 function paint() {
+  const portalScrollTop = root.querySelector(".project-portal")?.scrollTop || 0;
   renderApp(root, state);
   bindEvents();
+  const portal = root.querySelector(".project-portal");
+  if (state.activeView === "Projects" && state.projectPortalMode === "home" && portal) {
+    portal.scrollTop = portalScrollTop;
+  }
   configureJobPolling(state, refreshWorkbenchSilently);
 }
 

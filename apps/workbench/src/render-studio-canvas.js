@@ -1,6 +1,7 @@
-import { badge, button, el, sectionTitle } from "./dom.js";
-import { displayStatus, displayText } from "./display-labels.js";
+import { button, el, sectionTitle } from "./dom.js";
+import { displayText } from "./display-labels.js";
 import { statusTone } from "./workbench-state.js";
+import { STUDIO_MODES, studioModeById, studioModeCards } from "./studio-mode.js";
 
 export function selectedStudioCardId(cards, workspace, state) {
   const stateCardId = state && state.selectedCardId;
@@ -25,14 +26,15 @@ export function selectedStudioInspector(cards, selectedCardId, fallback) {
   };
 }
 
-export function renderStudioCanvas(workspace, selectedCardId) {
+export function renderStudioCanvas(workspace, selectedCardId, mode = "produce") {
   const cards = Array.isArray(workspace.canvas?.cards) ? workspace.canvas.cards : [];
+  const visibleCards = studioModeCards(cards, mode);
   return el("div", { className: "studio-canvas" }, [
-    renderCanvasToolbar(workspace, cards),
-    renderStageHeader(cards),
-    cards.length
-      ? el("div", { className: "studio-node-flow" }, cards.map((card, index) => renderNode(card, selectedCardId, index, cards.length)))
-      : renderEmptyCanvas(),
+    renderCanvasToolbar(workspace, cards, mode),
+    renderStudioModeSwitch(mode),
+    visibleCards.length
+      ? el("div", { className: "studio-node-flow" }, visibleCards.map((card, index) => renderNode(card, selectedCardId, index, visibleCards.length)))
+      : renderModeEmpty(mode),
   ]);
 }
 
@@ -43,29 +45,39 @@ export function renderStudioFilmstrip(items) {
   ]);
 }
 
-function renderCanvasToolbar(workspace, cards) {
-  const refCount = cards.reduce((total, card) => total + (Array.isArray(card.refs) ? card.refs.length : 0), 0);
-  const blockerCount = cards.reduce((total, card) => total + (Array.isArray(card.blockers) ? card.blockers.length : 0), 0);
+function renderCanvasToolbar(workspace, cards, mode) {
+  const modeInfo = studioModeById(mode);
+  const visibleCount = studioModeCards(cards, mode).length;
   return el("div", { className: "studio-canvas-toolbar" }, [
-    el("div", {}, [
-      sectionTitle("创作画布", displayStatus(workspace.status || "not_started")),
-      el("p", { className: "card-summary", text: "把需求、素材、分镜、候选和项目记忆放在同一张制作画布上推进。" }),
+    el("div", { className: "studio-canvas-title" }, [
+      el("h2", { text: "创作画布" }),
+      el("small", { text: `${modeInfo.label} · ${visibleCount || "暂无"} 个对象` }),
     ]),
     el("div", { className: "studio-canvas-tools" }, [
-      badge(`${cards.length} 个节点`, cards.length ? "ready" : "quiet"),
-      badge(`${refCount} 个引用`, refCount ? "active" : "quiet"),
-      badge(`${blockerCount} 个阻塞`, blockerCount ? "blocked" : "quiet"),
       button("生成画布草稿", "draft-canvas", "secondary"),
       button("添加分镜卡", "register-content-card", "ghost"),
     ]),
   ]);
 }
 
-function renderStageHeader(cards) {
-  const labels = ["需求", "素材", "分镜", "候选", "审片", "记忆"];
-  return el("div", { className: "studio-stage" }, labels.map((label, index) =>
-    el("span", { className: index < Math.max(cards.length, 1) ? "active" : "", text: label }),
+function renderStudioModeSwitch(mode) {
+  return el("div", { className: "studio-mode-switch", attrs: { "aria-label": "创作模式" } }, STUDIO_MODES.map((item) =>
+    el("button", {
+      className: `studio-mode-segment${item.id === mode ? " active" : ""}`,
+      text: item.label,
+      attrs: { "data-studio-mode": item.id, "aria-pressed": item.id === mode ? "true" : "false", title: item.meta },
+    }),
   ));
+}
+
+function renderModeEmpty(mode) {
+  const modeInfo = studioModeById(mode);
+  return el("div", { className: "studio-mode-empty" }, [
+    el("div", {}, [
+      el("strong", { text: `${modeInfo.label}模式暂无内容` }),
+      el("p", { text: modeInfo.empty }),
+    ]),
+  ]);
 }
 
 function renderNode(card, selectedCardId, index, total) {
@@ -73,16 +85,13 @@ function renderNode(card, selectedCardId, index, total) {
   return el("div", { className: "studio-node-wrap" }, [
     el("article", { className: `studio-node ${tone}${card.card_id === selectedCardId ? " selected" : ""}`, dataset: { cardId: card.card_id } }, [
       renderMediaFrame(card, index),
-      el("div", { className: "studio-node-top" }, [
-        badge(nodeLabel(card, index), tone),
-        badge(displayStatus(card.status || "not_started"), tone),
+      el("div", { className: "studio-node-caption" }, [
+        el("span", { className: `studio-node-status ${tone}`, attrs: { title: displayText(card.status || "not_started") } }),
+        el("h3", { text: displayText(card.title || "未命名节点") }),
       ]),
-      el("h3", { text: displayText(card.title || "未命名节点") }),
-      card.summary ? el("p", { className: "card-summary", text: displayText(card.summary) }) : null,
-      renderNodeMeta(card),
-      card.blockers?.length ? el("div", { className: "chips" }, card.blockers.map((item) => badge(displayText(item.message || item.blocker_id), "blocked"))) : null,
+      card.blockers?.length ? el("small", { className: "studio-node-warning", text: "需要处理" }) : null,
     ]),
-    index < total - 1 ? el("span", { className: "studio-node-connector", text: "→" }) : null,
+    index < total - 1 ? el("span", { className: "studio-node-connector", attrs: { "aria-hidden": "true" } }) : null,
   ]);
 }
 
@@ -90,26 +99,7 @@ function renderMediaFrame(card, index) {
   return el("div", { className: `studio-media-frame ${mediaFrameTone(card, index)}` }, [
     el("span", { text: mediaFrameLabel(card, index) }),
     el("strong", { text: String(index + 1).padStart(2, "0") }),
-    el("small", { text: displayText(card.kind || "canvas node") }),
   ]);
-}
-
-function renderNodeMeta(card) {
-  const refs = Array.isArray(card.refs) ? card.refs.length : 0;
-  return el("div", { className: "studio-node-meta" }, [
-    badge(`${refs} 引用`, refs ? "ready" : "quiet"),
-    card.primary_artifact_id ? button("打开产物", "open-artifact-ref", "ghost", { artifactId: card.primary_artifact_id }) : null,
-  ]);
-}
-
-function renderEmptyCanvas() {
-  const starters = ["需求", "素材", "分镜", "审片", "记忆"];
-  return el("div", { className: "studio-empty-flow" }, starters.map((item, index) =>
-    el("div", { className: "studio-empty-node" }, [
-      el("div", { className: "studio-node-preview" }, [el("span", { text: String(index + 1).padStart(2, "0") })]),
-      el("strong", { text: item }),
-    ]),
-  ));
 }
 
 function renderFilmstripItem(item, index) {

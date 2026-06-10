@@ -114,12 +114,10 @@ function viewPanels(activeView, workbench, state) {
     renderProductionBoard(workbench.production_board),
   ];
   if (activeView === "Projects") {
-    return withWindow(activeView, [
-      renderProjectHub(workbench.project_hub),
-      renderActionPanel(state, viewActionGroups(activeView)),
-      ...common,
-      renderArtifactPanel(state),
-    ]);
+    return [
+      renderProjectHub(workbench.project_hub, state),
+      state.artifact ? renderArtifactPanel(state) : null,
+    ];
   }
   if (activeView === "Assets") {
     return withWindow(activeView, [
@@ -181,8 +179,9 @@ function renderWorkspace(state) {
 }
 
 export function renderApp(root, state) {
+  const activeView = state.activeView || DEFAULT_WORKSPACE_ID;
   root.replaceChildren(
-    el("div", { className: "app-shell" }, [
+    el("div", { className: `app-shell app-view-${String(activeView).toLowerCase().replaceAll(" ", "-")}` }, [
       renderTopbar(state),
       el("div", { className: "main-layout" }, [
         el("aside", { className: "rail" }, [

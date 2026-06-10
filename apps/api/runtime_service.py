@@ -32,6 +32,7 @@ from apps.api.runtime_models import (
     ProviderValidationPlanRequest,
     TwoRoundValidateRequest,
 )
+from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
 from apps.api.runtime_tracing import (
     PROVIDER_PLAN_TOOL_GATE_STATE,
     artifact_refs,
@@ -278,6 +279,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts, "flow": build_flow_summary(store, request.project_id)}
 
     register_runtime_v02_routes(app, store)
+    register_runtime_provider_script_routes(app, store)
     configure_workbench_static(app)
 
     return app

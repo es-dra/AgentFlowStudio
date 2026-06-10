@@ -108,6 +108,41 @@
   line-height: 1.55;
 }
 
+.app-view-create {
+  grid-template-rows: minmax(0, 1fr);
+  background: #0b0c0d;
+}
+
+.app-view-projects {
+  grid-template-rows: minmax(0, 1fr);
+  background: #0b0c0d;
+}
+
+.app-view-create .topbar,
+.app-view-create .rail,
+.app-view-projects .topbar,
+.app-view-projects .rail {
+  display: none;
+}
+
+.app-view-create .main-layout,
+.app-view-projects .main-layout {
+  grid-template-columns: 1fr;
+}
+
+.app-view-create .workspace-canvas-v2,
+.app-view-create .libtv-canvas,
+.app-view-projects .workspace {
+  min-height: 100vh;
+}
+
+.app-view-projects .workspace {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: #0b0c0d;
+}
+
 @media (max-width: 1120px) {
   .main-layout {
     grid-template-rows: auto minmax(0, 1fr);

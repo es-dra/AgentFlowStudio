@@ -90,6 +90,16 @@ class ProviderValidationPlanRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class ProviderScriptDraftPlanRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    goal: str = Field(min_length=1)
+    target_platform: str = "short_video"
+    style: str = "clear_demo"
+    review_feedback_artifact_id: str | None = None
+    previous_script_artifact_id: str | None = None
+    generated_at: str = Field(min_length=1)
+
+
 class FeedbackRecordRequest(BaseModel):
     project_id: str = Field(min_length=1)
     feedback: dict[str, Any]
@@ -103,6 +113,7 @@ __all__ = (
     "FeedbackRecordRequest",
     "ProjectCreateRequest",
     "ProjectImportRequest",
+    "ProviderScriptDraftPlanRequest",
     "ProviderValidationPlanRequest",
     "ProjectStatus",
     "ReviewDecisionRecordRequest",

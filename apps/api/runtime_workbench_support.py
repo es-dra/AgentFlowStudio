@@ -17,6 +17,7 @@ def event_title(job: dict[str, Any]) -> str:
         "record_review_decision": "审片决定已记录",
         "two_round_validate": "下一轮已准备",
         "provider_validation_plan": "Provider 预检",
+        "llm_script_draft_plan": "LLM 脚本纵切计划",
     }
     return labels.get(str(job.get("action")), str(job.get("action") or "运行事件"))
 

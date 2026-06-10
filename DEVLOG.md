@@ -11,74 +11,7 @@
 - 本地内测落地记录：`docs/handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`
 - Runtime Service 前端对接：`docs/handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
 - 前端中文交接包：`docs/frontend_integration/AFS_FRONTEND_HANDOFF.zh-CN.md`
-
-## 2026-06-09 - Web Vertical Flow 001
-
-- Started `AFS-WEB-VERTICAL-FLOW-001`: deterministic Workbench path from empty project toward `ready_for_next_round`.
-- Added API-level vertical flow coverage for create project -> source summaries -> Draft Canvas -> inspector -> first deterministic check -> review decision -> two-round validation -> provider preflight readiness.
-- Added compact `flow` summaries to Runtime mutation responses so the frontend can show target status, current action, next command, Studio status, provider status, and non-claims without re-inferring the workflow.
-- Improved Workbench startup and navigation: empty workspace now exposes project create/open controls; Studio cross-stage commands navigate to the matching view; Project Hub no longer renders an empty-action Pending button.
-- Added browser-level Workbench smoke: Runtime Service starts on a temporary port, Chromium clicks create -> source summary -> draft -> first check -> Review decision -> next round, and reaches `ready_for_next_round`.
-- Tightened the main review action toward candidate-bound `record-review-decision`; generic `record-feedback` remains an auxiliary runtime control.
-- Fixed Production Board layout after screenshot QA exposed right-column clipping; command/board surfaces now span the workbench width and board lanes wrap.
-- Boundaries preserved: no live provider call, no secret, no signed URL, no private media bytes, no provider raw response, no durable-memory or human-acceptance claim.
-
-## 2026-06-09 - Web Foundation 001
-
-- Added Runtime Service workbench-state projection for frontend-facing project/canvas/events/provider status.
-- Kept provider execution backend-gated and surfaced only safe UI summary for provider preflight state.
-- Added `apps/workbench` as the new Runtime Service-backed product frontend foundation, separate from transitional `apps/web`.
-- Implemented runtime client, workbench-state normalizer, DOM renderer, canvas workspace shell, inspector, jobs lane, provider gate panel, and collapsed advanced diagnostics.
-- Added local Runtime Service CORS for localhost and direct file-origin workbench use.
-- Classified `apps/workbench` in retention policy as current production spine.
-- Added focused frontend boundary tests to prevent browser persistence, old bridge/CLI coupling, private local data references, and oversized new frontend files.
-- Added implementation handoff: `docs/handoff/AFS-WEB-FOUNDATION-001.md`.
-
-Boundaries:
-
-- No live provider call was started.
-- No secret, signed URL, private media, provider raw response, or generated media bytes were written.
-- This is not human acceptance, business validation, or durable memory.
-- `apps/workbench` is still a foundation; project-create/run/feedback actions are the next slice.
-
-## 2026-06-09 - Web Workflow Controls 001
-
-- Advanced `apps/workbench` from a read-only state shell to Runtime Service workflow controls.
-- Added project create/open/import/export actions, deterministic Round 1 asset-test trigger, raw feedback recording, Round 2 validation trigger, provider preflight trigger, and safe artifact loading.
-- Split frontend rendering into smaller modules: `dom.js`, `render-actions.js`, and `render-artifact.js`.
-- Updated the frontend state adapter to consume backend `cards/card_id/primary_artifact_id` workbench-state payloads.
-- Added workflow-control assertions to `tests/test_web_workbench_foundation.py`.
-- Added handoff: `docs/handoff/AFS-WEB-WORKFLOW-CONTROLS-001.md`.
-- Added Runtime Service static hosting for the Workbench at `/workbench/`, so
-  frontend/backend integration can start from the same service origin instead
-  of a file-only shell.
-- Added deterministic Draft Canvas flow: Runtime Service now turns safe
-  brief/reference/script summaries into Hook / Proof / CTA canvas cards, and
-  Workbench exposes this as a one-click Scene Planner action.
-
-Boundaries:
-
-- No live provider call was started.
-- Browser-side workflow execution was not introduced; all execution still goes through Runtime Service.
-- No secret, signed URL, private media, provider raw response, or generated media bytes were written.
-- HTTP smoke for `/workbench/` passed through a temporary Runtime Service;
-  Draft Canvas HTTP smoke created 3 canvas cards and a 3-item filmstrip;
-  browser screenshot QA is still pending because no Browser/Playwright/headless
-  browser runtime is available in the current environment.
-
-## 2026-06-09 - Workbench Projection Slices
-
-- Added backend-driven `creation_workspace` and `memory_workspace` projections for Create and Review/Style Memory views.
-- Split Create and Memory frontend state/render modules, removed obsolete `render-review.js`, and reduced `workbench-state.js` below the 300-line threshold.
-- Runtime HTTP smoke passed for the new static modules and deterministic projection states; no live provider, secret, signed URL, private media, provider raw response, or generated media bytes were written.
-
-## 2026-06-09 - Workbench Operations Workspace Slice
-
-- Added backend-driven `operations_workspace` projection, combining job queue, latest activity, provider preflight, provider controls, polling, and blocker counts into one Runtime Service-safe contract.
-- Added frontend Operations Workspace state/render modules and moved Job Center normalization out of `workbench-state.js`, reducing the total adapter to 184 lines.
-- Replaced the Jobs view's parallel Job Center / Activity / Provider Gate panels with one Operations Workspace product surface.
-- Boundaries preserved: no provider calls, no secrets, no private paths, no signed URLs, no media bytes, no provider raw responses, no human acceptance/business validation/durable-memory claim.
-- Focused verification: state/Web foundation `11 passed, 1 warning`; Runtime/Web/API/action suite `18 passed, 1 warning`; Runtime-hosted Operations Workspace HTTP smoke passed.
+- 早期 Web Foundation / Vertical Flow / Workflow Controls 日志归档：`docs/archive/DEVLOG-2026-06-09-web-foundation-archive.md`
 
 ## 2026-06-09 - Landing Prep Content / Memory / Web 001
 
@@ -280,12 +213,6 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Added `docs/handoff/AFS-WEB-RC-DRAFT-PR-001.md` with a ready-to-copy draft PR body after local `gh` was unavailable and the GitHub connector token was expired.
 - Boundaries unchanged: provider remains closed; no secret, private media, provider raw response, signed URL, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
 
-## 2026-06-09 - Web Provider Smoke Readiness Prep
-- Added `docs/handoff/AFS-WEB-PROVIDER-SMOKE-READINESS-001.md` to separate Web RC human acceptance from later capability-gated provider smoke.
-- Registered the handoff in `docs/handoff/INDEX.md` and updated `AFS-PROVIDER-GATED-REAL-SMOKE-001` in `TASK_TRACKER.md`.
-- Ran readiness-only provider gate without `--run-provider-validation`; it wrote ignored evidence under `data/processed/runs/web_rc_provider_gate_readiness/` with `status=blocked` and `provider_calls_started=false`.
-- Boundaries unchanged: provider not executed; no secret, local private material, provider raw response, signed URL, generated media byte, COS active rule, human acceptance claim, business validation claim, or durable memory promotion.
-
 ## 2026-06-09 - Web Workbench Acceptance Rehearsal
 - Made `/workbench/` auto-connect to Runtime Service and load the default project on cold start so the first screen is a usable workspace instead of an empty disconnected shell.
 - Tightened user-facing display mappings for provider gate, activity, review, and storyboard reference surfaces; safe artifact ids remain hidden from main creative views.
@@ -298,3 +225,74 @@ Verification: CLI help/version passed; focused Runtime/Web/API `23 passed, 1 war
 - Reduced main-surface engineering leakage by collapsing asset profile seed / promotion fields behind `高级运行参数`, translating `ready_for_next_round` to `可进入下一轮`, and replacing smoke fixture copy with Chinese operator-facing text.
 - Browser smoke reached `ready_for_next_round` with provider calls still not started; follow-up browser review found old demo text, raw project ids, mojibake titles, English Runtime projection copy, Create-view `completed_with_blocks`, and the English project-materials blocker leaking into user-visible surfaces, so display mappings, project selection, handoffs, smoke assertions, corrupt `artifact_index.json` recovery, viewport-locked Workbench scrolling, and primary-task-first Projects/Assets/Settings panel order were refreshed; latest smoke `proj_browser_vertical_1781030891` reached `ready_for_next_round` with provider calls blocked.
 - Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
+
+- LibTV 历史资产浮层详细 QA 已归档：`docs/archive/DEVLOG-2026-06-09-web-foundation-archive.md`
+
+## 2026-06-10 - LibTV Script Result Node QA
+- Re-opened live LibTV and captured the `/canvas` entry plus the story script generation node behavior under `data/processed/runs/web_reference_libtv_live_20260610/`.
+- Observed that clicking `故事脚本生成` expands into a `剧本` result node with a downstream placeholder node, an editable-content hint, a bottom generation control card, and `GVLM 3.1` model selection, instead of only opening a setup form.
+- Replicated that slice in the AFS Create starter canvas: selecting `故事脚本生成` now shows a script content node, connector, downstream node, `双击剧本内容，可直接编辑或替换`, `根据我上传的剧本生成一个完整的故事脚本`, `GVLM 3.1`, and `Provider 未启动`.
+- Browser QA evidence: `data/processed/runs/workbench_libtv_script_rebuild/04-script-flow-after-tip-layer-fix.png` and `data/processed/runs/workbench_libtv_script_rebuild/04-script-flow-after-tip-layer-fix-metrics.json`.
+- Verification: red test failed before implementation; focused Workbench frontend `10 passed`; `maintenance_audit` `failed=0, passed=6, warning=0`; `git diff --check` passed with CRLF warnings only.
+- Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
+
+## 2026-06-10 - LibTV Character Three-View Node QA
+- Re-opened live LibTV and captured the `/project` to `/canvas` entry plus the `角色三视图` starter behavior under `data/processed/runs/web_reference_libtv_live_20260610/`.
+- Observed that clicking `角色三视图` expands into a `角色图` input node and a `角色三视图` result node, with a top capability strip containing `全景`, `多角度`, `打光`, `九宫格`, `高清`, and `宫格切分`.
+- The live LibTV page reported a front-end generator chunk load failure after the node opened; this was recorded as reference evidence, not treated as AFS provider validation.
+- Replicated the slice in the AFS Create starter canvas using safe placeholder imagery only: selecting `角色三视图` now shows the role image node, three-view result node, replacement tip, capability strip, `生成器未启动`, and `Provider Gate 未授权`.
+- Browser QA evidence: `data/processed/runs/workbench_libtv_character_rebuild/01-character-flow-local-qa.png`, `data/processed/runs/workbench_libtv_character_rebuild/01-character-flow-local-qa-metrics.json`, and `data/processed/runs/workbench_libtv_character_rebuild/01-character-flow-local-console-errors.json`.
+- Verification: red test failed before implementation; focused Workbench frontend `10 passed`; `maintenance_audit` `failed=0, passed=6, warning=0`; `git diff --check` passed with CRLF warnings only.
+- Boundaries unchanged: no live provider call, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
+
+## 2026-06-10 - LibTV First-Frame Image-to-Video Node QA
+- Re-opened live LibTV and captured the `/project` to `/canvas` entry plus the `首帧图生视频` starter behavior under `data/processed/runs/web_reference_libtv_live_20260610/`.
+- Observed that clicking `首帧图生视频` expands into a `首帧` input node and a `视频` result node, with mode tabs `文生视频`, `全能参考`, `图生视频`, `首尾帧`, `图片参考`, tool buttons `标记`, `运镜`, `角色库`, and model/parameter controls `Seedance 2.0 VIP` plus `16:9 · 720P · 5s`.
+- Replicated the slice in the AFS Create starter canvas using safe placeholder imagery only: selecting `首帧图生视频` now shows the first-frame node, video preview node, replacement tip, mode tabs, tool row, model/parameter controls, and `视频生成未启动`.
+- Fixed compact-layout canvas scrolling so wheel events inside starter result flows no longer trigger canvas zoom; browser QA confirmed zoom stayed at `100%` after scrolling the image-video flow.
+- Browser QA evidence: `data/processed/runs/workbench_libtv_image_video_rebuild/01-image-video-flow-local-qa.png`, `data/processed/runs/workbench_libtv_image_video_rebuild/03-image-video-scroll-fixed.png`, and their metrics JSON files.
+- Verification: red tests failed before implementation and scroll fix; focused Workbench frontend `10 passed`; `maintenance_audit` `failed=0, passed=6, warning=0`; `git diff --check` passed with CRLF warnings only.
+- Boundaries unchanged: no live provider call, no upload, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
+
+## 2026-06-10 - LibTV Audio-to-Video Node QA
+- Re-opened live LibTV and captured the `/project` to `/canvas` entry plus the `音频生视频` starter behavior under `data/processed/runs/web_reference_libtv_live_20260610/`.
+- Observed that clicking `音频生视频` expands into an `音频` input node and a `视频` result node, with `00:00 / 00:03` time labels, `图片`, mode tabs `文生视频`, `全能参考`, `图生视频`, `首尾帧`, `图片参考`, tool buttons `标记`, `运镜`, `角色库`, model/parameter controls `Seedance 2.0 VIP`, `16:9 · 720P · 5s`, `1个`, `135`, and toggles `联网搜索` / `自动校验素材`.
+- Replicated the slice in the AFS Create starter canvas using safe placeholder audio/video surfaces only: selecting `音频生视频` now shows the audio waveform node, video preview node, replacement tip, mode tabs, tool row, model/parameter controls, safety toggles, and `音频驱动未启动`.
+- Browser QA evidence: `data/processed/runs/web_reference_libtv_live_20260610/10-audio-video-node-state.png`, `data/processed/runs/workbench_libtv_audio_video_rebuild/01-audio-video-flow-local-qa.png`, `data/processed/runs/workbench_libtv_audio_video_rebuild/02-audio-video-control-card-local-qa.png`, and their summary JSON files.
+- Verification: red test failed before implementation; focused Workbench frontend `10 passed`; `maintenance_audit` `failed=0, passed=6, warning=0`; `git diff --check` passed with CRLF warnings only.
+- Boundaries unchanged: no live provider call, no upload, no secret/private media/provider raw response/signed URL/generated media byte committed, and no human acceptance/business validation/durable memory claim.
+
+## 2026-06-10 - LibTV 添加节点菜单 QA
+- 重新打开真实 LibTV，并在 `data/processed/runs/web_reference_libtv_live_20260610/` 下记录 Create 画布底部“添加节点”菜单证据。
+- 观察结论：真实菜单不是早前 AFS 的三组抽象入口，而是 `文本`、`图片`、`视频`、`视频合成 Beta`、`导演台 NEW`、`音频`、`脚本`，下方另有 `添加资源`，包含 `上传` 和 `从生成历史选择`。
+- AFS Create 底部工具坞已复刻该结构：7 个节点按钮、2 个资源按钮、`Beta` / `NEW` 徽标，并显式落地 `data-add-node-kind` 与 `data-add-resource-kind`。
+- 浏览器 QA 证据：`data/processed/runs/workbench_libtv_add_node_rebuild/01-add-node-menu-libtv-aligned.png` 和 `data/processed/runs/workbench_libtv_add_node_rebuild/01-add-node-menu-libtv-aligned-summary.json`。
+- 验证状态：实现前红灯测试失败；实现后 focused Workbench frontend `10 passed`；浏览器 QA 记录 `missingLabels=[]`、`nodeButtonCount=7`、`resourceButtonCount=2`、`badgeCount=3`、`forbiddenMatches=[]`。
+- 边界不变：未启动真实 provider，未点击上传或历史生成入口，未提交 secret、私有媒体、provider 原始响应、signed URL 或生成媒体字节，也不声明 human acceptance、business validation 或 durable memory。
+
+## 2026-06-10 - LibTV 添加菜单节点态
+- 补齐点击“添加节点”菜单项后的本地节点态：`文本`、`图片`、`视频`、`视频合成`、`导演台`、`音频`、`脚本` 都会进入安全占位节点和控制卡，而不是只尝试选中已有 Runtime 卡片。
+- 新增 `render-studio-add-node-flow.js` 和添加节点样式分片，后续导演台/视频合成样式独立到 `styles-studio-director-merge-flow.css`，保持单文件维护线内。
+- 修复 QA 中暴露的状态问题：进入新增节点态后再次点击底部“添加节点”会先清理 `studioAddedNodeKind`，再打开菜单；资源入口只切到资产或历史面板。
+- 验证状态：实现前红灯测试失败在缺失新增节点流模块；实现后 `tests/test_web_workbench_studio.py` 通过，随后 focused Workbench frontend `10 passed`；HTTP 检查确认 `/workbench/src/render-studio-add-node-flow.js`、`/workbench/styles-studio-add-node-flow.css` 和 `/workbench/` 均返回 `200` 且包含目标标记。
+- 浏览器限制：本轮尝试用无头 Edge + CDP 补点击截图，但 CDP 目标上下文未稳定进入已连接 Workbench；已删除半成品截图，后续需要用稳定 Browser 工具补视觉 QA。
+- 边界不变：未启动真实 provider，未上传素材，未点击生成历史，未提交 secret、私有媒体、provider 原始响应、signed URL 或生成媒体字节，也不声明 human acceptance、business validation 或 durable memory。
+
+## 2026-06-10 - LibTV 导演台与视频合成节点态
+- 基于真实 LibTV `13-director-node.json` / `14-director-workspace.json` 取证，深化“添加节点”后的 `导演台`：现在显示 `3D导演台`、导演/机位/场景视角、对象搜索、`机位1`、`角色A`、摄像机属性、`FOV 50°`、位置/注视坐标、相机截图、AI 识图导入、全屏入口和 `导演台未启动`。
+- 将 `视频合成` 从通用占位提升为安全时间线控制面：显示 3 段安全引用片段、片段排序、转场、节奏、统一画幅和 `视频合成未启动`，但不读取生成历史字节、不上传、不启动真实合成。
+- 新增 `tests/test_web_workbench_libtv_add_node_flows.py`，红灯先失败在缺失 `renderDirectorFlow` / `renderVideoMergeFlow`，实现后该文件 `2 passed`；与既有 Studio 回归合跑为 `3 passed`。
+- HTTP 资源检查确认 `/workbench/` 暴露的新 JS/CSS 含导演台和视频合成目标标记；`npx playwright --version` 在当前环境超时，因此本轮仍不声明浏览器视觉验收完成。
+- 边界不变：未启动真实 provider，未上传素材，未提交 secret、私有媒体、provider 原始响应、signed URL 或生成媒体字节，也不声明 human acceptance、business validation 或 durable memory。
+
+## 2026-06-10 - LibTV 节点态与 Web RC 冻结收口
+- 添加资源、图片/脚本/文本/视频/音频节点态、工具箱、执行骨架和三视口 Playwright QA 已纳入验收包与 closeout 文档；DEVLOG 只保留当前入口摘要，详细证据见 `docs/frontend_integration/AFS_WEB_RC_FREEZE_CLOSEOUT_2026-06-10.zh-CN.md`。
+- 当前阶段已从横向 LibTV 复刻切换到 Web RC 冻结；不再新增 LibTV 功能面，provider 纵切建议按 LLM/script、image、video 顺序推进，Company OS 候选反馈见 `docs/frontend_integration/AFS_WEB_RC_COMPANY_OS_FEEDBACK_2026-06-10.zh-CN.md`。
+- 边界不变：provider 关闭；不提交 secret、signed URL、本地私有路径、provider 原始响应或生成媒体字节；不声明 human acceptance、business validation、durable memory 或 COS active rule。
+
+## 2026-06-10 - LLM/Script Provider 纵切准备
+- 新增 Runtime Service `POST /provider/script-draft-plan`，在真实 provider smoke 前创建 gate-closed 的 LLM/script 安全计划、本地确定性脚本/分镜草案、safe manifest 和 run trace。
+- 默认 `AFS_ALLOW_REMOTE_LLM` 关闭时 job 为 `blocked`，`provider_calls_started=false`，不存 provider raw payload、生成媒体字节，不写 Company KB 或 durable memory；Review feedback 和上一版脚本 artifact 只作为 candidate constraints 复用。
+- 新增 `tests/test_api_runtime_llm_script_vertical.py`，TDD 红灯先失败在缺失 route/OpenAPI path 与 `local_draft` 字段；最终验证 focused Runtime/API `8 passed, 1 warning`，full pytest `871 passed, 1 warning`。
+- 收口证据：`docs/frontend_integration/AFS_PROVIDER_LLM_SCRIPT_VERTICAL_PREP_2026-06-10.zh-CN.md`；Company OS 候选反馈：`docs/frontend_integration/AFS_PROVIDER_LLM_SCRIPT_COMPANY_OS_FEEDBACK_2026-06-10.zh-CN.md`。
+- 边界不变：本切口是 provider 纵切工程准备，不是 live provider smoke、human acceptance、business validation 或 durable memory promotion。

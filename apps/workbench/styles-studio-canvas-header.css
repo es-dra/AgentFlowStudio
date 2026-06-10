@@ -1,0 +1,118 @@
+.libtv-topbar {
+  z-index: 24;
+}
+
+.libtv-canvas-header {
+  position: relative;
+  z-index: 25;
+  grid-template-columns: 36px minmax(120px, 1fr) auto;
+  overflow: visible;
+}
+
+.libtv-canvas-title-input {
+  min-width: 0;
+  height: 44px;
+  border: 0;
+  padding: 0 12px;
+  color: #f4f5f2;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  text-overflow: ellipsis;
+}
+
+.libtv-canvas-title-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.libtv-canvas-switcher {
+  position: relative;
+  min-height: 44px;
+}
+
+.libtv-canvas-switcher .libtv-canvas-select {
+  height: 44px;
+  min-width: 86px;
+}
+
+.libtv-canvas-menu {
+  position: absolute;
+  z-index: 26;
+  top: 50px;
+  right: 0;
+  pointer-events: auto;
+  width: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(28, 28, 27, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+.libtv-canvas-menu button {
+  display: grid;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: #f4f5f2;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.libtv-canvas-menu button:hover,
+.libtv-canvas-menu button.active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.libtv-canvas-menu small,
+.libtv-canvas-intent-status small {
+  color: #aaaea7;
+  font-size: 12px;
+}
+
+.libtv-canvas-new {
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.libtv-canvas-intent-status {
+  pointer-events: auto;
+  display: grid;
+  gap: 2px;
+  max-width: 260px;
+  border: 1px solid rgba(113, 166, 139, 0.32);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #eff7ef;
+  background: rgba(22, 48, 39, 0.96);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.libtv-canvas-intent-status strong,
+.libtv-canvas-intent-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .libtv-canvas-header {
+    max-width: calc(100vw - 40px);
+    grid-template-columns: 32px minmax(82px, 1fr) auto;
+  }
+
+  .libtv-canvas-intent-status {
+    position: absolute;
+    top: 52px;
+    left: 0;
+    max-width: calc(100vw - 40px);
+  }
+
+  .libtv-canvas-menu {
+    right: -4px;
+    width: min(220px, calc(100vw - 56px));
+  }
+}

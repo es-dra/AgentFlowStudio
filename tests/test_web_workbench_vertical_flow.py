@@ -15,7 +15,7 @@ def test_workbench_vertical_flow_has_empty_project_start_and_next_action_feedbac
     actions = _read(WORKBENCH_ROOT / "src" / "render-actions.js")
     labels = _read(WORKBENCH_ROOT / "src" / "display-labels.js")
     project_hub = _read(WORKBENCH_ROOT / "src" / "render-project-hub.js")
-    studio = _read(WORKBENCH_ROOT / "src" / "render-studio-workspace.js")
+    studio = _read(WORKBENCH_ROOT / "src" / "render-studio-workspace.js") + _read(WORKBENCH_ROOT / "src" / "render-studio-canvas-header.js")
     workspace_config = _read(WORKBENCH_ROOT / "src" / "workspace-config.js")
     browser_smoke = _read(Path("tools/workbench_vertical_flow_browser_smoke.py"))
     board_css = _read(WORKBENCH_ROOT / "styles-production-board.css")

@@ -1,0 +1,204 @@
+.libtv-director-flow,
+.libtv-video-merge-flow {
+  width: min(1080px, calc(100vw - 72px));
+  display: grid;
+  gap: 16px;
+  padding: 72px 42px 26px;
+  color: #f4f5f2;
+}
+
+.libtv-director-flow {
+  grid-template-columns: minmax(420px, 1fr) 300px;
+}
+
+.libtv-director-canvas,
+.libtv-director-camera-panel,
+.libtv-video-merge-preview,
+.libtv-video-merge-timeline,
+.libtv-video-merge-control {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(25, 26, 25, 0.95);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+}
+
+.libtv-director-canvas,
+.libtv-director-camera-panel,
+.libtv-video-merge-preview,
+.libtv-video-merge-timeline,
+.libtv-video-merge-control {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.libtv-director-toolbar,
+.libtv-director-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.libtv-director-toolbar strong {
+  margin-right: auto;
+}
+
+.libtv-director-toolbar button,
+.libtv-director-action-row button,
+.libtv-director-object-list button,
+.libtv-director-camera-panel button,
+.libtv-video-merge-control button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #d9d9d4;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.libtv-director-toolbar .active,
+.libtv-video-merge-control .active {
+  color: #08100f;
+  background: #53d7d1;
+}
+
+.libtv-director-stage {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: radial-gradient(circle at 35% 30%, rgba(83, 215, 209, 0.22), transparent 28%),
+    linear-gradient(155deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.24));
+}
+
+.libtv-director-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+  transform: perspective(560px) rotateX(62deg) translateY(54px);
+  transform-origin: center bottom;
+}
+
+.libtv-director-camera,
+.libtv-director-role {
+  position: absolute;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #08100f;
+  background: #53d7d1;
+}
+
+.libtv-director-camera {
+  left: 18%;
+  top: 32%;
+}
+
+.libtv-director-role {
+  right: 24%;
+  top: 48%;
+  background: #f3c76b;
+}
+
+.libtv-director-object-list {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 8px;
+}
+
+.libtv-director-object-list input,
+.libtv-director-camera-panel input {
+  min-height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: #e9ebe7;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.libtv-director-camera-panel header,
+.libtv-director-camera-panel label,
+.libtv-director-fov {
+  display: grid;
+  gap: 6px;
+}
+
+.libtv-director-camera-panel header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.libtv-director-camera-panel span,
+.libtv-director-camera-panel p,
+.libtv-video-merge-control p {
+  margin: 0;
+  color: #bfc2bc;
+  font-size: 12px;
+}
+
+.libtv-director-camera-panel em,
+.libtv-director-camera-panel small,
+.libtv-video-merge-control small {
+  color: #53d7d1;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.libtv-video-merge-flow {
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1fr) 280px;
+  align-items: stretch;
+}
+
+.libtv-video-merge-preview header {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.libtv-video-merge-preview em {
+  grid-column: 2;
+  color: #aeb0ab;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.libtv-video-merge-screen {
+  min-height: 170px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(83, 215, 209, 0.22), rgba(255, 255, 255, 0.06));
+}
+
+.libtv-video-merge-timeline {
+  align-content: center;
+}
+
+.libtv-video-merge-clip {
+  display: grid;
+  gap: 8px;
+  min-height: 72px;
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.libtv-video-merge-clip small {
+  color: #aeb0ab;
+}
+
+@media (max-width: 760px) {
+  .libtv-director-flow,
+  .libtv-video-merge-flow {
+    width: auto;
+    grid-template-columns: 1fr;
+    padding: 72px 18px 24px;
+  }
+
+  .libtv-director-object-list {
+    grid-template-columns: 1fr;
+  }
+}

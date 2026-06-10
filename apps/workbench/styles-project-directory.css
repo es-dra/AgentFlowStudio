@@ -1,0 +1,44 @@
+.portal-directory {
+  gap: 28px;
+}
+
+.portal-directory-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.portal-directory-head h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.portal-back,
+.portal-folder-button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: #f5f5f1;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.portal-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.portal-directory-start {
+  min-height: 210px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 18px;
+}
+
+.portal-end-note {
+  color: #8f928e;
+  text-align: center;
+}

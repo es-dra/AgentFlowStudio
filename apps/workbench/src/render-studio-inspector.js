@@ -8,7 +8,7 @@ export function renderStudioInspector(inspector, state) {
     el("div", { className: "studio-inspector-hero" }, [
       el("span", { text: displayText(inspector.mode || "node") }),
       el("strong", { text: displayText(inspector.title || "未选择卡片") }),
-      inspector.primary_artifact_id ? badge("有安全产物", "ready") : badge("待生成预览", "quiet"),
+      inspector.primary_artifact_id ? el("small", { text: "有预览" }) : null,
     ]),
     el("h3", { text: displayText(inspector.title || "未选择卡片") }),
     inspector.summary ? el("p", { className: "card-summary", text: displayText(inspector.summary) }) : null,
@@ -30,9 +30,8 @@ export function renderStudioInspector(inspector, state) {
 function renderInspectorFacts(inspector) {
   const actions = Array.isArray(inspector.actions) ? inspector.actions : [];
   const blockers = Array.isArray(inspector.blockers) ? inspector.blockers : [];
+  if (!actions.length && !blockers.length) return null;
   return el("div", { className: "studio-inspector-facts" }, [
-    badge(`${actions.length} 个动作`, actions.length ? "ready" : "quiet"),
-    badge(`${blockers.length} 个阻塞`, blockers.length ? "blocked" : "quiet"),
     actions.length ? el("div", { className: "chips" }, actions.map((item) => badge(displayText(item), "active"))) : null,
     blockers.length ? el("div", { className: "chips" }, blockers.map((item) => badge(displayText(item.message || item.blocker_id), "blocked"))) : null,
   ]);
@@ -44,7 +43,7 @@ function renderRefs(refs) {
     el("div", { className: "ref-row" }, [
       el("span", { text: displayText(ref.label) }),
       el("code", { text: displayText(ref.artifact_type || "artifact") }),
-      badge(ref.artifact_id ? "安全引用" : "待生成", ref.artifact_id ? "quiet" : "blocked"),
+      ref.artifact_id ? null : badge("待生成", "blocked"),
     ]),
   ));
 }

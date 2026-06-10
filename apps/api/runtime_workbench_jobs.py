@@ -78,6 +78,8 @@ def _guidance(action: str, item_status: str, error: str) -> str:
         return error or "重试前先打开运行详情并检查错误。"
     if action == "provider_validation_plan" and item_status == "blocked":
         return "Provider 仍处于闸门关闭状态；真实模型试跑前必须显式授权对应能力。"
+    if action == "llm_script_draft_plan" and item_status == "blocked":
+        return "LLM 脚本纵切只创建了安全计划；真实文本 provider 试跑前必须显式启用 AFS_ALLOW_REMOTE_LLM。"
     if action == "asset_test_run" and item_status == "blocked":
         return "打开首轮检查报告，补齐缺失的项目素材后再重试。"
     if action == "two_round_validate" and item_status == "blocked":

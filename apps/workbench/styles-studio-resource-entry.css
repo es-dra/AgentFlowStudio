@@ -1,0 +1,212 @@
+.libtv-resource-entry-panel {
+  width: min(760px, calc(100vw - 56px));
+  max-height: min(620px, calc(100vh - 176px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  overflow: auto;
+}
+
+.libtv-resource-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.libtv-resource-header h2 {
+  margin: 0 0 5px;
+  color: #f4f5f2;
+  font-size: 18px;
+}
+
+.libtv-resource-header span,
+.libtv-upload-dropzone p,
+.libtv-resource-kind-grid small,
+.libtv-resource-empty p,
+.libtv-resource-history-card small,
+.libtv-resource-history-card em {
+  color: #a7a9a4;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.libtv-resource-tabs,
+.libtv-resource-history-actions,
+.libtv-resource-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.libtv-resource-tabs button,
+.libtv-resource-history-actions button,
+.libtv-resource-action-row button,
+.libtv-upload-dropzone button {
+  min-height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  padding: 0 12px;
+  color: #e8e9e4;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.libtv-resource-tabs .active,
+.libtv-resource-action-row .primary,
+.libtv-resource-tabs button:hover,
+.libtv-upload-dropzone button:hover {
+  background: rgba(31, 111, 91, 0.72);
+  border-color: rgba(67, 194, 158, 0.38);
+}
+
+.libtv-upload-resource-panel,
+.libtv-history-resource-picker {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+}
+
+section.libtv-history-resource-picker {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.libtv-upload-dropzone {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border: 1px dashed rgba(244, 245, 242, 0.24);
+  border-radius: 8px;
+  padding: 22px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.libtv-upload-dropzone span {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #f4f5f2;
+  background: rgba(31, 111, 91, 0.72);
+  font-size: 24px;
+}
+
+.libtv-upload-dropzone strong,
+.libtv-resource-history-head strong,
+.libtv-resource-kind-grid strong,
+.libtv-resource-empty strong,
+.libtv-resource-history-card strong {
+  color: #f4f5f2;
+}
+
+.libtv-upload-dropzone p {
+  max-width: 420px;
+  margin: 0;
+}
+
+.libtv-resource-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.libtv-resource-kind-grid article {
+  min-height: 78px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.libtv-resource-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.libtv-resource-history-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.libtv-resource-history-card {
+  min-height: 184px;
+  display: grid;
+  grid-template-rows: 68px auto minmax(42px, auto) auto;
+  gap: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.libtv-resource-history-card strong,
+.libtv-resource-history-card small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.libtv-resource-history-card small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.libtv-resource-history-card span,
+.libtv-resource-empty span {
+  display: grid;
+  place-items: center;
+  color: #f4f5f2;
+  background: linear-gradient(135deg, rgba(49, 95, 153, 0.3), rgba(180, 91, 57, 0.22));
+}
+
+.libtv-resource-history-card em {
+  font-style: normal;
+}
+
+.libtv-resource-empty {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.libtv-resource-empty span {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+}
+
+@media (max-width: 760px) {
+  .libtv-resource-entry-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 148px);
+  }
+
+  .libtv-resource-header {
+    display: grid;
+  }
+
+  .libtv-resource-kind-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

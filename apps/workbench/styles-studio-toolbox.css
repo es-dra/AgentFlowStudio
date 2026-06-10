@@ -1,0 +1,141 @@
+.libtv-toolbox-panel {
+  right: 312px;
+  bottom: 78px;
+  width: 292px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 14px;
+  max-height: min(640px, calc(100vh - 110px));
+  overflow: hidden;
+}
+
+.libtv-toolbox-body {
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.libtv-toolbox-section {
+  display: grid;
+  gap: 6px;
+}
+
+.libtv-toolbox-section h3 {
+  margin: 0;
+  color: #dfe2dc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.libtv-toolbox-row,
+.libtv-tv-tool-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  padding: 9px;
+  color: #f4f5f2;
+  background: transparent;
+  text-align: left;
+}
+
+.libtv-tv-tool-row {
+  background: rgba(126, 224, 217, 0.06);
+}
+
+.libtv-toolbox-row:hover,
+.libtv-tv-tool-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.libtv-toolbox-row.active,
+.libtv-tv-tool-row.active {
+  outline: 1px solid rgba(83, 215, 209, 0.72);
+  background: rgba(83, 215, 209, 0.14);
+}
+
+.libtv-toolbox-row small,
+.libtv-tv-tool-row small {
+  grid-column: 2;
+  color: #a7a9a4;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.libtv-toolbox-status {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(83, 215, 209, 0.18);
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(26, 46, 43, 0.96);
+}
+
+.libtv-toolbox-status h3,
+.libtv-toolbox-status p {
+  margin: 0;
+}
+
+.libtv-toolbox-status h3 {
+  color: #53d7d1;
+  font-size: 12px;
+}
+
+.libtv-toolbox-status strong {
+  color: #f4f5f2;
+  font-size: 13px;
+}
+
+.libtv-toolbox-status p,
+.libtv-toolbox-status small,
+.libtv-tool-intent-flow small {
+  color: #a7a9a4;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.libtv-tool-intent-flow {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.libtv-tool-intent-flow li {
+  display: grid;
+  gap: 2px;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  padding-left: 8px;
+}
+
+.libtv-tool-intent-flow .status-done,
+.libtv-tool-intent-flow .status-active {
+  border-left-color: #53d7d1;
+}
+
+.libtv-tool-intent-flow .status-locked span {
+  color: #858782;
+}
+
+.libtv-safe-tool-note {
+  margin: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+  color: #a7a9a4;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .libtv-toolbox-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}

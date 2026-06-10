@@ -183,23 +183,6 @@
   font-weight: 800;
 }
 
-.studio-empty-flow {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(100px, 1fr));
-  gap: 10px;
-}
-
-.studio-empty-node {
-  min-height: 92px;
-  display: grid;
-  align-content: center;
-  gap: 8px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  background: #fbfcfa;
-}
-
 .studio-filmstrip-row {
   display: grid;
   grid-auto-flow: column;
@@ -247,7 +230,6 @@
   .studio-command-strip,
   .studio-layout,
   .studio-node-flow,
-  .studio-empty-flow,
   .studio-ops-summary {
     grid-template-columns: 1fr;
     grid-auto-flow: row;

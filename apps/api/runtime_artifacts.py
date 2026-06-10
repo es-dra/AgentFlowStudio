@@ -57,6 +57,23 @@ def provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
     }
 
 
+def script_provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
+    return {
+        "llm_script_request_plan": store.register_artifact(
+            output_dir / "llm_script_request_plan.json",
+            role="llm_script_request_plan",
+        ),
+        "script_storyboard_safe_artifact": store.register_artifact(
+            output_dir / "script_storyboard_safe_artifact.json",
+            role="script_storyboard_safe_artifact",
+        ),
+        "script_provider_safe_manifest": store.register_artifact(
+            output_dir / "script_provider_safe_manifest.json",
+            role="script_provider_safe_manifest",
+        ),
+    }
+
+
 def update_project_after_asset_run(
     store: RuntimeStore,
     project_id: str,
@@ -102,6 +119,7 @@ __all__ = (
     "feedback_ref",
     "provider_artifacts",
     "round_2_run_ref",
+    "script_provider_artifacts",
     "two_round_artifacts",
     "update_project_after_asset_run",
 )
