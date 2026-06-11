@@ -39,6 +39,7 @@ def build_minimax_image_request_plan(
 
     model_name = resolve_model_name(store, account, service, model_name_override)
     base_url = resolve_image_base_url(store, account, service)
+    backend = str(service.get("execution_backend") or account.get("execution_backend") or "rest_api")
     create_json: dict[str, Any] = {
         "model": model_name,
         "prompt": prompt,
@@ -62,11 +63,12 @@ def build_minimax_image_request_plan(
         "gate_status": "enabled" if gate_enabled else "disabled",
         "live_call_authorized": gate_enabled,
         "auth": {
-            "auth_type": account.get("auth_type"),
-            "api_key_present": bool(api_key(account)),
+            "auth_type": account.get("auth_type") or ("mmx_cli" if backend == "mmx_cli" else None),
+            "api_key_present": api_key_available(account, backend),
             "authorization_scheme": "Bearer",
             "authorization_header_persisted": False,
             "api_key_persisted": False,
+            "cli_auth_persisted_in_repo": False,
         },
         "create_request": {
             "method": "POST",
@@ -91,6 +93,12 @@ def build_minimax_image_request_plan(
     if subject_reference is not None:
         plan["subject_reference"] = subject_reference
     return plan
+
+
+def api_key_available(account: dict[str, Any], backend: str = "rest_api") -> bool:
+    if backend == "mmx_cli":
+        return False
+    return bool(api_key(account))
 
 
 def ensure_minimax_image_service(service: dict[str, Any], service_id: str) -> None:
@@ -155,7 +163,12 @@ def resolve_model_name(
 def api_key(account: dict[str, Any]) -> str:
     value = account.get("api_key") or account.get("token_plan_key") or account.get("bearer_token")
     if not isinstance(value, str) or not value.strip():
-        raise ModelConfigError("MiniMax account requires api_key")
+        env_name = account.get("api_key_env")
+        if isinstance(env_name, str) and env_name.strip():
+            env_value = os.environ.get(env_name.strip())
+            if isinstance(env_value, str) and env_value.strip():
+                return env_value.strip()
+        raise ModelConfigError("MiniMax account requires API credential")
     return value.strip()
 
 

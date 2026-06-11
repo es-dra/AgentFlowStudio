@@ -1,32 +1,60 @@
-// 模型清单为本地预置展示数据：名称 / 描述 / 耗时标签 / 单次 ⚡ 展示值。
-// 不代表真实 provider 接入；发送动作在 v1 只产生本地安全预览。
+// Studio model presets describe the current MVP execution surface.
+// Only MiniMax text enhancement and MiniMax image keyframes are wired to Runtime providers.
 
 export const TEXT_MODELS = [
-  { id: "gvlm-3.1", name: "GVLM 3.1", desc: "多模态文本模型Pro", eta: "20s", cost: 1 },
-  { id: "cvlm-5.5", name: "CVLM 5.5", desc: "", eta: "10s", cost: 1 },
-  { id: "gvlm-3.1-flash", name: "GVLM 3.1 Flash", desc: "", eta: "15s", cost: 1 },
-  { id: "qwen-3-vl-flash", name: "Qwen 3 VL Flash", desc: "", eta: "10s", cost: 1 },
+  {
+    id: "local-creative-agent",
+    name: "Local Agent",
+    desc: "deterministic prompt assembly",
+    eta: "0s",
+    cost: 0,
+    provider: "local",
+  },
+  {
+    id: "minimax-m3-enhance",
+    name: "MiniMax-M3",
+    desc: "prompt enhancement",
+    eta: "15s",
+    cost: 1,
+    provider: "minimax",
+    capability: "llm_prompt_enhancement",
+    llmProvider: "minimax_m3",
+  },
 ];
 
 export const IMAGE_MODELS = [
-  { id: "lib-image", name: "Lib Image", desc: "最新图片模型，长文本能力突出", eta: "60s", cost: 18 },
-  { id: "lib-navo-pro", name: "Lib Navo Pro", desc: "", eta: "50s", cost: 14 },
-  { id: "lib-navo-2", name: "Lib Navo 2", desc: "", eta: "25s", cost: 8 },
-  { id: "midjourney-v8.1", name: "Midjourney V8.1", desc: "风格上新", eta: "50s", cost: 20 },
-  { id: "midjourney-v7", name: "Midjourney V7", desc: "风格上新", eta: "50s", cost: 16 },
-  { id: "midjourney-niji-7", name: "Midjourney Niji 7", desc: "风格上新", eta: "50s", cost: 16 },
-  { id: "seedream-4.6", name: "Seedream 4.6", desc: "", eta: "20s", cost: 10 },
+  {
+    id: "minimax-image-01",
+    name: "MiniMax image-01",
+    desc: "keyframe provider",
+    eta: "60s",
+    cost: 1,
+    provider: "minimax",
+    capability: "image_keyframe",
+    providerServiceId: "minimax_image",
+  },
 ];
 
 export const VIDEO_MODELS = [
-  { id: "seedance-2.0", name: "Seedance 2.0", desc: "VIP", eta: "120s", cost: 135 },
-  { id: "seedance-2.0-fast", name: "Seedance 2.0 Fast", desc: "", eta: "60s", cost: 60 },
-  { id: "lib-video-1.5", name: "Lib Video 1.5", desc: "", eta: "90s", cost: 45 },
+  {
+    id: "local-video-preview",
+    name: "Video preview",
+    desc: "provider disabled",
+    eta: "local",
+    cost: 0,
+    provider: "local",
+  },
 ];
 
 export const AUDIO_MODELS = [
-  { id: "lib-audio", name: "Lib Audio", desc: "音乐 / 音效 / 语音", eta: "30s", cost: 6 },
-  { id: "lib-voice", name: "Lib Voice", desc: "文字转语音", eta: "15s", cost: 3 },
+  {
+    id: "local-audio-preview",
+    name: "Audio preview",
+    desc: "provider disabled",
+    eta: "local",
+    cost: 0,
+    provider: "local",
+  },
 ];
 
 export const MODELS_BY_NODE_TYPE = {
@@ -44,4 +72,12 @@ export function defaultModel(nodeType) {
 
 export function findModel(nodeType, modelId) {
   return (MODELS_BY_NODE_TYPE[nodeType] || TEXT_MODELS).find((m) => m.id === modelId) || defaultModel(nodeType);
+}
+
+export function isRemoteImageModel(modelId) {
+  return IMAGE_MODELS.some((m) => m.id === modelId && m.providerServiceId);
+}
+
+export function providerServiceForImageModel(modelId) {
+  return findModel("image", modelId).providerServiceId || "minimax_image";
 }

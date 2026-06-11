@@ -1,0 +1,25 @@
+{
+  "schema_version": "company_provider_secrets.local.v2",
+  "accounts": {
+    "minimax": {
+      "auth_type": "api_key",
+      "base_url": "https://api.minimax.io",
+      "execution_backend": "mmx_cli",
+      "region": "cn",
+      "cli_command": "mmx",
+      "default_models": {
+        "image": "image-01"
+      }
+    }
+  },
+  "services": {
+    "minimax_image": {
+      "provider": "minimax",
+      "account_ref": "minimax",
+      "capability": "image",
+      "api_family": "t2i",
+      "execution_backend": "mmx_cli",
+      "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
+    }
+  }
+}

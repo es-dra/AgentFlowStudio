@@ -5,6 +5,7 @@ from typing import Any
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_assembly import (
     CONTEXT_PRIORITY,
@@ -31,13 +32,16 @@ def build_prompt_optimization(
 ) -> dict[str, Any]:
     state = load_creative_memory_state(store, project_id)
     assembly = assemble_prompt_context(request, state)
+    llm_enhancement = maybe_enhance_prompt_with_llm(request, assembly)
     rules = assembly["knowledge_rules"]
     background_refs = background_context_refs(state)
     extracted = extract_background_context(project_id, request, assembly["selected_slots"])
-    assembled_prompt = assembly["optimized_prompt"]
-    brief = _creative_brief(request, project_id, assembled_prompt)
-    trace = _prompt_trace(request, project_id, assembly, background_refs, extracted)
-    safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly)
+    assembled_prompt = str(llm_enhancement.get("optimized_prompt") or assembly["optimized_prompt"])
+    user_prompt = str(llm_enhancement.get("user_prompt") or assembly["user_prompt"])
+    user_prompt_sections = llm_enhancement.get("user_prompt_sections") or assembly["user_prompt_sections"]
+    brief = _creative_brief(request, project_id, assembled_prompt, llm_enhancement)
+    trace = _prompt_trace(request, project_id, assembly, background_refs, extracted, llm_enhancement)
+    safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement)
     for payload in (brief, trace, safe_manifest):
         reject_unsafe_payload(payload)
     state = merge_background_context(state, extracted)
@@ -51,14 +55,20 @@ def build_prompt_optimization(
         "trace": trace,
         "safe_manifest": safe_manifest,
         "provider_gate": provider_gate(),
+        "provider_calls_started": llm_enhancement["provider_calls_started"],
         "original_prompt": request.prompt_text,
         "optimized_prompt": assembled_prompt,
-        "user_prompt": assembly["user_prompt"],
-        "user_prompt_sections": assembly["user_prompt_sections"],
+        "user_prompt": user_prompt,
+        "user_prompt_sections": user_prompt_sections,
     }
 
 
-def _creative_brief(request: PromptOptimizationRequest, project_id: str, assembled_prompt: str) -> dict[str, Any]:
+def _creative_brief(
+    request: PromptOptimizationRequest,
+    project_id: str,
+    assembled_prompt: str,
+    llm_enhancement: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "artifact_type": "agentflow_creative_brief",
         "schema_version": "0.1.0",
@@ -79,7 +89,8 @@ def _creative_brief(request: PromptOptimizationRequest, project_id: str, assembl
         "node_parameters": request.node_parameters or {},
         "asset_refs": list(request.asset_refs),
         "provider_output": False,
-        "provider_calls_started": False,
+        "provider_calls_started": llm_enhancement["provider_calls_started"],
+        "llm_enhancement": _public_llm_enhancement(llm_enhancement),
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": PROMPT_MEMORY_NON_CLAIMS,
@@ -92,6 +103,7 @@ def _prompt_trace(
     assembly: dict[str, Any],
     background_refs: list[dict[str, str]],
     extracted: list[dict[str, Any]],
+    llm_enhancement: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "artifact_type": "agentflow_prompt_assembly_trace",
@@ -113,7 +125,8 @@ def _prompt_trace(
         "knowledgebase_version": assembly["knowledgebase_version"],
         "knowledgebase_registry_hash": assembly["knowledgebase_registry_hash"],
         "knowledgebase_rules_count": assembly["knowledgebase_rules_count"],
-        "provider_calls_started": False,
+        "llm_enhancement": _public_llm_enhancement(llm_enhancement),
+        "provider_calls_started": llm_enhancement["provider_calls_started"],
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": PROMPT_MEMORY_NON_CLAIMS,
@@ -126,6 +139,7 @@ def _safe_manifest(
     extracted_context_count: int,
     state: dict[str, Any],
     assembly: dict[str, Any],
+    llm_enhancement: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "artifact_type": "agentflow_prompt_optimization_safe_manifest",
@@ -133,9 +147,10 @@ def _safe_manifest(
         "project_id": project_id,
         "status": "succeeded",
         "provider_gate": provider_gate(),
-        "provider_calls_started": False,
+        "provider_calls_started": llm_enhancement["provider_calls_started"],
         "raw_provider_response_stored": False,
         "generated_media_bytes_stored": False,
+        "llm_enhancement": _public_llm_enhancement(llm_enhancement),
         "safe_artifacts": [
             "creative_brief.json",
             "prompt_assembly_trace.json",
@@ -151,6 +166,18 @@ def _safe_manifest(
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": PROMPT_MEMORY_NON_CLAIMS,
+    }
+
+
+def _public_llm_enhancement(value: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "requested": bool(value.get("requested")),
+        "status": str(value.get("status") or "not_requested"),
+        "provider": str(value.get("provider") or "not_requested"),
+        "model": str(value.get("model") or "not_requested"),
+        "provider_calls_started": bool(value.get("provider_calls_started")),
+        "raw_response_stored": False,
+        "discard_reason": value.get("discard_reason"),
     }
 
 

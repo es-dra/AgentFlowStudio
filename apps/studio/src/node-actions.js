@@ -1,4 +1,6 @@
 import { createNode, connect } from "./nodes.js";
+import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
+import { isRemoteImageModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
@@ -37,7 +39,199 @@ export function spawnSampleScriptFlow(store, scriptNode) {
   connect(store, textNode.id, scriptNode.id);
 }
 
-// 发送（Ctrl+Enter / 发送按钮）：本地安全预览，不触发 provider。
+export function uploadNodeImage(store, runtime, node) {
+  if (!runtime?.uploadImageAsset) {
+    setNodeError(store, node.id, "Runtime image upload API is not available.");
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/png,image/jpeg";
+  input.style.display = "none";
+  document.body.appendChild(input);
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    await uploadSelectedImage(store, runtime, node.id, file);
+  }, { once: true });
+  input.click();
+}
+
+async function uploadSelectedImage(store, runtime, nodeId, file) {
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    n.status = "generating";
+    n.result = "正在上传参考图...";
+  });
+  try {
+    const dataBase64 = await readFileAsBase64(file);
+    const response = await runtime.uploadImageAsset({
+      node_id: nodeId,
+      filename: file.name || "reference.png",
+      mime_type: file.type || "application/octet-stream",
+      data_base64: dataBase64,
+      role: "reference_image",
+      generated_at: new Date().toISOString(),
+    });
+    const asset = response?.asset;
+    if (!asset?.asset_id || !asset?.preview_url) throw new Error("Runtime did not return an image asset");
+    store.set((s) => {
+      const n = s.nodes[nodeId];
+      if (!n) return;
+      n.status = "complete";
+      n.previewUrl = asset.preview_url;
+      n.result = `已上传参考图\nAsset: ${asset.asset_id}\nSize: ${asset.width || "?"}x${asset.height || "?"}`;
+      n.params.uploads = mergeImageAssets(n.params.uploads || [], asset).slice(-4);
+      resizeNodeForImagePreview(n, asset, n.params?.spec?.ratio);
+      s.assets.unshift({
+        id: store.nextId("asset"),
+        kind: "image_reference",
+        title: n.title,
+        safe_summary: file.name || asset.asset_id,
+        thumbnail_ref: "keyframe",
+        source_node_id: n.id,
+        status: "ready",
+        asset_id: asset.asset_id,
+        preview_url: asset.preview_url,
+        created_at: new Date().toISOString(),
+      });
+    });
+  } catch (error) {
+    setNodeError(store, nodeId, `图片上传失败: ${safeError(error)}`);
+  }
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("image file read failed"));
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      const marker = ";base64,";
+      const index = text.indexOf(marker);
+      resolve(index >= 0 ? text.slice(index + marker.length) : text);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 发送（Ctrl+Enter / 发送按钮）：图片节点可走远程 keyframe，其他节点保持本地安全预览。
+export async function startNodeGeneration(store, runtime, node, resultText) {
+  const fresh = store.get().nodes[node.id] || node;
+  if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
+    await startRemoteKeyframeGeneration(store, runtime, fresh);
+    return;
+  }
+  startLocalPreview(store, fresh, resultText);
+}
+
+async function startRemoteKeyframeGeneration(store, runtime, node) {
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    n.status = "generating";
+    n.result = null;
+    n.previewUrl = null;
+  });
+  try {
+    const request = buildKeyframeGenerationRequest(store.get(), node);
+    const response = await runtime.generateKeyframe(request);
+    const succeeded = response?.job?.status === "succeeded";
+    store.set((s) => {
+      const n = s.nodes[node.id];
+      if (!n) return;
+      n.status = succeeded ? "complete" : "error";
+      const preview = response?.candidate_previews?.[0] || null;
+      const reusableAsset = response?.reusable_image_assets?.[0] || null;
+      n.previewUrl = preview?.preview_url || null;
+      if (n.previewUrl) resizeNodeForImagePreview(n, preview, request.aspect_ratio);
+      if (succeeded && reusableAsset?.asset_id) {
+        n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
+      }
+      n.result = keyframeResultText(response, request, succeeded);
+      const asset = visibleAssetForNode(store, n);
+      s.assets.unshift({
+        ...asset,
+        safe_summary: (n.prompt || "").slice(0, 90),
+        job_id: response?.job?.job_id || null,
+        artifact_id: response?.artifacts?.keyframe_generation_safe_manifest?.artifact_id || null,
+        asset_id: reusableAsset?.asset_id || null,
+        preview_url: n.previewUrl,
+        created_at: new Date().toISOString(),
+      });
+    });
+  } catch (error) {
+    setNodeError(store, node.id, `MiniMax keyframe request failed: ${safeError(error)}`);
+  }
+}
+
+function keyframeResultText(response, request, succeeded) {
+  const gate = response?.provider_gate?.status || "unknown";
+  const jobId = response?.job?.job_id || "not_available";
+  const outputCount = response?.safe_manifest?.output_count ?? 0;
+  if (!succeeded) {
+    const blocker = response?.safe_manifest?.blocks?.[0]?.reason || "remote image provider is not ready";
+    return `MiniMax 关键帧生成被阻止\nGate: ${gate}\n原因: ${blocker}`;
+  }
+  return [
+    "MiniMax 关键帧已生成",
+    `Job: ${jobId}`,
+    `请求比例: ${request.aspect_ratio}`,
+    `候选数量: ${outputCount}`,
+    response?.reusable_image_assets?.[0]?.asset_id ? `Reference Asset: ${response.reusable_image_assets[0].asset_id}` : null,
+    response?.candidate_previews?.[0]?.preview_url ? "预览已从 Runtime 安全 artifact 端点加载。" : "未返回预览地址。",
+  ].filter(Boolean).join("\n");
+}
+
+function mergeImageAssets(existing, asset) {
+  const items = Array.isArray(existing) ? [...existing] : [];
+  const assetId = String(asset?.asset_id || asset?.assetId || "").trim();
+  if (!assetId) return items;
+  return [...items.filter((item) => String(item?.asset_id || item?.assetId || "") !== assetId), asset];
+}
+
+function safeError(error) {
+  const message = error instanceof Error ? error.message : String(error || "unknown error");
+  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
+}
+
+function setNodeError(store, nodeId, message) {
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    n.status = "error";
+    n.result = message;
+  });
+}
+
+function resizeNodeForImagePreview(node, preview, fallbackAspectRatio) {
+  const [wRatio, hRatio] = previewRatio(preview, fallbackAspectRatio);
+  const portrait = hRatio >= wRatio;
+  const width = portrait ? 340 : 420;
+  const imageWidth = width - 56;
+  const imageHeight = Math.round(imageWidth * (hRatio / wRatio));
+  node.w = width;
+  node.h = Math.max(260, Math.min(720, imageHeight + 92));
+  node.params.previewAspectRatio = `${wRatio}:${hRatio}`;
+}
+
+function previewRatio(preview, fallbackAspectRatio) {
+  const width = Number(preview?.width || 0);
+  const height = Number(preview?.height || 0);
+  if (width > 0 && height > 0) return [width, height];
+  return parseRatio(preview?.aspect_ratio || fallbackAspectRatio);
+}
+
+function parseRatio(value) {
+  const match = String(value || "").match(/^(\d+):(\d+)$/);
+  if (!match) return [9, 16];
+  const w = Math.max(1, Number(match[1]));
+  const h = Math.max(1, Number(match[2]));
+  return [w, h];
+}
+
 export function startLocalPreview(store, node, resultText) {
   store.set((s) => {
     const n = s.nodes[node.id];

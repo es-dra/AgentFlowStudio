@@ -2,9 +2,11 @@
 
 from agentflow_studio.model_gateway.base import LLMProvider, LLMResponse
 from agentflow_studio.model_gateway.config import (
+    MODEL_GATEWAY_CONFIG_ENV,
     ModelGatewayConfig,
     ProviderConfig,
     load_model_gateway_config,
+    resolve_model_gateway_config_path,
 )
 from agentflow_studio.model_gateway.company_secrets import (
     CompanyProviderSecrets,
@@ -25,6 +27,7 @@ __all__ = [
     "CompanyProviderSecrets",
     "LLMProvider",
     "LLMResponse",
+    "MODEL_GATEWAY_CONFIG_ENV",
     "MockLLMProvider",
     "ModelConfigError",
     "ModelGateway",
@@ -37,6 +40,7 @@ __all__ = [
     "build_minimax_image_request_plan",
     "load_company_provider_secrets",
     "load_model_gateway_config",
+    "resolve_model_gateway_config_path",
     "run_kling_i2v_smoke",
     "run_minimax_image_smoke",
     "run_kling_t2v_smoke",

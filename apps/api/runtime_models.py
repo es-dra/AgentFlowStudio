@@ -133,10 +133,20 @@ class KeyframeGenerationRequest(BaseModel):
     style: str = "cinematic"
     aspect_ratio: str = "9:16"
     candidate_count: int = Field(default=1, ge=1, le=4)
+    seed: int | None = Field(default=None, ge=0)
     provider_service_id: str = "minimax_image"
     asset_refs: list[str] = Field(default_factory=list)
     director_setup: DirectorSetup2D | None = None
     node_parameters: dict[str, Any] | None = None
+    generated_at: str = Field(min_length=1)
+
+
+class ImageAssetUploadRequest(BaseModel):
+    node_id: str | None = None
+    filename: str = Field(min_length=1)
+    mime_type: str = Field(min_length=1)
+    data_base64: str = Field(min_length=1)
+    role: str = "reference_image"
     generated_at: str = Field(min_length=1)
 
 
@@ -152,6 +162,7 @@ __all__ = (
     "ContentCardRegisterRequest",
     "DirectorSetup2D",
     "FeedbackRecordRequest",
+    "ImageAssetUploadRequest",
     "KeyframeGenerationRequest",
     "PromptOptimizationRequest",
     "ProjectCreateRequest",

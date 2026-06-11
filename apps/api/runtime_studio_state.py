@@ -125,6 +125,8 @@ def _nodes(value: Any) -> dict[str, Any]:
                 "directorSetup",
                 "isReference",
                 "intent",
+                "uploads",
+                "previewAspectRatio",
             )
             if key in params
         }

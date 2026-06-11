@@ -9,7 +9,7 @@ import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { openCameraPopover } from "./panels/camera-popover.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
-import { startLocalPreview } from "./node-actions.js";
+import { startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
 import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
@@ -97,7 +97,7 @@ function buildBar(state, store, runtime, node) {
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      startLocalPreview(store, node);
+      startNodeGeneration(store, runtime, node);
     }
   });
   bar.appendChild(textarea);
@@ -220,7 +220,7 @@ function buildBottomRow(state, store, runtime, node, textarea) {
   const send = el("button", "send-btn");
   send.innerHTML = icon("arrowUp", 15);
   send.title = "生成";
-  send.addEventListener("click", () => startLocalPreview(store, node));
+  send.addEventListener("click", () => startNodeGeneration(store, runtime, node));
   row.appendChild(send);
 
   return row;

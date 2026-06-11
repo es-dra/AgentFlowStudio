@@ -83,6 +83,31 @@ def test_openai_compatible_provider_returns_chat_completion(monkeypatch) -> None
     assert captured["timeout"] == 12.5
 
 
+def test_openai_compatible_provider_sends_extra_body(monkeypatch) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse({"choices": [{"message": {"content": "enhanced prompt"}}]})
+
+    monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    provider = OpenAICompatibleProvider(
+        base_url="https://api.minimax.io/v1",
+        api_key="fake-key",
+        model="MiniMax-M3",
+        temperature=0.2,
+        max_completion_tokens=900,
+        extra_body={"thinking": {"type": "disabled"}},
+    )
+
+    assert provider.generate("hello") == "enhanced prompt"
+    assert captured["payload"]["model"] == "MiniMax-M3"
+    assert captured["payload"]["temperature"] == 0.2
+    assert captured["payload"]["max_completion_tokens"] == 900
+    assert captured["payload"]["thinking"] == {"type": "disabled"}
+
+
 def test_openai_compatible_provider_rejects_missing_choices(monkeypatch) -> None:
     def fake_urlopen(request, timeout):
         return FakeResponse({"choices": []})

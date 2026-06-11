@@ -64,13 +64,11 @@ function buildNodeElement(node) {
   ].join("");
   elNode.appendChild(actions);
 
-  if (def.upload) {
-    const upload = document.createElement("button");
-    upload.className = "node-float-action";
-    upload.dataset.action = "upload";
-    upload.innerHTML = `${icon("upload", 13)}<span>上传</span>`;
-    elNode.appendChild(upload);
-  }
+  const upload = document.createElement("button");
+  upload.className = "node-float-action";
+  upload.dataset.action = "upload";
+  upload.innerHTML = `${icon("upload", 13)}<span>上传</span>`;
+  elNode.appendChild(upload);
 
   const body = document.createElement("div");
   body.className = "node-body";
@@ -101,6 +99,7 @@ function syncNodeElement(elNode, node, state, relations) {
   elNode.classList.toggle("director", node.type === "director");
   elNode.classList.toggle("text-content", Boolean(node.content));
   elNode.classList.toggle("is-reference", Boolean(node.params?.isReference));
+  elNode.classList.toggle("has-image-preview", Boolean(node.previewUrl));
 
   elNode.classList.remove("rel-upstream", "rel-downstream", "rel-dimmed");
   if (relations && node.id !== relations.focus) {
@@ -123,6 +122,8 @@ function syncNodeElement(elNode, node, state, relations) {
     node.status,
     node.content ? node.content.length : 0,
     node.result ? node.result.length : 0,
+    node.previewUrl || "",
+    node.params?.previewAspectRatio || "",
     node.type,
     node.collapsed ? 1 : 0,
     directorSig,
@@ -176,7 +177,7 @@ function buildNodeBody(node, def) {
   if (node.status === "complete" && node.result) {
     const ok = document.createElement("div");
     ok.className = "node-status success";
-    ok.innerHTML = `${icon("check", 13)}<span>已完成（本地预览）</span>`;
+    ok.innerHTML = `${icon("check", 13)}<span>${node.previewUrl ? "已完成" : "已完成（本地预览）"}</span>`;
     out.push(ok, resultView(node));
     return out;
   }
@@ -185,6 +186,7 @@ function buildNodeBody(node, def) {
     err.className = "node-status error";
     err.innerHTML = `${icon("x", 13)}<span>生成失败，可在节点菜单重试</span>`;
     out.push(err);
+    if (node.result) out.push(resultView(node));
     return out;
   }
   const glyph = document.createElement("div");
@@ -212,9 +214,26 @@ function buildNodeBody(node, def) {
 
 function resultView(node) {
   const result = document.createElement("div");
-  result.className = "node-result";
-  result.textContent = node.result;
+  result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
+  if (node.previewUrl) {
+    const img = document.createElement("img");
+    img.className = "node-preview-img";
+    img.src = node.previewUrl;
+    img.alt = "MiniMax generated keyframe";
+    img.loading = "lazy";
+    img.style.aspectRatio = previewAspectRatio(node);
+    result.appendChild(img);
+  }
+  const text = document.createElement("div");
+  text.className = "node-result-text";
+  text.textContent = node.result;
+  result.appendChild(text);
   return result;
+}
+
+function previewAspectRatio(node) {
+  const value = String(node.params?.previewAspectRatio || node.params?.spec?.ratio || "9:16");
+  return /^\d+:\d+$/.test(value) ? value.replace(":", " / ") : "9 / 16";
 }
 
 function renderEdges(state, relations) {

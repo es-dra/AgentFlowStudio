@@ -9,6 +9,9 @@ from agentflow_studio.model_gateway.minimax_image_plan import (
     build_minimax_image_request_plan,
     resolve_image_base_url,
 )
+from agentflow_studio.model_gateway.minimax_image_cli_runtime import (
+    generate_minimax_image_outputs_with_mmx_cli,
+)
 from agentflow_studio.model_gateway.minimax_image_runtime import (
     generate_minimax_image_outputs,
     runtime_subject_reference,
@@ -47,20 +50,36 @@ def run_minimax_image_smoke(
     )
     account = store.account(str(store.service(service_id).get("account_ref") or ""))
     output_root = Path(output_dir)
-    outputs = generate_minimax_image_outputs(
-        base_url=resolve_image_base_url(store, account, store.service(service_id)),
-        api_key=api_key(account),
-        model=str(plan["create_request"]["json"]["model"]),
-        prompt=prompt,
-        output_root=output_root,
-        candidate_count=candidate_count,
-        aspect_ratio=aspect_ratio,
-        timeout_sec=timeout_sec,
-        subject_reference_image_path=(
-            subject_reference["path"] if subject_reference is not None else None
-        ),
-        seed=seed,
-    )
+    backend = str(store.service(service_id).get("execution_backend") or account.get("execution_backend") or "rest_api")
+    if backend == "mmx_cli":
+        outputs = generate_minimax_image_outputs_with_mmx_cli(
+            prompt=prompt,
+            output_root=output_root,
+            candidate_count=candidate_count,
+            aspect_ratio=aspect_ratio,
+            timeout_sec=timeout_sec,
+            seed=seed,
+            region=str(account.get("region") or store.service(service_id).get("region") or ""),
+            subject_reference_image_path=(
+                subject_reference["path"] if subject_reference is not None else None
+            ),
+            cli_command=str(account.get("cli_command") or store.service(service_id).get("cli_command") or "mmx"),
+        )
+    else:
+        outputs = generate_minimax_image_outputs(
+            base_url=resolve_image_base_url(store, account, store.service(service_id)),
+            api_key=api_key(account),
+            model=str(plan["create_request"]["json"]["model"]),
+            prompt=prompt,
+            output_root=output_root,
+            candidate_count=candidate_count,
+            aspect_ratio=aspect_ratio,
+            timeout_sec=timeout_sec,
+            subject_reference_image_path=(
+                subject_reference["path"] if subject_reference is not None else None
+            ),
+            seed=seed,
+        )
     manifest: dict[str, Any] = {
         "schema_version": "minimax_image_smoke_manifest.v1",
         "status": "succeeded",
@@ -69,6 +88,7 @@ def run_minimax_image_smoke(
         "api_family": plan["api_family"],
         "capability": "image",
         "model": plan["create_request"]["json"]["model"],
+        "execution_backend": backend,
         "required_gate": plan.get("required_gate"),
         "gate_status": plan.get("gate_status"),
         "candidate_count": candidate_count,

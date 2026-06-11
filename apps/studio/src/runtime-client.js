@@ -1,3 +1,6 @@
+// Minimal Studio API client. It sends only project ids, safe node context,
+// safe manifests, Studio state JSON, and explicit user-selected image uploads.
+
 const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 
 export function runtimeBaseUrl() {
@@ -24,6 +27,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     projectId,
     optimizePrompt(payload) {
       return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
+    },
+    uploadImageAsset(payload) {
+      return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
+    },
+    generateKeyframe(payload) {
+      return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });
     },
     loadStudioState() {
       return requestJson(`/projects/${encoded}/studio-state`);

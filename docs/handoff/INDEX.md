@@ -31,6 +31,7 @@ knowledgebase rules, and hidden background context policy.
 ## Runtime Service
 
 - `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
+- `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider

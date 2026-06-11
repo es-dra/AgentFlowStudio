@@ -23,7 +23,7 @@ def provider_config() -> dict:
             },
             "minimax": {
                 "auth_type": "api_key",
-                "base_url": "https://api.minimaxi.com/anthropic",
+                "base_url": "https://api.minimax.io",
                 "api_key": "fake-minimax-key",
                 "default_models": {"image": "image-01"},
             },

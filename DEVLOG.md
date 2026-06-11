@@ -7,6 +7,19 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - MiniMax Text/Image Integration And Reference Flow
+
+- Added gated MiniMax-M3 prompt enhancement for the creative intent agent path; deterministic local prompt assembly remains the fallback when the LLM gate or config is unavailable.
+- Added gated MiniMax image-01 keyframe generation and safe candidate preview refs; API responses do not expose provider raw payloads, local absolute paths, signed URLs, media bytes, or secrets.
+- Added Studio image upload assets and generated-keyframe reusable assets so connected downstream image nodes can send upstream reference images for image-to-image style tests.
+- Kept the Studio user surface product-facing: optimization remains a node action, keyframe sending is image-node scoped, and trace/rule/weight/provider internals stay out of the UI.
+- Local provider keys remain environment-only through `MINIMAX_API_KEY`; tracked config files contain examples and placeholders only.
+
+Boundaries:
+
+- Provider smoke is not human acceptance, business validation, video validation, or durable-memory promotion.
+- Video generation remains closed.
+
 ## 2026-06-12 - AFS Studio v0.2 Delivery Polish
 
 - Created isolated branch/worktree `codex/afs-studio-v02-delivery-polish-001` because the main checkout was occupied by a parallel MiniMax integration branch.

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 from agentflow_studio.model_gateway.errors import ModelConfigError
 
 
+MODEL_GATEWAY_CONFIG_ENV = "AFS_MODEL_CONFIG"
 ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -21,6 +22,9 @@ class ProviderConfig(BaseModel):
     api_key: str | None = None
     api_key_env: str | None = None
     timeout_sec: float = Field(default=30.0, gt=0)
+    temperature: float | None = None
+    max_completion_tokens: int | None = Field(default=None, gt=0)
+    extra_body: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelGatewayConfig(BaseModel):
@@ -50,6 +54,18 @@ def load_model_gateway_config(path: str | Path) -> ModelGatewayConfig:
             f"default_provider '{config.default_provider}' is not defined in providers"
         )
     return config
+
+
+def resolve_model_gateway_config_path(path: str | Path | None = None) -> Path:
+    if path is not None:
+        return Path(path)
+    env_path = os.environ.get(MODEL_GATEWAY_CONFIG_ENV, "").strip()
+    if env_path:
+        return Path(env_path)
+    raise ModelConfigError(
+        "Model gateway config path is required; pass a path "
+        f"or set {MODEL_GATEWAY_CONFIG_ENV}."
+    )
 
 
 def _expand_env_values(value: Any) -> Any:

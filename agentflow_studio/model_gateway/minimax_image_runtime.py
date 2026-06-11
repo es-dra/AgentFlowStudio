@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import mimetypes
+import struct
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -14,6 +15,7 @@ from agentflow_studio.model_gateway.errors import ModelProviderError
 
 MINIMAX_MIN_IMAGE_COUNT = 1
 MINIMAX_MAX_IMAGE_COUNT = 9
+MINIMAX_MAX_PROMPT_CHARS = 1500
 
 
 def runtime_subject_reference(image_path: str | Path | None) -> dict[str, Any] | None:
@@ -58,6 +60,7 @@ def generate_minimax_image_outputs(
     seed: int | None = None,
 ) -> list[dict[str, Any]]:
     _ensure_candidate_count(candidate_count)
+    _ensure_prompt_length(prompt)
     payload = {
         "model": model,
         "prompt": prompt,
@@ -135,16 +138,81 @@ def _write_output_summaries(
             raise ModelProviderError("MiniMax image_base64 entry is invalid") from exc
         image_ref = f"image_candidates/{candidate_id}{_image_extension(image_bytes)}"
         (output_root / image_ref).write_bytes(image_bytes)
+        dimensions = image_dimensions(image_bytes)
         outputs.append(
             {
                 "candidate_id": candidate_id,
                 "image_path": image_ref,
                 "byte_count": len(image_bytes),
                 "sha256": hashlib.sha256(image_bytes).hexdigest(),
+                **dimensions,
                 "provider_url_persisted": False,
             }
         )
     return outputs
+
+
+def image_dimensions(image_bytes: bytes) -> dict[str, Any]:
+    size = _png_dimensions(image_bytes) or _jpeg_dimensions(image_bytes)
+    if size is None:
+        return {}
+    width, height = size
+    if width <= 0 or height <= 0:
+        return {}
+    return {
+        "width": width,
+        "height": height,
+        "aspect_ratio": f"{width}:{height}",
+    }
+
+
+def _png_dimensions(image_bytes: bytes) -> tuple[int, int] | None:
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n") or len(image_bytes) < 24:
+        return None
+    return struct.unpack(">II", image_bytes[16:24])
+
+
+def _jpeg_dimensions(image_bytes: bytes) -> tuple[int, int] | None:
+    if not image_bytes.startswith(b"\xff\xd8"):
+        return None
+    index = 2
+    length = len(image_bytes)
+    while index + 9 < length:
+        while index < length and image_bytes[index] == 0xFF:
+            index += 1
+        if index >= length:
+            return None
+        marker = image_bytes[index]
+        index += 1
+        if marker in {0xD8, 0xD9}:
+            continue
+        if index + 2 > length:
+            return None
+        segment_length = int.from_bytes(image_bytes[index : index + 2], "big")
+        if segment_length < 2 or index + segment_length > length:
+            return None
+        if marker in {
+            0xC0,
+            0xC1,
+            0xC2,
+            0xC3,
+            0xC5,
+            0xC6,
+            0xC7,
+            0xC9,
+            0xCA,
+            0xCB,
+            0xCD,
+            0xCE,
+            0xCF,
+        }:
+            if segment_length < 7:
+                return None
+            height = int.from_bytes(image_bytes[index + 3 : index + 5], "big")
+            width = int.from_bytes(image_bytes[index + 5 : index + 7], "big")
+            return width, height
+        index += segment_length
+    return None
 
 
 def _base64_images(response: dict[str, Any]) -> list[str]:
@@ -164,7 +232,11 @@ def _ensure_success_response(response: dict[str, Any]) -> None:
     status_code = base_resp.get("status_code")
     if status_code in {None, 0}:
         return
-    raise ModelProviderError(f"MiniMax image response status_code {status_code}")
+    message = f"MiniMax image response status_code {status_code}"
+    status_msg = base_resp.get("status_msg")
+    if isinstance(status_msg, str) and status_msg.strip():
+        message = f"{message}: {_safe_status_msg(status_msg)}"
+    raise ModelProviderError(message)
 
 
 def _ensure_candidate_count(candidate_count: int) -> None:
@@ -173,6 +245,17 @@ def _ensure_candidate_count(candidate_count: int) -> None:
     raise ModelProviderError(
         f"MiniMax candidate_count must be between {MINIMAX_MIN_IMAGE_COUNT} and {MINIMAX_MAX_IMAGE_COUNT}"
     )
+
+
+def _ensure_prompt_length(prompt: str) -> None:
+    if len(prompt) <= MINIMAX_MAX_PROMPT_CHARS:
+        return
+    raise ModelProviderError(f"MiniMax image prompt must be at most {MINIMAX_MAX_PROMPT_CHARS} characters")
+
+
+def _safe_status_msg(value: str) -> str:
+    clean = " ".join(value.split())
+    return clean.replace("\x00", "")[:120]
 
 
 def _image_generation_url(base_url: str) -> str:

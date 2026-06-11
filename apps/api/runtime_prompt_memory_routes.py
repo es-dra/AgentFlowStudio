@@ -41,7 +41,7 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
                     "memory_policy": "background_context_internal_only",
                 },
                 tool_gate_state={
-                    "remote_llm": "blocked_by_default",
+                    "remote_llm": str(result["provider_gate"].get("status") or "blocked"),
                     "remote_asr": "blocked_by_default",
                     "remote_image": "not_requested",
                     "remote_video": "not_requested",
@@ -59,7 +59,7 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "user_prompt": result["user_prompt"],
             "user_prompt_sections": result["user_prompt_sections"],
             "provider_gate": result["provider_gate"],
-            "provider_calls_started": False,
+            "provider_calls_started": result["provider_calls_started"],
             "writes_long_term_memory": False,
             "writes_company_kb": False,
             "safe_manifest": result["safe_manifest"],

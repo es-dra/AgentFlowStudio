@@ -8,7 +8,7 @@ import { renderDock } from "./panels/dock.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
 import { closeTop, hasOpenOverlay, el } from "./overlay.js";
 import { createNode, deleteNodes, duplicateNode } from "./nodes.js";
-import { startLocalPreview, spawnSampleScriptFlow } from "./node-actions.js";
+import { startNodeGeneration, spawnSampleScriptFlow } from "./node-actions.js";
 import { STARTERS } from "./presets/starters.js";
 import { fitViewport, zoomAt } from "./geometry.js";
 import { icon } from "./icons.js";
@@ -162,7 +162,7 @@ function bindKeyboard() {
     }
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       const sel = store.get().selection.nodeIds;
-      if (sel.length === 1) startLocalPreview(store, store.get().nodes[sel[0]]);
+      if (sel.length === 1) startNodeGeneration(store, runtime, store.get().nodes[sel[0]]);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === "0") {

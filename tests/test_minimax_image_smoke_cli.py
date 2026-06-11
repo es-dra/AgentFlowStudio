@@ -58,7 +58,7 @@ def _provider_config() -> dict:
         "accounts": {
             "minimax": {
                 "auth_type": "api_key",
-                "base_url": "https://api.minimaxi.com/anthropic",
+                "base_url": "https://api.minimax.io",
                 "api_key": "fk-mm-key",
                 "default_models": {"image": ""},
             }

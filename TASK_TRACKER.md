@@ -47,3 +47,12 @@ not current task entrypoints.
 | AFS-STUDIO-BROWSER-QA-001 | Runtime-hosted `/studio/` browser QA: create nodes, move nodes, connect ports, optimize prompt, open director panel, check mobile layout. | Before merging/pushing this branch. |
 | AFS-IMAGE-PROVIDER-SMOKE-001 | Open `AFS_ALLOW_REMOTE_IMAGE=true` and run explicit MiniMax keyframe smoke with safe artifacts. | After branch is clean and user confirms real image provider smoke. |
 | AFS-KEYFRAME-QA-001 | Add visual QA for generated keyframes: subject count, text/watermark, black/blank, composition, reference consistency. | After first real keyframe provider output exists. |
+| AFS-STUDIO-SPRITE-V2-S0 | v2 画布小精灵首迭代前置：undo/redo 命令栈、Action Registry（L0-L3 白名单 + schema 校验）、`#sprite-layer`。规划见 `docs/architecture/AFS_STUDIO_SPRITE_V2_PLAN.zh-CN.md`（S0-S5 全里程碑、三工作模式、LLM gate 降级策略、lottie vendored 例外）。 | After MVP v1 联合验收（AFS-STUDIO-BROWSER-QA-001）收口。 |
+
+## Current Addendum - MiniMax Provider Smoke Prep
+
+| ID | Owner role | Scope | Status | Evidence |
+|---|---|---|---|---|
+| AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001 | Runtime/API Integrator + Provider Gate Steward | Add gated MiniMax-M3 prompt enhancement and MiniMax `image-01` keyframe path; keep video/audio off. | Local live smoke passed on `127.0.0.1:8793`; manual comparison pending. | `docs/handoff/AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`, `configs/models.example.yaml`, `configs/providers.example.json` |
+| AFS-MINIMAX-MANUAL-COMPARISON-001 | QA / Release Gatekeeper + Creative Director | Run A/B/C keyframe comparison: raw prompt, deterministic agent prompt, MiniMax-M3 enhanced prompt. | Ready for manual operation; latest provider output shows text/watermark risk to score. | `docs/handoff/AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md` |
+| AFS-CONNECTED-REFERENCE-KEYFRAME-001 | Runtime/API Integrator + Studio Interaction Designer | Upload images on any Studio node; collect connected upstream reference images and prompt notes for keyframe generation. | Focused tests and Runtime upload smoke passed; live creative comparison pending. | `apps/api/runtime_image_assets.py`, `apps/studio/src/optimizer-contract.js`, `tests/test_api_runtime_creative_agent_keyframes.py` |

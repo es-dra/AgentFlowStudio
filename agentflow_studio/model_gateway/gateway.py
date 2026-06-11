@@ -6,6 +6,7 @@ from agentflow_studio.model_gateway.config import (
     ModelGatewayConfig,
     ProviderConfig,
     load_model_gateway_config,
+    resolve_model_gateway_config_path,
 )
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.mock_provider import MockLLMProvider
@@ -21,6 +22,10 @@ class ModelGateway:
     @classmethod
     def from_config_path(cls, path: str | Path) -> "ModelGateway":
         return cls(load_model_gateway_config(path))
+
+    @classmethod
+    def from_env(cls) -> "ModelGateway":
+        return cls.from_config_path(resolve_model_gateway_config_path())
 
     def generate(
         self,
@@ -46,5 +51,8 @@ class ModelGateway:
                 api_key_env=config.api_key_env,
                 model=config.model or "",
                 timeout_sec=config.timeout_sec,
+                temperature=config.temperature,
+                max_completion_tokens=config.max_completion_tokens,
+                extra_body=config.extra_body,
             )
         raise ModelGatewayError(f"Unsupported model provider type: {config.type}")

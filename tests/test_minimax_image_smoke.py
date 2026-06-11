@@ -4,14 +4,12 @@ import base64
 import json
 
 from agentflow_studio.model_gateway import ModelProviderError
-from agentflow_studio.model_gateway.company_secrets import (
-    load_company_provider_secrets,
-)
 from agentflow_studio.model_gateway.minimax_image_smoke import (
     build_minimax_image_request_plan,
     run_minimax_image_smoke,
 )
 from agentflow_studio.model_gateway import minimax_image_runtime
+from tests.minimax_image_test_helpers import store as _store
 
 
 PNG_BYTES = base64.b64decode(
@@ -87,7 +85,7 @@ def test_minimax_image_smoke_normalizes_account_base_url_and_falls_back_model(mo
         timeout_sec=7.5,
     )
 
-    assert captured["url"] == "https://api.minimaxi.com/v1/image_generation"
+    assert captured["url"] == "https://api.minimax.io/v1/image_generation"
     assert captured["payload"] == {
         "model": "image-01",
         "prompt": "memory architecture demo keyframe",
@@ -102,12 +100,15 @@ def test_minimax_image_smoke_normalizes_account_base_url_and_falls_back_model(mo
     assert manifest["model"] == "image-01"
     assert manifest["provider"] == "minimax_image"
     assert manifest["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert manifest["outputs"][0]["width"] == 1
+    assert manifest["outputs"][0]["height"] == 1
+    assert manifest["outputs"][0]["aspect_ratio"] == "1:1"
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").read_bytes() == PNG_BYTES
 
     serialized = json.dumps(json.loads((tmp_path / "run" / "minimax_image_smoke_manifest.json").read_text()), ensure_ascii=False)
     assert "fk-mm-key" not in serialized
     assert "Bearer " not in serialized
-    assert "api.minimaxi.com" not in serialized
+    assert "api.minimax.io" not in serialized
     assert "minimax_task_001" not in serialized
 
 
@@ -220,7 +221,7 @@ def test_minimax_i2i_smoke_sends_subject_reference_data_url_without_persisting_i
     assert PNG_B64 not in serialized
     assert "fk-mm-key" not in serialized
     assert "Bearer " not in serialized
-    assert "api.minimaxi.com" not in serialized
+    assert "api.minimax.io" not in serialized
     assert "minimax_i2i_task_001" not in serialized
 
 
@@ -250,32 +251,3 @@ def test_minimax_image_smoke_passes_seed_to_provider_payload(monkeypatch, tmp_pa
     )
 
     assert captured["payload"]["seed"] == 120401
-
-
-def _store(tmp_path):
-    config_path = tmp_path / "providers.local.json"
-    config_path.write_text(json.dumps(_provider_config()), encoding="utf-8")
-    return load_company_provider_secrets(config_path)
-
-
-def _provider_config() -> dict:
-    return {
-        "schema_version": "company_provider_secrets.local.v2",
-        "accounts": {
-            "minimax": {
-                "auth_type": "api_key",
-                "base_url": "https://api.minimaxi.com/anthropic",
-                "api_key": "fk-mm-key",
-                "default_models": {"image": ""},
-            }
-        },
-        "services": {
-            "minimax_image": {
-                "provider": "minimax",
-                "account_ref": "minimax",
-                "capability": "image",
-                "api_family": "t2i",
-                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
-            },
-        },
-    }

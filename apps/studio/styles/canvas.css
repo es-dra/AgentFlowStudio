@@ -178,6 +178,10 @@
   padding: 18px;
   gap: 4px;
 }
+.node.has-image-preview .node-body {
+  justify-content: flex-start;
+  padding: 34px 18px 18px;
+}
 .node-glyph {
   align-self: center;
   font-size: 38px;
@@ -207,6 +211,26 @@
   max-height: 180px;
   overflow-y: auto;
   white-space: pre-wrap;
+}
+.node-result.has-preview {
+  padding: 0;
+  max-height: none;
+  overflow: hidden;
+  white-space: normal;
+}
+.node-preview-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  background: #0b0d10;
+}
+.node-result-text {
+  padding: 10px;
+  white-space: pre-wrap;
+}
+.node-result.has-preview .node-result-text {
+  display: none;
 }
 .node-status {
   margin: 0 14px 10px;

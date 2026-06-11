@@ -1,6 +1,7 @@
 import { imageSpecLabel, videoSpecLabel } from "./presets/specs.js";
 import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
+import { providerServiceForImageModel } from "./presets/models.js";
 
 const GENERATION_TARGET = {
   text: "prompt",
@@ -15,7 +16,12 @@ const GENERATION_TARGET = {
 export function buildOptimizationRequest(state, node) {
   const directorSetup = linkedDirectorSetup(state, node);
   const nodeParameters = nodeParameterSnapshot(node);
+  const assetRefs = safeAssetRefs(state, node);
+  const referenceCount = collectConnectedImageAssetRefs(state, node).length;
+  const connectedReferences = connectedReferenceNodeSummaries(state, node);
   if (directorSetup) nodeParameters.director_summary = directorPromptSummary(normalizeDirectorSetup(directorSetup));
+  if (referenceCount) nodeParameters.reference_image_count = referenceCount;
+  if (connectedReferences.length) nodeParameters.connected_reference_nodes = connectedReferences;
   return {
     node_id: node.id,
     node_type: normalizeNodeType(node.type),
@@ -23,7 +29,7 @@ export function buildOptimizationRequest(state, node) {
     generation_target: GENERATION_TARGET[node.type] || "prompt",
     target_platform: "short_video",
     style: node.params?.styleRef || "cinematic",
-    asset_refs: safeAssetRefs(state, node),
+    asset_refs: assetRefs,
     director_setup: directorSetup ? safeDirectorSetup(directorSetup) : null,
     node_parameters: nodeParameters,
     generated_at: new Date().toISOString(),
@@ -39,6 +45,7 @@ function normalizeNodeType(type) {
 function nodeParameterSnapshot(node) {
   const p = node.params || {};
   const snapshot = { model: p.model || null };
+  if (p.model === "minimax-m3-enhance") snapshot.llm_provider = "minimax_m3";
   if (node.type === "image" && p.spec) {
     snapshot.spec = imageSpecLabel(p.spec);
     snapshot.panorama = Boolean(p.spec.panorama);
@@ -56,6 +63,31 @@ function nodeParameterSnapshot(node) {
   return snapshot;
 }
 
+export function buildKeyframeGenerationRequest(state, node) {
+  const optimizationRequest = buildOptimizationRequest(state, node);
+  const spec = node.params?.spec || {};
+  return {
+    node_id: node.id,
+    prompt_text: optimizationRequest.prompt_text,
+    optimized_prompt: optimizationRequest.prompt_text,
+    target_platform: optimizationRequest.target_platform,
+    style: optimizationRequest.style,
+    aspect_ratio: safeImageAspectRatio(spec.ratio),
+    candidate_count: Math.max(1, Math.min(Number(spec.count || 1), 4)),
+    provider_service_id: providerServiceForImageModel(node.params?.model),
+    asset_refs: optimizationRequest.asset_refs,
+    director_setup: optimizationRequest.director_setup,
+    node_parameters: optimizationRequest.node_parameters,
+    seed: node.params?.seed ?? null,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+function safeImageAspectRatio(value) {
+  const allowed = new Set(["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"]);
+  return allowed.has(value) ? value : "9:16";
+}
+
 function linkedDirectorSetup(state, node) {
   if (node.type === "director" && node.params?.directorSetup) return node.params.directorSetup;
   if (node.params?.directorSetup) return node.params.directorSetup;
@@ -70,10 +102,7 @@ function linkedDirectorSetup(state, node) {
 }
 
 function safeAssetRefs(state, node) {
-  const refs = [];
-  for (const edge of Object.values(state.edges)) {
-    if (edge.to === node.id) refs.push(edge.from);
-  }
+  const refs = collectConnectedImageAssetRefs(state, node);
   for (const att of node.params?.attachments || []) refs.push(String(att.id || att));
   return refs
     .map((v) => String(v).trim())
@@ -82,6 +111,41 @@ function safeAssetRefs(state, node) {
     .filter((v) => !/[\\/]/.test(v))
     .filter((v) => !/(api_key|bearer|signed_url|token)/i.test(v))
     .slice(0, 3);
+}
+
+export function collectConnectedImageAssetRefs(state, node) {
+  const refs = [...nodeImageAssetRefs(node)];
+  for (const edge of Object.values(state.edges)) {
+    if (edge.to !== node.id) continue;
+    const upstream = state.nodes[edge.from];
+    refs.push(...nodeImageAssetRefs(upstream));
+  }
+  return refs;
+}
+
+function nodeImageAssetRefs(node) {
+  if (!node?.params?.uploads) return [];
+  return node.params.uploads
+    .map((item) => String(item?.asset_id || item?.assetId || "").trim())
+    .filter(Boolean);
+}
+
+function connectedReferenceNodeSummaries(state, node) {
+  const summaries = [];
+  for (const edge of Object.values(state.edges)) {
+    if (edge.to !== node.id) continue;
+    const upstream = state.nodes[edge.from];
+    const refs = nodeImageAssetRefs(upstream);
+    if (!upstream || (!refs.length && !String(upstream.prompt || "").trim())) continue;
+    summaries.push({
+      node_id: upstream.id,
+      node_type: normalizeNodeType(upstream.type),
+      title: String(upstream.title || "").slice(0, 40),
+      prompt: String(upstream.prompt || "").trim().slice(0, 180),
+      image_asset_refs: refs.slice(0, 4),
+    });
+  }
+  return summaries.slice(0, 6);
 }
 
 export function normalizeOptimization(result, request) {

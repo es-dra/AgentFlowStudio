@@ -27,7 +27,20 @@ def test_studio_state_can_save_and_restore_safe_canvas(tmp_path) -> None:
                         "cameras": [{"name": "A Cam", "fov": 45}],
                         "subjects": [{"name": "男孩", "x": 44, "y": 52}],
                         "lights": [{"name": "Key Light", "intensity": 72}],
-                    }
+                    },
+                    "uploads": [{
+                        "asset_id": "img_safe_reference_001",
+                        "role": "generated_keyframe_reference",
+                        "filename": "candidate_001.png",
+                        "mime_type": "image/png",
+                        "byte_count": 68,
+                        "sha256": "abc123",
+                        "width": 1,
+                        "height": 1,
+                        "aspect_ratio": "1:1",
+                        "preview_url": "/projects/studio-state-demo/image-assets/img_safe_reference_001/preview",
+                    }],
+                    "previewAspectRatio": "1:1",
                 },
             },
             "image_2": {"id": "image_2", "type": "image", "title": "关键帧", "x": 360, "y": 20, "prompt": "昏暗房间"},
@@ -56,7 +69,10 @@ def test_studio_state_can_save_and_restore_safe_canvas(tmp_path) -> None:
     restored = client.get(f"/projects/{project_id}/studio-state")
     assert restored.status_code == 200
     assert restored.json()["source"] == "runtime"
-    assert restored.json()["state"]["nodes"]["director_1"]["params"]["directorSetup"]["view"] == "top_down_2d"
+    restored_params = restored.json()["state"]["nodes"]["director_1"]["params"]
+    assert restored_params["directorSetup"]["view"] == "top_down_2d"
+    assert restored_params["uploads"][0]["asset_id"] == "img_safe_reference_001"
+    assert restored_params["previewAspectRatio"] == "1:1"
 
 
 def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> None:
@@ -85,7 +101,13 @@ def test_sanitize_studio_state_keeps_only_safe_node_and_asset_fields() -> None:
                     "title": "关键帧",
                     "x": 1,
                     "y": 2,
-                    "params": {"model": "safe-model", "draft": "ignored", "styleRef": "电影感"},
+                    "params": {
+                        "model": "safe-model",
+                        "draft": "ignored",
+                        "styleRef": "电影感",
+                        "uploads": [{"asset_id": "img_safe"}],
+                        "previewAspectRatio": "1:1",
+                    },
                     "private": "ignored",
                 }
             },
@@ -95,7 +117,12 @@ def test_sanitize_studio_state_keeps_only_safe_node_and_asset_fields() -> None:
     )
 
     node = next(iter(sanitized["nodes"].values()))
-    assert node["params"] == {"model": "safe-model", "styleRef": "电影感"}
+    assert node["params"] == {
+        "model": "safe-model",
+        "styleRef": "电影感",
+        "uploads": [{"asset_id": "img_safe"}],
+        "previewAspectRatio": "1:1",
+    }
     assert "private" not in node
     assert next(iter(sanitized["edges"].values()))["relation_type"] == "reference"
     assert sanitized["assets"][0]["safe_summary"] == "安全摘要"

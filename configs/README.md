@@ -28,3 +28,29 @@ PosterFlow 图片 provider 通过 `AFS_IMAGE_PROVIDER` 选择：
 - `minimax`：使用 MiniMax 原生图片生成 API；未设置本地 base URL / model 时使用默认服务地址和模型。
 
 所有 provider key 只能放在本地环境变量或 ignored 本地配置里，不能进入仓库。
+
+## MiniMax smoke setup
+
+Tracked examples:
+
+- `models.example.yaml`: text enhancement provider template for `MiniMax-M3`.
+- `providers.example.json`: image provider template for `image-01`.
+
+Local files are ignored by Git:
+
+- `configs/models.yaml`
+- `configs/providers.local.json`
+
+Use environment variables for local smoke runs:
+
+```powershell
+$env:MINIMAX_API_KEY="<local-test-key>"
+$env:AFS_MODEL_CONFIG="$PWD\configs\models.yaml"
+$env:AFS_PROVIDER_CONFIG="$PWD\configs\providers.local.json"
+$env:AFS_ALLOW_REMOTE_LLM="true"
+$env:AFS_ALLOW_REMOTE_IMAGE="true"
+```
+
+Do not write provider keys, Authorization headers, provider raw responses, signed URLs,
+base64 media bytes, or local absolute artifact paths into tracked files, manifests, or API
+responses.

@@ -46,12 +46,36 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
     assert "openOptimizer" in source
     assert "director" in source
     assert "prompt-optimizations" in source
+    assert "keyframe-generations" in source
+    assert "image-assets" in source
+    assert "uploadNodeImage" in source
+    assert "collectConnectedImageAssetRefs" in source
+    assert "connected_reference_nodes" in source
+    assert "candidate_previews" in source
+    assert "reusable_image_assets" in source
+    assert "mergeImageAssets" in source
+    assert "node-preview-img" in source
+    assert "resizeNodeForImagePreview" in source
+    assert "previewAspectRatio" in source
+    assert "has-image-preview" in source
+    assert "startNodeGeneration" in source
     assert "studio-state" in source
     assert "loadStudioState" in source
     assert "saveStudioState" in source
     assert "createNode" in source
     assert "undo()" in source
     assert "redo()" in source
+
+
+def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
+    source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
+
+    assert "MiniMax-M3" in source
+    assert "MiniMax image-01" in source
+    assert "local-creative-agent" in source
+    assert 'providerServiceId: "minimax_image"' in source
+    for retired in ("Midjourney", "Seedream", "Seedance", "Qwen 3", "Lib Video", "Lib Image"):
+        assert retired not in source
 
 
 def test_studio_v02_flow_native_surface_is_visible() -> None:
@@ -100,6 +124,7 @@ def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
     assert "reference-edge" in styles
     assert "edge-label" in styles
     assert "relation_type" in source
+    assert "max-height: none" in styles
 
 
 def test_prompt_optimizer_sources_stay_product_facing() -> None:

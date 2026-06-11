@@ -193,3 +193,118 @@ def test_prompt_optimizer_uses_professional_knowledgebase_trace_and_chinese_slot
     assert "Negative Constraints:" in brief["optimized_prompt"]
     assert "provider calls remain off" in brief["optimized_prompt"].lower()
     assert payload["provider_calls_started"] is False
+
+
+def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monkeypatch) -> None:
+    class FakeGateway:
+        def generate(self, prompt, *, task_type=None, provider_name=None):
+            assert task_type == "prompt_enhancement"
+            assert provider_name == "minimax_m3"
+            assert "Canonical brief:" in prompt
+            assert "不要替换成" in prompt
+            assert "最终展示给用户的内容必须以中文为主" in prompt
+            return "\n".join(
+                [
+                    "意图：为安静的创始人场景生成一张可控关键帧。",
+                    "人物/主体：保持创始人的身份、服装和神态稳定清晰。",
+                    "场景/美术：夜间工作室、玻璃墙、克制道具，避免杂乱背景。",
+                    "动作/情节：创始人在发言前短暂停顿，情绪内敛但有压力。",
+                    "镜头/构图：竖构图中景，主体位置明确，背景信息服务叙事。",
+                    "灯光：低调实景窗光，柔和反差，保留面部可读性。",
+                    "运动/时间推进：静态关键帧，暗示缓慢推进但不制造运动模糊。",
+                    "连续性：延续服装、空间方位和主光方向。",
+                    "负面约束：不要水印，不要手部畸形，不要身份漂移。",
+                ]
+            )
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_MODEL_CONFIG", str(tmp_path / "models.yaml"))
+    monkeypatch.setattr(
+        "apps.api.runtime_llm_enhancement.ModelGateway.from_config_path",
+        lambda path: FakeGateway(),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_minimax_llm/prompt-optimizations",
+        json={
+            "node_id": "image-node-minimax-text",
+            "node_type": "image",
+            "prompt_text": "A founder stands in a night studio before a product launch.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {"model": "minimax-image-01"},
+            "generated_at": "2026-06-12T13:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    brief = client.get(f"/artifacts/{payload['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
+    manifest = client.get(f"/artifacts/{payload['artifacts']['prompt_optimization_safe_manifest']['artifact_id']}").json()["payload"]
+    serialized = json.dumps({"payload": payload, "trace": trace, "brief": brief, "manifest": manifest}, ensure_ascii=False).lower()
+
+    assert payload["provider_calls_started"] is True
+    assert payload["optimized_prompt"].startswith("意图：为安静的创始人场景生成")
+    assert "Intent:" not in payload["optimized_prompt"]
+    assert payload["user_prompt"] == payload["optimized_prompt"]
+    assert trace["llm_enhancement"]["status"] == "applied"
+    assert trace["llm_enhancement"]["model"] == "MiniMax-M3"
+    assert manifest["llm_enhancement"]["raw_response_stored"] is False
+    assert brief["provider_calls_started"] is True
+    assert "api_key" not in serialized
+    assert "bearer " not in serialized
+    assert "reasoning_content" not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+
+def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated(tmp_path, monkeypatch) -> None:
+    class FakeGateway:
+        def generate(self, prompt, *, task_type=None, provider_name=None):
+            assert task_type == "prompt_enhancement"
+            return "\n".join(
+                [
+                    "Intent: generic scene.",
+                    "Subject/Character: Primary character with stable identity.",
+                    "Scene/Production Design: primary scene.",
+                    "Camera/Framing: medium shot.",
+                    "Lighting: cinematic light.",
+                    "Negative Constraints: no watermark.",
+                ]
+            )
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_MODEL_CONFIG", str(tmp_path / "models.yaml"))
+    monkeypatch.setattr(
+        "apps.api.runtime_llm_enhancement.ModelGateway.from_config_path",
+        lambda path: FakeGateway(),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_minimax_llm_fallback/prompt-optimizations",
+        json={
+            "node_id": "image-node-minimax-text-fallback",
+            "node_type": "image",
+            "prompt_text": "一个穿黑色风衣的年轻女导演，短发，雨夜天台，城市霓虹在湿地上反光。",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {"model": "minimax-image-01", "aspect_ratio": "9:16"},
+            "generated_at": "2026-06-12T13:10:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+
+    assert payload["provider_calls_started"] is True
+    assert payload["optimized_prompt"].startswith("意图：")
+    assert "人物/主体：" in payload["optimized_prompt"]
+    assert "Primary character" not in payload["optimized_prompt"]
+    assert trace["llm_enhancement"]["status"] == "discarded"
+    assert trace["llm_enhancement"]["discard_reason"] == "enhancement missing required sections"

@@ -6,7 +6,7 @@ from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_slots import extract_prompt_slots
 from apps.api.runtime_prompt_memory_state import background_memory_record
-from apps.api.runtime_provider_script import REMOTE_LLM_ENV
+from apps.api.runtime_llm_enhancement import llm_provider_gate
 
 
 CONTEXT_PRIORITY = [
@@ -59,7 +59,7 @@ def extract_background_context(
 
 
 def provider_gate() -> dict[str, str]:
-    return {"capability": "llm", "env": REMOTE_LLM_ENV, "status": "blocked"}
+    return llm_provider_gate()
 
 
 __all__ = (

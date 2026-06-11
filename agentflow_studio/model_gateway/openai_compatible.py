@@ -24,6 +24,9 @@ class OpenAICompatibleProvider:
         api_key: str | None = None,
         api_key_env: str | None = None,
         timeout_sec: float = 30.0,
+        temperature: float | None = None,
+        max_completion_tokens: int | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         if not base_url:
             raise ModelProviderError("OpenAI-compatible provider requires base_url")
@@ -34,6 +37,9 @@ class OpenAICompatibleProvider:
         self.api_key = api_key
         self.api_key_env = api_key_env
         self.timeout_sec = timeout_sec
+        self.temperature = temperature
+        self.max_completion_tokens = max_completion_tokens
+        self.extra_body = dict(extra_body or {})
 
     def generate(self, prompt: str, *, task_type: str | None = None) -> str:
         api_key = self._resolve_api_key()
@@ -41,8 +47,11 @@ class OpenAICompatibleProvider:
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.2,
+            "temperature": 0.2 if self.temperature is None else self.temperature,
         }
+        if self.max_completion_tokens is not None:
+            payload["max_completion_tokens"] = self.max_completion_tokens
+        payload.update(self.extra_body)
         response = self._send_request(payload, api_key)
         try:
             content = response["choices"][0]["message"]["content"]
