@@ -1,10 +1,10 @@
 import { el } from "./overlay.js";
 
-export function updateNode(store, nodeId, mutate) {
+export function updateNode(store, nodeId, mutate, options) {
   store.set((s) => {
     const node = s.nodes[nodeId];
     if (node) mutate(node);
-  });
+  }, options);
 }
 
 export function flashTooltip(anchor, text) {

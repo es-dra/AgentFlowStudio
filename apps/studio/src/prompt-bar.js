@@ -92,7 +92,7 @@ function buildBar(state, store, runtime, node) {
     : promptPlaceholder(node.type, p.spec?.mode);
   textarea.value = node.prompt || "";
   textarea.addEventListener("input", () => {
-    updateNode(store, node.id, (n) => { n.prompt = textarea.value; });
+    updateNode(store, node.id, (n) => { n.prompt = textarea.value; }, { history: false });
   });
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {

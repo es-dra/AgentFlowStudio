@@ -72,12 +72,17 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
 
     actions.replaceChildren();
     const replaceBtn = el("button", "opt-btn primary", "替换");
-    replaceBtn.addEventListener("click", () => { applyPrompt(outcome.optimized); close(); });
+    replaceBtn.addEventListener("click", () => {
+      applyPrompt(outcome.optimized);
+      stateLabel.textContent = "已替换";
+      setTimeout(close, 260);
+    });
     const appendBtn = el("button", "opt-btn", "追加");
     appendBtn.addEventListener("click", () => {
       const current = store.get().nodes[nodeId]?.prompt || "";
       applyPrompt(current ? `${current}\n${outcome.optimized}` : outcome.optimized);
-      close();
+      stateLabel.textContent = "已追加";
+      setTimeout(close, 260);
     });
     const copyBtn = el("button", "opt-btn", "复制");
     copyBtn.addEventListener("click", async () => {

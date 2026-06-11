@@ -41,7 +41,7 @@ export function bindCanvasInput(store, runtime) {
         s.viewport.x -= e.shiftKey ? e.deltaY : e.deltaX;
         s.viewport.y -= e.shiftKey ? 0 : e.deltaY;
       }
-    });
+    }, { history: false, persist: false });
   }, { passive: false });
 
   rootEl.addEventListener("dblclick", (e) => {
@@ -85,7 +85,7 @@ export function bindCanvasInput(store, runtime) {
       const state = store.get();
       const selected = state.selection.nodeIds.includes(nodeId) ? [...state.selection.nodeIds] : [nodeId];
       if (!state.selection.nodeIds.includes(nodeId)) {
-        store.set((s) => { s.selection = { nodeIds: [nodeId], edgeId: null }; });
+        store.set((s) => { s.selection = { nodeIds: [nodeId], edgeId: null }; }, { history: false, persist: false });
       }
       if (e.altKey) {
         const clone = duplicateNode(store, nodeId);
@@ -108,7 +108,7 @@ export function bindCanvasInput(store, runtime) {
       store.set((s) => {
         s.viewport.x = session.vp.x + (e.clientX - session.startX);
         s.viewport.y = session.vp.y + (e.clientY - session.startY);
-      });
+      }, { history: false, persist: false });
       return;
     }
     if (session.kind === "connect") {
@@ -128,7 +128,7 @@ export function bindCanvasInput(store, runtime) {
           node.x = snap(origin.x + dx);
           node.y = snap(origin.y + dy);
         }
-      });
+      }, { history: false });
       return;
     }
     if (session.kind === "marquee") {
@@ -156,7 +156,7 @@ export function bindCanvasInput(store, runtime) {
       if (rect && (rect.w > 6 || rect.h > 6)) {
         selectInRect(store, rect);
       } else if (!hasOpenOverlay()) {
-        store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; });
+        store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; }, { history: false, persist: false });
       }
     }
     session = null;
@@ -284,7 +284,7 @@ function selectInRect(store, rectScreen) {
   const hit = Object.values(state.nodes)
     .filter((n) => rectsIntersect(worldRect, { x: n.x, y: n.y, w: n.w, h: effectiveHeight(n) }))
     .map((n) => n.id);
-  store.set((s) => { s.selection = { nodeIds: hit, edgeId: null }; });
+  store.set((s) => { s.selection = { nodeIds: hit, edgeId: null }; }, { history: false, persist: false });
 }
 
 function isEditable(target) {

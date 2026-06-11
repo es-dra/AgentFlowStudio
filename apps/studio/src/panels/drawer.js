@@ -23,7 +23,7 @@ export function renderDrawer(state, store) {
   drawer.appendChild(proj);
 
   const tabs = el("div", "drawer-tabs");
-  for (const [id, label] of [["canvas", "画布"], ["assets", "资产"]]) {
+  for (const [id, label] of [["canvas", "画布元素"], ["assets", "显性资产"]]) {
     const tab = el("button", `drawer-tab${state.ui.drawerTab === id ? " active" : ""}`, label);
     tab.addEventListener("click", () => store.set((s) => { s.ui.drawerTab = id; }));
     tabs.appendChild(tab);
@@ -41,7 +41,7 @@ export function renderDrawer(state, store) {
     input.placeholder = "请输入搜索内容";
     search.appendChild(input);
     drawer.appendChild(search);
-    renderAssets(state, body);
+    renderAssets(state, store, body);
   }
   drawer.appendChild(body);
 
@@ -111,7 +111,7 @@ function treeItem(state, store, node) {
   return item;
 }
 
-function renderAssets(state, body) {
+function renderAssets(state, store, body) {
   if (!state.assets.length) {
     const empty = el("div", "drawer-empty");
     empty.innerHTML = `<span class="folder-glyph">${icon("folder", 34)}</span>暂无资产`;
@@ -119,10 +119,90 @@ function renderAssets(state, body) {
     return;
   }
   for (const asset of state.assets) {
-    const item = el("button", "tree-item");
-    item.innerHTML = `<span class="tree-icon">${icon("archive", 12)}</span><span class="tree-label">${asset.title}</span>`;
-    body.appendChild(item);
+    body.appendChild(assetCard(state, store, asset));
   }
+}
+
+function assetCard(state, store, asset) {
+  const card = el("div", "asset-card");
+  const thumb = el("button", `asset-thumb asset-thumb-${asset.thumbnail_ref || asset.kind || "reference"}`);
+  thumb.innerHTML = `<span>${icon(iconForAsset(asset), 18)}</span>`;
+  thumb.title = "从画布定位";
+  thumb.addEventListener("click", () => focusAssetSource(store, asset));
+  const meta = el("div", "asset-meta");
+  meta.appendChild(el("div", "asset-title", asset.title || "未命名资产"));
+  meta.appendChild(el("div", "asset-kind", kindLabel(asset.kind)));
+  meta.appendChild(el("div", "asset-summary", asset.safe_summary || "安全摘要将在生成后出现。"));
+  const actions = el("div", "asset-actions");
+  actions.appendChild(assetAction("设为参考", () => markAssetReference(store, asset)));
+  actions.appendChild(assetAction("用于当前节点", () => attachAssetToSelection(state, store, asset)));
+  actions.appendChild(assetAction("从画布定位", () => focusAssetSource(store, asset)));
+  card.append(thumb, meta, actions);
+  return card;
+}
+
+function assetAction(label, onClick) {
+  const btn = el("button", "asset-action", label);
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function markAssetReference(store, asset) {
+  store.set((s) => {
+    const sourceId = asset.source_node_id;
+    const selectedId = s.selection.nodeIds[0];
+    const target = sourceId && s.nodes[sourceId] ? s.nodes[sourceId] : s.nodes[selectedId];
+    if (!target) return;
+    target.params.isReference = true;
+    target.status = "complete";
+  });
+}
+
+function attachAssetToSelection(state, store, asset) {
+  const selectedId = state.selection.nodeIds[0];
+  if (!selectedId) return;
+  store.set((s) => {
+    const node = s.nodes[selectedId];
+    if (!node) return;
+    const list = Array.isArray(node.params.attachments) ? node.params.attachments : [];
+    if (!list.some((item) => item.id === asset.id)) {
+      node.params.attachments = [{ id: asset.id, label: asset.title, kind: asset.kind }, ...list].slice(0, 8);
+    }
+  });
+}
+
+function focusAssetSource(store, asset) {
+  if (!asset.source_node_id) return;
+  store.set((s) => {
+    const node = s.nodes[asset.source_node_id];
+    if (!node) return;
+    s.selection = { nodeIds: [node.id], edgeId: null };
+    const root = document.getElementById("canvas-root").getBoundingClientRect();
+    s.viewport = fitViewport({ [node.id]: node }, root.width, root.height, 220);
+  }, { history: false, persist: false });
+}
+
+function iconForAsset(asset) {
+  if (asset.kind === "director_setup") return "layers";
+  if (asset.kind === "character_turnaround") return "user";
+  if (asset.kind === "video_clip" || asset.kind === "video_comp") return "video";
+  if (asset.kind === "audio_clip") return "audio";
+  if (asset.kind === "storyboard") return "script";
+  return "image";
+}
+
+function kindLabel(kind) {
+  return {
+    character_turnaround: "人物三视图",
+    scene_board: "场景",
+    keyframe: "关键帧",
+    video_clip: "视频片段",
+    audio_clip: "音频",
+    director_setup: "导演台",
+    storyboard: "分镜",
+    text_brief: "文本",
+    video_comp: "合成",
+  }[kind] || "参考";
 }
 
 function drawerSignature(state) {
@@ -133,5 +213,6 @@ function drawerSignature(state) {
     Object.keys(state.groups).join(","),
     state.assets.length,
     ...Object.values(state.nodes).map((n) => n.title),
+    ...state.assets.map((asset) => `${asset.title}:${asset.safe_summary}:${asset.source_node_id}`),
   ].join("|");
 }

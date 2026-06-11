@@ -35,6 +35,7 @@ from apps.api.runtime_models import (
 from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory_routes
 from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
+from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_tracing import (
     PROVIDER_PLAN_TOOL_GATE_STATE,
     artifact_refs,
@@ -284,6 +285,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
     register_runtime_keyframe_routes(app, store)
+    register_runtime_studio_state_routes(app, store)
     configure_studio_static(app)
 
     return app

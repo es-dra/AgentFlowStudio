@@ -51,6 +51,16 @@
   stroke: #8192a8;
   stroke-dasharray: 3 7;
 }
+.edge-label {
+  display: none;
+  fill: var(--text-primary);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: rgba(17, 18, 20, 0.92);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+.edge-label.visible { display: block; }
 @keyframes edge-flow { to { stroke-dashoffset: -16; } }
 #edge-layer path.pending {
   stroke: var(--accent);

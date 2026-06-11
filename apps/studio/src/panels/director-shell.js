@@ -75,6 +75,8 @@ export function openDirectorShell(store, node) {
       current.result = `导演台提示词片段已生成：${directorSummary(setup)}`;
       current.status = "complete";
       current.params.directorSetup = withSelection(setup);
+      current.params.directorSummary = directorSummary(setup);
+      upsertDirectorAsset(s, node.id, current, setup);
     });
     close();
   });
@@ -194,8 +196,10 @@ function saveSetup(store, nodeId, setup, message) {
     const node = s.nodes[nodeId];
     if (!node) return;
     node.params.directorSetup = withSelection(setup);
+    node.params.directorSummary = directorSummary(setup);
     node.result = `${message}：${directorSummary(setup)}`;
     node.status = "complete";
+    upsertDirectorAsset(s, nodeId, node, setup);
   });
 }
 
@@ -209,10 +213,30 @@ function applyToDownstream(store, nodeId, setup) {
       if (!target) continue;
       target.params.directorSetup = payload;
       target.params.directorRef = nodeId;
+      edge.relation_type = "director";
       count += 1;
     }
+    const source = s.nodes[nodeId];
+    if (source) source.params.appliedDownstreamCount = count;
   });
   return count;
+}
+
+function upsertDirectorAsset(state, nodeId, node, setup) {
+  const assetId = `asset_director_${nodeId}`;
+  const payload = {
+    id: assetId,
+    kind: "director_setup",
+    title: node.title || "二维导演台布置",
+    safe_summary: directorSummary(setup),
+    thumbnail_ref: "director-board",
+    source_node_id: nodeId,
+    status: "ready",
+    created_at: new Date().toISOString(),
+  };
+  const index = state.assets.findIndex((asset) => asset.id === assetId);
+  if (index >= 0) state.assets[index] = payload;
+  else state.assets.unshift(payload);
 }
 
 function withSelection(setup) {

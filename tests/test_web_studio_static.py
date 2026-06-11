@@ -14,6 +14,7 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     assert './src/main.js' in index
     assert './styles/director.css' in index
+    assert "AFS Studio 创作图谱" in index
     assert "/workbench" not in index
 
 
@@ -45,7 +46,34 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
     assert "openOptimizer" in source
     assert "director" in source
     assert "prompt-optimizations" in source
+    assert "studio-state" in source
+    assert "loadStudioState" in source
+    assert "saveStudioState" in source
     assert "createNode" in source
+    assert "undo()" in source
+    assert "redo()" in source
+
+
+def test_studio_v02_flow_native_surface_is_visible() -> None:
+    source = "\n".join(path.read_text(encoding="utf-8") for path in STUDIO_ROOT.rglob("*.js"))
+    styles = "\n".join(path.read_text(encoding="utf-8") for path in STUDIO_ROOT.rglob("*.css"))
+
+    for label in (
+        "上传剧本生成分镜",
+        "创建角色三视图",
+        "布置二维导演台",
+        "生成关键帧提示词",
+        "生成 5s 视频片段提示词",
+        "画布元素",
+        "显性资产",
+        "设为参考",
+        "用于当前节点",
+        "从画布定位",
+    ):
+        assert label in source
+
+    for marker in ("save-pill", "asset-card", "asset-thumb", "asset-action"):
+        assert marker in styles
 
 
 def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
@@ -69,3 +97,15 @@ def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
     assert "已参考导演台布置" in source
     assert "opt-source-chip" in styles
     assert "director-edge" in styles
+    assert "reference-edge" in styles
+    assert "edge-label" in styles
+    assert "relation_type" in source
+
+
+def test_prompt_optimizer_sources_stay_product_facing() -> None:
+    source = "\n".join(path.read_text(encoding="utf-8") for path in STUDIO_ROOT.rglob("*.js"))
+
+    for label in ("影视结构", "项目风格", "角色/场景设定", "导演台布置"):
+        assert label in source
+    for forbidden in ("权重", "知识库", "provider raw", "候选记忆"):
+        assert forbidden not in source

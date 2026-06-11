@@ -1,7 +1,3 @@
-// Minimal Studio API client: v1 only calls prompt-optimizations.
-// 前端只接触 project_id / job_id / artifact_id / safe manifest，
-// 不接触 secret、本地路径、signed URL、媒体字节。
-
 const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 
 export function runtimeBaseUrl() {
@@ -11,11 +7,11 @@ export function runtimeBaseUrl() {
   return FALLBACK_BASE_URL;
 }
 
-async function postJson(route, payload) {
+async function requestJson(route, { method = "GET", payload = null } = {}) {
   const response = await fetch(`${runtimeBaseUrl()}${route}`, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(payload),
+    body: payload == null ? undefined : JSON.stringify(payload),
   });
   const body = await response.text();
   if (!response.ok) throw new Error(`运行服务请求失败（${response.status}）`);
@@ -23,10 +19,17 @@ async function postJson(route, payload) {
 }
 
 export function createRuntimeClient(projectId = "studio-local-001") {
+  const encoded = encodeURIComponent(projectId);
   return {
     projectId,
     optimizePrompt(payload) {
-      return postJson(`/projects/${encodeURIComponent(projectId)}/prompt-optimizations`, payload);
+      return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
+    },
+    loadStudioState() {
+      return requestJson(`/projects/${encoded}/studio-state`);
+    },
+    saveStudioState(state) {
+      return requestJson(`/projects/${encoded}/studio-state`, { method: "PUT", payload: { state } });
     },
   };
 }

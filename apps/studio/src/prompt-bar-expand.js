@@ -9,7 +9,7 @@ export function openExpandEditor(store, runtime, node) {
   const textarea = document.createElement("textarea");
   textarea.value = store.get().nodes[node.id]?.prompt || "";
   textarea.placeholder = promptPlaceholder(node.type, node.params.spec?.mode);
-  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => { n.prompt = textarea.value; }));
+  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => { n.prompt = textarea.value; }, { history: false }));
 
   const row = el("div", "bar-row");
   const optimizeBtn = el("button", "bar-tool optimize-btn");

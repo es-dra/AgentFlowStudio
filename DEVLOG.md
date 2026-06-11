@@ -7,6 +7,36 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - AFS Studio v0.2 Delivery Polish
+
+- Created isolated branch/worktree `codex/afs-studio-v02-delivery-polish-001` because the main checkout was occupied by a parallel MiniMax integration branch.
+- Reframed the user-facing Studio surface into AFS Studio 创作图谱: flow-native starters for script-to-storyboard, character turnaround, 2D director board, keyframe prompt, and 5s video prompt.
+- Added safe Runtime Studio state API: `GET /projects/{project_id}/studio-state` and `PUT /projects/{project_id}/studio-state`; only meta, viewport, nodes, semantic edges, visible assets, and safe summaries are persisted.
+- Added frontend Runtime save/restore with localStorage fallback and visible save status: 已保存 / 保存中 / 同步中 / 本地暂存.
+- Added lightweight undo/redo for meaningful canvas edits while excluding high-frequency pan/zoom/drag/prompt typing from history bloat.
+- Upgraded visible assets: local preview and director saves create typed asset cards; asset drawer supports 设为参考, 用于当前节点, and 从画布定位.
+- Added semantic edge types: generation, director, and reference; director/reference edges have distinct line styles and labels.
+- Director board saves now upsert a `director_setup` asset and mark downstream edges as director constraints when applied to connected nodes.
+- Prompt optimizer remains input-anchored and product-facing; result actions now give replace/append/copy feedback and source chips stay limited to 影视结构, 项目风格, 角色/场景设定, 导演台布置.
+- Fixed narrow viewport horizontal overflow and split asset drawer CSS into `assets.css` to keep maintenance audit clean.
+
+Verification:
+
+```text
+Runtime-hosted browser QA on http://127.0.0.1:8807/studio/: desktop director starter/modal path passed; mobile overflow false.
+Focused tests: 27 passed, 1 Starlette/httpx warning.
+Full pytest: 772 passed, 1 Starlette/httpx warning.
+apps/studio JS node --check: passed.
+maintenance_audit: passed.
+git diff --check: passed with Windows CRLF notices only.
+```
+
+Boundaries:
+
+- Provider gates remain closed.
+- No image/video/media bytes were generated.
+- This is not human acceptance, business validation, provider smoke, or durable-memory promotion.
+
 ## 2026-06-12 - AFS Studio UI Polish + 2D 导演台 Prompt 联动
 
 - 修复 Studio 左上角重叠：抽屉展开时项目身份只由抽屉承载，顶栏从 `var(--drawer-w)` 右侧开始；抽屉收起时才显示 compact 项目 pill。

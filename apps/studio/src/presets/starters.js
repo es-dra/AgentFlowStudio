@@ -1,8 +1,9 @@
 export const STARTERS = [
-  { id: "story_script", icon: "script", label: "故事脚本生成" },
-  { id: "character_sheet", icon: "user", label: "角色三视图" },
-  { id: "first_frame_video", icon: "image", label: "首帧图生视频" },
-  { id: "audio_video", icon: "music", label: "音频生视频" },
+  { id: "story_script", icon: "script", label: "上传剧本生成分镜" },
+  { id: "character_sheet", icon: "user", label: "创建角色三视图" },
+  { id: "director_board", icon: "layers", label: "布置二维导演台" },
+  { id: "keyframe_prompt", icon: "image", label: "生成关键帧提示词" },
+  { id: "first_frame_video", icon: "video", label: "生成 5s 视频片段提示词" },
 ];
 
 export const SAMPLE_SCRIPT_TITLE = "文本生剧本";

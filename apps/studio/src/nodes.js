@@ -179,7 +179,7 @@ export function connect(store, fromId, toId) {
     const exists = Object.values(s.edges).some((e) => e.from === fromId && e.to === toId);
     if (exists || fromId === toId) return;
     const id = `edge_${fromId}__${toId}`;
-    s.edges[id] = { id, from: fromId, to: toId };
+    s.edges[id] = { id, from: fromId, to: toId, relation_type: relationTypeFor(s, fromId, toId) };
     created = id;
     s.ui.lastConnectedEdgeId = id;
   });
@@ -191,6 +191,14 @@ export function connect(store, fromId, toId) {
     }, 1100);
   }
   return created;
+}
+
+function relationTypeFor(state, fromId, toId) {
+  const from = state.nodes[fromId];
+  const to = state.nodes[toId];
+  if (from?.type === "director") return "director";
+  if (from?.params?.isReference || to?.params?.isReference) return "reference";
+  return "generation";
 }
 
 export function downstreamTypesFor(type) {

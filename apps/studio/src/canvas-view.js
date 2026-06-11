@@ -119,7 +119,15 @@ function syncNodeElement(elNode, node, state, relations) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
   const directorSig = node.params?.directorSetup ? directorSummary(normalizeDirectorSetup(node.params.directorSetup)) : "";
-  const signature = [node.status, node.content ? node.content.length : 0, node.result ? node.result.length : 0, node.type, node.collapsed ? 1 : 0, directorSig].join("|");
+  const signature = [
+    node.status,
+    node.content ? node.content.length : 0,
+    node.result ? node.result.length : 0,
+    node.type,
+    node.collapsed ? 1 : 0,
+    directorSig,
+    node.params?.appliedDownstreamCount || 0,
+  ].join("|");
   if (body.dataset.signature !== signature) {
     body.dataset.signature = signature;
     body.replaceChildren(...buildNodeBody(node, def));
@@ -138,6 +146,9 @@ function buildNodeBody(node, def) {
   }
   if (node.type === "director") {
     const summary = directorSummary(normalizeDirectorSetup(node.params?.directorSetup));
+    const applied = node.params?.appliedDownstreamCount
+      ? ` / 已应用到 ${node.params.appliedDownstreamCount} 个相连节点`
+      : "";
     const glyph = document.createElement("div");
     glyph.className = "node-glyph";
     glyph.innerHTML = icon(def.icon, 38);
@@ -146,7 +157,7 @@ function buildNodeBody(node, def) {
     desc.textContent = "二维顶视图布置机位、人物、灯光和道具";
     const badge = document.createElement("div");
     badge.className = "director-node-summary";
-    badge.textContent = summary;
+    badge.textContent = `${summary}${applied}`;
     const open = document.createElement("button");
     open.className = "director-open-btn";
     open.dataset.action = "open-director";
@@ -221,22 +232,34 @@ function renderEdges(state, relations) {
     const to = state.nodes[edge.to];
     if (!from || !to) continue;
     seen.add(edge.id);
-    let path = group.querySelector(`[data-edge-id="${edge.id}"]`);
-    if (!path) {
-      path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.dataset.edgeId = edge.id;
+    let item = group.querySelector(`[data-edge-id="${edge.id}"]`);
+    if (!item) {
+      item = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      item.dataset.edgeId = edge.id;
+      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      label.classList.add("edge-label");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       path.classList.add("edge-flow");
-      group.appendChild(path);
+      item.append(path, label);
+      group.appendChild(item);
     }
-    path.setAttribute("d", bezier(
-      from.x + from.w, from.y + effectiveHeight(from) / 2,
-      to.x, to.y + effectiveHeight(to) / 2,
-    ));
-    path.classList.toggle("director-edge", from.type === "director" || to.params?.directorRef === from.id);
-    path.classList.toggle("reference-edge", Boolean(from.params?.isReference || to.params?.isReference));
+    const path = item.querySelector("path");
+    const label = item.querySelector(".edge-label");
+    const x1 = from.x + from.w;
+    const y1 = from.y + effectiveHeight(from) / 2;
+    const x2 = to.x;
+    const y2 = to.y + effectiveHeight(to) / 2;
+    path.setAttribute("d", bezier(x1, y1, x2, y2));
+    const relation = edge.relation_type || edge.relationType || "generation";
+    path.classList.toggle("director-edge", relation === "director");
+    path.classList.toggle("reference-edge", relation === "reference");
     path.classList.toggle("selected-edge", state.selection.edgeId === edge.id);
     path.classList.toggle("just-connected", state.ui.lastConnectedEdgeId === edge.id);
     path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
+    label.textContent = relation === "director" ? "导演台" : relation === "reference" ? "参考" : "";
+    label.setAttribute("x", String((x1 + x2) / 2));
+    label.setAttribute("y", String((y1 + y2) / 2 - 8));
+    label.classList.toggle("visible", Boolean(label.textContent));
     if (relations) {
       const upSide = (relations.upstream.has(edge.from) || edge.from === relations.focus)
         && (relations.upstream.has(edge.to) || edge.to === relations.focus);
@@ -247,8 +270,8 @@ function renderEdges(state, relations) {
       else path.classList.add("rel-dim-edge");
     }
   }
-  for (const path of [...group.children]) {
-    if (!seen.has(path.dataset.edgeId)) path.remove();
+  for (const item of [...group.children]) {
+    if (!seen.has(item.dataset.edgeId)) item.remove();
   }
 }
 
