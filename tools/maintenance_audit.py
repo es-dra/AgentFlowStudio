@@ -96,7 +96,10 @@ def _iter_text_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*"):
         if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
             continue
-        relative = path.relative_to(root).as_posix()
+        relative_path = path.relative_to(root)
+        if any(part.endswith(".egg-info") for part in relative_path.parts):
+            continue
+        relative = relative_path.as_posix()
         if any(relative == excluded or relative.startswith(f"{excluded}/") for excluded in DEFAULT_EXCLUDE_DIRS):
             continue
         yield path

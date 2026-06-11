@@ -44,6 +44,8 @@ def review_directory(path: str) -> ReviewedPath:
         return _dir(path, "operations_spine", "current", "GitHub Actions 维护门禁和协作自动化配置。")
     if path in {"agentflow", "agentflow/contracts", "agentflow/harness", "agentflow/memory", "agentflow/router", "agentflow/skills"}:
         return _dir(path, "production_spine", "current", "平台 contract、harness、memory、router 或 skill 核心代码。")
+    if path == "agentflow/knowledge" or path.startswith("agentflow/knowledge/"):
+        return _dir(path, "supporting_contract", "current", "Repo-safe professional prompt knowledgebase used by prompt assembly.")
     if path.startswith("agentflow_studio"):
         return _dir(path, "production_spine", "current", "内容生产与分发 pipeline 模块仍被测试和 CLI 覆盖；旧 demo 文件会在文件级降级。")
     if path.startswith("apps/api"):
@@ -108,7 +110,7 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
                 "提交删除后完成退休；如需恢复，必须证明 README.md 不能覆盖中文入口职责。",
             )
         return _file(path, git_state, "delete_candidate", "delete_candidate", "README.md 已作为中文主入口，旧中文副本会制造双入口漂移。", "删除或转为短跳转后再次运行审查。")
-    if path in {"README.md", "AGENTS.md", "TASK_TRACKER.md", "DEVLOG.md", "pyproject.toml", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
+    if path in {"README.md", "AGENTS.md", "TASK_TRACKER.md", "DEVLOG.md", "pyproject.toml", "uv.lock", ".gitignore", ".env.example", ".python-version", "LICENSE"}:
         return _file(path, git_state, "production_spine", "current", "项目入口、规则、跟踪、配置或许可证。")
     if path == ".github/workflows/maintenance.yml":
         return _file(path, git_state, "operations_spine", "current", "CI 维护门禁，运行 CLI、维护审计、测试和空白检查。")

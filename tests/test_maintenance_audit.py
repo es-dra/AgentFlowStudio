@@ -39,6 +39,18 @@ def test_maintenance_audit_cli_outputs_json() -> None:
     assert payload["summary"]["passed"] >= 1
 
 
+def test_maintenance_audit_ignores_generated_egg_info_metadata(tmp_path) -> None:
+    egg_info = tmp_path / "agentflow_studio.egg-info"
+    egg_info.mkdir()
+    (egg_info / "SOURCES.txt").write_text("\n".join(f"generated/file_{index}.py" for index in range(600)), encoding="utf-8")
+    (tmp_path / "README.md").write_text("# 当前说明\n\n这是当前中文入口。\n", encoding="utf-8")
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["oversized_files"]["status"] == "passed"
+
+
 def test_maintenance_audit_does_not_count_named_fake_secret_fixture(tmp_path) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "fixture.py").write_text('value = "sk-test-secret-value"\n', encoding="utf-8")
