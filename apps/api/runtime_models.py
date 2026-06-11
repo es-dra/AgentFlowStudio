@@ -100,6 +100,26 @@ class ProviderScriptDraftPlanRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class DirectorSetup2D(BaseModel):
+    view: str = "top_down_2d"
+    characters: list[dict[str, Any]] = Field(default_factory=list)
+    lights: list[dict[str, Any]] = Field(default_factory=list)
+    cameras: list[dict[str, Any]] = Field(default_factory=list)
+    notes: str = ""
+
+
+class PromptOptimizationRequest(BaseModel):
+    node_id: str | None = None
+    node_type: Literal["text", "image", "video", "audio", "script", "director", "video_merge"] = "text"
+    prompt_text: str = Field(min_length=1)
+    generation_target: Literal["prompt", "script", "image", "keyframe", "video", "audio"] = "prompt"
+    target_platform: str = "short_video"
+    style: str = "cinematic"
+    asset_refs: list[str] = Field(default_factory=list)
+    director_setup: DirectorSetup2D | None = None
+    generated_at: str = Field(min_length=1)
+
+
 class FeedbackRecordRequest(BaseModel):
     project_id: str = Field(min_length=1)
     feedback: dict[str, Any]
@@ -110,7 +130,9 @@ __all__ = (
     "AssetTestRunRequest",
     "CanvasDraftRequest",
     "ContentCardRegisterRequest",
+    "DirectorSetup2D",
     "FeedbackRecordRequest",
+    "PromptOptimizationRequest",
     "ProjectCreateRequest",
     "ProjectImportRequest",
     "ProviderScriptDraftPlanRequest",

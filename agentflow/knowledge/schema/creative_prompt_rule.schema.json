@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentflow.creative_prompt_rule.schema.v1",
+  "title": "AFS Creative Prompt Rule",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "domain",
+    "priority",
+    "weight",
+    "applies_to",
+    "required_slots",
+    "prompt_transform",
+    "negative_constraints",
+    "quality_checks",
+    "source_refs",
+    "version"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+_v[0-9]+$"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "priority": {
+      "const": "professional_knowledge_base"
+    },
+    "weight": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "applies_to": {
+      "type": "object",
+      "required": ["node_types", "generation_targets", "platforms", "slots", "languages"],
+      "properties": {
+        "node_types": {"type": "array", "items": {"type": "string"}},
+        "generation_targets": {"type": "array", "items": {"type": "string"}},
+        "platforms": {"type": "array", "items": {"type": "string"}},
+        "slots": {"type": "array", "items": {"type": "string"}},
+        "languages": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "required_slots": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "prompt_transform": {
+      "type": "object",
+      "required": ["output_section", "guidance", "template"],
+      "properties": {
+        "output_section": {"type": "string"},
+        "guidance": {"type": "string"},
+        "template": {"type": "string"}
+      }
+    },
+    "negative_constraints": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "quality_checks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "url", "note"],
+        "properties": {
+          "label": {"type": "string"},
+          "url": {"type": "string"},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "version": {
+      "type": "string"
+    }
+  }
+}

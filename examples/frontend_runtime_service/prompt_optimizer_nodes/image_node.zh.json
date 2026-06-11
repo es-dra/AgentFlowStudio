@@ -1,0 +1,25 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "image_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_image",
+    "project_type": "short_video_campaign",
+    "goal": "验证图片节点提示词优化。"
+  },
+  "request": {
+    "node_id": "image-node-fixture-001",
+    "node_type": "image",
+    "prompt_text": "一个少年坐在昏暗房间里，桌上有旧相机和未寄出的信，窗外冷光照进来。",
+    "generation_target": "image",
+    "target_platform": "short_video",
+    "style": "项目风格：低照度室内光线、写实美术、角色一致性优先。",
+    "asset_refs": ["asset_character_boy_safe_ref"],
+    "generated_at": "2026-06-11T12:05:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["cinematography", "lighting", "production_design", "character_consistency", "negative_constraints"],
+    "expected_sections": ["Subject/Character", "Scene/Production Design", "Camera/Framing", "Lighting", "Continuity", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}

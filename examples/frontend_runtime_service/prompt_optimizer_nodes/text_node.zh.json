@@ -1,0 +1,25 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "text_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_text",
+    "project_type": "short_video_campaign",
+    "goal": "验证文本节点提示词优化。"
+  },
+  "request": {
+    "node_id": "text-node-fixture-001",
+    "node_type": "text",
+    "prompt_text": "一个少年在雨后的霓虹街道停下脚步，第一次意识到自己被跟踪。",
+    "generation_target": "prompt",
+    "target_platform": "short_video",
+    "style": "项目风格：克制、真实、电影感；用户偏好：悬疑但不要夸张炫光。",
+    "asset_refs": [],
+    "generated_at": "2026-06-11T12:00:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["directing", "cinematography", "lighting", "character_consistency", "negative_constraints"],
+    "expected_sections": ["Intent", "Subject/Character", "Scene/Production Design", "Camera/Framing", "Lighting", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}

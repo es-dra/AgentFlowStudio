@@ -1,0 +1,40 @@
+{
+  "artifact_type": "agentflow_creative_prompt_knowledgebase_registry",
+  "schema_version": "0.1.0",
+  "knowledgebase_id": "creative_prompt_knowledgebase_v1",
+  "version": "creative_prompt_knowledgebase_v1",
+  "priority_order": [
+    "professional_knowledge_base",
+    "script_character_scene_assets",
+    "user_preferences"
+  ],
+  "rule_schema": "schema/creative_prompt_rule.schema.json",
+  "rule_files": [
+    "rules/directing.jsonl",
+    "rules/cinematography.jsonl",
+    "rules/lighting.jsonl",
+    "rules/production_design.jsonl",
+    "rules/storyboard.jsonl",
+    "rules/short_video_script.jsonl",
+    "rules/audio_design.jsonl",
+    "rules/character_consistency.jsonl",
+    "rules/keyframe_continuity.jsonl",
+    "rules/video_motion.jsonl",
+    "rules/director_setup_2d.jsonl",
+    "rules/negative_constraints.jsonl"
+  ],
+  "example_files": [
+    "examples/node_prompt_optimization_examples.jsonl"
+  ],
+  "sync_policy": {
+    "source_copy": "10-Startup/70-Projects/AgentFlow-Studio/knowledgebase",
+    "runtime_copy": "agentflow/knowledge",
+    "verification": "normalized_hash"
+  },
+  "non_claims": [
+    "not private company knowledge",
+    "not provider execution",
+    "not human acceptance",
+    "not durable memory"
+  ]
+}

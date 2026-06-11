@@ -74,7 +74,7 @@ def test_runtime_service_serves_workbench_static_entry_without_private_paths(tmp
     assert redirect.headers["location"] == "/workbench/"
     assert index.status_code == 200
     assert '<div id="app-root"></div>' in index.text
-    assert '<script type="module" src="./src/app.js?v=stage7-rc"></script>' in index.text
+    assert '<script type="module" src="./src/app.js?v=libtv-shell-reset-003"></script>' in index.text
     assert app_js.status_code == 200
     assert index.headers["cache-control"] == "no-store"
     assert app_js.headers["cache-control"] == "no-store"

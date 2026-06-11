@@ -74,6 +74,23 @@ def script_provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str
     }
 
 
+def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
+    return {
+        "creative_brief": store.register_artifact(
+            output_dir / "creative_brief.json",
+            role="creative_brief",
+        ),
+        "prompt_assembly_trace": store.register_artifact(
+            output_dir / "prompt_assembly_trace.json",
+            role="prompt_assembly_trace",
+        ),
+        "prompt_optimization_safe_manifest": store.register_artifact(
+            output_dir / "prompt_optimization_safe_manifest.json",
+            role="prompt_optimization_safe_manifest",
+        ),
+    }
+
+
 def update_project_after_asset_run(
     store: RuntimeStore,
     project_id: str,
@@ -117,6 +134,7 @@ def _artifact_list_ref(artifact: dict[str, Any]) -> dict[str, Any]:
 __all__ = (
     "asset_run_artifacts",
     "feedback_ref",
+    "prompt_memory_artifacts",
     "provider_artifacts",
     "round_2_run_ref",
     "script_provider_artifacts",

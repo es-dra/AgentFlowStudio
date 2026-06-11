@@ -1,0 +1,49 @@
+{
+  "artifact_type": "afs_prompt_optimizer_demo_project_seed",
+  "project": {
+    "project_id": "proj_prompt_optimizer_demo",
+    "project_type": "short_video_campaign",
+    "goal": "一个少年通过旧相机和未寄出的信，寻找家族秘密的短片。"
+  },
+  "style": {
+    "project_style": "克制、真实、电影感、低照度室内光线、清楚镜头运动",
+    "user_preferences": "悬疑、温暖但不要煽情，不使用快速甩镜或夸张炫光"
+  },
+  "characters": [
+    {
+      "asset_id": "asset_character_boy_safe_ref",
+      "label": "少年",
+      "summary": "16 岁，安静敏感，常穿深色外套，情绪表达克制。"
+    },
+    {
+      "asset_id": "asset_character_father_safe_ref",
+      "label": "父亲",
+      "summary": "只通过照片、信件和旁白出现，气质温和但留下悬念。"
+    }
+  ],
+  "scenes": [
+    {
+      "asset_id": "asset_scene_room_safe_ref",
+      "label": "昏暗房间",
+      "summary": "窗外冷光、桌面台灯、旧相机、未寄出的信、墙上海报。"
+    },
+    {
+      "asset_id": "asset_scene_neon_street_safe_ref",
+      "label": "雨后霓虹街道",
+      "summary": "湿润路面反光，街灯和店招形成冷暖对比。"
+    }
+  ],
+  "prompt_nodes": [
+    {"fixture": "prompt_optimizer_nodes/text_node.zh.json", "request": {"node_type": "text"}},
+    {"fixture": "prompt_optimizer_nodes/image_node.zh.json", "request": {"node_type": "image"}},
+    {"fixture": "prompt_optimizer_nodes/video_node.zh.json", "request": {"node_type": "video"}},
+    {"fixture": "prompt_optimizer_nodes/audio_node.zh.json", "request": {"node_type": "audio"}},
+    {"fixture": "prompt_optimizer_nodes/script_node.zh.json", "request": {"node_type": "script"}},
+    {"fixture": "prompt_optimizer_nodes/director_node.zh.json", "request": {"node_type": "director"}}
+  ],
+  "non_claims": [
+    "not provider execution",
+    "not human acceptance",
+    "not durable memory"
+  ]
+}

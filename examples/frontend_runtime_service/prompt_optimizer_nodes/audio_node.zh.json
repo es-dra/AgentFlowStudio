@@ -1,0 +1,25 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "audio_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_audio",
+    "project_type": "short_video_campaign",
+    "goal": "验证音频节点提示词优化。"
+  },
+  "request": {
+    "node_id": "audio-node-fixture-001",
+    "node_type": "audio",
+    "prompt_text": "旁白用温暖但克制的语气讲述：他终于发现那封信一直没有寄出，中间需要短暂停顿。",
+    "generation_target": "audio",
+    "target_platform": "short_video",
+    "style": "项目风格：自然旁白、清晰咬字、节奏留白；用户偏好：温暖但不要煽情。",
+    "asset_refs": [],
+    "generated_at": "2026-06-11T12:15:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["audio_design", "negative_constraints"],
+    "expected_sections": ["Action/Beat", "Motion/Temporal Progression", "Continuity", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}

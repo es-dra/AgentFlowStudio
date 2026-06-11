@@ -1,0 +1,25 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "video_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_video",
+    "project_type": "short_video_campaign",
+    "goal": "验证视频节点提示词优化。"
+  },
+  "request": {
+    "node_id": "video-node-fixture-001",
+    "node_type": "video",
+    "prompt_text": "少年从门口走向桌边，镜头缓慢推进，窗外冷光和台灯暖光形成对比。",
+    "generation_target": "video",
+    "target_platform": "short_video",
+    "style": "项目风格：克制、真实、镜头运动清楚；用户偏好：不要快速甩镜。",
+    "asset_refs": ["asset_keyframe_room_safe_ref"],
+    "generated_at": "2026-06-11T12:10:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["video_motion", "cinematography", "lighting", "negative_constraints"],
+    "expected_sections": ["Action/Beat", "Camera/Framing", "Lighting", "Motion/Temporal Progression", "Continuity", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}

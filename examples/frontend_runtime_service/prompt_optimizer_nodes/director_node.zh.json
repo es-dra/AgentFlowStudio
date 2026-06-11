@@ -1,0 +1,39 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "director_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_director",
+    "project_type": "short_video_campaign",
+    "goal": "验证导演台节点提示词优化。"
+  },
+  "request": {
+    "node_id": "director-node-fixture-001",
+    "node_type": "director",
+    "prompt_text": "导演台：少年从门口走到桌边，机位 A 在桌子左前方低角度拍摄，窗外冷光，台灯暖光。",
+    "generation_target": "video",
+    "target_platform": "short_video",
+    "style": "项目风格：2D 空间关系清楚，人物不要被道具遮挡。",
+    "asset_refs": ["asset_scene_room_safe_ref"],
+    "director_setup": {
+      "view": "top_down_2d",
+      "characters": [
+        {"label": "少年", "x": 32, "y": 70, "facing": "table", "movement": "door_to_table"}
+      ],
+      "lights": [
+        {"label": "Window Cool Light", "x": 12, "y": 30, "type": "soft_cool"},
+        {"label": "Desk Warm Lamp", "x": 64, "y": 48, "type": "practical_warm"}
+      ],
+      "cameras": [
+        {"label": "Camera A", "x": 46, "y": 82, "angle": "low", "fov": 50, "target": "少年"}
+      ],
+      "notes": "保持桌面旧相机可见，人物从门口进入后不要被桌角遮挡。"
+    },
+    "generated_at": "2026-06-11T12:25:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["director_setup_2d", "cinematography", "lighting", "negative_constraints"],
+    "expected_sections": ["Scene/Production Design", "Camera/Framing", "Lighting", "Motion/Temporal Progression", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}

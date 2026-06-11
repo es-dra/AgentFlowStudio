@@ -1,0 +1,25 @@
+{
+  "artifact_type": "afs_prompt_optimizer_node_fixture",
+  "fixture_id": "script_node_zh_prompt_v1",
+  "project": {
+    "project_id": "proj_prompt_fixture_script",
+    "project_type": "short_video_campaign",
+    "goal": "验证脚本节点提示词优化。"
+  },
+  "request": {
+    "node_id": "script-node-fixture-001",
+    "node_type": "script",
+    "prompt_text": "写一个 30 秒短片分镜脚本：少年发现父亲留下的旧相机，决定寻找信里的地址。",
+    "generation_target": "script",
+    "target_platform": "short_video",
+    "style": "项目风格：三段式短视频节奏、情绪递进、分镜可交接。",
+    "asset_refs": ["asset_character_boy_safe_ref", "asset_scene_room_safe_ref"],
+    "generated_at": "2026-06-11T12:20:00+08:00"
+  },
+  "expected": {
+    "expected_domains": ["short_video_script", "storyboard", "negative_constraints"],
+    "expected_sections": ["Intent", "Action/Beat", "Continuity", "Negative Constraints"],
+    "forbidden_ui_terms": ["Provider", "Runtime", "trace", "rule id", "weight", "候选记忆", "隐性资产"],
+    "provider_calls_started": false
+  }
+}
