@@ -36,6 +36,8 @@ POST /runs/asset-test
 POST /runs/two-round-validate
 POST /feedback
 POST /provider/validation-plan
+POST /projects/{project_id}/prompt-optimizations
+POST /projects/{project_id}/keyframe-generations
 ```
 
 ## OpenAPI 导出
@@ -43,13 +45,13 @@ POST /provider/validation-plan
 前端团队可直接使用已提交的 schema：
 
 ```text
-docs/frontend_integration/openapi/afs-runtime-service.openapi.json
+docs/openapi/afs-runtime-service.openapi.json
 ```
 
 也可以本地重新生成：
 
 ```powershell
-.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\frontend_integration\openapi\afs-runtime-service.openapi.json
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\openapi\afs-runtime-service.openapi.json
 ```
 
 ## 前端可使用

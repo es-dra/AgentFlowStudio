@@ -34,6 +34,7 @@ from apps.api.runtime_models import (
 )
 from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory_routes
 from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
+from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_tracing import (
     PROVIDER_PLAN_TOOL_GATE_STATE,
     artifact_refs,
@@ -43,7 +44,7 @@ from apps.api.runtime_tracing import (
 )
 from apps.api.runtime_store import RuntimeStore, read_json
 from apps.api.runtime_v02 import register_runtime_v02_routes
-from apps.api.runtime_workbench_static import configure_workbench_static
+from apps.api.runtime_studio_static import configure_studio_static
 from agentflow.harness.json_io import write_json
 from agentflow.memory.production_asset_provider_validation_gate import run_provider_validation_gate
 from agentflow.memory.production_asset_test_run_harness import run_real_asset_test_harness
@@ -58,7 +59,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     app = FastAPI(
         title="AgentFlow Runtime Service",
         version="0.2.0",
-        summary="Local AFS API adapter for frontend canvas/workbench integration.",
+        summary="Local AFS API adapter for AFS Studio canvas integration.",
     )
     configure_runtime_cors(app)
 
@@ -282,7 +283,8 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     register_runtime_v02_routes(app, store)
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
-    configure_workbench_static(app)
+    register_runtime_keyframe_routes(app, store)
+    configure_studio_static(app)
 
     return app
 

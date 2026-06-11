@@ -91,6 +91,23 @@ def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, 
     }
 
 
+def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
+    return {
+        "keyframe_request_plan": store.register_artifact(
+            output_dir / "keyframe_request_plan.json",
+            role="keyframe_request_plan",
+        ),
+        "keyframe_candidates_summary": store.register_artifact(
+            output_dir / "keyframe_candidates_summary.json",
+            role="keyframe_candidates_summary",
+        ),
+        "keyframe_generation_safe_manifest": store.register_artifact(
+            output_dir / "keyframe_generation_safe_manifest.json",
+            role="keyframe_generation_safe_manifest",
+        ),
+    }
+
+
 def update_project_after_asset_run(
     store: RuntimeStore,
     project_id: str,
@@ -134,6 +151,7 @@ def _artifact_list_ref(artifact: dict[str, Any]) -> dict[str, Any]:
 __all__ = (
     "asset_run_artifacts",
     "feedback_ref",
+    "keyframe_generation_artifacts",
     "prompt_memory_artifacts",
     "provider_artifacts",
     "round_2_run_ref",

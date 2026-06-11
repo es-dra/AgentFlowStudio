@@ -103,8 +103,12 @@ class ProviderScriptDraftPlanRequest(BaseModel):
 class DirectorSetup2D(BaseModel):
     view: str = "top_down_2d"
     characters: list[dict[str, Any]] = Field(default_factory=list)
+    subjects: list[dict[str, Any]] = Field(default_factory=list)
     lights: list[dict[str, Any]] = Field(default_factory=list)
     cameras: list[dict[str, Any]] = Field(default_factory=list)
+    modifiers: list[dict[str, Any]] = Field(default_factory=list)
+    props: list[dict[str, Any]] = Field(default_factory=list)
+    composition: str = ""
     notes: str = ""
 
 
@@ -117,6 +121,22 @@ class PromptOptimizationRequest(BaseModel):
     style: str = "cinematic"
     asset_refs: list[str] = Field(default_factory=list)
     director_setup: DirectorSetup2D | None = None
+    node_parameters: dict[str, Any] | None = None
+    generated_at: str = Field(min_length=1)
+
+
+class KeyframeGenerationRequest(BaseModel):
+    node_id: str | None = None
+    prompt_text: str = Field(min_length=1)
+    optimized_prompt: str | None = None
+    target_platform: str = "short_video"
+    style: str = "cinematic"
+    aspect_ratio: str = "9:16"
+    candidate_count: int = Field(default=1, ge=1, le=4)
+    provider_service_id: str = "minimax_image"
+    asset_refs: list[str] = Field(default_factory=list)
+    director_setup: DirectorSetup2D | None = None
+    node_parameters: dict[str, Any] | None = None
     generated_at: str = Field(min_length=1)
 
 
@@ -132,6 +152,7 @@ __all__ = (
     "ContentCardRegisterRequest",
     "DirectorSetup2D",
     "FeedbackRecordRequest",
+    "KeyframeGenerationRequest",
     "PromptOptimizationRequest",
     "ProjectCreateRequest",
     "ProjectImportRequest",

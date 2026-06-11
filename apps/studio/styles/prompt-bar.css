@@ -1,0 +1,143 @@
+#prompt-bar-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-promptbar);
+  pointer-events: none;
+}
+#prompt-bar-layer > * { pointer-events: auto; }
+
+.prompt-bar {
+  position: absolute;
+  width: 540px;
+  background: rgba(32, 35, 39, 0.96);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-bar);
+  box-shadow: var(--shadow-bar);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 8px;
+  gap: 6px;
+}
+
+.prompt-bar .mode-tabs { display: flex; gap: 6px; }
+.mode-tab {
+  padding: 5px 11px;
+  border-radius: var(--radius-chip);
+  border: 1px solid transparent;
+  color: var(--text-faint);
+}
+.mode-tab.active { border-color: var(--border-card); color: var(--text-primary); background: var(--bg-chip); }
+.mode-tab:not(.active):hover { color: var(--text-secondary); }
+
+.prompt-bar .tool-chips { display: flex; gap: 8px; }
+.tool-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 44px; padding: 7px 0 5px;
+  background: var(--bg-chip);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.tool-chip:hover { color: var(--text-primary); border-color: var(--border-card); }
+.tool-chip .tc-icon { font-size: 13px; }
+.tool-chip.active { background: var(--bg-chip-active); color: var(--text-primary); }
+
+.prompt-bar .attach-chips { display: flex; gap: 6px; }
+.attach-chip {
+  position: relative;
+  width: 34px; height: 34px;
+  border-radius: var(--radius-chip);
+  background: var(--bg-chip);
+  border: 1px solid var(--border-soft);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+}
+.attach-chip .badge {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 14px; height: 14px;
+  border-radius: 7px;
+  background: var(--bg-chip-active);
+  border: 1px solid var(--border-card);
+  font-size: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+}
+
+.prompt-bar textarea {
+  width: 100%;
+  min-height: 54px;
+  max-height: 140px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.prompt-bar .bar-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bar-row .row-spacer { flex: 1; }
+
+.bar-select {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+}
+.bar-select:hover { background: var(--bg-chip); }
+.bar-select .caret { color: var(--text-faint); font-size: 10px; }
+.bar-select .sel-icon { color: var(--text-secondary); }
+
+.bar-tool {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius-chip);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.bar-tool:hover { background: var(--bg-chip); color: var(--text-primary); }
+.bar-tool.optimize-btn { color: var(--text-primary); }
+.bar-tool.optimize-btn:hover { background: var(--accent-soft); }
+.bar-tool.optimize-btn.busy { pointer-events: none; opacity: 0.6; }
+
+.bar-cost { color: var(--text-faint); font-size: 12px; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; }
+.bar-cost .bolt { color: var(--energy); }
+
+.send-btn {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: var(--bg-chip-active);
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.send-btn:hover { background: #4a4e55; }
+
+.expand-btn {
+  position: absolute;
+  top: 8px; right: 10px;
+  color: var(--text-faint);
+}
+.expand-btn:hover { color: var(--text-primary); }
+
+/* 放大编辑窗 */
+.prompt-expand {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(740px, 84vw);
+  height: min(500px, 72vh);
+  background: rgba(32, 35, 39, 0.98);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-bar);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 10px;
+  gap: 8px;
+  z-index: var(--z-modal);
+}
+.prompt-expand textarea { flex: 1; max-height: none; }

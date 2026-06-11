@@ -53,4 +53,4 @@ docs/local_internal_test_runbook.md
 - `docs/architecture/production_memory_asset_profiles.md`
 - `docs/local_internal_test_runbook.md`
 - `docs/project_manifest_contract.md`
-- `docs/frontend_integration/`
+- `docs/architecture/AFS_STUDIO_FRONTEND_ARCHITECTURE_V1.zh-CN.md`

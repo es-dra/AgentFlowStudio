@@ -79,7 +79,7 @@ Promotion Ledger
 已具备：
 
 - deterministic Production Memory asset loop。
-- read-only Web Memory Workbench。
+- AFS Studio Web canvas。
 - Asset Profile Review Screen。
 - Real Asset Test Run Harness。
 - Two-Round Context Runtime Validation。
@@ -91,8 +91,8 @@ Promotion Ledger
 
 - 维护性重置与中文化。
 - Runtime Service v0.2。
-- OpenAPI / 前端 client 对接。
-- 前端画布工作台接入。
+- OpenAPI / Studio client 对接。
+- AFS Studio 画布工作台接入。
 - provider gate 继续保持默认 blocked。
 
 ## Worktree 政策

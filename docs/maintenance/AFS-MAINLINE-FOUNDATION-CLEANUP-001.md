@@ -1,5 +1,9 @@
 # AFS Mainline Foundation Cleanup 001
 
+中文摘要：本文是早期主线基础清理的维护记录，当前只作为理解收口经验的辅助证据。现在主线已经转向 Studio、Runtime API、知识库和创作智能体；任何与旧 Web、旧 Workbench 或旧维护叙事绑定的内容都不应再作为当前任务入口。后续若索引不再引用，应直接删除。
+
+保留理由：本文可以帮助理解为什么仓库采用 provider gate、safe artifact、trace-first 和非声明边界。它不应扩大当前任务范围，也不应恢复旧路径。后续维护应以当前 AGENTS、TASK_TRACKER、DEVLOG、Studio handoff 和 Runtime 测试为准；如果这些入口已经覆盖本文内容，就应移除本文。
+
 Status: in progress
 
 Date: 2026-06-03

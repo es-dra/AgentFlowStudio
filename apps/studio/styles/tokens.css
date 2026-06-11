@@ -1,0 +1,51 @@
+:root {
+  /* AFS Studio dark canvas palette, tuned from mature creative-tool references. */
+  --bg-canvas: #111214;
+  --bg-panel: #1b1d20;
+  --bg-panel-raised: #202327;
+  --bg-card: #232529;
+  --bg-card-soft: #1e2024;
+  --bg-input: #2a2d31;
+  --bg-chip: #2e3136;
+  --bg-chip-active: #3c4046;
+
+  --border-card: #3a3d42;
+  --border-soft: #2c2f34;
+  --border-selected: #e8e8ea;
+
+  --text-primary: #f2f3f5;
+  --text-secondary: #9b9ea4;
+  --text-faint: #6b6e74;
+
+  --accent: #5ac8fa;
+  --accent-soft: rgba(90, 200, 250, 0.18);
+  --danger: #ff5f57;
+  --energy: #f5c451;
+
+  --port-out: #38d4c0;
+  --port-in: #f0b35a;
+
+  --radius-card: 14px;
+  --radius-bar: 12px;
+  --radius-chip: 8px;
+  --radius-pill: 999px;
+
+  --shadow-pop: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --shadow-bar: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  --z-canvas: 0;
+  --z-edges: 1;
+  --z-nodes: 2;
+  --z-promptbar: 30;
+  --z-dock: 40;
+  --z-drawer: 45;
+  --z-topbar: 46;
+  --z-popover: 60;
+  --z-modal: 80;
+
+  --dock-h: 56px;
+  --topbar-h: 52px;
+  --drawer-w: 196px;
+
+  --font-ui: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+}

@@ -1,5 +1,9 @@
 # AFS Ignored Runtime Cleanup Manifest 001
 
+中文摘要：本文记录 ignored runtime 输出目录的安全清理策略，用于区分可删除运行产物、不可提交素材和应保留的工程文件。当前收口原则是 secret、provider raw、媒体字节、本地私有路径不得进入 repo；无用运行残留可删除而不是归档。它只支持本地维护，不声明业务验收。
+
+执行标准：清理前先确认路径是否位于 ignored runtime 目录或明确的临时输出目录，不能跨目录递归删除。清理后要用 git status、维护审计和保留策略扫描确认没有误删源代码、contract、测试或 handoff。任何可疑素材、provider 响应和本地路径都不得提交，只能作为本地临时证据处理。
+
 Status: manifest for safe local cleanup during `AFS-MAINTENANCE-SLIMMING-001`.
 
 ## Cleanup Policy

@@ -1,60 +1,71 @@
-# 开发日志
+# Devlog
 
-状态：当前会话短日志。历史长叙事不作为当前任务入口，旧记录已归档到 `docs/archive/`、`docs/frontend_integration/` 和对应 handoff。
+中文摘要：本文件只保留当前阶段的短记录和验证入口，不再承载旧 Web、旧 Workbench 或历史浏览器 QA 的长流水。当前判断以 Studio、Runtime Service、知识库、创作智能体和 provider gate 为主线；测试通过只代表工程验证，不代表人工验收、商业验证或长期记忆晋升。后续如果某条记录不再支持当前 MVP、真实模型接入或维护收口，应直接删除，避免把过期资料继续带入主线。
 
-## 当前证据入口
+当前状态：本轮收口已经把旧 Workbench、旧静态 Web、过期前端对接包和旧浏览器 QA 记录移出主线，同时补上创作意图控制智能体、关键帧生成 gate、Studio 静态入口和 OpenAPI 契约。后续记录只写影响当前落地的验证结果、阻塞项和真实模型接入证据，不再追加无明确后续用途的过程叙事。
 
-- 当前任务账本：`TASK_TRACKER.md`。
-- LibTV 画布提示词优化集成：`docs/handoff/AFS-LIBTV-NODE-PROMPT-OPTIMIZER-INTEGRATION-001.md`。
-- 提示词记忆闭环：`docs/handoff/AFS-PROMPT-MEMORY-LOOP-MVP-001.md`。
-- 专业知识库与 Prompt Assembly：`docs/handoff/AFS-PROFESSIONAL-KNOWLEDGEBASE-PROMPT-ASSEMBLY-001.md`。
-- MVP 联合验收：`docs/handoff/AFS-MVP-PROMPT-OPTIMIZER-SUPPORT-001.md`、`docs/frontend_integration/AFS_MVP_PROMPT_OPTIMIZER_JOINT_ACCEPTANCE.zh-CN.md`。
-- Web LibTV 画布主线：`docs/handoff/AFS-WEB-LIBTV-CANVAS-PROMPT-ONLY-006.md`。
+Status: short current-session log. Historical long narratives are not current
+product documentation.
 
-## 2026-06-11 - Professional Knowledgebase Prompt Assembly 001
+## 2026-06-12 - AFS Studio UI Polish + 2D 导演台 Prompt 联动
 
-- 新增双副本专业影视提示词知识库：公司源头副本在 `10-Startup/70-Projects/AgentFlow-Studio/knowledgebase`，仓库执行副本在 `agentflow/knowledge`。
-- 仓库执行副本包含 registry、schema、示例和 12 个规则域，覆盖导演、摄影、灯光、美术、分镜、短视频脚本、音频、角色一致性、关键帧连续性、视频运动、2D 导演台和负面约束。
-- Runtime `prompt-optimizations` 已从占位规则切换到 deterministic rule loader、规则选择、中文槽位抽取、上下文优先级、冲突抑制、分段 prompt 输出、trace 和 safe manifest。
-- 边界：provider 默认关闭；不提交 secret、signed URL、本地私有素材、provider 原始响应、生成媒体字节、durable memory 晋升或 Company OS active rule。
+- 修复 Studio 左上角重叠：抽屉展开时项目身份只由抽屉承载，顶栏从 `var(--drawer-w)` 右侧开始；抽屉收起时才显示 compact 项目 pill。
+- 将导演台占位壳改成二维顶视图布置板：对象列表、网格画布、相机视锥、灯光光束、人物朝向、道具形状和右侧参数面板均可见。
+- 导演台布置保存为节点本地 `directorSetup`；导演台节点展示机位 / 主体 / 灯光摘要，并可驱动相连图片或视频节点。
+- Prompt 优化会从当前导演台节点或最近上游导演台节点提取安全版 `director_setup`；优化浮层显示用户可懂的“导演台布置”来源 chip。
+- 后端用户版六段提示词已消费导演台上下文：人物站位、道具空间、机位/FOV/构图、灯光、运动连续性和光源/机位/空间冲突负面约束。
+- 修复从底部 dock 添加节点时新节点落入 dock 安全区的问题：菜单仍从 dock 弹出，但节点出生点改为当前画布可视中心。
+- 拆分导演台字段控件到 `apps/studio/src/panels/director-fields.js`，并将导演台 prompt API 测试移到 `tests/test_api_runtime_director_setup_prompt.py`，让本轮触达文件回到维护阈值内。
+- 将 AgentFlow local AgentOps contract 示例的 `doc_path` 从已删除旧维护文档改到当前 `docs/company_operating_model.md`。
 
-## 2026-06-11 - LibTV Node Prompt Optimizer Integration 001
+验证：
 
-- 集成 Web LibTV 画布和 Runtime `prompt-optimizations`：节点内 `优化` 优先调用 Runtime API，失败时才使用本地规则 fallback。
-- 新增 `prompt-optimizer-runtime.js`，负责节点类型映射、安全 artifact refs、请求组装、Runtime 响应归一化和 fallback 包装。
-- 用户界面只展示原始 prompt、优化后 prompt、分段结果、替换、追加、复制和应用到节点；不展示知识库权重、trace、候选记忆审核或 provider 配置。
-- 验证边界：浏览器 QA 记录 Runtime optimizer requests，provider requests 为 0。
+```text
+Full pytest: 767 passed, 1 Starlette/httpx warning
+Focused Studio / prompt / contract set: 21 passed
+apps/studio JS node --check: passed
+Runtime-hosted browser QA: passed
+repository_retention_review manual_review_required_count: 0
+git diff --check: passed with Windows CRLF notices only
+maintenance_audit: 仅剩既有 human-facing Markdown 中文覆盖 warning；oversized_files 已通过
+```
 
-## 2026-06-11 - LibTV Canvas Prompt-Only UI 006
+边界：
 
-- 普通用户 Web 路径重置为 LibTV 风格画布：深色首页、全屏点阵画布、底部 dock、左侧画布/资产抽屉、添加节点、工具箱、素材、历史浮层、节点内控制和导演台覆盖编辑器。
-- 提示词记忆闭环保留在后台；前端只在 prompt 输入位暴露 `优化` 入口。
-- 普通路径不展示项目记忆页、生成能力门、任务中心、诊断、provider/runtime 文案、trace、权重或候选记忆确认。
-- 浏览器 QA 已覆盖 canvas header、add-node、prompt optimizer、toolbox，provider/MiniMax 保持关闭。
+- Provider gate 仍关闭。
+- 未生成图片/视频字节，也未保存 provider 原始响应。
+- 这不是 human acceptance、business validation、provider smoke 或 durable-memory promotion。
 
-## 2026-06-11 - LibTV Canvas Interactions 006A-006L
+## 2026-06-12 - Creative Intent Agent And Keyframe Gate
 
-- 画布从静态布局推进到真实节点编辑器：空画布平移、双击添加节点、拖拽节点、动态 Bezier 边、可见端口、磁吸连接、成功反馈、长按/框选多选、批量复制/对齐/删除、关系聚焦、mini-map、fit view、center selected、reset viewport。
-- 默认 8 个 workflow 节点已可打开对应 LibTV 风格节点面板，并支持上游/当前/下游上下文 chip 导航。
-- 边选择工具条支持居中端点和断开自定义连接。
-- 验证：相关 browser QA 覆盖 canvas interactions、relation focus、canvas viewport、workflow node open、director interactions 和 prompt optimizer；未触发 provider 请求。
+- Added deterministic `creative_intent_control_agent_v1` trace for prompt optimization.
+- Added hard / strong / soft constraint layering, three internal candidates, multi-axis scores, deterministic selected candidate, and provider translation metadata.
+- Treated `node_parameters` as hard controls in prompt assembly and trace.
+- Added English `user preference:` extraction so lower-priority preferences can be suppressed when they conflict with professional/node constraints.
+- Added `POST /projects/{project_id}/keyframe-generations`.
+- Keyframe generation is gated by `AFS_ALLOW_REMOTE_IMAGE`; with the gate closed it writes only safe JSON artifacts and starts no network/provider call.
+- Added repo-safe engineering summary: `docs/architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md`.
+- Added private algorithm design note under `10-Startup/70-Projects/AgentFlow-Studio/30-agent-infrastructure/creative-intent-control-agent-v1.zh-CN.md`.
+- Deleted stale Web/Workbench handoffs, old Web superpowers plans/specs, stale Web maintenance ledgers, and old Web archive files instead of archiving them.
 
-## 2026-06-11 - LibTV Node Controls and Mobile 006M-006R
+Verification so far:
 
-- 节点参数 chips 已变成真实本地控制：text/script attempts、image modes/specs、video modes/specs/toggles、audio target/mode/voice/spec。
-- 打开节点、上下游跳转、返回画布具备 enter、chain、return 空间反馈。
-- 移动端和 tablet 已增加专用样式：压缩 topbar、底部 dock、上下文栏、参数网格、video-merge 和 Director Desk 布局，节点详情保持可滚动。
-- Canvas safety 增强：拖拽中的连线实时跟随，拖拽结束会按 topbar 和 bottom dock 安全区域校正视口，QA 以几何不重叠判断底部 dock 安全。
-- Video node `运镜` 入口已成为本地控制面板，含运镜、强度、主体动作、节奏、动画预览和 live summary。
-- 最近验证：full pytest 通过 `890 passed`；`maintenance_audit` 曾只剩长记录 warning；`git diff --check` 仅有 Windows CRLF 提示；provider/MiniMax 保持关闭。
+```text
+tests/test_api_runtime_creative_agent_keyframes.py: 3 passed
+prompt/runtime/studio focused set: 25 passed
+apps/studio JS node --check: passed
+```
 
-## 历史记录归档
+Boundaries:
 
-- 2026-06-09 到 2026-06-10 的 Web foundation / RC / provider-prep 长记录不再作为当前入口；详见 `docs/archive/DEVLOG-2026-06-09-web-foundation-archive.md`、`docs/frontend_integration/` 和对应 handoff。
+- No real provider call was made.
+- No image/video bytes were generated through Runtime.
+- This is not human acceptance, business validation, or durable-memory promotion.
 
-## 非声明
+## 2026-06-11 - AFS Studio Hard Cleanup
 
-- 当前自动化验证不是 human acceptance。
-- 当前本地 deterministic / browser QA 不是 business validation。
-- provider smoke 尚未执行，后续必须按能力 gate 单独授权。
-- 本轮没有把项目证据晋升为 durable memory 或 Company OS active rule。
+- Retired old Workbench/static memory-workbench user routes.
+- Current frontend entry is `/studio/`, backed by `apps/studio/`.
+- Deleted old UI source, old UI-specific tests, old Workbench browser QA tools, and old frontend integration docs.
+- Prompt optimizer contract moved to `docs/architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md`.
+- Verified earlier in this branch: full pytest, maintenance audit, `git diff --check`, Runtime-hosted `/studio/` browser QA, and `/workbench/` 404.

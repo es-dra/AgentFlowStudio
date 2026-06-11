@@ -1,14 +1,23 @@
-# 前端 Runtime Service 请求示例
+# Frontend Runtime Service Examples
 
-这些 request examples 用于本地 AFS Runtime Service v0.2。
+中文摘要：本目录保存给 Studio 与 Runtime Service 对接使用的安全请求示例。示例只包含 project id、node prompt、safe asset refs、节点参数和 provider gate 所需的非敏感字段；不得加入 secret、本地素材路径、signed URL、媒体字节或 provider 原始响应。当前重点是 prompt optimization 和 keyframe generation 契约。
 
-启动服务：
+These request examples are safe local fixtures for AFS Studio and Runtime
+Service integration.
+
+Start the local service:
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
 ```
 
-第一轮前端集成 smoke 可以直接把这些文件作为 request body：
+Current OpenAPI export:
+
+```powershell
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\openapi\afs-runtime-service.openapi.json
+```
+
+Core fixtures:
 
 - `create_project.request.example.json`
 - `project_import.request.example.json`
@@ -17,10 +26,18 @@
 - `feedback_record.request.example.json`
 - `provider_validation_plan.request.example.json`
 
-OpenAPI 固定导出：
+Node prompt optimizer fixtures:
 
 ```text
-docs/frontend_integration/openapi/afs-runtime-service.openapi.json
+prompt_optimizer_nodes/
 ```
 
-`two_round_validate` fixture 里有占位 `round_1_job_id`。实际联调时，用 `/runs/asset-test` 返回的 `job.job_id` 替换它。
+Key Runtime endpoints for Studio:
+
+- `POST /projects/{project_id}/prompt-optimizations`
+- `POST /projects/{project_id}/keyframe-generations`
+
+Provider gates are closed by default. Fixtures must not contain provider
+secrets, local private paths, signed URLs, provider raw responses, or media
+bytes. Replace the placeholder `round_1_job_id` in `two_round_validate` with the
+`job.job_id` returned by `/runs/asset-test` during live local smoke.

@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-FEEDBACK-INTAKE-001
 
+中文摘要：本文记录资产反馈进入后端证据链的早期实现方式。当前阶段反馈仍是 candidate evidence，不能自动成为 durable memory，也不能覆盖专业知识库、节点硬约束或角色/场景连续性。它只支持理解安全反馈结构和测试证据；如果当前创作智能体反馈回路替代了该说明，应直接删除。
+
+执行标准：反馈只能进入项目级候选证据，必须带来源、时间、关联 artifact 和非声明边界。系统可以用反馈影响下一次候选评分，但不能静默改写角色设定、场景设定、专业规则或 provider 约束。人工确认之前，反馈不得强注入后续生成，也不得写入公司知识库。
+
 Status: implementation handoff.
 
 ## Scope

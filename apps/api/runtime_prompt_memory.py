@@ -53,6 +53,8 @@ def build_prompt_optimization(
         "provider_gate": provider_gate(),
         "original_prompt": request.prompt_text,
         "optimized_prompt": assembled_prompt,
+        "user_prompt": assembly["user_prompt"],
+        "user_prompt_sections": assembly["user_prompt_sections"],
     }
 
 
@@ -74,6 +76,7 @@ def _creative_brief(request: PromptOptimizationRequest, project_id: str, assembl
             "Do not include private asset paths, signed URLs, or raw provider responses.",
         ],
         "director_setup": request.director_setup.model_dump(mode="json") if request.director_setup else {"view": "not_provided"},
+        "node_parameters": request.node_parameters or {},
         "asset_refs": list(request.asset_refs),
         "provider_output": False,
         "provider_calls_started": False,
@@ -100,6 +103,7 @@ def _prompt_trace(
         "generation_target": request.generation_target,
         "context_priority": CONTEXT_PRIORITY,
         "knowledge_rules": assembly["knowledge_rules"],
+        "creative_agent": assembly["creative_agent"],
         "selected_slots": assembly["selected_slots"],
         "conflict_resolution": assembly["conflict_resolution"],
         "suppressed_context": assembly["suppressed_context"],

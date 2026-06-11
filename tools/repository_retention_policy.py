@@ -50,8 +50,10 @@ def review_directory(path: str) -> ReviewedPath:
         return _dir(path, "production_spine", "current", "内容生产与分发 pipeline 模块仍被测试和 CLI 覆盖；旧 demo 文件会在文件级降级。")
     if path.startswith("apps/api"):
         return _dir(path, "production_spine", "current", "Runtime Service 是前后端唯一对接面。")
+    if path.startswith("apps/studio"):
+        return _dir(path, "production_spine", "current", "AFS Studio 是当前唯一用户侧 Web 画布入口。")
     if path.startswith("apps/workbench"):
-        return _dir(path, "production_spine", "current", "Runtime Service backed product Web workbench foundation.")
+        return _dir(path, "delete_candidate", "legacy_workbench_surface", "旧 Workbench 已被 AFS Studio 替代，不再作为当前产品入口。")
     if path.startswith("apps/reporting"):
         return _dir(path, "production_spine", "current", "CLI、Runtime 和过渡面共用的应用层 report helper。")
     if path.startswith("apps/cli"):
@@ -59,7 +61,7 @@ def review_directory(path: str) -> ReviewedPath:
     if path.startswith("apps/web_bridge"):
         return _dir(path, "delete_candidate", "legacy_runtime_surface", "旧 Web bridge 已退出当前产品主干，应直接删除。")
     if path.startswith("apps/web"):
-        return _dir(path, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台仍被静态测试覆盖，外部前端接管后应退休。")
+        return _dir(path, "delete_candidate", "retired_static_viewer", "旧 static memory-workbench 已被 AFS Studio 替代，不再作为当前产品入口。")
     if path == "apps":
         return _dir(path, "production_spine", "current", "应用入口层，包含 API、CLI 和过渡面。")
     if path.startswith("configs"):
@@ -69,7 +71,7 @@ def review_directory(path: str) -> ReviewedPath:
     if path.startswith("docs/archive"):
         return _dir(path, "historical_reference", "archive_only", "历史证据归档，不作为当前入口。")
     if path.startswith("docs/frontend_integration"):
-        return _dir(path, "production_spine", "current", "前端团队对接材料和 Runtime Service contract 映射。")
+        return _dir(path, "delete_candidate", "retired_frontend_docs", "旧前端对接包已由 Studio 架构文档和 OpenAPI 目录替代。")
     if path.startswith("docs/handoff"):
         return _dir(path, "historical_reference", "archive_or_delete_when_indexed", "多切片交接证据；应继续摘要归档和删减。")
     if path.startswith("docs/maintenance"):
@@ -133,6 +135,8 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(path, git_state, "production_spine", "current", "内容生产与分发 pipeline 代码。")
     if path.startswith("apps/api/"):
         return _file(path, git_state, "production_spine", "current", "Runtime Service 对接面、模型、job、artifact 或文档。")
+    if path.startswith("apps/studio/"):
+        return _file(path, git_state, "production_spine", "current", "AFS Studio 当前用户侧 Web 画布代码。")
     if path.startswith("apps/reporting/"):
         return _file(path, git_state, "production_spine", "current", "CLI、Runtime 和过渡面共用的应用层 report helper。")
     if path == "apps/cli/memory_demo_commands.py":
@@ -153,15 +157,15 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
     if path.startswith("apps/web_bridge/"):
         return _file(path, git_state, "delete_candidate", "legacy_runtime_surface", "本地 Web bridge 已退出当前产品主干，应直接删除。", "提交删除并保持 Runtime Service / local artifact 边界后完成退休。")
     if path.startswith("apps/workbench/"):
-        return _file(path, git_state, "production_spine", "current", "Runtime Service backed product Web workbench foundation.")
+        return _file(path, git_state, "delete_candidate", "legacy_workbench_surface", "旧 Workbench 已被 AFS Studio 替代，不再作为当前产品入口。")
     if path.startswith("apps/web/"):
-        return _file(path, git_state, "transition_surface", "retire_when_replaced", "过渡 read-only Web 工作台；外部前端上线后按测试覆盖退休。")
+        return _file(path, git_state, "delete_candidate", "retired_static_viewer", "旧 static memory-workbench 已被 AFS Studio 替代，不再作为当前产品入口。")
     if path.startswith("configs/"):
         return _file(path, git_state, "supporting_contract", "current", "配置 template、platform profile 或 tool catalog；不含本地 secret。")
     if path.startswith("docs/archive/"):
         return _file(path, git_state, "historical_reference", "archive_only", "历史执行证据，后续用中文摘要继续瘦身。")
     if path.startswith("docs/frontend_integration/"):
-        return _file(path, git_state, "production_spine", "current", "前端对接包、API 适配说明或 fixture。")
+        return _file(path, git_state, "delete_candidate", "retired_frontend_docs", "旧前端对接包已由 Studio 架构文档和 OpenAPI 目录替代。")
     if path.startswith("docs/handoff/"):
         return _file(path, git_state, "historical_reference", "archive_or_delete_when_indexed", "历史/当前切片交接证据，应继续摘要归档和删减。")
     if path.startswith("docs/maintenance/"):

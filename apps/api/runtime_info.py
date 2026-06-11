@@ -35,14 +35,14 @@ def runtime_capabilities_payload() -> dict[str, Any]:
             "draft_canvas",
             "update_scene_inspector",
             "record_review_decision",
-            "read_workbench_state",
             "asset_test_run",
             "two_round_validate",
             "record_feedback",
             "provider_validation_plan",
+            "keyframe_generation",
             "export_openapi_schema",
         ],
-        "workbench_flow": {
+        "studio_flow": {
             "target_status": "ready_for_next_round",
             "actions": [
                 "add_reference",

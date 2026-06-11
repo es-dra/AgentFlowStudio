@@ -24,8 +24,8 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "register_source_asset" in capabilities["actions"]
     assert "draft_canvas" in capabilities["actions"]
     assert "record_review_decision" in capabilities["actions"]
-    assert capabilities["workbench_flow"]["target_status"] == "ready_for_next_round"
-    assert capabilities["workbench_flow"]["actions"] == [
+    assert capabilities["studio_flow"]["target_status"] == "ready_for_next_round"
+    assert capabilities["studio_flow"]["actions"] == [
         "add_reference",
         "draft_canvas",
         "start_first_generation_check",
@@ -38,7 +38,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "d:\\" not in serialized
 
 
-def test_runtime_service_allows_local_workbench_cors(tmp_path) -> None:
+def test_runtime_service_allows_local_studio_cors(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     localhost_response = client.options(
@@ -62,27 +62,35 @@ def test_runtime_service_allows_local_workbench_cors(tmp_path) -> None:
     assert file_response.headers["access-control-allow-origin"] == "null"
 
 
-def test_runtime_service_serves_workbench_static_entry_without_private_paths(tmp_path) -> None:
+def test_runtime_service_serves_studio_static_entry_without_private_paths(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    redirect = client.get("/workbench", follow_redirects=False)
-    index = client.get("/workbench/")
-    app_js = client.get("/workbench/src/app.js")
+    redirect = client.get("/studio", follow_redirects=False)
+    index = client.get("/studio/")
+    app_js = client.get("/studio/src/main.js")
     serialized = (index.text + app_js.text).lower()
 
     assert redirect.status_code in {307, 308}
-    assert redirect.headers["location"] == "/workbench/"
+    assert redirect.headers["location"] == "/studio/"
     assert index.status_code == 200
-    assert '<div id="app-root"></div>' in index.text
-    assert '<script type="module" src="./src/app.js?v=libtv-shell-reset-003"></script>' in index.text
+    assert '<div id="app">' in index.text
+    assert '<script type="module" src="./src/main.js"></script>' in index.text
     assert app_js.status_code == 200
     assert index.headers["cache-control"] == "no-store"
     assert app_js.headers["cache-control"] == "no-store"
-    assert "createRuntimeClient" in app_js.text
+    assert "createStore" in app_js.text
     assert "d:\\" not in serialized
     assert "c:\\" not in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+def test_runtime_service_does_not_serve_retired_workbench_static_entry(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    assert client.get("/workbench", follow_redirects=False).status_code == 404
+    assert client.get("/workbench/").status_code == 404
+    assert client.get("/workbench/src/app.js").status_code == 404
 
 
 def test_runtime_service_creates_project_manifest_and_reads_safe_artifact(tmp_path) -> None:

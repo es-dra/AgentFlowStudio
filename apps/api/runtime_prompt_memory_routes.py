@@ -56,6 +56,8 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "ui_surface": "node_prompt_optimizer",
             "original_prompt": result["original_prompt"],
             "optimized_prompt": result["optimized_prompt"],
+            "user_prompt": result["user_prompt"],
+            "user_prompt_sections": result["user_prompt_sections"],
             "provider_gate": result["provider_gate"],
             "provider_calls_started": False,
             "writes_long_term_memory": False,

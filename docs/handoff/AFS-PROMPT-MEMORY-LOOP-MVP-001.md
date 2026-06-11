@@ -1,5 +1,11 @@
 # AFS Prompt Memory Loop MVP 001
 
+中文摘要：本文记录第一版节点 prompt 优化闭环的后端能力。当前产品面只在 Studio 节点输入处提供优化动作，后台可使用知识库、角色/场景上下文和低权重用户偏好，但不展示候选记忆审核 UI。这里的“memory loop”只表示项目级背景证据复用，不等于 durable memory，也不等于公司知识库晋升。
+
+执行标准：优化输出要适合节点直接使用，并保持 Intent、Subject、Scene、Action、Camera、Lighting、Motion、Continuity 和 Negative Constraints 等结构。第二次优化可以复用前次抽取的人物和场景，但必须在 trace 中说明来源和非 durable memory。provider gate 关闭时仍要本地 deterministic 可用。
+
+下一步口径：前端只需要调用节点优化接口、展示优化结果并允许替换或追加到节点 prompt；后台 trace、候选评分、知识库权重和上下文来源不进入普通 UI。真实模型接入时，先让 prompt 优化和关键帧生成形成一条可回放证据链，再根据人工反馈调整规则。任何反馈都先作为候选证据，不能静默改变 durable memory。
+
 Date: 2026-06-11
 
 Owner role: Runtime/API Integrator + Memory Steward
@@ -74,7 +80,7 @@ Current focused verification:
 
 ```powershell
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_prompt_memory_loop.py -q
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_prompt_memory_loop.py tests\test_api_runtime_llm_script_vertical.py tests\test_api_runtime_service_v02.py tests\test_api_runtime_workbench_state.py -q
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_prompt_memory_loop.py tests\test_api_runtime_prompt_node_contract.py tests\test_api_runtime_creative_agent_keyframes.py tests\test_api_runtime_service_v02.py tests\test_web_studio_static.py -q
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py

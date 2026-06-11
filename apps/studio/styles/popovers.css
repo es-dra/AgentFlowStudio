@@ -1,0 +1,209 @@
+.popover {
+  position: absolute;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-bar);
+  box-shadow: var(--shadow-pop);
+  z-index: var(--z-popover);
+  min-width: 200px;
+  padding: 6px;
+}
+
+.menu-title { padding: 8px 10px 4px; color: var(--text-faint); font-size: 12px; }
+
+.menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  text-align: left;
+}
+.menu-item:hover:not(:disabled) { background: var(--bg-chip); }
+.menu-item:disabled { color: var(--text-faint); }
+.menu-item .mi-icon {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--bg-chip);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex: none;
+}
+.menu-item .mi-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-chip);
+  color: var(--text-secondary);
+}
+.menu-item .mi-tag.new { background: #2b4f5e; color: #9adcf5; }
+.menu-item .mi-meta { margin-left: auto; color: var(--text-faint); font-size: 11px; }
+.menu-item .mi-sub { display: block; color: var(--text-faint); font-size: 11px; margin-top: 2px; }
+.menu-item.selected { background: var(--bg-chip-active); }
+
+/* 规格弹层 */
+.spec-pop { width: 280px; padding: 12px; }
+.spec-pop .spec-section { margin-bottom: 10px; }
+.spec-pop .spec-label { color: var(--text-faint); font-size: 12px; margin-bottom: 6px; }
+.spec-pop .spec-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.spec-opt {
+  padding: 6px 10px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+.spec-opt:hover { color: var(--text-primary); }
+.spec-opt.active { border-color: var(--text-secondary); color: var(--text-primary); background: var(--bg-chip); }
+.spec-opt.ratio { width: 52px; display: inline-flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0; font-size: 11px; }
+
+/* 摄像机弹层 */
+.camera-pop { width: 430px; padding: 14px; }
+.camera-pop .cam-title { color: var(--text-primary); margin-bottom: 12px; display: flex; justify-content: space-between; }
+.camera-pop .cam-cols { display: flex; gap: 10px; }
+.cam-col { flex: 1; text-align: center; }
+.cam-col .cam-box {
+  height: 76px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px;
+  color: var(--text-secondary);
+}
+.cam-col .cam-box .cam-value { color: var(--text-primary); font-size: 15px; }
+.cam-col select {
+  margin-top: 8px;
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.camera-pop .cam-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+.cam-use-btn {
+  background: var(--text-primary);
+  color: #15161a;
+  border-radius: var(--radius-chip);
+  padding: 6px 16px;
+}
+
+/* 优化 popover */
+.optimizer-pop {
+  width: 460px;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.optimizer-pop .opt-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.optimizer-pop .opt-head .opt-title { color: var(--text-primary); }
+.optimizer-pop .opt-head .opt-state { color: var(--text-faint); font-size: 12px; }
+.optimizer-pop .opt-head .opt-close { margin-left: auto; color: var(--text-faint); }
+.optimizer-pop .opt-head .opt-close:hover { color: var(--text-primary); }
+
+.optimizer-pop .opt-body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.optimizer-pop .opt-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.optimizer-pop .opt-source-chip {
+  border: 1px solid var(--border-soft);
+  background: var(--bg-chip);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.opt-section-label { color: var(--text-faint); font-size: 12px; }
+.opt-original {
+  background: var(--bg-card-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  padding: 9px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  max-height: 84px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+.opt-result {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-chip);
+  padding: 10px 11px;
+  color: var(--text-primary);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.opt-result .opt-sec-name { color: var(--accent); }
+
+.optimizer-pop .opt-loading {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text-secondary);
+  padding: 18px 0;
+  justify-content: center;
+}
+.optimizer-pop .opt-loading .spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border-card);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+.optimizer-pop .opt-actions {
+  display: flex; gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.opt-actions .opt-btn {
+  padding: 6px 13px;
+  border-radius: var(--radius-chip);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+.opt-actions .opt-btn:hover { color: var(--text-primary); border-color: var(--border-card); }
+.opt-actions .opt-btn.primary {
+  background: var(--text-primary);
+  color: #15161a;
+  border-color: transparent;
+}
+.opt-actions .row-spacer { flex: 1; }
+
+.menu-item.danger { color: var(--danger); }
+.menu-item.danger .mi-icon { color: var(--danger); }
+
+/* 重命名弹层 */
+.rename-pop { padding: 8px; }
+.rename-input {
+  width: 200px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-chip);
+  padding: 7px 9px;
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+/* tooltip */
+.tooltip {
+  position: absolute;
+  background: #0d0e10;
+  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  z-index: var(--z-popover);
+  pointer-events: none;
+  white-space: nowrap;
+}

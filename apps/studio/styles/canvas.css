@@ -1,0 +1,278 @@
+#canvas-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: var(--z-canvas);
+}
+
+#canvas-viewport {
+  position: absolute;
+  inset: 0;
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 24px 24px;
+  cursor: default;
+}
+#canvas-viewport.panning { cursor: grabbing; }
+#canvas-viewport.space-pan { cursor: grab; }
+
+#world {
+  position: absolute;
+  left: 0; top: 0;
+  width: 0; height: 0;
+  transform-origin: 0 0;
+}
+
+#edge-layer {
+  position: absolute;
+  left: -20000px; top: -20000px;
+  width: 40000px; height: 40000px;
+  overflow: visible;
+  z-index: var(--z-edges);
+  pointer-events: none;
+}
+#edge-layer path {
+  fill: none;
+  stroke: #4a6f86;
+  stroke-width: 2;
+  pointer-events: stroke;
+  transition: stroke 0.15s ease, opacity 0.15s ease;
+}
+#edge-layer path.edge-flow {
+  stroke-dasharray: 7 9;
+  animation: edge-flow 1.4s linear infinite;
+}
+#edge-layer path.director-edge {
+  stroke: var(--energy);
+  stroke-dasharray: 4 8;
+  filter: drop-shadow(0 0 4px rgba(245, 196, 81, 0.32));
+}
+#edge-layer path.reference-edge {
+  stroke: #8192a8;
+  stroke-dasharray: 3 7;
+}
+@keyframes edge-flow { to { stroke-dashoffset: -16; } }
+#edge-layer path.pending {
+  stroke: var(--accent);
+  stroke-dasharray: 6 5;
+  animation: edge-flow 0.8s linear infinite;
+}
+#edge-layer path.pending.target-locked {
+  stroke: var(--port-out);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px rgba(56, 212, 192, 0.55));
+}
+#edge-layer path.selected-edge { stroke: var(--accent); stroke-width: 2.5; }
+#edge-layer path.just-connected {
+  stroke: var(--port-out);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(56, 212, 192, 0.7));
+  animation: edge-success 1s ease;
+}
+@keyframes edge-success {
+  0% { stroke-width: 5; }
+  100% { stroke-width: 3; }
+}
+#edge-layer path.rel-up-edge { stroke: var(--port-in); stroke-width: 2.5; }
+#edge-layer path.rel-down-edge { stroke: var(--port-out); stroke-width: 2.5; }
+#edge-layer path.rel-dim-edge { opacity: 0.18; }
+
+#node-layer { position: absolute; left: 0; top: 0; z-index: var(--z-nodes); }
+
+/* ---------- 节点卡 ---------- */
+.node {
+  position: absolute;
+  width: 280px;
+  min-height: 250px;
+  background: rgba(35, 37, 41, 0.92);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+.node.selected { border-color: var(--border-selected); box-shadow: 0 0 0 1px var(--border-selected); }
+.node.drag-moving { opacity: 0.92; }
+.node.collapsed { min-height: 48px; overflow: hidden; }
+.node.drop-target {
+  border-color: var(--port-out);
+  box-shadow: 0 0 0 1px var(--port-out), 0 0 18px rgba(56, 212, 192, 0.35);
+}
+.node.rel-upstream { border-color: var(--port-in); }
+.node.rel-downstream { border-color: var(--port-out); }
+.node.rel-dimmed { opacity: 0.35; }
+.node.is-reference { border-style: dashed; }
+
+.ref-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-chip);
+  border: 1px solid var(--border-soft);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* hover 操作条 */
+.node-actions {
+  position: absolute;
+  top: -38px; right: 0;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  background: rgba(27, 29, 32, 0.95);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  padding: 3px;
+  z-index: 3;
+}
+.node:hover .node-actions, .node.selected .node-actions { display: inline-flex; }
+.na-btn {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.na-btn:hover { background: var(--bg-chip-active); color: var(--text-primary); }
+
+.node-title {
+  position: absolute;
+  top: -22px; left: 2px;
+  display: flex; align-items: center; gap: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.node-float-action {
+  position: absolute;
+  top: -38px; left: 0;
+  background: rgba(27, 29, 32, 0.95);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  padding: 5px 10px;
+  color: var(--text-primary);
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+.node.selected .node-float-action { display: inline-flex; }
+
+.node-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 18px;
+  gap: 4px;
+}
+.node-glyph {
+  align-self: center;
+  font-size: 38px;
+  color: #4a4d53;
+  margin-bottom: 10px;
+}
+.node-empty-label { color: var(--text-faint); margin-bottom: 4px; }
+.node-intents { display: flex; flex-direction: column; gap: 2px; }
+.node-intent {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-chip);
+  color: var(--text-secondary);
+  text-align: left;
+}
+.node-intent:hover { background: var(--bg-chip); color: var(--text-primary); }
+.node-intent .intent-icon { font-size: 12px; width: 16px; text-align: center; }
+
+.node-result {
+  margin: 0 14px 12px;
+  background: var(--bg-card-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  padding: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+.node-status {
+  margin: 0 14px 10px;
+  display: flex; align-items: center; gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.node-status .spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--border-card);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.node-status.success { color: var(--port-out); margin-top: 12px; }
+.node-status.error { color: var(--danger); margin-top: 12px; }
+
+/* 端口 */
+.node-port {
+  position: absolute;
+  top: 50%;
+  width: 22px; height: 22px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-card);
+  color: var(--text-secondary);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.node:hover .node-port, .node.selected .node-port { opacity: 1; }
+.node-port.in { left: -32px; }
+.node-port.out { right: -32px; }
+.node-port:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+/* 导演台节点 */
+.node.director .node-body { align-items: center; text-align: center; }
+.node .director-open-btn {
+  margin-top: 10px;
+  background: var(--bg-chip);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-chip);
+  padding: 7px 14px;
+  color: var(--text-primary);
+}
+.node .director-open-btn:hover { background: var(--bg-chip-active); }
+.director-node-summary {
+  margin-top: 6px;
+  border: 1px solid rgba(245, 196, 81, 0.30);
+  background: rgba(245, 196, 81, 0.09);
+  color: var(--energy);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+/* 文本内容节点（示例剧本等） */
+.node.text-content .node-body { justify-content: flex-start; padding: 14px; }
+.node .text-content-view {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  overflow-y: auto;
+  max-height: 220px;
+  white-space: pre-wrap;
+}
+
+/* 框选 */
+#marquee {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  z-index: var(--z-promptbar);
+  pointer-events: none;
+}

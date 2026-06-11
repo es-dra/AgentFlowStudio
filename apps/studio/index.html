@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentFlow Studio</title>
+    <link rel="stylesheet" href="./styles/tokens.css" />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/shell.css" />
+    <link rel="stylesheet" href="./styles/canvas.css" />
+    <link rel="stylesheet" href="./styles/prompt-bar.css" />
+    <link rel="stylesheet" href="./styles/popovers.css" />
+    <link rel="stylesheet" href="./styles/modals.css" />
+    <link rel="stylesheet" href="./styles/director.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar"></header>
+      <aside id="drawer"></aside>
+      <main id="canvas-root">
+        <div id="canvas-viewport">
+          <div id="world">
+            <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="node-layer"></div>
+          </div>
+        </div>
+        <div id="canvas-empty-hint" hidden>
+          <span class="hint-chip">双击画布</span> <span class="hint-dim">自由生成节点</span>
+        </div>
+        <div id="starter-row" hidden></div>
+        <div id="prompt-bar-layer"></div>
+      </main>
+      <footer id="dock"></footer>
+      <div id="corner-controls"></div>
+      <div id="overlay-root"></div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

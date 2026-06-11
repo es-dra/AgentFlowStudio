@@ -9,8 +9,10 @@ from agentflow.knowledge.creative_prompt_rules import (
     normalized_knowledgebase_hash,
     select_creative_prompt_rules,
 )
+from apps.api.runtime_creative_agent import build_creative_agent_decision
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_prompt_memory_slots import extract_prompt_slots
+from apps.api.runtime_prompt_memory_user_prompt import build_user_prompt
 
 
 SECTION_ORDER = [
@@ -40,9 +42,21 @@ def assemble_prompt_context(request: PromptOptimizationRequest, state: dict[str,
     background = _background_context(state)
     suppressed = _suppressed_preferences(slots, selected_rules)
     sections = _prompt_sections(request, slots, selected_rules, background, suppressed)
+    user_prompt = build_user_prompt(request, slots)
+    creative_agent = build_creative_agent_decision(
+        request,
+        sections=sections,
+        rules=selected_rules,
+        slots=slots,
+        background=background,
+        suppressed_context=suppressed,
+    )
     return {
-        "optimized_prompt": "\n".join(f"{section['title']}: {section['text']}" for section in sections),
+        "optimized_prompt": creative_agent["selected_candidate"]["canonical_prompt"],
         "prompt_sections": sections,
+        "user_prompt": user_prompt["user_prompt"],
+        "user_prompt_sections": user_prompt["user_prompt_sections"],
+        "creative_agent": creative_agent,
         "knowledge_rules": selected_rules,
         "selected_slots": slots,
         "background_context": background,
@@ -67,6 +81,9 @@ def _prompt_sections(
 ) -> list[dict[str, str]]:
     rule_guidance = _guidance_by_section(rules)
     background_text = _background_text(background)
+    camera_controls = _node_parameter_text(request, ("aspect_ratio", "panorama", "shot_scale", "camera"))
+    lighting_controls = _node_parameter_text(request, ("lighting",))
+    motion_controls = _node_parameter_text(request, ("motion",))
     text_by_section = {
         "Intent": (
             f"Optimize this {request.node_type} node for {request.generation_target} on {request.target_platform}. "
@@ -81,9 +98,9 @@ def _prompt_sections(
             f"{_scene_background(background)} {rule_guidance.get('Scene/Production Design', '')}"
         ),
         "Action/Beat": f"{slots['action']}; visible emotional cue: {slots['emotion']}. {rule_guidance.get('Action/Beat', '')}",
-        "Camera/Framing": f"{slots['camera']}; choose shot scale and angle for the beat. {rule_guidance.get('Camera/Framing', '')}",
-        "Lighting": f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {rule_guidance.get('Lighting', '')}",
-        "Motion/Temporal Progression": f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {rule_guidance.get('Motion/Temporal Progression', '')}",
+        "Camera/Framing": f"{slots['camera']}; choose shot scale and angle for the beat. {camera_controls} {rule_guidance.get('Camera/Framing', '')}",
+        "Lighting": f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {lighting_controls} {rule_guidance.get('Lighting', '')}",
+        "Motion/Temporal Progression": f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {motion_controls} {rule_guidance.get('Motion/Temporal Progression', '')}",
         "Continuity": (
             f"Reuse safe background context only: {background_text}. Asset refs: {_asset_refs(request)}. "
             f"Durable memory remains false. {rule_guidance.get('Continuity', '')}"
@@ -133,6 +150,24 @@ def _suppressed_preferences(slots: dict[str, str], rules: list[dict[str, Any]]) 
     if any(rule["domain"] == "negative_constraints" for rule in rules):
         return []
     return []
+
+
+def _node_parameter_text(request: PromptOptimizationRequest, keys: tuple[str, ...]) -> str:
+    params = request.node_parameters or {}
+    parts = []
+    for key in keys:
+        value = params.get(key)
+        if value in (None, ""):
+            continue
+        label = key.replace("_", " ")
+        if isinstance(value, bool):
+            if value:
+                parts.append(label)
+        else:
+            parts.append(f"{label} {value}")
+    if not parts:
+        return ""
+    return "Node hard controls: " + "; ".join(parts) + "."
 
 
 def _background_text(background: list[dict[str, Any]]) -> str:

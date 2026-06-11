@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-CONSISTENCY-REVIEW-001
 
+中文摘要：本文作为资产一致性后端链路的历史证据保留，当前用途是帮助理解安全 artifact、候选证据和一致性检查如何进入 Runtime 流程。它不代表当前 Studio UI 入口，也不声明人工验收、商业验证或 durable memory。若后续资产一致性逻辑被新 Runtime 测试和当前文档完全覆盖，本文件应直接删除。
+
+保留理由：资产一致性仍可能影响人物、场景和关键帧连续性，所以本文暂时作为工程证据存在。后续维护时，只引用其中仍能支撑当前测试、接口和安全边界的部分；不要恢复旧 UI，不要把候选反馈当强记忆。真实 provider 接入前，所有一致性结论都必须通过新的 keyframe 流程重新验证。
+
 Status: implementation handoff for Node 5 of the non-Web Production Memory
 asset loop.
 

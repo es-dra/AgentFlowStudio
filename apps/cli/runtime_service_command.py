@@ -27,7 +27,7 @@ def runtime_service_command(
 
 def runtime_service_openapi_export_command(
     output: Path = typer.Option(
-        Path("docs/frontend_integration/openapi/afs-runtime-service.openapi.json"),
+        Path("docs/openapi/afs-runtime-service.openapi.json"),
         "--output",
         help="Output path for the Runtime Service OpenAPI schema.",
         show_default=False,

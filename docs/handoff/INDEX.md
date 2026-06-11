@@ -1,12 +1,41 @@
 # Handoff Index
 
+中文摘要：本索引只保留仍能服务当前本地 MVP 的交接文件。当前有效主线是 Studio、Runtime Service、专业知识库、创作智能体、图片/关键帧 gate 和安全 artifact；旧 Workbench、旧静态 Web、旧 LibTV 迭代、发布候选包和过期浏览器 QA 已按“证据足够即删除”处理。后续接手时只能从本索引进入，不应回到已删除历史入口。
+
+维护标准：索引中的文件必须能说明当前接口、测试、验证证据、provider 边界或下一步真实模型接入。不能解释当前主线的文件不再保留。每次新增 handoff 都要写明非目标、非声明、是否发生 provider call、是否写入长期记忆以及对应的验证命令。
+
 Status: current handoff directory index for AgentFlow Studio.
 
-This directory now keeps only handoff files that still support the current
-local-internal-test product spine. Old node-by-node, demo, competition, and
-Web bridge handoffs were deleted instead of migrated.
+This directory keeps only handoff files that still support the current local
+MVP. Retired Workbench, static memory-workbench, old LibTV canvas iterations,
+release-candidate Web docs, and old browser-QA handoffs were deleted instead of
+archived.
 
-## Current Mainline Evidence
+## AFS Studio
+
+- `AFS-STUDIO-MVP-M1-001.md`
+- `AFS-STUDIO-MVP-M1-5-CORE-LOOPS-001.md`
+
+`/studio/` is the only current user-facing frontend entry. Do not resume old
+`/workbench/` or `apps/web` work from historical references.
+
+## Prompt / Knowledge Runtime
+
+- `AFS-PROMPT-MEMORY-LOOP-MVP-001.md`
+- `AFS-PROFESSIONAL-KNOWLEDGEBASE-PROMPT-ASSEMBLY-001.md`
+
+These handoffs cover the deterministic prompt assembly baseline, professional
+knowledgebase rules, and hidden background context policy.
+
+## Runtime Service
+
+- `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
+
+Runtime remains the frontend boundary. Browser UI must not consume CLI
+internals, provider secrets, local private paths, signed URLs, raw provider
+responses, or media bytes.
+
+## Production Memory Backend Evidence
 
 - `AFS-PRODUCTION-MEMORY-ASSET-PROFILE-READINESS-001.md`
 - `AFS-PRODUCTION-MEMORY-ASSET-FEEDBACK-INTAKE-001.md`
@@ -14,65 +43,20 @@ Web bridge handoffs were deleted instead of migrated.
 - `AFS-PRODUCTION-MEMORY-ASSET-PROFILE-PROMOTION-VERSIONING-001.md`
 - `AFS-PRODUCTION-MEMORY-ASSET-CONTEXT-PROJECTION-001.md`
 - `AFS-PRODUCTION-MEMORY-ASSET-CONSISTENCY-REVIEW-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-COCKPIT-WEB-001.md`
 
-These files describe the deterministic local Production Memory Asset Loop:
-
-```text
-asset profile package
--> tester feedback event
--> update candidate
--> promotion decision
--> profile version
--> context projection
--> consistency review
--> read-only Web cockpit
-```
-
-## Runtime Service / Frontend Handoff
-
-- `AFS-WEB-LIBTV-SHELL-RESET-003.md`
-- `AFS-LANDING-PREP-CONTENT-MEMORY-WEB-001.md`
-- `AFS-WEB-RC-DRAFT-PR-001.md`
-- `AFS-WEB-PROVIDER-SMOKE-READINESS-001.md`
-- `AFS-WEB-CANVAS-EXPERIENCE-002.md`
-- `AFS-WEB-CANVAS-EXPERIENCE-002-BROWSER-QA.md`
-- `AFS-WEB-REFOUNDATION-VERTICAL-001.md`
-- `AFS-LIBTV-NODE-PROMPT-OPTIMIZER-INTEGRATION-001.md`
-- `AFS-PROMPT-MEMORY-LOOP-MVP-001.md`
-- `AFS-PROFESSIONAL-KNOWLEDGEBASE-PROMPT-ASSEMBLY-001.md`
-- `AFS-WEB-LIBTV-CANVAS-PROMPT-ONLY-006.md`
-- `AFS-WEB-LIBTV-CANVAS-USABILITY-006P.md`
-- `AFS-WEB-LIBTV-CANVAS-INTERACTION-SAFETY-006Q.md`
-- `AFS-WEB-LIBTV-VIDEO-MOTION-CONTROLS-006R.md`
-- `AFS-WEB-FOUNDATION-001.md`
-- `AFS-WEB-WORKFLOW-CONTROLS-001.md`
-- `AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md`
-- `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
-
-## Local Internal Test Handoff
-
-- `AFS-LOCAL-INTERNAL-TEST-LANDING-001.md`
+These files are backend evidence only. They do not reintroduce a memory review
+UI into the MVP canvas.
 
 ## Current Maintenance Evidence
 
-- `../maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md`
-- `../maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md`
+- `../maintenance/AFS-STUDIO-HARD-CLEANUP-001.zh-CN.md`
 - `../maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`
-
-## Deleted Surfaces
-
-Deleted from current handoff surface:
-
-- old numbered memory/demo handoffs;
-- old competition demo run/talk docs;
-- old Company KB feedback handoffs;
-- old generic Production Memory operator node handoffs;
-- old Web bridge and Web operator handoffs.
+- `../maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md`
 
 ## Routing Rule
 
-- Product/tester handoff: start with the asset loop current evidence.
-- Frontend integration: start with the landing prep plan, then Runtime Service / frontend contract handoffs.
-- New Web work: start from the read-only asset cockpit handoff and current Web tests.
-- Provider work: start from provider-gated docs and never infer authorization from deterministic test success.
+- Studio work starts from `apps/studio/` and the two Studio handoffs.
+- Prompt optimization work starts from the prompt/knowledge runtime handoffs.
+- Provider work starts from provider-gated Runtime contracts and requires an
+  explicit capability gate.
+- Historical Web terms are not task entry points.

@@ -1,103 +1,106 @@
-# 当前架构
+# Current Architecture
 
-本文是 AFS 当前工程基线的中文架构入口。旧 Alpha、Phase、Golden Path、编号 demo 和历史路线图不再作为当前任务入口。
+中文摘要：本文描述当前仍有效的 AFS 架构投影。产品入口是 `/studio/`，后端入口是 Runtime Service，核心能力是把节点 prompt、专业知识、人物/场景上下文、节点参数和 provider gate 组合成安全可追踪的创作指令。旧 Workbench、旧静态 Web、历史候选记忆审核流程和 provider 原始响应不属于当前产品面。本文只作为工程协作和接口理解依据，不声明人工验收、商业验证或 durable memory。
 
-## 当前定位
+执行标准：任何生成链路都先保留 canonical brief、safe manifest、trace 和非声明边界，再考虑调用真实模型。secret、signed URL、本地绝对路径、媒体字节、provider 原始响应不得写入仓库或返回前端。用户偏好只是软约束，专业规则、节点参数、角色身份和场景连续性优先。
 
-AgentFlow Studio 是 provider-gated 的 Agent-native 内容生产与执行投影验证线。近期目标是形成低维护成本工程基线，而不是保留历史 demo 面或无治理的大规模 provider 平台。
+AgentFlow Studio is a local-first, provider-gated content production system. The current web product is **AFS Studio**, an infinite-canvas creation graph for prompt-first creative workflows.
 
-当前工程主线：
-
-```text
-Runtime Service / CLI
-  -> deterministic asset loop
-  -> run trace / quality report / safe manifest
-  -> read-only artifact review
-  -> tester feedback
-  -> candidate / promotion / context projection
-  -> two-round runtime validation
-```
-
-所有通过项只代表结构验证或运行验证，不自动代表 human acceptance、business validation 或 durable memory。
-
-## 代码分层
+The product surface is flow-native:
 
 ```text
-apps/api/              Runtime Service，对前端的唯一正式后端对接面
-apps/cli/              本地运维、deterministic harness 和 smoke 入口
-apps/web/              过渡 read-only artifact viewer，不作为新 Web 基础
-agentflow/             平台 contract、memory loop、harness、router、skills
-agentflow_studio/      内容生产、分发、workflow、provider adapter
-configs/               示例配置和 tool catalog contract
-examples/              可提交 contract fixture
-workflows/             YAML workflow definition
-docs/                  当前中文入口、runbook、contract、维护账本
-tests/                 自动化验证面
-data/                  ignored runtime data，只保留 .gitkeep
+AFS Studio canvas
+  -> prompt optimization
+  -> creative intent control agent trace
+  -> gated keyframe generation request
+  -> safe Runtime Service API
+  -> deterministic artifacts or gated provider tasks
+  -> reviewable evidence
 ```
 
-## 正式对接面
+Passing tests and browser QA are runtime verification only. They are not human acceptance, business validation, provider smoke, or durable-memory promotion.
 
-前端只对接 Runtime Service：
+## Code Layers
+
+```text
+apps/api/              Runtime Service, the only official backend boundary for frontend code
+apps/cli/              local operations, deterministic harness, smoke entrypoints
+apps/studio/           current user-facing AFS Studio canvas frontend
+agentflow/             platform contracts, memory loop, harness, router, skills
+agentflow_studio/      content production, workflow, distribution, provider adapters
+configs/               example configuration and tool catalog contracts
+examples/              committed contract fixtures
+workflows/             YAML workflow definitions
+docs/                  current docs, runbooks, contracts, maintenance ledgers
+tests/                 automated verification
+data/                  ignored runtime data; only .gitkeep is committed
+```
+
+Retired Workbench and static memory-workbench packages are no longer part of the current architecture.
+
+## Frontend Boundary
+
+Start the Runtime Service:
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
 ```
 
-OpenAPI：
+Open:
 
 ```text
-http://127.0.0.1:8790/docs
-http://127.0.0.1:8790/openapi.json
+http://127.0.0.1:8790/studio/
 ```
 
-前端可使用：
+Frontend code may use:
 
 - `project_id`
 - `job_id`
 - `artifact_id`
 - safe summary
 - safe manifest
-- OpenAPI request / response fixture
+- OpenAPI request and response shapes
 
-前端不应接触：
+Frontend code must not expose:
 
-- CLI 内部编排。
-- provider secret。
-- 本地素材绝对路径。
-- signed URL。
-- provider 原始响应。
-- 私有素材字节或生成媒体字节。
+- CLI internals
+- provider secrets
+- local absolute media paths
+- signed URLs
+- provider raw responses
+- private media bytes
+- generated media bytes
 
-## 当前核心能力
+## Current Core Capabilities
 
-- Production Memory asset loop。
-- Asset Profile Review Screen。
-- Real Asset Test Run Harness。
-- Two-Round Context Runtime Validation。
-- Project Manifest v0.1。
-- Provider Validation Gate。
-- Runtime Service v0.2 前端 contract。
-- 本地轻量 AgentOps artifact：run trace、quality report、guardrail result、handoff record、maintenance audit report。
+- AFS Studio canvas shell and node workflow.
+- Prompt optimization API and local fallback.
+- Creative intent control agent v1: deterministic constraint layering, candidate scoring, selected canonical prompt, and provider translation trace.
+- Keyframe generation Runtime API with `AFS_ALLOW_REMOTE_IMAGE` gate closed by default.
+- Production Memory asset loop.
+- Asset Profile Review Screen.
+- Real Asset Test Run Harness.
+- Two-Round Context Runtime Validation.
+- Project Manifest v0.1.
+- Provider Validation Gate.
+- Runtime Service v0.2 frontend contract.
+- Local AgentOps artifacts: run trace, quality report, guardrail result, handoff record, maintenance audit report.
 
-## 质量与治理边界
+## Governance
 
-- provider 默认关闭，按能力显式 gate。
-- feedback 是 raw evidence，不自动成为 memory。
-- candidate 不是 durable memory。
-- blocked refs 必须保留原因，并且不能进入下一轮 context。
-- Runtime Service 输出 safe refs，不暴露私有路径或 secret。
-- 维护清理先记录账本，再删除；已验证退出主线的旧 demo 和旧文档直接删除。
+- Remote provider calls are closed by default and opened only by explicit capability gates.
+- Feedback is raw evidence, not automatic memory.
+- Candidate memory is not durable memory.
+- Runtime Service outputs safe refs and must not leak private paths or secrets.
+- Maintenance cleanup records the decision before deletion.
 
-## 下一阶段
-
-进入轻量 Web 和完整流程跑通前，应先完成低成本维护基线：
+## Next Engineering Focus
 
 ```text
-维护门禁通过
-  -> repository retention review 无 delete/manual blocker
-  -> deterministic Loulan/fixture full loop
-  -> Runtime Service/OpenAPI 对齐
-  -> 简单 Web 工作台
-  -> provider smoke gate
+Studio interaction QA
+  -> prompt-memory loop hardening
+  -> explicit asset reuse
+  -> director setup as shot intent
+  -> provider-gated image/keyframe smoke
+  -> provider-gated video slice after keyframe controllability evidence
 ```

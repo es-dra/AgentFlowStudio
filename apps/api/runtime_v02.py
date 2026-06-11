@@ -21,7 +21,6 @@ from apps.api.runtime_models import (
 )
 from apps.api.runtime_store import RuntimeStore, project_summary, read_json, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
-from apps.api.runtime_workbench_state import build_workbench_state
 
 
 NON_CLAIMS = ["not human acceptance", "not business validation", "not durable memory"]
@@ -242,13 +241,6 @@ def register_runtime_v02_routes(app: FastAPI, store: RuntimeStore) -> None:
             "artifact": artifact,
             "non_claims": NON_CLAIMS,
         }
-
-    @app.get("/projects/{project_id}/workbench-state")
-    def workbench_state(project_id: str) -> dict[str, Any]:
-        try:
-            return build_workbench_state(store, project_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 __all__ = ("NON_CLAIMS", "register_runtime_v02_routes")

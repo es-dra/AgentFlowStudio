@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-CONTEXT-PROJECTION-001
 
+中文摘要：本文保留的是资产上下文投影的后端证据，用来说明角色、场景和项目上下文如何以安全摘要方式参与后续生成。当前 MVP 不暴露记忆审核 UI，也不把候选证据自动晋升为长期记忆。阅读时只应提取可复用的 contract、测试和边界，不应把旧流程当作当前产品入口。
+
+执行标准：上下文投影必须服务于节点 prompt、创作 brief 和关键帧控制，不能变成不可追踪的黑箱记忆。人物身份、场景连续性和节点参数是硬约束；用户偏好只是软约束。任何上下文引用都要能在 trace 中说明来源、优先级和是否属于 durable memory，默认不是长期记忆。
+
 Status: implementation handoff for Node 4 of the non-Web Production Memory
 asset loop.
 

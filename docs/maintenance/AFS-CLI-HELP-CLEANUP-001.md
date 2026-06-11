@@ -1,5 +1,7 @@
 # AFS CLI Help Cleanup 001
 
+中文摘要：本文保留 CLI help 收口的验证证据，当前用途是说明命令行入口曾经过安全清理和本地检查。它不是当前产品入口，也不替代 Runtime Service 或 Studio 验收。若后续 CLI 帮助文档被 README、测试和命令注册检查完全覆盖，本文件可直接删除。
+
 Date: 2026-06-03
 
 Status: verified locally, integration pending

@@ -10,7 +10,7 @@ AgentFlow Studio 是一个面向 Agent 的 provider-gated 内容生产与执行�
 agentflow/             平台 contract、harness、router、memory、skills
 examples/agentflow_production/  内容生产侧结构化 handoff 示例输入
 agentflow_studio/      短视频分发侧包装、审查、报告
-apps/                  CLI、Runtime Service、过渡 Web 工作台
+apps/                  CLI、Runtime Service、AFS Studio Web 画布
 ```
 
 当前 MVP 链路：
@@ -19,7 +19,7 @@ apps/                  CLI、Runtime Service、过渡 Web 工作台
 subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
 ```
 
-近期主线是本地内测可用，不是 SaaS，也不是商业试点。
+近期主线是本地内测可用，不是 SaaS，也不是商业试点。当前用户侧 Web 入口是 `/studio/`，对应源码为 `apps/studio/`；旧 Workbench / memory-workbench 不再作为当前产品入口。
 
 ## 规则层级
 

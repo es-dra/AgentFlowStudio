@@ -13,7 +13,7 @@ from apps.api.runtime_service import create_runtime_app
 
 
 FIXTURE_DIR = Path("examples/frontend_runtime_service/prompt_optimizer_nodes")
-CONTRACT_PATH = Path("docs/frontend_integration/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md")
+CONTRACT_PATH = Path("docs/architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md")
 DEMO_PROJECT_PATH = Path("examples/frontend_runtime_service/prompt_optimizer_demo_project.example.json")
 SMOKE_TOOL = Path("tools/prompt_optimizer_api_smoke.py")
 NODE_FIXTURES = {
@@ -51,7 +51,7 @@ def test_node_prompt_optimizer_contract_and_fixtures_are_complete() -> None:
     assert CONTRACT_PATH.exists()
     contract = CONTRACT_PATH.read_text(encoding="utf-8")
     assert "video_merge" in contract
-    assert "默认无 prompt 输入" in contract
+    assert "no prompt by default" in contract
     for node_type in NODE_FIXTURES:
         assert f"`{node_type}`" in contract
 

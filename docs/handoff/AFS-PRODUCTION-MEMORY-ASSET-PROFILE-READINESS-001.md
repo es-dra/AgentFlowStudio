@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-PROFILE-READINESS-001
 
+中文摘要：本文用于说明资产 profile readiness 的后端准备状态和测试证据。当前主线已经聚焦 Studio、Runtime prompt/keyframe API、知识库和创作智能体，因此本文只能作为资产循环的辅助证据，不应驱动 UI 或产品入口。若 readiness 逻辑不再被当前测试、接口或 handoff 引用，应直接清理。
+
+保留理由：readiness 检查仍可帮助判断资产是否足够参与 prompt assembly 和关键帧生成。当前使用时，只看结构化字段、缺口、风险和安全边界；不要把 readiness 视为创意质量验收。真实模型接入前，readiness 还需要和关键帧结果、自动 QA、人工反馈一起重新校验。
+
 Status: implementation handoff.
 
 ## Scope

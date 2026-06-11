@@ -85,7 +85,7 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path) 
     assert "/projects/{project_id}/canvas-draft" in schema["paths"]
     assert "/projects/{project_id}/scene-inspector" in schema["paths"]
     assert "/projects/{project_id}/review-decisions" in schema["paths"]
-    assert "/projects/{project_id}/workbench-state" in schema["paths"]
+    assert "/projects/{project_id}/workbench-state" not in schema["paths"]
     assert "/runs/{job_id}" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 

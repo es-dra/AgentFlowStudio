@@ -57,31 +57,31 @@
     {
       "artifact_type": "agentflow_run_trace",
       "example_path": "examples/agentflow/agentops_run_trace.example.json",
-      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "doc_path": "docs/company_operating_model.md",
       "contract_surface": "local_agentops_trace"
     },
     {
       "artifact_type": "agentflow_quality_report",
       "example_path": "examples/agentflow/agentops_quality_report.example.json",
-      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "doc_path": "docs/company_operating_model.md",
       "contract_surface": "local_agentops_quality_report"
     },
     {
       "artifact_type": "agentflow_guardrail_result",
       "example_path": "examples/agentflow/agentops_guardrail_result.example.json",
-      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "doc_path": "docs/company_operating_model.md",
       "contract_surface": "local_agentops_guardrail"
     },
     {
       "artifact_type": "agentflow_handoff_record",
       "example_path": "examples/agentflow/agentops_handoff_record.example.json",
-      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "doc_path": "docs/company_operating_model.md",
       "contract_surface": "local_agentops_handoff"
     },
     {
       "artifact_type": "agentflow_maintenance_audit_report",
       "example_path": "examples/agentflow/agentops_maintenance_audit_report.example.json",
-      "doc_path": "docs/maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md",
+      "doc_path": "docs/company_operating_model.md",
       "contract_surface": "local_agentops_maintenance_audit"
     },
     {

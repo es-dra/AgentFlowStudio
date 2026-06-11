@@ -124,6 +124,9 @@ def _preference(value: str) -> str:
     match = re.search(r"用户偏好[:：]([^；;]+)", value)
     if match:
         return _clean(match.group(1))
+    english = re.search(r"user\s+preference\s*:\s*([^;]+)", value, re.I)
+    if english:
+        return _clean(english.group(1))
     return ""
 
 

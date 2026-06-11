@@ -1,44 +1,41 @@
-# AgentFlow Studio 文档入口
+# AgentFlow Studio Docs
 
-这页是当前文档导航。新任务优先从当前产品状态、contract、runbook、维护账本进入，不要从历史 phase 长文重新开始。
+中文摘要：本目录是当前 AFS 文档入口。新任务应从本文件、`TASK_TRACKER.md`、当前架构文档和最新 handoff 开始，不再从旧 Web、旧 Workbench、历史 RC 或过期浏览器 QA 文档恢复上下文。仓库只保存工程实现、接口、测试、safe artifact 和安全摘要；详细算法讨论、专利候选点和公司知识沉淀应留在 `10-Startup` 私有知识库，不写入公开 repo 投影。
 
-## 当前必读
+保留理由：本文负责把当前可执行入口收敛到少数文件，降低维护成本。后续如果某份文档没有被这里、任务跟踪、测试命令或架构说明引用，就不再默认归档，而是按收口规则删除。任何 provider、模型或媒体相关结论，都必须带 gate、测试证据和非声明边界。
 
-- [项目规则投影](company_operating_model.md)
-- [本地内测 runbook](local_internal_test_runbook.md)
+This directory is the current documentation entrypoint. Start new work from this
+file, `TASK_TRACKER.md`, and the current architecture docs. Do not resume from
+retired Web/Workbench handoffs or old smoke logs.
+
+## Current Required Reading
+
+- [Company operating projection](company_operating_model.md)
+- [Current architecture](current_architecture.md)
 - [Project Manifest contract](project_manifest_contract.md)
-- [前端对接包](frontend_integration/README.md)
-- [维护性重置账本](maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md)
-- [Agent 项目开发规范候选](maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md)
-- [任务追踪](../TASK_TRACKER.md)
-- [开发日志](../DEVLOG.md)
+- [Task tracker](../TASK_TRACKER.md)
+- [Devlog](../DEVLOG.md)
 
-## 产品与架构
+## Current Product Surface
 
-- [当前架构](current_architecture.md)
-- [Project Manifest contract](project_manifest_contract.md)
-- [Production Memory 架构](architecture/production_memory_architecture.md)
+- [AFS Studio frontend architecture](architecture/AFS_STUDIO_FRONTEND_ARCHITECTURE_V1.zh-CN.md)
+- Current Web entry: `http://127.0.0.1:8790/studio/`
+- Current frontend source: `apps/studio/`
+
+AFS Studio is the only current user-facing frontend. Retired Workbench and
+static memory-workbench paths are not task entrypoints.
+
+## Architecture And Contracts
+
+- [Current architecture](current_architecture.md)
+- [Node prompt optimizer contract](architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md)
+- [Creative intent control agent engineering summary](architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md)
+- [Production Memory architecture](architecture/production_memory_architecture.md)
 - [Production Memory Asset Profile](architecture/production_memory_asset_profiles.md)
 - [Skill contract](agentflow_skill_contract.md)
 - [Router contract](agentflow_router_contract.md)
 
-## 本地内测与前端
-
-- [本地内测 runbook](local_internal_test_runbook.md)
-- [前端对接包](frontend_integration/README.md)
-- [Runtime Service 前端交接](handoff/AFS-RUNTIME-SERVICE-FRONTEND-INTEGRATION-001.md)
-- [本地内测落地交接](handoff/AFS-LOCAL-INTERNAL-TEST-LANDING-001.md)
-
-## 维护与交接
-
-- [低成本维护收口](maintenance/AFS-MAINTENANCE-CLOSEOUT-001.zh-CN.md)
-- [维护性重置账本](maintenance/AFS-MAINTENANCE-LOCALIZATION-CLEANUP-001.zh-CN.md)
-- [Product Spine Reset 账本](maintenance/AFS-PRODUCT-SPINE-RESET-003.zh-CN.md)
-- [Agent 项目开发规范候选](maintenance/AFS-AGENT-PROJECT-DEVELOPMENT-STANDARD-001.zh-CN.md)
-
-## 开发命令
-
-基础验证：
+## Useful Commands
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main --help
@@ -47,35 +44,28 @@
 git diff --check
 ```
 
-维护审计：
+Maintenance cleanup:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
 ```
 
-Runtime Service：
+Runtime Service:
 
 ```powershell
 .\.venv\Scripts\python.exe -m apps.cli.main runtime-service --host 127.0.0.1 --port 8790
 ```
 
-OpenAPI：
+OpenAPI:
 
 ```text
 http://127.0.0.1:8790/docs
 http://127.0.0.1:8790/openapi.json
+docs/openapi/afs-runtime-service.openapi.json
 ```
 
-## 历史文档处理原则
+## Cleanup Policy
 
-历史 phase、alpha、golden path、旧 demo 和旧 smoke 文档不再作为当前任务入口。当前仓库优先保留能直接支撑代码、contract、runbook、Runtime Service、deterministic harness 和维护门禁的文档。
-
-仍需保留历史信息时，优先写入中文摘要：
-
-- 做了什么。
-- 当前是否仍有效。
-- 替代路径。
-- 证据路径。
-- 非声明边界。
-
-机器契约、JSON key、API path、CLI command、artifact_type 和 schema_version 保留英文。
+Old, unused, or misleading docs should be deleted once replacement paths and
+tests are clear. Keep only current architecture, contract, verification, and
+handoff material that helps land the MVP.

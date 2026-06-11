@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-PROFILE-PROMOTION-VERSIONING-001
 
+中文摘要：本文保留资产 profile 晋升与版本记录的后端证据，但当前 MVP 不做用户可见的记忆审核和长期记忆自动晋升。任何 profile promotion 都只能作为受控、安全、可追踪的工程证据，不能等同于人工验收或公司知识库 active rule。后续若当前 Runtime contract 已覆盖其用途，应删除而不是归档。
+
+执行标准：profile 版本只能记录安全摘要、决策依据和关联 artifact，不能保存素材字节、provider raw、secret 或本地绝对路径。晋升必须有人类决策或明确规则支持；测试通过、provider smoke 成功或模型输出好看，都不能自动构成长期记忆。当前阶段只把这些内容作为后端证据链参考。
+
 Status: implementation handoff for Node 3 of the non-Web Production Memory
 asset loop.
 

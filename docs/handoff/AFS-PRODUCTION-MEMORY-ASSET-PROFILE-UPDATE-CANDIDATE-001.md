@@ -1,5 +1,9 @@
 # AFS-PRODUCTION-MEMORY-ASSET-PROFILE-UPDATE-CANDIDATE-001
 
+中文摘要：本文记录资产 profile 更新候选的工程切片。当前规则是 raw feedback、candidate evidence、background context 与 durable memory 必须区分；未经明确确认的候选不能强注入后续生成。本文只保留可追踪 contract 和测试参考，不代表当前 Studio 有记忆管理 UI。
+
+执行标准：更新候选必须说明触发来源、关联节点、影响字段、冲突关系和拒绝条件。专业知识库、节点参数、角色身份和场景连续性优先级高于候选偏好。候选可以帮助下一轮创作智能体排序，但不能直接覆盖 confirmed asset，也不能写入长期记忆或公司知识库。
+
 Status: implementation handoff.
 
 ## Scope
