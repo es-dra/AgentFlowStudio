@@ -1,20 +1,26 @@
 import { createRuntimeClient } from "./runtime-client.js";
 import { createActionHandlers } from "./app-actions.js";
-import { latestJobId, selectedCard } from "./app-selection.js";
+import { selectedCard } from "./app-selection.js";
 import { syncInputs } from "./input-sync.js";
 import { normalizeWorkbenchState } from "./workbench-state.js";
-import { renderApp } from "./render.js?v=stage7-rc";
+import { renderApp } from "./render.js?v=libtv-shell-reset-003";
 import { state } from "./state.js";
 import { configureJobPolling } from "./polling.js";
-import { applyProjectTemplate, applySourcePreset } from "./presets.js";
+import { applyProjectTemplate } from "./presets.js";
 import { bindCanvasInteractions } from "./canvas-interactions.js";
 import { bindCanvasHeaderEvents } from "./studio-canvas-header-events.js";
-
+import { bindStudioExperienceEvents } from "./studio-experience-events.js";
+import { directorPromptContext, directorSetupAsset } from "./director-setup-model.js";
+import { createCanvasNode, openCanvasNode } from "./studio-node-actions.js";
+import { applyCanvasEdgeAction, applyCanvasSelectionAction } from "./canvas-selection-actions.js";
 const root = document.querySelector("#app-root");
 let silentRefreshInFlight = false;
+state.debugMode = new URLSearchParams(window.location.search).get("debug") === "1";
+
 function client() {
   return createRuntimeClient(state.baseUrl);
 }
+
 async function run(action) {
   syncInputs(root, state);
   state.loading = true;
@@ -43,16 +49,13 @@ async function connectRuntime() {
 }
 
 async function loadWorkbench() {
-  if (!state.projectId) throw new Error("Project id required.");
+  if (!state.projectId) throw new Error("请先选择项目。");
   const payload = await client().workbenchState(state.projectId);
   state.workbench = normalizeWorkbenchState(payload);
-  const currentExists = state.workbench.canvas_cards.some((card) => card.id === state.selectedCardId);
-  state.selectedCardId = currentExists ? state.selectedCardId : state.workbench.canvas_cards[0]?.id || "";
-  const variantExists = state.workbench.review_room?.candidates.some((candidate) => candidate.candidate_id === state.selectedVariantId);
-  state.selectedVariantId = variantExists ? state.selectedVariantId : state.workbench.review_room?.candidates[0]?.candidate_id || "";
-  state.latestAssetTestJobId = latestJobId(state, "asset_test_run");
+  state.selectedCardId = state.selectedCardId || "script-input";
   state.selectedArtifactId = selectedCard(state)?.primary_artifact_id || state.selectedArtifactId;
 }
+
 async function refreshWorkbench() {
   await connectRuntime();
   selectAvailableProject();
@@ -78,28 +81,20 @@ const actionHandlers = createActionHandlers({ state, client, refreshWorkbench })
 
 function selectAvailableProject() {
   if (!state.projects.length) return;
-  const selected = state.projects.some((project) => project.project_id === state.projectId);
-  if (!selected) {
-    state.projectId = preferredProject(state.projects)?.project_id || state.projectId;
-    syncProjectInputs(state.projectId);
-  }
+  if (state.projects.some((project) => project.project_id === state.projectId)) return;
+  state.projectId = preferredProject(state.projects)?.project_id || state.projectId;
+  syncProjectInputs(state.projectId);
 }
 
 function preferredProject(projects) {
-  return [...projects].sort((left, right) => {
-    const score = projectScore(right) - projectScore(left);
-    if (score) return score;
-    return String(right.project_id || "").localeCompare(String(left.project_id || ""));
-  })[0];
+  return [...projects].sort((left, right) => projectScore(right) - projectScore(left))[0];
 }
 
 function projectScore(project) {
   const ready = project.status === "ready_for_next_round" ? 10000 : 0;
-  const profile = Number(project.profile_version_count || 0) * 1000;
   const feedback = Number(project.feedback_count || 0) * 100;
   const runs = Number(project.run_count || 0) * 10;
-  const cards = Number(project.content_card_count || 0);
-  return ready + profile + feedback + runs + cards;
+  return ready + feedback + runs + Number(project.content_card_count || 0);
 }
 
 function syncProjectInputs(projectId) {
@@ -109,36 +104,78 @@ function syncProjectInputs(projectId) {
 }
 
 function runAction(action, dataset = {}) {
+  if (action === "run-node-generation-preview") {
+    const surface = dataset.nodeGenerateSurface || "node";
+    state.pendingNodeGenerationSurface = surface;
+    state.nodeGenerationStatus = {
+      ...state.nodeGenerationStatus,
+      [surface]: {
+        status: "generating",
+        message: "正在生成本地预览",
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  }
   const handlers = {
     "apply-project-template": () => applyProjectTemplate(state, dataset.templateId),
-    "apply-source-preset": () => applySourcePreset(state, dataset.sourcePresetId),
-    "set-review-intent": () => {
-      state.selectedCardId = dataset.cardId || state.selectedCardId;
-      state.selectedVariantId = dataset.variantId || state.selectedVariantId;
-      state.selectedArtifactId = dataset.artifactId || state.selectedArtifactId;
-      state.reviewDecision = dataset.decision || state.reviewDecision;
-      state.activeView = dataset.nextView || "Review";
-    },
+    "save-director-setup": saveDirectorSetup,
+    "apply-director-setup-to-shot": applyDirectorSetupToShot,
     connect: connectRuntime,
     "load-project": refreshWorkbench,
     refresh: refreshWorkbench,
     ...actionHandlers,
   };
-  if (handlers[action]) run(handlers[action]);
+  if (handlers[action]) run(() => handlers[action](dataset));
+}
+
+function saveDirectorSetup() {
+  const timestamp = Date.now();
+  state.directorSavedSetupId = state.directorSavedSetupId || `director-setup-${timestamp}`;
+  state.directorSaveStatus = "已保存为场景资产";
+  state.selectedAssetType = "director_setup";
+  state.selectedVisibleAssetId = directorSetupAsset(state).asset_id;
+  state.lastResult = {
+    status: "director_setup_saved",
+    message: directorSetupAsset(state).safe_summary,
+  };
+}
+
+function applyDirectorSetupToShot() {
+  state.directorAppliedShotContext = directorPromptContext(state);
+  state.directorSaveStatus = "已应用到当前镜头";
+  state.lastResult = {
+    status: "director_setup_applied",
+    message: "导演台布光、机位和人物站位已作为当前镜头上下文。",
+  };
 }
 
 function bindEvents() {
+  bindActionButtons();
+  bindViewButtons();
+  bindPortalButtons();
+  bindStudioButtons();
+  bindSelectionButtons();
+  bindCanvasInteractions(root, state, paint);
+  bindCanvasHeaderEvents(root, state, paint);
+  bindStudioExperienceEvents(root, state, paint);
+  state.promptOptimizationOpen = Boolean(state.promptOptimizationOpen);
+}
+
+function bindActionButtons() {
   root.querySelectorAll("[data-action]").forEach((node) => {
     node.addEventListener("click", () => {
       if (node.dataset.action === "select-project") {
         state.projectId = node.dataset.projectId || state.projectId;
         syncProjectInputs(state.projectId);
         run(refreshWorkbench);
-      } else {
-        runAction(node.dataset.action, node.dataset);
+        return;
       }
+      runAction(node.dataset.action, node.dataset);
     });
   });
+}
+
+function bindViewButtons() {
   root.querySelectorAll("[data-view]").forEach((node) => {
     node.addEventListener("click", () => {
       state.activeView = node.dataset.view || state.activeView;
@@ -146,95 +183,47 @@ function bindEvents() {
         state.studioStarterMode = true;
         state.studioAddedNodeKind = "";
       }
+      if (node.dataset.studioStarter === "close") {
+        state.studioStarterMode = false;
+        state.studioStarterKind = "";
+        state.studioAddedNodeKind = "";
+        state.studioResourceMode = "";
+        state.openedCanvasNodeId = "";
+        state.nodeOpenTransition = "return";
+      }
       paint();
     });
   });
-  root.querySelectorAll("[data-studio-starter-kind]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.studioStarterKind = node.dataset.studioStarterKind || "";
-      state.studioAddedNodeKind = "";
-      state.studioPanel = ["script", "character", "image", "audio"].includes(state.studioStarterKind) ? "" : "inspector";
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-studio-starter]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.studioStarterMode = node.dataset.studioStarter === "open";
-      state.studioAddedNodeKind = "";
-      paint();
-    });
-  });
+}
+
+function bindPortalButtons() {
   root.querySelectorAll("[data-project-portal]").forEach((node) => {
     node.addEventListener("click", () => {
       state.projectPortalMode = node.dataset.projectPortal || "home";
-      state.selectedShowcaseId = node.dataset.showcaseId || state.selectedShowcaseId;
-      state.portalMenuOpen = false;
-      if (state.projectPortalMode !== "showcase-detail") state.showcaseProcessOpen = false;
       paint();
     });
   });
-  root.querySelectorAll("[data-portal-menu]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.portalMenuOpen = node.dataset.portalMenu === "open";
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-showcase-process]").forEach((node) => {
-    node.addEventListener("click", () => {
-      const intent = node.dataset.showcaseProcess || "";
-      if (intent === "open") state.showcaseProcessOpen = true;
-      if (intent === "close") state.showcaseProcessOpen = false;
-      if (intent === "copy") {
-        state.showcaseProcessOpen = false;
-        state.projectPortalMode = "home";
-        state.activeView = "Create";
-      }
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-showcase-filter]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.showcaseFilter = node.dataset.showcaseFilter || "全部";
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-showcase-search]").forEach((node) => {
-    node.addEventListener("input", () => {
-      state.showcaseQuery = node.value || "";
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-process-node]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.showcaseProcessNode = node.dataset.processNode || state.showcaseProcessNode;
-      paint();
-    });
-  });
+}
+
+function bindStudioButtons() {
   root.querySelectorAll("[data-studio-tool]").forEach((node) => {
     node.addEventListener("click", () => {
-      const panel = node.dataset.studioTool || "";
-      if (panel === "add") {
-        state.studioAddedNodeKind = "";
-        state.studioResourceMode = "";
-        state.studioStarterMode = false;
-        state.studioStarterKind = "";
-      }
-      state.studioPanel = state.studioPanel === panel ? "" : panel;
+      state.studioPanel = state.studioPanel === node.dataset.studioTool ? "" : node.dataset.studioTool || "";
       paint();
     });
   });
   root.querySelectorAll("[data-add-node-kind]").forEach((node) => {
     node.addEventListener("click", () => {
-      const cards = state.workbench?.studio_workspace?.canvas?.cards || [];
-      const match = cards.find((card) => String(card.kind || "").includes(node.dataset.addNodeKind || ""));
+      if (state.pendingNodePosition) {
+        createCanvasNode(state, node.dataset.addNodeKind || "text");
+        paint();
+        return;
+      }
       state.studioAddedNodeKind = node.dataset.addNodeKind || "";
+      state.studioStarterKind = "";
       state.studioResourceMode = "";
       state.studioStarterMode = false;
-      state.studioStarterKind = "";
-      if (match) {
-        state.selectedCardId = match.card_id;
-        state.selectedArtifactId = match.primary_artifact_id || "";
-      }
+      state.openedCanvasNodeId = "";
       state.studioPanel = "";
       paint();
     });
@@ -242,36 +231,47 @@ function bindEvents() {
   root.querySelectorAll("[data-add-resource-kind]").forEach((node) => {
     node.addEventListener("click", () => {
       state.studioAddedNodeKind = "";
-      state.studioStarterMode = false;
       state.studioStarterKind = "";
+      state.studioStarterMode = false;
+      state.openedCanvasNodeId = "";
+      state.studioPanel = "";
       state.studioResourceMode = node.dataset.addResourceKind || "";
-      state.studioPanel = "resource";
       paint();
     });
   });
-  root.querySelectorAll("[data-execution-intent]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.studioExecutionIntent = node.dataset.executionIntent || "";
+}
+
+function bindSelectionButtons() {
+  root.querySelectorAll("[data-canvas-selection-action]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      applyCanvasSelectionAction(state, node.dataset.canvasSelectionAction || "clear");
       paint();
     });
   });
-  root.querySelectorAll("[data-toolbox-intent]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.studioToolIntent = node.dataset.toolboxIntent || "";
+  root.querySelectorAll("[data-canvas-edge-action]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      applyCanvasEdgeAction(state, node.dataset.canvasEdgeAction || "center-edge");
+      paint();
+    });
+  });
+  root.querySelectorAll("[data-open-node-kind]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openCanvasNode(state, node.dataset.openNodeId || state.selectedCardId, node.dataset.openNodeKind || "text");
       paint();
     });
   });
   root.querySelectorAll("[data-card-id]").forEach((node) => {
     node.addEventListener("click", () => {
-      state.selectedCardId = node.dataset.cardId || "";
+      state.selectedCardId = node.dataset.cardId || "script-input";
+      state.selectedNodeIds = [state.selectedCardId];
       state.selectedArtifactId = selectedCard(state)?.primary_artifact_id || "";
-      paint();
-    });
-  });
-  root.querySelectorAll("[data-variant-id]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.selectedVariantId = node.dataset.variantId || "";
-      state.selectedArtifactId = node.dataset.artifactId || state.selectedArtifactId;
+      state.studioAddedNodeKind = "";
       paint();
     });
   });
@@ -281,20 +281,20 @@ function bindEvents() {
       run(actionHandlers["open-selected-artifact"]);
     });
   });
-  bindCanvasHeaderEvents(root, state, paint);
-  bindCanvasInteractions(root, state, paint);
 }
 
 function paint() {
-  const portalScrollTop = root.querySelector(".project-portal")?.scrollTop || 0;
   renderApp(root, state);
   bindEvents();
-  const portal = root.querySelector(".project-portal");
-  if (state.activeView === "Projects" && state.projectPortalMode === "home" && portal) {
-    portal.scrollTop = portalScrollTop;
-  }
   configureJobPolling(state, refreshWorkbenchSilently);
 }
+
+document.addEventListener("keydown", (event) => {
+  if (event.altKey && event.key.toLowerCase() === "d") {
+    state.debugMode = !state.debugMode;
+    paint();
+  }
+});
 
 paint();
 run(refreshWorkbench);

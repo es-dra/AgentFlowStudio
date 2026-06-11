@@ -110,10 +110,9 @@
 .libtv-list-row small {
   grid-column: 2;
   min-width: 0;
-  overflow: hidden;
   color: #9fa19c;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
 }
 
 .libtv-add-menu .libtv-node-action {

@@ -1,0 +1,67 @@
+.canvas-node-port {
+  position: absolute;
+  top: 50%;
+  z-index: 8;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(230, 246, 255, 0.22);
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(20, 21, 21, 0.92);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.025), 0 0 18px rgba(0, 0, 0, 0.34);
+  transform: translateY(-50%);
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.canvas-node-port::after {
+  position: absolute;
+  inset: 4px;
+  border-radius: inherit;
+  background: currentColor;
+  content: "";
+}
+
+.canvas-node-port.input-port {
+  left: -9px;
+  color: rgba(240, 180, 90, 0.92);
+}
+
+.canvas-node-port.output-port {
+  right: -9px;
+  color: rgba(85, 214, 194, 0.95);
+}
+
+.workflow-node:hover .canvas-node-port,
+.workflow-node.selected .canvas-node-port,
+.libtv-canvas-stage.is-connecting .canvas-node-port {
+  opacity: 1;
+  border-color: currentColor;
+}
+
+.canvas-node-port:hover,
+.canvas-node-port:active {
+  transform: translateY(-50%) scale(1.18);
+  box-shadow: 0 0 0 5px rgba(85, 214, 194, 0.09), 0 0 22px currentColor;
+}
+
+.workflow-node.canvas-connection-target .input-port {
+  border-color: rgba(230, 246, 255, 0.96);
+  color: rgba(230, 246, 255, 0.98);
+  background: rgba(85, 214, 194, 0.18);
+  box-shadow: 0 0 0 6px rgba(85, 214, 194, 0.1), 0 0 28px rgba(85, 214, 194, 0.36);
+}
+
+.studio-canvas-edge.connected {
+  animation: edge-flow 960ms ease-out 1, edge-idle-flow 3800ms linear infinite 960ms;
+}
+
+.studio-canvas-edge.connection-success-ripple {
+  stroke: rgba(230, 246, 255, 0.95);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 16px rgba(85, 214, 194, 0.42));
+}
+
+@keyframes edge-idle-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -40; }
+}

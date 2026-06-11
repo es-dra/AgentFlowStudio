@@ -1,7 +1,12 @@
 export function el(tag, options = {}, children = []) {
-  const node = document.createElement(tag);
+  const node = ["svg", "path", "circle", "line", "polyline", "defs", "marker"].includes(tag)
+    ? document.createElementNS("http://www.w3.org/2000/svg", tag)
+    : document.createElement(tag);
   for (const [key, value] of Object.entries(options)) {
-    if (key === "className") node.className = value;
+    if (key === "className") {
+      if (node.namespaceURI === "http://www.w3.org/2000/svg") node.setAttribute("class", value);
+      else node.className = value;
+    }
     else if (key === "text") node.textContent = value;
     else if (key === "dataset") {
       for (const [dataKey, dataValue] of Object.entries(value)) node.dataset[dataKey] = dataValue;

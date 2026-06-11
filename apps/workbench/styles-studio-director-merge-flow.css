@@ -63,6 +63,21 @@
   background: #53d7d1;
 }
 
+.libtv-director-reference {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(83, 215, 209, 0.18);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(83, 215, 209, 0.06);
+}
+
+.libtv-director-reference span {
+  color: #bfc2bc;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .libtv-director-stage {
   position: relative;
   min-height: 300px;
@@ -71,6 +86,7 @@
   background: radial-gradient(circle at 35% 30%, rgba(83, 215, 209, 0.22), transparent 28%),
     linear-gradient(155deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.24));
 }
+
 
 .libtv-director-grid {
   position: absolute;
@@ -83,13 +99,17 @@
 }
 
 .libtv-director-camera,
-.libtv-director-role {
+.libtv-director-role,
+.libtv-director-light,
+.libtv-director-modifier,
+.libtv-director-prop {
   position: absolute;
   border-radius: 999px;
   padding: 6px 10px;
   color: #08100f;
   background: #53d7d1;
 }
+
 
 .libtv-director-camera {
   left: 18%;
@@ -102,11 +122,24 @@
   background: #f3c76b;
 }
 
+.libtv-director-light {
+  background: #ffe59d;
+  color: #241809;
+  box-shadow: 0 0 22px rgba(255, 217, 120, 0.22);
+}
+
+.libtv-director-light.key-light { left: 42%; top: 18%; }
+.libtv-director-light.fill-light { left: 22%; top: 58%; }
+.libtv-director-light.back-light { right: 18%; top: 24%; }
+.libtv-director-light.practical-light { right: 12%; bottom: 18%; }
+
+
 .libtv-director-object-list {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) auto auto;
   gap: 8px;
 }
+
 
 .libtv-director-object-list input,
 .libtv-director-camera-panel input {

@@ -1,15 +1,14 @@
 import { el } from "./dom.js";
-import { displayStatus, displayText } from "./display-labels.js";
+import { displayText } from "./display-labels.js";
 
 const CANVAS_ITEMS = [
-  { id: "canvas-1", label: "画布 1", meta: "当前制作画布" },
-  { id: "canvas-2", label: "画布 2", meta: "本地草稿位" },
-  { id: "canvas-review", label: "审片画布", meta: "候选对比视图" },
+  { id: "canvas-1", label: "画布 1", meta: "当前创作画布" },
+  { id: "canvas-2", label: "画布 2", meta: "本地草稿画布" },
+  { id: "canvas-review", label: "审看片段", meta: "候选片段对比" },
 ];
 
 export function renderCanvasTopbar(workspace, state) {
   const project = workspace.active_project || {};
-  const command = workspace.primary_command || {};
   return el("header", { className: "libtv-topbar" }, [
     el("div", { className: "libtv-project-pill libtv-canvas-header" }, [
       el("span", { className: "libtv-mark", text: "AFS" }),
@@ -20,12 +19,12 @@ export function renderCanvasTopbar(workspace, state) {
     el("div", { className: "libtv-top-actions" }, [
       (state.studioStarterMode || state.studioAddedNodeKind) ? el("button", {
         className: "btn secondary",
-        text: "实际画布",
-        dataset: { studioStarter: "close" },
+        text: "返回画布",
+        dataset: { view: "Create", studioStarter: "close" },
         attrs: { type: "button" },
       }) : null,
-      command.enabled && command.view ? el("button", { className: "btn primary", text: displayText(command.label || "继续"), dataset: { view: command.view }, attrs: { type: "button" } }) : null,
-      toolButton("gate", `生成能力 ${displayStatus(workspace.provider_status || "ready_not_run")}`, "⚡", false),
+      topAction("分享", "SHARE"),
+      topAction("导出", "EXPORT"),
     ]),
   ]);
 }
@@ -71,16 +70,22 @@ function renderCanvasMenu(activeCanvas) {
       attrs: { type: "button", "data-studio-canvas-action": "new_canvas" },
     }, [
       el("strong", { text: "新建画布" }),
-      el("small", { text: "仅登记本地画布意图" }),
+      el("small", { text: "创建新的创作空间" }),
     ]),
   ]);
 }
 
 function renderCanvasIntentStatus(state) {
   return el("div", { className: "libtv-canvas-intent-status" }, [
-    el("strong", { text: "本地画布意图已登记" }),
+    el("strong", { text: "画布已切换" }),
     el("span", { text: canvasIntentLabel(state.studioCanvasIntent) }),
-    el("small", { text: "未创建真实画布 · 未启动 provider" }),
+  ]);
+}
+
+function topAction(label, icon) {
+  return el("button", { className: "libtv-tool", attrs: { type: "button", title: label, "aria-label": label } }, [
+    el("span", { text: icon }),
+    el("small", { text: label }),
   ]);
 }
 
@@ -88,19 +93,8 @@ function canvasIntentLabel(intent) {
   const labels = {
     "canvas-1": "切换到画布 1",
     "canvas-2": "切换到画布 2",
-    "canvas-review": "切换到审片画布",
+    "canvas-review": "切换到审看片段",
     new_canvas: "准备新建画布",
   };
   return labels[intent] || "更新画布工作区";
-}
-
-function toolButton(panel, label, icon, active) {
-  return el("button", {
-    className: `libtv-tool${active ? " active" : ""}`,
-    dataset: { studioTool: panel },
-    attrs: { type: "button", title: label, "aria-label": label },
-  }, [
-    el("span", { text: icon }),
-    el("small", { text: label }),
-  ]);
 }

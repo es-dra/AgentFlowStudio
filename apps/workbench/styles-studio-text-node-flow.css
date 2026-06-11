@@ -1,5 +1,6 @@
 .libtv-text-node-flow {
-  width: min(700px, calc(100vw - 72px));
+  box-sizing: border-box;
+  width: min(720px, calc(100vw - 72px));
   display: grid;
   grid-template-columns: minmax(280px, 350px) minmax(260px, 1fr);
   gap: 16px;

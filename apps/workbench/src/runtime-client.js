@@ -1,4 +1,10 @@
-export const DEFAULT_RUNTIME_BASE_URL = "http://127.0.0.1:8790";
+export const FALLBACK_RUNTIME_BASE_URL = "http://127.0.0.1:8790";
+export const DEFAULT_RUNTIME_BASE_URL = runtimeBaseUrl();
+
+function runtimeBaseUrl() {
+  if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) return window.location.origin;
+  return FALLBACK_RUNTIME_BASE_URL;
+}
 
 export function normalizeBaseUrl(value) {
   const trimmed = String(value || DEFAULT_RUNTIME_BASE_URL).trim();
@@ -87,6 +93,12 @@ export function createRuntimeClient(baseUrl = DEFAULT_RUNTIME_BASE_URL) {
     },
     providerValidationPlan(payload) {
       return postJson(baseUrl, "/provider/validation-plan", payload);
+    },
+    providerScriptDraftPlan(payload) {
+      return postJson(baseUrl, "/provider/script-draft-plan", payload);
+    },
+    optimizePrompt(projectId, payload) {
+      return postJson(baseUrl, `/projects/${encodeURIComponent(projectId)}/prompt-optimizations`, payload);
     },
   };
 }

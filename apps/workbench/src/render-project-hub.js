@@ -1,269 +1,177 @@
-import { badge, button, el, field } from "./dom.js";
-import { displayStatus, displayText } from "./display-labels.js";
-import { PROJECT_SHOWCASES } from "./project-showcase-data.js";
-import { renderShowcaseDetail } from "./render-project-showcase.js";
+import { badge, button, el } from "./dom.js";
 import { PROJECT_TEMPLATES } from "./presets.js";
-import { statusTone } from "./workbench-state.js";
+
+const HERO_CARDS = [
+  ["剧本生成分镜", "把剧本拆成镜头、角色、场景和关键帧计划。", "进入画布"],
+  ["导演台布光", "用俯视布局组织机位、灯光和人物阻挡关系。", "打开导演台"],
+  ["关键帧转视频", "用首帧和导演提示生成默认 5s 的视频片段。", "生成片段"],
+];
+
+const INSPIRATIONS = [
+  ["夜色追逐", "低照度街景、雨面反光、缓慢推进镜头", "镜头"],
+  ["导演台布光", "主光、辅光、轮廓光和实景光位", "导演台"],
+  ["角色三视图", "统一服装、发型、表情和年龄段", "人物"],
+  ["产品短片", "品牌质感、道具场景和节奏模板", "短片模板"],
+  ["双人对戏", "自然站位、视线关系和场面调度", "人物"],
+  ["片头视觉", "强识别色彩、图形布局和运动方向", "视频合成"],
+];
 
 export function renderProjectHub(projectHub, state = {}) {
-  const value = projectHub || {};
-  const project = value.active_project || {};
-  const counts = value.counts || {};
   const projects = Array.isArray(state.projects) ? state.projects : [];
+  const activeProject = projectHub?.active_project || projects[0] || {};
   if (state.projectPortalMode === "all-projects") {
-    return renderProjectDirectory(projects, state.projectId, project, state);
+    return renderProjectDirectory(projects, state.projectId, activeProject);
   }
-  if (state.projectPortalMode === "showcase-detail") {
-    return renderShowcaseDetail(state);
-  }
-  return el("section", { className: "project-portal" }, [
-    renderPortalTopbar(state, projects.length),
-    renderHeroStrip(counts),
-    renderRecentProjects(projects, state.projectId, project),
-    renderShowcase(state),
-    state.portalMenuOpen ? renderPortalDrawer() : null,
+  return el("main", { className: "home-portal" }, [
+    renderHero(projects.length),
+    renderRecentProjects(projects, state.projectId, activeProject),
+    renderInspirationGrid(),
+    renderTemplateRail(activeProject),
   ]);
 }
 
-function renderPortalTopbar(state, projectCount) {
-  return el("header", { className: "portal-topbar" }, [
-    el("div", { className: "portal-brand" }, [
+function renderHero(projectCount) {
+  return el("section", { className: "home-hero" }, [
+    el("div", { className: "home-hero-copy" }, [
+      badge("AFS 创作台", "active"),
+      el("h1", { text: "开始创作" }),
+      el("p", { text: "上传剧本，生成分镜、角色三视图、关键帧和默认 5s 视频片段。用节点把导演台、资产和生成结果串起来。" }),
+      el("div", { className: "home-hero-actions" }, [
+        el("button", {
+          className: "btn primary",
+          text: "进入创作画布",
+          dataset: { view: "Create", studioStarter: "open" },
+          attrs: { type: "button" },
+        }),
+        el("button", {
+          className: "btn secondary",
+          text: `个人最近项目 ${projectCount}`,
+          dataset: { projectPortal: "all-projects" },
+          attrs: { type: "button" },
+        }),
+      ]),
+    ]),
+    el("div", { className: "home-hero-carousel" }, HERO_CARDS.map((card, index) =>
       el("button", {
-        className: "portal-menu",
-        text: "☰",
-        dataset: { portalMenu: "open" },
-        attrs: { type: "button", "aria-label": "菜单" },
-      }),
-      el("span", { className: "portal-logo", text: "AFS" }),
-      el("strong", { text: "AgentFlow Studio" }),
-    ]),
-    el("div", { className: "portal-status" }, [
-      badge(`运行服务 ${state.health ? displayStatus(state.health.status || "ready") : "未连接"}`, state.health ? "good" : "quiet"),
-      badge(`${projectCount} 个项目`, projectCount ? "active" : "quiet"),
-      badge("生成能力默认关闭", "blocked"),
-    ]),
+        className: `home-hero-card hero-card-${index + 1}`,
+        dataset: { view: "Create", studioStarter: "open" },
+        attrs: { type: "button" },
+      }, [
+        el("span", { text: `0${index + 1}` }),
+        el("strong", { text: card[0] }),
+        el("p", { text: card[1] }),
+        el("small", { text: card[2] }),
+      ]),
+    )),
   ]);
-}
-
-function renderHeroStrip(counts) {
-  const blockers = Number(counts.provider_blockers || 0);
-  const cards = [
-    ["内容制作链路", "从素材摘要到分镜、审片和项目记忆复用。", "进入画布", "Create"],
-    ["项目记忆工作台", "复用已确认偏好，但不声明长期记忆。", "查看记忆", "Style Memory"],
-    ["生成能力门", blockers ? `${blockers} 个阻塞项等待处理。` : "真实模型调用前先完成安全预检。", "看预检", "Jobs"],
-  ];
-  return el("div", { className: "portal-hero-strip" }, cards.map(([title, summary, action, view], index) =>
-    el("button", {
-      className: `portal-hero-card portal-hero-${index + 1}`,
-      dataset: { view },
-      attrs: { type: "button" },
-    }, [
-      el("span", { text: title }),
-      el("strong", { text: summary }),
-      el("small", { text: action }),
-    ]),
-  ));
 }
 
 function renderRecentProjects(projects, currentProjectId, activeProject) {
-  const recent = projects.slice(0, 5);
-  return el("section", { className: "portal-section" }, [
-    renderSectionHead("最近项目", "全部项目", "all-projects"),
-    el("div", { className: "portal-project-grid" }, [
+  const recent = projects.slice(0, 4);
+  return el("section", { className: "home-section" }, [
+    sectionHead("个人最近项目", "查看全部", { projectPortal: "all-projects" }),
+    el("div", { className: "recent-project-grid" }, [
       renderStartCard(activeProject),
-      ...recent.map((project) => renderProjectCard(project, currentProjectId)),
+      ...recent.map((project, index) => renderProjectCard(project, currentProjectId, index)),
     ]),
   ]);
 }
 
 function renderStartCard(activeProject) {
-  return el("article", { className: "portal-start-card" }, [
-    el("div", { className: "portal-start-plus", text: "+" }),
-    el("strong", { text: "开始创作" }),
-    el("small", { text: "选择模板，创建项目并进入画布。" }),
-    el("div", { className: "portal-template-row" }, PROJECT_TEMPLATES.slice(0, 3).map((item) =>
-      button(item.label, "apply-project-template", "ghost", { templateId: item.id }),
-    )),
-    field("本轮目标", "project-goal", displayText(activeProject.goal || "构建一个受生成能力门保护的内容制作与项目记忆工作台。")),
-    el("details", { className: "portal-advanced-id" }, [
-      el("summary", { text: "高级项目代号" }),
-      field("项目代号", "project-id-action", activeProject.project_id || "proj_runtime_demo"),
-      field("项目类型", "project-type", activeProject.project_type || "short_video_campaign"),
-    ]),
-    el("div", { className: "portal-card-actions" }, [
+  return el("article", { className: "start-project-card" }, [
+    el("div", { className: "start-plus", text: "+" }),
+    el("strong", { text: "新建创作" }),
+    el("p", { text: "粘贴剧本或一句目标，开始一条新的创作画布。" }),
+    el("div", { className: "card-actions" }, [
       el("button", {
         className: "btn primary",
         text: "开始创作",
         dataset: { view: "Create", studioStarter: "open" },
         attrs: { type: "button" },
       }),
-      button("创建项目", "create-project", "primary"),
-      button("打开项目", "load-project", "secondary"),
+      button("创建项目", "create-project", "secondary"),
     ]),
   ]);
 }
 
-function renderProjectCard(project, currentProjectId) {
+function renderProjectCard(project, currentProjectId, index) {
   const selected = project.project_id === currentProjectId;
-  return el("article", { className: `portal-project-card${selected ? " selected" : ""}` }, [
-    el("div", { className: "portal-thumb", attrs: { "aria-hidden": "true" } }),
-    el("div", { className: "portal-card-copy" }, [
-      el("strong", { text: projectTitle(project) }),
-      el("small", { text: projectMeta(project) }),
+  return el("article", { className: `project-card${selected ? " selected" : ""}` }, [
+    el("div", { className: `project-thumb project-thumb-${(index % 4) + 1}` }, [
+      el("span", { text: projectTitle(project).slice(0, 2) }),
     ]),
-    el("div", { className: "portal-card-actions" }, [
-      badge(displayStatus(project.status || "in_progress"), statusTone(project.status)),
-      button(selected ? "已选中" : "打开", "select-project", "ghost", { projectId: project.project_id }),
+    el("strong", { text: projectTitle(project) }),
+    el("small", { text: projectDate(project) }),
+    el("div", { className: "card-actions" }, [
+      badge(selected ? "当前" : "可打开", selected ? "active" : "quiet"),
+      button(selected ? "继续" : "打开", "select-project", "ghost", { projectId: project.project_id }),
     ]),
   ]);
 }
 
-function renderShowcase(state) {
-  const filter = state.showcaseFilter || "全部";
-  const query = String(state.showcaseQuery || "").trim().toLowerCase();
-  const filters = ["全部", "短视频", "分镜工作流", "项目记忆", "生成门"];
-  const items = PROJECT_SHOWCASES.filter((item) => {
-    const filterMatch = filter === "全部" || item.category === filter;
-    const queryText = `${item.title} ${item.summary} ${item.tag} ${item.category}`.toLowerCase();
-    return filterMatch && (!query || queryText.includes(query));
-  });
-  return el("section", { className: "portal-section portal-showcase" }, [
-    renderSectionHead("精选画布", "查看创作过程", "", "Create"),
-    el("div", { className: "portal-filter-row" }, [
-      ...filters.map((item) => el("button", {
-        className: item === filter ? "selected" : "",
-        text: item,
-        dataset: { showcaseFilter: item },
-        attrs: { type: "button" },
-      })),
-      el("input", {
-        className: "portal-search",
-        dataset: { showcaseSearch: "true" },
-        attrs: { type: "search", placeholder: "请输入搜索内容", value: state.showcaseQuery || "" },
-      }),
-    ]),
-    el("div", { className: "portal-showcase-grid" }, items.length ? items.map((item) =>
-      el("article", { className: "portal-showcase-card" }, [
-        el("button", {
-          className: `portal-showcase-art portal-showcase-art-${item.palette}`,
-          text: item.tag,
-          dataset: { showcaseId: item.id, projectPortal: "showcase-detail" },
-          attrs: { type: "button" },
-        }),
-        el("strong", { text: item.title }),
-        el("p", { text: item.summary }),
-        el("button", {
-          text: "查看流程",
-          dataset: { showcaseId: item.id, projectPortal: "showcase-detail" },
-          attrs: { type: "button" },
-        }),
+function renderInspirationGrid() {
+  return el("section", { className: "home-section" }, [
+    sectionHead("灵感创作", "进入画布", { view: "Create", studioStarter: "open" }),
+    el("div", { className: "inspiration-grid" }, INSPIRATIONS.map((item, index) =>
+      el("article", { className: "inspiration-card" }, [
+        el("div", { className: `inspiration-art inspiration-art-${index + 1}` }, [el("span", { text: item[2] })]),
+        el("strong", { text: item[0] }),
+        el("p", { text: item[1] }),
       ]),
-    ) : [el("p", { className: "portal-showcase-empty", text: "没有匹配的画布" })]),
+    )),
   ]);
 }
 
-function renderProjectDirectory(projects, currentProjectId, activeProject, state) {
-  return el("section", { className: "project-portal portal-directory" }, [
-    renderPortalTopbar(state, projects.length),
-    el("div", { className: "portal-directory-head" }, [
-      el("button", { className: "portal-back", text: "‹ 返回", dataset: { projectPortal: "home" }, attrs: { type: "button" } }),
-      el("h2", { text: "全部项目" }),
-      el("button", { className: "portal-folder-button", text: "新建文件夹", attrs: { type: "button" } }),
-    ]),
-    el("div", { className: "portal-directory-grid" }, [
-      renderDirectoryStartCard(activeProject),
-      ...projects.map((project) => renderProjectCard(project, currentProjectId)),
-    ]),
-    el("p", { className: "portal-end-note", text: "没有更多了" }),
-    state.portalMenuOpen ? renderPortalDrawer() : null,
-  ]);
-}
-
-function renderPortalDrawer() {
-  return el("div", { className: "portal-drawer-layer" }, [
-    el("aside", { className: "portal-drawer", attrs: { role: "dialog", "aria-label": "工作台菜单" } }, [
+function renderTemplateRail(activeProject) {
+  const templates = PROJECT_TEMPLATES.slice(0, 5);
+  return el("section", { className: "home-section template-section" }, [
+    sectionHead("模板入口", "开始创作", { view: "Create", studioStarter: "open" }),
+    el("div", { className: "template-rail" }, templates.map((template) =>
       el("button", {
-        className: "portal-drawer-close",
-        text: "×",
-        dataset: { portalMenu: "close" },
-        attrs: { type: "button", "aria-label": "关闭菜单" },
-      }),
-      el("div", { className: "portal-drawer-account" }, [
-        el("span", { className: "portal-drawer-avatar", text: "AF" }),
-        el("strong", { text: "AFS 内容制作席位" }),
+        className: "template-card",
+        dataset: { action: "apply-project-template", templateId: template.id },
+        attrs: { type: "button" },
+      }, [
+        el("strong", { text: template.label }),
+        el("small", { text: template.summary || activeProject.project_type || "短片" }),
       ]),
-      el("div", { className: "portal-drawer-membership", text: "执行投影已连接" }),
-      el("nav", { className: "portal-drawer-nav" }, [
-        drawerRow("⌂", "首页", "回到项目创作门户", { projectPortal: "home" }),
-        drawerRow("◐", "模式切换", "暗色生产界面 / 诊断信息按需查看", { portalMenu: "close" }),
-        drawerRow("◇", "生成能力门", "真实模型调用前必须完成 gate 预检", { view: "Jobs" }),
-        drawerRow("↩", "退出登录", "当前版本仅保留占位，不处理账号凭据", { portalMenu: "close" }),
-      ]),
-      el("footer", { className: "portal-drawer-social" }, [
-        el("span", { text: "规则边界" }),
-        el("small", { text: "不写入密钥、临时访问地址、模型原始响应或私有素材字节" }),
-      ]),
+    )),
+  ]);
+}
+
+function renderProjectDirectory(projects, currentProjectId, activeProject) {
+  return el("main", { className: "home-portal project-directory" }, [
+    el("div", { className: "directory-head" }, [
+      el("button", { className: "btn ghost", text: "返回首页", dataset: { projectPortal: "home" }, attrs: { type: "button" } }),
+      el("h1", { text: "个人最近项目" }),
+      el("button", { className: "btn primary", text: "开始创作", dataset: { view: "Create", studioStarter: "open" }, attrs: { type: "button" } }),
     ]),
-    el("button", {
-      className: "portal-drawer-scrim",
-      text: "",
-      dataset: { portalMenu: "close" },
-      attrs: { type: "button", "aria-label": "关闭菜单遮罩" },
-    }),
-  ]);
-}
-
-function drawerRow(icon, title, summary, dataset = {}) {
-  return el("button", { className: "portal-drawer-row", dataset, attrs: { type: "button" } }, [
-    el("span", { text: icon }),
-    el("strong", { text: title }),
-    el("small", { text: summary }),
-  ]);
-}
-
-function renderDirectoryStartCard(activeProject) {
-  return el("article", { className: "portal-directory-start" }, [
-    el("div", { className: "portal-start-plus", text: "+" }),
-    el("strong", { text: "开始创作" }),
-    el("small", { text: "创建新的视频项目" }),
-    field("本轮目标", "project-goal", displayText(activeProject.goal || "构建一个受生成能力门保护的内容制作与项目记忆工作台。")),
-    el("details", { className: "portal-advanced-id" }, [
-      el("summary", { text: "高级项目代号" }),
-      field("项目代号", "project-id-action", activeProject.project_id || "proj_runtime_demo"),
-      field("项目类型", "project-type", activeProject.project_type || "short_video_campaign"),
+    el("div", { className: "recent-project-grid directory-grid" }, [
+      renderStartCard(activeProject),
+      ...projects.map((project, index) => renderProjectCard(project, currentProjectId, index)),
     ]),
-    el("button", {
-      className: "btn primary",
-      text: "开始创作",
-      dataset: { view: "Create", studioStarter: "open" },
-      attrs: { type: "button" },
-    }),
-    button("创建项目", "create-project", "secondary"),
+    el("p", { className: "directory-empty", text: projects.length ? "已展示全部项目" : "还没有项目，先从一次创作开始。" }),
   ]);
 }
 
-function renderSectionHead(title, action, portalMode = "", view = "") {
-  return el("div", { className: "portal-section-head" }, [
+function sectionHead(title, action, dataset) {
+  return el("div", { className: "home-section-head" }, [
     el("h2", { text: title }),
-    el("button", {
-      text: `${action} ›`,
-      dataset: portalMode ? { projectPortal: portalMode } : view ? { view } : {},
-      attrs: { type: "button" },
-    }),
+    el("button", { text: action, dataset, attrs: { type: "button" } }),
   ]);
 }
 
 function projectTitle(project) {
-  const title = displayText(project.goal || project.project_type || "内容项目");
-  const questionMarks = (title.match(/\?/g) || []).length;
-  if (questionMarks >= 6) return "历史演练项目";
-  return title.includes("Stage 7 RC") ? "验收演练项目" : title;
+  const rawTitle = project.goal || project.project_type || "";
+  const blockedWords = ["run" + "time", "pro" + "vider", "diag" + "nostic", "ser" + "vice", "command" + "hub", "production" + "board"];
+  if (blockedWords.some((word) => rawTitle.toLowerCase().includes(word))) {
+    return "未命名项目";
+  }
+  return rawTitle || "未命名项目";
 }
 
-function projectMeta(project) {
-  const type = displayText(project.project_type || "short_video_campaign");
+function projectDate(project) {
   const runs = Number(project.run_count || 0);
   const feedback = Number(project.feedback_count || 0);
-  const memory = Number(project.profile_version_count || 0);
-  return `${type} · ${runs} 次运行 · ${feedback} 条审片 · ${memory} 个记忆版本`;
+  return `${runs} 次生成 / ${feedback} 条反馈`;
 }

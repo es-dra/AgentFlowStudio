@@ -1,0 +1,56 @@
+.script-vertical-flow .field {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.script-vertical-flow .field span { color: #b8bbb4; font-size: 12px; }
+
+.script-vertical-flow textarea,
+.script-vertical-flow input,
+.script-vertical-flow select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: #f6f6f1;
+  background: rgba(8, 9, 9, 0.62);
+}
+
+.script-vertical-flow textarea { resize: vertical; }
+
+.script-vertical-grid {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.script-vertical-result {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  padding: 18px;
+  text-align: center;
+}
+
+.script-vertical-result p { max-width: 230px; margin: 0; color: #d4d7d1; line-height: 1.5; }
+
+.script-vertical-flow .libtv-script-node { top: 24%; }
+.script-vertical-flow .libtv-script-target { top: 14%; height: 210px; }
+.script-vertical-flow .libtv-script-connector { top: calc(24% + 98px); }
+.script-vertical-flow .libtv-edit-tip { top: calc(24% + 92px); }
+.script-vertical-flow .libtv-script-control-card { align-items: start; }
+.script-vertical-flow .libtv-script-control-card .field { grid-column: 2; }
+
+@media (max-width: 820px) {
+  .script-vertical-flow .libtv-script-node,
+  .script-vertical-flow .libtv-script-target,
+  .script-vertical-flow .libtv-edit-tip {
+    top: auto;
+  }
+
+  .script-vertical-flow .libtv-script-target {
+    min-height: 210px;
+    height: auto;
+  }
+}

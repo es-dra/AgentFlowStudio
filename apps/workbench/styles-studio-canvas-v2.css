@@ -95,6 +95,11 @@
   padding: 4px;
 }
 
+.libtv-top-actions .btn,
+.libtv-top-actions .libtv-tool { white-space: nowrap; }
+
+.libtv-top-actions .btn { overflow: hidden; text-overflow: ellipsis; }
+
 .libtv-canvas-stage {
   position: absolute;
   inset: 0;
@@ -268,4 +273,25 @@
   color: #f5f5f1;
   background: rgba(255, 255, 255, 0.08);
   font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .libtv-topbar {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    gap: 8px;
+  }
+
+  .libtv-top-actions {
+    max-width: 150px;
+    gap: 4px;
+  }
+
+  .libtv-top-actions .btn {
+    max-width: 76px;
+    padding: 0 9px;
+  }
+
+  .libtv-top-actions .libtv-tool small { display: none; }
 }

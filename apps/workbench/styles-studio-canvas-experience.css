@@ -1,0 +1,246 @@
+.studio-edge-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.studio-canvas-edge {
+  fill: none;
+  stroke: rgba(83, 213, 196, 0.55);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 9px rgba(83, 213, 196, 0.28));
+  transition: stroke 120ms ease-out, opacity 120ms ease-out;
+}
+
+.studio-canvas-edge.connected {
+  stroke-dasharray: 10 6;
+  animation: edge-flow 900ms ease-out 1;
+}
+
+.studio-canvas-edge.pending {
+  stroke: rgba(255, 189, 91, 0.9);
+  stroke-dasharray: 6 8;
+  animation: edge-pulse 900ms ease-in-out infinite;
+}
+
+.studio-canvas-edge.selected {
+  stroke: rgba(230, 246, 255, 0.95);
+  stroke-width: 3;
+}
+
+.libtv-node {
+  transition: transform 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.libtv-node:hover {
+  transform: translateY(-3px);
+  border-color: rgba(230, 246, 255, 0.64);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+}
+
+.libtv-node.is-linked {
+  border-color: rgba(83, 213, 196, 0.78);
+  box-shadow: 0 0 0 1px rgba(83, 213, 196, 0.24), 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+.libtv-node.is-dimmed {
+  opacity: 0.42;
+}
+
+.studio-node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+
+.libtv-node:hover .studio-node-actions,
+.libtv-node.selected .studio-node-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.studio-node-actions button {
+  min-height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.studio-node-actions button:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.status-chip.loading {
+  border: 1px solid rgba(255, 189, 91, 0.45);
+  background: linear-gradient(90deg, rgba(255, 189, 91, 0.1), rgba(255, 255, 255, 0.08));
+  animation: node-status-flow 1.6s ease-in-out infinite;
+}
+
+.status-chip.success {
+  border: 1px solid rgba(83, 213, 196, 0.42);
+  background: rgba(83, 213, 196, 0.12);
+}
+
+.status-chip.error {
+  border: 1px solid rgba(255, 103, 103, 0.48);
+  background: rgba(255, 103, 103, 0.12);
+}
+
+.canvas-product-v3 { grid-column: 1 / -1; min-height: 100%; }
+
+.libtv-workflow-control {
+  z-index: 3;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 420px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 8px;
+  background: rgba(32, 34, 35, 0.96);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.36);
+}
+
+.libtv-workflow-control header { display: flex; align-items: center; gap: 10px; }
+.libtv-workflow-control small { color: var(--afs-muted); line-height: 1.45; }
+
+.canvas-asset-drawer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 248px;
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.canvas-drawer-head { display: grid; gap: 5px; margin-bottom: 14px; }
+.canvas-drawer-head span { color: var(--afs-muted); font-size: 12px; }
+.canvas-drawer-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+
+.canvas-drawer-tabs button,
+.asset-type-filter {
+  min-height: 32px;
+  border: 1px solid var(--afs-line);
+  border-radius: 7px;
+  padding: 0 12px;
+  color: var(--afs-muted);
+  background: rgba(255,255,255,0.05);
+}
+
+.canvas-drawer-tabs button.active { color: var(--afs-ink); background: rgba(255,255,255,0.12); }
+.canvas-drawer-body { display: grid; align-content: start; gap: 10px; height: calc(100% - 92px); overflow-y: auto; }
+.canvas-node-list, .canvas-asset-list { display: grid; gap: 8px; }
+
+.canvas-node-list button,
+.libtv-list-row,
+.libtv-material-panel button {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--afs-line);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--afs-ink);
+  background: rgba(255,255,255,0.055);
+  text-align: left;
+}
+
+.canvas-node-list small,
+.libtv-list-row small,
+.libtv-material-panel small {
+  grid-column: 2;
+  overflow: hidden;
+  color: var(--afs-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.libtv-material-panel { min-width: 240px; display: grid; gap: 10px; }
+
+.libtv-material-panel em {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: #06100f;
+  background: var(--afs-cyan);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+@keyframes edge-flow {
+  from { stroke-dashoffset: 30; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes edge-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+@keyframes node-status-flow {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 189, 91, 0); }
+  50% { box-shadow: 0 0 18px rgba(255, 189, 91, 0.24); }
+}
+
+@media (max-width: 720px) {
+  .libtv-node-layer {
+    inset: 96px 12px 96px 12px;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    justify-content: stretch;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .studio-edge-layer {
+    opacity: 0.28;
+  }
+
+  .libtv-node {
+    display: grid;
+    min-height: 190px;
+  }
+
+  .libtv-node-layer-execution > .libtv-node {
+    display: grid;
+  }
+
+  .studio-node-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .canvas-asset-drawer { width: min(88vw, 280px); }
+  .libtv-workflow-control { min-width: min(100%, 320px); }
+}

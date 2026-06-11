@@ -1,0 +1,66 @@
+.studio-canvas-edge.connected {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.studio-canvas-edge.edge-selected {
+  stroke: rgba(230, 246, 255, 0.98);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 14px rgba(230, 246, 255, 0.42));
+}
+
+.canvas-edge-toolbar {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  gap: 6px;
+  width: 272px;
+  padding: 9px;
+  border: 1px solid rgba(230, 246, 255, 0.18);
+  border-radius: 8px;
+  color: rgba(245, 246, 241, 0.9);
+  background: rgba(25, 27, 28, 0.94);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(14px);
+}
+
+.canvas-edge-toolbar span {
+  color: rgba(85, 214, 194, 0.82);
+  font-size: 11px;
+}
+
+.canvas-edge-toolbar strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-edge-toolbar div {
+  display: flex;
+  gap: 6px;
+}
+
+.canvas-edge-toolbar button {
+  min-height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: rgba(230, 246, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+  transition: transform 80ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.canvas-edge-toolbar button:not(:disabled):hover {
+  border-color: rgba(85, 214, 194, 0.5);
+  background: rgba(85, 214, 194, 0.12);
+}
+
+.canvas-edge-toolbar button:not(:disabled):active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.canvas-edge-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

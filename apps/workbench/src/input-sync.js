@@ -30,4 +30,10 @@ export function syncInputs(root, state) {
   state.promotionDecision = value(root, "promotion-decision", state.promotionDecision);
   state.promotionRationale = value(root, "promotion-rationale", state.promotionRationale);
   state.feedbackNote = value(root, "feedback-note", state.feedbackNote);
+  state.scriptDraftGoal = value(root, "script-draft-goal", state.scriptDraftGoal);
+  state.scriptDraftDurationSeconds = value(root, "script-draft-duration", state.scriptDraftDurationSeconds);
+  state.scriptDraftTone = value(root, "script-draft-tone", state.scriptDraftTone);
+  state.scriptDraftFeedbackNote = value(root, "script-draft-feedback-note", state.scriptDraftFeedbackNote);
+  state.scriptDraftPreviousArtifactId = value(root, "script-draft-previous-artifact-id", state.scriptDraftPreviousArtifactId);
+  state.scriptDraftReviewFeedbackArtifactId = value(root, "script-draft-review-feedback-artifact-id", state.scriptDraftReviewFeedbackArtifactId);
 }

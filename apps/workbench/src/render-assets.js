@@ -1,5 +1,6 @@
 import { badge, el, sectionTitle } from "./dom.js";
 import { displayStatus, displayText } from "./display-labels.js";
+import { renderVisibleAssetShelf } from "./render-visible-assets.js";
 
 function renderCounts(counts) {
   const value = counts || {};
@@ -56,6 +57,7 @@ export function renderAssetLibrary(assetLibrary) {
       el("p", { className: "card-summary", text: displayText(value.summary, "先添加安全摘要，再进入制作检查。") }),
     ]),
     renderCounts(value.counts),
+    renderVisibleAssetShelf(),
     items.length ? el("div", { className: "asset-groups" }, groupedAssets(items).map(renderAssetGroup)) : renderEmptyLibrary(),
     el("div", { className: "asset-next-actions" }, [
       sectionTitle("下一步", displayText("safe summary only")),

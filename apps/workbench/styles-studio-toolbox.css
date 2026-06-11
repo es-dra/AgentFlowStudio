@@ -1,5 +1,7 @@
 .libtv-toolbox-panel {
-  right: 312px;
+  position: fixed;
+  left: max(12px, calc(50vw - 146px));
+  right: auto;
   bottom: 78px;
   width: 292px;
   display: grid;
@@ -134,8 +136,8 @@
 
 @media (max-width: 720px) {
   .libtv-toolbox-panel {
-    right: 12px;
     left: 12px;
+    right: 12px;
     width: auto;
   }
 }

@@ -5,11 +5,15 @@ import json
 import re
 import sys
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
+
+from workbench_libtv_browser_qa_common import assert_url_available
+from workbench_libtv_browser_qa_common import capture_node_control_feedback
+from workbench_libtv_browser_qa_common import capture_video_motion_feedback
+from workbench_libtv_browser_qa_common import is_provider_request
+from workbench_libtv_browser_qa_common import workbench_url
+from workbench_libtv_browser_qa_common import write_stdout
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8790/workbench/"
@@ -66,8 +70,8 @@ def main() -> int:
             f"{sys.executable} -m pip install playwright && {sys.executable} -m playwright install chromium"
         ) from exc
 
-    base_url = _workbench_url(args.base_url)
-    _assert_url_available(base_url)
+    base_url = workbench_url(args.base_url)
+    assert_url_available(base_url)
     output_dir = args.output_dir.resolve()
     screenshot_dir = output_dir / "screenshots"
     screenshot_dir.mkdir(parents=True, exist_ok=True)
@@ -91,7 +95,7 @@ def main() -> int:
                     )
                     page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
                     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
-                    page.on("request", lambda request: provider_request_urls.append(request.url) if _is_provider_request(request.url) else None)
+                    page.on("request", lambda request: provider_request_urls.append(request.url) if is_provider_request(request.url, PROVIDER_REQUEST_PATTERNS) else None)
                     try:
                         _open_workbench(page, base_url)
                         viewport_dir = screenshot_dir / viewport_id
@@ -128,7 +132,7 @@ def main() -> int:
     report_path = output_dir / "workbench_libtv_add_node_browser_qa.json"
     serialized_report = json.dumps(report, indent=2, ensure_ascii=False)
     report_path.write_text(serialized_report, encoding="utf-8")
-    _write_stdout(serialized_report)
+    write_stdout(serialized_report)
     if failures:
         raise SystemExit(f"LibTV browser QA found {len(failures)} failure(s). See {report_path}")
     return 0
@@ -136,11 +140,11 @@ def main() -> int:
 
 def _open_workbench(page: Any, base_url: str) -> None:
     page.goto(base_url, wait_until="domcontentloaded")
-    page.locator(".app-shell").first.wait_for(state="visible", timeout=15_000)
-    create_entry = page.locator("[data-view='Create']:visible").first
+    page.locator(".libtv-shell").first.wait_for(state="visible", timeout=15_000)
+    create_entry = page.locator(".product-nav button", has_text="创作画布").first
     create_entry.wait_for(state="visible", timeout=20_000)
     create_entry.click()
-    page.locator(".studio-workspace").first.wait_for(state="visible", timeout=15_000)
+    page.locator(".libtv-canvas.canvas-product-v3").first.wait_for(state="visible", timeout=15_000)
 
 
 def _capture_case(
@@ -161,6 +165,12 @@ def _capture_case(
     expected = page.locator(item["expected_selector"]).first
     expected.wait_for(state="visible", timeout=10_000)
     page.wait_for_timeout(150)
+    node_control = capture_node_control_feedback(
+        page,
+        skipped=item["group"] != "node" or item["kind"] in {"director", "video_merge"},
+    )
+    transition = expected.get_attribute("data-node-open-transition") if item["group"] == "node" else ""
+    transition_animation = expected.evaluate("node => getComputedStyle(node).animationName") if item["group"] == "node" else ""
 
     screenshot_path = screenshot_dir / f"{item['case_id']}.png"
     page.screenshot(path=screenshot_path, full_page=True)
@@ -189,6 +199,10 @@ def _capture_case(
         "overflow_nodes": overflow_nodes,
         "overflow_node_count": len(overflow_nodes),
         "viewport_overflow": viewport_overflow,
+        "node_control": node_control,
+        "video_motion": capture_video_motion_feedback(page, skipped=item["kind"] != "video"),
+        "transition": transition,
+        "transition_animation": transition_animation,
     }
 
 
@@ -217,7 +231,12 @@ def _overflow_nodes(page: Any) -> list[dict[str, Any]]:
             if (rect.width < 2 || rect.height < 2) return false;
             const text = (node.innerText || node.textContent || '').trim();
             if (!text) return false;
-            return node.scrollWidth > node.clientWidth + 2 || node.scrollHeight > node.clientHeight + 2;
+            if (node.matches('.libtv-canvas-stage')) return false;
+            const horizontalOverflow = node.scrollWidth > node.clientWidth + 2;
+            const verticalOverflow = node.scrollHeight > node.clientHeight + 2;
+            const handlesHorizontal = ['auto', 'scroll'].includes(style.overflowX);
+            const handlesVertical = ['auto', 'scroll'].includes(style.overflowY);
+            return (horizontalOverflow && !handlesHorizontal) || (verticalOverflow && !handlesVertical);
         }).slice(0, 20).map((node) => ({
             tag: node.tagName.toLowerCase(),
             className: String(node.className || ''),
@@ -239,6 +258,26 @@ def _qa_failures(report: dict[str, Any]) -> list[str]:
             failures.append(f"{case['case_id']}: forbidden visible text {case['forbidden_matches']}")
         if case["provider_calls_started"]:
             failures.append(f"{case['case_id']}: provider request started")
+        if case["overflow_node_count"]:
+            failures.append(f"{case['case_id']}/{case['viewport_id']}: visible text or controls overflow")
+        if case["group"] == "node" and case.get("transition") != "enter":
+            failures.append(f"{case['case_id']}: add-node panel did not use enter transition")
+        if case["group"] == "node" and "node-enter-from-canvas" not in str(case.get("transition_animation")):
+            failures.append(f"{case['case_id']}: add-node panel animation missing")
+        node_control = case["node_control"]
+        if not node_control.get("skipped"):
+            if node_control.get("control_count", 0) < 1:
+                failures.append(f"{case['case_id']}: no node controls found")
+            if not node_control.get("clicked") or not node_control.get("after_pressed"):
+                failures.append(f"{case['case_id']}: node control did not become active")
+            if case["kind"] in {"image", "video", "audio"}:
+                if node_control.get("summary_count", 0) < 1:
+                    failures.append(f"{case['case_id']}: node control summary missing")
+                if not node_control.get("summary_changed") or not node_control.get("summary_mentions_value"):
+                    failures.append(f"{case['case_id']}: node control summary did not reflect clicked value: {node_control}")
+        video_motion = case.get("video_motion", {})
+        if case["kind"] == "video" and (not video_motion.get("panel_visible") or not video_motion.get("summary_mentions_value")):
+            failures.append(f"{case['case_id']}: video motion controls did not update summary: {video_motion}")
     if report["console_errors"]:
         failures.append(f"console errors: {report['console_errors']}")
     if report["page_errors"]:
@@ -248,36 +287,10 @@ def _qa_failures(report: dict[str, Any]) -> list[str]:
     return failures
 
 
-def _workbench_url(raw_url: str) -> str:
-    parsed = urllib.parse.urlparse(raw_url)
-    if parsed.path.rstrip("/").endswith("/workbench"):
-        return raw_url if raw_url.endswith("/") else f"{raw_url}/"
-    return urllib.parse.urljoin(raw_url.rstrip("/") + "/", "workbench/")
-
-
-def _assert_url_available(url: str) -> None:
-    try:
-        with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310 - local QA URL.
-            if response.status >= 400:
-                raise RuntimeError(f"{url} returned HTTP {response.status}")
-    except (OSError, urllib.error.URLError) as exc:
-        raise SystemExit(f"Workbench URL is not available: {url} ({exc})") from exc
-
-
-def _is_provider_request(url: str) -> bool:
-    return any(pattern in url for pattern in PROVIDER_REQUEST_PATTERNS)
-
-
 def _selected_viewports(raw_values: list[str] | None) -> list[str]:
     if not raw_values or "all" in raw_values:
         return list(VIEWPORTS.keys())
     return list(dict.fromkeys(raw_values))
-
-
-def _write_stdout(text: str) -> None:
-    sys.stdout.buffer.write(text.encode("utf-8"))
-    sys.stdout.buffer.write(b"\n")
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

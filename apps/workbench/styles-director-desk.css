@@ -1,0 +1,127 @@
+.director-desk-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) minmax(460px, 1fr) 320px;
+  gap: 16px;
+  width: min(1160px, calc(100vw - 340px));
+  min-height: 560px;
+  padding: 18px;
+  transform-origin: top left;
+}
+
+.director-reference-frame,
+.director-floor-plan,
+.director-inspector {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.84);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+}
+
+.director-reference-frame {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+}
+
+.director-reference-frame header,
+.director-inspector header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.director-reference-image {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(30, 54, 67, 0.9), rgba(68, 57, 43, 0.88));
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.director-floor-plan {
+  position: relative;
+  min-height: 520px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    rgba(12, 13, 13, 0.86);
+  background-size: 24px 24px;
+  overflow: hidden;
+}
+
+.director-room {
+  position: absolute;
+  inset: 58px 68px;
+  border: 3px solid rgba(230, 246, 255, 0.24);
+}
+
+.director-light,
+.director-camera,
+.director-subject,
+.director-prop,
+.director-modifier {
+  position: absolute;
+  min-width: 78px;
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.director-light {
+  box-shadow: 0 0 28px rgba(255, 189, 91, 0.22);
+}
+
+.director-light.key-light { left: 14%; top: 17%; }
+.director-light.fill-light { right: 14%; top: 28%; }
+.director-light.back-light { left: 46%; bottom: 16%; }
+.director-camera { right: 22%; bottom: 26%; border-color: rgba(83, 213, 196, 0.45); }
+.director-subject { left: 43%; top: 43%; border-color: rgba(230, 246, 255, 0.5); }
+.director-prop.bed { right: 10%; top: 11%; }
+.director-prop.poster { right: 7%; top: 43%; }
+.director-prop.window { left: 8%; bottom: 18%; }
+.director-modifier.reflector { left: 24%; top: 31%; }
+.director-modifier.diffusion { left: 32%; bottom: 25%; }
+.director-modifier.flag { left: 12%; top: 49%; }
+
+.director-light.selected,
+.director-camera.selected,
+.director-subject.selected {
+  border-color: rgba(230, 246, 255, 0.82);
+  transform: translateY(-2px);
+}
+
+.director-inspector {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+}
+
+.director-inspector label {
+  display: grid;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
+
+.director-inspector input {
+  min-height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+@media (max-width: 980px) {
+  .director-desk-board {
+    grid-template-columns: 1fr;
+    width: calc(100vw - 40px);
+  }
+}
+

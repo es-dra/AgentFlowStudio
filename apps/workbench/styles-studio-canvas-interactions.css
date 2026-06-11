@@ -1,0 +1,298 @@
+.libtv-canvas-stage {
+  position: relative;
+  min-height: 640px;
+}
+
+.libtv-bottom-bar {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 8;
+}
+
+.libtv-tool,
+.libtv-toolbox-panel {
+  position: relative;
+}
+
+.libtv-workflow-control {
+  position: absolute;
+}
+
+.libtv-canvas-stage.is-connecting {
+  cursor: crosshair;
+}
+
+.libtv-canvas-stage.is-selecting {
+  cursor: default;
+}
+
+.canvas-marquee {
+  position: fixed;
+  z-index: 20;
+  border: 1px solid rgba(85, 214, 194, 0.72);
+  border-radius: 6px;
+  background: rgba(85, 214, 194, 0.12);
+  box-shadow: 0 0 26px rgba(85, 214, 194, 0.22);
+  pointer-events: none;
+}
+
+.studio-canvas-edge.pending {
+  stroke: rgba(240, 180, 90, 0.92);
+  stroke-dasharray: 6 10;
+  animation: edge-pulse 780ms ease-in-out infinite;
+}
+
+.studio-canvas-edge.pending.target-locked {
+  stroke: rgba(230, 246, 255, 0.96);
+  stroke-width: 4;
+  filter: drop-shadow(0 0 12px rgba(230, 246, 255, 0.42));
+}
+
+.studio-canvas-edge.connected {
+  stroke-dasharray: 12 8;
+  animation: edge-flow 960ms ease-out 1;
+}
+
+.studio-canvas-edge.edge-upstream {
+  stroke: rgba(240, 180, 90, 0.88);
+  filter: drop-shadow(0 0 10px rgba(240, 180, 90, 0.28));
+}
+
+.studio-canvas-edge.edge-downstream {
+  stroke: rgba(85, 214, 194, 0.9);
+  filter: drop-shadow(0 0 10px rgba(85, 214, 194, 0.3));
+}
+
+.studio-canvas-edge.edge-dimmed {
+  opacity: 0.16;
+}
+
+.workflow-node {
+  z-index: 4;
+}
+
+.workflow-node:hover,
+.workflow-node.selected {
+  z-index: 14;
+  border-color: rgba(230, 246, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(230, 246, 255, 0.16), 0 20px 54px rgba(0, 0, 0, 0.42);
+}
+
+.workflow-node.relation-upstream {
+  border-color: rgba(240, 180, 90, 0.6);
+  box-shadow: 0 0 0 1px rgba(240, 180, 90, 0.18), 0 18px 44px rgba(0, 0, 0, 0.35);
+}
+
+.workflow-node.relation-downstream {
+  border-color: rgba(85, 214, 194, 0.62);
+  box-shadow: 0 0 0 1px rgba(85, 214, 194, 0.18), 0 18px 44px rgba(0, 0, 0, 0.35);
+}
+
+.workflow-node.relation-bridge,
+.workflow-node.relation-direct {
+  transform: translateY(-2px);
+}
+
+.workflow-node.is-dragging {
+  z-index: 16;
+  opacity: 0.94;
+  transition: none;
+  border-color: rgba(230, 246, 255, 0.72);
+  box-shadow: 0 0 0 2px rgba(230, 246, 255, 0.16), 0 24px 64px rgba(0, 0, 0, 0.48);
+}
+
+.workflow-node.canvas-connection-target {
+  border-color: rgba(230, 246, 255, 0.96);
+  box-shadow: 0 0 0 2px rgba(230, 246, 255, 0.22), 0 0 26px rgba(85, 214, 194, 0.24), 0 18px 54px rgba(0, 0, 0, 0.46);
+  transform: translateY(-3px) scale(1.01);
+}
+
+.workflow-node-layer { min-height: 2400px; padding-bottom: 160px; }
+.workflow-node-layer::after { position: absolute; left: 0; right: 0; bottom: 0; height: 160px; pointer-events: none; content: ""; }
+
+.canvas-selection-frame {
+  position: absolute;
+  z-index: 7;
+  border: 1px solid rgba(230, 246, 255, 0.78);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(85, 214, 194, 0.07), rgba(230, 246, 255, 0.025));
+  box-shadow: 0 0 0 1px rgba(85, 214, 194, 0.18), 0 0 34px rgba(85, 214, 194, 0.12);
+  pointer-events: none;
+}
+
+.canvas-selection-toolbar {
+  position: absolute;
+  left: 0;
+  top: -46px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(620px, 100vw);
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(27, 29, 30, 0.96);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+  pointer-events: auto;
+}
+
+.canvas-selection-toolbar span {
+  padding: 0 8px;
+  color: rgba(230, 246, 255, 0.82);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.canvas-selection-toolbar button {
+  min-height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: rgba(230, 246, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.canvas-selection-toolbar button:hover {
+  border-color: rgba(85, 214, 194, 0.52);
+  background: rgba(85, 214, 194, 0.12);
+}
+
+.canvas-anchored-add-menu {
+  position: fixed;
+}
+
+.canvas-navigator-panel {
+  position: fixed;
+  left: max(12px, calc(50vw + 210px));
+  bottom: 78px;
+  width: 282px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.canvas-mini-map {
+  position: relative;
+  width: 238px;
+  height: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.18) 1px, transparent 1.8px),
+    rgba(9, 10, 11, 0.9);
+  background-size: 10px 10px;
+}
+
+.canvas-mini-node,
+.canvas-mini-viewport {
+  position: absolute;
+  border-radius: 5px;
+  pointer-events: none;
+}
+
+.canvas-mini-node {
+  border: 1px solid rgba(85, 214, 194, 0.48);
+  background: rgba(85, 214, 194, 0.28);
+}
+
+.canvas-mini-node.selected {
+  border-color: rgba(240, 180, 90, 0.86);
+  background: rgba(240, 180, 90, 0.45);
+  box-shadow: 0 0 12px rgba(240, 180, 90, 0.3);
+}
+
+.canvas-mini-viewport {
+  border: 1px solid rgba(230, 246, 255, 0.82);
+  background: rgba(230, 246, 255, 0.08);
+  box-shadow: 0 0 18px rgba(230, 246, 255, 0.18);
+}
+
+.canvas-navigator-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.canvas-navigator-actions button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  color: rgba(230, 246, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.canvas-navigator-actions button:hover {
+  border-color: rgba(85, 214, 194, 0.52);
+  background: rgba(85, 214, 194, 0.12);
+}
+
+.canvas-product-v3 {
+  height: 100%;
+  min-height: 100vh;
+}
+
+.canvas-product-v3 .libtv-canvas-stage {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.node-flow-shell { position: relative; animation: node-open-rise 180ms cubic-bezier(0.2, 0.82, 0.2, 1) both; }
+
+.node-open-context-bar {
+  display: grid; grid-template-columns: minmax(128px, 1.1fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr) auto;
+  align-items: center; gap: 8px; position: absolute; top: 16px; left: clamp(16px, 5vw, 52px); right: clamp(16px, 4vw, 42px); z-index: 16;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  color: rgba(245, 246, 241, 0.92);
+  background: rgba(20, 21, 21, 0.92);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+}
+
+.node-open-origin,
+.context-chain {
+  display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden;
+}
+
+.node-open-origin span,
+.context-chain span { color: rgba(245, 246, 241, 0.52); font-size: 11px; white-space: nowrap; }
+
+.node-open-origin strong,
+.context-node-chip { overflow: hidden; color: rgba(245, 246, 241, 0.92); font-size: 12px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+
+.node-open-origin small,
+.context-node-chip { border-radius: 999px; padding: 3px 7px; background: rgba(255, 255, 255, 0.07); }
+
+.context-node-chip {
+  max-width: 120px; border: 1px solid transparent; color: rgba(245, 246, 241, 0.9); cursor: pointer;
+  transition: transform 80ms ease, border-color 120ms ease, background 120ms ease, color 120ms ease; }
+
+.context-node-chip:hover { border-color: rgba(230, 246, 255, 0.34); background: rgba(230, 246, 255, 0.12); }
+
+.context-node-chip:active { transform: translateY(1px) scale(0.98); }
+
+.context-node-chip.empty { cursor: default; opacity: 0.62; }
+
+.context-node-chip.current { border-color: rgba(230, 246, 255, 0.24); }
+
+.context-upstream .context-node-chip { color: #ffd78e; background: rgba(240, 180, 90, 0.12); }
+
+.context-downstream .context-node-chip { color: #8ff3e6; background: rgba(85, 214, 194, 0.12); }
+
+.node-context-return {
+  min-height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px; padding: 0 10px;
+  color: rgba(245, 246, 241, 0.92); background: rgba(255, 255, 255, 0.07);
+}
+
+.node-context-return:hover { border-color: rgba(85, 214, 194, 0.48); background: rgba(85, 214, 194, 0.13); }
+
+@keyframes node-open-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}

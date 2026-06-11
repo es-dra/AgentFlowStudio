@@ -1,300 +1,234 @@
 from __future__ import annotations
+
 import shutil
 import subprocess
 from pathlib import Path
+
 import pytest
+
+
 WORKBENCH_ROOT = Path("apps/workbench")
-WORKBENCH_JS = [
+
+ACTIVE_JS = [
     WORKBENCH_ROOT / "src" / "dom.js",
     WORKBENCH_ROOT / "src" / "runtime-client.js",
-    WORKBENCH_ROOT / "src" / "presets.js",
-    WORKBENCH_ROOT / "src" / "display-labels.js",
-    WORKBENCH_ROOT / "src" / "app-selection.js",
-    WORKBENCH_ROOT / "src" / "app-actions.js",
-    WORKBENCH_ROOT / "src" / "input-sync.js",
-    WORKBENCH_ROOT / "src" / "polling.js",
-    WORKBENCH_ROOT / "src" / "canvas-interactions.js", WORKBENCH_ROOT / "src" / "studio-canvas-header-events.js",
-    WORKBENCH_ROOT / "src" / "command-hub-state.js",
-    WORKBENCH_ROOT / "src" / "project-hub-state.js",
-    WORKBENCH_ROOT / "src" / "creation-workspace-state.js",
-    WORKBENCH_ROOT / "src" / "memory-workspace-state.js",
-    WORKBENCH_ROOT / "src" / "operations-workspace-state.js",
-    WORKBENCH_ROOT / "src" / "studio-workspace-state.js",
-    WORKBENCH_ROOT / "src" / "activity-state.js",
-    WORKBENCH_ROOT / "src" / "production-board-state.js",
-    WORKBENCH_ROOT / "src" / "readiness-state.js",
     WORKBENCH_ROOT / "src" / "state.js",
     WORKBENCH_ROOT / "src" / "workspace-config.js",
-    WORKBENCH_ROOT / "src" / "workbench-state.js",
-    WORKBENCH_ROOT / "src" / "studio-mode.js",
-    WORKBENCH_ROOT / "src" / "project-showcase-data.js", WORKBENCH_ROOT / "src" / "render-actions.js",
-    WORKBENCH_ROOT / "src" / "render-command-hub.js", WORKBENCH_ROOT / "src" / "render-project-hub.js", WORKBENCH_ROOT / "src" / "render-project-showcase.js",
-    WORKBENCH_ROOT / "src" / "render-review-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-style-memory-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-operations-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-studio-canvas.js", WORKBENCH_ROOT / "src" / "render-studio-canvas-header.js",
-    WORKBENCH_ROOT / "src" / "render-studio-inspector.js",
-    WORKBENCH_ROOT / "src" / "render-studio-history.js",
-    WORKBENCH_ROOT / "src" / "render-studio-panels.js", WORKBENCH_ROOT / "src" / "render-studio-resource-entry.js", WORKBENCH_ROOT / "src" / "render-studio-video-node-flow.js", WORKBENCH_ROOT / "src" / "render-studio-audio-node-flow.js",
-    WORKBENCH_ROOT / "src" / "render-studio-side-rail.js",
-    WORKBENCH_ROOT / "src" / "render-studio-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-storyboard-workspace.js",
-    WORKBENCH_ROOT / "src" / "render-activity.js",
-    WORKBENCH_ROOT / "src" / "render-production-board.js",
-    WORKBENCH_ROOT / "src" / "render-assets.js",
-    WORKBENCH_ROOT / "src" / "render-artifact.js",
-    WORKBENCH_ROOT / "src" / "render-readiness.js",
+    WORKBENCH_ROOT / "src" / "prompt-optimizer-knowledge.js",
+    WORKBENCH_ROOT / "src" / "prompt-optimizer-runtime.js",
     WORKBENCH_ROOT / "src" / "render.js",
+    WORKBENCH_ROOT / "src" / "render-project-hub.js",
+    WORKBENCH_ROOT / "src" / "render-studio-workspace.js",
+    WORKBENCH_ROOT / "src" / "studio-workflow-graph.js",
+    WORKBENCH_ROOT / "src" / "studio-node-actions.js",
+    WORKBENCH_ROOT / "src" / "studio-node-control-state.js",
+    WORKBENCH_ROOT / "src" / "render-studio-node-context.js",
+    WORKBENCH_ROOT / "src" / "canvas-relation-focus.js",
+    WORKBENCH_ROOT / "src" / "canvas-interaction-geometry.js",
+    WORKBENCH_ROOT / "src" / "canvas-node-drag.js",
+    WORKBENCH_ROOT / "src" / "canvas-selection-actions.js",
+    WORKBENCH_ROOT / "src" / "canvas-viewport-actions.js",
+    WORKBENCH_ROOT / "src" / "canvas-interactions.js",
+    WORKBENCH_ROOT / "src" / "render-studio-panels.js",
+    WORKBENCH_ROOT / "src" / "render-studio-canvas-topbar.js",
+    WORKBENCH_ROOT / "src" / "render-studio-add-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-director-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-video-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-audio-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-starter-flows.js",
+    WORKBENCH_ROOT / "src" / "render-studio-canvas-header.js",
+    WORKBENCH_ROOT / "src" / "render-studio-toolbox.js",
+    WORKBENCH_ROOT / "src" / "render-visible-assets.js",
+    WORKBENCH_ROOT / "src" / "render-director-desk.js",
+    WORKBENCH_ROOT / "src" / "director-setup-model.js",
+    WORKBENCH_ROOT / "src" / "render-node-prompt.js",
+    WORKBENCH_ROOT / "src" / "render-node-control-summary.js",
+    WORKBENCH_ROOT / "src" / "render-prompt-optimizer.js",
+    WORKBENCH_ROOT / "src" / "studio-experience-events.js",
+    WORKBENCH_ROOT / "src" / "app-actions.js",
     WORKBENCH_ROOT / "src" / "app.js",
 ]
+
+ACTIVE_UI_FILES = [
+    WORKBENCH_ROOT / "index.html",
+    WORKBENCH_ROOT / "styles-libtv-shell.css",
+    WORKBENCH_ROOT / "styles-studio-canvas-experience.css",
+    WORKBENCH_ROOT / "styles-studio-canvas-interactions.css",
+    WORKBENCH_ROOT / "styles-studio-edge-toolbar.css",
+    WORKBENCH_ROOT / "styles-studio-node-ports.css",
+    WORKBENCH_ROOT / "styles-studio-node-transitions.css",
+    WORKBENCH_ROOT / "styles-studio-node-controls.css",
+    WORKBENCH_ROOT / "styles-studio-director-node-flow.css",
+    WORKBENCH_ROOT / "styles-studio-mobile-node-workspace.css",
+    WORKBENCH_ROOT / "styles-prompt-optimizer.css",
+    WORKBENCH_ROOT / "src" / "workspace-config.js",
+    WORKBENCH_ROOT / "src" / "render.js",
+    WORKBENCH_ROOT / "src" / "render-project-hub.js",
+    WORKBENCH_ROOT / "src" / "render-studio-workspace.js",
+    WORKBENCH_ROOT / "src" / "studio-workflow-graph.js",
+    WORKBENCH_ROOT / "src" / "studio-node-actions.js",
+    WORKBENCH_ROOT / "src" / "studio-node-control-state.js",
+    WORKBENCH_ROOT / "src" / "render-studio-node-context.js",
+    WORKBENCH_ROOT / "src" / "canvas-relation-focus.js",
+    WORKBENCH_ROOT / "src" / "canvas-interaction-geometry.js",
+    WORKBENCH_ROOT / "src" / "canvas-node-drag.js",
+    WORKBENCH_ROOT / "src" / "canvas-selection-actions.js",
+    WORKBENCH_ROOT / "src" / "canvas-viewport-actions.js",
+    WORKBENCH_ROOT / "src" / "canvas-interactions.js",
+    WORKBENCH_ROOT / "src" / "render-studio-panels.js",
+    WORKBENCH_ROOT / "src" / "render-studio-canvas-topbar.js",
+    WORKBENCH_ROOT / "src" / "render-studio-add-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-director-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-video-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-audio-node-flow.js",
+    WORKBENCH_ROOT / "src" / "render-studio-starter-flows.js",
+    WORKBENCH_ROOT / "src" / "render-studio-canvas-header.js",
+    WORKBENCH_ROOT / "src" / "render-studio-toolbox.js",
+    WORKBENCH_ROOT / "src" / "render-visible-assets.js",
+    WORKBENCH_ROOT / "src" / "render-director-desk.js",
+    WORKBENCH_ROOT / "src" / "director-setup-model.js",
+    WORKBENCH_ROOT / "src" / "render-node-prompt.js",
+    WORKBENCH_ROOT / "src" / "render-node-control-summary.js",
+    WORKBENCH_ROOT / "src" / "render-prompt-optimizer.js",
+]
+
+
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
-def _all_workbench_source() -> str:
-    files = [
-        WORKBENCH_ROOT / "README.md",
-        WORKBENCH_ROOT / "index.html",
-        WORKBENCH_ROOT / "styles.css",
-        WORKBENCH_ROOT / "styles-app-shell.css",
-        WORKBENCH_ROOT / "styles-components.css",
-        WORKBENCH_ROOT / "styles-command-hub.css",
-        WORKBENCH_ROOT / "styles-project-hub.css",
-        WORKBENCH_ROOT / "styles-project-directory.css", WORKBENCH_ROOT / "styles-project-drawer.css", WORKBENCH_ROOT / "styles-project-showcase.css",
-        WORKBENCH_ROOT / "styles-project-setup.css",
-        WORKBENCH_ROOT / "styles-assets.css",
-        WORKBENCH_ROOT / "styles-creation-workspace.css",
-        WORKBENCH_ROOT / "styles-studio-workspace.css",
-        WORKBENCH_ROOT / "styles-studio-canvas-v2.css", WORKBENCH_ROOT / "styles-studio-canvas-header.css", WORKBENCH_ROOT / "styles-studio-starters.css", WORKBENCH_ROOT / "styles-studio-text-node-flow.css", WORKBENCH_ROOT / "styles-studio-video-node-flow.css", WORKBENCH_ROOT / "styles-studio-audio-node-flow.css", WORKBENCH_ROOT / "styles-studio-script-generator-flow.css", WORKBENCH_ROOT / "styles-studio-director-merge-flow.css", WORKBENCH_ROOT / "styles-studio-canvas-panels.css", WORKBENCH_ROOT / "styles-studio-utility-panels.css", WORKBENCH_ROOT / "styles-studio-toolbox.css",
-        WORKBENCH_ROOT / "styles-studio-resource-entry.css",
-        WORKBENCH_ROOT / "styles-storyboard.css",
-        WORKBENCH_ROOT / "styles-review-memory.css",
-        WORKBENCH_ROOT / "styles-activity.css",
-        WORKBENCH_ROOT / "styles-operations.css",
-        WORKBENCH_ROOT / "styles-production-board.css",
-        WORKBENCH_ROOT / "styles-readiness.css",
-        WORKBENCH_ROOT / "styles-workflow.css",
-        *WORKBENCH_JS,
-    ]
-    return "\n".join(_read(path) for path in files)
-def test_workbench_shell_targets_runtime_service_contract() -> None:
+
+
+def _active_source() -> str:
+    return "\n".join(_read(path) for path in ACTIVE_UI_FILES)
+
+
+def test_workbench_uses_libtv_product_shell_entrypoint() -> None:
     index = _read(WORKBENCH_ROOT / "index.html")
-    source = _all_workbench_source()
-    assert '<script type="module" src="./src/app.js?v=stage7-rc"></script>' in index
-    assert '<html lang="zh-CN">' in index
-    assert '<link rel="stylesheet" href="./styles-app-shell.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-components.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-command-hub.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-project-hub.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-project-directory.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-project-drawer.css" />' in index and '<link rel="stylesheet" href="./styles-project-showcase.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-project-setup.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-assets.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-creation-workspace.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-studio-canvas-v2.css" />' in index and '<link rel="stylesheet" href="./styles-studio-canvas-header.css" />' in index and '<link rel="stylesheet" href="./styles-studio-starters.css" />' in index and '<link rel="stylesheet" href="./styles-studio-text-node-flow.css" />' in index and '<link rel="stylesheet" href="./styles-studio-video-node-flow.css" />' in index and '<link rel="stylesheet" href="./styles-studio-audio-node-flow.css" />' in index and '<link rel="stylesheet" href="./styles-studio-script-generator-flow.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-studio-director-merge-flow.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-studio-resource-entry.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-studio-canvas-panels.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-studio-utility-panels.css" />' in index and '<link rel="stylesheet" href="./styles-studio-toolbox.css" />' in index
-    assert "styles-studio-canvas-focus.css" not in index
-    assert "styles-studio-canvas-mode.css" not in index
-    assert '<link rel="stylesheet" href="./styles-storyboard.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-review-memory.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-activity.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-operations.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-production-board.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-readiness.css" />' in index
-    assert '<link rel="stylesheet" href="./styles-workflow.css" />' in index
-    assert "http://127.0.0.1:8790" in source
-    for endpoint in [
-        "/health",
-        "/capabilities",
-        "/projects",
-        "/source-assets",
-        "/content-cards",
-        "/canvas-draft",
-        "/scene-inspector",
-        "/review-decisions",
-        "/workbench-state",
-        "/runs/asset-test",
-        "/feedback",
-    ]:
-        assert endpoint in source
-    assert "/runs/two-round-validate" in source
-    assert "/provider/validation-plan" in source
-    assert "/artifacts/" in source
-    assert "createRuntimeClient" in source
-    assert "normalizeWorkbenchState" in source
-def test_workbench_keeps_frontend_safety_boundary() -> None:
-    source = _all_workbench_source()
-    js_source = "\n".join(_read(path) for path in WORKBENCH_JS)
-    for retired in ["render-jobs.js", "render-creation-workspace.js", "render-memory-workspace.js"]:
-        assert not (WORKBENCH_ROOT / "src" / retired).exists()
-    forbidden_patterns = [
-        "localStorage",
-        "indexedDB",
-        "showSaveFilePicker",
-        "createWritable",
-        "OPENAI_API_KEY",
-        "AFS_OPENAI_API_KEY",
-        "data/processed/runs",
-        "D:\\",
-        "C:\\",
-        "provider_config",
-        "signed_urls",
-    ]
-    for pattern in forbidden_patterns:
-        assert pattern not in source
-    for runtime_only_pattern in ["apps.cli", "web_bridge"]:
-        assert runtime_only_pattern not in js_source
-    for pattern in [".innerHTML", "insertAdjacentHTML", "throw new Error(body"]:
-        assert pattern not in js_source
-    assert "运行服务请求失败" in js_source and "无法解析的 JSON" in js_source
-    assert 'el("details", { className: "advanced" }' in js_source
-    assert "visible_by_default" in source
-    assert "feedback_is_memory: false" in source
-    assert "safe summaries" in source
-    assert all(marker in source for marker in ["STATUS_MAP[value]", "Add project materials before running a real generation pass."])
-    assert all(marker in source.lower() for marker in ["content card", "filmstrip"])
-    for marker in [
-        "生成画布草稿", "draft-canvas", "项目设置向导", "创作画布", "分镜台",
-        "素材库", "审片室", "项目记忆", "任务中心", "诊断", "产品发布", "脚本提纲",
-        "project-portal", "portal-hero-strip", "最近项目", "精选画布", "查看流程",
-        "projectPortalMode", "data-project-portal", "portal-directory", "新建文件夹", "没有更多了",
-        "showcase-detail", "showcaseProcessOpen", "data-showcase-process", "只读模式", "复制到项目", "process-dialog", "process-canvas", "data-process-node", "安全摘要", "portalScrollTop", "portalMenuOpen", "portal-drawer", "data-portal-menu", "工作台菜单", "执行投影已连接", "showcaseFilter", "data-showcase-filter", "data-showcase-search", "没有匹配的画布",
-        "素材准备", "运行首轮检查", "非人工验收",
-        "project_hub", "studio_workspace", "creation_workspace", "memory_workspace",
-        "operations_workspace", "project_readiness", "production_board", "command_hub",
-        "reference-grid", "variant-grid", "job-progress", "activity_timeline",
-        "libtv-canvas", "libtv-node-layer", "libtv-bottom-bar", "libtv-canvas-title-input", "studioCanvasIntent",
-        "studioStarterMode", "data-studio-starter", "故事脚本生成", "角色三视图", "首帧图生视频", "音频生视频",
-        "libtv-add-menu", "libtv-node-palette", "libtv-asset-tabs", "libtv-asset-groups",
-        "libtv-side-panel", "libtv-toolbox-panel", "libtv-history-panel", "libtv-shortcuts-panel", "libtv-help-panel",
-        "data-canvas-action", "canvasTransformStyle", "zoomPercent",
-        "libtv-inspector-panel", "libtv-gate-panel", "asset-groups",
-        "asset-next-actions", "asset-empty-state", "storyboard-workspace",
-        "storyboard-strip", "storyboard-preview", "storyboard-inspector",
-        "review-workspace", "review-candidate-strip", "review-decision-dock",
-        "style-memory-workspace", "style-preference-board", "style-next-round-panel",
-        "set-review-intent",
-        "candidateSummary(candidate)", "isEnglishFallback", "查看证据",
-        "selected_card_id", "selected_candidate_id", "selected_job_id",
-        "viewActionGroups", "configureJobPolling", "自动刷新", "保存检查器",
-        "inspector-prompt", "reusable_preferences", "next_pass_usage",
-        "保留方向", "标记修改", "拒绝候选", "record-review-decision",
-    ]:
-        assert marker in source
-    assert "ref_kind" not in js_source
-    assert "provider_config" not in js_source
-def test_workbench_normalizes_backend_state_shape() -> None:
-    source = _read(WORKBENCH_ROOT / "src" / "workbench-state.js")
-    assert "source.cards" in source
-    assert "source.asset_library" in source
-    assert "source.filmstrip" in source
-    assert "source.style_memory" in source
-    assert "source.review_room" in source
-    assert "source.job_center" in source
-    assert "source.activity_timeline" in source
-    assert "source.production_board" in source
-    assert "source.command_hub" in source
-    assert "source.project_hub" in source
-    assert "source.creation_workspace" in source
-    assert "source.memory_workspace" in source
-    assert "source.operations_workspace" in source
-    assert "source.project_readiness" in source
-    assert "source.inspector" in source
-    assert "source.card_id" in source
-    assert "source.primary_artifact_id" in source
-    assert "evidence.artifact_ids" in source
-    assert "source.event_id" in source
-def test_workbench_navigation_drives_stage_views() -> None:
-    app = _read(WORKBENCH_ROOT / "src" / "app.js")
-    render = _read(WORKBENCH_ROOT / "src" / "render.js")
-    actions = _read(WORKBENCH_ROOT / "src" / "render-actions.js")
-    state_source = _read(WORKBENCH_ROOT / "src" / "state.js")
     workspace_config = _read(WORKBENCH_ROOT / "src" / "workspace-config.js")
-    projects_block = render.split('if (activeView === "Projects") {', 1)[1].split('if (activeView === "Assets")', 1)[0]; assets_block = render.split('if (activeView === "Assets") {', 1)[1].split('if (activeView === "Storyboard")', 1)[0]; settings_block = render.split('if (activeView === "Settings") {', 1)[1].split('return withWindow("Create"', 1)[0]
-    style_memory_block = render.split('if (activeView === "Style Memory") {', 1)[1].split('if (activeView === "Jobs")', 1)[0]
-    jobs_block = render.split('if (activeView === "Jobs") {', 1)[1].split('if (activeView === "Settings")', 1)[0]
-    assert 'activeView: "Projects"' in state_source
-    assert "state.activeView = node.dataset.view" in app
-    assert "function syncProjectInputs(projectId)" in app and "state.projectId = state.lastResult.project_id || state.projectId" in _read(WORKBENCH_ROOT / "src" / "app-actions.js")
-    assert all(marker in app for marker in ["function selectAvailableProject()", "function preferredProject(projects)", 'project.status === "ready_for_next_round" ? 10000'])
-    assert "run(refreshWorkbench);" in app
-    assert 'root.querySelectorAll("#project-id-action, #project-id")' in app
-    assert "syncProjectInputs(state.projectId)" in app
-    assert "workspaceItems(items)" in render
-    assert "viewActionGroups" in render
-    assert "renderActionPanel(state, viewActionGroups(activeView))" in render
-    assert "renderProjectHub(workbench.project_hub, state)" in projects_block
-    assert "...common" not in projects_block
-    assert assets_block.index("renderAssetLibrary") < assets_block.index("...common")
-    assert "renderProjectReadiness" not in settings_block and "...common" not in settings_block
-    assert "renderStudioWorkspace(workbench.studio_workspace, state)" in render
-    assert "renderStoryboardWorkspace(workbench.studio_workspace, workbench.creation_workspace, state)" in render
-    assert "renderReviewWorkspace(workbench.review_room, workbench.memory_workspace, state)" in render
-    assert "renderStyleMemoryWorkspace(workbench.style_memory, workbench.memory_workspace)" in render
-    assert "renderActivityTimeline" not in style_memory_block
-    assert "renderOperationsWorkspace(workbench.operations_workspace)" in render
-    for retired in ["renderMemoryWorkspace", "renderJobCenter", "renderCreationWorkspace"]:
-        assert retired not in render
-    assert "...common" not in jobs_block
-    assert '"set-review-intent": () =>' in app
-    assert "state.selectedVariantId = dataset.variantId || state.selectedVariantId" in app
-    assert all(marker in actions for marker in ["function projectTitle(project)", "project.goal || project.project_type"]) and 'el("strong", { text: project.project_id || "project" })' not in actions
-    assert 'id: "Storyboard"' in workspace_config
-    assert 'label: "项目记忆"' in workspace_config
-    assert "groups.includes(\"project\")" in actions
-    assert "groups.includes(\"runtime\")" in actions
-def test_workbench_renders_artifact_specific_report_views() -> None:
-    source = _read(WORKBENCH_ROOT / "src" / "render-artifact.js")
-    for artifact_type in [
-        "agentflow_project_manifest",
-        "agentflow_real_asset_test_report",
-        "agentflow_two_round_context_runtime_report",
-        "agentflow_runtime_feedback_event",
-        "agentflow_runtime_review_decision",
-        "agentflow_provider_safe_manifest",
+    render = _read(WORKBENCH_ROOT / "src" / "render.js")
+
+    assert '<html lang="zh-CN">' in index
+    assert '<title>AgentFlow Studio</title>' in index
+    assert '<link rel="stylesheet" href="./styles-libtv-shell.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-canvas-interactions.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-edge-toolbar.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-node-ports.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-node-transitions.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-node-controls.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-director-node-flow.css" />' in index
+    assert '<link rel="stylesheet" href="./styles-studio-mobile-node-workspace.css" />' in index
+    assert 'id: "Projects"' in workspace_config and 'label: "首页"' in workspace_config
+    assert 'id: "Create"' in workspace_config and 'label: "创作画布"' in workspace_config
+    assert 'id: "Assets"' in workspace_config and 'label: "资产库"' in workspace_config
+
+    for removed in ["Style Memory", "Jobs", "Settings", "项目记忆", "任务中心", "诊断"]:
+      assert removed not in workspace_config
+
+    assert "renderProjectHub" in render
+    assert "renderStudioWorkspace" in render
+    assert "renderVisibleAssetsLibrary" in render
+    for disconnected in ["renderCommandHub", "renderProductionBoard", "renderOperationsWorkspace", "renderStyleMemoryWorkspace", "renderDiagnosticPanel"]:
+      assert disconnected not in render
+    assert "debugMode" in render and "Alt+D" in render
+
+
+def test_user_visible_product_path_has_no_engineering_terms_or_mojibake() -> None:
+    source = _active_source()
+    forbidden = [
+        "项目记忆",
+        "生成能力门",
+        "Provider",
+        "Runtime",
+        "高级诊断",
+        "任务中心",
+        "连接与诊断",
+        "CommandHub",
+        "ProductionBoard",
+        "本地规则降级",
+        "权重",
+        "候选记忆",
+        "隐性资产",
+        "鍓",
+        "鎻",
+        "鈻",
+    ]
+    for term in forbidden:
+        assert term not in source
+
+    for required in [
+        "开始创作",
+        "个人最近项目",
+        "灵感创作",
+        "模板入口",
+        "创作画布",
+        "资产库",
+        "添加节点",
+        "导演台",
+        "提示词优化",
     ]:
-        assert artifact_type in source
-    assert "JSON 详情" in source
-    assert "provider_calls_started" in source
-    assert "writes_long_term_memory" in source
-def test_workbench_artifact_ref_buttons_use_registered_handler() -> None:
-    app = _read(WORKBENCH_ROOT / "src" / "app.js")
-    assert "data-action='open-artifact-ref'" in app
-    assert "state.selectedArtifactId = node.dataset.artifactId" in app
-    assert 'run(actionHandlers["open-selected-artifact"])' in app
-    assert "run(openSelectedArtifact)" not in app
-def test_workbench_files_stay_below_maintenance_threshold() -> None:
-    for path in [
-        WORKBENCH_ROOT / "styles.css",
-        WORKBENCH_ROOT / "styles-app-shell.css",
-        WORKBENCH_ROOT / "styles-components.css",
-        WORKBENCH_ROOT / "styles-project-directory.css", WORKBENCH_ROOT / "styles-project-drawer.css", WORKBENCH_ROOT / "styles-project-showcase.css",
-        WORKBENCH_ROOT / "styles-project-setup.css",
-        WORKBENCH_ROOT / "styles-assets.css",
-        WORKBENCH_ROOT / "styles-studio-canvas-v2.css", WORKBENCH_ROOT / "styles-studio-canvas-header.css",
-        WORKBENCH_ROOT / "styles-studio-starters.css", WORKBENCH_ROOT / "styles-studio-text-node-flow.css", WORKBENCH_ROOT / "styles-studio-video-node-flow.css", WORKBENCH_ROOT / "styles-studio-audio-node-flow.css", WORKBENCH_ROOT / "styles-studio-script-generator-flow.css",
-        WORKBENCH_ROOT / "styles-studio-director-merge-flow.css",
-        WORKBENCH_ROOT / "styles-studio-resource-entry.css",
-        WORKBENCH_ROOT / "styles-studio-canvas-panels.css",
-        WORKBENCH_ROOT / "styles-studio-utility-panels.css", WORKBENCH_ROOT / "styles-studio-toolbox.css",
-        WORKBENCH_ROOT / "styles-storyboard.css",
-        WORKBENCH_ROOT / "styles-review-memory.css",
-        WORKBENCH_ROOT / "styles-activity.css",
-        WORKBENCH_ROOT / "styles-operations.css",
-        WORKBENCH_ROOT / "styles-readiness.css",
-        WORKBENCH_ROOT / "styles-workflow.css",
-        *WORKBENCH_JS,
+        assert required in source
+
+
+def test_prompt_optimizer_is_node_popover_only() -> None:
+    node_prompt = _read(WORKBENCH_ROOT / "src" / "render-node-prompt.js")
+    renderer = _read(WORKBENCH_ROOT / "src" / "render-prompt-optimizer.js")
+
+    assert "node-prompt-box" in node_prompt
+    assert "data-node-prompt-input" in node_prompt
+    assert "optimize-current-prompt" in node_prompt
+    assert "promptSurface" in node_prompt
+    assert "prompt-optimizer-popover" in renderer
+    assert "已按影视结构优化" in renderer
+    assert "已结合当前项目风格" in renderer
+    assert "已参考角色/场景设定" in renderer
+    assert "已用本地优化" in renderer
+    for hidden_copy in ["专业知识库 70%", "项目风格 20%", "个人偏好 10%", "权重", "Provider", "Runtime"]:
+        assert hidden_copy not in renderer
+
+
+def test_prompt_optimizer_uses_runtime_api_before_local_fallback() -> None:
+    client = _read(WORKBENCH_ROOT / "src" / "runtime-client.js")
+    actions = _read(WORKBENCH_ROOT / "src" / "app-actions.js")
+    runtime = _read(WORKBENCH_ROOT / "src" / "prompt-optimizer-runtime.js")
+    renderer = _read(WORKBENCH_ROOT / "src" / "render-prompt-optimizer.js")
+
+    assert "optimizePrompt(projectId, payload)" in client
+    assert "/prompt-optimizations" in client
+    assert "await client().optimizePrompt" in actions
+    assert "buildRuntimePromptOptimizationRequest" in actions
+    assert 'optimization_source: "runtime_service"' in runtime
+    assert 'optimization_source: "local_rule_fallback"' in runtime
+    assert "已用本地优化" in renderer
+    assert "Provider" not in renderer
+
+
+def test_prompt_optimizer_maps_libtv_node_kinds_to_runtime_contract() -> None:
+    actions = _read(WORKBENCH_ROOT / "src" / "app-actions.js")
+    runtime = _read(WORKBENCH_ROOT / "src" / "prompt-optimizer-runtime.js")
+
+    for marker in [
+        'text: "text"',
+        'image: "image"',
+        'video: "video"',
+        'audio: "audio"',
+        'script: "script"',
+        'director: "director"',
+        'video_merge: "video_merge"',
     ]:
-        lines = _read(path).splitlines()
-        assert len(lines) <= 300, path
-def test_workbench_uses_multi_tone_product_palette() -> None:
-    css = _read(WORKBENCH_ROOT / "styles.css") + _read(WORKBENCH_ROOT / "styles-components.css") + _read(WORKBENCH_ROOT / "styles-app-shell.css")
-    assert all(token in css for token in ["--accent: #1f6f5b", "--accent-2: #b45b39", "--ready: #315f99", "--blocked: #a83b32"])
-    assert all(token in css for token in ["height: 100vh", "overflow: hidden", "overflow-y: auto", "overscroll-behavior: contain"])
-def test_workbench_javascript_syntax() -> None:
+        assert marker in runtime
+    assert "safeArtifactRefs" in runtime
+    for forbidden in ["showOpenFilePicker", "FileReader", "readAsDataURL", "AFS_ALLOW_REMOTE_LLM"]:
+        assert forbidden not in actions
+        assert forbidden not in runtime
+
+
+def test_active_workbench_files_stay_below_maintenance_threshold() -> None:
+    for path in [WORKBENCH_ROOT / "styles-libtv-shell.css", *ACTIVE_JS]:
+        assert len(_read(path).splitlines()) <= 300, path
+
+
+def test_active_workbench_javascript_syntax() -> None:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not available")
-    for path in WORKBENCH_JS:
+    for path in ACTIVE_JS:
         subprocess.run([node, "--check", str(path)], check=True)

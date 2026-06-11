@@ -84,6 +84,18 @@ function providerView(payload) {
   ];
 }
 
+function scriptStoryboardView(payload) {
+  const scripts = Array.isArray(payload.scripts) ? payload.scripts : [];
+  const storyboard = Array.isArray(payload.storyboard) ? payload.storyboard : [];
+  return [
+    fact("脚本", scripts.length, "ready"),
+    fact("分镜", storyboard.length, "ready"),
+    fact("Provider 输出", payload.provider_output === true ? "是" : "否", "quiet"),
+    fact("远程调用", payload.remote_provider_calls_started === true ? "已启动" : "未启动", "quiet"),
+    listItems("分镜镜头", storyboard.slice(0, 6), "shot_id"),
+  ];
+}
+
 function reportView(artifact) {
   const payload = payloadOf(artifact);
   if (!payload || typeof payload !== "object") return [];
@@ -94,6 +106,7 @@ function reportView(artifact) {
   if (type === "agentflow_runtime_feedback_event") return feedbackView(payload);
   if (type === "agentflow_runtime_review_decision") return reviewDecisionView(payload);
   if (type === "agentflow_provider_safe_manifest") return providerView(payload);
+  if (type === "agentflow_script_storyboard_safe_artifact") return scriptStoryboardView(payload);
   return [];
 }
 
