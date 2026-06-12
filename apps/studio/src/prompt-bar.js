@@ -1,5 +1,5 @@
 import { promptPlaceholder } from "./nodes.js";
-import { MODELS_BY_NODE_TYPE, findModel } from "./presets/models.js";
+import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel } from "./presets/models.js";
 import {
   VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS, VIDEO_COUNTS, VIDEO_MODES,
   videoSpecLabel,
@@ -86,7 +86,7 @@ function buildBar(store, runtime, node) {
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      if (node.type !== "image") {
+      if (node.type !== "image" && !(node.type === "video" && isRemoteVideoModel(node.params?.model))) {
         flashTooltip(textarea, "当前版本仅图片节点支持真实生成");
         return;
       }
@@ -176,8 +176,10 @@ function buildBottomRow(store, runtime, node, textarea) {
 
   const send = el("button", "send-btn");
   send.innerHTML = icon("arrowUp", 15);
+  const canSend = node.type === "image" || (node.type === "video" && isRemoteVideoModel(node.params?.model));
   send.title = node.type === "image" ? "生成" : "视频/音频通道开发中，当前版本仅图片节点支持真实生成";
-  send.disabled = node.type !== "image";
+  if (canSend) send.title = "生成";
+  send.disabled = !canSend;
   send.addEventListener("click", () => startNodeGeneration(store, runtime, node));
   row.appendChild(send);
 

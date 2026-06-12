@@ -1,5 +1,48 @@
 # Devlog
 
+## 2026-06-13 - Kling I2V Preflight And Project Persistence
+
+- Added Runtime project listing and image asset public listing for Studio project selection and drawer rehydration.
+- Persisted safe Runtime preview URLs in Studio state and rejected non-runtime preview URLs.
+- Added project-scoped Studio local cache, topbar project selector/new-project action, and preview hydration from saved uploads.
+- Split context resolver responsibilities into subgraph, asset arbitration, and text-channel modules while keeping the old facade import.
+- Added shared provider dispatch retry helper for image/video reuse.
+- Extended ProviderDescriptor to v0.2 video fields and added `kling_i2v` registry adapter wiring on top of existing Kling modules.
+- Added Runtime video generation submit/poll/cancel/preview routes with explicit first-frame asset id, candidate_count=1, video gate, quota counter, and safe manifest.
+- Added Studio video node path for explicit first/last frame marking and Kling I2V submit.
+- Added safe Kling provider preflight tool and video descriptor addendum.
+- Added a narrow legacy descriptor inference path for descriptorless Kling local configs so the existing external secret file can be used without copying credentials into the repo.
+
+Verification:
+
+```text
+Project persistence focused: 4 passed
+Provider registry focused: 19 passed
+Runtime video focused: 4 passed
+Resolver/keyframe/visual asset focused: 18 passed
+Keyframe focused: 11 passed
+Studio static: 12 passed
+Combined focused set: 63 passed
+Full pytest: 868 passed
+Studio JS node --check for all apps/studio/src JS files: passed
+Project browser QA: passed on 127.0.0.1:8791/studio/
+External Kling secret preflight: ready, secrets_printed=false, gate disabled
+```
+
+Live state:
+
+```text
+Repo-local configs/providers.local.json only exposes MiniMax services.
+For Kling, use AFS_PROVIDER_CONFIG pointing at the external `.secrets` provider config supplied by the operator.
+Preflight against that file is ready; AFS_ALLOW_REMOTE_VIDEO is still disabled in the current shell.
+```
+
+Boundaries:
+
+- No live Kling submit was run.
+- No provider secret, provider raw response, signed URL, local absolute media path, or media bytes were written to tracked files or API responses.
+- Fake async video remains contract verification only.
+
 ## 2026-06-13 - MVP Hardening 001
 
 - Added provider-facing `user_prompt_plain` and backend section-header stripping so human-readable prompt sections do not leak into image provider prompts.

@@ -1,4 +1,4 @@
-# Provider Adapter v0.1 Contract
+# Provider Adapter v0.1 / v0.2 Contract
 
 中文摘要：本契约定义 AFS 本地 provider 中转站的最小公共接口。Runtime 只能通过
 `ProviderRegistry.dispatch(...)` 调度 provider；服务能力由 descriptor 描述，账号由

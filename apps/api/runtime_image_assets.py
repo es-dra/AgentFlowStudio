@@ -24,6 +24,11 @@ IMAGE_SUFFIX_TYPES = {
 
 
 def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> None:
+    @app.get("/projects/{project_id}/image-assets", include_in_schema=False)
+    def list_project_image_assets(project_id: str) -> dict[str, Any]:
+        store.ensure_project_manifest(project_id)
+        return {"project_id": project_id, "assets": list_image_assets(store, project_id)}
+
     @app.post("/projects/{project_id}/image-assets", include_in_schema=False)
     def upload_image_asset(project_id: str, request: ImageAssetUploadRequest) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
@@ -100,6 +105,23 @@ def image_asset_metadata(store: RuntimeStore, project_id: str, asset_id: str) ->
     metadata = read_json(path)
     reject_unsafe_payload(metadata)
     return metadata
+
+
+def list_image_assets(store: RuntimeStore, project_id: str) -> list[dict[str, Any]]:
+    assets: list[dict[str, Any]] = []
+    root = store.root.resolve()
+    image_assets_dir = (store.projects_dir / safe_id(project_id) / "image_assets").resolve()
+    try:
+        image_assets_dir.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("image assets path escapes runtime root") from exc
+    if not image_assets_dir.is_dir():
+        return []
+    for path in sorted(image_assets_dir.glob("*/image_asset.json")):
+        metadata = read_json(path)
+        reject_unsafe_payload(metadata)
+        assets.append(public_image_asset(metadata))
+    return assets
 
 
 def public_image_asset(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -257,6 +279,7 @@ def _asset_dir(store: RuntimeStore, project_id: str, asset_id: str) -> Path:
 __all__ = (
     "image_asset_file_path",
     "image_asset_metadata",
+    "list_image_assets",
     "public_image_asset",
     "register_runtime_image_asset_routes",
     "resolve_reference_images",

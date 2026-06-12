@@ -110,10 +110,12 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
         "IMAGE_RATIOS",
     ):
         assert removed not in prompt_bar
-    assert 'if (node.type !== "image")' in prompt_bar
+    assert "isRemoteVideoModel" in prompt_bar
+    assert 'node.type !== "image"' in prompt_bar
     assert "bar-cost" not in prompt_bar
     assert "当前版本仅图片节点支持真实生成" in prompt_bar
     assert "uploadNodeImage" in node_menu
+    assert "setNodeVideoFrame" in node_menu
     assert "上传/替换参考图" in node_menu
 
 

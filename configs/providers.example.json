@@ -26,6 +26,23 @@
       "default_models": {
         "video": "fake-video"
       }
+    },
+    "kling": {
+      "auth_type": "jwt_hs256_from_ak_sk",
+      "base_url": "https://api-beijing.klingai.com",
+      "access_key_env": "KLING_ACCESS_KEY",
+      "secret_key_env": "KLING_SECRET_KEY",
+      "jwt": {
+        "ttl_seconds": 1800,
+        "nbf_skew_seconds": -5
+      },
+      "default_models": {
+        "i2v": "kling-v3"
+      },
+      "endpoints": {
+        "i2v_create": "/v1/videos/image2video",
+        "i2v_query": "/v1/videos/image2video/{id}"
+      }
     }
   },
   "account_pools": {
@@ -67,6 +84,21 @@
           "enabled_capabilities": ["video"],
           "enabled": true,
           "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "kling_video_pool": {
+      "accounts": [
+        {
+          "account_id": "kling",
+          "service_id": "kling_i2v",
+          "credential_env": null,
+          "enabled_capabilities": ["video"],
+          "enabled": true,
+          "priority": 20,
           "weight": 1,
           "concurrency_limit": 1,
           "health_state": "unknown"
@@ -143,6 +175,45 @@
         "cost_hint": "Fake adapter only; no provider cost.",
         "rate_limit_hint": "Fake adapter is deterministic and local.",
         "required_gate": "AFS_ALLOW_REMOTE_VIDEO"
+      }
+    },
+    "kling_i2v": {
+      "provider": "kling",
+      "account_ref": "kling",
+      "capability": "video",
+      "api_family": "i2v",
+      "default_model_ref": "accounts.kling.default_models.i2v",
+      "create_endpoint_ref": "accounts.kling.endpoints.i2v_create",
+      "query_endpoint_ref": "accounts.kling.endpoints.i2v_query",
+      "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.2",
+        "modality": "video",
+        "execution_mode": "async",
+        "capabilities": ["video"],
+        "account_pool_id": "kling_video_pool",
+        "reference_image_slots": 2,
+        "supported_aspect_ratios": ["16:9", "9:16"],
+        "prompt_char_limit": 2500,
+        "seed_supported": false,
+        "cost_hint": "Kling I2V live usage is billed by provider duration and mode.",
+        "rate_limit_hint": "Use one live Kling video task at a time during MVP validation.",
+        "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+        "frame_slots": {
+          "first_frame": "required",
+          "last_frame": "optional"
+        },
+        "frame_modes": ["first_frame", "first_last_frame"],
+        "supported_durations_sec": [5, 10],
+        "supported_resolutions": ["720p", "1080p"],
+        "async_poll_interval_sec": 5,
+        "async_timeout_sec": 600,
+        "async_max_polls": 120,
+        "prompt_profile": "video_i2v_v1",
+        "cost_estimate": {
+          "unit": "task",
+          "disclaimer": "Example only; use local provider terms for actual cost."
+        }
       }
     }
   }

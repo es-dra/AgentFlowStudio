@@ -11,7 +11,7 @@ export const VIDEO_RESOLUTIONS = ["480P", "720P", "1080P"];
 export const VIDEO_DURATIONS = ["5s", "10s", "15s"];
 
 export const IMAGE_COUNTS = [1, 2, 4];
-export const VIDEO_COUNTS = [1, 2];
+export const VIDEO_COUNTS = [1];
 
 export const VIDEO_MODES = ["文生视频", "全能参考", "图生视频", "首尾帧", "图片参考"];
 

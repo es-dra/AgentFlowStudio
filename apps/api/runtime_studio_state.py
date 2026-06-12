@@ -29,6 +29,12 @@ FORBIDDEN_STUDIO_KEYS = {
     "hidden_memory",
 }
 LOCAL_PATH_PATTERN = re.compile(r"([a-zA-Z]:\\|/Users/|/home/|data/processed/runs)")
+SAFE_PREVIEW_URL_PATTERN = re.compile(
+    r"^/projects/([a-zA-Z0-9_.-]+)/(?:"
+    r"image-assets/[a-zA-Z0-9_.-]+/preview|"
+    r"keyframe-generations/[a-zA-Z0-9_.-]+/candidates/[a-zA-Z0-9_.-]+/preview"
+    r")$"
+)
 SAFE_NODE_PARAM_KEYS = (
     "model",
     "spec",
@@ -69,7 +75,7 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
     def put_studio_state(project_id: str, request: StudioStateRequest) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
         try:
-            state = sanitize_studio_state(request.state)
+            state = sanitize_studio_state(request.state, project_id=project_id)
             reject_unsafe_payload(state)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -87,14 +93,14 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
         return {"project_id": project_id, "source": "runtime", "saved": True, "state": state}
 
 
-def sanitize_studio_state(value: dict[str, Any]) -> dict[str, Any]:
+def sanitize_studio_state(value: dict[str, Any], *, project_id: str | None = None) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("studio state must be an object")
     _reject_forbidden_known_surfaces(value)
     sanitized = {
         "meta": _meta(value.get("meta")),
         "viewport": _viewport(value.get("viewport")),
-        "nodes": _nodes(value.get("nodes")),
+        "nodes": _nodes(value.get("nodes"), project_id=project_id),
         "edges": _edges(value.get("edges")),
         "order": _order(value.get("order"), value.get("nodes")),
         "assets": _assets(value.get("assets")),
@@ -126,7 +132,7 @@ def _viewport(value: Any) -> dict[str, float]:
     }
 
 
-def _nodes(value: Any) -> dict[str, Any]:
+def _nodes(value: Any, *, project_id: str | None = None) -> dict[str, Any]:
     result: dict[str, Any] = {}
     source = value if isinstance(value, dict) else {}
     for raw_id, node in source.items():
@@ -134,12 +140,9 @@ def _nodes(value: Any) -> dict[str, Any]:
             continue
         node_id = safe_id(str(raw_id))
         params = node.get("params") if isinstance(node.get("params"), dict) else {}
-        safe_params = {
-            key: params[key]
-            for key in SAFE_NODE_PARAM_KEYS
-            if key in params
-        }
-        result[node_id] = {
+        safe_params = _node_params(params, project_id=project_id)
+        preview_url = _preview_url(node.get("previewUrl"), project_id=project_id)
+        safe_node = {
             "id": node_id,
             "type": _text(node.get("type"), "text", 40),
             "title": _text(node.get("title"), "未命名节点", 120),
@@ -154,6 +157,9 @@ def _nodes(value: Any) -> dict[str, Any]:
             "result": _text(node.get("result"), "", 4000),
             "collapsed": bool(node.get("collapsed")),
         }
+        if preview_url:
+            safe_node["previewUrl"] = preview_url
+        result[node_id] = safe_node
     return result
 
 
@@ -220,7 +226,8 @@ def _reject_forbidden_known_surfaces(value: dict[str, Any]) -> None:
         for node in nodes.values():
             if not isinstance(node, dict):
                 continue
-            node_shallow = {key: item for key, item in node.items() if key != "params"}
+            _preview_url(node.get("previewUrl"))
+            node_shallow = {key: item for key, item in node.items() if key not in {"params", "previewUrl"}}
             _reject_forbidden(node_shallow)
             params = node.get("params")
             if not isinstance(params, dict):
@@ -232,6 +239,8 @@ def _reject_forbidden_known_surfaces(value: dict[str, Any]) -> None:
                 if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
                     raise ValueError(f"studio state contains forbidden field: {key}")
                 if key in SAFE_NODE_PARAM_KEYS:
+                    if key == "uploads":
+                        _uploads(item)
                     _reject_forbidden(item)
     assets = value.get("assets")
     if isinstance(assets, list):
@@ -258,6 +267,46 @@ def _jsonable(value: Any) -> Any:
     dumped = json.dumps(value, ensure_ascii=False)
     _reject_forbidden(value)
     return json.loads(dumped)
+
+
+def _node_params(value: dict[str, Any], *, project_id: str | None = None) -> dict[str, Any]:
+    safe_params: dict[str, Any] = {}
+    for key in SAFE_NODE_PARAM_KEYS:
+        if key not in value:
+            continue
+        if key == "uploads":
+            safe_params[key] = _uploads(value[key], project_id=project_id)
+        else:
+            safe_params[key] = value[key]
+    return safe_params
+
+
+def _uploads(value: Any, *, project_id: str | None = None) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    result: list[Any] = []
+    for item in value[:24]:
+        if not isinstance(item, dict):
+            continue
+        upload = dict(item)
+        if "preview_url" in upload:
+            upload["preview_url"] = _preview_url(upload.get("preview_url"), project_id=project_id)
+        result.append(upload)
+    return result
+
+
+def _preview_url(value: Any, *, project_id: str | None = None) -> str:
+    if value in {None, ""}:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    match = SAFE_PREVIEW_URL_PATTERN.fullmatch(text)
+    if not match:
+        raise ValueError("studio state previewUrl must be a safe Runtime preview route")
+    if project_id is not None and match.group(1) != safe_id(project_id):
+        raise ValueError("studio state previewUrl must belong to the current project")
+    return text
 
 
 __all__ = ("register_runtime_studio_state_routes", "sanitize_studio_state")

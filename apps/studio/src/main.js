@@ -14,18 +14,130 @@ import { STARTERS } from "./presets/starters.js";
 import { fitViewport, zoomAt } from "./geometry.js";
 import { icon } from "./icons.js";
 
-const store = createStore();
-const runtime = createRuntimeClient("studio-local-001");
+const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
+let runtime = createRuntimeClient(initialProjectId());
+const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
+const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
+let projectSummaries = [];
 
 renderStarters();
-renderDock(store, runtime);
-bindCanvasInput(store, runtime);
+renderDock(store, runtimeRef);
+bindCanvasInput(store, runtimeRef);
 bindKeyboard();
 
 store.subscribe(renderAll);
 renderAll(store.get());
-store.hydrateRuntime(runtime);
+store.hydrateRuntime(runtime).then(syncRuntimeAssets);
+refreshProjectSummaries();
+
+function initialProjectId() {
+  const params = new URLSearchParams(window.location.search || "");
+  const fromQuery = safeProjectId(params.get("project"));
+  if (fromQuery) return fromQuery;
+  const stored = safeProjectId(localStorage.getItem(ACTIVE_PROJECT_KEY));
+  return stored || "studio-local-001";
+}
+
+function safeProjectId(value) {
+  const text = String(value || "").trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
+  return text || "";
+}
+
+async function refreshProjectSummaries() {
+  try {
+    const payload = await runtime.listProjects();
+    projectSummaries = Array.isArray(payload?.projects) ? payload.projects : [];
+    renderAll(store.get());
+  } catch {
+    projectSummaries = [];
+  }
+}
+
+async function switchProject(projectId) {
+  const safe = safeProjectId(projectId) || "studio-local-001";
+  localStorage.setItem(ACTIVE_PROJECT_KEY, safe);
+  syncProjectUrl(safe);
+  runtime = createRuntimeClient(safe);
+  store.attachRuntime(runtime);
+  await store.switchProject(safe, runtime);
+  await syncRuntimeAssets();
+  await refreshProjectSummaries();
+}
+
+function syncProjectUrl(projectId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("project", projectId);
+  window.history.replaceState({}, "", url);
+}
+
+async function createNewProject() {
+  const name = window.prompt("项目名称", "AFS 内测项目");
+  if (name === null) return;
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
+  runtime = createRuntimeClient(projectId);
+  await runtime.createProject({ project_id: projectId, goal: name.trim() || "AFS Studio project" });
+  localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+  syncProjectUrl(projectId);
+  await store.switchProject(projectId, runtime);
+  store.set((s) => {
+    s.meta.projectName = name.trim() || "AFS Studio project";
+    s.meta.canvasName = "画布 1";
+  }, { history: false });
+  await runtime.saveStudioState(store.get());
+  await syncRuntimeAssets();
+  await refreshProjectSummaries();
+}
+
+async function syncRuntimeAssets() {
+  const [imagePayload, visualPayload] = await Promise.allSettled([
+    runtime.listImageAssets?.(),
+    runtime.listVisualAssets?.("fixed"),
+  ]);
+  const imageAssets = imagePayload.status === "fulfilled" && Array.isArray(imagePayload.value?.assets) ? imagePayload.value.assets : [];
+  const visualAssets = visualPayload.status === "fulfilled" && Array.isArray(visualPayload.value?.assets) ? visualPayload.value.assets : [];
+  store.set((s) => {
+    const generated = [
+      ...visualAssets.map((asset) => ({
+        id: `visual_${asset.asset_id}`,
+        kind: asset.asset_type === "scene" ? "scene_asset" : "character_asset",
+        title: asset.label || asset.asset_id,
+        safe_summary: asset.signature || "",
+        thumbnail_ref: "character-sheet",
+        source_node_id: asset.source_node_id || null,
+        status: asset.status || "fixed",
+        asset_id: asset.asset_id,
+      })),
+      ...imageAssets.map((asset) => ({
+        id: `image_${asset.asset_id}`,
+        kind: "image_reference",
+        title: asset.filename || asset.asset_id,
+        safe_summary: asset.role || "image asset",
+        thumbnail_ref: "keyframe",
+        source_node_id: asset.source_node_id || null,
+        status: "ready",
+        asset_id: asset.asset_id,
+        preview_url: asset.preview_url,
+      })),
+    ];
+    const ids = new Set(generated.map((item) => item.id));
+    s.assets = [...generated, ...s.assets.filter((item) => !ids.has(item.id))];
+  }, { history: false });
+}
+
+function projectLabel(item) {
+  const meta = item?.studio_state_meta || {};
+  return meta.projectName || item?.goal || item?.project_id || "studio-local-001";
+}
+
+function projectOptions(state) {
+  const currentId = state.meta.projectId || runtime.projectId;
+  const current = { project_id: currentId, studio_state_meta: { projectName: state.meta.projectName, canvasName: state.meta.canvasName } };
+  const known = projectSummaries.length ? [...projectSummaries] : [];
+  if (currentId && !known.some((item) => item.project_id === currentId)) known.unshift(current);
+  return known.length ? known : [current];
+}
 
 function renderAll(state) {
   renderTopbar(state, store);
@@ -37,11 +149,13 @@ function renderAll(state) {
 function renderTopbar(state, store) {
   const topbar = document.getElementById("topbar");
   const signature = [
+    state.meta.projectId,
     state.ui.drawerOpen,
     state.meta.projectName,
     state.meta.canvasName,
     state.ui.saveState,
     state.ui.saveMessage,
+    projectSummaries.map((item) => item.project_id).join(","),
   ].join("|");
   if (topbar.dataset.signature === signature) return;
   topbar.dataset.signature = signature;
@@ -63,6 +177,29 @@ function renderTopbar(state, store) {
     title.appendChild(el("span", "divider"));
     title.appendChild(el("span", "canvas-name", `${state.meta.canvasName} ▾`));
     topbar.appendChild(title);
+
+    const projectSelect = el("select", "project-select");
+    projectSelect.title = "切换项目";
+    const known = projectOptions(state);
+    for (const item of known) {
+      const option = document.createElement("option");
+      option.value = item.project_id;
+      option.textContent = projectLabel(item);
+      option.selected = item.project_id === runtime.projectId;
+      projectSelect.appendChild(option);
+    }
+    projectSelect.addEventListener("change", () => switchProject(projectSelect.value));
+    topbar.appendChild(projectSelect);
+
+    const newProject = el("button", "icon-btn");
+    newProject.innerHTML = icon("plus", 14);
+    newProject.title = "新建项目";
+    newProject.addEventListener("click", createNewProject);
+    topbar.appendChild(newProject);
+  }
+
+  if (state.ui.drawerOpen) {
+    appendProjectControls(topbar, state);
   }
 
   topbar.appendChild(el("div", "topbar-spacer"));
@@ -73,6 +210,27 @@ function renderTopbar(state, store) {
   right.appendChild(save);
   // 分享/作品库/账户尚未实现:内测版本不展示无功能按钮,待功能落地后恢复。
   topbar.appendChild(right);
+}
+
+function appendProjectControls(topbar, state) {
+  const projectSelect = el("select", "project-select");
+  projectSelect.title = "切换项目";
+  const known = projectOptions(state);
+  for (const item of known) {
+    const option = document.createElement("option");
+    option.value = item.project_id;
+    option.textContent = projectLabel(item);
+    option.selected = item.project_id === runtime.projectId;
+    projectSelect.appendChild(option);
+  }
+  projectSelect.addEventListener("change", () => switchProject(projectSelect.value));
+  topbar.appendChild(projectSelect);
+
+  const newProject = el("button", "icon-btn");
+  newProject.innerHTML = icon("plus", 14);
+  newProject.title = "新建项目";
+  newProject.addEventListener("click", createNewProject);
+  topbar.appendChild(newProject);
 }
 
 function renderStarters() {

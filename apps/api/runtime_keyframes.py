@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
 from typing import Any
 
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     load_provider_registry,
@@ -14,6 +13,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
+from apps.api.runtime_provider_dispatch import dispatch_provider_with_retry
 from apps.api.runtime_keyframe_payloads import (
     keyframe_candidate_summary,
     keyframe_request_plan,
@@ -114,8 +114,9 @@ def build_keyframe_generation(
                 reference_image_paths=tuple(item["path"] for item in reference_images),
                 subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
             )
-            manifest, retry_count = _dispatch_image_provider_with_retry(
+            manifest, retry_count = dispatch_provider_with_retry(
                 registry,
+                "image",
                 request.provider_service_id,
                 dispatch_request,
             )
@@ -270,48 +271,6 @@ def _provider_outputs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return outputs
-
-
-def _dispatch_image_provider_with_retry(
-    registry: Any,
-    service_id: str,
-    request: ProviderDispatchRequest,
-) -> tuple[dict[str, Any], int]:
-    try:
-        return registry.dispatch("image", service_id, request), 0
-    except ModelGatewayError as exc:
-        if not _retryable_provider_error(exc):
-            raise
-        time.sleep(2)
-        try:
-            manifest = registry.dispatch("image", service_id, request)
-        except ModelGatewayError as retry_exc:
-            setattr(retry_exc, "retry_count", 1)
-            raise
-        return manifest, 1
-
-
-def _retryable_provider_error(error: ModelGatewayError) -> bool:
-    if isinstance(error, ModelConfigError):
-        return False
-    lowered = str(error).lower()
-    if any(code in lowered for code in (" 400", " 401", " 403", " 404", " 409", " 422", "invalid api key", "invalid parameter")):
-        return False
-    return any(
-        term in lowered
-        for term in (
-            "timeout",
-            "timed out",
-            "connection",
-            "network",
-            "temporarily",
-            "readiness",
-            "not ready",
-            "502",
-            "503",
-            "504",
-        )
-    )
 
 
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:

@@ -1,6 +1,6 @@
 import { createNode, connect } from "./nodes.js";
 import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
-import { isRemoteImageModel } from "./presets/models.js";
+import { isRemoteImageModel, isRemoteVideoModel, providerServiceForVideoModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { lastImageAsset, mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
@@ -63,6 +63,21 @@ export function uploadNodeImage(store, runtime, node) {
 export function fixNodeVisualAsset(store, runtime, node) {
   const imageAsset = lastImageAsset(node);
   openVisualAssetPanel({ store, runtime, node, imageAsset });
+}
+
+export function setNodeVideoFrame(store, node, slot = "first") {
+  const imageAsset = lastImageAsset(node);
+  if (!imageAsset?.asset_id) {
+    setNodeError(store, node.id, "请先上传图片，再设为首帧或尾帧。");
+    return;
+  }
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    if (slot === "last") n.params.lastFrameImageAssetId = imageAsset.asset_id;
+    else n.params.firstFrameImageAssetId = imageAsset.asset_id;
+    n.result = slot === "last" ? `已设为尾帧: ${imageAsset.asset_id}` : `已设为首帧: ${imageAsset.asset_id}`;
+  });
 }
 
 async function uploadSelectedImage(store, runtime, nodeId, file) {
@@ -131,11 +146,76 @@ export async function startNodeGeneration(store, runtime, node, resultText) {
     await startRemoteKeyframeGeneration(store, runtime, fresh);
     return;
   }
+  if (fresh.type === "video" && isRemoteVideoModel(fresh.params?.model) && runtime?.generateVideo) {
+    await startRemoteVideoGeneration(store, runtime, fresh);
+    return;
+  }
   setNodeError(
     store,
     fresh.id,
     resultText || "当前版本仅图片节点支持真实生成；视频、音频、脚本和合成通道仍在开发中。",
   );
+}
+
+async function startRemoteVideoGeneration(store, runtime, node) {
+  const firstFrame = node.params?.firstFrameImageAssetId;
+  if (!firstFrame) {
+    setNodeError(store, node.id, "请先在节点菜单中上传图片并设为首帧，再生成图生视频。");
+    return;
+  }
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    n.status = "generating";
+    n.result = "视频任务提交中...";
+  });
+  try {
+    const response = await runtime.generateVideo({
+      node_id: node.id,
+      prompt_text: node.prompt || "保持首帧主体身份，生成自然克制的镜头运动。",
+      optimized_prompt: node.params?.lastOptimizedPromptPlain || null,
+      provider_service_id: providerServiceForVideoModel(node.params?.model),
+      first_frame_image_asset_id: firstFrame,
+      last_frame_image_asset_id: node.params?.lastFrameImageAssetId || null,
+      duration_sec: parseDuration(node.params?.spec?.duration),
+      resolution: String(node.params?.spec?.resolution || "720P").toLowerCase(),
+      aspect_ratio: node.params?.spec?.ratio || "9:16",
+      motion: node.params?.motion || "",
+      candidate_count: 1,
+      context_subgraph: null,
+      temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
+      quota_override_confirmed: Boolean(node.params?.quotaOverrideConfirmed),
+      generated_at: new Date().toISOString(),
+    });
+    applyVideoResponse(store, node.id, response);
+  } catch (error) {
+    setNodeError(store, node.id, `Kling video request failed: ${safeError(error)}`);
+  }
+}
+
+function applyVideoResponse(store, nodeId, response) {
+  const status = response?.job?.status || "blocked";
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    n.params.lastVideoJobId = response?.job?.job_id || null;
+    n.params.lastVideoPreviewUrl = response?.candidate_previews?.[0]?.preview_url || null;
+    n.status = status === "succeeded" ? "complete" : status === "submitted" ? "generating" : "error";
+    n.result = videoResultText(response);
+  });
+}
+
+function videoResultText(response) {
+  const status = response?.job?.status || "blocked";
+  if (status === "succeeded") return "Kling 视频已完成，预览已通过 Runtime 安全端点加载。";
+  if (status === "submitted") return `Kling 视频已提交，可继续轮询。\nJob: ${response?.job?.job_id || "unknown"}`;
+  const reason = response?.safe_manifest?.blocks?.[0]?.reason || "video provider is not ready";
+  return `视频生成未开始或未完成。\n状态: ${status}\n原因: ${reason}`;
+}
+
+function parseDuration(value) {
+  const match = String(value || "5").match(/\d+/);
+  return match ? Number(match[0]) : 5;
 }
 
 async function startRemoteKeyframeGeneration(store, runtime, node) {

@@ -40,6 +40,7 @@ from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_visual_assets import register_runtime_visual_asset_routes
+from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import (
     PROVIDER_PLAN_TOOL_GATE_STATE,
     artifact_refs,
@@ -47,7 +48,7 @@ from apps.api.runtime_tracing import (
     safe_request_ref,
     write_run_trace,
 )
-from apps.api.runtime_store import RuntimeStore, read_json
+from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import configure_studio_static
 from agentflow.harness.json_io import write_json
@@ -59,6 +60,26 @@ from agentflow.memory.production_asset_two_round_validation import run_two_round
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/runtime_service")
 LEGACY_RUNTIME_V02_ENV = "AFS_ENABLE_LEGACY_RUNTIME_V02"
 TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, Any]) -> dict[str, Any]:
+    project_id = str(summary.get("project_id") or "")
+    path = store.projects_dir / safe_id(project_id) / "studio_state.json"
+    meta: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            payload = read_json(path)
+            state = payload.get("state")
+            if isinstance(state, dict) and isinstance(state.get("meta"), dict):
+                meta = {
+                    "projectName": state["meta"].get("projectName", ""),
+                    "canvasName": state["meta"].get("canvasName", ""),
+                    "seq": state["meta"].get("seq", 1),
+                    "updated_at": state["meta"].get("updated_at", ""),
+                }
+        except (ValueError, OSError):
+            meta = {}
+    return {**summary, "studio_state_meta": meta}
 
 
 def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
@@ -77,6 +98,10 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     @app.get("/capabilities")
     def capabilities() -> dict[str, Any]:
         return runtime_capabilities_payload()
+
+    @app.get("/projects")
+    def list_projects() -> dict[str, Any]:
+        return {"projects": [_project_summary_with_studio_meta(store, item) for item in store.list_project_summaries()]}
 
     @app.post("/projects")
     def create_project(request: ProjectCreateRequest) -> dict[str, Any]:
@@ -294,6 +319,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     register_runtime_image_asset_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
     register_runtime_keyframe_routes(app, store)
+    register_runtime_video_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
     register_runtime_studio_state_routes(app, store)
     configure_studio_static(app)

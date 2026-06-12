@@ -246,7 +246,7 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
 
 def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
-    monkeypatch.setattr("apps.api.runtime_keyframes.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("apps.api.runtime_provider_dispatch.time.sleep", lambda _seconds: None)
     attempts = {"count": 0}
 
     def fake_dispatch(capability, service_id, request):
