@@ -1,11 +1,11 @@
 # AFS MVP Closeout Evidence - 2026-06-12
 
-中文摘要：本记录是 MVP 内测前收尾证据。当前主线 `master` 已与 `origin/master` 同步，工程测试和 gate-closed 浏览器 QA 已重新通过；真实 A/B/C 已在用户授权的 image gate 下尝试，但当前本机 shell 缺少 `MINIMAX_API_KEY`，因此在 provider 凭据检查处安全阻塞，未产出真实图片。
+中文摘要：本记录是 MVP 内测前收尾证据。当前主线 `master` 已与 `origin/master` 同步；工程测试、gate-closed 浏览器 QA、以及用户授权 image gate 下的真实 MiniMax A/B/C 均已跑通。真实出图使用本机 `mmx_cli` token plan，不读取、不提交、不展示 provider secret。
 
 ## Fresh Evidence
 
 - Git health: `git fsck --no-progress` returned only dangling trees; no corrupt, missing, bad, or fatal object signal.
-- Git status: `master...origin/master`, clean before closeout QA; current closeout work only changes QA tooling and this handoff.
+- Git status before closeout work: `master...origin/master`, clean.
 - Focused static/runtime tests: `35 passed`, one existing Starlette/httpx warning.
 - Studio JS syntax: all `apps/studio/src/**/*.js` passed `node --check`.
 - Browser QA: `tools/studio_asset_context_browser_qa.py --report runs/studio_asset_context_browser_qa_report_20260612_closeout.json` passed.
@@ -15,7 +15,7 @@
 - Maintenance audit: failed=0, warning=1 existing oversized-files warning.
 - `git diff --check`: passed with Windows CRLF notice only.
 
-## Live A/B/C Attempt
+## Live A/B/C Evidence
 
 Authorized gate scope:
 
@@ -29,35 +29,55 @@ AFS_ALLOW_REMOTE_VIDEO unset
 Runner:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\studio_asset_context_live_comparison.py --provider-config configs\providers.local.json --allow-live-provider --sample-reference-output runs\studio_asset_context_sample_reference_20260612_closeout.png --report runs\studio_asset_context_live_comparison_report_20260612_closeout_r3.json
+.\.venv\Scripts\python.exe tools\studio_asset_context_live_comparison.py --provider-config configs\providers.local.json --allow-live-provider --sample-reference-output runs\studio_asset_context_sample_reference_20260612_closeout.png --report runs\studio_asset_context_live_comparison_report_20260612_final.json
 ```
 
 Result:
 
 - `runner_mode=live_provider`
+- `comparison_status=succeeded`
 - `provider_gate.status=ready_not_run`
 - `provider_calls_started=true`
-- all A/B/C arms remained `blocked`
-- block reason: provider configuration is not ready because the current shell does not provide `MINIMAX_API_KEY`
-- no provider image output was produced
-- no human acceptance, business validation, or durable memory promotion is claimed
+- Arm A: succeeded, 1 image, no reference image, no fixed asset injection.
+- Arm B: succeeded, 1 image, resolver path, fixed asset injection disabled.
+- Arm C: succeeded, 1 image, resolver path, fixed asset injection enabled, 1 subject reference image, 1 included fixed asset.
 
-Local ignored config note: `configs/providers.local.json` was updated locally to include the v0.1 MiniMax image descriptor and `minimax_image_pool` metadata copied from `configs/providers.example.json`. The file remains ignored and is not committed.
+Ignored evidence directory:
 
-## Remaining MVP Gate
-
-The next unblock is not code. Load the MiniMax credential into the shell environment expected by the account pool:
-
-```powershell
-$env:MINIMAX_API_KEY = "<local secret>"
-$env:AFS_ALLOW_REMOTE_IMAGE = "true"
+```text
+runs/studio_asset_context_live_comparison_20260612_final/
 ```
 
-Then rerun the live A/B/C command above and score the generated A/B/C images before sending the MVP to internal testers.
+Important files:
+
+- `runs/studio_asset_context_live_comparison_report_20260612_final.json`
+- `runs/studio_asset_context_live_comparison_20260612_final/generation_comparison_report.json`
+- `runs/studio_asset_context_live_comparison_20260612_final/A/candidate_001.jpg`
+- `runs/studio_asset_context_live_comparison_20260612_final/B/candidate_001.jpg`
+- `runs/studio_asset_context_live_comparison_20260612_final/C/candidate_001.jpg`
+- `runs/studio_asset_context_live_comparison_20260612_final/visual_observation_summary.json`
+
+## Visual Observation
+
+Codex visual inspection, not human acceptance:
+
+- A generated a male figure in dark clothing on a rainy rooftop. It failed Lin Wan identity, red trench coat, and character locks.
+- B generated a young woman in a red trench coat with cinematic rain. It captured the broad prompt but missed short hair and the left-brow scar.
+- C generated a young woman with short black hair, red coat, and a visible left-brow marker. The fixed asset package materially improved identity/wardrobe/lock visibility, but the scar was over-literal as a thick black cross-like mark.
+
+Interpretation:
+
+- C is materially better than A and better than B for identity, wardrobe, and visible lock adherence.
+- Feature-card wording for `left brow scar` should be refined before broad internal testing, for example toward a subtler “small natural scar above the left eyebrow, not painted makeup or symbol.”
+
+## Local Config Note
+
+The local ignored `configs/providers.local.json` uses MiniMax `execution_backend=mmx_cli`. During closeout it was aligned with Provider Gateway v0.1 by adding the MiniMax image descriptor and `minimax_image_pool`, then preserving CLI-token-plan semantics by not requiring `credential_env` for the `mmx_cli` account path. The file remains ignored and is not committed.
 
 ## Non-Claims
 
 - Browser/runtime verification is not human acceptance.
-- Provider dispatch reaching credential validation is not live provider success.
-- A/B/C is still blocked-env evidence until real image outputs exist.
+- Live A/B/C output is provider smoke and asset-semantics evidence, not business validation.
+- Codex visual observation is not user approval.
+- Generated images are ignored runtime evidence, not durable memory.
 - Image authorization does not authorize LLM, ASR, video, or external download.

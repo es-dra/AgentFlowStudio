@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-06-12 - MVP Closeout Live A/B/C
+
+- Ran gate-closed Studio browser QA successfully after tightening the QA selector for multiple temporary-unlock buttons.
+- Ran live MiniMax A/B/C through the Provider Gateway using the local `mmx_cli` token-plan backend and `AFS_ALLOW_REMOTE_IMAGE=true`; LLM/ASR/video/download gates stayed unset.
+- Live A/B/C succeeded with one generated image per arm. A had no asset context, B used the resolver path without fixed asset injection, and C used fixed asset feature/locks plus one subject reference image.
+- Visual observation: C materially improved identity, red coat, short black hair, and left-brow marker compared with A/B, but the brow scar wording produced an over-literal black cross-like mark and should be refined before broad internal testing.
+- Evidence is under ignored `runs/studio_asset_context_live_comparison_20260612_final/`; closeout summary is `docs/handoff/AFS-MVP-CLOSEOUT-20260612.md`.
+- Non-claims: live A/B/C is provider smoke and asset-semantics evidence only; it is not human acceptance, business validation, or durable-memory promotion.
+
 中文摘要：本文件只保留当前阶段的短记录和验证入口，不再承载旧 Web、旧 Workbench 或历史浏览器 QA 的长流水。当前判断以 Studio、Runtime Service、知识库、创作智能体和 provider gate 为主线；测试通过只代表工程验证，不代表人工验收、商业验证或长期记忆晋升。后续如果某条记录不再支持当前 MVP、真实模型接入或维护收口，应直接删除，避免把过期资料继续带入主线。
 
 当前状态：本轮收口已经把旧 Workbench、旧静态 Web、过期前端对接包和旧浏览器 QA 记录移出主线，同时补上创作意图控制智能体、关键帧生成 gate、Studio 静态入口和 OpenAPI 契约。后续记录只写影响当前落地的验证结果、阻塞项和真实模型接入证据，不再追加无明确后续用途的过程叙事。
