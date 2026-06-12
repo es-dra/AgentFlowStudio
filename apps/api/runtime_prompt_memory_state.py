@@ -24,6 +24,8 @@ def load_creative_memory_state(store: RuntimeStore, project_id: str) -> dict[str
     state["writes_long_term_memory"] = False
     state["writes_company_kb"] = False
     state["non_claims"] = PROMPT_MEMORY_NON_CLAIMS
+    if any(state.get(field) for field in BACKGROUND_FIELDS):
+        state["legacy_background_context"] = True
     reject_unsafe_payload(state)
     return state
 
@@ -83,12 +85,32 @@ def merge_background_context(state: dict[str, Any], extracted: list[dict[str, An
     return state
 
 
+def append_extracted_context(
+    state: dict[str, Any],
+    extracted: list[dict[str, Any]],
+    *,
+    limit: int = 80,
+) -> dict[str, Any]:
+    existing_context = [entry for entry in _list(state.get("extracted_context")) if isinstance(entry, dict)]
+    known_ids = {str(entry.get("memory_id") or "") for entry in existing_context}
+    merged = [
+        *existing_context,
+        *[item for item in extracted if isinstance(item, dict) and str(item.get("memory_id") or "") not in known_ids],
+    ]
+    state["extracted_context"] = merged[-limit:]
+    state["legacy_background_context"] = any(state.get(field) for field in BACKGROUND_FIELDS)
+    return state
+
+
 def background_memory_record(
     project_id: str,
     memory_type: str,
     label: str,
     summary: str,
     generated_at: str,
+    *,
+    source_node_id: str | None = None,
+    confidence: float | None = None,
 ) -> dict[str, Any]:
     digest = hashlib.sha1(f"{project_id}:{memory_type}:{label}:{generated_at}".encode("utf-8")).hexdigest()[:8]
     return {
@@ -97,6 +119,8 @@ def background_memory_record(
         "label": label,
         "summary": summary,
         "source": "prompt_optimization_background",
+        "source_node_id": source_node_id,
+        "confidence": confidence,
         "created_at": generated_at,
         "priority": _priority_for_type(memory_type),
         "durable_memory": False,
@@ -156,6 +180,7 @@ def _list(value: Any) -> list[Any]:
 __all__ = (
     "background_context_refs",
     "background_memory_record",
+    "append_extracted_context",
     "extracted_context_refs",
     "load_creative_memory_state",
     "merge_background_context",

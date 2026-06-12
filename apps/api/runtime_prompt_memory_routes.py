@@ -60,6 +60,7 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "user_prompt_sections": result["user_prompt_sections"],
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
+            "context_bundle": result.get("context_bundle"),
             "writes_long_term_memory": False,
             "writes_company_kb": False,
             "safe_manifest": result["safe_manifest"],

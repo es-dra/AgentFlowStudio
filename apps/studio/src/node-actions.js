@@ -2,6 +2,8 @@ import { createNode, connect } from "./nodes.js";
 import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
 import { isRemoteImageModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
+import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
+import { lastImageAsset, mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -56,6 +58,11 @@ export function uploadNodeImage(store, runtime, node) {
     await uploadSelectedImage(store, runtime, node.id, file);
   }, { once: true });
   input.click();
+}
+
+export function fixNodeVisualAsset(store, runtime, node) {
+  const imageAsset = lastImageAsset(node);
+  openVisualAssetPanel({ store, runtime, node, imageAsset });
 }
 
 async function uploadSelectedImage(store, runtime, nodeId, file) {
@@ -150,6 +157,7 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
       if (succeeded && reusableAsset?.asset_id) {
         n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
       }
+      n.params.lastContextBundle = response?.context_bundle || null;
       n.result = keyframeResultText(response, request, succeeded);
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({
@@ -185,13 +193,6 @@ function keyframeResultText(response, request, succeeded) {
   ].filter(Boolean).join("\n");
 }
 
-function mergeImageAssets(existing, asset) {
-  const items = Array.isArray(existing) ? [...existing] : [];
-  const assetId = String(asset?.asset_id || asset?.assetId || "").trim();
-  if (!assetId) return items;
-  return [...items.filter((item) => String(item?.asset_id || item?.assetId || "") !== assetId), asset];
-}
-
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
@@ -204,32 +205,6 @@ function setNodeError(store, nodeId, message) {
     n.status = "error";
     n.result = message;
   });
-}
-
-function resizeNodeForImagePreview(node, preview, fallbackAspectRatio) {
-  const [wRatio, hRatio] = previewRatio(preview, fallbackAspectRatio);
-  const portrait = hRatio >= wRatio;
-  const width = portrait ? 340 : 420;
-  const imageWidth = width - 56;
-  const imageHeight = Math.round(imageWidth * (hRatio / wRatio));
-  node.w = width;
-  node.h = Math.max(260, Math.min(720, imageHeight + 92));
-  node.params.previewAspectRatio = `${wRatio}:${hRatio}`;
-}
-
-function previewRatio(preview, fallbackAspectRatio) {
-  const width = Number(preview?.width || 0);
-  const height = Number(preview?.height || 0);
-  if (width > 0 && height > 0) return [width, height];
-  return parseRatio(preview?.aspect_ratio || fallbackAspectRatio);
-}
-
-function parseRatio(value) {
-  const match = String(value || "").match(/^(\d+):(\d+)$/);
-  if (!match) return [9, 16];
-  const w = Math.max(1, Number(match[1]));
-  const h = Math.max(1, Number(match[2]));
-  return [w, h];
 }
 
 export function startLocalPreview(store, node, resultText) {

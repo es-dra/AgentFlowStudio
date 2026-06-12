@@ -200,38 +200,6 @@
 .node-intent:hover { background: var(--bg-chip); color: var(--text-primary); }
 .node-intent .intent-icon { font-size: 12px; width: 16px; text-align: center; }
 
-.node-result {
-  margin: 0 14px 12px;
-  background: var(--bg-card-soft);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-chip);
-  padding: 10px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  max-height: 180px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-}
-.node-result.has-preview {
-  padding: 0;
-  max-height: none;
-  overflow: hidden;
-  white-space: normal;
-}
-.node-preview-img {
-  display: block;
-  width: 100%;
-  height: auto;
-  object-fit: contain;
-  background: #0b0d10;
-}
-.node-result-text {
-  padding: 10px;
-  white-space: pre-wrap;
-}
-.node-result.has-preview .node-result-text {
-  display: none;
-}
 .node-status {
   margin: 0 14px 10px;
   display: flex; align-items: center; gap: 7px;

@@ -2,6 +2,7 @@ import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 import { bezier } from "./geometry.js";
 import { icon } from "./icons.js";
 import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
+import { bundleSummary, resultView } from "./node-result-view.js";
 
 const EDGE_OFFSET = 20000;
 
@@ -57,6 +58,7 @@ function buildNodeElement(node) {
   actions.className = "node-actions";
   actions.dataset.role = "actions";
   actions.innerHTML = [
+    `<button class="na-btn" data-action="fix-visual-asset" title="fix visual asset">${icon("bookmark", 13)}</button>`,
     `<button class="na-btn" data-action="run" title="生成">${icon("play", 13)}</button>`,
     `<button class="na-btn" data-action="duplicate" title="复制节点">${icon("copy", 13)}</button>`,
     `<button class="na-btn" data-action="toggle-collapse" title="折叠/展开">${icon("chevronUp", 13)}</button>`,
@@ -110,7 +112,8 @@ function syncNodeElement(elNode, node, state, relations) {
 
   const title = elNode.querySelector('[data-role="title"]');
   const refBadge = node.params?.isReference ? `<span class="ref-badge">${icon("bookmark", 11)}参考</span>` : "";
-  title.innerHTML = `${icon(def.icon, 13)}<span>${escapeHtml(node.title)}</span>${refBadge}`;
+  const fixedBadge = node.params?.visualAssets?.length ? `<span class="ref-badge">${icon("lock", 11)}fixed</span>` : "";
+  title.innerHTML = `${icon(def.icon, 13)}<span>${escapeHtml(node.title)}</span>${refBadge}${fixedBadge}`;
 
   const collapseBtn = elNode.querySelector('[data-action="toggle-collapse"]');
   if (collapseBtn) collapseBtn.innerHTML = icon(node.collapsed ? "chevronDown" : "chevronUp", 13);
@@ -124,6 +127,8 @@ function syncNodeElement(elNode, node, state, relations) {
     node.result ? node.result.length : 0,
     node.previewUrl || "",
     node.params?.previewAspectRatio || "",
+    node.params?.visualAssets?.length || 0,
+    node.params?.lastContextBundle?.included_assets?.length || 0,
     node.type,
     node.collapsed ? 1 : 0,
     directorSig,
@@ -178,14 +183,18 @@ function buildNodeBody(node, def) {
     const ok = document.createElement("div");
     ok.className = "node-status success";
     ok.innerHTML = `${icon("check", 13)}<span>${node.previewUrl ? "已完成" : "已完成（本地预览）"}</span>`;
-    out.push(ok, resultView(node));
+    const bundle = bundleSummary(node);
+    if (bundle) out.push(ok, bundle, resultView(node));
+    else out.push(ok, resultView(node));
     return out;
   }
   if (node.status === "error") {
     const err = document.createElement("div");
     err.className = "node-status error";
     err.innerHTML = `${icon("x", 13)}<span>生成失败，可在节点菜单重试</span>`;
-    out.push(err);
+    const bundle = bundleSummary(node);
+    if (bundle) out.push(err, bundle);
+    else out.push(err);
     if (node.result) out.push(resultView(node));
     return out;
   }
@@ -210,30 +219,6 @@ function buildNodeBody(node, def) {
     out.push(label, list);
   }
   return out;
-}
-
-function resultView(node) {
-  const result = document.createElement("div");
-  result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
-  if (node.previewUrl) {
-    const img = document.createElement("img");
-    img.className = "node-preview-img";
-    img.src = node.previewUrl;
-    img.alt = "MiniMax generated keyframe";
-    img.loading = "lazy";
-    img.style.aspectRatio = previewAspectRatio(node);
-    result.appendChild(img);
-  }
-  const text = document.createElement("div");
-  text.className = "node-result-text";
-  text.textContent = node.result;
-  result.appendChild(text);
-  return result;
-}
-
-function previewAspectRatio(node) {
-  const value = String(node.params?.previewAspectRatio || node.params?.spec?.ratio || "9:16");
-  return /^\d+:\d+$/.test(value) ? value.replace(":", " / ") : "9 / 16";
 }
 
 function renderEdges(state, relations) {

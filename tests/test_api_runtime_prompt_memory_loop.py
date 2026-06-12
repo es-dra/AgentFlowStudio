@@ -75,58 +75,6 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert "data/processed/runs" not in serialized
 
 
-def test_second_node_prompt_optimization_uses_background_assets_without_user_memory_review(tmp_path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-    client.post(
-        "/projects",
-        json={
-            "project_id": "proj_libtv_background_context",
-            "project_type": "short_video_campaign",
-            "goal": "Optimize repeated node prompts with hidden context.",
-        },
-    )
-    first = client.post(
-        "/projects/proj_libtv_background_context/prompt-optimizations",
-        json={
-            "node_id": "text-node-001",
-            "node_type": "text",
-            "prompt_text": "A silver-haired detective searches an abandoned observatory at blue hour.",
-            "generation_target": "image",
-            "target_platform": "short_video",
-            "style": "moody cinematic",
-            "generated_at": "2026-06-11T10:10:00+08:00",
-        },
-    ).json()
-    second = client.post(
-        "/projects/proj_libtv_background_context/prompt-optimizations",
-        json={
-            "node_id": "image-node-002",
-            "node_type": "image",
-            "prompt_text": "The recurring detective finds a hidden map under the observatory floor.",
-            "generation_target": "keyframe",
-            "target_platform": "short_video",
-            "style": "controlled mystery",
-            "asset_refs": [first["artifacts"]["creative_brief"]["artifact_id"]],
-            "generated_at": "2026-06-11T10:20:00+08:00",
-        },
-    ).json()
-
-    trace = client.get(f"/artifacts/{second['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
-    brief = client.get(f"/artifacts/{second['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
-    serialized = json.dumps({"trace": trace, "brief": brief, "response": second}, ensure_ascii=False).lower()
-
-    assert trace["background_context_refs"]
-    assert any(ref["memory_type"] == "character" for ref in trace["background_context_refs"])
-    assert any(ref["memory_type"] == "scene" for ref in trace["background_context_refs"])
-    assert trace["asset_refs"] == [first["artifacts"]["creative_brief"]["artifact_id"]]
-    assert "Silver-haired detective" in brief["optimized_prompt"]
-    assert "Abandoned observatory" in brief["optimized_prompt"]
-    assert "candidate_memory" not in serialized
-    assert "memory_decision" not in serialized
-    assert trace["provider_calls_started"] is False
-    assert "not durable memory" in trace["non_claims"]
-
-
 def test_prompt_memory_mvp_openapi_exposes_optimizer_but_not_memory_review_surfaces(tmp_path) -> None:
     output_path = tmp_path / "frontend" / "afs-runtime-service.openapi.json"
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")

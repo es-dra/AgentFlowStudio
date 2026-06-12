@@ -9,7 +9,13 @@ from agentflow_studio.model_gateway.company_secrets import load_company_provider
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 from apps.api.runtime_image_assets import resolve_reference_images
+from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
+from apps.api.runtime_keyframe_payloads import (
+    keyframe_candidate_summary,
+    keyframe_request_plan,
+    keyframe_safe_manifest,
+)
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_state import load_creative_memory_state
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -32,16 +38,23 @@ def build_keyframe_generation(
     project_id: str,
     request: KeyframeGenerationRequest,
     output_dir: Path,
+    *,
+    include_fixed_assets: bool = True,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     prompt_request = _prompt_request(request)
     state = load_creative_memory_state(store, project_id)
-    assembly = assemble_prompt_context(prompt_request, state)
-    reference_images = resolve_reference_images(store, project_id, request.asset_refs)
-    provider_prompt = minimax_keyframe_prompt(
-        request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"]
-    )
-    if reference_images:
+    assembly_state = _resolver_safe_state(state) if request.context_subgraph else state
+    assembly = assemble_prompt_context(prompt_request, assembly_state)
+    context_bundle = _context_bundle(store, project_id, request, include_fixed_assets=include_fixed_assets)
+    reference_images = _reference_images(store, project_id, request, context_bundle)
+    if context_bundle:
+        provider_prompt = minimax_keyframe_prompt(provider_prompt_from_bundle(context_bundle))
+    else:
+        provider_prompt = minimax_keyframe_prompt(
+            request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"]
+        )
+    if reference_images and not context_bundle:
         provider_prompt = minimax_keyframe_prompt(
             f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}"
         )
@@ -78,9 +91,18 @@ def build_keyframe_generation(
                 }
             )
 
-    request_plan = _request_plan(request, provider_prompt, provider_gate, assembly, status, reference_images)
-    candidates = _candidate_summary(request, provider_prompt, provider_outputs)
-    safe_manifest = _safe_manifest(
+    request_plan = keyframe_request_plan(
+        request,
+        provider_prompt,
+        provider_gate,
+        assembly,
+        status,
+        reference_images,
+        context_bundle,
+        KEYFRAME_NON_CLAIMS,
+    )
+    candidates = keyframe_candidate_summary(request, provider_prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
+    safe_manifest = keyframe_safe_manifest(
         project_id,
         request,
         status=status,
@@ -89,6 +111,8 @@ def build_keyframe_generation(
         provider_calls_started=provider_calls_started,
         output_count=len(provider_outputs),
         reference_image_count=len(reference_images),
+        context_bundle=context_bundle,
+        non_claims=KEYFRAME_NON_CLAIMS,
     )
     for payload in (request_plan, candidates, safe_manifest):
         reject_unsafe_payload(payload)
@@ -101,6 +125,7 @@ def build_keyframe_generation(
         "provider_calls_started": provider_calls_started,
         "provider_outputs": provider_outputs,
         "safe_manifest": safe_manifest,
+        "context_bundle": context_bundle,
         "tool_gate_state": {
             "remote_llm": "not_requested",
             "remote_asr": "blocked_by_default",
@@ -108,6 +133,50 @@ def build_keyframe_generation(
             "remote_video": "blocked_by_default",
         },
     }
+
+
+def _context_bundle(
+    store: RuntimeStore,
+    project_id: str,
+    request: KeyframeGenerationRequest,
+    *,
+    include_fixed_assets: bool,
+) -> dict[str, Any] | None:
+    if not request.context_subgraph:
+        return None
+    visible_prompt = request.optimized_prompt or request.prompt_text
+    return resolve_context_bundle(
+        store,
+        project_id,
+        mode="generate",
+        visible_prompt=visible_prompt,
+        context_subgraph=request.context_subgraph,
+        temporary_lock_overrides=request.temporary_lock_overrides,
+        include_fixed_assets=include_fixed_assets,
+    )
+
+
+def _reference_images(
+    store: RuntimeStore,
+    project_id: str,
+    request: KeyframeGenerationRequest,
+    context_bundle: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if not context_bundle:
+        return resolve_reference_images(store, project_id, request.asset_refs)
+    refs = [
+        str(item.get("asset_id") or "")
+        for item in context_bundle.get("reference_image_channel", [])
+        if isinstance(item, dict)
+    ]
+    return resolve_reference_images(store, project_id, refs, limit=1)
+
+
+def _resolver_safe_state(state: dict[str, Any]) -> dict[str, Any]:
+    safe_state = dict(state)
+    for field in ("characters", "scenes", "style_preferences", "user_preferences"):
+        safe_state[field] = []
+    return safe_state
 
 
 def image_provider_gate() -> dict[str, str]:
@@ -128,108 +197,9 @@ def _prompt_request(request: KeyframeGenerationRequest) -> PromptOptimizationReq
         asset_refs=list(request.asset_refs),
         director_setup=request.director_setup,
         node_parameters=params,
+        context_subgraph=request.context_subgraph,
         generated_at=request.generated_at,
     )
-
-
-def _request_plan(
-    request: KeyframeGenerationRequest,
-    provider_prompt: str,
-    provider_gate: dict[str, str],
-    assembly: dict[str, Any],
-    status: str,
-    reference_images: list[dict[str, Any]],
-) -> dict[str, Any]:
-    public_refs = [item["public"] for item in reference_images]
-    return {
-        "artifact_type": "agentflow_keyframe_request_plan",
-        "schema_version": "0.1.0",
-        "node_id": request.node_id,
-        "requested_capability": "image_keyframe",
-        "provider": request.provider_service_id,
-        "provider_gate": provider_gate,
-        "live_call_authorized": provider_gate["status"] != "blocked",
-        "status": status,
-        "target_platform": request.target_platform,
-        "aspect_ratio": request.aspect_ratio,
-        "candidate_count": request.candidate_count,
-        "seed": request.seed,
-        "prompt_source": "request.optimized_prompt" if request.optimized_prompt else "creative_intent_control_agent",
-        "reference_image_count": len(public_refs),
-        "reference_images": public_refs,
-        "subject_reference_asset_id": public_refs[0]["asset_id"] if public_refs else None,
-        "provider_prompt": provider_prompt,
-        "creative_agent": assembly["creative_agent"],
-        "claim_boundary": "gate_closed_request_plan_only" if provider_gate["status"] == "blocked" else "provider_smoke_request_plan",
-        "artifact_policy": {
-            "provider_config_path_persisted": False,
-            "authorization_header_persisted": False,
-            "secret_material_persisted": False,
-            "raw_provider_response_persisted": False,
-            "media_bytes_returned_by_api": False,
-        },
-        "non_claims": KEYFRAME_NON_CLAIMS,
-    }
-
-
-def _candidate_summary(
-    request: KeyframeGenerationRequest,
-    provider_prompt: str,
-    outputs: list[dict[str, Any]],
-) -> dict[str, Any]:
-    return {
-        "artifact_type": "agentflow_keyframe_candidates_summary",
-        "schema_version": "0.1.0",
-        "node_id": request.node_id,
-        "provider": request.provider_service_id,
-        "candidate_count": len(outputs),
-        "requested_candidate_count": request.candidate_count,
-        "seed": request.seed,
-        "provider_prompt": provider_prompt,
-        "outputs": outputs,
-        "media_bytes_in_payload": False,
-        "provider_raw_response_stored": False,
-        "non_claims": KEYFRAME_NON_CLAIMS,
-    }
-
-
-def _safe_manifest(
-    project_id: str,
-    request: KeyframeGenerationRequest,
-    *,
-    status: str,
-    provider_gate: dict[str, str],
-    blocks: list[dict[str, str]],
-    provider_calls_started: bool,
-    output_count: int,
-    reference_image_count: int,
-) -> dict[str, Any]:
-    return {
-        "artifact_type": "agentflow_keyframe_generation_safe_manifest",
-        "schema_version": "0.1.0",
-        "project_id": project_id,
-        "node_id": request.node_id,
-        "status": status,
-        "requested_capability": "image_keyframe",
-        "provider_gate": provider_gate,
-        "provider_calls_started": provider_calls_started,
-        "raw_provider_response_stored": False,
-        "generated_media_bytes_stored": False,
-        "generated_media_bytes_returned": False,
-        "generated_media_artifacts_registered": False,
-        "output_count": output_count,
-        "reference_image_count": reference_image_count,
-        "seed": request.seed,
-        "blocks": blocks,
-        "safe_artifacts": [
-            "keyframe_request_plan.json",
-            "keyframe_candidates_summary.json",
-            "keyframe_generation_safe_manifest.json",
-        ],
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-        "non_claims": KEYFRAME_NON_CLAIMS,
-    }
 
 
 def _provider_outputs(manifest: dict[str, Any]) -> list[dict[str, Any]]:

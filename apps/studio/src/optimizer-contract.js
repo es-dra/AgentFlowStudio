@@ -17,6 +17,7 @@ export function buildOptimizationRequest(state, node) {
   const directorSetup = linkedDirectorSetup(state, node);
   const nodeParameters = nodeParameterSnapshot(node);
   const assetRefs = safeAssetRefs(state, node);
+  const contextSubgraph = buildContextSubgraph(state, node, "prompt_optimize");
   const referenceCount = collectConnectedImageAssetRefs(state, node).length;
   const connectedReferences = connectedReferenceNodeSummaries(state, node);
   if (directorSetup) nodeParameters.director_summary = directorPromptSummary(normalizeDirectorSetup(directorSetup));
@@ -32,6 +33,7 @@ export function buildOptimizationRequest(state, node) {
     asset_refs: assetRefs,
     director_setup: directorSetup ? safeDirectorSetup(directorSetup) : null,
     node_parameters: nodeParameters,
+    context_subgraph: contextSubgraph,
     generated_at: new Date().toISOString(),
   };
 }
@@ -78,9 +80,68 @@ export function buildKeyframeGenerationRequest(state, node) {
     asset_refs: optimizationRequest.asset_refs,
     director_setup: optimizationRequest.director_setup,
     node_parameters: optimizationRequest.node_parameters,
+    context_subgraph: buildContextSubgraph(state, node, "context_generate"),
+    temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
     seed: node.params?.seed ?? null,
     generated_at: new Date().toISOString(),
   };
+}
+
+export function buildContextSubgraph(state, node, runtimeWorkMode = "context_generate") {
+  const nodes = [];
+  const edges = [];
+  const seenNodes = new Set();
+  const seenEdges = new Set();
+  const queue = [{ id: node.id, hop: 0 }];
+  while (queue.length && nodes.length < 24) {
+    const current = queue.shift();
+    const item = state.nodes[current.id];
+    if (!item || seenNodes.has(item.id) || current.hop > 3) continue;
+    seenNodes.add(item.id);
+    nodes.push(safeContextNode(item));
+    if (current.hop >= 3) continue;
+    for (const edge of Object.values(state.edges)) {
+      if (edge.to !== item.id || seenEdges.has(edge.id) || edges.length >= 32) continue;
+      seenEdges.add(edge.id);
+      edges.push({
+        id: String(edge.id || ""),
+        from: String(edge.from || ""),
+        to: String(edge.to || ""),
+        relation_type: safeRelation(edge.relation_type || edge.relationType),
+      });
+      queue.push({ id: edge.from, hop: current.hop + 1 });
+    }
+  }
+  return {
+    target_node_id: node.id,
+    runtime_work_mode: runtimeWorkMode,
+    nodes,
+    edges,
+  };
+}
+
+function safeContextNode(node) {
+  return {
+    id: String(node.id || ""),
+    type: normalizeNodeType(node.type),
+    title: String(node.title || "").slice(0, 80),
+    prompt: String(node.prompt || node.content || "").replace(/\s+/g, " ").trim().slice(0, 240),
+    image_asset_refs: nodeImageAssetRefs(node).slice(0, 4),
+    visual_asset_ids: nodeVisualAssetIds(node).slice(0, 8),
+    director_setup_summary: node.params?.directorSetup
+      ? directorPromptSummary(normalizeDirectorSetup(node.params.directorSetup)).slice(0, 240)
+      : null,
+    node_parameters: safeContextParameters(node),
+  };
+}
+
+function safeContextParameters(node) {
+  const params = nodeParameterSnapshot(node);
+  return Object.fromEntries(Object.entries(params).filter(([key]) => !/signature|feature|lock|secret|token/i.test(key)));
+}
+
+function safeRelation(value) {
+  return ["reference", "director", "generation"].includes(value) ? value : "generation";
 }
 
 function safeImageAspectRatio(value) {
@@ -130,6 +191,18 @@ function nodeImageAssetRefs(node) {
     .filter(Boolean);
 }
 
+function nodeVisualAssetIds(node) {
+  const values = [
+    ...(Array.isArray(node?.params?.visualAssets) ? node.params.visualAssets : []),
+    ...(Array.isArray(node?.params?.visual_asset_ids) ? node.params.visual_asset_ids : []),
+  ];
+  return values
+    .map((item) => String(item?.asset_id || item?.assetId || item || "").trim())
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+    .filter((value) => !/[\\/]/.test(value));
+}
+
 function connectedReferenceNodeSummaries(state, node) {
   const summaries = [];
   for (const edge of Object.values(state.edges)) {
@@ -159,6 +232,7 @@ export function normalizeOptimization(result, request) {
     original: result?.original_prompt || request.prompt_text,
     optimized: userPrompt || sections.map((s) => `${s.name}：${s.text}`).join("\n"),
     sections,
+    context_bundle: result?.context_bundle || null,
   };
 }
 

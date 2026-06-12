@@ -5,6 +5,7 @@ from typing import Any
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_context_resolver import resolve_context_bundle
 from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_assembly import (
@@ -15,9 +16,9 @@ from apps.api.runtime_prompt_memory_assembly import (
 from apps.api.runtime_prompt_memory_constants import PROMPT_MEMORY_NON_CLAIMS
 from apps.api.runtime_prompt_memory_state import (
     background_context_refs,
+    append_extracted_context,
     extracted_context_refs,
     load_creative_memory_state,
-    merge_background_context,
     public_background_counts,
     write_creative_memory_state,
 )
@@ -31,7 +32,9 @@ def build_prompt_optimization(
     output_dir: Path,
 ) -> dict[str, Any]:
     state = load_creative_memory_state(store, project_id)
-    assembly = assemble_prompt_context(request, state)
+    assembly_state = _resolver_safe_state(state) if request.context_subgraph else state
+    assembly = assemble_prompt_context(request, assembly_state)
+    context_bundle = _context_bundle(store, project_id, request)
     llm_enhancement = maybe_enhance_prompt_with_llm(request, assembly)
     rules = assembly["knowledge_rules"]
     background_refs = background_context_refs(state)
@@ -39,12 +42,19 @@ def build_prompt_optimization(
     assembled_prompt = str(llm_enhancement.get("optimized_prompt") or assembly["optimized_prompt"])
     user_prompt = str(llm_enhancement.get("user_prompt") or assembly["user_prompt"])
     user_prompt_sections = llm_enhancement.get("user_prompt_sections") or assembly["user_prompt_sections"]
+    if context_bundle:
+        signature_segment = str(context_bundle.get("text_channel", {}).get("asset_signature_segment") or "")
+        if signature_segment:
+            assembled_prompt = f"{assembled_prompt}\nAsset Signatures:\n{signature_segment}"
+            user_prompt = assembled_prompt
     brief = _creative_brief(request, project_id, assembled_prompt, llm_enhancement)
-    trace = _prompt_trace(request, project_id, assembly, background_refs, extracted, llm_enhancement)
-    safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement)
+    if context_bundle:
+        brief["context_bundle"] = context_bundle
+    trace = _prompt_trace(request, project_id, assembly, background_refs, extracted, llm_enhancement, context_bundle)
+    safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement, context_bundle)
     for payload in (brief, trace, safe_manifest):
         reject_unsafe_payload(payload)
-    state = merge_background_context(state, extracted)
+    state = append_extracted_context(state, extracted)
     write_creative_memory_state(store, project_id, state)
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(output_dir / "creative_brief.json", brief)
@@ -60,7 +70,31 @@ def build_prompt_optimization(
         "optimized_prompt": assembled_prompt,
         "user_prompt": user_prompt,
         "user_prompt_sections": user_prompt_sections,
+        "context_bundle": context_bundle,
     }
+
+
+def _context_bundle(
+    store: RuntimeStore,
+    project_id: str,
+    request: PromptOptimizationRequest,
+) -> dict[str, Any] | None:
+    if not request.context_subgraph:
+        return None
+    return resolve_context_bundle(
+        store,
+        project_id,
+        mode="optimize",
+        visible_prompt=request.prompt_text,
+        context_subgraph=request.context_subgraph,
+    )
+
+
+def _resolver_safe_state(state: dict[str, Any]) -> dict[str, Any]:
+    safe_state = dict(state)
+    for field in ("characters", "scenes", "style_preferences", "user_preferences"):
+        safe_state[field] = []
+    return safe_state
 
 
 def _creative_brief(
@@ -104,8 +138,9 @@ def _prompt_trace(
     background_refs: list[dict[str, str]],
     extracted: list[dict[str, Any]],
     llm_enhancement: dict[str, Any],
+    context_bundle: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "artifact_type": "agentflow_prompt_assembly_trace",
         "schema_version": "0.1.0",
         "project_id": project_id,
@@ -131,6 +166,9 @@ def _prompt_trace(
         "writes_company_kb": False,
         "non_claims": PROMPT_MEMORY_NON_CLAIMS,
     }
+    if context_bundle:
+        payload["context_bundle"] = context_bundle
+    return payload
 
 
 def _safe_manifest(
@@ -140,8 +178,9 @@ def _safe_manifest(
     state: dict[str, Any],
     assembly: dict[str, Any],
     llm_enhancement: dict[str, Any],
+    context_bundle: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "artifact_type": "agentflow_prompt_optimization_safe_manifest",
         "schema_version": "0.1.0",
         "project_id": project_id,
@@ -167,6 +206,10 @@ def _safe_manifest(
         "writes_company_kb": False,
         "non_claims": PROMPT_MEMORY_NON_CLAIMS,
     }
+    if context_bundle:
+        payload["context_bundle_mode"] = context_bundle.get("mode")
+        payload["context_included_asset_count"] = len(context_bundle.get("included_assets", []))
+    return payload
 
 
 def _public_llm_enhancement(value: dict[str, Any]) -> dict[str, Any]:

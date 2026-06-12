@@ -92,6 +92,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             "writes_long_term_memory": False,
             "writes_company_kb": False,
             "safe_manifest": safe_manifest,
+            "context_bundle": result.get("context_bundle"),
             "artifacts": artifacts,
             "candidate_previews": candidate_previews,
             "reusable_image_assets": reusable_image_assets,

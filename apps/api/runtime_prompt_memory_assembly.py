@@ -30,32 +30,54 @@ def extract_background_context(
     slots: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     selected_slots = slots or extract_prompt_slots(request)
-    character = selected_slots.get("subject") or "Primary character"
-    scene = selected_slots.get("scene") or "Primary scene"
-    style = selected_slots.get("style") or "Project style"
-    return [
-        background_memory_record(
-            project_id,
-            "character",
-            character,
-            f"Recurring subject extracted from node prompt: {character}",
-            request.generated_at,
-        ),
-        background_memory_record(
-            project_id,
-            "scene",
-            scene,
-            f"Reusable scene abstraction extracted from node prompt: {scene}",
-            request.generated_at,
-        ),
-        background_memory_record(
-            project_id,
-            "style_preference",
-            style,
-            f"Style preference extracted from request: {style}",
-            request.generated_at,
-        ),
-    ]
+    records: list[dict[str, Any]] = []
+    character = _usable_slot(selected_slots.get("subject"), "Primary character")
+    scene = _usable_slot(selected_slots.get("scene"), "Primary scene")
+    style = _usable_slot(selected_slots.get("style"), "Project style")
+    if character:
+        records.append(
+            background_memory_record(
+                project_id,
+                "character",
+                character,
+                f"Recurring subject extracted from node prompt: {character}",
+                request.generated_at,
+                source_node_id=request.node_id,
+                confidence=0.55,
+            )
+        )
+    if scene:
+        records.append(
+            background_memory_record(
+                project_id,
+                "scene",
+                scene,
+                f"Reusable scene abstraction extracted from node prompt: {scene}",
+                request.generated_at,
+                source_node_id=request.node_id,
+                confidence=0.55,
+            )
+        )
+    if style:
+        records.append(
+            background_memory_record(
+                project_id,
+                "style_preference",
+                style,
+                f"Style preference extracted from request: {style}",
+                request.generated_at,
+                source_node_id=request.node_id,
+                confidence=0.45,
+            )
+        )
+    return records[:12]
+
+
+def _usable_slot(value: str | None, fallback: str) -> str:
+    text = str(value or "").strip()
+    if not text or text.casefold() == fallback.casefold():
+        return ""
+    return text
 
 
 def provider_gate() -> dict[str, str]:

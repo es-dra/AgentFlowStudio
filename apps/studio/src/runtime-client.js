@@ -31,6 +31,15 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     uploadImageAsset(payload) {
       return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
     },
+    promoteVisualAsset(payload) {
+      return requestJson(`/projects/${encoded}/visual-assets/promote`, { method: "POST", payload });
+    },
+    listVisualAssets(status = "fixed") {
+      return requestJson(`/projects/${encoded}/visual-assets?status=${encodeURIComponent(status)}`);
+    },
+    retireVisualAsset(assetId, payload) {
+      return requestJson(`/projects/${encoded}/visual-assets/${encodeURIComponent(assetId)}/retire`, { method: "POST", payload });
+    },
     generateKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });
     },

@@ -7,6 +7,42 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - AFS Asset Context S1
+
+- Created isolated branch/worktree `codex/afs-asset-context-s1`.
+- Added `visual_asset v0.1` Runtime storage and promote/list/retire APIs.
+- Stopped prompt-background placeholder pollution: `Primary character` / `Primary scene` no longer create records, and extracted context stays candidate-only.
+- Added `context_subgraph v0.1` and `context_bundle v0.1`; prompt optimization and keyframe generation now share the resolver when a subgraph is supplied.
+- Split optimize/generate views: optimize injects only connected or label-matched signatures, generate consumes only connected fixed assets.
+- Added request-level temporary lock overrides and unconditional negative-lock injection for non-overridden locks.
+- Kept no-subgraph keyframe requests on the old `asset_refs` path for compatibility.
+- Added `generation_comparison_report v0.1` with fixed A/B/C arm definitions.
+- Added one-click connect for named unconnected assets, request-level temporary unlock, and reproducible gate-closed browser QA in `tools/studio_asset_context_browser_qa.py`.
+- Browser QA drives upload -> fixed asset -> optimize warning -> one-click connect -> temporary unlock -> generate -> A/B/C report and writes `runs/studio_asset_context_browser_qa_report.json`.
+- Added `tools/studio_asset_context_live_comparison.py` as the S1 A/B/C evidence runner. It writes a gate-closed readiness report by default and requires `AFS_ALLOW_REMOTE_IMAGE=true`, `--allow-live-provider`, provider config, and a real `--reference-image` or explicit `--sample-reference-output` before any image provider call can start.
+- Added `tools/studio_asset_context_sample_reference.py` to write a deterministic non-provider PNG reference for reproducible provider smoke setup.
+- Added `docs/handoff/AFS-ASSET-CONTEXT-S1-COMPLETION-AUDIT.md` to keep the current pass/block state explicit until live MiniMax evidence is available.
+- Added Studio single-canvas fixed-asset confirmation panel, `context_subgraph` request building, asset connection status display, and "本次携带" bundle summary.
+
+Verification so far:
+
+```text
+Focused Runtime/Web set: 34 passed, 1 Starlette/httpx warning.
+Full pytest: 798 passed, 1 Starlette/httpx warning.
+Studio changed JS node --check: passed.
+Browser QA script: passed with provider gate closed; report records browser API POST proxy via FastAPI TestClient due local Chrome POST hang.
+Live comparison runner gate-closed readiness: passed with ignored provider config path supplied; provider_calls_started=false.
+Live comparison gate-safety preflight: simulated `AFS_ALLOW_REMOTE_IMAGE=true` without `--allow-live-provider`; blocked with `live_provider_flag_missing`, provider_calls_started=false.
+Maintenance audit: passed with 0 warnings.
+git diff --check: passed with Windows CRLF notices only.
+```
+
+Boundaries:
+
+- Provider gates remain closed in local verification.
+- No provider raw response, media bytes, local absolute paths, signed URLs, or secrets were added.
+- This is not human acceptance, business validation, provider smoke, or durable-memory promotion.
+
 ## 2026-06-12 - MiniMax Text/Image Integration And Reference Flow
 
 - Added gated MiniMax-M3 prompt enhancement for the creative intent agent path; deterministic local prompt assembly remains the fallback when the LLM gate or config is unavailable.
