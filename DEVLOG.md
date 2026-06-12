@@ -14,6 +14,7 @@ product documentation.
 - Hid Runtime v02 list/import/source-assets/content-cards/canvas-draft routes by default behind `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
 - Marked `agentflow/memory` as read-only legacy for Studio/Runtime work; added a static guard against new Studio/Runtime imports.
 - Audited the named `*_sop` cleanup targets with `git ls-files`; only `agentflow_studio/compliance/__init__.py` was tracked and unreferenced, so only that stub was deleted.
+- Created `BACKLOG.md` for follow-up maintenance debt: oversized file split and Kling adapter v0.2.
 
 Verification:
 
