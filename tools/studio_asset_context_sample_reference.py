@@ -18,6 +18,14 @@ def write_sample_reference(path: str | Path) -> Path:
     return output
 
 
+def write_sample_scene_reference(path: str | Path) -> Path:
+    output = Path(path).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pixels = _observatory_pixels(WIDTH, HEIGHT)
+    output.write_bytes(_png_bytes(WIDTH, HEIGHT, pixels))
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Write a deterministic S1 character reference PNG.")
     parser.add_argument("--output", required=True)
@@ -33,6 +41,18 @@ def _portrait_pixels(width: int, height: int) -> bytes:
         row = bytearray()
         for x in range(width):
             row.extend(_pixel(x, y, width, height))
+        rows.append(bytes(row))
+    return b"".join(rows)
+
+
+def _observatory_pixels(width: int, height: int) -> bytes:
+    rows: list[bytes] = []
+    for y in range(height):
+        row = bytearray()
+        for x in range(width):
+            nx = (x - width / 2) / (width / 2)
+            ny = (y - height / 2) / (height / 2)
+            row.extend(_observatory_pixel(nx, ny))
         rows.append(bytes(row))
     return b"".join(rows)
 
@@ -56,6 +76,30 @@ def _pixel(x: int, y: int, width: int, height: int) -> tuple[int, int, int]:
     if _hair(nx, ny):
         return (18, 18, 20)
     return background
+
+
+def _observatory_pixel(nx: float, ny: float) -> tuple[int, int, int]:
+    dome = nx * nx + (ny + 0.32) * (ny + 0.32) < 0.82
+    telescope_base = abs(nx) < 0.14 and -0.06 < ny < 0.28
+    telescope_tube = -0.2 < nx < 0.45 and -0.2 < ny + nx * 0.28 < -0.13
+    floor = ny > 0.32
+    cracked_window = abs(nx + 0.5) < 0.08 and -0.18 < ny < 0.16
+    star_chart = 0.36 < nx < 0.68 and -0.02 < ny < 0.22
+    if telescope_tube:
+        return (88, 96, 98)
+    if telescope_base:
+        return (111, 74, 47)
+    if cracked_window:
+        return (115, 178, 205)
+    if star_chart:
+        return (44, 65, 78)
+    if floor:
+        shade = int(42 + 25 * (1 - abs(nx)))
+        return (shade, shade + 15, shade + 24)
+    if dome:
+        shade = int(34 + 40 * (1 - abs(nx)) + 20 * (1 - abs(ny + 0.3)))
+        return (max(20, shade - 5), max(42, shade + 16), max(58, shade + 36))
+    return (14, 25, 34)
 
 
 def _background(nx: float, ny: float) -> tuple[int, int, int]:

@@ -272,6 +272,38 @@ Boundaries:
 - No image/video bytes were generated through Runtime.
 - This is not human acceptance, business validation, or durable-memory promotion.
 
+## 2026-06-12 - MVP Follow-up Live Comparisons
+
+- Implemented `tools/studio_asset_context_followup_comparisons.py` for the two runbook follow-up groups: character+scene A/B/C and lock-conflict locked/unlocked live runs.
+- Added deterministic observatory scene reference generation to `tools/studio_asset_context_sample_reference.py`.
+- Added focused tests for gate-closed no-call behavior, dual-asset C-arm context, temporary lock override capture, and scene PNG generation.
+- Ran live MiniMax image follow-up with only `AFS_ALLOW_REMOTE_IMAGE=true`.
+- Group 2 first run succeeded for A/B/C; C included both character and scene assets, used one character subject reference, and kept the scene in the text channel.
+- Group 3 retry succeeded; locked output kept black short hair despite red-long-hair prompt, while temporary unlock produced red long hair and recorded the override in trace.
+- One immediate Group 2 rerun hit a provider/CLI safe readiness block; preserved as provider intermittency evidence, not resolver failure.
+
+Evidence:
+
+```text
+runs/studio_asset_context_followup_20260612_group2_success/
+runs/studio_asset_context_followup_20260612_group3_retry/
+runs/studio_asset_context_followup_group3_retry_report_20260612.json
+docs/handoff/AFS-MVP-FOLLOWUP-LIVE-COMPARISONS-20260612.md
+```
+
+Verification:
+
+```text
+tests/test_studio_asset_context_followup_comparisons.py: 3 passed, 1 existing Starlette/httpx warning
+py_compile follow-up tools: passed
+git diff --check: passed with Windows CRLF notices only
+```
+
+Boundaries:
+
+- Image provider gate only; LLM/ASR/video/download gates remained closed.
+- Live output is provider smoke and asset-semantics evidence, not human acceptance or business validation.
+
 ## 2026-06-11 - AFS Studio Hard Cleanup
 
 - Retired old Workbench/static memory-workbench user routes.
