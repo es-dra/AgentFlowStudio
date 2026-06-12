@@ -157,9 +157,10 @@ def create_character_asset(page: Page, upload_file: Path) -> None:
     expect(panel).to_be_visible()
     panel.locator('[data-field="label"]').fill("Lin Wan")
     panel.locator('[data-field="signature"]').fill("black short hair, red trench coat, left brow scar")
-    panel.locator('[data-field="feature_card"]').fill(
-        "appearance: black short hair and left brow scar\nwardrobe: red trench coat"
-    )
+    # Structured feature-card fields replaced the old free-text feature_card textarea.
+    panel.locator('[data-card="hair"]').fill("black short hair")
+    panel.locator('[data-card="face"]').fill("left brow scar")
+    panel.locator('[data-card="wardrobe"]').fill("red trench coat")
     panel.locator('[data-field="negative_locks"]').fill(
         "keep black short hair\nkeep red trench coat\nkeep left brow scar"
     )
