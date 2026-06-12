@@ -30,18 +30,33 @@ def provider_config(*, use_env_key: bool = False, use_mmx_cli: bool = False) -> 
             "schema_version": "provider_descriptor.v0.1",
             "modality": "image",
             "execution_mode": "sync",
+            "capabilities": ["image"],
+            "account_pool_id": "minimax_image_pool",
             "reference_image_slots": 1,
             "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
             "prompt_char_limit": 1500,
             "seed_supported": True,
             "cost_hint": "test-only",
+            "rate_limit_hint": "test-only",
             "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
         },
+    }
+    account_pool_entry = {
+        "account_id": "minimax",
+        "service_id": "minimax_image",
+        "credential_env": "MINIMAX_API_KEY" if use_env_key else None,
+        "enabled_capabilities": ["image"],
+        "enabled": True,
+        "priority": 10,
+        "weight": 1,
+        "concurrency_limit": 1,
+        "health_state": "healthy",
     }
     if use_mmx_cli:
         account["execution_backend"] = "mmx_cli"
         account["region"] = "cn"
         service["execution_backend"] = "mmx_cli"
+        account_pool_entry["credential_env"] = None
     elif use_env_key:
         account["api_key_env"] = "MINIMAX_API_KEY"
     else:
@@ -49,5 +64,6 @@ def provider_config(*, use_env_key: bool = False, use_mmx_cli: bool = False) -> 
     return {
         "schema_version": "company_provider_secrets.local.v2",
         "accounts": {"minimax": account},
+        "account_pools": {"minimax_image_pool": {"accounts": [account_pool_entry]}},
         "services": {"minimax_image": service},
     }

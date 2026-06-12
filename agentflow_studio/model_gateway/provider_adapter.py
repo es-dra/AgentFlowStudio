@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -11,11 +10,15 @@ from agentflow_studio.model_gateway.company_secrets import (
     CompanyProviderSecrets,
     load_company_provider_secrets,
 )
-from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
-from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
+from agentflow_studio.model_gateway.errors import ModelConfigError
+from agentflow_studio.model_gateway.provider_account_pool import (
+    ProviderAccountSelection,
+    select_provider_account,
+)
 
 
-ProviderModality = Literal["image", "video", "llm", "asr"]
+ProviderCapability = Literal["image", "video", "llm", "asr"]
+ProviderModality = ProviderCapability
 ProviderExecutionMode = Literal["sync", "async"]
 
 
@@ -23,11 +26,14 @@ class ProviderDescriptor(BaseModel):
     schema_version: str = "provider_descriptor.v0.1"
     modality: ProviderModality
     execution_mode: ProviderExecutionMode
+    capabilities: list[ProviderCapability] = Field(default_factory=list)
+    account_pool_id: str | None = None
     reference_image_slots: int = Field(ge=0, le=8)
     supported_aspect_ratios: list[str] = Field(min_length=1)
     prompt_char_limit: int = Field(gt=0, le=20000)
     seed_supported: bool
     cost_hint: str = ""
+    rate_limit_hint: str = ""
     required_gate: str
 
     @field_validator("required_gate")
@@ -53,6 +59,7 @@ class ProviderDescriptor(BaseModel):
 class ProviderDispatchRequest:
     prompt: str
     output_dir: Path
+    task_type: str | None = None
     aspect_ratio: str = "9:16"
     candidate_count: int = 1
     timeout_sec: float = 120.0
@@ -67,7 +74,11 @@ class ProviderAdapter(Protocol):
 
     def validate(self, request: ProviderDispatchRequest) -> None: ...
 
-    def translate(self, request: ProviderDispatchRequest) -> dict[str, Any]: ...
+    def translate(
+        self,
+        request: ProviderDispatchRequest,
+        account_selection: ProviderAccountSelection,
+    ) -> dict[str, Any]: ...
 
     def submit(self, plan: dict[str, Any]) -> dict[str, Any]: ...
 
@@ -78,51 +89,11 @@ class ProviderAdapter(Protocol):
     def safe_error(self, error: Exception) -> dict[str, str]: ...
 
 
-class MiniMaxImageAdapter:
-    def __init__(self, store: CompanyProviderSecrets, service_id: str, descriptor: ProviderDescriptor) -> None:
-        self.store = store
-        self.service_id = service_id
-        self.descriptor = descriptor
-
-    def validate(self, request: ProviderDispatchRequest) -> None:
-        if request.aspect_ratio not in self.descriptor.supported_aspect_ratios:
-            raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
-        if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
-            raise ModelConfigError(
-                f"reference_image_slots exceeded for {self.service_id}: "
-                f"{len(request.reference_image_paths)} > {self.descriptor.reference_image_slots}"
-            )
-        gate = os.environ.get(self.descriptor.required_gate, "").strip().lower()
-        if gate not in {"1", "true", "yes", "on"}:
-            raise ModelGatewayError(f"Remote provider gate is closed: {self.descriptor.required_gate}")
-
-    def translate(self, request: ProviderDispatchRequest) -> dict[str, Any]:
-        subject_reference = request.subject_reference_image_path
-        if subject_reference is None and request.reference_image_paths:
-            subject_reference = request.reference_image_paths[0]
-        return {
-            "prompt": request.prompt,
-            "output_dir": request.output_dir,
-            "aspect_ratio": request.aspect_ratio,
-            "candidate_count": request.candidate_count,
-            "timeout_sec": request.timeout_sec,
-            "model_name_override": request.model_name_override,
-            "subject_reference_image_path": subject_reference,
-            "seed": request.seed,
-        }
-
-    def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        manifest = run_minimax_image_smoke(self.store, service_id=self.service_id, **plan)
-        return {"status": "already_complete", "raw": manifest}
-
-    def poll(self, task: dict[str, Any]) -> dict[str, Any]:
-        return task["raw"]
-
-    def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return raw
-
-    def safe_error(self, error: Exception) -> dict[str, str]:
-        return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
+from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
+    FakeAsyncVideoAdapter,
+    MiniMaxImageAdapter,
+    OpenAICompatibleLLMAdapter,
+)
 
 
 class ProviderRegistry:
@@ -148,6 +119,12 @@ class ProviderRegistry:
             if capability == "image" and provider == "minimax":
                 adapters[service_id] = MiniMaxImageAdapter(store, service_id, descriptor)
                 continue
+            if capability == "llm" and provider == "openai_compatible":
+                adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
+                continue
+            if capability == "video" and provider == "fake":
+                adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
+                continue
         return cls(store, adapters, descriptors)
 
     def descriptor(self, service_id: str) -> ProviderDescriptor:
@@ -164,7 +141,13 @@ class ProviderRegistry:
         if adapter.descriptor.modality != capability:
             raise ModelConfigError(f"Provider service {service_id} does not support capability: {capability}")
         adapter.validate(request)
-        plan = adapter.translate(request)
+        selection = select_provider_account(
+            self.store,
+            service_id=service_id,
+            capability=capability,
+            account_pool_id=adapter.descriptor.account_pool_id,
+        )
+        plan = adapter.translate(request, selection)
         task = adapter.submit(plan)
         raw = adapter.poll(task)
         return adapter.normalize(raw)
@@ -179,23 +162,22 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any]) -> Provide
     if not isinstance(payload, dict):
         raise ModelConfigError(f"Provider service descriptor is required: {service_id}")
     try:
-        return ProviderDescriptor.model_validate(payload)
+        descriptor = ProviderDescriptor.model_validate(payload)
     except ValidationError as exc:
         raise ModelConfigError(f"Provider service descriptor is invalid: {service_id}: {exc}") from exc
-
-
-def _safe_error(value: str) -> str:
-    lowered = value.lower()
-    if "status_code 2049" in lowered and "invalid api key" in lowered:
-        return "MiniMax image response status_code 2049: invalid API Key"
-    if "api" in lowered or "key" in lowered or "secret" in lowered:
-        return "Provider configuration is not ready."
-    return value[:160]
+    if not descriptor.capabilities:
+        descriptor = descriptor.model_copy(update={"capabilities": [descriptor.modality]})
+    if descriptor.modality not in descriptor.capabilities:
+        raise ModelConfigError(f"Provider service descriptor capabilities must include modality: {service_id}")
+    return descriptor
 
 
 __all__ = (
     "MiniMaxImageAdapter",
+    "OpenAICompatibleLLMAdapter",
+    "FakeAsyncVideoAdapter",
     "ProviderAdapter",
+    "ProviderCapability",
     "ProviderDescriptor",
     "ProviderDispatchRequest",
     "ProviderRegistry",

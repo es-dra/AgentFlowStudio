@@ -1,6 +1,6 @@
 # Handoff Index
 
-中文摘要：本索引只保留仍能服务当前本地 MVP 的交接文件。当前有效主线是 Studio、Runtime Service、专业知识库、创作智能体、图片/关键帧 gate 和安全 artifact；旧 Workbench、旧静态 Web、旧 LibTV 迭代、发布候选包和过期浏览器 QA 已按“证据足够即删除”处理。后续接手时只能从本索引进入，不应回到已删除历史入口。
+中文摘要：本索引只保留仍能服务当前本地 MVP 的交接文件。当前有效主线是 Studio、Runtime Service、专业知识库、创作智能体、图片关键帧 gate 和安全 artifact；旧 Workbench、旧静态 Web、旧 LibTV 迭代、发布候选包和过期浏览器 QA 已按“证据足够即删除”处理。后续接手时只能从本索引进入，不应回到已删除历史入口。
 
 维护标准：索引中的文件必须能说明当前接口、测试、验证证据、provider 边界或下一步真实模型接入。不能解释当前主线的文件不再保留。每次新增 handoff 都要写明非目标、非声明、是否发生 provider call、是否写入长期记忆以及对应的验证命令。
 
@@ -19,6 +19,7 @@ archived.
 - `AFS-ASSET-CONTEXT-S1.md`
 - `AFS-ASSET-CONTEXT-S1-COMPLETION-AUDIT.md`
 - `AFS-ASSET-CONTEXT-S1-FOLLOWUP-001.md`
+- `AFS-STUDIO-FRONTEND-POLISH-001.md`
 - `AFS-DIRECTOR-COMPILER-V1.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
@@ -37,6 +38,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
 - `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
 - `AFS-PROVIDER-ADAPTER-V0-1.md`
+- `AFS-PROVIDER-GATEWAY-V0-1.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider

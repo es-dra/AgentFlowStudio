@@ -5,8 +5,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.model_gateway import ModelGateway, ModelGatewayError
-from agentflow_studio.model_gateway.config import MODEL_GATEWAY_CONFIG_ENV
+from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_provider_script import REMOTE_LLM_ENV
 from apps.api.runtime_store import reject_unsafe_text
@@ -61,16 +61,18 @@ def maybe_enhance_prompt_with_llm(
     if gate["status"] == "blocked":
         return {**base, "status": "blocked", "discard_reason": "remote_llm_gate_closed"}
 
-    config_path = os.environ.get(MODEL_GATEWAY_CONFIG_ENV, "").strip()
-    if not config_path:
-        return {**base, "status": "blocked", "discard_reason": "model_config_missing"}
     try:
-        gateway = ModelGateway.from_config_path(Path(config_path))
-        enhanced = gateway.generate(
-            _enhancement_instruction(request, assembly),
-            task_type="prompt_enhancement",
-            provider_name=_provider_name(request),
+        registry = load_provider_registry()
+        result = registry.dispatch(
+            "llm",
+            _provider_name(request),
+            ProviderDispatchRequest(
+                prompt=_enhancement_instruction(request, assembly),
+                output_dir=Path("."),
+                task_type="prompt_enhancement",
+            ),
         )
+        enhanced = str(result.get("text") or "")
     except ModelGatewayError as exc:
         return {**base, "status": "discarded", "discard_reason": _safe_reason(str(exc))}
     try:
