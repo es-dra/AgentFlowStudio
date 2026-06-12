@@ -1,7 +1,5 @@
 import { showModal, el } from "../overlay.js";
-
-// 结构化资产确认面板:按特征卡模板预置字段,避免用户手写 "key: value" 行语法。
-// 字段集与 docs/visual_asset_feature_card_template.zh-CN.md 保持一致。
+import { visualAssetDefaults } from "./visual-asset-defaults.js";
 
 const CHARACTER_FIELDS = [
   ["identity", "身份", "28 岁左右的女性私家侦探，神情冷静"],
@@ -15,14 +13,13 @@ const CHARACTER_FIELDS = [
 
 const SCENE_FIELDS = [
   ["location", "地点定位", "城市边缘的废弃天文观测站内部"],
-  ["layout", "空间结构", "入口在东侧，中央是望远镜基座，西墙整面碎玻璃窗"],
+  ["layout", "空间结构", "入口在东侧，中央是望远镜基座，西墙整面破玻璃窗"],
   ["props", "关键道具", "翻倒的金属椅，墙上褪色的星图，地面积水"],
   ["lighting_mood", "光线基调", "冷月光从西窗斜入，整体青蓝色调"],
   ["palette", "场景配色", "青蓝 + 锈橙"],
   ["time_weather", "时间天气", "深夜，雨后"],
 ];
 
-// 锁定项快捷模板:{field} 取对应字段已填内容(截断),否则用占位文案。
 const CHARACTER_LOCK_CHIPS = [
   ["保持发型发色", "hair"],
   ["保持标志性服装", "wardrobe"],
@@ -45,8 +42,8 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
     markNodeError(store, node.id, "当前节点没有可固定的图片，请先上传或生成图片。");
     return;
   }
-  let assetType = "character";
 
+  let assetType = "character";
   const modal = el("div", "modal-card visual-asset-panel");
   const close = showModal(modal);
   render();
@@ -55,10 +52,11 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
     const fields = assetType === "character" ? CHARACTER_FIELDS : SCENE_FIELDS;
     const lockChips = assetType === "character" ? CHARACTER_LOCK_CHIPS : SCENE_LOCK_CHIPS;
     const previous = collectFieldValues(modal);
+    const defaults = visualAssetDefaults(node, imageAsset, assetType);
     modal.innerHTML = `
       <div class="modal-head">
         <div>
-          <div class="eyebrow">人工确认 · asset_fix</div>
+          <div class="eyebrow">人工确认</div>
           <h3>固定为${assetType === "character" ? "人物" : "场景"}资产</h3>
         </div>
         <button class="icon-btn" data-action="close" title="关闭">×</button>
@@ -75,20 +73,20 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
         <button class="va-type${assetType === "character" ? " active" : ""}" data-type="character">人物资产</button>
         <button class="va-type${assetType === "scene" ? " active" : ""}" data-type="scene">场景资产</button>
       </div>
-      <label class="va-row">名称<input data-field="label" value="${escapeAttr(previous.label || node.title || "")}" placeholder="如：林晚 / 观测站"></label>
-      <label class="va-row">一句话签名<input data-field="signature" value="${escapeAttr(previous.signature ?? "")}" placeholder="只写最具辨识度的 2-4 个特征，将进入优化提示词"></label>
+      <label class="va-row">名称<input data-field="label" value="${escapeAttr(previous.label || defaults.label || node.title || "")}" placeholder="如：林晚 / 观测站"></label>
+      <label class="va-row">一句话签名<input data-field="signature" value="${escapeAttr(previous.signature || defaults.signature || "")}" placeholder="只写最具辨识度的 2-4 个特征，将进入优化提示词"></label>
       <div class="va-section-label">特征卡 <small>逐项填写，生成时全文注入模型；至少填一项</small></div>
       ${fields.map(([key, label, hint]) => `
-        <label class="va-row va-feature">${label}<input data-card="${key}" value="${escapeAttr(previous.card?.[key] ?? "")}" placeholder="${escapeAttr(hint)}"></label>
+        <label class="va-row va-feature">${label}<input data-card="${key}" value="${escapeAttr(previous.card?.[key] || defaults.card?.[key] || "")}" placeholder="${escapeAttr(hint)}"></label>
       `).join("")}
       <div class="va-section-label">不可变锁定项 <small>每行一条；生成时强制遵守，可临时解除</small></div>
       <div class="va-lock-chips">
         ${lockChips.map(([label], index) => `<button class="va-chip" data-chip="${index}">+ ${label}</button>`).join("")}
       </div>
-      <textarea data-field="negative_locks" rows="3" placeholder="保持黑色短发&#10;保持左眉尾疤痕">${escapeHtml(previous.locks ?? "")}</textarea>
+      <textarea data-field="negative_locks" rows="3" placeholder="保持黑色短发&#10;保持左眉尾疤痕">${escapeHtml(previous.locks || defaults.locks || "")}</textarea>
       <div class="va-error" data-role="error" hidden></div>
       <div class="modal-actions">
-        <button class="ghost-btn" data-action="reject">拒绝（仅留证据）</button>
+        <button class="ghost-btn" data-action="reject">不采用</button>
         <button class="primary-btn" data-action="fix">确认固定</button>
       </div>
     `;
@@ -130,7 +128,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
     const cardOrFallback = decision === "rejected" && !Object.keys(card).length ? { review: "rejected candidate" } : card;
     if (decision === "fixed") {
       if (!values.label) return showError("请填写资产名称。");
-      if (!signature) return showError("请填写一句话签名——它会出现在优化提示词里。");
+      if (!signature) return showError("请填写一句话签名，它会出现在优化提示词里。");
       if (!Object.keys(card).length) return showError("特征卡至少填写一项，生成时模型只认特征卡内容。");
     }
     setBusy(true);
@@ -198,22 +196,35 @@ async function submitVisualAssetReview({ store, runtime, node, imageAsset, decis
   };
   const response = await runtime.promoteVisualAsset(payload);
   const asset = response?.asset;
+  const localAsset = asset?.asset_id ? {
+    ...asset,
+    asset_type: assetType,
+    label,
+    signature,
+    feature_card: featureCard,
+    negative_locks: negativeLocks,
+  } : null;
   store.set((s) => {
     const n = s.nodes[node.id];
-    if (!n || !asset?.asset_id) return;
-    n.params.visualAssets = mergeVisualAssets(n.params.visualAssets || [], asset);
+    if (!n || !localAsset?.asset_id) return;
+    n.params.visualAssets = mergeVisualAssets(n.params.visualAssets || [], localAsset);
     n.params.lastVisualAssetWarnings = response?.warnings || [];
-    n.result = `${n.result || ""}\n${decision === "fixed" ? "已固定为资产" : "候选已拒绝"}：${asset.label}（${asset.asset_id}）`.trim();
+    n.result = `${n.result || ""}\n${decision === "fixed" ? "资产已固定；画布撤销(Ctrl+Z)不影响已固定资产" : "候选未采用"}：${localAsset.label}：${localAsset.asset_id}`.trim();
     s.assets.unshift({
       id: store.nextId("asset"),
       kind: "visual_asset",
-      title: asset.label,
-      safe_summary: asset.signature,
-      thumbnail_ref: asset.asset_type,
+      title: localAsset.label,
+      safe_summary: localAsset.signature,
+      thumbnail_ref: localAsset.asset_type,
       source_node_id: n.id,
-      status: asset.status,
-      asset_id: asset.asset_id,
-      visual_asset_id: asset.asset_id,
+      asset_status: localAsset.status,
+      status: localAsset.status,
+      asset_type: localAsset.asset_type,
+      asset_id: localAsset.asset_id,
+      visual_asset_id: localAsset.asset_id,
+      signature: localAsset.signature,
+      feature_card: localAsset.feature_card,
+      negative_locks: localAsset.negative_locks,
       created_at: new Date().toISOString(),
     });
   });

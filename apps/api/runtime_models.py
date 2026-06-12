@@ -204,6 +204,7 @@ class VisualAssetPromoteRequest(BaseModel):
     feature_card: dict[str, Any] = Field(default_factory=dict)
     negative_locks: list[str] = Field(default_factory=list)
     source_node_id: str | None = None
+    supersedes_asset_id: str | None = None
     review_decision: Literal["fixed", "rejected"]
     reviewed_at: str = Field(min_length=1)
 

@@ -1,5 +1,55 @@
 # Devlog
 
+## 2026-06-13 - MVP Hardening 001
+
+- Added provider-facing `user_prompt_plain` and backend section-header stripping so human-readable prompt sections do not leak into image provider prompts.
+- Capped generate-mode full-card asset injection at 3 characters and 1 scene; over-limit assets degrade to signature-only and are traceable in `excluded_assets`.
+- Changed context subgraph traversal so `reference` edges do not consume the normal 3-hop budget, with a separate 6-reference-edge loop guard.
+- Upgraded `visual_asset` to v0.2 with `supersedes_asset_id` and deterministic same-label arbitration by version terminal or newest `server_recorded_at`.
+- Added `resolver_version`, `vocabulary_hash`, and `feature_card_hash` metadata to context bundles.
+- Added one readiness/network retry around image provider dispatch and writes `retry_count` into keyframe safe manifests.
+- Removed non-image local preview placeholders from Studio; non-image sends are disabled with explanatory copy, and fake cost numbers are hidden.
+- Added readonly visual-asset detail popovers, fixed/retired drawer distinction, asset badge invalid-state correction, drawer search, Chinese fixed-asset action titles, and shortcut panel entries for `?`, `Ctrl+L`, and `Ctrl+D`.
+
+Verification:
+
+```text
+Backend focused hardening set: 33 passed, 1 Starlette/httpx warning
+Studio static: 12 passed
+Changed Studio JS node --check: passed
+Full pytest: 855 passed, 1 Starlette/httpx warning
+maintenance_audit: failed=0, warning=2 existing doc/oversized warnings
+git diff --check: passed with Windows CRLF notices only
+Browser light QA: `/studio/` loaded with no console errors; visible page no longer exposes `asset_fix`, `fix visual asset`, local-preview text, or `.bar-cost`. Current browser state had no asset badge, so readonly asset-detail clicking remains static-test covered until a seeded asset state is used.
+```
+
+Boundaries:
+
+- No live provider call or human acceptance was run in this slice.
+- Kling/video, S2 feature-card LLM extraction, S3 storyboard schema, and legacy package retirement remain out of scope.
+
+## 2026-06-13 - Studio MVP Usability P0
+
+- Switched the Studio prompt optimizer product path to remote-required LLM enhancement. Local deterministic assembly remains backend-internal for tests and non-Studio fallback, but the Studio UI no longer silently shows it as an optimization result.
+- Persisted local Windows user env gates for this machine: `AFS_ALLOW_REMOTE_IMAGE=true`, `AFS_ALLOW_REMOTE_LLM=true`, and `AFS_PROVIDER_CONFIG=D:\Projects\AgentFlowStudio\configs\providers.local.json`; video, ASR, and download gates remain untouched.
+- Fixed Studio state persistence so transient runtime bundle details such as `lastContextBundle.trace_summary` are pruned before safety scanning, while fixed `visualAssets` can persist on nodes.
+- Updated node actions so image-node retry uses the real generation path and node menus expose direct asset marking from the canvas.
+- Improved runtime client error detail propagation and image gate blocked copy, so provider/gate failures are visible instead of turning into generic request errors.
+
+Verification:
+
+```text
+Focused prompt/state/static tests: 4 passed
+Prompt/state/static related suite: 21 passed
+Changed Studio JS node --check: passed
+Full pytest: 844 passed, 1 Starlette/httpx warning
+```
+
+Boundaries:
+
+- No live provider call was run as part of this code change.
+- Runtime/browser verification is still not human acceptance.
+
 ## 2026-06-12 - MVP Closeout Live A/B/C
 
 - Ran gate-closed Studio browser QA successfully after tightening the QA selector for multiple temporary-unlock buttons.

@@ -13,7 +13,7 @@ from apps.api.runtime_models import VisualAssetPromoteRequest, VisualAssetRetire
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
-VISUAL_ASSET_SCHEMA_VERSION = "0.1.0"
+VISUAL_ASSET_SCHEMA_VERSION = "0.2.0"
 VISUAL_ASSET_STATUSES = {"fixed", "rejected", "retired"}
 
 
@@ -63,6 +63,7 @@ def create_visual_asset(
         "status": request.review_decision,
         "version": 1,
         "source_node_id": request.source_node_id,
+        "supersedes_asset_id": request.supersedes_asset_id.strip() if request.supersedes_asset_id else None,
         "created_at": _server_now(),
         "image_asset_refs": _clean_refs(request.source_image_asset_refs),
         "signature": request.signature.strip(),
@@ -149,6 +150,7 @@ def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
         "signature": record.get("signature"),
         "image_asset_refs": list(record.get("image_asset_refs") or []),
         "source_node_id": record.get("source_node_id"),
+        "supersedes_asset_id": record.get("supersedes_asset_id"),
         "created_at": record.get("created_at"),
         "reviewed_at": review.get("reviewed_at"),
         "server_recorded_at": review.get("server_recorded_at"),
@@ -169,6 +171,8 @@ def _validate_promote_request(store: RuntimeStore, project_id: str, request: Vis
         raise ValueError("source_image_asset_refs is required")
     for asset_id in refs:
         image_asset_metadata(store, project_id, asset_id)
+    if request.supersedes_asset_id:
+        visual_asset_record(store, project_id, request.supersedes_asset_id.strip())
 
 
 def _duplicate_label_warnings(

@@ -88,6 +88,7 @@ def keyframe_safe_manifest(
     provider_calls_started: bool,
     output_count: int,
     reference_image_count: int,
+    retry_count: int,
     context_bundle: dict[str, Any] | None,
     non_claims: list[str],
 ) -> dict[str, Any]:
@@ -106,6 +107,7 @@ def keyframe_safe_manifest(
         "generated_media_artifacts_registered": False,
         "output_count": output_count,
         "reference_image_count": reference_image_count,
+        "retry_count": retry_count,
         "seed": request.seed,
         "blocks": blocks,
         "safe_artifacts": [

@@ -91,6 +91,7 @@ class ProviderAdapter(Protocol):
 
 from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     FakeAsyncVideoAdapter,
+    MiniMaxCliLLMAdapter,
     MiniMaxImageAdapter,
     OpenAICompatibleLLMAdapter,
 )
@@ -121,6 +122,9 @@ class ProviderRegistry:
                 continue
             if capability == "llm" and provider == "openai_compatible":
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
+                continue
+            if capability == "llm" and provider == "minimax_cli":
+                adapters[service_id] = MiniMaxCliLLMAdapter(store, service_id, descriptor)
                 continue
             if capability == "video" and provider == "fake":
                 adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
@@ -176,6 +180,7 @@ __all__ = (
     "MiniMaxImageAdapter",
     "OpenAICompatibleLLMAdapter",
     "FakeAsyncVideoAdapter",
+    "MiniMaxCliLLMAdapter",
     "ProviderAdapter",
     "ProviderCapability",
     "ProviderDescriptor",

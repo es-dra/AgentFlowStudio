@@ -21,6 +21,7 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
 
     def fake_dispatch(capability, service_id, request):
         captured["subject_reference_image_path"] = request.subject_reference_image_path
+        captured["prompt"] = request.prompt
         output_dir = Path(request.output_dir)
         image_dir = output_dir / "image_candidates"
         image_dir.mkdir(parents=True, exist_ok=True)
@@ -94,6 +95,8 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
     assert plan["reference_image_count"] == 1
     assert plan["subject_reference_asset_id"] == asset["asset_id"]
     assert plan["reference_images"][0]["asset_id"] == asset["asset_id"]
+    assert "Only apply the user-requested edit" in str(captured["prompt"])
+    assert "Preserve the reference face, clothing, silhouette" in str(captured["prompt"])
     assert "data_base64" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized

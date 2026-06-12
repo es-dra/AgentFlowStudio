@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
+from apps.api.runtime_attribute_vocabulary import ATTRIBUTE_GROUPS
 from apps.api.runtime_context_budget import apply_context_budget, context_warnings, duplicate_labels
 from apps.api.runtime_director_compiler import compile_director_setup
 from apps.api.runtime_models import ContextSubgraph, DirectorSetup2D, TemporaryLockOverride
@@ -12,7 +15,11 @@ from apps.api.runtime_visual_assets import fixed_visual_assets_by_id, public_vis
 MAX_SUBGRAPH_NODES = 24
 MAX_SUBGRAPH_EDGES = 32
 MAX_SUBGRAPH_HOPS = 3
+MAX_REFERENCE_EDGE_DEPTH = 6
 MAX_OPTIMIZE_SIGNATURES = 4
+MAX_GENERATE_FULL_CHARACTER_ASSETS = 3
+MAX_GENERATE_FULL_SCENE_ASSETS = 1
+RESOLVER_VERSION = "context_resolver_v0.2"
 RELATION_PRIORITY = {"reference": 0, "director": 1, "generation": 2}
 FORBIDDEN_ASSET_TEXT_KEYS = {"signature", "feature_card", "negative_locks", "visual_asset", "visual_assets"}
 
@@ -38,27 +45,45 @@ def resolve_context_bundle(
     overrides = _override_pairs(temporary_lock_overrides or [])
 
     if mode == "optimize":
-        included_ids = _optimize_asset_ids(assets, sorted_connected_ids, visible_prompt)
+        candidate_ids = _optimize_asset_ids(assets, sorted_connected_ids, visible_prompt)
     elif mode == "generate":
-        included_ids = sorted_connected_ids if include_fixed_assets else []
+        candidate_ids = sorted_connected_ids if include_fixed_assets else []
     else:
         raise ValueError("context resolver mode must be optimize or generate")
 
-    included = [_included_asset(assets[asset_id], connected.get(asset_id), mode) for asset_id in included_ids if asset_id in assets]
-    excluded = _excluded_assets(assets, included_ids, connected, mode, include_fixed_assets)
+    included_ids, arbitration_exclusions = _apply_label_arbitration(assets, candidate_ids)
+    detail_levels = _asset_detail_levels(assets, included_ids, mode)
+    degraded_exclusions = _degraded_asset_exclusions(assets, included_ids, detail_levels) if mode == "generate" else []
+    included = [
+        _included_asset(assets[asset_id], connected.get(asset_id), mode, detail_levels.get(asset_id, "signature_only"))
+        for asset_id in included_ids
+        if asset_id in assets
+    ]
+    excluded = _excluded_assets(
+        assets,
+        included_ids,
+        connected,
+        mode,
+        include_fixed_assets,
+        extra_exclusions=[*arbitration_exclusions, *degraded_exclusions],
+    )
     available = _available_assets(assets, included_ids, connected, visible_prompt)
     upstream_lines = _upstream_summary_lines(context_subgraph, node_hops)
     director_compile = _director_compile_result(director_setup, assets)
     text_channel = _text_channel(
         mode,
         visible_prompt,
-        [assets[item] for item in included_ids if item in assets],
+        [(assets[item], detail_levels.get(item, "signature_only")) for item in included_ids if item in assets],
         overrides,
         upstream_lines=upstream_lines,
         style_preference=style_preference,
         director_compile=director_compile,
     )
-    included_asset_records = [assets[item] for item in included_ids if item in assets]
+    included_asset_records = [
+        assets[item]
+        for item in included_ids
+        if item in assets and detail_levels.get(item) == "full_card"
+    ]
     subject_asset = _subject_reference_asset(included_asset_records, connected)
     reference_channel = _reference_image_channel(included_asset_records, connected, reference_image_slots)
     text_channel, budget = apply_context_budget(mode, text_channel, total_prompt_budget=prompt_char_limit)
@@ -66,6 +91,8 @@ def resolve_context_bundle(
 
     return {
         "schema_version": "0.1.0",
+        "resolver_version": RESOLVER_VERSION,
+        "vocabulary_hash": _hash_payload(ATTRIBUTE_GROUPS),
         "mode": mode,
         "included_assets": included,
         "excluded_assets": excluded,
@@ -84,7 +111,11 @@ def resolve_context_bundle(
             "context_subgraph_assertion": "client_supplied_not_security_boundary",
             "asset_truth_source": "runtime_visual_asset_store_by_id",
             "duplicate_label_candidates": duplicate_labels([assets[item] for item in included_ids if item in assets]),
-            "selection_rule": "hop_then_reference_director_generation_then_asset_id",
+            "selection_rule": "label_version_terminal_then_hop_then_reference_director_generation_then_asset_id",
+            "generate_full_card_limits": {
+                "character": MAX_GENERATE_FULL_CHARACTER_ASSETS,
+                "scene": MAX_GENERATE_FULL_SCENE_ASSETS,
+            },
         },
     }
 
@@ -126,20 +157,28 @@ def _connected_asset_refs(subgraph: ContextSubgraph) -> tuple[dict[str, dict[str
     upstream_by_to: dict[str, list[Any]] = {}
     for edge in subgraph.edges:
         upstream_by_to.setdefault(edge.to_node_id, []).append(edge)
-    queue: list[tuple[str, int, str]] = [(subgraph.target_node_id, 0, "generation")]
+    queue: list[tuple[str, int, int, str]] = [(subgraph.target_node_id, 0, 0, "generation")]
     visited: dict[str, int] = {}
+    visited_costs: dict[str, tuple[int, int]] = {}
     refs: dict[str, dict[str, Any]] = {}
     while queue:
-        node_id, hop, relation = queue.pop(0)
-        if hop > MAX_SUBGRAPH_HOPS or visited.get(node_id, 99) <= hop:
+        node_id, hop, reference_depth, relation = queue.pop(0)
+        if hop > MAX_SUBGRAPH_HOPS or reference_depth > MAX_REFERENCE_EDGE_DEPTH:
             continue
+        previous = visited_costs.get(node_id)
+        if previous and previous <= (hop, reference_depth):
+            continue
+        visited_costs[node_id] = (hop, reference_depth)
         visited[node_id] = hop
         node = nodes.get(node_id)
         if node:
             for asset_id in node.visual_asset_ids:
                 _remember_ref(refs, str(asset_id), hop, relation, node_id)
         for edge in upstream_by_to.get(node_id, []):
-            queue.append((edge.from_node_id, hop + 1, str(edge.relation_type or "generation")))
+            next_relation = str(edge.relation_type or "generation")
+            next_hop = hop if next_relation == "reference" else hop + 1
+            next_reference_depth = reference_depth + 1 if next_relation == "reference" else reference_depth
+            queue.append((edge.from_node_id, next_hop, next_reference_depth, next_relation))
     return refs, visited
 
 
@@ -149,7 +188,7 @@ def _upstream_summary_lines(subgraph: ContextSubgraph, node_hops: dict[str, int]
         (
             (hop, node_id)
             for node_id, hop in node_hops.items()
-            if hop >= 1 and node_id in nodes and str(nodes[node_id].prompt or "").strip()
+            if node_id != subgraph.target_node_id and node_id in nodes and str(nodes[node_id].prompt or "").strip()
         ),
     )
     lines: list[str] = []
@@ -195,11 +234,115 @@ def _optimize_asset_ids(assets: dict[str, dict[str, Any]], connected_ids: list[s
     return selected[:MAX_OPTIMIZE_SIGNATURES]
 
 
-def _included_asset(asset: dict[str, Any], ref: dict[str, Any] | None, mode: str) -> dict[str, Any]:
+def _apply_label_arbitration(
+    assets: dict[str, dict[str, Any]],
+    candidate_ids: list[str],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    groups: dict[tuple[str, str], list[str]] = {}
+    for asset_id in candidate_ids:
+        asset = assets.get(asset_id)
+        if not asset:
+            continue
+        key = (str(asset.get("asset_type") or ""), str(asset.get("label") or "").casefold())
+        groups.setdefault(key, []).append(asset_id)
+
+    selected_by_group: dict[tuple[str, str], str] = {}
+    exclusions: list[dict[str, Any]] = []
+    for key, ids in groups.items():
+        unique_ids = [item for index, item in enumerate(ids) if item and item not in ids[:index]]
+        if len(unique_ids) == 1:
+            selected_by_group[key] = unique_ids[0]
+            continue
+        selected = _terminal_asset_id(assets, unique_ids)
+        selected_by_group[key] = selected
+        for asset_id in unique_ids:
+            if asset_id == selected:
+                continue
+            asset = assets[asset_id]
+            exclusions.append(
+                {
+                    "asset_id": asset_id,
+                    "label": asset.get("label"),
+                    "asset_type": asset.get("asset_type"),
+                    "reason": "superseded_by_newer_label_version",
+                    "selected_asset_id": selected,
+                }
+            )
+
+    selected_ids: list[str] = []
+    for asset_id in candidate_ids:
+        asset = assets.get(asset_id)
+        if not asset:
+            continue
+        key = (str(asset.get("asset_type") or ""), str(asset.get("label") or "").casefold())
+        selected = selected_by_group.get(key, asset_id)
+        if selected == asset_id and selected not in selected_ids:
+            selected_ids.append(selected)
+    return selected_ids, exclusions
+
+
+def _terminal_asset_id(assets: dict[str, dict[str, Any]], ids: list[str]) -> str:
+    superseded = {
+        str(assets[asset_id].get("supersedes_asset_id") or "")
+        for asset_id in ids
+        if str(assets[asset_id].get("supersedes_asset_id") or "") in ids
+    }
+    terminals = [asset_id for asset_id in ids if asset_id not in superseded] or ids
+    return sorted(terminals, key=lambda asset_id: (_asset_recorded_at(assets[asset_id]), asset_id))[-1]
+
+
+def _asset_recorded_at(asset: dict[str, Any]) -> str:
+    review = asset.get("promotion_review") if isinstance(asset.get("promotion_review"), dict) else {}
+    return str(review.get("server_recorded_at") or asset.get("created_at") or "")
+
+
+def _asset_detail_levels(assets: dict[str, dict[str, Any]], included_ids: list[str], mode: str) -> dict[str, str]:
+    if mode != "generate":
+        return {asset_id: "signature_only" for asset_id in included_ids}
+    counts = {"character": 0, "scene": 0}
+    limits = {"character": MAX_GENERATE_FULL_CHARACTER_ASSETS, "scene": MAX_GENERATE_FULL_SCENE_ASSETS}
+    detail: dict[str, str] = {}
+    for asset_id in included_ids:
+        asset_type = str(assets.get(asset_id, {}).get("asset_type") or "character")
+        if counts.get(asset_type, 0) < limits.get(asset_type, 0):
+            detail[asset_id] = "full_card"
+            counts[asset_type] = counts.get(asset_type, 0) + 1
+        else:
+            detail[asset_id] = "signature_only"
+    return detail
+
+
+def _degraded_asset_exclusions(
+    assets: dict[str, dict[str, Any]],
+    included_ids: list[str],
+    detail_levels: dict[str, str],
+) -> list[dict[str, Any]]:
+    degraded: list[dict[str, Any]] = []
+    for asset_id in included_ids:
+        if detail_levels.get(asset_id) != "signature_only":
+            continue
+        asset = assets.get(asset_id)
+        if not asset:
+            continue
+        degraded.append(
+            {
+                "asset_id": asset_id,
+                "label": asset.get("label"),
+                "asset_type": asset.get("asset_type"),
+                "reason": "degraded_to_signature_over_limit",
+                "degraded_channel": "signature_text",
+            }
+        )
+    return degraded
+
+
+def _included_asset(asset: dict[str, Any], ref: dict[str, Any] | None, mode: str, detail_level: str) -> dict[str, Any]:
     public = public_visual_asset(asset)
     public.update(
         {
             "channel": "signature_text" if mode == "optimize" else "companion_text",
+            "detail_level": detail_level,
+            "feature_card_hash": _hash_payload(asset.get("feature_card") if isinstance(asset.get("feature_card"), dict) else {}),
             "hop": (ref or {}).get("hop"),
             "relation_type": (ref or {}).get("relation_type"),
             "connected": ref is not None,
@@ -214,14 +357,33 @@ def _excluded_assets(
     refs: dict[str, dict[str, Any]],
     mode: str,
     include_fixed_assets: bool,
+    extra_exclusions: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     excluded: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in extra_exclusions or []:
+        asset_id = str(item.get("asset_id") or "")
+        reason = str(item.get("reason") or "")
+        if not asset_id or not reason:
+            continue
+        seen.add((asset_id, reason))
+        excluded.append(item)
+    for asset_id in sorted(refs):
+        if asset_id in assets or asset_id in included_ids:
+            continue
+        reason = "retired_or_missing_visual_asset"
+        if (asset_id, reason) in seen:
+            continue
+        seen.add((asset_id, reason))
+        excluded.append({"asset_id": asset_id, "label": None, "asset_type": None, "reason": reason})
     for asset_id, asset in sorted(assets.items()):
         if asset_id in included_ids:
             continue
         reason = "not_selected_for_optimize" if mode == "optimize" else "not_connected_to_target"
         if mode == "generate" and not include_fixed_assets and asset_id in refs:
             reason = "fixed_assets_excluded_by_comparison_arm"
+        if (asset_id, reason) in seen:
+            continue
         excluded.append({"asset_id": asset_id, "label": asset.get("label"), "asset_type": asset.get("asset_type"), "reason": reason})
     return excluded
 
@@ -247,7 +409,7 @@ def _available_assets(
 def _text_channel(
     mode: str,
     visible_prompt: str,
-    assets: list[dict[str, Any]],
+    assets: list[tuple[dict[str, Any], str]],
     overrides: set[tuple[str, str]],
     *,
     upstream_lines: list[str] | None = None,
@@ -255,7 +417,7 @@ def _text_channel(
     director_compile: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     if mode == "optimize":
-        signatures = [f"{asset['label']}: {asset.get('signature')}" for asset in assets]
+        signatures = [f"{asset['label']}: {asset.get('signature')}" for asset, _detail in assets]
         return {
             "visible_prompt": visible_prompt,
             "asset_signature_segment": "\n".join(signatures),
@@ -266,7 +428,14 @@ def _text_channel(
         }
     identity_lines: list[str] = []
     scene_lines: list[str] = []
-    for asset in assets:
+    for asset, detail_level in assets:
+        if detail_level != "full_card":
+            line = f"{asset.get('label')}: {asset.get('signature')}".strip()
+            if asset.get("asset_type") == "scene":
+                scene_lines.append(line)
+            else:
+                identity_lines.append(line)
+            continue
         card = asset.get("feature_card") if isinstance(asset.get("feature_card"), dict) else {}
         card_text = "; ".join(f"{key}: {value}" for key, value in card.items())
         locks = [
@@ -358,6 +527,11 @@ def _reference_image_channel(
 
 def _override_pairs(overrides: list[TemporaryLockOverride]) -> set[tuple[str, str]]:
     return {(item.asset_id, item.lock_text) for item in overrides}
+
+
+def _hash_payload(value: Any) -> str:
+    data = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()[:16]
 
 
 __all__ = ("provider_prompt_from_bundle", "resolve_context_bundle")

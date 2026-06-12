@@ -33,3 +33,7 @@ include = ["apps*", "agentflow*", "agentflow_studio*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "live: tests that require an explicitly authorized remote provider call",
+    "slow: slower end-to-end or browser/runtime tests skipped during daily focused runs",
+]

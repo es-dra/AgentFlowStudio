@@ -94,12 +94,69 @@ def test_studio_asset_context_workflow_is_single_canvas() -> None:
     assert "mode-tab context_generate" not in source
 
 
+def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "openModelPopover" in prompt_bar
+    assert "openOptimizer" in prompt_bar
+    assert "startNodeGeneration" in prompt_bar
+    for removed in (
+        "openImageSpecPopover",
+        "openCameraPopover",
+        "IMAGE_COUNTS",
+        "IMAGE_QUALITY",
+        "IMAGE_RESOLUTION",
+        "IMAGE_RATIOS",
+    ):
+        assert removed not in prompt_bar
+    assert 'if (node.type !== "image")' in prompt_bar
+    assert "bar-cost" not in prompt_bar
+    assert "当前版本仅图片节点支持真实生成" in prompt_bar
+    assert "uploadNodeImage" in node_menu
+    assert "上传/替换参考图" in node_menu
+
+
+def test_studio_hardening_static_contract_markers() -> None:
+    source = _source()
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
+    visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    shortcuts = (STUDIO_ROOT / "src" / "panels" / "shortcuts-panel.js").read_text(encoding="utf-8")
+
+    assert "lastOptimizedPromptPlain" in source
+    assert "user_prompt_plain" in optimizer_contract
+    assert "referenceDepth" in optimizer_contract
+    assert "costHop" in optimizer_contract
+    assert "degraded_to_signature_over_limit" not in source
+    assert "不采用" in visual_asset_panel
+    assert "asset_fix" not in visual_asset_panel
+    assert "fix visual asset" not in source
+    assert "未引用 · 可连线" in optimizer
+    assert '["Ctrl", "L"]' in shortcuts
+    assert '["Ctrl", "D"]' in shortcuts
+    assert "?" in shortcuts
+    assert "send.disabled" in prompt_bar
+
+
+def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
+    panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
+
+    assert "visualAssetDefaults" in panel
+    assert "data-card" in panel
+    assert "短发" in defaults
+    assert "保持参考图人物身份和脸部辨识度" in defaults
+
+
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
 
-    assert "MiniMax-M3" in source
+    assert "提示词优化" in source
     assert "MiniMax image-01" in source
-    assert "local-creative-agent" in source
+    assert "local-creative-agent" not in source
+    assert "remote_optimizer_required" in _source()
     assert 'providerServiceId: "minimax_image"' in source
     for retired in ("Midjourney", "Seedream", "Seedance", "Qwen 3", "Lib Video", "Lib Image"):
         assert retired not in source

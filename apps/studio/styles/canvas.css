@@ -123,6 +123,13 @@
   font-size: 10px;
   color: var(--text-secondary);
 }
+.ref-badge.asset-badge { cursor: pointer; }
+.ref-badge.asset-badge:hover { color: var(--text-primary); border-color: var(--border-card); }
+.ref-badge.asset-badge.invalid {
+  color: var(--text-faint);
+  border-color: rgba(255, 122, 122, 0.35);
+  background: rgba(255, 122, 122, 0.08);
+}
 
 /* hover 操作条 */
 .node-actions {

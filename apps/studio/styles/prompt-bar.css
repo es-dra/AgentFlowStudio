@@ -102,9 +102,6 @@
 .bar-tool.optimize-btn:hover { background: var(--accent-soft); }
 .bar-tool.optimize-btn.busy { pointer-events: none; opacity: 0.6; }
 
-.bar-cost { color: var(--text-faint); font-size: 12px; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; }
-.bar-cost .bolt { color: var(--energy); }
-
 .send-btn {
   width: 32px; height: 32px;
   border-radius: 10px;

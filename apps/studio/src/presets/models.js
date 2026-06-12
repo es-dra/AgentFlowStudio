@@ -1,19 +1,11 @@
 // Studio model presets describe the current MVP execution surface.
-// Only MiniMax text enhancement and MiniMax image keyframes are wired to Runtime providers.
+// User-facing prompt optimization is always remote-gated; local assembly remains backend-internal.
 
 export const TEXT_MODELS = [
   {
-    id: "local-creative-agent",
-    name: "Local Agent",
-    desc: "deterministic prompt assembly",
-    eta: "0s",
-    cost: 0,
-    provider: "local",
-  },
-  {
     id: "minimax-m3-enhance",
-    name: "MiniMax-M3",
-    desc: "prompt enhancement",
+    name: "提示词优化",
+    desc: "remote prompt enhancement",
     eta: "15s",
     cost: 1,
     provider: "minimax",

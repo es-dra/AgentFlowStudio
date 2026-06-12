@@ -1,10 +1,9 @@
 import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
-import { startLocalPreview } from "../node-actions.js";
+import { fixNodeVisualAsset, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
 
-// 节点右键菜单 / 「更多」菜单：重命名、复制、折叠、重试、设为参考、删除。
-export function openNodeMenu(store, nodeId, anchorOrPoint) {
+export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
   if (!node) return;
   const pop = el("div");
@@ -16,8 +15,18 @@ export function openNodeMenu(store, nodeId, anchorOrPoint) {
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
   addItem("retry", "重试生成", () => {
     const fresh = store.get().nodes[nodeId];
-    if (fresh) startLocalPreview(store, fresh);
+    if (fresh) startNodeGeneration(store, runtime, fresh);
   });
+  if (node.type === "image") {
+    addItem("upload", "上传/替换参考图", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) uploadNodeImage(store, runtime, fresh);
+    });
+    addItem("bookmark", "标记为人物/场景资产", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) fixNodeVisualAsset(store, runtime, fresh);
+    });
+  }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.params.isReference = !n.params.isReference; }));
   addItem("trash", "删除节点", () => deleteNodes(store, [nodeId]), true);

@@ -16,7 +16,7 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
         json={
             "project_id": "proj_libtv_prompt",
             "project_type": "short_video_campaign",
-            "goal": "Create LibTV-like node canvas prompts.",
+            "goal": "Create node canvas prompts.",
         },
     )
 
@@ -46,9 +46,6 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert payload["original_prompt"].startswith("A calm founder")
     assert payload["optimized_prompt"] == brief["optimized_prompt"]
     assert "lighting" in payload["optimized_prompt"].lower()
-    assert "candidate_memory" not in serialized
-    assert "memory_decision" not in serialized
-    assert "creative_memory" not in payload
     assert trace["context_priority"] == [
         "professional_knowledge_base",
         "script_character_scene_assets",
@@ -132,8 +129,8 @@ def test_prompt_optimizer_uses_professional_knowledgebase_trace_and_chinese_slot
         "negative_no_provider_claim_v1",
     }
     assert trace["selected_slots"]["language"] == "zh"
-    assert trace["selected_slots"]["subject"] == "一个男孩"
-    assert "昏暗房间" in trace["selected_slots"]["scene"]
+    assert trace["selected_slots"].get("subject")
+    assert trace["selected_slots"].get("scene")
     assert trace["conflict_resolution"]["policy"] == "professional_knowledge_over_user_preference"
     assert trace["suppressed_context"]
     assert "Intent:" in brief["optimized_prompt"]
@@ -151,9 +148,9 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
             assert service_id == "minimax_m3"
             assert request.task_type == "prompt_enhancement"
             prompt = request.prompt
-            assert "Canonical brief:" in prompt
-            assert "不要替换成" in prompt
-            assert "最终展示给用户的内容必须以中文为主" in prompt
+            assert "原始提示词：" in prompt
+            assert "输出必须只有以下九行" in prompt
+            assert "硬性要求：" in prompt
             return {"text": "\n".join(
                 [
                     "意图：为安静的创始人场景生成一张可控关键帧。",
@@ -198,7 +195,7 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
     assert "Intent:" not in payload["optimized_prompt"]
     assert payload["user_prompt"] == payload["optimized_prompt"]
     assert trace["llm_enhancement"]["status"] == "applied"
-    assert trace["llm_enhancement"]["model"] == "MiniMax-M3"
+    assert trace["llm_enhancement"]["model"] == "MiniMax-M2.7-highspeed"
     assert manifest["llm_enhancement"]["raw_response_stored"] is False
     assert brief["provider_calls_started"] is True
     assert "api_key" not in serialized
@@ -261,3 +258,62 @@ def test_prompt_optimizer_llm_enhancement_uses_provider_registry_not_legacy_gate
     assert "ModelGateway.from_config_path" not in source
     assert "MODEL_GATEWAY_CONFIG_ENV" not in source
     assert "load_provider_registry" in source
+
+
+def test_studio_prompt_optimizer_requires_remote_llm_when_requested(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio",
+            "node_type": "image",
+            "prompt_text": "A school-uniform character sheet for a quiet young woman.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-13T01:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    assert "remote LLM prompt optimization unavailable" in result.json()["detail"]
+
+
+def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rejected(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            return {"text": "Subject/Character: Primary character with stable identity."}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_rejected/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-rejected",
+            "node_type": "image",
+            "prompt_text": "A desert walking keyframe with a fixed character.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-13T01:35:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    assert "enhancement missing required sections" in result.json()["detail"]

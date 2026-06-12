@@ -1,4 +1,4 @@
-import { buildOptimizationRequest, normalizeOptimization, buildLocalOptimization } from "./optimizer-contract.js";
+import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
 import { showPopover, el } from "./overlay.js";
 import { icon } from "./icons.js";
 import { connect } from "./nodes.js";
@@ -42,14 +42,15 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     try {
       const result = await runtime.optimizePrompt(request);
       outcome = normalizeOptimization(result, request);
-    } catch {
-      outcome = buildLocalOptimization(request);
+    } catch (error) {
+      renderError(error, request);
+      return;
     }
     renderResult(outcome, request);
   }
 
   function renderResult(outcome, request) {
-    stateLabel.textContent = outcome.source === "runtime" ? "已优化" : "本地优化";
+    stateLabel.textContent = "已优化";
     body.replaceChildren();
 
     body.appendChild(sourceChips(request));
@@ -77,14 +78,19 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     actions.replaceChildren();
     const replaceBtn = el("button", "opt-btn primary", "替换");
     replaceBtn.addEventListener("click", () => {
-      applyPrompt(outcome.optimized);
+      applyPrompt(outcome.optimized, outcome.plain || outcome.optimized);
       stateLabel.textContent = "已替换";
       setTimeout(close, 260);
     });
     const appendBtn = el("button", "opt-btn", "追加");
     appendBtn.addEventListener("click", () => {
-      const current = store.get().nodes[nodeId]?.prompt || "";
-      applyPrompt(current ? `${current}\n${outcome.optimized}` : outcome.optimized);
+      const currentNode = store.get().nodes[nodeId] || {};
+      const current = currentNode.prompt || "";
+      const currentPlain = currentNode.params?.lastOptimizedPromptPlain || stripSectionHeaders(current);
+      applyPrompt(
+        current ? `${current}\n${outcome.optimized}` : outcome.optimized,
+        currentPlain ? `${currentPlain}\n${outcome.plain || stripSectionHeaders(outcome.optimized)}` : (outcome.plain || stripSectionHeaders(outcome.optimized)),
+      );
       stateLabel.textContent = "已追加";
       setTimeout(close, 260);
     });
@@ -100,6 +106,20 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     actions.appendChild(appendBtn);
     actions.appendChild(copyBtn);
     actions.appendChild(el("span", "row-spacer"));
+    actions.appendChild(retryBtn);
+    requestAnimationFrame(() => close.reposition?.());
+  }
+
+  function renderError(error, request) {
+    stateLabel.textContent = "优化失败";
+    body.replaceChildren();
+    body.appendChild(sourceChips(request));
+    const result = el("div", "opt-result");
+    result.textContent = `优化失败：${safeError(error)}`;
+    body.appendChild(result);
+    actions.replaceChildren();
+    const retryBtn = el("button", "opt-btn primary", "重试");
+    retryBtn.addEventListener("click", run);
     actions.appendChild(retryBtn);
     requestAnimationFrame(() => close.reposition?.());
   }
@@ -133,7 +153,7 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
       chips.appendChild(el("span", `opt-source-chip${item.connected ? " linked" : " unlinked"}`, `${item.label || item.asset_id} · ${suffix}`));
     }
     for (const item of available.filter((asset) => !asset.injected).slice(0, 6)) {
-      chips.appendChild(el("span", "opt-source-chip muted", `${item.label || item.asset_id} · 项目内可用`));
+      chips.appendChild(el("span", "opt-source-chip muted", `${item.label || item.asset_id} · 未引用 · 可连线`));
     }
     wrap.append(title, chips);
     renderConnectionWarnings(wrap, warnings);
@@ -202,10 +222,13 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     stateLabel.textContent = "本次生成已解除锁定";
   }
 
-  function applyPrompt(text) {
+  function applyPrompt(text, plainText) {
     store.set((s) => {
       const node = s.nodes[nodeId];
-      if (node) node.prompt = text;
+      if (node) {
+        node.prompt = text;
+        node.params.lastOptimizedPromptPlain = plainText || stripSectionHeaders(text);
+      }
     });
     if (textarea) textarea.value = text;
   }
@@ -223,4 +246,17 @@ function hasVisualAsset(node, assetId) {
     ...(Array.isArray(node?.params?.visual_asset_ids) ? node.params.visual_asset_ids : []),
   ];
   return values.some((item) => String(item?.asset_id || item?.assetId || item || "") === String(assetId || ""));
+}
+
+function stripSectionHeaders(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*(意图|人物|人物\/主体|主体|场景|场景\/美术|镜头|镜头\/构图|灯光|运动|运动\/时间推进|连续性|负面|负面约束)\s*[：:]\s*/, "").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function safeError(error) {
+  const message = error instanceof Error ? error.message : String(error || "unknown error");
+  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
 }

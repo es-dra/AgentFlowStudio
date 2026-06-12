@@ -4,6 +4,7 @@ from typing import Any
 
 from apps.api.runtime_director_compiler import compile_director_setup
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_prompt_text import plain_prompt_from_sections
 
 
 USER_SECTION_ORDER = ["人物", "场景", "镜头", "灯光", "运动", "负面约束"]
@@ -34,7 +35,11 @@ def build_user_prompt(request: PromptOptimizationRequest, slots: dict[str, str])
     }
     user_sections = [{"title": title, "text": sections[title]} for title in USER_SECTION_ORDER]
     user_prompt = "\n".join(f"{item['title']}：{item['text']}" for item in user_sections)
-    return {"user_prompt": user_prompt, "user_prompt_sections": user_sections}
+    return {
+        "user_prompt": user_prompt,
+        "user_prompt_plain": plain_prompt_from_sections(user_sections),
+        "user_prompt_sections": user_sections,
+    }
 
 
 def _compiled_director_user_prompt(request: PromptOptimizationRequest) -> dict[str, Any]:
@@ -52,6 +57,7 @@ def _compiled_director_user_prompt(request: PromptOptimizationRequest) -> dict[s
     user_prompt = "\n".join(f"{item['title']}：{item['text']}" for item in user_sections)
     return {
         "user_prompt": user_prompt,
+        "user_prompt_plain": plain_prompt_from_sections(user_sections),
         "user_prompt_sections": user_sections,
         "director_compile_result": compiled,
     }

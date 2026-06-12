@@ -124,14 +124,18 @@ function readFileAsBase64(file) {
   });
 }
 
-// 发送（Ctrl+Enter / 发送按钮）：图片节点可走远程 keyframe，其他节点保持本地安全预览。
+// 发送（Ctrl+Enter / 发送按钮）：当前 MVP 只允许图片节点触发真实 keyframe。
 export async function startNodeGeneration(store, runtime, node, resultText) {
   const fresh = store.get().nodes[node.id] || node;
   if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
     await startRemoteKeyframeGeneration(store, runtime, fresh);
     return;
   }
-  startLocalPreview(store, fresh, resultText);
+  setNodeError(
+    store,
+    fresh.id,
+    resultText || "当前版本仅图片节点支持真实生成；视频、音频、脚本和合成通道仍在开发中。",
+  );
 }
 
 async function startRemoteKeyframeGeneration(store, runtime, node) {
@@ -158,6 +162,7 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
         n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
       }
       n.params.lastContextBundle = response?.context_bundle || null;
+      reconcileVisualAssetBadges(n, response?.context_bundle || null);
       // “本次解除”语义:锁定解除只随单次请求生效,请求发出后即清空,避免静默延续到下一次生成。
       n.params.temporaryLockOverrides = [];
       n.result = keyframeResultText(response, request, succeeded);
@@ -183,7 +188,12 @@ function keyframeResultText(response, request, succeeded) {
   const outputCount = response?.safe_manifest?.output_count ?? 0;
   if (!succeeded) {
     const blocker = response?.safe_manifest?.blocks?.[0]?.reason || "remote image provider is not ready";
-    return `MiniMax 关键帧生成被阻止\nGate: ${gate}\n原因: ${blocker}`;
+    return [
+      "生成未开始，当前图像 provider gate 未开启或 provider 不可用。",
+      `Gate: ${gate}`,
+      `原因: ${blocker}`,
+      "处理：确认本机已设置 AFS_ALLOW_REMOTE_IMAGE=true，并重启 Runtime Service 后重试。",
+    ].join("\n");
   }
   return [
     "MiniMax 关键帧已生成",
@@ -209,27 +219,6 @@ function setNodeError(store, nodeId, message) {
   });
 }
 
-export function startLocalPreview(store, node, resultText) {
-  store.set((s) => {
-    const n = s.nodes[node.id];
-    if (!n) return;
-    n.status = "generating";
-  });
-  setTimeout(() => {
-    store.set((s) => {
-      const n = s.nodes[node.id];
-      if (!n) return;
-      n.status = "complete";
-      n.result = resultText || buildPreviewResult(n);
-      const asset = visibleAssetForNode(store, n);
-      s.assets.unshift({
-        ...asset,
-        created_at: new Date().toISOString(),
-      });
-    });
-  }, 1200);
-}
-
 export function visibleAssetForNode(store, node) {
   const kind = assetKind(node.type);
   return {
@@ -243,17 +232,27 @@ export function visibleAssetForNode(store, node) {
   };
 }
 
-function buildPreviewResult(node) {
-  const prompt = (node.prompt || "").trim();
-  const head = {
-    text: "文本结果（本地预览）",
-    image: "图片结果占位（本地预览）",
-    video: "视频结果占位（本地预览）",
-    audio: "音频结果占位（本地预览）",
-    script: "分镜脚本占位（本地预览）",
-    video_merge: "合成结果占位（本地预览）",
-  }[node.type] || "结果占位（本地预览）";
-  return `${head}\n${prompt ? `提示词：${prompt}` : "（未输入提示词）"}`;
+function reconcileVisualAssetBadges(node, bundle) {
+  const current = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+  if (!current.length || !bundle) return;
+  const included = new Set((bundle.included_assets || []).map((item) => String(item.asset_id || "")));
+  const excluded = new Map((bundle.excluded_assets || []).map((item) => [String(item.asset_id || ""), item]));
+  node.params.visualAssets = current.map((asset) => {
+    const assetId = String(asset?.asset_id || asset?.assetId || asset || "");
+    if (included.has(assetId)) return { ...asset, runtime_status: "included", disabled_reason: "" };
+    const miss = excluded.get(assetId);
+    if (!miss) return asset;
+    if (["retired_or_missing_visual_asset", "superseded_by_newer_label_version"].includes(miss.reason)) {
+      return {
+        ...asset,
+        status: asset.status || "fixed",
+        runtime_status: "excluded",
+        disabled_reason: "已失效，本次未携带",
+        excluded_reason: miss.reason,
+      };
+    }
+    return asset;
+  });
 }
 
 function assetKind(type) {
@@ -284,7 +283,7 @@ function assetTitle(node) {
 function assetSummary(node) {
   if (node.type === "director" && node.params?.directorSummary) return node.params.directorSummary;
   const prompt = (node.prompt || node.result || node.content || "").replace(/\s+/g, " ").trim();
-  return prompt.slice(0, 90) || "本地预览生成的安全摘要，可作为后续节点参考。";
+  return prompt.slice(0, 90) || "生成后的安全摘要会在这里显示。";
 }
 
 function thumbnailForKind(kind) {

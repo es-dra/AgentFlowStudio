@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -9,12 +8,13 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_provider_script import REMOTE_LLM_ENV
+from apps.api.runtime_prompt_text import plain_prompt_from_sections, strip_user_prompt_section_headers
 from apps.api.runtime_store import reject_unsafe_text
 
 
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 MINIMAX_TEXT_PROVIDER = "minimax_m3"
-MINIMAX_TEXT_MODEL = "MiniMax-M3"
+MINIMAX_TEXT_MODEL = "MiniMax-M2.7-highspeed"
 MINIMAX_MODEL_IDS = {
     "minimax-m3",
     "minimax_m3",
@@ -32,13 +32,25 @@ REQUIRED_SECTION_LABELS = (
     "灯光",
     "负面约束",
 )
+SECTION_ORDER = (
+    "意图",
+    "人物/主体",
+    "场景/美术",
+    "动作/情节",
+    "镜头/构图",
+    "灯光",
+    "运动/时间推进",
+    "连续性",
+    "负面约束",
+)
 BANNED_GENERIC_PHRASES = (
     "primary character",
     "primary scene",
     "stable identity",
     "user original prompt unclear",
-    "原始提示词含义仍不明确",
     "用户原始提示词含义仍不明确",
+    "主体角色",
+    "主要场景",
 )
 
 
@@ -47,7 +59,6 @@ def maybe_enhance_prompt_with_llm(
     assembly: dict[str, Any],
 ) -> dict[str, Any]:
     requested = minimax_text_requested(request)
-    gate = llm_provider_gate()
     base = {
         "requested": requested,
         "provider": MINIMAX_TEXT_PROVIDER if requested else "not_requested",
@@ -58,7 +69,7 @@ def maybe_enhance_prompt_with_llm(
     }
     if not requested:
         return base
-    if gate["status"] == "blocked":
+    if llm_provider_gate()["status"] == "blocked":
         return {**base, "status": "blocked", "discard_reason": "remote_llm_gate_closed"}
 
     try:
@@ -75,6 +86,7 @@ def maybe_enhance_prompt_with_llm(
         enhanced = str(result.get("text") or "")
     except ModelGatewayError as exc:
         return {**base, "status": "discarded", "discard_reason": _safe_reason(str(exc))}
+
     try:
         prompt = sanitize_enhanced_prompt(enhanced)
     except ValueError as exc:
@@ -86,6 +98,7 @@ def maybe_enhance_prompt_with_llm(
             "discard_reason": _safe_reason(str(exc)),
             "optimized_prompt": fallback,
             "user_prompt": fallback,
+            "user_prompt_plain": strip_user_prompt_section_headers(fallback),
             "user_prompt_sections": _sections_from_canonical(fallback),
         }
 
@@ -96,6 +109,7 @@ def maybe_enhance_prompt_with_llm(
         "provider_calls_started": True,
         "optimized_prompt": prompt,
         "user_prompt": prompt,
+        "user_prompt_plain": plain_prompt_from_sections(sections) or strip_user_prompt_section_headers(prompt),
         "user_prompt_sections": sections,
     }
 
@@ -116,14 +130,14 @@ def sanitize_enhanced_prompt(value: str) -> str:
     text = _strip_code_fence(value).strip()
     if not text:
         raise ValueError("empty enhancement")
-    if "<think" in text.lower() or "reasoning_content" in text.lower():
+    lowered = text.lower()
+    if "<think" in lowered or "reasoning_content" in lowered or "\nthinking:" in lowered:
         raise ValueError("reasoning content is not allowed")
     if len(text) > 5000:
         raise ValueError("enhancement too long")
     missing = [label for label in REQUIRED_SECTION_LABELS if not _has_section(text, label)]
     if missing:
         raise ValueError("enhancement missing required sections")
-    lowered = text.lower()
     if any(phrase in lowered for phrase in BANNED_GENERIC_PHRASES):
         raise ValueError("enhancement includes generic placeholder")
     reject_unsafe_text(text)
@@ -139,36 +153,113 @@ def deterministic_chinese_fallback_prompt(
     subject = _slot(slots, "subject") or _compact(request.prompt_text)
     scene = _slot(slots, "scene") or _compact(request.prompt_text)
     action = _slot(slots, "action") or _slot(slots, "emotion") or "保留当前提示词中的核心动作和情绪转折。"
-    lighting = _slot(slots, "lighting") or "灯光需要服务叙事情绪，避免无来源的强光和过度风格化。"
+    lighting = _slot(slots, "lighting") or "灯光服务叙事情绪，避免无来源强光和过度风格化。"
     style = request.style or _slot(slots, "style") or "cinematic"
     aspect = str(params.get("aspect_ratio") or params.get("spec") or "").strip()
     camera = str(params.get("camera") or "").strip()
     framing_bits = [bit for bit in (camera, f"画幅/规格：{aspect}" if aspect else "") if bit]
-    framing = "；".join(framing_bits) or "镜头构图要明确主体位置、景别和背景信息层次。"
+    framing = "；".join(framing_bits) or "明确主体位置、景别和背景信息层次。"
     prompt = "\n".join(
         [
             f"意图：围绕“{_compact(request.prompt_text)}”生成本轮节点可直接使用的创作提示词，先保证意图清晰和可控，再强化画面表现。",
             f"人物/主体：{subject}。保持身份、服装、姿态和情绪连续，不新增原始提示词没有的人物数量或身份。",
-            f"场景/美术：{scene}。空间、道具和环境细节必须服务当前画面，不让背景抢走主体。",
+            f"场景/美术：{scene}。空间、道具和环境细节服务当前画面，不让背景抢走主体。",
             f"动作/情节：{action}",
             f"镜头/构图：{framing}",
             f"灯光：{lighting}",
             f"运动/时间推进：当前目标是 {request.generation_target}；关键帧优先保持单帧可读，视频节点再强调运动方向和节奏。",
-            f"连续性：保留本轮提示词中的具体中文细节，并与项目人物、场景和风格资产保持一致；用户偏好只能作为低权重风格倾向。当前风格：{style}。",
-            "负面约束：不要水印、文字乱码、过度磨皮、五官或手部畸形、身份漂移、镜头语言互相冲突；不要暴露 provider、路径、token 或内部工程信息。",
+            f"连续性：保留本轮提示词中的具体细节，并与项目人物、场景和风格资产保持一致；用户偏好只作为低权重风格倾向。当前风格：{style}。",
+            "负面约束：不要水印、文字乱码、过度磨皮、五官或手部畸形、身份漂移、镜头语言互相冲突。",
         ]
     )
     reject_unsafe_text(prompt)
     return prompt
 
 
+def _enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, Any]) -> str:
+    if request.node_type in {"text", "script"}:
+        return _text_enhancement_instruction(request)
+    return _visual_enhancement_instruction(request)
+
+
+def _visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+    parts = [
+        f"意图：围绕“{request.prompt_text}”完成本次生成。",
+        "人物/主体：保留原始提示词中的主体；若写到“这个人物”，必须理解为参考图中的同一个人物。",
+        "场景/美术：保持参考图或原提示中的场景信息；未指定时不要新增具体地点。",
+        f"动作/情节：只执行“{request.prompt_text}”这一项变化，不扩写新剧情。",
+        "镜头/构图：关键帧清晰呈现主体变化，构图稳定，主体可辨识。",
+        "灯光：保持自然可读的光线，不改变参考图的主要光感。",
+        "运动/时间推进：单帧关键画面，不制造多阶段动作。",
+        "连续性：保持参考图人物身份、脸部辨识度、服装、体型比例和整体风格；只改变用户明确要求改变的部分。",
+        "负面约束：不要水印、文字乱码、五官畸形、身份漂移、服装漂移、背景大幅变化。",
+    ]
+    return "\n".join(
+        [
+            f"原始提示词：{request.prompt_text}",
+            "硬性要求：只优化提示词，不解释、不输出思考过程、不添加标题；保留用户明确要求，尤其是图生图时只改用户点名的部分。",
+            "输出必须只有以下九行，标签不可改名：意图、人物/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
+            " ".join(parts),
+        ]
+    )
+
+
+def _text_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+    parts = [
+        f"意图：围绕“{request.prompt_text}”形成清晰、可继续扩写的创作方向。",
+        f"人物/主体：以“{request.prompt_text}”中的主体为核心，不新增无关主角。",
+        "场景/美术：保留原始提示词中的场景信息；未指定时只补充服务主题的环境氛围。",
+        f"动作/情节：围绕“{request.prompt_text}”展开一个单一、明确的情境，不扩写成完整长故事。",
+        "镜头/构图：用画面化语言说明主体位置、视角和信息层次。",
+        "灯光：根据情绪选择自然、可读的光线描述。",
+        "运动/时间推进：保持节奏克制，说明当前瞬间或短段落的时间感。",
+        "连续性：保留原始提示词的主题、主体和情绪，不漂移到无关题材。",
+        "负面约束：不要模板化空话、不要新增无关角色、不要过度解释、不要水印或乱码。",
+    ]
+    return "\n".join(
+        [
+            f"原始提示词：{request.prompt_text}",
+            "硬性要求：只优化提示词，不解释、不输出思考过程、不添加标题；保持主题清楚、可生成、可继续扩写。",
+            "输出必须只有以下九行，标签不可改名：意图、人物/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
+            " ".join(parts),
+        ]
+    )
+
+
+def _sections_from_canonical(prompt: str) -> list[dict[str, str]]:
+    sections: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for raw_line in prompt.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        matched = _section_label(line)
+        if matched:
+            text = line[len(matched):].lstrip("：: ").strip()
+            current = {"title": matched, "text": text}
+            sections.append(current)
+            continue
+        if current:
+            current["text"] = f"{current['text']} {line}".strip()
+    return sections
+
+
+def _section_label(line: str) -> str:
+    for label in SECTION_ORDER:
+        if line.startswith(f"{label}：") or line.startswith(f"{label}:"):
+            return label
+    return ""
+
+
+def _has_section(text: str, label: str) -> bool:
+    return any(line.strip().startswith(f"{label}：") or line.strip().startswith(f"{label}:") for line in text.splitlines())
+
+
 def _slot(slots: Any, key: str) -> str:
     if not isinstance(slots, dict):
         return ""
     value = slots.get(key)
-    if value is None:
-        return ""
-    return _compact(str(value))
+    return _compact(str(value)) if value is not None else ""
 
 
 def _compact(value: str, limit: int = 120) -> str:
@@ -182,61 +273,6 @@ def _provider_name(request: PromptOptimizationRequest) -> str:
     params = request.node_parameters or {}
     value = str(params.get("llm_provider") or "").strip()
     return value or MINIMAX_TEXT_PROVIDER
-
-
-def _enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, Any]) -> str:
-    return "\n".join(
-        [
-            "你是 AFS 创作意图控制智能体的中文提示词编辑器。",
-            "请把 canonical brief 改写成适合节点输入框展示和继续生成的中文创作提示词。",
-            "必须保留硬约束、人物身份、场景连续性、镜头意图、灯光意图和负面约束。",
-            "必须保留用户原始提示词里的具体细节；不要替换成“主体角色”“主要场景”“稳定身份”等模板化占位词。",
-            "当前节点原始提示词和 node parameters 是本轮最高优先级；如果 canonical brief 或历史上下文与原始提示词冲突，必须以原始提示词为准。",
-            "禁止新增原始提示词没有的人物数量、职业、地点、道具和剧情事实。",
-            "最终展示给用户的内容必须以中文为主；只有模型专用术语或镜头术语确实更清楚时才可夹少量英文。",
-            "每个段落都要针对本次请求写具体内容，避免可复用模板腔。",
-            "不要输出推理过程、chain-of-thought、工具日志、provider 元数据、路径、URL、token 或实现说明。",
-            "只返回以下中文段落，顺序固定，标签也必须使用中文：",
-            "意图：",
-            "人物/主体：",
-            "场景/美术：",
-            "动作/情节：",
-            "镜头/构图：",
-            "灯光：",
-            "运动/时间推进：",
-            "连续性：",
-            "负面约束：",
-            "",
-            f"Node type: {request.node_type}",
-            f"Generation target: {request.generation_target}",
-            f"Target platform: {request.target_platform}",
-            f"Original user prompt: {request.prompt_text}",
-            "",
-            "Canonical brief:",
-            str(assembly["optimized_prompt"]),
-            "",
-            "再次确认：请以 Original user prompt 为准，只输出上面列出的中文段落。",
-        ]
-    )
-
-
-def _sections_from_canonical(prompt: str) -> list[dict[str, str]]:
-    pattern = re.compile(r"^([^:\n：]{2,64})[:：]\s*(.*)$")
-    sections: list[dict[str, str]] = []
-    current: dict[str, str] | None = None
-    for line in prompt.splitlines():
-        match = pattern.match(line.strip())
-        if match:
-            current = {"title": match.group(1).strip(), "text": match.group(2).strip()}
-            sections.append(current)
-            continue
-        if current and line.strip():
-            current["text"] = f"{current['text']} {line.strip()}".strip()
-    return sections
-
-
-def _has_section(text: str, label: str) -> bool:
-    return re.search(rf"^{re.escape(label)}\s*[:：]", text, flags=re.MULTILINE) is not None
 
 
 def _strip_code_fence(value: str) -> str:

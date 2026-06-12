@@ -6,6 +6,8 @@
   background: rgba(35, 37, 41, 0.72);
 }
 .asset-card:hover { border-color: var(--border-card); background: rgba(38, 41, 46, 0.9); }
+.asset-card.retired { opacity: 0.55; }
+.asset-card.retired .asset-kind { color: var(--text-faint); }
 
 .asset-thumb {
   width: 100%;
@@ -28,7 +30,7 @@
     var(--bg-card-soft);
 }
 
-.asset-meta { padding: 8px 2px 2px; }
+.asset-meta { padding: 8px 2px 2px; cursor: pointer; }
 .asset-title { color: var(--text-primary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-kind { color: var(--accent); font-size: 11px; margin-top: 2px; }
 .asset-summary {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 import pytest
 
@@ -120,6 +121,51 @@ def test_provider_registry_dispatches_openai_compatible_llm(tmp_path, monkeypatc
     assert captured["api_key"] == "secret-value"
 
 
+def test_provider_registry_dispatches_minimax_cli_llm_from_token_plan(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "content": [
+                        {"type": "thinking", "thinking": "internal chain"},
+                        {"type": "text", "text": "enhanced by minimax cli"},
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.shutil.which", lambda value: value)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    store = _store(tmp_path, _provider_gateway_config())
+    registry = ProviderRegistry.from_store(store)
+
+    result = registry.dispatch(
+        "llm",
+        "minimax_m3",
+        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
+    )
+
+    assert result["text"] == "enhanced by minimax cli"
+    assert result["provider_calls_started"] is True
+    args = list(captured["args"])
+    assert args[:3] == ["mmx", "text", "chat"]
+    assert "--message" in args
+    assert args[args.index("--message") + 1] == "Improve this prompt"
+    assert "--output" in args
+    assert args[args.index("--output") + 1] == "json"
+    assert "--non-interactive" in args
+    assert "secret" not in json.dumps(captured, ensure_ascii=False).lower()
+
+
 def test_provider_registry_blocks_llm_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
     called = {"count": 0}
 
@@ -189,6 +235,13 @@ def _provider_gateway_config() -> dict:
                 "base_url": "https://video.example.test",
                 "default_models": {"video": "fake-video"},
             },
+            "minimax_cli_account": {
+                "auth_type": "token_plan",
+                "execution_backend": "mmx_cli",
+                "cli_command": "mmx",
+                "region": "cn",
+                "default_models": {"llm": "MiniMax-M2.7"},
+            },
         },
         "account_pools": {
             "llm_pool": {
@@ -197,6 +250,20 @@ def _provider_gateway_config() -> dict:
                         "account_id": "openai_account",
                         "service_id": "openai_text",
                         "credential_env": "AFS_TEST_LLM_KEY",
+                        "enabled_capabilities": ["llm"],
+                        "enabled": True,
+                        "priority": 10,
+                        "weight": 1,
+                        "concurrency_limit": 1,
+                        "health_state": "healthy",
+                    }
+                ]
+            },
+            "minimax_llm_pool": {
+                "accounts": [
+                    {
+                        "account_id": "minimax_cli_account",
+                        "service_id": "minimax_m3",
                         "enabled_capabilities": ["llm"],
                         "enabled": True,
                         "priority": 10,
@@ -240,6 +307,29 @@ def _provider_gateway_config() -> dict:
                     "seed_supported": False,
                     "cost_hint": "test-only",
                     "rate_limit_hint": "test-only",
+                    "required_gate": "AFS_ALLOW_REMOTE_LLM",
+                },
+            },
+            "minimax_m3": {
+                "provider": "minimax_cli",
+                "account_ref": "minimax_cli_account",
+                "capability": "llm",
+                "model": "MiniMax-M2.7",
+                "temperature": 0.2,
+                "max_completion_tokens": 900,
+                "required_gate": "AFS_ALLOW_REMOTE_LLM",
+                "descriptor": {
+                    "schema_version": "provider_descriptor.v0.1",
+                    "modality": "llm",
+                    "execution_mode": "sync",
+                    "capabilities": ["llm"],
+                    "account_pool_id": "minimax_llm_pool",
+                    "reference_image_slots": 0,
+                    "supported_aspect_ratios": ["1:1"],
+                    "prompt_char_limit": 5000,
+                    "seed_supported": False,
+                    "cost_hint": "token-plan",
+                    "rate_limit_hint": "local mmx cli",
                     "required_gate": "AFS_ALLOW_REMOTE_LLM",
                 },
             },

@@ -1,13 +1,11 @@
 import { promptPlaceholder } from "./nodes.js";
 import { MODELS_BY_NODE_TYPE, findModel } from "./presets/models.js";
 import {
-  IMAGE_QUALITY, IMAGE_RESOLUTION, IMAGE_RATIOS, IMAGE_COUNTS,
   VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS, VIDEO_COUNTS, VIDEO_MODES,
-  imageSpecLabel, videoSpecLabel,
+  videoSpecLabel,
 } from "./presets/specs.js";
 import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
-import { openCameraPopover } from "./panels/camera-popover.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
 import { startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
@@ -36,7 +34,7 @@ export function renderPromptBar(state, store, runtime) {
       positionBar(bar, state, node);
       return;
     }
-    const next = buildBar(state, store, runtime, node);
+    const next = buildBar(store, runtime, node);
     next.dataset.signature = signature;
     next.dataset.structure = structureSignature(node);
     if (bar) bar.replaceWith(next);
@@ -46,7 +44,7 @@ export function renderPromptBar(state, store, runtime) {
   positionBar(bar, state, node);
 }
 
-function buildBar(state, store, runtime, node) {
+function buildBar(store, runtime, node) {
   const bar = el("div", "prompt-bar");
   bar.dataset.nodeId = node.id;
   const p = node.params;
@@ -59,16 +57,9 @@ function buildBar(state, store, runtime, node) {
       tabs.appendChild(tab);
     }
     bar.appendChild(tabs);
-    // “标记”“角色库”尚未实现,内测版本不展示死按钮。
-    bar.appendChild(buildToolChips(store, runtime, node, [
+    bar.appendChild(buildToolChips(store, node, [
       ["特效", "sparkles", () => openGalleryModal(store, "effects", node.id)],
     ]));
-  }
-
-  if (node.type === "image") {
-    bar.appendChild(buildToolChips(store, runtime, node, [
-      ["风格", "wand", () => openGalleryModal(store, "styles", node.id)],
-    ], p.spec.panorama));
   }
 
   if ((p.attachments || []).length) {
@@ -77,24 +68,28 @@ function buildBar(state, store, runtime, node) {
       const chip = el("button", "attach-chip");
       chip.innerHTML = icon("text", 14);
       chip.title = att.label || att.id;
-      const badge = el("span", "badge", "1");
-      chip.appendChild(badge);
+      chip.appendChild(el("span", "badge", "1"));
       chips.appendChild(chip);
     }
     bar.appendChild(chips);
   }
 
   const textarea = document.createElement("textarea");
-  textarea.placeholder = node.params.spec?.panorama
-    ? "描述你想要的全景画面，例如“生成一张科技展厅的 720° 全景图”，支持上传场景参考图。"
-    : promptPlaceholder(node.type, p.spec?.mode);
+  textarea.placeholder = promptPlaceholder(node.type, p.spec?.mode);
   textarea.value = node.prompt || "";
   textarea.addEventListener("input", () => {
-    updateNode(store, node.id, (n) => { n.prompt = textarea.value; }, { history: false });
+    updateNode(store, node.id, (n) => {
+      n.prompt = textarea.value;
+      delete n.params.lastOptimizedPromptPlain;
+    }, { history: false });
   });
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
+      if (node.type !== "image") {
+        flashTooltip(textarea, "当前版本仅图片节点支持真实生成");
+        return;
+      }
       startNodeGeneration(store, runtime, node);
     }
   });
@@ -108,17 +103,15 @@ function buildBar(state, store, runtime, node) {
     bar.appendChild(expand);
   }
 
-  bar.appendChild(buildBottomRow(state, store, runtime, node, textarea));
+  bar.appendChild(buildBottomRow(store, runtime, node, textarea));
   return bar;
 }
 
-function buildToolChips(store, runtime, node, defs, disabled = false) {
+function buildToolChips(store, node, defs) {
   const wrap = el("div", "tool-chips");
   for (const [label, iconName, onClick] of defs) {
     const chip = el("button", "tool-chip");
     chip.innerHTML = `<span class="tc-icon">${icon(iconName, 14)}</span><span>${label}</span>`;
-    if (disabled) chip.disabled = true;
-    if (label === "风格" && node.params.styleRef) chip.classList.add("active");
     if (label === "特效" && node.params.effect) chip.classList.add("active");
     chip.addEventListener("click", onClick);
     wrap.appendChild(chip);
@@ -126,7 +119,7 @@ function buildToolChips(store, runtime, node, defs, disabled = false) {
   return wrap;
 }
 
-function buildBottomRow(state, store, runtime, node, textarea) {
+function buildBottomRow(store, runtime, node, textarea) {
   const row = el("div", "bar-row");
   const p = node.params;
   const model = findModel(node.type, p.model);
@@ -135,25 +128,6 @@ function buildBottomRow(state, store, runtime, node, textarea) {
   modelBtn.innerHTML = `<span class="sel-icon">${icon("sparkle1", 13)}</span><span>${model.name}</span><span class="caret">▾</span>`;
   modelBtn.addEventListener("click", () => openModelPopover(store, node, modelBtn));
   row.appendChild(modelBtn);
-
-  if (node.type === "image") {
-    const specBtn = el("button", "bar-select");
-    specBtn.innerHTML = `<span class="sel-icon">${icon("frames", 13)}</span><span>${imageSpecLabel(p.spec)}</span><span class="caret">▾</span>`;
-    specBtn.addEventListener("click", () => openImageSpecPopover(store, node, specBtn));
-    row.appendChild(specBtn);
-
-    const camBtn = el("button", `bar-tool${p.camera ? " active" : ""}`);
-    camBtn.innerHTML = `${icon("camera", 14)}<span>摄像机</span>`;
-    camBtn.addEventListener("click", () => openCameraPopover(store, node, camBtn));
-    row.appendChild(camBtn);
-
-    const panoBtn = el("button", `bar-tool${p.spec.panorama ? " active" : ""}`);
-    panoBtn.innerHTML = `${icon("globe", 14)}<span>全景</span>`;
-    panoBtn.addEventListener("click", () => updateNode(store, node.id, (n) => {
-      n.params.spec.panorama = !n.params.spec.panorama;
-    }));
-    row.appendChild(panoBtn);
-  }
 
   if (node.type === "video" || node.type === "video_merge") {
     const specBtn = el("button", "bar-select");
@@ -169,7 +143,6 @@ function buildBottomRow(state, store, runtime, node, textarea) {
 
   row.appendChild(el("span", "row-spacer"));
 
-  // —— 唯一增量：优化提示词 ——
   const optimizeBtn = el("button", "bar-tool optimize-btn");
   optimizeBtn.dataset.action = "optimize-prompt";
   optimizeBtn.innerHTML = `${icon("sparkles", 14)}<span>优化</span>`;
@@ -183,15 +156,13 @@ function buildBottomRow(state, store, runtime, node, textarea) {
   });
   row.appendChild(optimizeBtn);
 
-  const counts = node.type === "image" ? IMAGE_COUNTS : (node.type === "video" ? VIDEO_COUNTS : null);
-  if (counts) {
-    const unit = node.type === "image" ? "张" : "个";
+  if (node.type === "video") {
     const countBtn = el("button", "bar-select");
-    countBtn.innerHTML = `<span>${p.spec.count}${unit}</span><span class="caret">▾</span>`;
+    countBtn.innerHTML = `<span>${p.spec.count}个</span><span class="caret">▾</span>`;
     countBtn.addEventListener("click", () => {
       const pop = el("div");
-      for (const c of counts) {
-        const item = el("button", `menu-item${p.spec.count === c ? " selected" : ""}`, `${c}${unit}`);
+      for (const c of VIDEO_COUNTS) {
+        const item = el("button", `menu-item${p.spec.count === c ? " selected" : ""}`, `${c}个`);
         item.addEventListener("click", () => {
           updateNode(store, node.id, (n) => { n.params.spec.count = c; });
           close();
@@ -203,15 +174,10 @@ function buildBottomRow(state, store, runtime, node, textarea) {
     row.appendChild(countBtn);
   }
 
-  const model2 = findModel(node.type, p.model);
-  const baseCost = model2.cost * (p.spec?.count || 1);
-  const cost = el("span", "bar-cost");
-  cost.innerHTML = `<span class="bolt">${icon("bolt", 12)}</span><span>${baseCost}</span>`;
-  row.appendChild(cost);
-
   const send = el("button", "send-btn");
   send.innerHTML = icon("arrowUp", 15);
-  send.title = "生成";
+  send.title = node.type === "image" ? "生成" : "视频/音频通道开发中，当前版本仅图片节点支持真实生成";
+  send.disabled = node.type !== "image";
   send.addEventListener("click", () => startNodeGeneration(store, runtime, node));
   row.appendChild(send);
 
@@ -232,17 +198,6 @@ function openModelPopover(store, node, anchor) {
     pop.appendChild(item);
   }
   const close = showPopover(anchor, pop, { place: "top" });
-}
-
-function openImageSpecPopover(store, node, anchor) {
-  const pop = el("div", "spec-pop");
-  pop.appendChild(specSection("画质", IMAGE_QUALITY, node.params.spec.quality, (v) =>
-    updateNode(store, node.id, (n) => { n.params.spec.quality = v; })));
-  pop.appendChild(specSection("清晰度", IMAGE_RESOLUTION, node.params.spec.resolution, (v) =>
-    updateNode(store, node.id, (n) => { n.params.spec.resolution = v; })));
-  pop.appendChild(specSection("比例", IMAGE_RATIOS, node.params.spec.ratio, (v) =>
-    updateNode(store, node.id, (n) => { n.params.spec.ratio = v; }), true));
-  showPopover(anchor, pop, { place: "top" });
 }
 
 function openVideoSpecPopover(store, node, anchor) {

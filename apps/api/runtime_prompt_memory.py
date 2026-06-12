@@ -22,6 +22,7 @@ from apps.api.runtime_prompt_memory_state import (
     public_background_counts,
     write_creative_memory_state,
 )
+from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -36,17 +37,26 @@ def build_prompt_optimization(
     assembly = assemble_prompt_context(request, assembly_state)
     context_bundle = _context_bundle(store, project_id, request)
     llm_enhancement = maybe_enhance_prompt_with_llm(request, assembly)
+    if _remote_optimizer_required(request) and llm_enhancement.get("status") != "applied":
+        reason = str(llm_enhancement.get("discard_reason") or llm_enhancement.get("status") or "not_available")
+        raise ValueError(f"remote LLM prompt optimization unavailable: {reason}")
     rules = assembly["knowledge_rules"]
     background_refs = background_context_refs(state)
     extracted = extract_background_context(project_id, request, assembly["selected_slots"])
     assembled_prompt = str(llm_enhancement.get("optimized_prompt") or assembly["optimized_prompt"])
     user_prompt = str(llm_enhancement.get("user_prompt") or assembly["user_prompt"])
+    user_prompt_plain = str(
+        llm_enhancement.get("user_prompt_plain")
+        or assembly.get("user_prompt_plain")
+        or strip_user_prompt_section_headers(user_prompt)
+    )
     user_prompt_sections = llm_enhancement.get("user_prompt_sections") or assembly["user_prompt_sections"]
     if context_bundle:
         signature_segment = str(context_bundle.get("text_channel", {}).get("asset_signature_segment") or "")
         if signature_segment:
             assembled_prompt = f"{assembled_prompt}\nAsset Signatures:\n{signature_segment}"
-            user_prompt = assembled_prompt
+            user_prompt = f"{user_prompt}\n资产签名：\n{signature_segment}"
+            user_prompt_plain = "\n".join(part for part in (user_prompt_plain, signature_segment) if part)
     brief = _creative_brief(request, project_id, assembled_prompt, llm_enhancement)
     if context_bundle:
         brief["context_bundle"] = context_bundle
@@ -69,6 +79,7 @@ def build_prompt_optimization(
         "original_prompt": request.prompt_text,
         "optimized_prompt": assembled_prompt,
         "user_prompt": user_prompt,
+        "user_prompt_plain": user_prompt_plain,
         "user_prompt_sections": user_prompt_sections,
         "context_bundle": context_bundle,
     }
@@ -89,6 +100,11 @@ def _context_bundle(
         context_subgraph=request.context_subgraph,
         director_setup=request.director_setup,
     )
+
+
+def _remote_optimizer_required(request: PromptOptimizationRequest) -> bool:
+    params = request.node_parameters or {}
+    return bool(params.get("remote_optimizer_required"))
 
 
 def _resolver_safe_state(state: dict[str, Any]) -> dict[str, Any]:

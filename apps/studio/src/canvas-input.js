@@ -3,6 +3,7 @@ import { effectiveHeight, connect, duplicateNode } from "./nodes.js";
 import { getPendingEdgeGroup } from "./canvas-view.js";
 import { openAddNodeMenu, openReferenceMenu } from "./panels/add-node-menu.js";
 import { openNodeMenu } from "./panels/node-menu.js";
+import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
 import { fixNodeVisualAsset, handleNodeIntent, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { hasOpenOverlay } from "./overlay.js";
@@ -53,7 +54,7 @@ export function bindCanvasInput(store, runtime) {
     const nodeEl = e.target.closest(".node");
     if (!nodeEl) return;
     e.preventDefault();
-    openNodeMenu(store, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
+    openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
 
   rootEl.addEventListener("pointerdown", (e) => {
@@ -174,12 +175,13 @@ export function bindCanvasInput(store, runtime) {
     if (!action) return;
     if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
     else if (action === "open-director") openDirectorShell(store, node);
+    else if (action === "asset-detail") openAssetDetailPopover(store, node.params?.visualAssets?.[0], actionEl);
     else if (action === "upload") uploadNodeImage(store, runtime, node);
     else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
     else if (action === "run") startNodeGeneration(store, runtime, node);
     else if (action === "duplicate") duplicateNode(store, nodeId);
     else if (action === "toggle-collapse") store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; });
-    else if (action === "node-menu") openNodeMenu(store, nodeId, actionEl);
+    else if (action === "node-menu") openNodeMenu(store, runtime, nodeId, actionEl);
   });
 }
 

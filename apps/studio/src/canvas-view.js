@@ -58,7 +58,7 @@ function buildNodeElement(node) {
   actions.className = "node-actions";
   actions.dataset.role = "actions";
   actions.innerHTML = [
-    `<button class="na-btn" data-action="fix-visual-asset" title="fix visual asset">${icon("bookmark", 13)}</button>`,
+    `<button class="na-btn" data-action="fix-visual-asset" title="固定为资产">${icon("bookmark", 13)}</button>`,
     `<button class="na-btn" data-action="run" title="生成">${icon("play", 13)}</button>`,
     `<button class="na-btn" data-action="duplicate" title="复制节点">${icon("copy", 13)}</button>`,
     `<button class="na-btn" data-action="toggle-collapse" title="折叠/展开">${icon("chevronUp", 13)}</button>`,
@@ -112,7 +112,11 @@ function syncNodeElement(elNode, node, state, relations) {
 
   const title = elNode.querySelector('[data-role="title"]');
   const refBadge = node.params?.isReference ? `<span class="ref-badge">${icon("bookmark", 11)}参考</span>` : "";
-  const fixedBadge = node.params?.visualAssets?.length ? `<span class="ref-badge">${icon("lock", 11)}fixed</span>` : "";
+  const visualAssets = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+  const hasInvalidAsset = visualAssets.some((asset) => asset?.runtime_status === "excluded" || asset?.status === "retired");
+  const fixedBadge = visualAssets.length
+    ? `<button class="ref-badge asset-badge${hasInvalidAsset ? " invalid" : ""}" data-action="asset-detail" title="${hasInvalidAsset ? "已失效，本次未携带" : "查看固定资产"}">${icon("lock", 11)}${visualAssets.length}资产</button>`
+    : "";
   title.innerHTML = `${icon(def.icon, 13)}<span>${escapeHtml(node.title)}</span>${refBadge}${fixedBadge}`;
 
   const collapseBtn = elNode.querySelector('[data-action="toggle-collapse"]');
@@ -182,7 +186,7 @@ function buildNodeBody(node, def) {
   if (node.status === "complete" && node.result) {
     const ok = document.createElement("div");
     ok.className = "node-status success";
-    ok.innerHTML = `${icon("check", 13)}<span>${node.previewUrl ? "已完成" : "已完成（本地预览）"}</span>`;
+    ok.innerHTML = `${icon("check", 13)}<span>已完成</span>`;
     const bundle = bundleSummary(node);
     if (bundle) out.push(ok, bundle, resultView(node));
     else out.push(ok, resultView(node));

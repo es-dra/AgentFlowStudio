@@ -66,6 +66,26 @@ def _subgraph(target: str, upstream: str, asset_id: str, relation: str = "refere
     }
 
 
+def _chain_subgraph(target: str, asset_id: str, relation: str, depth: int) -> dict:
+    nodes = [{"id": target, "type": "image", "title": "Target", "prompt": "target", "visual_asset_ids": []}]
+    edges = []
+    previous = target
+    for index in range(1, depth + 1):
+        node_id = f"chain-{relation}-{index}"
+        nodes.append(
+            {
+                "id": node_id,
+                "type": "image",
+                "title": f"Chain {index}",
+                "prompt": f"chain prompt {index}",
+                "visual_asset_ids": [asset_id] if index == depth else [],
+            }
+        )
+        edges.append({"id": f"edge-{index}", "from": node_id, "to": previous, "relation_type": relation})
+        previous = node_id
+    return {"target_node_id": target, "runtime_work_mode": "context_generate", "nodes": nodes, "edges": edges}
+
+
 def test_optimize_context_injects_only_connected_or_label_matched_signatures(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_optimize_context"
@@ -383,3 +403,206 @@ def test_lock_conflict_warning_uses_attribute_vocabulary_and_enforcement_is_inde
     assert ("hair_length", "short", "long") in conflict_attrs
     # enforcement is independent of detection: the lock still rides the prompt
     assert "keep black short hair" in plan["provider_prompt"]
+
+
+def test_generate_degrades_assets_over_character_and_scene_limits(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_asset_limit"
+    characters = []
+    for index in range(5):
+        image_id = _upload(client, project_id, f"char-{index}")
+        characters.append(_promote(client, project_id, image_id, f"Character {index}"))
+    scene_a = _promote(client, project_id, _upload(client, project_id, "scene-a"), "Scene A", "scene")
+    scene_b = _promote(client, project_id, _upload(client, project_id, "scene-b"), "Scene B", "scene")
+    graph = {
+        "target_node_id": "target-node",
+        "runtime_work_mode": "context_generate",
+        "nodes": [
+            {"id": "target-node", "type": "image", "title": "Target", "prompt": "target", "visual_asset_ids": []},
+            *[
+                {"id": f"asset-node-{asset['asset_id']}", "type": "image", "title": asset["label"], "prompt": "", "visual_asset_ids": [asset["asset_id"]]}
+                for asset in [*characters, scene_a, scene_b]
+            ],
+        ],
+        "edges": [
+            {"id": f"edge-{asset['asset_id']}", "from": f"asset-node-{asset['asset_id']}", "to": "target-node", "relation_type": "reference"}
+            for asset in [*characters, scene_a, scene_b]
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "group scene",
+            "optimized_prompt": "group scene",
+            "context_subgraph": graph,
+            "generated_at": "2026-06-12T11:30:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    bundle = plan["context_bundle"]
+    full = [asset for asset in bundle["included_assets"] if asset.get("detail_level") == "full_card"]
+    signature_only = [asset for asset in bundle["included_assets"] if asset.get("detail_level") == "signature_only"]
+    degraded = [asset for asset in bundle["excluded_assets"] if asset.get("reason") == "degraded_to_signature_over_limit"]
+
+    assert len([asset for asset in full if asset["asset_type"] == "character"]) == 3
+    assert len([asset for asset in full if asset["asset_type"] == "scene"]) == 1
+    assert len([asset for asset in signature_only if asset["asset_type"] == "character"]) == 2
+    assert len([asset for asset in signature_only if asset["asset_type"] == "scene"]) == 1
+    assert len(degraded) == 3
+    assert bundle["budget"]["overflow_beyond_total"] is False
+
+
+def test_reference_edges_do_not_consume_normal_hop_budget_but_generation_edges_do(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_reference_hops"
+    image_id = _upload(client, project_id, "asset-node")
+    asset = _promote(client, project_id, image_id, "Long Hop Actor")
+
+    reference = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "reference chain",
+            "optimized_prompt": "reference chain",
+            "context_subgraph": _chain_subgraph("target-node", asset["asset_id"], "reference", 4),
+            "generated_at": "2026-06-12T11:40:00+08:00",
+        },
+    )
+    generation = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "generation chain",
+            "optimized_prompt": "generation chain",
+            "context_subgraph": _chain_subgraph("target-node", asset["asset_id"], "generation", 4),
+            "generated_at": "2026-06-12T11:41:00+08:00",
+        },
+    )
+    assert reference.status_code == 200
+    assert generation.status_code == 200
+    ref_plan = client.get(f"/artifacts/{reference.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    gen_plan = client.get(f"/artifacts/{generation.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+
+    assert asset["asset_id"] in {item["asset_id"] for item in ref_plan["context_bundle"]["included_assets"]}
+    assert asset["asset_id"] not in {item["asset_id"] for item in gen_plan["context_bundle"]["included_assets"]}
+
+
+def test_same_label_visual_assets_resolve_to_chain_terminal_or_newest(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_label_arbitration"
+    old = _promote(client, project_id, _upload(client, project_id, "old"), "Lin Wan")
+    new = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json={
+            "source_image_asset_refs": [_upload(client, project_id, "new")],
+            "asset_type": "character",
+            "label": "Lin Wan",
+            "signature": "Lin Wan v2 signature",
+            "feature_card": {"identity": "Lin Wan v2 identity"},
+            "negative_locks": ["keep Lin Wan v2 identity"],
+            "source_node_id": "new-node",
+            "review_decision": "fixed",
+            "reviewed_at": "2026-06-12T11:45:00+08:00",
+            "supersedes_asset_id": old["asset_id"],
+        },
+    ).json()["asset"]
+    graph = {
+        "target_node_id": "target-node",
+        "runtime_work_mode": "context_generate",
+        "nodes": [
+            {"id": "target-node", "type": "image", "title": "Target", "prompt": "target", "visual_asset_ids": []},
+            {"id": "old-node", "type": "image", "title": "Old", "prompt": "", "visual_asset_ids": [old["asset_id"]]},
+            {"id": "new-node", "type": "image", "title": "New", "prompt": "", "visual_asset_ids": [new["asset_id"]]},
+        ],
+        "edges": [
+            {"id": "old-edge", "from": "old-node", "to": "target-node", "relation_type": "reference"},
+            {"id": "new-edge", "from": "new-node", "to": "target-node", "relation_type": "reference"},
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Lin Wan",
+            "optimized_prompt": "Lin Wan",
+            "context_subgraph": graph,
+            "generated_at": "2026-06-12T11:46:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    bundle = plan["context_bundle"]
+
+    assert [item["asset_id"] for item in bundle["included_assets"]] == [new["asset_id"]]
+    assert any(item["asset_id"] == old["asset_id"] and item["reason"] == "superseded_by_newer_label_version" for item in bundle["excluded_assets"])
+
+
+def test_same_label_without_supersedes_uses_newest_server_recorded_asset(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_label_newest"
+    first = _promote(client, project_id, _upload(client, project_id, "first"), "Lin Wan")
+    second = _promote(client, project_id, _upload(client, project_id, "second"), "Lin Wan")
+    graph = {
+        "target_node_id": "target-node",
+        "runtime_work_mode": "context_generate",
+        "nodes": [
+            {"id": "target-node", "type": "image", "title": "Target", "prompt": "target", "visual_asset_ids": []},
+            {"id": "first-node", "type": "image", "title": "First", "prompt": "", "visual_asset_ids": [first["asset_id"]]},
+            {"id": "second-node", "type": "image", "title": "Second", "prompt": "", "visual_asset_ids": [second["asset_id"]]},
+        ],
+        "edges": [
+            {"id": "first-edge", "from": "first-node", "to": "target-node", "relation_type": "reference"},
+            {"id": "second-edge", "from": "second-node", "to": "target-node", "relation_type": "reference"},
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Lin Wan",
+            "optimized_prompt": "Lin Wan",
+            "context_subgraph": graph,
+            "generated_at": "2026-06-12T11:47:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    bundle = plan["context_bundle"]
+
+    assert [item["asset_id"] for item in bundle["included_assets"]] == [second["asset_id"]]
+    assert any(item["asset_id"] == first["asset_id"] and item["reason"] == "superseded_by_newer_label_version" for item in bundle["excluded_assets"])
+
+
+def test_context_bundle_reproducibility_metadata_is_deterministic(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_bundle_metadata"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+
+    first = resolve_context_bundle(
+        RuntimeStore(tmp_path),
+        project_id,
+        mode="generate",
+        visible_prompt="metadata",
+        context_subgraph=ContextSubgraph.model_validate(_subgraph("target-node", "char-node", asset["asset_id"])),
+    )
+    second = resolve_context_bundle(
+        RuntimeStore(tmp_path),
+        project_id,
+        mode="generate",
+        visible_prompt="metadata",
+        context_subgraph=ContextSubgraph.model_validate(_subgraph("target-node", "char-node", asset["asset_id"])),
+    )
+
+    assert first["resolver_version"].startswith("context_resolver_")
+    assert first["vocabulary_hash"] == second["vocabulary_hash"]
+    assert first["included_assets"][0]["feature_card_hash"] == second["included_assets"][0]["feature_card_hash"]

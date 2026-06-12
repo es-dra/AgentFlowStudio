@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     load_provider_registry,
@@ -20,6 +21,7 @@ from apps.api.runtime_keyframe_payloads import (
 )
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_state import load_creative_memory_state
+from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -94,6 +96,7 @@ def build_keyframe_generation(
     status = "blocked"
     blocks = []
     provider_calls_started = False
+    retry_count = 0
     if provider_gate["status"] == "blocked":
         blocks.append(_gate_closed_block(required_gate))
     else:
@@ -102,22 +105,24 @@ def build_keyframe_generation(
                 registry = load_provider_registry()
                 descriptor = registry.descriptor(request.provider_service_id)
             provider_calls_started = True
-            manifest = registry.dispatch(
-                "image",
+            dispatch_request = ProviderDispatchRequest(
+                prompt=provider_prompt,
+                output_dir=output_dir,
+                aspect_ratio=request.aspect_ratio,
+                candidate_count=request.candidate_count,
+                seed=request.seed,
+                reference_image_paths=tuple(item["path"] for item in reference_images),
+                subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
+            )
+            manifest, retry_count = _dispatch_image_provider_with_retry(
+                registry,
                 request.provider_service_id,
-                ProviderDispatchRequest(
-                    prompt=provider_prompt,
-                    output_dir=output_dir,
-                    aspect_ratio=request.aspect_ratio,
-                    candidate_count=request.candidate_count,
-                    seed=request.seed,
-                    reference_image_paths=tuple(item["path"] for item in reference_images),
-                    subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
-                ),
+                dispatch_request,
             )
             status = "succeeded"
             provider_outputs = _provider_outputs(manifest)
         except ModelGatewayError as exc:
+            retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
             blocks.append(
                 {
@@ -147,6 +152,7 @@ def build_keyframe_generation(
         provider_calls_started=provider_calls_started,
         output_count=len(provider_outputs),
         reference_image_count=len(reference_images),
+        retry_count=retry_count,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
     )
@@ -182,7 +188,7 @@ def _context_bundle(
 ) -> dict[str, Any] | None:
     if not request.context_subgraph:
         return None
-    visible_prompt = request.optimized_prompt or request.prompt_text
+    visible_prompt = strip_user_prompt_section_headers(request.optimized_prompt or request.prompt_text)
     return resolve_context_bundle(
         store,
         project_id,
@@ -266,11 +272,55 @@ def _provider_outputs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return outputs
 
 
+def _dispatch_image_provider_with_retry(
+    registry: Any,
+    service_id: str,
+    request: ProviderDispatchRequest,
+) -> tuple[dict[str, Any], int]:
+    try:
+        return registry.dispatch("image", service_id, request), 0
+    except ModelGatewayError as exc:
+        if not _retryable_provider_error(exc):
+            raise
+        time.sleep(2)
+        try:
+            manifest = registry.dispatch("image", service_id, request)
+        except ModelGatewayError as retry_exc:
+            setattr(retry_exc, "retry_count", 1)
+            raise
+        return manifest, 1
+
+
+def _retryable_provider_error(error: ModelGatewayError) -> bool:
+    if isinstance(error, ModelConfigError):
+        return False
+    lowered = str(error).lower()
+    if any(code in lowered for code in (" 400", " 401", " 403", " 404", " 409", " 422", "invalid api key", "invalid parameter")):
+        return False
+    return any(
+        term in lowered
+        for term in (
+            "timeout",
+            "timed out",
+            "connection",
+            "network",
+            "temporarily",
+            "readiness",
+            "not ready",
+            "502",
+            "503",
+            "504",
+        )
+    )
+
+
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:
     lines = [
         (
-            f"Connected reference images: {reference_count}. Preserve the reference identity, hairstyle, "
-            "wardrobe, silhouette, body proportions, and key visual traits."
+            f"Connected reference images: {reference_count}. Use the uploaded reference as the subject source. "
+            "Only apply the user-requested edit; preserve all unspecified details. "
+            "Preserve the reference face, clothing, silhouette, body proportions, color palette, "
+            "camera relationship, and key visual traits."
         )
     ]
     params = request.node_parameters or {}
@@ -303,7 +353,7 @@ def _safe_error(value: str) -> str:
 
 def minimax_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:
     lines = []
-    for raw_line in str(value or "").splitlines():
+    for raw_line in strip_user_prompt_section_headers(str(value or "")).splitlines():
         line = raw_line.strip()
         if not line:
             continue

@@ -2,6 +2,7 @@ import { NODE_TYPES, deleteNodes } from "../nodes.js";
 import { el } from "../overlay.js";
 import { fitViewport } from "../geometry.js";
 import { icon } from "../icons.js";
+import { openAssetDetailPopover } from "./asset-detail-popover.js";
 
 export function renderDrawer(state, store) {
   const drawer = document.getElementById("drawer");
@@ -39,6 +40,10 @@ export function renderDrawer(state, store) {
     search.innerHTML = icon("search", 13);
     const input = document.createElement("input");
     input.placeholder = "请输入搜索内容";
+    input.value = state.ui.drawerSearch || "";
+    input.addEventListener("input", () => {
+      store.set((s) => { s.ui.drawerSearch = input.value; }, { history: false });
+    });
     search.appendChild(input);
     drawer.appendChild(search);
     renderAssets(state, store, body);
@@ -112,27 +117,33 @@ function treeItem(state, store, node) {
 }
 
 function renderAssets(state, store, body) {
-  if (!state.assets.length) {
+  const query = String(state.ui.drawerSearch || "").trim().toLowerCase();
+  const assets = query
+    ? state.assets.filter((asset) => `${asset.title || ""} ${asset.safe_summary || ""} ${asset.asset_id || ""}`.toLowerCase().includes(query))
+    : state.assets;
+  if (!assets.length) {
     const empty = el("div", "drawer-empty");
     empty.innerHTML = `<span class="folder-glyph">${icon("folder", 34)}</span>暂无资产`;
     body.appendChild(empty);
     return;
   }
-  for (const asset of state.assets) {
+  for (const asset of assets) {
     body.appendChild(assetCard(state, store, asset));
   }
 }
 
 function assetCard(state, store, asset) {
-  const card = el("div", "asset-card");
+  const retired = asset.status === "retired" || asset.asset_status === "retired";
+  const card = el("div", `asset-card${retired ? " retired" : ""}`);
   const thumb = el("button", `asset-thumb asset-thumb-${asset.thumbnail_ref || asset.kind || "reference"}`);
   thumb.innerHTML = `<span>${icon(iconForAsset(asset), 18)}</span>`;
-  thumb.title = "从画布定位";
-  thumb.addEventListener("click", () => focusAssetSource(store, asset));
+  thumb.title = "查看资产详情";
+  thumb.addEventListener("click", () => openAssetDetailPopover(store, asset, thumb));
   const meta = el("div", "asset-meta");
   meta.appendChild(el("div", "asset-title", asset.title || "未命名资产"));
-  meta.appendChild(el("div", "asset-kind", kindLabel(asset.kind)));
+  meta.appendChild(el("div", "asset-kind", `${kindLabel(asset.kind)}${retired ? " · 已退役" : ""}`));
   meta.appendChild(el("div", "asset-summary", asset.safe_summary || "安全摘要将在生成后出现。"));
+  meta.addEventListener("click", () => openAssetDetailPopover(store, asset, meta));
   const actions = el("div", "asset-actions");
   actions.appendChild(assetAction("设为参考", () => markAssetReference(store, asset)));
   actions.appendChild(assetAction("用于当前节点", () => attachAssetToSelection(state, store, asset)));

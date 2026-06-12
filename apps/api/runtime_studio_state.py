@@ -29,6 +29,25 @@ FORBIDDEN_STUDIO_KEYS = {
     "hidden_memory",
 }
 LOCAL_PATH_PATTERN = re.compile(r"([a-zA-Z]:\\|/Users/|/home/|data/processed/runs)")
+SAFE_NODE_PARAM_KEYS = (
+    "model",
+    "spec",
+    "camera",
+    "motion",
+    "styleRef",
+    "attachments",
+    "directorSetup",
+    "isReference",
+    "intent",
+    "uploads",
+    "previewAspectRatio",
+    "visualAssets",
+    "visual_asset_ids",
+)
+PRUNED_RUNTIME_PARAM_KEYS = {
+    "lastContextBundle",
+    "temporaryLockOverrides",
+}
 
 
 class StudioStateRequest(BaseModel):
@@ -71,8 +90,8 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
 def sanitize_studio_state(value: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("studio state must be an object")
-    _reject_forbidden(value)
-    return {
+    _reject_forbidden_known_surfaces(value)
+    sanitized = {
         "meta": _meta(value.get("meta")),
         "viewport": _viewport(value.get("viewport")),
         "nodes": _nodes(value.get("nodes")),
@@ -80,6 +99,8 @@ def sanitize_studio_state(value: dict[str, Any]) -> dict[str, Any]:
         "order": _order(value.get("order"), value.get("nodes")),
         "assets": _assets(value.get("assets")),
     }
+    _reject_forbidden(sanitized)
+    return sanitized
 
 
 def _state_path(store: RuntimeStore, project_id: str):
@@ -115,19 +136,7 @@ def _nodes(value: Any) -> dict[str, Any]:
         params = node.get("params") if isinstance(node.get("params"), dict) else {}
         safe_params = {
             key: params[key]
-            for key in (
-                "model",
-                "spec",
-                "camera",
-                "motion",
-                "styleRef",
-                "attachments",
-                "directorSetup",
-                "isReference",
-                "intent",
-                "uploads",
-                "previewAspectRatio",
-            )
+            for key in SAFE_NODE_PARAM_KEYS
             if key in params
         }
         result[node_id] = {
@@ -203,6 +212,32 @@ def _reject_forbidden(value: Any) -> None:
             raise ValueError(f"studio state contains forbidden field: {key}")
     if LOCAL_PATH_PATTERN.search(serialized):
         raise ValueError("studio state contains local path or runtime artifact path")
+
+
+def _reject_forbidden_known_surfaces(value: dict[str, Any]) -> None:
+    nodes = value.get("nodes")
+    if isinstance(nodes, dict):
+        for node in nodes.values():
+            if not isinstance(node, dict):
+                continue
+            node_shallow = {key: item for key, item in node.items() if key != "params"}
+            _reject_forbidden(node_shallow)
+            params = node.get("params")
+            if not isinstance(params, dict):
+                continue
+            for key, item in params.items():
+                if key in PRUNED_RUNTIME_PARAM_KEYS:
+                    continue
+                lowered = str(key).lower()
+                if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
+                    raise ValueError(f"studio state contains forbidden field: {key}")
+                if key in SAFE_NODE_PARAM_KEYS:
+                    _reject_forbidden(item)
+    assets = value.get("assets")
+    if isinstance(assets, list):
+        for item in assets:
+            if isinstance(item, dict):
+                _reject_forbidden(item)
 
 
 def _text(value: Any, fallback: str, max_length: int) -> str:

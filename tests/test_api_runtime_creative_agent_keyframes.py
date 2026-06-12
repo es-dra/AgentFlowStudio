@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_keyframes import DEFAULT_IMAGE_PROMPT_LIMIT, minimax_keyframe_prompt
 from apps.api.runtime_service import create_runtime_app
@@ -129,6 +130,41 @@ def test_keyframe_generation_gate_closed_blocks_before_network(tmp_path, monkeyp
     assert "data/processed/runs" not in serialized
 
 
+def test_keyframe_generation_strips_user_visible_section_headers_from_provider_prompt(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_plain_prompt/keyframe-generations",
+        json={
+            "node_id": "image-node-plain-001",
+            "prompt_text": "一个人物走在雨夜街头",
+            "optimized_prompt": "\n".join(
+                [
+                    "人物：黑短发女性，穿蓝白校服。",
+                    "场景：雨夜街头，路面反光。",
+                    "镜头：中景，主体居中。",
+                    "灯光：冷色路灯。",
+                    "运动：静态关键帧。",
+                    "负面约束：不要文字水印。",
+                ]
+            ),
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-12T12:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    plan = client.get(f"/artifacts/{result.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    provider_prompt = plan["provider_prompt"]
+
+    for label in ("人物：", "场景：", "镜头：", "灯光：", "运动：", "负面约束："):
+        assert label not in provider_prompt
+    assert "黑短发女性" in provider_prompt
+    assert "雨夜街头" in provider_prompt
+
+
 def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
 
@@ -208,6 +244,60 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     assert reusable_preview.content == PNG_BYTES
 
 
+def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setattr("apps.api.runtime_keyframes.time.sleep", lambda _seconds: None)
+    attempts = {"count": 0}
+
+    def fake_dispatch(capability, service_id, request):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise ModelGatewayError("provider temporarily not ready")
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                }
+            ]
+        }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_keyframe_retry/keyframe-generations",
+        json={
+            "node_id": "image-node-retry-001",
+            "prompt_text": "A controlled vertical keyframe.",
+            "optimized_prompt": "A controlled vertical keyframe.",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-12T12:10:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    manifest = client.get(
+        f"/artifacts/{payload['artifacts']['keyframe_generation_safe_manifest']['artifact_id']}"
+    ).json()["payload"]
+
+    assert attempts["count"] == 2
+    assert payload["job"]["status"] == "succeeded"
+    assert manifest["retry_count"] == 1
+
+
 def test_keyframe_prompt_for_minimax_removes_internal_runtime_terms() -> None:
     prompt = minimax_keyframe_prompt(
         "\n".join(
@@ -223,8 +313,10 @@ def test_keyframe_prompt_for_minimax_removes_internal_runtime_terms() -> None:
 
     assert "Provider calls remain off" not in prompt
     assert "Agent Rationale" not in prompt
-    assert "Lighting: low-key practical window light." in prompt
-    assert "Continuity: stable wardrobe" in prompt
+    assert "Lighting:" not in prompt
+    assert "Continuity:" not in prompt
+    assert "low-key practical window light." in prompt
+    assert "stable wardrobe" in prompt
     assert len(prompt) <= DEFAULT_IMAGE_PROMPT_LIMIT
 
 

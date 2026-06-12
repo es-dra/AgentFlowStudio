@@ -17,8 +17,20 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
     body: payload == null ? undefined : JSON.stringify(payload),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(`运行服务请求失败（${response.status}）`);
+  if (!response.ok) throw new Error(runtimeErrorMessage(response, body));
   return body ? JSON.parse(body) : {};
+}
+
+function runtimeErrorMessage(response, body) {
+  let detail = "";
+  try {
+    const payload = body ? JSON.parse(body) : {};
+    detail = String(payload?.detail || payload?.message || "").trim();
+  } catch {
+    detail = String(body || "").trim();
+  }
+  const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
+  return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
 }
 
 export function createRuntimeClient(projectId = "studio-local-001") {
