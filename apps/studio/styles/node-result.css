@@ -43,3 +43,25 @@
   cursor: pointer;
   color: var(--text-primary);
 }
+.bundle-detail { display: grid; gap: 6px; margin-top: 6px; }
+.bundle-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.bundle-chip {
+  border-radius: var(--radius-chip);
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid rgba(90, 200, 250, 0.35);
+  color: var(--text-primary);
+}
+.bundle-chip.scene { border-color: rgba(140, 220, 160, 0.4); }
+.bundle-warning {
+  color: #ffc285;
+  background: rgba(255, 170, 90, 0.08);
+  border-radius: 6px;
+  padding: 4px 7px;
+}
+.bundle-override {
+  color: var(--text-secondary);
+  border-left: 2px solid rgba(255, 170, 90, 0.5);
+  padding-left: 7px;
+}
+.bundle-budget-note { color: var(--text-faint); }

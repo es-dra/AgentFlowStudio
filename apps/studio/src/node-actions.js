@@ -158,6 +158,8 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
         n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
       }
       n.params.lastContextBundle = response?.context_bundle || null;
+      // “本次解除”语义:锁定解除只随单次请求生效,请求发出后即清空,避免静默延续到下一次生成。
+      n.params.temporaryLockOverrides = [];
       n.result = keyframeResultText(response, request, succeeded);
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({

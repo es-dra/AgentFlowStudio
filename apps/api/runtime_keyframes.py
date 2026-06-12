@@ -153,6 +153,7 @@ def _context_bundle(
         context_subgraph=request.context_subgraph,
         temporary_lock_overrides=request.temporary_lock_overrides,
         include_fixed_assets=include_fixed_assets,
+        style_preference=request.style,
     )
 
 

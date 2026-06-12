@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from apps.api.runtime_context_budget import context_budget, context_warnings, duplicate_labels
+from apps.api.runtime_context_budget import apply_context_budget, context_warnings, duplicate_labels
 from apps.api.runtime_models import ContextSubgraph, TemporaryLockOverride
 from apps.api.runtime_store import RuntimeStore
 from apps.api.runtime_visual_assets import fixed_visual_assets_by_id, public_visual_asset
@@ -25,10 +25,11 @@ def resolve_context_bundle(
     context_subgraph: ContextSubgraph,
     temporary_lock_overrides: list[TemporaryLockOverride] | None = None,
     include_fixed_assets: bool = True,
+    style_preference: str | None = None,
 ) -> dict[str, Any]:
     _validate_subgraph(context_subgraph)
     assets = fixed_visual_assets_by_id(store, project_id)
-    connected = _connected_asset_refs(context_subgraph)
+    connected, node_hops = _connected_asset_refs(context_subgraph)
     sorted_connected_ids = _sort_asset_ids(assets, connected)
     overrides = _override_pairs(temporary_lock_overrides or [])
 
@@ -42,10 +43,18 @@ def resolve_context_bundle(
     included = [_included_asset(assets[asset_id], connected.get(asset_id), mode) for asset_id in included_ids if asset_id in assets]
     excluded = _excluded_assets(assets, included_ids, connected, mode, include_fixed_assets)
     available = _available_assets(assets, included_ids, connected, visible_prompt)
-    text_channel = _text_channel(mode, visible_prompt, [assets[item] for item in included_ids if item in assets], overrides)
+    upstream_lines = _upstream_summary_lines(context_subgraph, node_hops)
+    text_channel = _text_channel(
+        mode,
+        visible_prompt,
+        [assets[item] for item in included_ids if item in assets],
+        overrides,
+        upstream_lines=upstream_lines,
+        style_preference=style_preference,
+    )
     subject_asset = _subject_reference_asset([assets[item] for item in included_ids if item in assets], connected)
     reference_channel = _reference_image_channel(subject_asset)
-    budget = context_budget(visible_prompt, text_channel)
+    text_channel, budget = apply_context_budget(mode, text_channel)
     warnings = context_warnings(assets, connected, visible_prompt, overrides)
 
     return {
@@ -73,10 +82,13 @@ def resolve_context_bundle(
 
 
 def provider_prompt_from_bundle(bundle: dict[str, Any]) -> str:
+    # Identity/locks lead the prompt: if the provider hard limit ever tail-cuts
+    # the joined text, the loss order matches the priority order (preference
+    # and summaries die first, locks never), consistent with lock > user text.
     text = bundle.get("text_channel") if isinstance(bundle.get("text_channel"), dict) else {}
     parts = [
-        str(text.get("visible_prompt") or "").strip(),
         str(text.get("asset_identity_segment") or "").strip(),
+        str(text.get("visible_prompt") or "").strip(),
         str(text.get("scene_director_segment") or "").strip(),
         str(text.get("upstream_summary_segment") or "").strip(),
         str(text.get("preference_segment") or "").strip(),
@@ -101,7 +113,7 @@ def _validate_subgraph(subgraph: ContextSubgraph) -> None:
             raise ValueError("context_subgraph edge contains forbidden asset text")
 
 
-def _connected_asset_refs(subgraph: ContextSubgraph) -> dict[str, dict[str, Any]]:
+def _connected_asset_refs(subgraph: ContextSubgraph) -> tuple[dict[str, dict[str, Any]], dict[str, int]]:
     nodes = {node.id: node for node in subgraph.nodes}
     upstream_by_to: dict[str, list[Any]] = {}
     for edge in subgraph.edges:
@@ -120,7 +132,25 @@ def _connected_asset_refs(subgraph: ContextSubgraph) -> dict[str, dict[str, Any]
                 _remember_ref(refs, str(asset_id), hop, relation, node_id)
         for edge in upstream_by_to.get(node_id, []):
             queue.append((edge.from_node_id, hop + 1, str(edge.relation_type or "generation")))
-    return refs
+    return refs, visited
+
+
+def _upstream_summary_lines(subgraph: ContextSubgraph, node_hops: dict[str, int], limit: int = 3) -> list[str]:
+    nodes = {node.id: node for node in subgraph.nodes}
+    candidates = sorted(
+        (
+            (hop, node_id)
+            for node_id, hop in node_hops.items()
+            if hop >= 1 and node_id in nodes and str(nodes[node_id].prompt or "").strip()
+        ),
+    )
+    lines: list[str] = []
+    for hop, node_id in candidates[:limit]:
+        node = nodes[node_id]
+        title = str(node.title or node_id).strip()
+        prompt = str(node.prompt or "").strip()[:120]
+        lines.append(f"{title}: {prompt}")
+    return lines
 
 
 def _remember_ref(refs: dict[str, dict[str, Any]], asset_id: str, hop: int, relation: str, node_id: str) -> None:
@@ -211,6 +241,9 @@ def _text_channel(
     visible_prompt: str,
     assets: list[dict[str, Any]],
     overrides: set[tuple[str, str]],
+    *,
+    upstream_lines: list[str] | None = None,
+    style_preference: str | None = None,
 ) -> dict[str, str]:
     if mode == "optimize":
         signatures = [f"{asset['label']}: {asset.get('signature')}" for asset in assets]
@@ -237,13 +270,14 @@ def _text_channel(
             scene_lines.append(line)
         else:
             identity_lines.append(line)
+    preference = str(style_preference or "").strip()
     return {
         "visible_prompt": visible_prompt,
         "asset_signature_segment": "",
         "asset_identity_segment": "\n".join(identity_lines),
         "scene_director_segment": "\n".join(scene_lines),
-        "upstream_summary_segment": "",
-        "preference_segment": "",
+        "upstream_summary_segment": "\n".join(upstream_lines or []),
+        "preference_segment": f"style preference: {preference}" if preference else "",
     }
 
 

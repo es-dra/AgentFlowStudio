@@ -6,6 +6,7 @@ import { renderPromptBar } from "./prompt-bar.js";
 import { renderDrawer } from "./panels/drawer.js";
 import { renderDock } from "./panels/dock.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
+import { openShortcutsPanel } from "./panels/shortcuts-panel.js";
 import { closeTop, hasOpenOverlay, el } from "./overlay.js";
 import { createNode, deleteNodes, duplicateNode } from "./nodes.js";
 import { startNodeGeneration, spawnSampleScriptFlow } from "./node-actions.js";
@@ -70,13 +71,7 @@ function renderTopbar(state, store) {
   const save = el("span", `save-pill ${saveClass(state.ui.saveState)}`, state.ui.saveState || "本地暂存");
   if (state.ui.saveMessage) save.title = state.ui.saveMessage;
   right.appendChild(save);
-
-  for (const [iconName, label] of [["share", "分享"], ["archive", "作品库"], ["user", "账户"]]) {
-    const btn = el("button", "icon-btn");
-    btn.innerHTML = icon(iconName, 15);
-    btn.title = label;
-    right.appendChild(btn);
-  }
+  // 分享/作品库/账户尚未实现:内测版本不展示无功能按钮,待功能落地后恢复。
   topbar.appendChild(right);
 }
 
@@ -191,6 +186,11 @@ function bindKeyboard() {
     if ((e.ctrlKey || e.metaKey) && e.key === "-") {
       e.preventDefault();
       zoomCenter(1 / 1.15);
+      return;
+    }
+    if (e.key === "?") {
+      e.preventDefault();
+      openShortcutsPanel();
     }
   });
 }
@@ -203,17 +203,49 @@ function zoomCenter(factor) {
 }
 
 function arrangeCanvas() {
+  // 按连线拓扑分层排列:上游在左、下游在右,同层纵向排布;孤立节点排在最后一层之后。
   store.set((s) => {
-    const columns = 4;
-    const gapX = 360;
-    const gapY = 320;
-    s.order.forEach((id, index) => {
-      const node = s.nodes[id];
-      if (!node) return;
-      node.x = (index % columns) * gapX - 520;
-      node.y = Math.floor(index / columns) * gapY - 180;
+    const gapX = 400;
+    const gapY = 330;
+    const layers = topologicalLayers(s);
+    layers.forEach((ids, layerIndex) => {
+      ids.forEach((id, rowIndex) => {
+        const node = s.nodes[id];
+        if (!node) return;
+        node.x = layerIndex * gapX - 520;
+        node.y = rowIndex * gapY - 180 - Math.floor(ids.length / 2) * 40;
+      });
     });
   });
+}
+
+function topologicalLayers(state) {
+  const upstreamOf = {};
+  for (const edge of Object.values(state.edges)) {
+    (upstreamOf[edge.to] = upstreamOf[edge.to] || []).push(edge.from);
+  }
+  const layerOf = {};
+  const resolve = (id, depth = 0) => {
+    if (layerOf[id] !== undefined) return layerOf[id];
+    if (depth > 32) return 0;
+    const ups = (upstreamOf[id] || []).filter((up) => state.nodes[up]);
+    layerOf[id] = ups.length ? Math.max(...ups.map((up) => resolve(up, depth + 1))) + 1 : 0;
+    return layerOf[id];
+  };
+  const connected = new Set(Object.values(state.edges).flatMap((e) => [e.from, e.to]));
+  const layers = [];
+  const isolated = [];
+  for (const id of state.order) {
+    if (!state.nodes[id]) continue;
+    if (!connected.has(id)) { isolated.push(id); continue; }
+    const layer = resolve(id);
+    (layers[layer] = layers[layer] || []).push(id);
+  }
+  const result = layers.filter(Boolean);
+  for (let i = 0; i < isolated.length; i += 3) {
+    result.push(isolated.slice(i, i + 3));
+  }
+  return result;
 }
 
 function duplicateSelected() {

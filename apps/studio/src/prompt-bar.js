@@ -59,17 +59,15 @@ function buildBar(state, store, runtime, node) {
       tabs.appendChild(tab);
     }
     bar.appendChild(tabs);
+    // “标记”“角色库”尚未实现,内测版本不展示死按钮。
     bar.appendChild(buildToolChips(store, runtime, node, [
-      ["标记", "pencil", () => {}],
       ["特效", "sparkles", () => openGalleryModal(store, "effects", node.id)],
-      ["角色库", "user", () => {}],
     ]));
   }
 
   if (node.type === "image") {
     bar.appendChild(buildToolChips(store, runtime, node, [
       ["风格", "wand", () => openGalleryModal(store, "styles", node.id)],
-      ["标记", "pencil", () => {}],
     ], p.spec.panorama));
   }
 
@@ -184,12 +182,6 @@ function buildBottomRow(state, store, runtime, node, textarea) {
     openOptimizer(store, runtime, node.id, optimizeBtn, textarea);
   });
   row.appendChild(optimizeBtn);
-
-  const translateBtn = el("button", "bar-tool");
-  translateBtn.innerHTML = icon("translate", 14);
-  translateBtn.title = "翻译提示词";
-  translateBtn.addEventListener("click", () => flashTooltip(translateBtn, "翻译将在后续版本开放"));
-  row.appendChild(translateBtn);
 
   const counts = node.type === "image" ? IMAGE_COUNTS : (node.type === "video" ? VIDEO_COUNTS : null);
   if (counts) {

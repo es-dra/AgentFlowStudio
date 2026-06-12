@@ -2,6 +2,7 @@ import { buildOptimizationRequest, normalizeOptimization, buildLocalOptimization
 import { showPopover, el } from "./overlay.js";
 import { icon } from "./icons.js";
 import { connect } from "./nodes.js";
+import { humanWarning } from "./node-result-view.js";
 
 // Prompt optimization stays anchored to the node input and hides internal assembly details.
 
@@ -125,14 +126,14 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     const included = Array.isArray(bundle.included_assets) ? bundle.included_assets : [];
     const available = Array.isArray(bundle.available_project_assets) ? bundle.available_project_assets : [];
     const warnings = Array.isArray(bundle.warnings) ? bundle.warnings : [];
-    const title = el("div", "opt-section-label", "fixed assets");
+    const title = el("div", "opt-section-label", "项目资产引用");
     const chips = el("div", "opt-source-chips");
     for (const item of included) {
-      const suffix = item.connected ? "connected" : "unconnected";
-      chips.appendChild(el("span", "opt-source-chip", `${item.label || item.asset_id} · ${suffix}`));
+      const suffix = item.connected ? "已连线" : "未连线";
+      chips.appendChild(el("span", `opt-source-chip${item.connected ? " linked" : " unlinked"}`, `${item.label || item.asset_id} · ${suffix}`));
     }
     for (const item of available.filter((asset) => !asset.injected).slice(0, 6)) {
-      chips.appendChild(el("span", "opt-source-chip muted", `${item.label || item.asset_id} · available`));
+      chips.appendChild(el("span", "opt-source-chip muted", `${item.label || item.asset_id} · 项目内可用`));
     }
     wrap.append(title, chips);
     renderConnectionWarnings(wrap, warnings);
@@ -157,13 +158,24 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
   function renderLockWarnings(wrap, warnings) {
     for (const warning of warnings.filter((item) => item.warning_id === "best_effort_lock_conflict")) {
       const row = el("div", "opt-asset-warning");
-      row.appendChild(document.createTextNode(`best-effort conflict: ${warning.lock_text || warning.asset_id}`));
-      const unlockBtn = el("button", "opt-inline-btn", "本次解除");
+      row.appendChild(document.createTextNode(humanWarning(warning)));
+      const alreadyOverridden = hasOverride(warning);
+      const unlockBtn = el("button", "opt-inline-btn", alreadyOverridden ? "本次已解除" : "本次解除");
       unlockBtn.dataset.action = "temporary-unlock";
-      unlockBtn.addEventListener("click", () => addTemporaryLockOverride(warning));
+      unlockBtn.disabled = alreadyOverridden;
+      unlockBtn.addEventListener("click", () => {
+        addTemporaryLockOverride(warning);
+        unlockBtn.textContent = "本次已解除";
+        unlockBtn.disabled = true;
+      });
       row.appendChild(unlockBtn);
       wrap.appendChild(row);
     }
+  }
+
+  function hasOverride(warning) {
+    const overrides = store.get().nodes[nodeId]?.params?.temporaryLockOverrides || [];
+    return overrides.some((item) => item.asset_id === warning.asset_id && item.lock_text === warning.lock_text);
   }
 
   function connectNamedAssetToTarget(assetId) {

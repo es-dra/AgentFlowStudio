@@ -221,3 +221,95 @@ def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path)
     assert "Legacy Character" not in serialized
     assert "Legacy Scene" not in serialized
     assert plan["context_bundle"]["included_assets"] == []
+
+
+def test_generate_budget_enforces_floor_and_never_truncates_locks(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_budget_enforce"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+
+    long_visible = "Lin Wan crosses the rooftop in slow motion. " * 60
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Lin Wan rooftop keyframe.",
+            "optimized_prompt": long_visible,
+            "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+            "generated_at": "2026-06-12T11:00:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    bundle = plan["context_bundle"]
+    budget = bundle["budget"]
+
+    assert budget["enforcement_applied"] is True
+    assert budget["segments"]["lock_identity"]["truncated"] is False
+    assert budget["segments"]["visible_prompt"]["truncated"] is True
+    assert budget["segments"]["visible_prompt"]["used"] >= budget["visible_prompt_floor"]
+    assert budget["total_used"] <= budget["total_limit"]
+    assert "keep Lin Wan identity" in plan["provider_prompt"]
+    assert "keep black short hair" in plan["provider_prompt"]
+
+
+def test_generate_fills_upstream_summary_and_style_preference_segments(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_upstream_preference"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Lin Wan night rooftop.",
+            "optimized_prompt": "Lin Wan night rooftop.",
+            "style": "noir film",
+            "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+            "generated_at": "2026-06-12T11:10:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    text_channel = plan["context_bundle"]["text_channel"]
+
+    assert "asset prompt" in text_channel["upstream_summary_segment"]
+    assert text_channel["preference_segment"] == "style preference: noir film"
+    assert "asset prompt" in plan["provider_prompt"]
+    assert "style preference: noir film" in plan["provider_prompt"]
+
+
+def test_lock_conflict_warning_uses_attribute_vocabulary_and_enforcement_is_independent(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_vocab_conflict"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Draw Lin Wan with red long hair.",
+            "optimized_prompt": "Draw Lin Wan with red long hair.",
+            "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+            "generated_at": "2026-06-12T11:20:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    warnings = plan["context_bundle"]["warnings"]
+    conflict_attrs = {
+        (item["attribute"], item["lock_value"], item["prompt_value"])
+        for item in warnings
+        if item["warning_id"] == "best_effort_lock_conflict"
+    }
+
+    assert ("hair_color", "black", "red") in conflict_attrs
+    assert ("hair_length", "short", "long") in conflict_attrs
+    # enforcement is independent of detection: the lock still rides the prompt
+    assert "keep black short hair" in plan["provider_prompt"]

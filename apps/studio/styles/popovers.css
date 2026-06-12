@@ -126,6 +126,17 @@
   color: var(--text-faint);
   background: transparent;
 }
+.optimizer-pop .opt-source-chip.linked {
+  border-color: rgba(140, 220, 160, 0.45);
+  color: var(--text-primary);
+}
+.optimizer-pop .opt-source-chip.unlinked {
+  border-color: rgba(245, 196, 81, 0.45);
+}
+.optimizer-pop .opt-inline-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .optimizer-pop .opt-context-assets {
   display: grid;
   gap: 6px;
