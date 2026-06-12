@@ -7,6 +7,35 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+中文当前说明：本文件当前只作为工程维护流水账，不承担业务验收、模型效果判断或长期公司规则晋升。每条记录都应服务于后续接手者快速判断“这轮到底改变了什么、验证了什么、还剩什么风险”。如果某项工作只产生了本地缓存、临时运行产物或 provider 原始响应，它不能被写成产品能力完成；如果某项证据还没有经过人工验收，也不能被写成业务有效。当前阶段的重点是把 Studio 主线、Runtime Service、provider gate、固定资产、图谱上下文和维护清理统一到一条可落地的 MVP 链路上。历史分发线、旧 Workbench、旧 memory UI、旧候选记忆流程只保留为 legacy 或审计背景，不再作为新任务入口。后续每次接入真实模型前，都应先确认本地配置没有进入 tracked 文件，provider gate 按能力单独开启，生成媒体只落在 ignored runtime/evidence 目录，并在报告中明确区分工程验证、provider smoke、人工验收和业务验证。
+
+## 2026-06-12 - Project Inventory And Direct Cleanup 001
+
+- Added reusable project inventory / cleanup tooling with tracked, ignored, and untracked-unignored classification.
+- Protected local provider config, local model weights, raw source media, and media evidence as report-only.
+- Generated `docs/maintenance/AFS-PROJECT-INVENTORY-20260612.md` and machine reports under ignored `data/reports/project_inventory/`.
+- Executed low-risk cache cleanup. Across cleanup and post-verification cleanup passes, 14,452 cache targets were deleted, saving about 30.24MB.
+- Confirmed `configs/providers.local.json`, `configs/models.yaml`, `data/models/faster-whisper`, and `data/raw/demo_zombie/input.mp4` remained in place.
+- Recorded remaining Windows ownership/ACL blocker: `data/processed/pytest-basetemp` is ignored pytest cache but cannot be fully deleted by the current user.
+- Removed the extra deep-review helper code after using its output; maintenance should not accumulate one-off audit tooling.
+- Deleted the unreferenced tracked empty package `agentflow_studio/asset_manager/__init__.py`.
+- Deleted six obsolete `AFS-PRODUCTION-MEMORY-ASSET-*` handoff files superseded by fixed `visual_asset` and graph-scoped resolver work.
+- Removed Production Memory short aliases from the default CLI product surface; legacy long `production-memory-loop-*` commands remain hidden compatibility while `agentflow/memory` is still tested.
+- Deep local review covered 12,791 local files, 3.46GB, 755 project text files, and 86,993 text lines; 80 exact duplicate media/evidence groups represent about 827MB theoretical reclaimable space once a canonical evidence-retention rule exists.
+
+Verification so far:
+
+```text
+tests/test_project_inventory_cleanup.py: 3 passed
+```
+
+Boundaries:
+
+- Provider gates remain closed.
+- No model weights, provider local config, source media, or unique evidence artifacts were deleted.
+- Duplicate media evidence was not deleted without a canonical run retention rule.
+- This is not human acceptance, business validation, or durable-memory promotion.
+
 ## 2026-06-12 - Studio Mainline Cleanup 001
 
 - Updated project authority docs so `/studio/` + Runtime Service + fixed assets/context resolver/provider-gated evidence is the current MVP line.

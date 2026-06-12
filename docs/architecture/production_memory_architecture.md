@@ -1,6 +1,6 @@
 # Production Memory 架构
 
-本文是当前 Production Memory 主线的短索引。详细事实以代码、contract example、测试和本地内测 runbook 为准。
+本文是 Production Memory 遗产层的短索引。它不再是当前 Studio MVP 主线，也不再提供默认可见 CLI 产品入口；详细事实以代码、contract example、测试和本地内测 runbook 为准。
 
 ## 目标
 
@@ -17,11 +17,11 @@ Round 1 package
   -> before/after report
 ```
 
-## 当前实现入口
+## 遗产实现入口
 
 ```text
 agentflow/memory/
-apps/cli/production_memory_command_registry.py
+apps/cli/production_memory_command_registry.py  # hidden compatibility only
 examples/agentflow/production_memory_loop.example.json
 docs/local_internal_test_runbook.md
 ```

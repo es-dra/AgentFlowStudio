@@ -82,7 +82,7 @@ def test_real_asset_test_run_harness_cli_smoke(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "apps.cli.main",
-            "asset-test-run-harness",
+            "production-memory-loop-run-real-asset-test-harness",
             "--asset-profile-seed",
             str(EXAMPLE_SEED),
             "--feedback-json",

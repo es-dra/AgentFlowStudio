@@ -16,6 +16,10 @@ archived.
 - `AFS-STUDIO-V02-DELIVERY-POLISH-001.md`
 - `AFS-STUDIO-MVP-M1-001.md`
 - `AFS-STUDIO-MVP-M1-5-CORE-LOOPS-001.md`
+- `AFS-ASSET-CONTEXT-S1.md`
+- `AFS-ASSET-CONTEXT-S1-COMPLETION-AUDIT.md`
+- `AFS-ASSET-CONTEXT-S1-FOLLOWUP-001.md`
+- `AFS-DIRECTOR-COMPILER-V1.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.
@@ -32,25 +36,16 @@ knowledgebase rules, and hidden background context policy.
 
 - `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
 - `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
+- `AFS-PROVIDER-ADAPTER-V0-1.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider
 responses, or media bytes.
 
-## Production Memory Backend Evidence
-
-- `AFS-PRODUCTION-MEMORY-ASSET-PROFILE-READINESS-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-FEEDBACK-INTAKE-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-PROFILE-UPDATE-CANDIDATE-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-PROFILE-PROMOTION-VERSIONING-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-CONTEXT-PROJECTION-001.md`
-- `AFS-PRODUCTION-MEMORY-ASSET-CONSISTENCY-REVIEW-001.md`
-
-These files are backend evidence only. They do not reintroduce a memory review
-UI into the MVP canvas.
-
 ## Current Maintenance Evidence
 
+- `AFS-PROJECT-INVENTORY-001.md`
+- `../maintenance/AFS-PROJECT-INVENTORY-20260612.md`
 - `../maintenance/AFS-STUDIO-HARD-CLEANUP-001.zh-CN.md`
 - `../maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`
 - `../maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md`

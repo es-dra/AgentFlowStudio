@@ -49,7 +49,7 @@ def test_provider_validation_gate_cli_smoke(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "apps.cli.main",
-            "asset-provider-validation-gate",
+            "production-memory-loop-provider-validation-gate",
             "--asset-profile-seed",
             str(EXAMPLE_SEED),
             "--generated-at",

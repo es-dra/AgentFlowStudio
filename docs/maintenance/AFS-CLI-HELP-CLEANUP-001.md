@@ -19,9 +19,9 @@ in tester-facing CLI help.
 - Hid long default runtime output paths in public help while keeping command
   defaults unchanged.
 - Added short public options for tester-facing commands:
-  - `asset-profile-update-review --candidate`
-  - `asset-consistency-review --projection`
-  - `asset-consistency-review --review-json`
+  - `production-memory-loop-review-asset-profile-update-candidate --candidate`
+  - `production-memory-loop-review-asset-consistency --projection`
+  - `production-memory-loop-review-asset-consistency --review-json`
 - Kept legacy hidden command names and long internal options callable for
   runbook compatibility.
 - Added a CLI boundary test that scans visible product command help for
