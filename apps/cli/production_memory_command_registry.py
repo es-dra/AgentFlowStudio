@@ -96,43 +96,7 @@ from apps.cli.production_memory_session_command import (
 
 
 def register_production_memory_commands(app: typer.Typer) -> None:
-    """Register Production Memory CLI commands with a thin default help surface."""
-    _visible(app, "memory-loop-validate", production_memory_loop_validate_command)
-    _visible(app, "memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
-    _visible(
-        app,
-        "asset-profile-readiness",
-        production_memory_loop_asset_profile_readiness_command,
-    )
-    _visible(
-        app,
-        "asset-test-package-run",
-        production_memory_loop_run_asset_test_package_command,
-    )
-    _visible(app, "asset-feedback-record", production_memory_loop_record_asset_feedback_command)
-    _visible(
-        app,
-        "asset-profile-update-draft",
-        production_memory_loop_draft_asset_profile_update_candidate_command,
-    )
-    _visible(
-        app,
-        "asset-profile-update-review",
-        asset_profile_update_review_command,
-    )
-    _visible(
-        app,
-        "asset-context-project",
-        production_memory_loop_asset_profile_context_projection_command,
-    )
-    _visible(
-        app,
-        "asset-consistency-review",
-        asset_consistency_review_command,
-    )
-    _visible(app, "asset-test-run-harness", asset_test_run_harness_command)
-    _visible(app, "asset-two-round-validate", asset_two_round_validate_command)
-    _visible(app, "asset-provider-validation-gate", asset_provider_validation_gate_command)
+    """Register legacy Production Memory commands as hidden compatibility only."""
 
     _hidden(app, "production-memory-loop-validate", production_memory_loop_validate_command)
     _hidden(app, "production-memory-loop-run-no-provider", production_memory_loop_run_no_provider_command)
@@ -277,10 +241,6 @@ def register_production_memory_commands(app: typer.Typer) -> None:
         "production-memory-loop-record-next-operator-action-result",
         production_memory_loop_record_next_operator_action_result_command,
     )
-
-
-def _visible(app: typer.Typer, name: str, command: object) -> None:
-    app.command(name=name)(command)
 
 
 def _hidden(app: typer.Typer, name: str, command: object) -> None:

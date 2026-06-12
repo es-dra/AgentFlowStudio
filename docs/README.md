@@ -30,10 +30,17 @@ static memory-workbench paths are not task entrypoints.
 - [Current architecture](current_architecture.md)
 - [Node prompt optimizer contract](architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md)
 - [Creative intent control agent engineering summary](architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md)
-- [Production Memory architecture](architecture/production_memory_architecture.md)
-- [Production Memory Asset Profile](architecture/production_memory_asset_profiles.md)
 - [Skill contract](agentflow_skill_contract.md)
 - [Router contract](agentflow_router_contract.md)
+
+## Legacy / Read-Only References
+
+- [Production Memory architecture](architecture/production_memory_architecture.md)
+- [Production Memory Asset Profile](architecture/production_memory_asset_profiles.md)
+
+Production Memory docs are retained only as legacy contract references. The
+current MVP context system is fixed `visual_asset` plus graph-scoped resolver,
+not the old asset-profile CLI surface.
 
 ## Useful Commands
 

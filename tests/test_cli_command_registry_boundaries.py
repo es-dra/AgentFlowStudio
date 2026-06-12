@@ -24,18 +24,6 @@ VISIBLE_PRODUCT_COMMANDS = (
     "inspect-run",
     "review-run",
     "memory-evidence-reuse-review",
-    "memory-loop-validate",
-    "memory-loop-run-no-provider",
-    "asset-profile-readiness",
-    "asset-test-package-run",
-    "asset-feedback-record",
-    "asset-profile-update-draft",
-    "asset-profile-update-review",
-    "asset-context-project",
-    "asset-consistency-review",
-    "asset-test-run-harness",
-    "asset-two-round-validate",
-    "asset-provider-validation-gate",
     "runtime-service",
     "runtime-service-openapi-export",
 )
@@ -61,19 +49,10 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "production-memory-loop-record-action-result-acceptance-feedback" not in source
 
 
-def test_production_memory_registry_layers_public_and_hidden_commands() -> None:
+def test_production_memory_registry_is_hidden_compatibility_only() -> None:
     source = PRODUCTION_MEMORY_REGISTRY.read_text(encoding="utf-8")
 
-    assert "asset-profile-readiness" in source
-    assert "asset-test-package-run" in source
-    assert "asset-feedback-record" in source
-    assert "asset-profile-update-draft" in source
-    assert "asset-profile-update-review" in source
-    assert "asset-context-project" in source
-    assert "asset-consistency-review" in source
-    assert "asset-test-run-harness" in source
-    assert "asset-two-round-validate" in source
-    assert "asset-provider-validation-gate" in source
+    assert "hidden compatibility only" in source
     assert "production-memory-loop-asset-profile-readiness" in source
     assert "production-memory-loop-run-asset-test-package" in source
     assert "production-memory-loop-record-asset-feedback" in source
@@ -83,21 +62,21 @@ def test_production_memory_registry_layers_public_and_hidden_commands() -> None:
     assert "production-memory-loop-next-operator-start-packet" in source
     assert "production-memory-loop-record-next-operator-action-result" in source
     assert "production-memory-loop-record-action-result-acceptance-feedback" in source
-    assert "_visible(app" in source
     assert "_hidden(app" in source
     assert "hidden=True" in source
+    assert "_visible(app" not in source
 
 
-def test_default_help_keeps_production_memory_product_surface_thin() -> None:
+def test_default_help_excludes_production_memory_legacy_surface() -> None:
     result = CliRunner().invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "asset-test-package-run" in result.output
-    assert "asset-test-run-harness" in result.output
-    assert "asset-two-round-validate" in result.output
-    assert "asset-provider-validation-gate" in result.output
-    assert "asset-feedback-record" in result.output
-    assert "asset-profile-update-review" in result.output
+    assert "asset-test-package-run" not in result.output
+    assert "asset-test-run-harness" not in result.output
+    assert "asset-two-round-validate" not in result.output
+    assert "asset-provider-validation-gate" not in result.output
+    assert "asset-feedback-record" not in result.output
+    assert "asset-profile-update-review" not in result.output
     assert "production-memory-loop-run-asset-test-package" not in result.output
     assert "production-memory-loop-record-asset-feedback" not in result.output
     assert "production-memory-loop-record-next-operator-action-result" not in result.output

@@ -69,7 +69,7 @@ def test_two_round_context_runtime_validation_cli_smoke(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "apps.cli.main",
-            "asset-two-round-validate",
+            "production-memory-loop-two-round-context-runtime-validation",
             "--round-1",
             str(round_1_dir),
             "--consistency-review-json",

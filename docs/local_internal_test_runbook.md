@@ -50,7 +50,7 @@ data/processed/runs/local_internal_test/<project>_provider_validation_gate_live/
 运行 deterministic asset harness：
 
 ```powershell
-.\.venv\Scripts\python.exe -m apps.cli.main asset-test-run-harness `
+.\.venv\Scripts\python.exe -m apps.cli.main production-memory-loop-run-real-asset-test-harness `
   --asset-profile-seed data/processed/runs/local_internal_test/loulan_fixture_inputs/asset_profile_seed.loulan.local.json `
   --feedback-json data/processed/runs/local_internal_test/loulan_fixture_inputs/asset_feedback.loulan.local.json `
   --consistency-review-json data/processed/runs/local_internal_test/loulan_fixture_inputs/asset_consistency_review.loulan.local.json `
@@ -116,7 +116,7 @@ review_screen_selected_files.json
 运行 context runtime validation：
 
 ```powershell
-.\.venv\Scripts\python.exe -m apps.cli.main asset-two-round-validate `
+.\.venv\Scripts\python.exe -m apps.cli.main production-memory-loop-two-round-context-runtime-validation `
   --round-1 data/processed/runs/local_internal_test/<project>_asset_loop_round_1 `
   --consistency-review-json data/processed/runs/local_internal_test/loulan_fixture_inputs/asset_consistency_review.loulan.local.json `
   --generated-at 2026-06-04T00:40:00+08:00 `
@@ -185,7 +185,7 @@ readiness-only plan：
 $env:AFS_ALLOW_REMOTE_IMAGE='true'
 $env:AFS_ALLOW_REMOTE_VIDEO='true'
 
-.\.venv\Scripts\python.exe -m apps.cli.main asset-provider-validation-gate `
+.\.venv\Scripts\python.exe -m apps.cli.main production-memory-loop-provider-validation-gate `
   --request-validation `
   --asset-profile-seed data/processed/runs/local_internal_test/loulan_fixture_inputs/asset_profile_seed.loulan.local.json `
   --output data/processed/runs/local_internal_test/<project>_provider_validation_gate_plan
