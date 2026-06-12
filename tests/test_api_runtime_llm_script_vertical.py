@@ -10,6 +10,7 @@ from apps.api.runtime_service import create_runtime_app
 
 def test_llm_script_plan_is_gate_closed_safe_and_review_reusable(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
         "/projects",
@@ -97,6 +98,7 @@ def test_llm_script_plan_is_gate_closed_safe_and_review_reusable(tmp_path, monke
 
 def test_llm_script_plan_reuses_prior_script_feedback_as_candidate_constraints(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
         "/projects",

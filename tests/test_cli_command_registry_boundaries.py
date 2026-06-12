@@ -141,7 +141,8 @@ def test_runtime_service_openapi_export_command_writes_frontend_schema(tmp_path)
     assert result.exit_code == 0
     assert schema["info"]["version"] == "0.2.0"
     assert "/projects" in schema["paths"]
-    assert "/projects/import" in schema["paths"]
+    assert "/projects/import" not in schema["paths"]
+    assert "/provider/script-draft-plan" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 
 

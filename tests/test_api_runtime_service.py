@@ -209,7 +209,8 @@ def test_runtime_service_provider_validation_plan_is_blocked_without_live_calls(
     assert "d:\\" not in serialized
 
 
-def test_frontend_runtime_service_request_examples_match_api_contract(tmp_path) -> None:
+def test_frontend_runtime_service_request_examples_match_api_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     fixture_dir = Path("examples/frontend_runtime_service")
 

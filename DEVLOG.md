@@ -19,6 +19,8 @@ Verification:
 
 ```text
 Cleanup/static focused tests: 15 passed, 1 Starlette/httpx warning.
+Full pytest: 828 passed, 1 Starlette/httpx warning.
+Studio JS node --check: 35 files passed.
 maintenance_audit.py: 0 failed checks, 1 oversized-files warning.
 git diff --check: clean except Windows CRLF notices.
 ```
