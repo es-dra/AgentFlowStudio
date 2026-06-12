@@ -21,6 +21,7 @@ archived.
 - `AFS-ASSET-CONTEXT-S1-FOLLOWUP-001.md`
 - `AFS-STUDIO-FRONTEND-POLISH-001.md`
 - `AFS-DIRECTOR-COMPILER-V1.md`
+- `AFS-MVP-CLOSEOUT-20260612.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.

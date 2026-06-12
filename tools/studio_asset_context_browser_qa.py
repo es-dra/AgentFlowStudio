@@ -191,7 +191,7 @@ def click_connect_suggestion(page: Page) -> dict[str, Any]:
 
 
 def click_temporary_unlock(page: Page) -> None:
-    page.locator('.optimizer-pop [data-action="temporary-unlock"]').click()
+    page.locator('.optimizer-pop [data-action="temporary-unlock"]').first.click()
     page.wait_for_function(
         "() => window.localStorage.getItem('afs_studio_canvas_v2')?.includes('one-off-ui-unlock')"
     )
