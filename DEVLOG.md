@@ -7,6 +7,27 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - Provider Adapter v0.1
+
+- Added `provider_descriptor.v0.1` to service config and documented the adapter contract in `docs/provider_adapter_contract.md`.
+- Added `ProviderRegistry.dispatch(capability, service_id, request)` and a MiniMax image adapter wrapper with the standard `validate -> translate -> submit -> poll -> normalize` lifecycle.
+- Changed Runtime keyframe generation to use the registry instead of importing MiniMax smoke directly.
+- Moved keyframe prompt length and reference image slot limits behind provider descriptors; MiniMax remains configured as one subject reference image slot.
+- Kept gate-closed Runtime paths config-free and no-network.
+
+Verification:
+
+```text
+Provider/keyframe/resolver focused tests: 22 passed, 1 Starlette/httpx warning.
+MiniMax smoke regression: 9 passed.
+py_compile for provider adapter, Runtime keyframes, context resolver, budget: passed.
+```
+
+Boundaries:
+
+- No live provider gate was opened.
+- Kling/video adapter is expressible by the contract but not implemented in this slice.
+
 ## 2026-06-12 - AFS Asset Context S1
 
 - Created isolated branch/worktree `codex/afs-asset-context-s1`.

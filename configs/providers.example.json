@@ -19,7 +19,18 @@
       "capability": "image",
       "api_family": "t2i",
       "execution_backend": "mmx_cli",
-      "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
+      "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "image",
+        "execution_mode": "sync",
+        "reference_image_slots": 1,
+        "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+        "prompt_char_limit": 1500,
+        "seed_supported": true,
+        "cost_hint": "Live image generation cost depends on provider account configuration.",
+        "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
+      }
     }
   }
 }

@@ -26,6 +26,8 @@ def resolve_context_bundle(
     temporary_lock_overrides: list[TemporaryLockOverride] | None = None,
     include_fixed_assets: bool = True,
     style_preference: str | None = None,
+    prompt_char_limit: int = 1500,
+    reference_image_slots: int = 1,
 ) -> dict[str, Any]:
     _validate_subgraph(context_subgraph)
     assets = fixed_visual_assets_by_id(store, project_id)
@@ -52,9 +54,10 @@ def resolve_context_bundle(
         upstream_lines=upstream_lines,
         style_preference=style_preference,
     )
-    subject_asset = _subject_reference_asset([assets[item] for item in included_ids if item in assets], connected)
-    reference_channel = _reference_image_channel(subject_asset)
-    text_channel, budget = apply_context_budget(mode, text_channel)
+    included_asset_records = [assets[item] for item in included_ids if item in assets]
+    subject_asset = _subject_reference_asset(included_asset_records, connected)
+    reference_channel = _reference_image_channel(included_asset_records, connected, reference_image_slots)
+    text_channel, budget = apply_context_budget(mode, text_channel, total_prompt_budget=prompt_char_limit)
     warnings = context_warnings(assets, connected, visible_prompt, overrides)
 
     return {
@@ -295,13 +298,30 @@ def _subject_reference_asset(assets: list[dict[str, Any]], refs: dict[str, dict[
     )[0]
 
 
-def _reference_image_channel(subject_asset: dict[str, Any] | None) -> list[dict[str, str]]:
-    if not subject_asset:
+def _reference_image_channel(
+    assets: list[dict[str, Any]],
+    refs: dict[str, dict[str, Any]],
+    reference_image_slots: int,
+) -> list[dict[str, str]]:
+    if reference_image_slots <= 0:
         return []
-    image_refs = list(subject_asset.get("image_asset_refs") or [])
-    if not image_refs:
-        return []
-    return [{"asset_id": image_refs[0], "visual_asset_id": subject_asset["asset_id"], "role": "subject_reference"}]
+    characters = [asset for asset in assets if asset.get("asset_type") == "character" and asset.get("image_asset_refs")]
+    sorted_characters = sorted(
+        characters,
+        key=lambda asset: (
+            refs.get(str(asset.get("asset_id")), {}).get("hop", 99),
+            RELATION_PRIORITY.get(refs.get(str(asset.get("asset_id")), {}).get("relation_type", "generation"), 9),
+            str(asset.get("asset_id")),
+        ),
+    )
+    channel: list[dict[str, str]] = []
+    for asset in sorted_characters:
+        image_refs = [str(item) for item in list(asset.get("image_asset_refs") or []) if str(item)]
+        for image_ref in image_refs:
+            channel.append({"asset_id": image_ref, "visual_asset_id": str(asset["asset_id"]), "role": "subject_reference"})
+            if len(channel) >= reference_image_slots:
+                return channel
+    return channel
 
 
 def _override_pairs(overrides: list[TemporaryLockOverride]) -> set[tuple[str, str]]:

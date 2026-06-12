@@ -19,9 +19,9 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     captured: dict[str, object] = {}
 
-    def fake_smoke(store, **kwargs):
-        captured["subject_reference_image_path"] = kwargs.get("subject_reference_image_path")
-        output_dir = Path(kwargs["output_dir"])
+    def fake_dispatch(capability, service_id, request):
+        captured["subject_reference_image_path"] = request.subject_reference_image_path
+        output_dir = Path(request.output_dir)
         image_dir = output_dir / "image_candidates"
         image_dir.mkdir(parents=True, exist_ok=True)
         image_path = image_dir / "candidate_001.jpg"
@@ -47,8 +47,7 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
             },
         }
 
-    monkeypatch.setattr("apps.api.runtime_keyframes.load_company_provider_secrets", lambda: object())
-    monkeypatch.setattr("apps.api.runtime_keyframes.run_minimax_image_smoke", fake_smoke)
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     upload = client.post(
@@ -104,9 +103,9 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     captured: dict[str, object] = {"subject_paths": []}
 
-    def fake_smoke(store, **kwargs):
-        captured["subject_paths"].append(kwargs.get("subject_reference_image_path"))
-        output_dir = Path(kwargs["output_dir"])
+    def fake_dispatch(capability, service_id, request):
+        captured["subject_paths"].append(request.subject_reference_image_path)
+        output_dir = Path(request.output_dir)
         image_dir = output_dir / "image_candidates"
         image_dir.mkdir(parents=True, exist_ok=True)
         image_path = image_dir / "candidate_001.png"
@@ -126,8 +125,7 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
             ]
         }
 
-    monkeypatch.setattr("apps.api.runtime_keyframes.load_company_provider_secrets", lambda: object())
-    monkeypatch.setattr("apps.api.runtime_keyframes.run_minimax_image_smoke", fake_smoke)
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     first = client.post(
@@ -176,3 +174,20 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
     assert "image_candidates/candidate_001.png" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+class _FakeDescriptor:
+    prompt_char_limit = 1500
+    reference_image_slots = 1
+    required_gate = "AFS_ALLOW_REMOTE_IMAGE"
+
+
+class _FakeRegistry:
+    def __init__(self, dispatch) -> None:
+        self._dispatch = dispatch
+
+    def descriptor(self, service_id: str) -> _FakeDescriptor:
+        return _FakeDescriptor()
+
+    def dispatch(self, capability: str, service_id: str, request):
+        return self._dispatch(capability, service_id, request)

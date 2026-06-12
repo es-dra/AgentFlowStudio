@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from apps.api.openapi_export import export_openapi_schema
-from apps.api.runtime_keyframes import MINIMAX_IMAGE_PROMPT_LIMIT, minimax_keyframe_prompt
+from apps.api.runtime_keyframes import DEFAULT_IMAGE_PROMPT_LIMIT, minimax_keyframe_prompt
 from apps.api.runtime_service import create_runtime_app
 
 PNG_BYTES = base64.b64decode(
@@ -132,8 +132,8 @@ def test_keyframe_generation_gate_closed_blocks_before_network(tmp_path, monkeyp
 def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
 
-    def fake_smoke(store, **kwargs):
-        output_dir = Path(kwargs["output_dir"])
+    def fake_dispatch(capability, service_id, request):
+        output_dir = Path(request.output_dir)
         image_dir = output_dir / "image_candidates"
         image_dir.mkdir(parents=True, exist_ok=True)
         image_path = image_dir / "candidate_001.png"
@@ -153,8 +153,7 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
             ]
         }
 
-    monkeypatch.setattr("apps.api.runtime_keyframes.load_company_provider_secrets", lambda: object())
-    monkeypatch.setattr("apps.api.runtime_keyframes.run_minimax_image_smoke", fake_smoke)
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
@@ -226,7 +225,60 @@ def test_keyframe_prompt_for_minimax_removes_internal_runtime_terms() -> None:
     assert "Agent Rationale" not in prompt
     assert "Lighting: low-key practical window light." in prompt
     assert "Continuity: stable wardrobe" in prompt
-    assert len(prompt) <= MINIMAX_IMAGE_PROMPT_LIMIT
+    assert len(prompt) <= DEFAULT_IMAGE_PROMPT_LIMIT
+
+
+def test_keyframe_generation_uses_provider_descriptor_prompt_limit(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    captured: dict[str, object] = {}
+
+    def fake_dispatch(capability, service_id, request):
+        captured["prompt"] = request.prompt
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_keyframes.load_provider_registry",
+        lambda: _FakeRegistry(fake_dispatch, prompt_limit=64),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_descriptor_limit/keyframe-generations",
+        json={
+            "node_id": "image-node-limit-001",
+            "prompt_text": "A long keyframe prompt.",
+            "optimized_prompt": "A cinematic rooftop prompt with many details. " * 20,
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-12T10:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    assert len(str(captured["prompt"])) <= 64
+
+
+def test_runtime_keyframes_no_longer_imports_minimax_smoke_directly() -> None:
+    source = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
+
+    assert "run_minimax_image_smoke" not in source
 
 
 def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) -> None:
@@ -241,3 +293,22 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     assert "provider_config" not in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+class _FakeDescriptor:
+    def __init__(self, prompt_limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> None:
+        self.prompt_char_limit = prompt_limit
+        self.reference_image_slots = 1
+        self.required_gate = "AFS_ALLOW_REMOTE_IMAGE"
+
+
+class _FakeRegistry:
+    def __init__(self, dispatch, prompt_limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> None:
+        self._dispatch = dispatch
+        self._descriptor = _FakeDescriptor(prompt_limit)
+
+    def descriptor(self, service_id: str) -> _FakeDescriptor:
+        return self._descriptor
+
+    def dispatch(self, capability: str, service_id: str, request):
+        return self._dispatch(capability, service_id, request)

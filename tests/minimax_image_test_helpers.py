@@ -26,6 +26,17 @@ def provider_config(*, use_env_key: bool = False, use_mmx_cli: bool = False) -> 
         "capability": "image",
         "api_family": "t2i",
         "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "image",
+            "execution_mode": "sync",
+            "reference_image_slots": 1,
+            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "prompt_char_limit": 1500,
+            "seed_supported": True,
+            "cost_hint": "test-only",
+            "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+        },
     }
     if use_mmx_cli:
         account["execution_backend"] = "mmx_cli"

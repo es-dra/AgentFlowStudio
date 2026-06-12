@@ -5,6 +5,8 @@ import json
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_context_resolver import resolve_context_bundle
+from apps.api.runtime_models import ContextSubgraph
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 from agentflow.harness.json_io import write_json
@@ -179,6 +181,40 @@ def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is
         },
     )
     assert rejected.status_code == 422
+
+
+def test_reference_image_slots_allow_multiple_character_subject_refs(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_reference_slots"
+    first_image = _upload(client, project_id, "first-char")
+    first = _promote(client, project_id, first_image, "Lin Wan")
+    second_image = _upload(client, project_id, "second-char")
+    second = _promote(client, project_id, second_image, "Zhou Yu")
+    graph = {
+        "target_node_id": "target-node",
+        "runtime_work_mode": "context_generate",
+        "nodes": [
+            {"id": "target-node", "type": "image", "title": "Target", "prompt": "target", "visual_asset_ids": []},
+            {"id": "first-char", "type": "image", "title": "First", "prompt": "first", "visual_asset_ids": [first["asset_id"]]},
+            {"id": "second-char", "type": "image", "title": "Second", "prompt": "second", "visual_asset_ids": [second["asset_id"]]},
+        ],
+        "edges": [
+            {"id": "edge-1", "from": "first-char", "to": "target-node", "relation_type": "reference"},
+            {"id": "edge-2", "from": "second-char", "to": "target-node", "relation_type": "reference"},
+        ],
+    }
+
+    bundle = resolve_context_bundle(
+        RuntimeStore(tmp_path),
+        project_id,
+        mode="generate",
+        visible_prompt="two character keyframe",
+        context_subgraph=ContextSubgraph.model_validate(graph),
+        reference_image_slots=2,
+    )
+
+    expected = [image_id for _, image_id in sorted([(first["asset_id"], first_image), (second["asset_id"], second_image)])]
+    assert [item["asset_id"] for item in bundle["reference_image_channel"]] == expected
 
 
 def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path) -> None:

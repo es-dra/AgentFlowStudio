@@ -23,7 +23,12 @@ TRUNCATION_ORDER = [
 ]
 
 
-def apply_context_budget(mode: str, text: dict[str, str]) -> tuple[dict[str, str], dict[str, Any]]:
+def apply_context_budget(
+    mode: str,
+    text: dict[str, str],
+    *,
+    total_prompt_budget: int = TOTAL_PROMPT_BUDGET,
+) -> tuple[dict[str, str], dict[str, Any]]:
     """Enforce the provider prompt character budget on a text channel.
 
     generate mode waterfall:
@@ -44,14 +49,14 @@ def apply_context_budget(mode: str, text: dict[str, str]) -> tuple[dict[str, str
         "preference": str(text.get("preference_segment") or ""),
     }
     if mode != "generate":
-        report = _report(mode, raw, raw, enforcement_applied=False)
+        report = _report(mode, raw, raw, total_prompt_budget=total_prompt_budget, enforcement_applied=False)
         return dict(text), report
 
     final: dict[str, str] = {}
     identity = raw["lock_identity"]
     final["lock_identity"] = identity
 
-    effective_total = TOTAL_PROMPT_BUDGET - SEGMENT_SEPARATOR_RESERVE
+    effective_total = max(0, total_prompt_budget - SEGMENT_SEPARATOR_RESERVE)
     visible_allow = max(VISIBLE_PROMPT_FLOOR, effective_total - len(identity))
     final["visible_prompt"] = _truncate(raw["visible_prompt"], visible_allow)
 
@@ -68,7 +73,7 @@ def apply_context_budget(mode: str, text: dict[str, str]) -> tuple[dict[str, str
     budgeted["scene_director_segment"] = final["scene_director"]
     budgeted["upstream_summary_segment"] = final["upstream_summary"]
     budgeted["preference_segment"] = final["preference"]
-    report = _report(mode, raw, final, enforcement_applied=True)
+    report = _report(mode, raw, final, total_prompt_budget=total_prompt_budget, enforcement_applied=True)
     return budgeted, report
 
 
@@ -145,6 +150,7 @@ def _report(
     raw: dict[str, str],
     final: dict[str, str],
     *,
+    total_prompt_budget: int,
     enforcement_applied: bool,
 ) -> dict[str, Any]:
     allocations = {
@@ -166,9 +172,9 @@ def _report(
         "unit": "characters",
         "mode": mode,
         "enforcement_applied": enforcement_applied,
-        "total_limit": TOTAL_PROMPT_BUDGET,
+        "total_limit": total_prompt_budget,
         "total_used": total_used,
-        "overflow_beyond_total": total_used > TOTAL_PROMPT_BUDGET,
+        "overflow_beyond_total": total_used > total_prompt_budget,
         "segments": segments,
         "visible_prompt_floor": VISIBLE_PROMPT_FLOOR,
         "lock_identity_never_truncate": True,

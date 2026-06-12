@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.errors import ModelGatewayError
-from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
+from agentflow_studio.model_gateway.provider_adapter import (
+    ProviderDispatchRequest,
+    load_provider_registry,
+)
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
@@ -23,7 +25,8 @@ from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
-MINIMAX_IMAGE_PROMPT_LIMIT = 1500
+DEFAULT_IMAGE_PROMPT_LIMIT = 1500
+DEFAULT_REFERENCE_IMAGE_SLOTS = 1
 KEYFRAME_NON_CLAIMS = [
     "runtime verification only",
     "not human acceptance",
@@ -46,38 +49,71 @@ def build_keyframe_generation(
     state = load_creative_memory_state(store, project_id)
     assembly_state = _resolver_safe_state(state) if request.context_subgraph else state
     assembly = assemble_prompt_context(prompt_request, assembly_state)
-    context_bundle = _context_bundle(store, project_id, request, include_fixed_assets=include_fixed_assets)
-    reference_images = _reference_images(store, project_id, request, context_bundle)
+    registry = None
+    descriptor = _default_descriptor()
+    if os.environ.get(REMOTE_IMAGE_ENV, "").strip().lower() in REMOTE_TRUE_VALUES:
+        try:
+            registry = load_provider_registry()
+            descriptor = registry.descriptor(request.provider_service_id)
+        except ModelGatewayError:
+            registry = None
+    context_bundle = _context_bundle(
+        store,
+        project_id,
+        request,
+        include_fixed_assets=include_fixed_assets,
+        prompt_char_limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
+        reference_image_slots=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+    )
+    reference_images = _reference_images(
+        store,
+        project_id,
+        request,
+        context_bundle,
+        limit=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+    )
     if context_bundle:
-        provider_prompt = minimax_keyframe_prompt(provider_prompt_from_bundle(context_bundle))
+        provider_prompt = minimax_keyframe_prompt(
+            provider_prompt_from_bundle(context_bundle),
+            limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
+        )
     else:
         provider_prompt = minimax_keyframe_prompt(
-            request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"]
+            request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
+            limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     if reference_images and not context_bundle:
         provider_prompt = minimax_keyframe_prompt(
-            f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}"
+            f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}",
+            limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
-    provider_gate = image_provider_gate()
+    required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
+    provider_gate = image_provider_gate(required_gate)
 
     provider_outputs: list[dict[str, Any]] = []
     status = "blocked"
     blocks = []
     provider_calls_started = False
     if provider_gate["status"] == "blocked":
-        blocks.append(_gate_closed_block())
+        blocks.append(_gate_closed_block(required_gate))
     else:
         try:
+            if registry is None:
+                registry = load_provider_registry()
+                descriptor = registry.descriptor(request.provider_service_id)
             provider_calls_started = True
-            manifest = run_minimax_image_smoke(
-                load_company_provider_secrets(),
-                service_id=request.provider_service_id,
-                prompt=provider_prompt,
-                output_dir=output_dir,
-                aspect_ratio=request.aspect_ratio,
-                candidate_count=request.candidate_count,
-                seed=request.seed,
-                subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
+            manifest = registry.dispatch(
+                "image",
+                request.provider_service_id,
+                ProviderDispatchRequest(
+                    prompt=provider_prompt,
+                    output_dir=output_dir,
+                    aspect_ratio=request.aspect_ratio,
+                    candidate_count=request.candidate_count,
+                    seed=request.seed,
+                    reference_image_paths=tuple(item["path"] for item in reference_images),
+                    subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
+                ),
             )
             status = "succeeded"
             provider_outputs = _provider_outputs(manifest)
@@ -87,7 +123,7 @@ def build_keyframe_generation(
                 {
                     "block_id": "remote_image_provider_not_ready",
                     "reason": _safe_error(str(exc)),
-                    "required_gate": REMOTE_IMAGE_ENV,
+                    "required_gate": required_gate,
                 }
             )
 
@@ -141,6 +177,8 @@ def _context_bundle(
     request: KeyframeGenerationRequest,
     *,
     include_fixed_assets: bool,
+    prompt_char_limit: int,
+    reference_image_slots: int,
 ) -> dict[str, Any] | None:
     if not request.context_subgraph:
         return None
@@ -154,6 +192,8 @@ def _context_bundle(
         temporary_lock_overrides=request.temporary_lock_overrides,
         include_fixed_assets=include_fixed_assets,
         style_preference=request.style,
+        prompt_char_limit=prompt_char_limit,
+        reference_image_slots=reference_image_slots,
     )
 
 
@@ -162,15 +202,17 @@ def _reference_images(
     project_id: str,
     request: KeyframeGenerationRequest,
     context_bundle: dict[str, Any] | None,
+    *,
+    limit: int,
 ) -> list[dict[str, Any]]:
     if not context_bundle:
-        return resolve_reference_images(store, project_id, request.asset_refs)
+        return resolve_reference_images(store, project_id, request.asset_refs, limit=limit)
     refs = [
         str(item.get("asset_id") or "")
         for item in context_bundle.get("reference_image_channel", [])
         if isinstance(item, dict)
     ]
-    return resolve_reference_images(store, project_id, refs, limit=1)
+    return resolve_reference_images(store, project_id, refs, limit=limit)
 
 
 def _resolver_safe_state(state: dict[str, Any]) -> dict[str, Any]:
@@ -180,9 +222,9 @@ def _resolver_safe_state(state: dict[str, Any]) -> dict[str, Any]:
     return safe_state
 
 
-def image_provider_gate() -> dict[str, str]:
-    status = "ready_not_run" if os.environ.get(REMOTE_IMAGE_ENV, "").strip().lower() in REMOTE_TRUE_VALUES else "blocked"
-    return {"capability": "image", "env": REMOTE_IMAGE_ENV, "status": status}
+def image_provider_gate(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
+    status = "ready_not_run" if os.environ.get(required_gate, "").strip().lower() in REMOTE_TRUE_VALUES else "blocked"
+    return {"capability": "image", "env": required_gate, "status": status}
 
 
 def _prompt_request(request: KeyframeGenerationRequest) -> PromptOptimizationRequest:
@@ -241,11 +283,11 @@ def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_
     return "\n".join(lines)
 
 
-def _gate_closed_block() -> dict[str, str]:
+def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
     return {
         "block_id": "remote_image_gate_closed",
-        "reason": f"Set {REMOTE_IMAGE_ENV}=true only for an explicit image/keyframe provider smoke.",
-        "required_gate": REMOTE_IMAGE_ENV,
+        "reason": f"Set {required_gate}=true only for an explicit image/keyframe provider smoke.",
+        "required_gate": required_gate,
     }
 
 
@@ -258,7 +300,7 @@ def _safe_error(value: str) -> str:
     return value[:160]
 
 
-def minimax_keyframe_prompt(value: str) -> str:
+def minimax_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:
     lines = []
     for raw_line in str(value or "").splitlines():
         line = raw_line.strip()
@@ -270,9 +312,19 @@ def minimax_keyframe_prompt(value: str) -> str:
         lines.append(line)
     prompt = " ".join(lines)
     prompt = " ".join(prompt.split())
-    if len(prompt) <= MINIMAX_IMAGE_PROMPT_LIMIT:
+    if len(prompt) <= limit:
         return prompt
-    return prompt[:MINIMAX_IMAGE_PROMPT_LIMIT].rsplit(" ", 1)[0].strip()
+    return prompt[:limit].rsplit(" ", 1)[0].strip()
+
+
+class _DefaultImageDescriptor:
+    prompt_char_limit = DEFAULT_IMAGE_PROMPT_LIMIT
+    reference_image_slots = DEFAULT_REFERENCE_IMAGE_SLOTS
+    required_gate = REMOTE_IMAGE_ENV
+
+
+def _default_descriptor() -> _DefaultImageDescriptor:
+    return _DefaultImageDescriptor()
 
 
 def _internal_prompt_terms() -> tuple[str, ...]:
@@ -293,7 +345,7 @@ def _internal_prompt_terms() -> tuple[str, ...]:
 
 __all__ = (
     "KEYFRAME_NON_CLAIMS",
-    "MINIMAX_IMAGE_PROMPT_LIMIT",
+    "DEFAULT_IMAGE_PROMPT_LIMIT",
     "REMOTE_IMAGE_ENV",
     "build_keyframe_generation",
     "image_provider_gate",
