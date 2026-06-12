@@ -1,10 +1,11 @@
+const STORAGE_KEY_PREFIX = "afs_studio_canvas_v2:";
 const STORAGE_KEY = "afs_studio_canvas_v2";
 const LEGACY_STORAGE_KEY = "afs_studio_canvas_v1";
 const SAVE_DEBOUNCE_MS = 700;
 const HISTORY_LIMIT = 80;
 
-export function createStore() {
-  const state = loadPersisted() || initialState();
+export function createStore(projectId = "studio-local-001") {
+  let state = loadPersisted(projectId) || initialState(projectId);
   const listeners = new Set();
   const history = { past: [], future: [] };
   let scheduled = false;
@@ -41,6 +42,7 @@ export function createStore() {
 
   function attachRuntime(runtime) {
     runtimeClient = runtime;
+    if (runtime?.projectId) state.meta.projectId = runtime.projectId;
     state.ui.saveState = "本地暂存";
     notifySoon();
   }
@@ -53,6 +55,7 @@ export function createStore() {
       const payload = await runtime.loadStudioState();
       const remote = normalizeSnapshot(payload?.state);
       if (payload?.source === "runtime" && hasStudioContent(remote)) {
+        remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
         persist(state);
         state.ui.saveState = "已保存";
@@ -91,6 +94,14 @@ export function createStore() {
     notifySoon();
   }
 
+  async function switchProject(projectId, runtime) {
+    runtimeClient = runtime;
+    state = loadPersisted(projectId) || initialState(projectId);
+    state.meta.projectId = projectId;
+    notifySoon();
+    return hydrateRuntime(runtime);
+  }
+
   function scheduleRuntimeSave() {
     if (!runtimeClient?.saveStudioState) return;
     clearTimeout(saveTimer);
@@ -117,12 +128,13 @@ export function createStore() {
     });
   }
 
-  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, undo, redo };
+  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, undo, redo };
 }
 
-function initialState() {
+function initialState(projectId = "studio-local-001") {
   return {
     meta: {
+      projectId,
       seq: 1,
       projectName: "未命名项目",
       canvasName: "画布 1",
@@ -180,20 +192,21 @@ function seedAssets() {
 
 function persist(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotStudioState(state)));
+    localStorage.setItem(storageKey(state.meta.projectId), JSON.stringify(snapshotStudioState(state)));
   } catch {
     /* 本地持久化失败时静默，画布仍可用 */
   }
 }
 
-function loadPersisted() {
+function loadPersisted(projectId = "studio-local-001") {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(projectId)) || localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
     const snap = normalizeSnapshot(JSON.parse(raw));
     if (!hasStudioContent(snap)) return null;
-    const base = initialState();
+    const base = initialState(projectId);
     replaceSerializable(base, snap);
+    base.meta.projectId = projectId;
     return base;
   } catch {
     return null;
@@ -216,6 +229,7 @@ function normalizeSnapshot(snap) {
   const input = snap && typeof snap === "object" ? snap : {};
   return {
     meta: {
+      projectId: String(input.meta?.projectId || base.meta.projectId),
       projectName: String(input.meta?.projectName || base.meta.projectName),
       canvasName: String(input.meta?.canvasName || base.meta.canvasName),
       seq: Number(input.meta?.seq || 1),
@@ -226,7 +240,7 @@ function normalizeSnapshot(snap) {
       y: Number(input.viewport?.y || 0),
       scale: clamp(Number(input.viewport?.scale || 1), 0.18, 2.6),
     },
-    nodes: input.nodes && typeof input.nodes === "object" ? input.nodes : {},
+    nodes: hydrateNodePreviews(input.nodes && typeof input.nodes === "object" ? input.nodes : {}),
     edges: input.edges && typeof input.edges === "object" ? input.edges : {},
     order: Array.isArray(input.order) ? input.order : Object.keys(input.nodes || {}),
     assets: Array.isArray(input.assets) ? input.assets : base.assets,
@@ -245,6 +259,21 @@ function replaceSerializable(state, snap) {
   state.ui = { ...initialState().ui, ...state.ui };
 }
 
+function hydrateNodePreviews(nodes) {
+  const result = {};
+  for (const [id, node] of Object.entries(nodes || {})) {
+    if (!node || typeof node !== "object") continue;
+    const next = { ...node, params: { ...(node.params || {}) } };
+    if (!next.previewUrl) {
+      const uploads = Array.isArray(next.params.uploads) ? next.params.uploads : [];
+      const last = uploads[uploads.length - 1] || null;
+      if (last?.preview_url) next.previewUrl = last.preview_url;
+    }
+    result[id] = next;
+  }
+  return result;
+}
+
 function hasStudioContent(snap) {
   return Boolean(snap && (Object.keys(snap.nodes || {}).length || Object.keys(snap.edges || {}).length || (snap.assets || []).length));
 }
@@ -260,4 +289,8 @@ function pushHistory(stack, snapshot) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function storageKey(projectId) {
+  return `${STORAGE_KEY_PREFIX}${projectId || "studio-local-001"}`;
 }

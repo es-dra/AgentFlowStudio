@@ -1,7 +1,7 @@
 import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
-import { fixNodeVisualAsset, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
+import { fixNodeVisualAsset, setNodeVideoFrame, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
 
 export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
@@ -25,6 +25,20 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     addItem("bookmark", "标记为人物/场景资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
+    });
+  }
+  if (node.type === "video") {
+    addItem("upload", "上传首帧/尾帧图片", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) uploadNodeImage(store, runtime, fresh);
+    });
+    addItem("frames", "设最近上传图为首帧", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) setNodeVideoFrame(store, fresh, "first");
+    });
+    addItem("frames", "设最近上传图为尾帧", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) setNodeVideoFrame(store, fresh, "last");
     });
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>

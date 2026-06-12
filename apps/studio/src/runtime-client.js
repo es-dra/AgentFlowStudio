@@ -37,11 +37,20 @@ export function createRuntimeClient(projectId = "studio-local-001") {
   const encoded = encodeURIComponent(projectId);
   return {
     projectId,
+    listProjects() {
+      return requestJson("/projects");
+    },
+    createProject(payload) {
+      return requestJson("/projects", { method: "POST", payload });
+    },
     optimizePrompt(payload) {
       return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
     },
     uploadImageAsset(payload) {
       return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
+    },
+    listImageAssets() {
+      return requestJson(`/projects/${encoded}/image-assets`);
     },
     promoteVisualAsset(payload) {
       return requestJson(`/projects/${encoded}/visual-assets/promote`, { method: "POST", payload });
@@ -54,6 +63,15 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     generateKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });
+    },
+    generateVideo(payload) {
+      return requestJson(`/projects/${encoded}/video-generations`, { method: "POST", payload });
+    },
+    pollVideo(jobId) {
+      return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/poll`, { method: "POST" });
+    },
+    cancelVideo(jobId) {
+      return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
     },
     loadStudioState() {
       return requestJson(`/projects/${encoded}/studio-state`);

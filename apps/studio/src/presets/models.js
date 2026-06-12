@@ -29,12 +29,14 @@ export const IMAGE_MODELS = [
 
 export const VIDEO_MODELS = [
   {
-    id: "local-video-preview",
-    name: "Video preview",
-    desc: "provider disabled",
-    eta: "local",
+    id: "kling-i2v",
+    name: "Kling I2V",
+    desc: "image to video",
+    eta: "2m",
     cost: 0,
-    provider: "local",
+    provider: "kling",
+    capability: "video_i2v",
+    providerServiceId: "kling_i2v",
   },
 ];
 
@@ -72,4 +74,12 @@ export function isRemoteImageModel(modelId) {
 
 export function providerServiceForImageModel(modelId) {
   return findModel("image", modelId).providerServiceId || "minimax_image";
+}
+
+export function isRemoteVideoModel(modelId) {
+  return VIDEO_MODELS.some((m) => m.id === modelId && m.providerServiceId);
+}
+
+export function providerServiceForVideoModel(modelId) {
+  return findModel("video", modelId).providerServiceId || "kling_i2v";
 }

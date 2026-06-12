@@ -10,6 +10,7 @@ from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
+from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
 from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
@@ -239,6 +240,69 @@ class FakeAsyncVideoAdapter:
         return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
 
 
+class KlingVideoAdapter:
+    def __init__(self, store: CompanyProviderSecrets, service_id: str, descriptor: ProviderDescriptor) -> None:
+        self.store = store
+        self.service_id = service_id
+        self.descriptor = descriptor
+
+    def validate(self, request: ProviderDispatchRequest) -> None:
+        _require_gate(self.descriptor.required_gate)
+        service = self.store.service(self.service_id)
+        if service.get("api_family") != "i2v":
+            raise ModelConfigError(f"Kling Studio adapter only supports i2v services: {self.service_id}")
+        if request.aspect_ratio not in self.descriptor.supported_aspect_ratios:
+            raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
+        if len(request.prompt) > self.descriptor.prompt_char_limit:
+            raise ModelConfigError(f"prompt_char_limit exceeded for {self.service_id}")
+        if request.candidate_count != 1:
+            raise ModelConfigError("Kling I2V candidate_count must be 1")
+        if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
+            raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
+        if request.subject_reference_image_path is None and not request.reference_image_paths:
+            raise ModelConfigError("Kling I2V requires an explicit first frame image")
+        duration = request.duration_sec or _first_or_default(self.descriptor.supported_durations_sec, 5)
+        if self.descriptor.supported_durations_sec and duration not in self.descriptor.supported_durations_sec:
+            raise ModelConfigError(f"unsupported duration for {self.service_id}: {duration}")
+        resolution = request.resolution or _first_or_default(self.descriptor.supported_resolutions, "")
+        if self.descriptor.supported_resolutions and resolution not in self.descriptor.supported_resolutions:
+            raise ModelConfigError(f"unsupported resolution for {self.service_id}: {resolution}")
+
+    def translate(
+        self,
+        request: ProviderDispatchRequest,
+        account_selection: ProviderAccountSelection,
+    ) -> dict[str, Any]:
+        first_frame = request.subject_reference_image_path or request.reference_image_paths[0]
+        service = self.store.service(self.service_id)
+        return {
+            "service_id": self.service_id,
+            "prompt": request.prompt,
+            "image_path": Path(first_frame),
+            "output_dir": request.output_dir,
+            "duration": str(request.duration_sec or _first_or_default(self.descriptor.supported_durations_sec, 5)),
+            "mode": str(service.get("mode") or "pro"),
+            "poll_interval_sec": float(self.descriptor.async_poll_interval_sec or 5.0),
+            "max_polls": int(self.descriptor.async_max_polls or 120),
+            "timeout_sec": float(request.timeout_sec or self.descriptor.async_timeout_sec or 120.0),
+            "transport": str(service.get("transport") or "httpx"),
+            "model_name_override": request.model_name_override,
+        }
+
+    def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
+        manifest = run_kling_i2v_smoke(self.store, **plan)
+        return {"status": "already_complete", "raw": manifest}
+
+    def poll(self, task: dict[str, Any]) -> dict[str, Any]:
+        return task["raw"]
+
+    def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return raw
+
+    def safe_error(self, error: Exception) -> dict[str, str]:
+        return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
+
+
 def _require_gate(required_gate: str) -> None:
     gate = os.environ.get(required_gate, "").strip().lower()
     if gate not in {"1", "true", "yes", "on"}:
@@ -301,8 +365,13 @@ def _walk_text_payload(payload: Any) -> str:
     return ""
 
 
+def _first_or_default(values: list[Any], default: Any) -> Any:
+    return values[0] if values else default
+
+
 __all__ = (
     "FakeAsyncVideoAdapter",
+    "KlingVideoAdapter",
     "MiniMaxImageAdapter",
     "MiniMaxCliLLMAdapter",
     "OpenAICompatibleLLMAdapter",

@@ -42,6 +42,17 @@
   white-space: nowrap;
 }
 
+.project-select {
+  height: 32px;
+  max-width: 220px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  background: rgba(27, 29, 32, 0.9);
+  color: var(--text-secondary);
+  padding: 0 8px;
+  font-size: 12px;
+}
+
 .topbar-spacer { flex: 1; }
 
 .drawer-restore {

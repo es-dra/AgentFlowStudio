@@ -23,6 +23,7 @@ archived.
 - `AFS-DIRECTOR-COMPILER-V1.md`
 - `AFS-MVP-CLOSEOUT-20260612.md`
 - `AFS-MVP-FOLLOWUP-LIVE-COMPARISONS-20260612.md`
+- `AFS-KLING-PREFLIGHT-001.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.
@@ -41,6 +42,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
 - `AFS-PROVIDER-ADAPTER-V0-1.md`
 - `AFS-PROVIDER-GATEWAY-V0-1.md`
+- `AFS-KLING-PREFLIGHT-001.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider

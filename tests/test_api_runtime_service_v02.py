@@ -93,7 +93,7 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path, 
 
 
 def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(tmp_path, monkeypatch) -> None:
-    # GET /projects is a legacy v02 listing route.
+    # GET /projects is now a mainline Studio project listing route.
     monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
@@ -118,13 +118,13 @@ def test_runtime_service_v02_routes_are_hidden_by_default(tmp_path, monkeypatch)
     monkeypatch.delenv("AFS_ENABLE_LEGACY_RUNTIME_V02", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    assert client.get("/projects").status_code in {404, 405}
+    assert client.get("/projects").status_code == 200
 
     output_path = tmp_path / "frontend" / "afs-runtime-service.openapi.json"
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
     schema = json.loads(exported_path.read_text(encoding="utf-8"))
 
-    assert schema["paths"]["/projects"].get("get") is None
+    assert schema["paths"]["/projects"].get("get") is not None
     assert "/projects/import" not in schema["paths"]
     assert "/projects/{project_id}/export" not in schema["paths"]
     assert "/projects/{project_id}/source-assets" not in schema["paths"]

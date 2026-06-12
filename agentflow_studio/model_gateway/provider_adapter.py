@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from agentflow_studio.model_gateway.company_secrets import (
     CompanyProviderSecrets,
@@ -20,6 +20,7 @@ from agentflow_studio.model_gateway.provider_account_pool import (
 ProviderCapability = Literal["image", "video", "llm", "asr"]
 ProviderModality = ProviderCapability
 ProviderExecutionMode = Literal["sync", "async"]
+FrameSlotRequirement = Literal["required", "optional", "unsupported"]
 
 
 class ProviderDescriptor(BaseModel):
@@ -35,6 +36,15 @@ class ProviderDescriptor(BaseModel):
     cost_hint: str = ""
     rate_limit_hint: str = ""
     required_gate: str
+    frame_slots: dict[str, FrameSlotRequirement] = Field(default_factory=dict)
+    frame_modes: list[str] = Field(default_factory=list)
+    supported_durations_sec: list[int] = Field(default_factory=list)
+    supported_resolutions: list[str] = Field(default_factory=list)
+    async_poll_interval_sec: float | None = Field(default=None, gt=0)
+    async_timeout_sec: float | None = Field(default=None, gt=0)
+    async_max_polls: int | None = Field(default=None, gt=0)
+    prompt_profile: str | None = None
+    cost_estimate: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("required_gate")
     @classmethod
@@ -54,6 +64,46 @@ class ProviderDescriptor(BaseModel):
                 raise ValueError("supported_aspect_ratios entries must be positive")
         return values
 
+    @field_validator("frame_slots")
+    @classmethod
+    def _validate_frame_slots(cls, values: dict[str, FrameSlotRequirement]) -> dict[str, FrameSlotRequirement]:
+        for key in values:
+            if key not in {"first_frame", "last_frame"}:
+                raise ValueError("frame_slots may only contain first_frame and last_frame")
+        return values
+
+    @field_validator("supported_durations_sec")
+    @classmethod
+    def _validate_durations(cls, values: list[int]) -> list[int]:
+        for value in values:
+            if int(value) <= 0:
+                raise ValueError("supported_durations_sec entries must be positive")
+        return values
+
+    @field_validator("supported_resolutions")
+    @classmethod
+    def _validate_resolutions(cls, values: list[str]) -> list[str]:
+        for value in values:
+            text = str(value)
+            if not (text.endswith("p") and text[:-1].isdigit()) and "x" not in text:
+                raise ValueError("supported_resolutions entries must use 720p or WxH format")
+        return values
+
+    @model_validator(mode="after")
+    def _validate_video_v02(self) -> "ProviderDescriptor":
+        if self.schema_version == "provider_descriptor.v0.2" and self.modality == "video":
+            if self.frame_slots.get("first_frame") != "required":
+                raise ValueError("video provider_descriptor.v0.2 requires frame_slots.first_frame=required")
+            if not self.frame_modes:
+                raise ValueError("video provider_descriptor.v0.2 requires frame_modes")
+            if not self.supported_durations_sec:
+                raise ValueError("video provider_descriptor.v0.2 requires supported_durations_sec")
+            if not self.supported_resolutions:
+                raise ValueError("video provider_descriptor.v0.2 requires supported_resolutions")
+            if not self.prompt_profile:
+                raise ValueError("video provider_descriptor.v0.2 requires prompt_profile")
+        return self
+
 
 @dataclass(frozen=True)
 class ProviderDispatchRequest:
@@ -67,6 +117,9 @@ class ProviderDispatchRequest:
     reference_image_paths: tuple[Path | str, ...] = ()
     subject_reference_image_path: Path | str | None = None
     seed: int | None = None
+    duration_sec: int | None = None
+    resolution: str | None = None
+    motion: str = ""
 
 
 class ProviderAdapter(Protocol):
@@ -91,6 +144,7 @@ class ProviderAdapter(Protocol):
 
 from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     FakeAsyncVideoAdapter,
+    KlingVideoAdapter,
     MiniMaxCliLLMAdapter,
     MiniMaxImageAdapter,
     OpenAICompatibleLLMAdapter,
@@ -112,8 +166,9 @@ class ProviderRegistry:
     def from_store(cls, store: CompanyProviderSecrets) -> "ProviderRegistry":
         adapters: dict[str, ProviderAdapter] = {}
         descriptors: dict[str, ProviderDescriptor] = {}
+        legacy_descriptorless = _is_legacy_descriptorless_kling_store(store)
         for service_id, service in sorted(store.services.items()):
-            descriptor = _descriptor_for_service(service_id, service)
+            descriptor = _descriptor_for_service(service_id, service, allow_legacy=legacy_descriptorless)
             descriptors[service_id] = descriptor
             capability = str(service.get("capability") or descriptor.modality)
             provider = str(service.get("provider") or "")
@@ -129,6 +184,9 @@ class ProviderRegistry:
             if capability == "video" and provider == "fake":
                 adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
                 continue
+            if capability == "video" and provider == "kling":
+                adapters[service_id] = KlingVideoAdapter(store, service_id, descriptor)
+                continue
         return cls(store, adapters, descriptors)
 
     def descriptor(self, service_id: str) -> ProviderDescriptor:
@@ -138,6 +196,10 @@ class ProviderRegistry:
             raise ModelConfigError(f"Provider service not found: {service_id}") from exc
 
     def dispatch(self, capability: str, service_id: str, request: ProviderDispatchRequest) -> dict[str, Any]:
+        task = self.submit(capability, service_id, request)
+        return self.poll(capability, service_id, task)
+
+    def submit(self, capability: str, service_id: str, request: ProviderDispatchRequest) -> dict[str, Any]:
         try:
             adapter = self._adapters[service_id]
         except KeyError as exc:
@@ -153,7 +215,16 @@ class ProviderRegistry:
         )
         plan = adapter.translate(request, selection)
         task = adapter.submit(plan)
-        raw = adapter.poll(task)
+        return {"service_id": service_id, "capability": capability, "task": task}
+
+    def poll(self, capability: str, service_id: str, task: dict[str, Any]) -> dict[str, Any]:
+        try:
+            adapter = self._adapters[service_id]
+        except KeyError as exc:
+            raise ModelConfigError(f"Provider service not found: {service_id}") from exc
+        if adapter.descriptor.modality != capability:
+            raise ModelConfigError(f"Provider service {service_id} does not support capability: {capability}")
+        raw = adapter.poll(dict(task.get("task") or task))
         return adapter.normalize(raw)
 
 
@@ -161,9 +232,11 @@ def load_provider_registry(path: str | Path | None = None) -> ProviderRegistry:
     return ProviderRegistry.from_store(load_company_provider_secrets(path))
 
 
-def _descriptor_for_service(service_id: str, service: dict[str, Any]) -> ProviderDescriptor:
+def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_legacy: bool = False) -> ProviderDescriptor:
     payload = service.get("descriptor")
     if not isinstance(payload, dict):
+        if allow_legacy:
+            return _legacy_descriptor_for_service(service_id, service)
         raise ModelConfigError(f"Provider service descriptor is required: {service_id}")
     try:
         descriptor = ProviderDescriptor.model_validate(payload)
@@ -176,10 +249,99 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any]) -> Provide
     return descriptor
 
 
+def _is_legacy_descriptorless_kling_store(store: CompanyProviderSecrets) -> bool:
+    if not store.services:
+        return False
+    if any(isinstance(service.get("descriptor"), dict) for service in store.services.values()):
+        return False
+    return any(str(service.get("provider") or "") == "kling" for service in store.services.values())
+
+
+def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> ProviderDescriptor:
+    capability = str(service.get("capability") or "image")
+    provider = str(service.get("provider") or "")
+    api_family = str(service.get("api_family") or "")
+    required_gate = _legacy_required_gate(capability, str(service.get("required_gate") or ""))
+    if capability == "video":
+        is_kling_i2v = provider == "kling" and (api_family == "i2v" or "i2v" in service_id)
+        payload: dict[str, Any] = {
+            "schema_version": "provider_descriptor.v0.2" if is_kling_i2v else "provider_descriptor.v0.1",
+            "modality": "video",
+            "execution_mode": "async",
+            "capabilities": ["video"],
+            "reference_image_slots": 2 if is_kling_i2v else 0,
+            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "prompt_char_limit": 1800,
+            "seed_supported": False,
+            "cost_hint": "legacy-local-config",
+            "rate_limit_hint": "legacy-local-config",
+            "required_gate": required_gate,
+        }
+        if is_kling_i2v:
+            payload.update(
+                {
+                    "frame_slots": {"first_frame": "required", "last_frame": "optional"},
+                    "frame_modes": ["first_frame", "first_last_frame"],
+                    "supported_durations_sec": [5, 10],
+                    "supported_resolutions": ["720p", "1080p"],
+                    "async_poll_interval_sec": 10,
+                    "async_timeout_sec": 600,
+                    "async_max_polls": 60,
+                    "prompt_profile": "video_i2v_v1",
+                    "cost_estimate": {"unit": "video_submit", "source": "legacy-local-config"},
+                }
+            )
+        return ProviderDescriptor.model_validate(payload)
+    if capability == "llm":
+        return ProviderDescriptor.model_validate(
+            {
+                "schema_version": "provider_descriptor.v0.1",
+                "modality": "llm",
+                "execution_mode": "sync",
+                "capabilities": ["llm"],
+                "reference_image_slots": 0,
+                "supported_aspect_ratios": ["1:1"],
+                "prompt_char_limit": 12000,
+                "seed_supported": False,
+                "cost_hint": "legacy-local-config",
+                "rate_limit_hint": "legacy-local-config",
+                "required_gate": required_gate,
+            }
+        )
+    return ProviderDescriptor.model_validate(
+        {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "image",
+            "execution_mode": "sync",
+            "capabilities": ["image"],
+            "reference_image_slots": 1,
+            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "prompt_char_limit": 1500,
+            "seed_supported": True,
+            "cost_hint": "legacy-local-config",
+            "rate_limit_hint": "legacy-local-config",
+            "required_gate": required_gate,
+        }
+    )
+
+
+def _legacy_required_gate(capability: str, configured: str) -> str:
+    if configured.startswith("AFS_ALLOW_REMOTE_"):
+        return configured
+    defaults = {
+        "image": "AFS_ALLOW_REMOTE_IMAGE",
+        "video": "AFS_ALLOW_REMOTE_VIDEO",
+        "llm": "AFS_ALLOW_REMOTE_LLM",
+        "asr": "AFS_ALLOW_REMOTE_ASR",
+    }
+    return defaults.get(capability, "AFS_ALLOW_REMOTE_IMAGE")
+
+
 __all__ = (
     "MiniMaxImageAdapter",
     "OpenAICompatibleLLMAdapter",
     "FakeAsyncVideoAdapter",
+    "KlingVideoAdapter",
     "MiniMaxCliLLMAdapter",
     "ProviderAdapter",
     "ProviderCapability",
