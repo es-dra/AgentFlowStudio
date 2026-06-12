@@ -74,15 +74,12 @@ def maybe_enhance_prompt_with_llm(
 
     try:
         registry = load_provider_registry()
-        result = registry.dispatch(
-            "llm",
-            _provider_name(request),
-            ProviderDispatchRequest(
-                prompt=_enhancement_instruction(request, assembly),
-                output_dir=Path("."),
-                task_type="prompt_enhancement",
-            ),
+        dispatch_request = ProviderDispatchRequest(
+            prompt=_enhancement_instruction(request, assembly),
+            output_dir=Path("."),
+            task_type="prompt_enhancement",
         )
+        result = _dispatch_llm_with_fallback(registry, request, dispatch_request)
         enhanced = str(result.get("text") or "")
     except ModelGatewayError as exc:
         return {**base, "status": "discarded", "discard_reason": _safe_reason(str(exc))}
@@ -273,6 +270,40 @@ def _provider_name(request: PromptOptimizationRequest) -> str:
     params = request.node_parameters or {}
     value = str(params.get("llm_provider") or "").strip()
     return value or MINIMAX_TEXT_PROVIDER
+
+
+def _provider_candidates(request: PromptOptimizationRequest, registry: Any) -> list[str]:
+    params = request.node_parameters or {}
+    explicit = str(params.get("llm_provider") or "").strip()
+    candidates: list[str] = []
+    for value in (explicit, MINIMAX_TEXT_PROVIDER, "minimax_llm"):
+        if value and value not in candidates:
+            candidates.append(value)
+    descriptors = getattr(registry, "_descriptors", {})
+    if isinstance(descriptors, dict):
+        for service_id, descriptor in sorted(descriptors.items()):
+            if getattr(descriptor, "modality", None) == "llm" and service_id not in candidates:
+                candidates.append(service_id)
+    return candidates
+
+
+def _dispatch_llm_with_fallback(
+    registry: Any,
+    request: PromptOptimizationRequest,
+    dispatch_request: ProviderDispatchRequest,
+) -> dict[str, Any]:
+    missing: list[str] = []
+    for service_id in _provider_candidates(request, registry):
+        try:
+            return registry.dispatch("llm", service_id, dispatch_request)
+        except ModelGatewayError as exc:
+            message = str(exc)
+            if "Provider service not found" in message:
+                missing.append(service_id)
+                continue
+            raise
+    missing_text = ", ".join(missing) if missing else _provider_name(request)
+    raise ModelGatewayError(f"Provider service not found: {missing_text}")
 
 
 def _strip_code_fence(value: str) -> str:

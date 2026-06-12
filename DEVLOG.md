@@ -1,5 +1,24 @@
 # Devlog
 
+## 2026-06-13 - Provider Service Alias Fix
+
+- Fixed Studio prompt optimization when the active provider config exposes `minimax_llm` instead of `minimax_m3`.
+- Added LLM service fallback in Runtime prompt enhancement: explicit request -> `minimax_m3` -> `minimax_llm` -> other registry LLM services.
+- Mapped legacy descriptorless `provider=minimax`, `capability=llm` services to the OpenAI-compatible LLM adapter under the existing `AFS_ALLOW_REMOTE_LLM` gate.
+
+Verification:
+
+```text
+tests/test_provider_adapter_registry.py tests/test_api_runtime_prompt_memory_loop.py: 29 passed, 1 warning
+Studio optimizer/model JS node --check: passed
+External provider config registry check: minimax_image ok, minimax_llm ok, kling_i2v ok, minimax_m3 absent by design
+```
+
+Boundary:
+
+- No live LLM, image, or video provider call was made in this fix.
+- Existing running Runtime processes must be restarted to pick up the alias fallback.
+
 ## 2026-06-13 - Kling I2V Preflight And Project Persistence
 
 - Added Runtime project listing and image asset public listing for Studio project selection and drawer rehydration.

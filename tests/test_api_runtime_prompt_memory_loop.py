@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
 
@@ -203,6 +204,63 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
     assert "reasoning_content" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_prompt_optimizer_falls_back_to_available_minimax_llm_service(tmp_path, monkeypatch) -> None:
+    class Descriptor:
+        modality = "llm"
+
+    class FakeRegistry:
+        _descriptors = {"minimax_llm": Descriptor()}
+
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            self.calls.append(service_id)
+            if service_id == "minimax_m3":
+                raise ModelGatewayError("Provider service not found: minimax_m3")
+            assert service_id == "minimax_llm"
+            return {"text": "\n".join(
+                [
+                    "鎰忓浘锛氫负瀹夐潤鐨勫垱濮嬩汉鍦烘櫙鐢熸垚涓€寮犲彲鎺у叧閿抚銆?",
+                    "浜虹墿/涓讳綋锛氫繚鎸佸垱濮嬩汉鐨勮韩浠姐€佹湇瑁呭拰绁炴€佺ǔ瀹氭竻鏅般€?",
+                    "鍦烘櫙/缇庢湳锛氬闂村伐浣滃銆佺幓鐠冨銆佸厠鍒堕亾鍏凤紝閬垮厤鏉備贡鑳屾櫙銆?",
+                    "鍔ㄤ綔/鎯呰妭锛氬垱濮嬩汉鍦ㄥ彂瑷€鍓嶇煭鏆傚仠椤匡紝鎯呯华鍐呮暃浣嗘湁鍘嬪姏銆?",
+                    "闀滃ご/鏋勫浘锛氱珫鏋勫浘涓櫙锛屼富浣撲綅缃槑纭紝鑳屾櫙淇℃伅鏈嶅姟鍙欎簨銆?",
+                    "鐏厜锛氫綆璋冨疄鏅獥鍏夛紝鏌斿拰鍙嶅樊锛屼繚鐣欓潰閮ㄥ彲璇绘€с€?",
+                    "杩愬姩/鏃堕棿鎺ㄨ繘锛氶潤鎬佸叧閿抚锛屾殫绀虹紦鎱㈡帹杩涗絾涓嶅埗閫犺繍鍔ㄦā绯娿€?",
+                    "杩炵画鎬э細寤剁画鏈嶈銆佺┖闂存柟浣嶅拰涓诲厜鏂瑰悜銆?",
+                    "璐熼潰绾︽潫锛氫笉瑕佹按鍗帮紝涓嶈鎵嬮儴鐣稿舰锛屼笉瑕佽韩浠芥紓绉汇€?",
+                ]
+            )}
+
+    registry = FakeRegistry()
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: registry)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_minimax_llm_alias/prompt-optimizations",
+        json={
+            "node_id": "image-node-minimax-alias",
+            "node_type": "image",
+            "prompt_text": "A founder stands in a night studio before a product launch.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+            },
+            "generated_at": "2026-06-13T13:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    assert registry.calls[:2] == ["minimax_m3", "minimax_llm"]
+    assert result.json()["provider_calls_started"] is True
 
 
 def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated(tmp_path, monkeypatch) -> None:

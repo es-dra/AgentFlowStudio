@@ -175,7 +175,7 @@ class ProviderRegistry:
             if capability == "image" and provider == "minimax":
                 adapters[service_id] = MiniMaxImageAdapter(store, service_id, descriptor)
                 continue
-            if capability == "llm" and provider == "openai_compatible":
+            if capability == "llm" and provider in {"openai_compatible", "minimax", "deepseek"}:
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
                 continue
             if capability == "llm" and provider == "minimax_cli":

@@ -253,6 +253,40 @@ def test_provider_registry_derives_legacy_kling_i2v_descriptor(tmp_path) -> None
     assert descriptor.prompt_profile == "video_i2v_v1"
 
 
+def test_provider_registry_supports_legacy_minimax_llm_service(tmp_path, monkeypatch) -> None:
+    payload = legacy_kling_provider_config()
+    payload["accounts"]["minimax"]["default_models"]["llm"] = "MiniMax-M3"
+    payload["services"]["minimax_llm"] = {
+        "provider": "minimax",
+        "account_ref": "minimax",
+        "capability": "llm",
+        "default_model_ref": "accounts.minimax.default_models.llm",
+        "required_gate": "NARRATOCUT_ALLOW_REMOTE_LLM",
+    }
+    captured: dict[str, object] = {}
+
+    def fake_send(self, payload, api_key):
+        captured["payload"] = payload
+        captured["api_key"] = api_key
+        return {"choices": [{"message": {"content": "legacy minimax llm ok"}}]}
+
+    monkeypatch.setattr(openai_compatible.OpenAICompatibleProvider, "_send_request", fake_send)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    result = registry.dispatch(
+        "llm",
+        "minimax_llm",
+        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
+    )
+
+    assert registry.descriptor("minimax_llm").required_gate == "AFS_ALLOW_REMOTE_LLM"
+    assert result["text"] == "legacy minimax llm ok"
+    assert captured["payload"]["model"] == "MiniMax-M3"
+    assert captured["api_key"] == "fake-minimax-key"
+
+
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
     called = {"count": 0}
 
