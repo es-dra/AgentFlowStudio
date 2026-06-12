@@ -287,6 +287,45 @@ def test_provider_registry_supports_legacy_minimax_llm_service(tmp_path, monkeyp
     assert captured["api_key"] == "fake-minimax-key"
 
 
+def test_provider_registry_uses_legacy_deepseek_default_model_when_ref_blank(tmp_path, monkeypatch) -> None:
+    payload = legacy_kling_provider_config()
+    payload["accounts"]["deepseek"] = {
+        "auth_type": "bearer",
+        "base_url": "https://api.deepseek.com",
+        "api_key": "fake-deepseek-key",
+        "default_models": {"llm": ""},
+    }
+    payload["services"]["deepseek_llm"] = {
+        "provider": "deepseek",
+        "account_ref": "deepseek",
+        "capability": "llm",
+        "default_model_ref": "accounts.deepseek.default_models.llm",
+        "required_gate": "NARRATOCUT_ALLOW_REMOTE_LLM",
+    }
+    captured: dict[str, object] = {}
+
+    def fake_send(self, payload, api_key):
+        captured["payload"] = payload
+        captured["api_key"] = api_key
+        return {"choices": [{"message": {"content": "legacy deepseek llm ok"}}]}
+
+    monkeypatch.setattr(openai_compatible.OpenAICompatibleProvider, "_send_request", fake_send)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    result = registry.dispatch(
+        "llm",
+        "deepseek_llm",
+        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
+    )
+
+    assert registry.descriptor("deepseek_llm").required_gate == "AFS_ALLOW_REMOTE_LLM"
+    assert result["text"] == "legacy deepseek llm ok"
+    assert captured["payload"]["model"] == "deepseek-chat"
+    assert captured["api_key"] == "fake-deepseek-key"
+
+
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
     called = {"count": 0}
 

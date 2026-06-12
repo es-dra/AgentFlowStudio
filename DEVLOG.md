@@ -1,5 +1,27 @@
 # Devlog
 
+## 2026-06-13 - LLM Optimizer Runtime Fallback Fix
+
+- Fixed the remaining Studio prompt optimization 422 when the external provider config has blank legacy LLM default model refs.
+- Added provider-side legacy defaults for descriptorless OpenAI-compatible LLM services: MiniMax falls back to `MiniMax-M2.7-highspeed`, DeepSeek falls back to `deepseek-chat`.
+- Prompt optimization now skips MiniMax Anthropic-style OpenAI-compatible 404s and continues to the next registry LLM service.
+
+Verification:
+
+```text
+tests/test_provider_adapter_registry.py tests/test_api_runtime_prompt_memory_loop.py: 31 passed, 1 warning
+Runtime 8790 restarted with external provider config and AFS_ALLOW_REMOTE_LLM/IMAGE/VIDEO=true
+POST /projects/debug-optimizer/prompt-optimizations: 200 OK, provider_calls_started=true, llm_enhancement.status=applied
+Kling provider preflight: ready, secrets_printed=false
+Registry descriptor check: minimax_image, kling_i2v, deepseek_llm, minimax_llm ready
+```
+
+Boundary:
+
+- No provider secret or raw provider response was written to tracked files.
+- No live image or Kling video job was submitted in this fix.
+- The live LLM optimization call is runtime verification, not human acceptance.
+
 ## 2026-06-13 - Provider Service Alias Fix
 
 - Fixed Studio prompt optimization when the active provider config exposes `minimax_llm` instead of `minimax_m3`.

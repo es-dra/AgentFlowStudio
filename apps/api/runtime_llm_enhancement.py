@@ -298,7 +298,7 @@ def _dispatch_llm_with_fallback(
             return registry.dispatch("llm", service_id, dispatch_request)
         except ModelGatewayError as exc:
             message = str(exc)
-            if "Provider service not found" in message:
+            if "Provider service not found" in message or "OpenAI-compatible HTTP error 404" in message:
                 missing.append(service_id)
                 continue
             raise

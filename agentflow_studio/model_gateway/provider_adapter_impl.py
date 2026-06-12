@@ -8,13 +8,17 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets
+from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
 from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
 from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
+
+
+DEFAULT_MINIMAX_TEXT_MODEL = "MiniMax-M2.7-highspeed"
+DEFAULT_DEEPSEEK_TEXT_MODEL = "deepseek-chat"
 
 
 class MiniMaxImageAdapter:
@@ -87,7 +91,13 @@ class OpenAICompatibleLLMAdapter:
         service = self.store.service(self.service_id)
         account = account_selection.account
         default_models = account.get("default_models") if isinstance(account.get("default_models"), dict) else {}
-        model = request.model_name_override or service.get("model") or default_models.get("llm")
+        model = (
+            request.model_name_override
+            or service.get("model")
+            or _model_from_ref(self.store, service)
+            or default_models.get("llm")
+            or _legacy_llm_default_model(service)
+        )
         return {
             "prompt": request.prompt,
             "task_type": request.task_type,
@@ -316,6 +326,23 @@ def _safe_error(value: str) -> str:
     if "api" in lowered or "key" in lowered or "secret" in lowered:
         return "Provider configuration is not ready."
     return value[:160]
+
+
+def _model_from_ref(store: CompanyProviderSecrets, service: dict[str, Any]) -> str:
+    ref = service.get("default_model_ref")
+    if not isinstance(ref, str) or not ref.strip():
+        return ""
+    value = resolve_ref(store.model_dump(mode="python"), ref.strip())
+    return str(value or "").strip()
+
+
+def _legacy_llm_default_model(service: dict[str, Any]) -> str:
+    provider = str(service.get("provider") or "")
+    if provider == "minimax":
+        return DEFAULT_MINIMAX_TEXT_MODEL
+    if provider == "deepseek":
+        return DEFAULT_DEEPSEEK_TEXT_MODEL
+    return ""
 
 
 def _resolve_cli_invocation(command: str) -> list[str]:
