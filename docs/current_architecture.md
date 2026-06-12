@@ -77,7 +77,7 @@ Frontend code must not expose:
 - Prompt optimization API and local fallback.
 - Creative intent control agent v1: deterministic constraint layering, candidate scoring, selected canonical prompt, and provider translation trace.
 - Fixed visual asset APIs and graph-scoped context resolver.
-- Provider Adapter v0.1 descriptor registry for Runtime image dispatch.
+- Provider Gateway v0.1 descriptor registry, account pools, Runtime image dispatch, registry-backed LLM prompt enhancement, and fake async video lifecycle contract.
 - Director Compiler v1 for deterministic 2D director setup translation.
 - Keyframe generation Runtime API with `AFS_ALLOW_REMOTE_IMAGE` gate closed by default.
 - Project Manifest v0.1.

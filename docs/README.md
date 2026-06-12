@@ -30,6 +30,7 @@ static memory-workbench paths are not task entrypoints.
 - [Current architecture](current_architecture.md)
 - [Node prompt optimizer contract](architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md)
 - [Creative intent control agent engineering summary](architecture/AFS_CREATIVE_INTENT_CONTROL_AGENT_ENGINEERING_SUMMARY.zh-CN.md)
+- [Provider adapter contract](provider_adapter_contract.md)
 - [Skill contract](agentflow_skill_contract.md)
 - [Router contract](agentflow_router_contract.md)
 

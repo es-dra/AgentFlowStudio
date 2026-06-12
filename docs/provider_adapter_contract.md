@@ -1,56 +1,77 @@
-# Provider Adapter v0.1 契约
+# Provider Adapter v0.1 Contract
 
-AFS 的 provider 接入走本地轻量 adapter 层，不引入外部网关。adapter 层只负责把 Runtime 的安全请求转成具体 provider 调用，并把结果归一化为 safe manifest / safe output。
+中文摘要：本契约定义 AFS 本地 provider 中转站的最小公共接口。Runtime 只能通过
+`ProviderRegistry.dispatch(...)` 调度 provider；服务能力由 descriptor 描述，账号由
+本地 account pool 选择，真实 secret 只存在于环境变量或 ignored local config 中。
+
+AFS 使用本地轻量 provider adapter 层，不引入外部网关。Runtime 只面向统一
+registry，不直接 import 具体 provider smoke、SDK wrapper 或账号实现。
 
 ## Descriptor
 
-每个 `services.*` provider 配置必须带 `descriptor`：
+每个 `services.*` 必须带 `descriptor`。示例见 `configs/providers.example.json`。
 
-```json
-{
-  "schema_version": "provider_descriptor.v0.1",
-  "modality": "image",
-  "execution_mode": "sync",
-  "reference_image_slots": 1,
-  "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
-  "prompt_char_limit": 1500,
-  "seed_supported": true,
-  "cost_hint": "Live image generation cost depends on provider account configuration.",
-  "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
-}
-```
+关键字段：
 
-Runtime 直接消费两个字段：
+- `modality`: `llm | image | video | asr`
+- `execution_mode`: `sync | async`
+- `capabilities`: 服务支持的能力列表，必须包含 `modality`
+- `account_pool_id`: 可选账号池 id；缺省时兼容旧 `account_ref`
+- `reference_image_slots`: adapter 可接受的参考图位数
+- `supported_aspect_ratios`: adapter 支持的画幅
+- `prompt_char_limit`: provider prompt 字符上限
+- `seed_supported`: 是否支持 seed
+- `cost_hint` / `rate_limit_hint`: 只写公开提示，不写真实成本或账号策略
+- `required_gate`: 必须是 `AFS_ALLOW_REMOTE_*`
 
-- `prompt_char_limit`：控制上下文预算和最终 provider prompt 截断。
-- `reference_image_slots`：控制 resolver 参考图通道最多传给 adapter 的图片数量。
+Runtime 已消费 `prompt_char_limit` 和 `reference_image_slots`，因此 MiniMax 的
+1500 字符与单参考图限制只是服务配置，不再是 resolver 的架构假设。
 
-MiniMax image 当前配置为 1 个主体参考图位。这个限制属于服务能力描述，不再是 resolver 的架构假设。
+## Account Pool
 
-## 生命周期
+账号池只存在于 ignored local config 或 example config。仓库不得提交真实 key。
 
-所有 adapter 都实现同一生命周期：
+账号池 entry 支持：
+
+- `account_id`
+- `service_id`
+- `credential_env`
+- `enabled_capabilities`
+- `enabled`
+- `priority`
+- `weight`
+- `concurrency_limit`
+- `health_state`
+
+选择规则：按 `priority` 升序、再按 `account_id` 稳定排序。`enabled=false` 或
+`health_state=disabled` 不参与调度。`credential_env` 只检查变量是否存在，不读取
+或写入变量值。trace、manifest、OpenAPI 和前端响应不得暴露 secret。
+
+## Lifecycle
+
+所有 adapter 实现同一生命周期：
 
 ```text
-validate -> translate -> submit -> poll -> normalize
+validate -> translate -> submit -> poll -> normalize -> safe_error
 ```
 
-同步 provider 的 `submit` 可以返回 already-complete task，因此 `poll` 会立即完成；异步 provider 可复用同一个接口表达 submit/poll 分离。
+同步 provider 的 `submit` 可以返回 already-complete task；异步 provider 必须把
+提交和轮询拆开。fake video adapter 只用于本地 contract 验证，不代表真实 video
+provider smoke。
 
-`safe_error(error)` 必须在错误进入 Runtime artifact 前脱敏，不能泄露 provider config、secret、token、Authorization header、本地路径或原始响应。
+## Runtime Dispatch
 
-## Runtime 调度
-
-Runtime 只允许调用：
+Runtime 唯一调度入口：
 
 ```python
 registry.dispatch(capability, service_id, request)
 ```
 
-`apps/api/runtime_keyframes.py` 不应直接 import MiniMax smoke 函数。旧 CLI 命令名可以保留；未来如果要把 CLI 也纳入统一调度，应在内部复用 registry。
+已接入：
 
-## Gate
+- `minimax_image`: image / sync
+- `minimax_m3`: OpenAI-compatible LLM / sync
+- `fake_video`: video / async contract test only
 
-`descriptor.required_gate` 是该服务的能力 gate。gate 按能力单独授权：打开 `AFS_ALLOW_REMOTE_IMAGE=true` 不代表授权 LLM、ASR、video、download 或其他网络能力。
-
-gate 关闭时，Runtime 路径不要求本地 provider config，也不得启动网络调用。
+Kling 等真实 video adapter 属于后续切片。真实 provider 调用仍必须单独开启对应
+gate；image 授权不代表 LLM、ASR、video 或下载授权。

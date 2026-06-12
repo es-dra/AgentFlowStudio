@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -144,14 +145,16 @@ def test_prompt_optimizer_uses_professional_knowledgebase_trace_and_chinese_slot
 
 
 def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monkeypatch) -> None:
-    class FakeGateway:
-        def generate(self, prompt, *, task_type=None, provider_name=None):
-            assert task_type == "prompt_enhancement"
-            assert provider_name == "minimax_m3"
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            assert request.task_type == "prompt_enhancement"
+            prompt = request.prompt
             assert "Canonical brief:" in prompt
             assert "不要替换成" in prompt
             assert "最终展示给用户的内容必须以中文为主" in prompt
-            return "\n".join(
+            return {"text": "\n".join(
                 [
                     "意图：为安静的创始人场景生成一张可控关键帧。",
                     "人物/主体：保持创始人的身份、服装和神态稳定清晰。",
@@ -163,14 +166,10 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
                     "连续性：延续服装、空间方位和主光方向。",
                     "负面约束：不要水印，不要手部畸形，不要身份漂移。",
                 ]
-            )
+            )}
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    monkeypatch.setenv("AFS_MODEL_CONFIG", str(tmp_path / "models.yaml"))
-    monkeypatch.setattr(
-        "apps.api.runtime_llm_enhancement.ModelGateway.from_config_path",
-        lambda path: FakeGateway(),
-    )
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
@@ -210,10 +209,12 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
 
 
 def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated(tmp_path, monkeypatch) -> None:
-    class FakeGateway:
-        def generate(self, prompt, *, task_type=None, provider_name=None):
-            assert task_type == "prompt_enhancement"
-            return "\n".join(
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            assert request.task_type == "prompt_enhancement"
+            return {"text": "\n".join(
                 [
                     "Intent: generic scene.",
                     "Subject/Character: Primary character with stable identity.",
@@ -222,14 +223,10 @@ def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated
                     "Lighting: cinematic light.",
                     "Negative Constraints: no watermark.",
                 ]
-            )
+            )}
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    monkeypatch.setenv("AFS_MODEL_CONFIG", str(tmp_path / "models.yaml"))
-    monkeypatch.setattr(
-        "apps.api.runtime_llm_enhancement.ModelGateway.from_config_path",
-        lambda path: FakeGateway(),
-    )
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
@@ -256,3 +253,11 @@ def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated
     assert "Primary character" not in payload["optimized_prompt"]
     assert trace["llm_enhancement"]["status"] == "discarded"
     assert trace["llm_enhancement"]["discard_reason"] == "enhancement missing required sections"
+
+
+def test_prompt_optimizer_llm_enhancement_uses_provider_registry_not_legacy_gateway() -> None:
+    source = Path("apps/api/runtime_llm_enhancement.py").read_text(encoding="utf-8")
+
+    assert "ModelGateway.from_config_path" not in source
+    assert "MODEL_GATEWAY_CONFIG_ENV" not in source
+    assert "load_provider_registry" in source

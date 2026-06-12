@@ -17,6 +17,7 @@ DEFAULT_COMPANY_PROVIDER_SECRETS: Path | None = None
 class CompanyProviderSecrets(BaseModel):
     schema_version: str
     accounts: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    account_pools: dict[str, dict[str, Any]] = Field(default_factory=dict)
     services: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def account(self, account_id: str) -> dict[str, Any]:

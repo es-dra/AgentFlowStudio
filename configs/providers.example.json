@@ -4,12 +4,74 @@
     "minimax": {
       "auth_type": "api_key",
       "base_url": "https://api.minimax.io",
+      "api_key_env": "MINIMAX_API_KEY",
       "execution_backend": "mmx_cli",
       "region": "cn",
       "cli_command": "mmx",
       "default_models": {
         "image": "image-01"
       }
+    },
+    "openai_compatible_llm": {
+      "auth_type": "api_key",
+      "base_url": "https://api.example.com/v1",
+      "api_key_env": "AFS_OPENAI_COMPATIBLE_API_KEY",
+      "default_models": {
+        "llm": "gpt-compatible"
+      }
+    },
+    "fake_video": {
+      "auth_type": "none",
+      "base_url": "https://video.example.invalid",
+      "default_models": {
+        "video": "fake-video"
+      }
+    }
+  },
+  "account_pools": {
+    "minimax_image_pool": {
+      "accounts": [
+        {
+          "account_id": "minimax",
+          "service_id": "minimax_image",
+          "credential_env": "MINIMAX_API_KEY",
+          "enabled_capabilities": ["image"],
+          "enabled": true,
+          "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "llm_pool": {
+      "accounts": [
+        {
+          "account_id": "openai_compatible_llm",
+          "service_id": "openai_text",
+          "credential_env": "AFS_OPENAI_COMPATIBLE_API_KEY",
+          "enabled_capabilities": ["llm"],
+          "enabled": true,
+          "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "video_pool": {
+      "accounts": [
+        {
+          "account_id": "fake_video",
+          "service_id": "fake_video",
+          "enabled_capabilities": ["video"],
+          "enabled": true,
+          "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
     }
   },
   "services": {
@@ -24,12 +86,63 @@
         "schema_version": "provider_descriptor.v0.1",
         "modality": "image",
         "execution_mode": "sync",
+        "capabilities": ["image"],
+        "account_pool_id": "minimax_image_pool",
         "reference_image_slots": 1,
         "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
         "prompt_char_limit": 1500,
         "seed_supported": true,
         "cost_hint": "Live image generation cost depends on provider account configuration.",
+        "rate_limit_hint": "Use a single local smoke at a time unless the provider account explicitly allows more.",
         "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
+      }
+    },
+    "minimax_m3": {
+      "provider": "openai_compatible",
+      "account_ref": "openai_compatible_llm",
+      "capability": "llm",
+      "model": "MiniMax-M3",
+      "temperature": 0.2,
+      "max_completion_tokens": 900,
+      "extra_body": {
+        "thinking": {
+          "type": "disabled"
+        }
+      },
+      "required_gate": "AFS_ALLOW_REMOTE_LLM",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "llm",
+        "execution_mode": "sync",
+        "capabilities": ["llm"],
+        "account_pool_id": "llm_pool",
+        "reference_image_slots": 0,
+        "supported_aspect_ratios": ["1:1"],
+        "prompt_char_limit": 5000,
+        "seed_supported": false,
+        "cost_hint": "Live text enhancement cost depends on provider account configuration.",
+        "rate_limit_hint": "Prompt enhancement should be manually gated and sampled before bulk use.",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM"
+      }
+    },
+    "fake_video": {
+      "provider": "fake",
+      "account_ref": "fake_video",
+      "capability": "video",
+      "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "video",
+        "execution_mode": "async",
+        "capabilities": ["video"],
+        "account_pool_id": "video_pool",
+        "reference_image_slots": 1,
+        "supported_aspect_ratios": ["16:9", "9:16"],
+        "prompt_char_limit": 2000,
+        "seed_supported": false,
+        "cost_hint": "Fake adapter only; no provider cost.",
+        "rate_limit_hint": "Fake adapter is deterministic and local.",
+        "required_gate": "AFS_ALLOW_REMOTE_VIDEO"
       }
     }
   }

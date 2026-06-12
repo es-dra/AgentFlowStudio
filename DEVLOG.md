@@ -9,6 +9,33 @@ product documentation.
 
 中文当前说明：本文件当前只作为工程维护流水账，不承担业务验收、模型效果判断或长期公司规则晋升。每条记录都应服务于后续接手者快速判断“这轮到底改变了什么、验证了什么、还剩什么风险”。如果某项工作只产生了本地缓存、临时运行产物或 provider 原始响应，它不能被写成产品能力完成；如果某项证据还没有经过人工验收，也不能被写成业务有效。当前阶段的重点是把 Studio 主线、Runtime Service、provider gate、固定资产、图谱上下文和维护清理统一到一条可落地的 MVP 链路上。历史分发线、旧 Workbench、旧 memory UI、旧候选记忆流程只保留为 legacy 或审计背景，不再作为新任务入口。后续每次接入真实模型前，都应先确认本地配置没有进入 tracked 文件，provider gate 按能力单独开启，生成媒体只落在 ignored runtime/evidence 目录，并在报告中明确区分工程验证、provider smoke、人工验收和业务验证。
 
+## 2026-06-12 - Provider Gateway v0.1
+
+- Extended the provider descriptor with `capabilities`, optional `account_pool_id`, and `rate_limit_hint`.
+- Added local account pool selection with deterministic priority ordering, disabled-account filtering, and credential-env presence checks without reading or persisting secret values.
+- Kept MiniMax image on the unified `ProviderRegistry.dispatch(...)` path and preserved descriptor-driven prompt budget / reference slots.
+- Added OpenAI-compatible LLM dispatch to the registry and moved Runtime prompt enhancement away from legacy `ModelGateway.from_config_path`.
+- Added a fake async video adapter to validate `submit -> poll -> normalize` lifecycle without live video provider calls.
+- Replaced provider adapter and config docs with readable contracts and expanded `configs/providers.example.json` to cover image, LLM, fake video, descriptors, and account pools.
+
+Verification so far:
+
+```text
+tests/test_provider_adapter_registry.py: 11 passed
+Focused provider/keyframe/resolver/prompt set: 42 passed, 1 Starlette/httpx warning
+Full pytest: 838 passed, 1 Starlette/httpx warning
+Studio JS node --check: passed 35 files
+maintenance_audit: failed=0, warning=1 existing oversized-files warning
+git diff --check: passed with Windows CRLF notices only
+```
+
+Boundaries:
+
+- Provider gates remain closed except mocked dispatch paths inside tests.
+- No live image, LLM, ASR, video, or download provider call was made.
+- Fake video adapter is a lifecycle contract test only, not provider smoke.
+- This is not human acceptance, business validation, or durable-memory promotion.
+
 ## 2026-06-12 - Project Inventory And Direct Cleanup 001
 
 - Added reusable project inventory / cleanup tooling with tracked, ignored, and untracked-unignored classification.
