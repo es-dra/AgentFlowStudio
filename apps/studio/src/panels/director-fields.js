@@ -14,6 +14,7 @@ export function cameraFields(obj, renderBoard) {
 
 export function subjectFields(obj) {
   return [
+    textField("绑定人物资产 ID", obj.visual_asset_id, (value) => { obj.visual_asset_id = value; }),
     textField("动作状态", obj.action, (value) => { obj.action = value; }),
     textField("情绪状态", obj.emotion, (value) => { obj.emotion = value; }),
   ];

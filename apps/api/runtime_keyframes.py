@@ -194,6 +194,7 @@ def _context_bundle(
         style_preference=request.style,
         prompt_char_limit=prompt_char_limit,
         reference_image_slots=reference_image_slots,
+        director_setup=request.director_setup,
     )
 
 

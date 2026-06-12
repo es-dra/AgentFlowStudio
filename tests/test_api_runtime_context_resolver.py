@@ -5,8 +5,8 @@ import json
 
 from fastapi.testclient import TestClient
 
-from apps.api.runtime_context_resolver import resolve_context_bundle
-from apps.api.runtime_models import ContextSubgraph
+from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
+from apps.api.runtime_models import ContextSubgraph, DirectorSetup2D
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 from agentflow.harness.json_io import write_json
@@ -215,6 +215,40 @@ def test_reference_image_slots_allow_multiple_character_subject_refs(tmp_path) -
 
     expected = [image_id for _, image_id in sorted([(first["asset_id"], first_image), (second["asset_id"], second_image)])]
     assert [item["asset_id"] for item in bundle["reference_image_channel"]] == expected
+
+
+def test_director_setup_asset_binding_reads_signature_from_backend_store(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_director_asset_binding"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+
+    bundle = resolve_context_bundle(
+        RuntimeStore(tmp_path),
+        project_id,
+        mode="generate",
+        visible_prompt="director setup binding test",
+        context_subgraph=ContextSubgraph.model_validate(_subgraph("target-node", "char-node", asset["asset_id"])),
+        include_fixed_assets=False,
+        director_setup=DirectorSetup2D.model_validate(
+            {
+                "subjects": [
+                    {
+                        "id": "sub_a",
+                        "name": "主体A",
+                        "visual_asset_id": asset["asset_id"],
+                        "signature": "forged frontend signature",
+                    }
+                ],
+                "cameras": [{"id": "cam_a", "name": "机位", "x": 20, "y": 80, "shot": "中景"}],
+            }
+        ),
+    )
+    prompt = provider_prompt_from_bundle(bundle)
+
+    assert "Lin Wan signature" in prompt
+    assert "forged frontend signature" not in prompt
+    assert bundle["director_compile_result"]["asset_refs_used"] == [asset["asset_id"]]
 
 
 def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path) -> None:

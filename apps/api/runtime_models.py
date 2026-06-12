@@ -102,6 +102,8 @@ class ProviderScriptDraftPlanRequest(BaseModel):
 
 class DirectorSetup2D(BaseModel):
     view: str = "top_down_2d"
+    activeCameraId: str | None = None
+    activeSubjectIds: list[str] = Field(default_factory=list)
     characters: list[dict[str, Any]] = Field(default_factory=list)
     subjects: list[dict[str, Any]] = Field(default_factory=list)
     lights: list[dict[str, Any]] = Field(default_factory=list)

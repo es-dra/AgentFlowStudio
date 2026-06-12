@@ -87,6 +87,7 @@ def _context_bundle(
         mode="optimize",
         visible_prompt=request.prompt_text,
         context_subgraph=request.context_subgraph,
+        director_setup=request.director_setup,
     )
 
 

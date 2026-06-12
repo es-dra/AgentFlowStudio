@@ -21,6 +21,8 @@ export function createDefaultDirectorSetup() {
   return {
     view: "top_down_2d",
     selectedId: "camera_main",
+    activeCameraId: "camera_main",
+    activeSubjectIds: ["subject_a"],
     cameras: [{
       id: "camera_main",
       name: "机位1",
@@ -40,27 +42,15 @@ export function createDefaultDirectorSetup() {
       x: 53,
       y: 55,
       angle: 210,
-      action: "坐姿",
-      emotion: "低落",
+      action: "",
+      emotion: "",
+      visual_asset_id: "",
     }],
-    lights: [
-      light("key_light", "Key Light", 34, 30, 45, 78, 4300, 68, true),
-      light("fill_light", "Fill Light", 74, 42, 190, 38, 5600, 82, false),
-      light("back_light", "Back Light", 56, 22, 120, 48, 5200, 42, false),
-    ],
-    modifiers: [
-      modifier("reflector", "反光板", 68, 52, 180, "回收面部暗部"),
-      modifier("flag", "遮光旗", 26, 50, 90, "压暗背景墙"),
-    ],
-    props: [
-      prop("bed", "床", 58, 68, 28, 14, "主体坐位"),
-      prop("window", "窗", 82, 28, 18, 8, "冷色窗外光"),
-      prop("poster", "海报", 76, 46, 12, 8, "角色身份线索"),
-      prop("door", "门", 18, 40, 10, 20, "入画方向"),
-      prop("wall", "墙", 50, 18, 74, 5, "背景边界"),
-    ],
-    composition: "主体偏左，窗户光和海报形成右侧叙事信息",
-    notes: "暗调房间，主光来自床侧，保留墙上海报作为情绪线索。",
+    lights: [],
+    modifiers: [],
+    props: [],
+    composition: "",
+    notes: "",
   };
 }
 
@@ -90,11 +80,15 @@ export function normalizeDirectorSetup(value) {
   };
   setup.view = "top_down_2d";
   setup.selectedId = setup.selectedId || setup.cameras[0]?.id || "camera_main";
+  setup.activeCameraId = setup.activeCameraId || setup.cameras[0]?.id || null;
+  setup.activeSubjectIds = Array.isArray(setup.activeSubjectIds)
+    ? setup.activeSubjectIds.filter(Boolean)
+    : setup.subjects.map((item) => item.id).filter(Boolean);
   return setup;
 }
 
 function normalizeList(value, fallback) {
-  return Array.isArray(value) && value.length ? clone(value) : clone(fallback);
+  return Array.isArray(value) ? clone(value) : clone(fallback);
 }
 
 export function selectedDirectorObject(setup) {
@@ -133,13 +127,14 @@ export function directorSummary(setup) {
 }
 
 export function directorPromptSummary(setup) {
-  const camera = setup.cameras[0];
-  const subject = setup.subjects[0];
-  const lights = setup.lights.map((item) => `${item.name} ${item.intensity}% ${item.colorTemp}K`).join("；");
-  const props = setup.props.filter((item) => item.visible !== false).map((item) => `${item.name}:${item.narrative || "可见"}`).join("；");
+  const camera = setup.cameras.find((item) => item.id === setup.activeCameraId) || setup.cameras[0];
+  const active = new Set(setup.activeSubjectIds || []);
+  const subjects = setup.subjects.filter((item) => !active.size || active.has(item.id));
+  const lights = setup.lights.map((item) => item.name).filter(Boolean).slice(0, 3).join("、");
+  const props = setup.props.filter((item) => item.visible !== false).map((item) => item.name).filter(Boolean).slice(0, 4).join("、");
   return [
-    camera ? `机位 ${camera.name}，${camera.shot}，${camera.height}，FOV ${camera.fov}，构图 ${camera.composition}` : "",
-    subject ? `主体 ${subject.name} 位于画面 ${subject.x}/${subject.y}，朝向 ${subject.angle}°，动作 ${subject.action}，情绪 ${subject.emotion}` : "",
+    camera ? `生效机位 ${camera.name || camera.id}，${camera.shot || "未设景别"}，${camera.height || "未设高度"}` : "未指定生效机位",
+    subjects.length ? `生效主体 ${subjects.map((item) => item.name || item.id).join("、")}` : "未指定生效主体",
     lights ? `灯光 ${lights}` : "",
     props ? `道具 ${props}` : "",
     setup.composition ? `构图意图 ${setup.composition}` : "",
@@ -151,8 +146,10 @@ export function safeDirectorSetup(setup) {
   const normalized = normalizeDirectorSetup(setup);
   return {
     view: "top_down_2d",
-    characters: normalized.subjects.map(({ id, name, x, y, angle, action, emotion }) => ({ id, name, x, y, angle, action, emotion })),
-    subjects: normalized.subjects.map(({ id, name, x, y, angle, action, emotion }) => ({ id, name, x, y, angle, action, emotion })),
+    activeCameraId: normalized.activeCameraId || null,
+    activeSubjectIds: normalized.activeSubjectIds || [],
+    characters: normalized.subjects.map(({ id, name, x, y, angle, action, emotion, visual_asset_id }) => ({ id, name, x, y, angle, action, emotion, visual_asset_id })),
+    subjects: normalized.subjects.map(({ id, name, x, y, angle, action, emotion, visual_asset_id }) => ({ id, name, x, y, angle, action, emotion, visual_asset_id })),
     lights: normalized.lights.map(({ id, kind, name, x, y, angle, intensity, colorTemp, softness, distance, motivated }) => ({ id, kind, name, x, y, angle, intensity, colorTemp, softness, distance, motivated })),
     cameras: normalized.cameras.map(({ id, name, x, y, angle, fov, focalLength, height, shot, composition, lookAt }) => ({ id, name, x, y, angle, fov, focalLength, height, shot, composition, lookAt })),
     modifiers: normalized.modifiers.map(({ id, kind, name, x, y, angle, width, influence }) => ({ id, kind, name, x, y, angle, width, influence })),

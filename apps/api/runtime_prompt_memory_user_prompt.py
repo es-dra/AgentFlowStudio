@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from apps.api.runtime_director_compiler import compile_director_setup
 from apps.api.runtime_models import PromptOptimizationRequest
 
 
@@ -21,6 +22,8 @@ _EN_FALLBACKS = {
 def build_user_prompt(request: PromptOptimizationRequest, slots: dict[str, str]) -> dict[str, Any]:
     params = request.node_parameters or {}
     director = request.director_setup.model_dump(mode="json") if request.director_setup else {}
+    if request.director_setup:
+        return _compiled_director_user_prompt(request)
     sections = {
         "人物": _character_section(slots, director),
         "场景": _scene_section(request, slots, director),
@@ -32,6 +35,26 @@ def build_user_prompt(request: PromptOptimizationRequest, slots: dict[str, str])
     user_sections = [{"title": title, "text": sections[title]} for title in USER_SECTION_ORDER]
     user_prompt = "\n".join(f"{item['title']}：{item['text']}" for item in user_sections)
     return {"user_prompt": user_prompt, "user_prompt_sections": user_sections}
+
+
+def _compiled_director_user_prompt(request: PromptOptimizationRequest) -> dict[str, Any]:
+    compiled = compile_director_setup(request.director_setup)
+    compiled_by_title = {section["title"]: section["text"] for section in compiled["sections"]}
+    sections = {
+        "人物": compiled_by_title.get("主体调度", ""),
+        "场景": compiled_by_title.get("空间道具", ""),
+        "镜头": compiled_by_title.get("机位景别", ""),
+        "灯光": compiled_by_title.get("光线", ""),
+        "运动": compiled_by_title.get("运动连续", ""),
+        "负面约束": compiled_by_title.get("负面约束", ""),
+    }
+    user_sections = [{"title": title, "text": sections[title]} for title in USER_SECTION_ORDER]
+    user_prompt = "\n".join(f"{item['title']}：{item['text']}" for item in user_sections)
+    return {
+        "user_prompt": user_prompt,
+        "user_prompt_sections": user_sections,
+        "director_compile_result": compiled,
+    }
 
 
 def _character_section(slots: dict[str, str], director: dict[str, Any]) -> str:

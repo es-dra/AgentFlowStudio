@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from apps.api.runtime_context_budget import apply_context_budget, context_warnings, duplicate_labels
-from apps.api.runtime_models import ContextSubgraph, TemporaryLockOverride
+from apps.api.runtime_director_compiler import compile_director_setup
+from apps.api.runtime_models import ContextSubgraph, DirectorSetup2D, TemporaryLockOverride
 from apps.api.runtime_store import RuntimeStore
 from apps.api.runtime_visual_assets import fixed_visual_assets_by_id, public_visual_asset
 
@@ -28,6 +29,7 @@ def resolve_context_bundle(
     style_preference: str | None = None,
     prompt_char_limit: int = 1500,
     reference_image_slots: int = 1,
+    director_setup: DirectorSetup2D | None = None,
 ) -> dict[str, Any]:
     _validate_subgraph(context_subgraph)
     assets = fixed_visual_assets_by_id(store, project_id)
@@ -46,6 +48,7 @@ def resolve_context_bundle(
     excluded = _excluded_assets(assets, included_ids, connected, mode, include_fixed_assets)
     available = _available_assets(assets, included_ids, connected, visible_prompt)
     upstream_lines = _upstream_summary_lines(context_subgraph, node_hops)
+    director_compile = _director_compile_result(director_setup, assets)
     text_channel = _text_channel(
         mode,
         visible_prompt,
@@ -53,6 +56,7 @@ def resolve_context_bundle(
         overrides,
         upstream_lines=upstream_lines,
         style_preference=style_preference,
+        director_compile=director_compile,
     )
     included_asset_records = [assets[item] for item in included_ids if item in assets]
     subject_asset = _subject_reference_asset(included_asset_records, connected)
@@ -75,6 +79,7 @@ def resolve_context_bundle(
             {"asset_id": item.asset_id, "lock_text": item.lock_text, "reason": item.reason}
             for item in (temporary_lock_overrides or [])
         ],
+        "director_compile_result": director_compile,
         "trace_summary": {
             "context_subgraph_assertion": "client_supplied_not_security_boundary",
             "asset_truth_source": "runtime_visual_asset_store_by_id",
@@ -247,6 +252,7 @@ def _text_channel(
     *,
     upstream_lines: list[str] | None = None,
     style_preference: str | None = None,
+    director_compile: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     if mode == "optimize":
         signatures = [f"{asset['label']}: {asset.get('signature')}" for asset in assets]
@@ -274,14 +280,40 @@ def _text_channel(
         else:
             identity_lines.append(line)
     preference = str(style_preference or "").strip()
+    director_lines = _director_lines(director_compile)
     return {
         "visible_prompt": visible_prompt,
         "asset_signature_segment": "",
         "asset_identity_segment": "\n".join(identity_lines),
-        "scene_director_segment": "\n".join(scene_lines),
+        "scene_director_segment": "\n".join([*director_lines, *scene_lines]),
         "upstream_summary_segment": "\n".join(upstream_lines or []),
         "preference_segment": f"style preference: {preference}" if preference else "",
     }
+
+
+def _director_compile_result(director_setup: DirectorSetup2D | None, assets: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    if director_setup is None:
+        return None
+    signatures = {
+        str(asset.get("asset_id")): str(asset.get("signature") or "")
+        for asset in assets.values()
+        if str(asset.get("signature") or "")
+    }
+    return compile_director_setup(director_setup, visual_asset_signatures=signatures)
+
+
+def _director_lines(director_compile: dict[str, Any] | None) -> list[str]:
+    if not director_compile:
+        return []
+    lines = []
+    for section in director_compile.get("sections", []):
+        if not isinstance(section, dict):
+            continue
+        title = str(section.get("title") or "").strip()
+        text = str(section.get("text") or "").strip()
+        if title and text:
+            lines.append(f"{title}: {text}")
+    return lines
 
 
 def _subject_reference_asset(assets: list[dict[str, Any]], refs: dict[str, dict[str, Any]]) -> dict[str, Any] | None:

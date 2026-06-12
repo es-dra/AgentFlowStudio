@@ -135,6 +135,22 @@ def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
     assert "max-height: none" in styles
 
 
+def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:
+    director_data = (STUDIO_ROOT / "src" / "director-data.js").read_text(encoding="utf-8")
+    director_shell = (STUDIO_ROOT / "src" / "panels" / "director-shell.js").read_text(encoding="utf-8")
+    director_fields = (STUDIO_ROOT / "src" / "panels" / "director-fields.js").read_text(encoding="utf-8")
+
+    assert "activeCameraId" in director_data
+    assert "activeSubjectIds" in director_data
+    assert "visual_asset_id" in director_data
+    assert "Array.isArray(value) ? clone(value) : clone(fallback)" in director_data
+    assert "window.confirm" in director_shell
+    assert "current.prompt = prompt" not in director_shell
+    assert "join(\"\\n\\n\")" in director_shell
+    assert "directorVisualAssetIds" in director_shell
+    assert "绑定人物资产 ID" in director_fields
+
+
 def test_prompt_optimizer_sources_stay_product_facing() -> None:
     source = _source()
 

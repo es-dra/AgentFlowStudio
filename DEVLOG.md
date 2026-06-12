@@ -7,6 +7,27 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - Director Compiler v1
+
+- Added deterministic backend `Director Compiler v1` for `DirectorSetup2D`.
+- Extended director setup with `activeCameraId`, `activeSubjectIds`, and subject-level `visual_asset_id`.
+- Changed user prompt assembly and context resolver to consume compiler output rather than frontend readout text.
+- Backend compiler reads visual asset signatures by id from the Runtime visual asset store; frontend-provided signatures are ignored.
+- Updated Studio director defaults so empty lists remain empty and the old bedroom prop/modifier template no longer repopulates after deletion.
+- Changed Studio “生成提示词片段” to confirmed append-only behavior; it no longer overwrites the node prompt.
+
+Verification:
+
+```text
+Director compiler/API/context/static focused set: 24 passed, 1 Starlette/httpx warning.
+Changed director JS node --check: passed.
+```
+
+Boundaries:
+
+- Frontend `directorPromptSummary` is now a UI summary only, not the authoritative compiler.
+- No live provider gate was opened.
+
 ## 2026-06-12 - Provider Adapter v0.1
 
 - Added `provider_descriptor.v0.1` to service config and documented the adapter contract in `docs/provider_adapter_contract.md`.
