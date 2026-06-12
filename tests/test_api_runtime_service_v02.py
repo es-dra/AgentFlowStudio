@@ -8,7 +8,8 @@ from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
 
 
-def test_runtime_service_v02_lists_imports_and_exports_projects_without_private_paths(tmp_path) -> None:
+def test_runtime_service_v02_lists_imports_and_exports_projects_without_private_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     assert client.get("/projects").json()["projects"] == []
@@ -57,7 +58,8 @@ def test_runtime_service_v02_lists_imports_and_exports_projects_without_private_
     assert "c:\\" not in serialized
 
 
-def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path) -> None:
+def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
@@ -90,7 +92,9 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path) 
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 
 
-def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(tmp_path) -> None:
+def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(tmp_path, monkeypatch) -> None:
+    # GET /projects is a legacy v02 listing route.
+    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
         "/projects",
@@ -108,3 +112,21 @@ def test_runtime_service_recovers_corrupt_artifact_index_when_listing_projects(t
     assert project_list.status_code == 200
     assert project_list.json()["projects"][0]["project_id"] == "proj_recover_index"
     assert index["artifacts"]
+
+
+def test_runtime_service_v02_routes_are_hidden_by_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ENABLE_LEGACY_RUNTIME_V02", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    assert client.get("/projects").status_code in {404, 405}
+
+    output_path = tmp_path / "frontend" / "afs-runtime-service.openapi.json"
+    exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
+    schema = json.loads(exported_path.read_text(encoding="utf-8"))
+
+    assert schema["paths"]["/projects"].get("get") is None
+    assert "/projects/import" not in schema["paths"]
+    assert "/projects/{project_id}/export" not in schema["paths"]
+    assert "/projects/{project_id}/source-assets" not in schema["paths"]
+    assert "/projects/{project_id}/content-cards" not in schema["paths"]
+    assert "/projects/{project_id}/canvas-draft" not in schema["paths"]

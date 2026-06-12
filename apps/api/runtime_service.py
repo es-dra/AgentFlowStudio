@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +57,8 @@ from agentflow.memory.production_asset_two_round_validation import run_two_round
 
 
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/runtime_service")
+LEGACY_RUNTIME_V02_ENV = "AFS_ENABLE_LEGACY_RUNTIME_V02"
+TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
@@ -284,7 +287,8 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
         public_job = store.write_job(job)
         return {"job": public_job, "report": report, "safe_manifest": safe_manifest, "artifacts": artifacts, "flow": build_flow_summary(store, request.project_id)}
 
-    register_runtime_v02_routes(app, store)
+    if legacy_runtime_v02_enabled():
+        register_runtime_v02_routes(app, store)
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
     register_runtime_image_asset_routes(app, store)
@@ -297,4 +301,8 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     return app
 
 
-__all__ = ("DEFAULT_RUNTIME_ROOT", "create_runtime_app")
+def legacy_runtime_v02_enabled() -> bool:
+    return os.environ.get(LEGACY_RUNTIME_V02_ENV, "").strip().lower() in TRUE_VALUES
+
+
+__all__ = ("DEFAULT_RUNTIME_ROOT", "LEGACY_RUNTIME_V02_ENV", "create_runtime_app", "legacy_runtime_v02_enabled")

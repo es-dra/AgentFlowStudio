@@ -16,10 +16,11 @@ apps/                  CLI、Runtime Service、AFS Studio Web 画布
 当前 MVP 链路：
 
 ```text
-subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata
+/studio/ canvas -> Runtime Service -> prompt optimization -> fixed visual assets
+  -> graph context resolver -> provider-gated keyframe/image evidence
 ```
 
-近期主线是本地内测可用，不是 SaaS，也不是商业试点。当前用户侧 Web 入口是 `/studio/`，对应源码为 `apps/studio/`；旧 Workbench / memory-workbench 不再作为当前产品入口。
+近期主线是本地内测可用，不是 SaaS，也不是商业试点。当前用户侧 Web 入口是 `/studio/`，对应源码为 `apps/studio/`；Runtime Service 是前端唯一后端边界。旧 Workbench / memory-workbench 不再作为当前产品入口；subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata 分发链为 legacy/optional，不再是当前 MVP 主线。
 
 ## 规则层级
 

@@ -76,15 +76,19 @@ Frontend code must not expose:
 - AFS Studio canvas shell and node workflow.
 - Prompt optimization API and local fallback.
 - Creative intent control agent v1: deterministic constraint layering, candidate scoring, selected canonical prompt, and provider translation trace.
+- Fixed visual asset APIs and graph-scoped context resolver.
+- Provider Adapter v0.1 descriptor registry for Runtime image dispatch.
+- Director Compiler v1 for deterministic 2D director setup translation.
 - Keyframe generation Runtime API with `AFS_ALLOW_REMOTE_IMAGE` gate closed by default.
-- Production Memory asset loop.
-- Asset Profile Review Screen.
-- Real Asset Test Run Harness.
-- Two-Round Context Runtime Validation.
 - Project Manifest v0.1.
-- Provider Validation Gate.
-- Runtime Service v0.2 frontend contract.
-- Local AgentOps artifacts: run trace, quality report, guardrail result, handoff record, maintenance audit report.
+- Safe Runtime artifacts: run trace, safe manifest, request plan, context bundle, handoff record, maintenance audit report.
+
+Legacy/optional capabilities still exist for compatibility, but are not the
+current product surface:
+
+- subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata distribution chain.
+- Production Memory asset loop and related review/promotion harnesses.
+- Runtime Service v0.2 list/import/source-assets/content-cards/canvas-draft routes, hidden unless `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
 
 ## Governance
 
@@ -98,9 +102,9 @@ Frontend code must not expose:
 
 ```text
 Studio interaction QA
-  -> prompt-memory loop hardening
-  -> explicit asset reuse
-  -> director setup as shot intent
-  -> provider-gated image/keyframe smoke
+  -> fixed visual asset QA
+  -> graph context resolver hardening
+  -> director compiler browser QA
+  -> provider adapter smoke readiness
   -> provider-gated video slice after keyframe controllability evidence
 ```

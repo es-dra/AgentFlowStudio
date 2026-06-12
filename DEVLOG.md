@@ -7,6 +7,27 @@
 Status: short current-session log. Historical long narratives are not current
 product documentation.
 
+## 2026-06-12 - Studio Mainline Cleanup 001
+
+- Updated project authority docs so `/studio/` + Runtime Service + fixed assets/context resolver/provider-gated evidence is the current MVP line.
+- Marked the subtitle/text distribution chain as legacy/optional rather than current MVP.
+- Hid Runtime v02 list/import/source-assets/content-cards/canvas-draft routes by default behind `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
+- Marked `agentflow/memory` as read-only legacy for Studio/Runtime work; added a static guard against new Studio/Runtime imports.
+- Audited the named `*_sop` cleanup targets with `git ls-files`; only `agentflow_studio/compliance/__init__.py` was tracked and unreferenced, so only that stub was deleted.
+
+Verification:
+
+```text
+Cleanup/static focused tests: 15 passed, 1 Starlette/httpx warning.
+maintenance_audit.py: 0 failed checks, 1 oversized-files warning.
+git diff --check: clean except Windows CRLF notices.
+```
+
+Boundaries:
+
+- No broad deletion of `agentflow/memory`.
+- No live provider gate was opened.
+
 ## 2026-06-12 - Director Compiler v1
 
 - Added deterministic backend `Director Compiler v1` for `DirectorSetup2D`.

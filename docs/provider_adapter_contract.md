@@ -1,11 +1,10 @@
-# Provider Adapter v0.1 Contract
+# Provider Adapter v0.1 契约
 
-AFS keeps provider access behind local adapters. The adapter layer is a thin
-runtime boundary, not an external gateway.
+AFS 的 provider 接入走本地轻量 adapter 层，不引入外部网关。adapter 层只负责把 Runtime 的安全请求转成具体 provider 调用，并把结果归一化为 safe manifest / safe output。
 
 ## Descriptor
 
-Each `services.*` entry in provider config must include `descriptor`:
+每个 `services.*` provider 配置必须带 `descriptor`：
 
 ```json
 {
@@ -21,47 +20,37 @@ Each `services.*` entry in provider config must include `descriptor`:
 }
 ```
 
-Runtime consumes two descriptor fields directly:
+Runtime 直接消费两个字段：
 
-- `prompt_char_limit`: controls context budget and final provider prompt trimming.
-- `reference_image_slots`: controls how many resolver reference images may reach
-  the adapter.
+- `prompt_char_limit`：控制上下文预算和最终 provider prompt 截断。
+- `reference_image_slots`：控制 resolver 参考图通道最多传给 adapter 的图片数量。
 
-MiniMax image is configured with one reference image slot. This is a service
-capability, not a resolver architecture assumption.
+MiniMax image 当前配置为 1 个主体参考图位。这个限制属于服务能力描述，不再是 resolver 的架构假设。
 
-## Lifecycle
+## 生命周期
 
-All adapters implement:
+所有 adapter 都实现同一生命周期：
 
 ```text
 validate -> translate -> submit -> poll -> normalize
 ```
 
-Sync providers return an already-complete task from `submit`, so `poll` is still
-present but immediate. Async providers can use the same interface for submit/poll
-separation.
+同步 provider 的 `submit` 可以返回 already-complete task，因此 `poll` 会立即完成；异步 provider 可复用同一个接口表达 submit/poll 分离。
 
-`safe_error(error)` must redact or generalize provider config and credential
-details before any error reaches Runtime artifacts.
+`safe_error(error)` 必须在错误进入 Runtime artifact 前脱敏，不能泄露 provider config、secret、token、Authorization header、本地路径或原始响应。
 
-## Runtime Dispatch
+## Runtime 调度
 
-Runtime code must call:
+Runtime 只允许调用：
 
 ```python
 registry.dispatch(capability, service_id, request)
 ```
 
-`apps/api/runtime_keyframes.py` must not import MiniMax smoke functions directly.
-The old CLI command names may remain, but should call through the adapter/registry
-when they become Runtime-facing.
+`apps/api/runtime_keyframes.py` 不应直接 import MiniMax smoke 函数。旧 CLI 命令名可以保留；未来如果要把 CLI 也纳入统一调度，应在内部复用 registry。
 
-## Gates
+## Gate
 
-Descriptor `required_gate` is the capability gate for that service. Gate-open
-checks are per capability. `AFS_ALLOW_REMOTE_IMAGE=true` never authorizes LLM,
-ASR, video, downloads, or other network operations.
+`descriptor.required_gate` 是该服务的能力 gate。gate 按能力单独授权：打开 `AFS_ALLOW_REMOTE_IMAGE=true` 不代表授权 LLM、ASR、video、download 或其他网络能力。
 
-Gate-closed Runtime paths should not require local provider config and must not
-start network calls.
+gate 关闭时，Runtime 路径不要求本地 provider config，也不得启动网络调用。
