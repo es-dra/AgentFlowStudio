@@ -17,6 +17,7 @@
 - 旧 `NARRATOCUT_ALLOW_REMOTE_*` provider gate 兼容全量退役；当前配置只接受 `AFS_ALLOW_REMOTE_*`。
 - `ComplianceResult` 仅剩 schema package re-export 与 roundtrip 测试引用，已作为孤儿 schema 删除。
 - `docs/handoff/AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md` 指向已退役 Runtime 路由，已删除；历史 maintenance/DEVLOG 记录保留。
+- 根目录未跟踪的 `AFS-CLEANUP-INSTRUCTIONS-*` 与 `AFS-PROJECT-HEALTH-REVIEW-*` 是本地输入资料，不纳入提交；repository retention review 将其归类为 `local_workspace_input`，不计为仓库 retention 人工复审项。
 
 ## 冻结范围
 
@@ -54,6 +55,8 @@ slice 2 default pytest: 363 passed, 527 deselected, 2 warnings
 slice 2 legacy pytest: 527 passed, 363 deselected, 1 warning
 maintenance_audit: failed=0, passed=4, warning=3
 git diff --check: exit 0, Windows LF conversion notices only
+merged master default pytest initial rerun: blocked by untracked local input files
+local input classification regression test: 4 passed
 ```
 
 ## 非声明

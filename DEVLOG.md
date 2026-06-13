@@ -14,6 +14,9 @@
   provider gates now use `AFS_ALLOW_REMOTE_*` only.
 - Deleted the stale v0.2 Runtime frontend handoff and the orphan
   `ComplianceResult` schema.
+- Classified untracked root cleanup/review instruction files as local workspace
+  inputs so they do not break repository retention review when present in the
+  operator checkout.
 
 Verification so far:
 
