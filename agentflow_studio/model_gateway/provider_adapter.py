@@ -164,14 +164,18 @@ class ProviderRegistry:
 
     @classmethod
     def from_store(cls, store: CompanyProviderSecrets) -> "ProviderRegistry":
+        store = _normalize_store_required_gates(store)
         adapters: dict[str, ProviderAdapter] = {}
         descriptors: dict[str, ProviderDescriptor] = {}
         legacy_descriptorless = _is_legacy_descriptorless_kling_store(store)
         for service_id, service in sorted(store.services.items()):
+            provider = str(service.get("provider") or "")
+            capability = _service_capability(service)
+            if not _is_adapter_service(provider, capability):
+                continue
             descriptor = _descriptor_for_service(service_id, service, allow_legacy=legacy_descriptorless)
             descriptors[service_id] = descriptor
             capability = str(service.get("capability") or descriptor.modality)
-            provider = str(service.get("provider") or "")
             if capability == "image" and provider == "minimax":
                 adapters[service_id] = MiniMaxImageAdapter(store, service_id, descriptor)
                 continue
@@ -238,6 +242,8 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
         if allow_legacy:
             return _legacy_descriptor_for_service(service_id, service)
         raise ModelConfigError(f"Provider service descriptor is required: {service_id}")
+    capability = str(service.get("capability") or payload.get("modality") or "image")
+    payload = _normalize_descriptor_required_gate(payload, capability)
     try:
         descriptor = ProviderDescriptor.model_validate(payload)
     except ValidationError as exc:
@@ -247,6 +253,57 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
     if descriptor.modality not in descriptor.capabilities:
         raise ModelConfigError(f"Provider service descriptor capabilities must include modality: {service_id}")
     return descriptor
+
+
+def _service_capability(service: dict[str, Any]) -> str:
+    value = str(service.get("capability") or "")
+    if value:
+        return value
+    descriptor = service.get("descriptor")
+    if isinstance(descriptor, dict):
+        return str(descriptor.get("modality") or "")
+    return ""
+
+
+def _is_adapter_service(provider: str, capability: str) -> bool:
+    if provider == "company_gateway" or "/" in capability:
+        return False
+    return True
+
+
+def _normalize_store_required_gates(store: CompanyProviderSecrets) -> CompanyProviderSecrets:
+    services: dict[str, dict[str, Any]] = {}
+    changed = False
+    for service_id, service in store.services.items():
+        next_service = dict(service)
+        capability = str(next_service.get("capability") or "")
+        descriptor = next_service.get("descriptor")
+        if not capability and isinstance(descriptor, dict):
+            capability = str(descriptor.get("modality") or "")
+        configured = str(next_service.get("required_gate") or "")
+        normalized = _legacy_required_gate(capability or "image", configured)
+        if normalized != configured:
+            next_service["required_gate"] = normalized
+            changed = True
+        if isinstance(descriptor, dict):
+            normalized_descriptor = _normalize_descriptor_required_gate(descriptor, capability or "image")
+            if normalized_descriptor != descriptor:
+                next_service["descriptor"] = normalized_descriptor
+                changed = True
+        services[service_id] = next_service
+    if not changed:
+        return store
+    return store.model_copy(update={"services": services})
+
+
+def _normalize_descriptor_required_gate(payload: dict[str, Any], capability: str) -> dict[str, Any]:
+    configured = str(payload.get("required_gate") or "")
+    normalized = _legacy_required_gate(capability, configured)
+    if normalized == configured:
+        return payload
+    next_payload = dict(payload)
+    next_payload["required_gate"] = normalized
+    return next_payload
 
 
 def _is_legacy_descriptorless_kling_store(store: CompanyProviderSecrets) -> bool:
@@ -327,6 +384,8 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
 
 def _legacy_required_gate(capability: str, configured: str) -> str:
     if configured.startswith("AFS_ALLOW_REMOTE_"):
+        return configured
+    if configured and not configured.startswith("NARRATOCUT_ALLOW_REMOTE_"):
         return configured
     defaults = {
         "image": "AFS_ALLOW_REMOTE_IMAGE",

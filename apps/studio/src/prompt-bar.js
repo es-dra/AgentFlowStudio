@@ -1,13 +1,13 @@
 import { promptPlaceholder } from "./nodes.js";
 import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel } from "./presets/models.js";
 import {
-  VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS, VIDEO_COUNTS, VIDEO_MODES,
+  VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS,
   videoSpecLabel,
 } from "./presets/specs.js";
 import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
-import { startNodeGeneration } from "./node-actions.js";
+import { pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
 import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
@@ -29,7 +29,7 @@ export function renderPromptBar(state, store, runtime) {
 
   const signature = barSignature(state, node);
   if (!bar || bar.dataset.signature !== signature) {
-    if (bar && bar.dataset.nodeId === node.id && bar.contains(document.activeElement) && bar.dataset.structure === structureSignature(node)) {
+    if (bar && bar.dataset.nodeId === node.id && isPromptTextEditing(bar) && bar.dataset.structure === structureSignature(node)) {
       bar.dataset.signature = signature;
       positionBar(bar, state, node);
       return;
@@ -44,23 +44,15 @@ export function renderPromptBar(state, store, runtime) {
   positionBar(bar, state, node);
 }
 
+function isPromptTextEditing(bar) {
+  const active = document.activeElement;
+  return Boolean(bar.contains(active) && ["TEXTAREA", "INPUT"].includes(active?.tagName));
+}
+
 function buildBar(store, runtime, node) {
   const bar = el("div", "prompt-bar");
   bar.dataset.nodeId = node.id;
   const p = node.params;
-
-  if (node.type === "video") {
-    const tabs = el("div", "mode-tabs");
-    for (const mode of VIDEO_MODES) {
-      const tab = el("button", `mode-tab${p.spec.mode === mode ? " active" : ""}`, mode);
-      tab.addEventListener("click", () => updateNode(store, node.id, (n) => { n.params.spec.mode = mode; }));
-      tabs.appendChild(tab);
-    }
-    bar.appendChild(tabs);
-    bar.appendChild(buildToolChips(store, node, [
-      ["特效", "sparkles", () => openGalleryModal(store, "effects", node.id)],
-    ]));
-  }
 
   if ((p.attachments || []).length) {
     const chips = el("div", "attach-chips");
@@ -90,12 +82,12 @@ function buildBar(store, runtime, node) {
         flashTooltip(textarea, "当前版本仅图片节点支持真实生成");
         return;
       }
-      startNodeGeneration(store, runtime, node);
+      runPromptBarGeneration(store, runtime, node);
     }
   });
   bar.appendChild(textarea);
 
-  if (node.type === "image" || node.type === "video" || node.type === "script") {
+  if (node.type === "video" || node.type === "script") {
     const expand = el("button", "expand-btn");
     expand.innerHTML = icon("expand", 14);
     expand.title = "放大编辑";
@@ -156,34 +148,28 @@ function buildBottomRow(store, runtime, node, textarea) {
   });
   row.appendChild(optimizeBtn);
 
-  if (node.type === "video") {
-    const countBtn = el("button", "bar-select");
-    countBtn.innerHTML = `<span>${p.spec.count}个</span><span class="caret">▾</span>`;
-    countBtn.addEventListener("click", () => {
-      const pop = el("div");
-      for (const c of VIDEO_COUNTS) {
-        const item = el("button", `menu-item${p.spec.count === c ? " selected" : ""}`, `${c}个`);
-        item.addEventListener("click", () => {
-          updateNode(store, node.id, (n) => { n.params.spec.count = c; });
-          close();
-        });
-        pop.appendChild(item);
-      }
-      const close = showPopover(countBtn, pop, { place: "top" });
-    });
-    row.appendChild(countBtn);
-  }
-
   const send = el("button", "send-btn");
-  send.innerHTML = icon("arrowUp", 15);
-  const canSend = node.type === "image" || (node.type === "video" && isRemoteVideoModel(node.params?.model));
+  const canVideo = node.type === "video" && isRemoteVideoModel(node.params?.model);
+  const shouldPollVideo = canVideo && node.status === "generating" && Boolean(node.params?.lastVideoJobId);
+  send.innerHTML = shouldPollVideo ? icon("retry", 15) : icon("arrowUp", 15);
+  const canSend = node.type === "image" || canVideo;
   send.title = node.type === "image" ? "生成" : "视频/音频通道开发中，当前版本仅图片节点支持真实生成";
   if (canSend) send.title = "生成";
+  if (shouldPollVideo) send.title = "继续轮询";
   send.disabled = !canSend;
-  send.addEventListener("click", () => startNodeGeneration(store, runtime, node));
+  send.addEventListener("click", () => runPromptBarGeneration(store, runtime, node));
   row.appendChild(send);
 
   return row;
+}
+
+function runPromptBarGeneration(store, runtime, node) {
+  const fresh = store.get().nodes[node.id] || node;
+  if (fresh.type === "video" && fresh.status === "generating" && fresh.params?.lastVideoJobId) {
+    pollNodeVideoGeneration(store, runtime, fresh);
+    return;
+  }
+  startNodeGeneration(store, runtime, fresh);
 }
 
 function openModelPopover(store, node, anchor) {

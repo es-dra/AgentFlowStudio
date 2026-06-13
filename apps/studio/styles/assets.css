@@ -29,6 +29,12 @@
     linear-gradient(0deg, transparent 49%, rgba(90, 200, 250, 0.16) 50%, transparent 51%),
     var(--bg-card-soft);
 }
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 7px;
+}
 
 .asset-meta { padding: 8px 2px 2px; cursor: pointer; }
 .asset-title { color: var(--text-primary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

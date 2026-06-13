@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import base64
 import json
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from apps.api import runtime_video_routes
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -149,6 +151,49 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert "data/processed/runs" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class FailingRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO")
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            raise TypeError("unexpected adapter kwarg: model_name_override")
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: FailingRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-provider-internal-error"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video safe error guard"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "prompt_text": "A slow camera push in.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "generated_at": "2026-06-13T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "poll_failed"
+    assert payload["safe_manifest"]["status"] == "poll_failed"
+    assert payload["provider_calls_started"] is True
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "secret" not in serialized
+    assert "token" not in serialized
 
 
 def _fake_video_provider_config(tmp_path) -> str:

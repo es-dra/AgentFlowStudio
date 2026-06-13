@@ -7,7 +7,7 @@ import { renderDrawer } from "./panels/drawer.js";
 import { renderDock } from "./panels/dock.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
 import { openShortcutsPanel } from "./panels/shortcuts-panel.js";
-import { closeTop, hasOpenOverlay, el } from "./overlay.js";
+import { closeTop, hasOpenOverlay, el, showModal } from "./overlay.js";
 import { createNode, deleteNodes, duplicateNode } from "./nodes.js";
 import { startNodeGeneration, spawnSampleScriptFlow } from "./node-actions.js";
 import { STARTERS } from "./presets/starters.js";
@@ -20,6 +20,7 @@ const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
 let projectSummaries = [];
+let showAllProjects = false;
 
 renderStarters();
 renderDock(store, runtimeRef);
@@ -48,10 +49,24 @@ async function refreshProjectSummaries() {
   try {
     const payload = await runtime.listProjects();
     projectSummaries = Array.isArray(payload?.projects) ? payload.projects : [];
+    syncCurrentProjectMetaFromSummaries();
     renderAll(store.get());
   } catch {
     projectSummaries = [];
   }
+}
+
+function syncCurrentProjectMetaFromSummaries() {
+  const currentId = runtime.projectId || store.get().meta.projectId;
+  const found = projectSummaries.find((item) => item.project_id === currentId);
+  const meta = found?.studio_state_meta || {};
+  const projectName = String(meta.projectName || "").trim();
+  const canvasName = String(meta.canvasName || "").trim();
+  if (!projectName && !canvasName) return;
+  store.set((s) => {
+    if (projectName) s.meta.projectName = projectName;
+    if (canvasName) s.meta.canvasName = canvasName;
+  }, { history: false, persist: false });
 }
 
 async function switchProject(projectId) {
@@ -72,22 +87,109 @@ function syncProjectUrl(projectId) {
 }
 
 async function createNewProject() {
-  const name = window.prompt("项目名称", "AFS 内测项目");
+  const name = await requestProjectName();
   if (name === null) return;
   const suffix = Math.random().toString(36).slice(2, 8);
   const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
-  runtime = createRuntimeClient(projectId);
-  await runtime.createProject({ project_id: projectId, goal: name.trim() || "AFS Studio project" });
-  localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
-  syncProjectUrl(projectId);
-  await store.switchProject(projectId, runtime);
-  store.set((s) => {
-    s.meta.projectName = name.trim() || "AFS Studio project";
-    s.meta.canvasName = "画布 1";
-  }, { history: false });
-  await runtime.saveStudioState(store.get());
-  await syncRuntimeAssets();
-  await refreshProjectSummaries();
+  const projectName = name.trim() || "AFS Studio project";
+  try {
+    runtime = createRuntimeClient(projectId);
+    await runtime.createProject({ project_id: projectId, goal: projectName });
+    localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+    syncProjectUrl(projectId);
+    await store.switchProject(projectId, runtime);
+    store.set((s) => {
+      s.meta.projectName = projectName;
+      s.meta.canvasName = "画布 1";
+    }, { history: false });
+    await runtime.saveStudioState(store.get());
+    await syncRuntimeAssets();
+    await refreshProjectSummaries();
+  } catch (error) {
+    showProjectCreateError(error);
+  }
+}
+
+function requestProjectName() {
+  return new Promise((resolve) => {
+    const modal = el("div", "modal compact project-create-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "新建项目"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.innerHTML = icon("x", 15);
+    head.appendChild(el("span", "head-spacer"));
+    head.appendChild(closeBtn);
+
+    const body = el("div", "modal-body project-create-body");
+    const field = el("label", "modal-field");
+    field.appendChild(el("span", "", "项目名称"));
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = "AFS 内测项目";
+    input.maxLength = 80;
+    field.appendChild(input);
+    const error = el("div", "modal-error");
+    error.hidden = true;
+    body.append(field, error);
+
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const confirm = el("button", "primary-btn", "创建并切换");
+    actions.append(cancel, confirm);
+
+    modal.append(head, body, actions);
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve(null); } });
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(value);
+    };
+    closeBtn.addEventListener("click", () => finish(null));
+    cancel.addEventListener("click", () => finish(null));
+    confirm.addEventListener("click", () => {
+      const name = input.value.trim();
+      if (!name) {
+        error.textContent = "请先填写项目名称。";
+        error.hidden = false;
+        input.focus();
+        return;
+      }
+      finish(name);
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") confirm.click();
+    });
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  });
+}
+
+function showProjectCreateError(error) {
+  const modal = el("div", "modal compact project-create-modal");
+  const head = el("div", "modal-head");
+  head.appendChild(el("strong", "", "项目创建失败"));
+  const closeBtn = el("button", "modal-close");
+  closeBtn.innerHTML = icon("x", 15);
+  head.appendChild(el("span", "head-spacer"));
+  head.appendChild(closeBtn);
+  const body = el("div", "modal-body project-create-body");
+  body.appendChild(el("div", "modal-error", `Runtime 没有完成项目创建：${safeError(error)}`));
+  const actions = el("div", "modal-actions");
+  const ok = el("button", "primary-btn", "知道了");
+  actions.appendChild(ok);
+  modal.append(head, body, actions);
+  const close = showModal(modal);
+  closeBtn.addEventListener("click", close);
+  ok.addEventListener("click", close);
+}
+
+function safeError(error) {
+  const message = error instanceof Error ? error.message : String(error || "unknown error");
+  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
 }
 
 async function syncRuntimeAssets() {
@@ -97,17 +199,27 @@ async function syncRuntimeAssets() {
   ]);
   const imageAssets = imagePayload.status === "fulfilled" && Array.isArray(imagePayload.value?.assets) ? imagePayload.value.assets : [];
   const visualAssets = visualPayload.status === "fulfilled" && Array.isArray(visualPayload.value?.assets) ? visualPayload.value.assets : [];
+  const imagePreviewById = new Map(imageAssets.map((asset) => [asset.asset_id, asset.preview_url]).filter(([assetId, previewUrl]) => assetId && previewUrl));
   store.set((s) => {
+    const existingByKey = new Map();
+    for (const item of s.assets || []) {
+      const key = assetStableKey(item);
+      if (key && !existingByKey.has(key)) existingByKey.set(key, item);
+    }
     const generated = [
       ...visualAssets.map((asset) => ({
         id: `visual_${asset.asset_id}`,
         kind: asset.asset_type === "scene" ? "scene_asset" : "character_asset",
         title: asset.label || asset.asset_id,
         safe_summary: asset.signature || "",
-        thumbnail_ref: "character-sheet",
+        thumbnail_ref: asset.asset_type === "scene" ? "scene-board" : "character-sheet",
         source_node_id: asset.source_node_id || null,
         status: asset.status || "fixed",
         asset_id: asset.asset_id,
+        visual_asset_id: asset.asset_id,
+        asset_type: asset.asset_type || null,
+        image_asset_refs: Array.isArray(asset.image_asset_refs) ? asset.image_asset_refs : [],
+        preview_url: visualAssetPreviewUrl(asset, imagePreviewById),
       })),
       ...imageAssets.map((asset) => ({
         id: `image_${asset.asset_id}`,
@@ -120,29 +232,90 @@ async function syncRuntimeAssets() {
         asset_id: asset.asset_id,
         preview_url: asset.preview_url,
       })),
+    ].map((item) => mergeAsset(existingByKey.get(assetStableKey(item)), item));
+    const generatedKeys = new Set(generated.map(assetStableKey).filter(Boolean));
+    s.assets = [
+      ...generated,
+      ...s.assets.filter((item) => {
+        const key = assetStableKey(item);
+        return !key || !generatedKeys.has(key);
+      }),
     ];
-    const ids = new Set(generated.map((item) => item.id));
-    s.assets = [...generated, ...s.assets.filter((item) => !ids.has(item.id))];
   }, { history: false });
+}
+
+function assetStableKey(asset) {
+  const visualId = String(asset?.visual_asset_id || (isVisualAssetKind(asset?.kind) ? asset?.asset_id : "") || "").trim();
+  if (visualId) return `visual:${visualId}`;
+  const imageId = String(asset?.asset_id || "").trim();
+  if (imageId) return `image:${imageId}`;
+  return "";
+}
+
+function isVisualAssetKind(kind) {
+  return ["visual_asset", "character_asset", "scene_asset"].includes(String(kind || ""));
+}
+
+function mergeAsset(existing, generated) {
+  if (!existing) return generated;
+  return {
+    ...generated,
+    ...existing,
+    id: generated.id,
+    kind: generated.kind,
+    title: generated.title || existing.title,
+    safe_summary: generated.safe_summary || existing.safe_summary,
+    thumbnail_ref: generated.thumbnail_ref || existing.thumbnail_ref,
+    source_node_id: generated.source_node_id || existing.source_node_id || null,
+    status: generated.status || existing.status,
+    asset_id: generated.asset_id || existing.asset_id,
+    visual_asset_id: generated.visual_asset_id || existing.visual_asset_id,
+    preview_url: generated.preview_url || existing.preview_url,
+    asset_type: generated.asset_type || existing.asset_type,
+    image_asset_refs: generated.image_asset_refs || existing.image_asset_refs,
+  };
+}
+
+function visualAssetPreviewUrl(asset, imagePreviewById) {
+  const refs = Array.isArray(asset?.image_asset_refs) ? asset.image_asset_refs : [];
+  const firstRef = String(refs[0] || "").trim();
+  if (!firstRef) return "";
+  const fromImageList = imagePreviewById.get(firstRef);
+  if (fromImageList) return fromImageList;
+  return `/projects/${encodeURIComponent(runtime.projectId)}/image-assets/${encodeURIComponent(firstRef)}/preview`;
 }
 
 function projectLabel(item) {
   const meta = item?.studio_state_meta || {};
-  return meta.projectName || item?.goal || item?.project_id || "studio-local-001";
+  return meta.projectName || item?.project_id || "studio-local-001";
 }
 
 function projectOptions(state) {
-  const currentId = state.meta.projectId || runtime.projectId;
+  const currentId = runtime.projectId || state.meta.projectId;
   const current = { project_id: currentId, studio_state_meta: { projectName: state.meta.projectName, canvasName: state.meta.canvasName } };
   const known = projectSummaries.length ? [...projectSummaries] : [];
   if (currentId && !known.some((item) => item.project_id === currentId)) known.unshift(current);
-  return known.length ? known : [current];
+  const visible = showAllProjects ? known : known.filter((item) => item.project_id === currentId || !isTestProject(item));
+  return visible.length ? visible : [current];
+}
+
+function hiddenProjectCount(state) {
+  const currentId = state.meta.projectId || runtime.projectId;
+  if (showAllProjects) return 0;
+  return projectSummaries.filter((item) => item.project_id !== currentId && isTestProject(item)).length;
+}
+
+function isTestProject(item) {
+  const id = String(item?.project_id || "").toLowerCase();
+  const goal = String(item?.goal || "").toLowerCase();
+  const name = String(item?.studio_state_meta?.projectName || "").toLowerCase();
+  return /(smoke|qa|debug|test|browser|walkthrough|proj_)/.test(`${id} ${goal} ${name}`);
 }
 
 function renderAll(state) {
   renderTopbar(state, store);
   renderCanvas(state);
-  renderDrawer(state, store);
+  renderDrawer(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
 }
 
@@ -155,6 +328,7 @@ function renderTopbar(state, store) {
     state.meta.canvasName,
     state.ui.saveState,
     state.ui.saveMessage,
+    showAllProjects ? "all-projects" : "studio-projects",
     projectSummaries.map((item) => item.project_id).join(","),
   ].join("|");
   if (topbar.dataset.signature === signature) return;
@@ -196,6 +370,8 @@ function renderTopbar(state, store) {
     newProject.title = "新建项目";
     newProject.addEventListener("click", createNewProject);
     topbar.appendChild(newProject);
+
+    appendProjectFilterToggle(topbar, state);
   }
 
   if (state.ui.drawerOpen) {
@@ -231,6 +407,20 @@ function appendProjectControls(topbar, state) {
   newProject.title = "新建项目";
   newProject.addEventListener("click", createNewProject);
   topbar.appendChild(newProject);
+  appendProjectFilterToggle(topbar, state);
+}
+
+function appendProjectFilterToggle(topbar, state) {
+  const hidden = hiddenProjectCount(state);
+  if (!hidden && !showAllProjects) return;
+  const toggle = el("button", "icon-btn");
+  toggle.innerHTML = icon("more", 14);
+  toggle.title = showAllProjects ? "收起测试项目" : `显示全部项目（隐藏 ${hidden} 个测试项目）`;
+  toggle.addEventListener("click", () => {
+    showAllProjects = !showAllProjects;
+    renderAll(store.get());
+  });
+  topbar.appendChild(toggle);
 }
 
 function renderStarters() {

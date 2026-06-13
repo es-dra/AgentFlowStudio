@@ -167,6 +167,16 @@ def _submit_video_generation(
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         return _result_from_manifest(status="poll_failed", safe_manifest=manifest)
+    except Exception as exc:
+        manifest = _safe_manifest(
+            project_id,
+            status="poll_failed",
+            provider_calls_started=True,
+            provider_gate=gate,
+            blocks=[_provider_not_ready_block(str(exc))],
+        )
+        _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
+        return _result_from_manifest(status="poll_failed", safe_manifest=manifest)
 
     _increment_daily_submit_count(store, project_id)
     task_state = {
@@ -209,6 +219,33 @@ def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Pat
         state["status"] = "poll_failed"
         _write_task_state(output_dir, state)
         return _result_from_manifest(status="poll_failed", safe_manifest=manifest, task_state=state)
+    except Exception as exc:
+        manifest = _safe_manifest(
+            project_id,
+            status="poll_failed",
+            provider_calls_started=True,
+            blocks=[_provider_not_ready_block(str(exc))],
+        )
+        _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
+        state["status"] = "poll_failed"
+        _write_task_state(output_dir, state)
+        return _result_from_manifest(status="poll_failed", safe_manifest=manifest, task_state=state)
+    if str(raw.get("status") or "").lower() == "running":
+        manifest = _safe_manifest(
+            project_id,
+            status="running",
+            provider_calls_started=True,
+            blocks=[],
+        )
+        _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
+        state["status"] = "running"
+        state["last_provider_poll"] = {
+            "status": "running",
+            "task": raw.get("task") or {},
+            "provider_raw_persisted": False,
+        }
+        _write_task_state(output_dir, state)
+        return _result_from_manifest(status="running", safe_manifest=manifest, task_state=state)
     result = _complete_video_result(output_dir, project_id, raw, state, _video_gate(REMOTE_VIDEO_ENV))
     return result
 

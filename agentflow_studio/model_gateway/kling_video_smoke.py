@@ -11,16 +11,21 @@ from agentflow_studio.model_gateway.kling_plan import build_kling_request_plan
 from agentflow_studio.model_gateway.kling_video_completion import complete_video_task_with_transport_fallback
 from agentflow_studio.model_gateway.kling_video_task_state import (
     I2V_MANIFEST_NAME,
+    build_success_manifest,
     build_task_state,
     load_task_state,
     safe_input_image_state,
+    updated_task_state,
     write_task_state,
 )
 from agentflow_studio.model_gateway.kling_video_runtime import (
     build_runtime_payload,
     build_runtime_token,
+    download_with_transport,
     request_json_with_transport,
     response_data,
+    task_video_url,
+    video_extension,
 )
 
 
@@ -40,6 +45,51 @@ def run_kling_i2v_smoke(
     max_polls: int = 120,
     timeout_sec: float = 120.0,
     transport: str = "httpx",
+    model_name_override: str | None = None,
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    output_root = Path(output_dir)
+    state = submit_kling_i2v_task(
+        store,
+        service_id=service_id,
+        prompt=prompt,
+        image_path=image_path,
+        output_dir=output_root,
+        duration=duration,
+        mode=mode,
+        timeout_sec=timeout_sec,
+        transport=transport,
+        model_name_override=model_name_override,
+    )
+    account = store.account(str(store.service(service_id).get("account_ref") or ""))
+    authorization = f"Bearer {build_runtime_token(account)}"
+    query_url_template = _resume_query_url_template(store, store.service(service_id), account)
+    return complete_video_task_with_transport_fallback(
+        output_root,
+        state=state,
+        query_url_template=query_url_template,
+        authorization=authorization,
+        transport=transport,
+        poll_interval_sec=poll_interval_sec,
+        max_polls=max_polls,
+        timeout_sec=timeout_sec,
+        started=started,
+        resumed_from_task_state=False,
+    )
+
+
+def submit_kling_i2v_task(
+    store: CompanyProviderSecrets,
+    *,
+    service_id: str,
+    prompt: str,
+    image_path: str | Path,
+    output_dir: str | Path,
+    duration: str = "5",
+    mode: str = "pro",
+    timeout_sec: float = 120.0,
+    transport: str = "httpx",
+    model_name_override: str | None = None,
 ) -> dict[str, Any]:
     source_image = Path(image_path)
     if not source_image.is_file():
@@ -52,15 +102,14 @@ def run_kling_i2v_smoke(
         duration=duration,
         mode=mode,
         require_live_gate=True,
+        model_name_override=model_name_override,
     )
     if plan.get("api_family") != "i2v":
-        raise ModelConfigError(f"Kling I2V smoke requires i2v api_family: {service_id}")
+        raise ModelConfigError(f"Kling I2V submit requires i2v api_family: {service_id}")
     account = store.account(str(store.service(service_id).get("account_ref") or ""))
     authorization = f"Bearer {build_runtime_token(account)}"
-    started = time.perf_counter()
     payload = build_runtime_payload(plan["create_request"]["json"], source_image)
-    request_json = request_json_with_transport(transport)
-    create_response = request_json(
+    create_response = request_json_with_transport(transport)(
         str(plan["create_request"]["url"]),
         method="POST",
         authorization=authorization,
@@ -68,7 +117,6 @@ def run_kling_i2v_smoke(
         timeout_sec=timeout_sec,
     )
     task_id = _task_id(create_response)
-    output_root = Path(output_dir)
     state = build_task_state(
         plan=plan,
         task_id=task_id,
@@ -76,19 +124,75 @@ def run_kling_i2v_smoke(
         input_image=safe_input_image_state(source_image),
         status="submitted",
     )
-    write_task_state(output_root, state)
-    return complete_video_task_with_transport_fallback(
-        output_root,
-        state=state,
-        query_url_template=str(plan["query_request"]["url_template"]),
+    write_task_state(output_dir, state)
+    return state
+
+
+def poll_kling_i2v_task_once(
+    store: CompanyProviderSecrets,
+    *,
+    output_dir: str | Path,
+    state: dict[str, Any],
+    timeout_sec: float = 120.0,
+    transport: str = "httpx",
+) -> dict[str, Any]:
+    service_id = str(state.get("service_id") or "")
+    service = store.service(service_id)
+    if service.get("provider") != "kling" or service.get("api_family") != "i2v":
+        raise ModelConfigError(f"Kling I2V poll requires i2v service: {service_id}")
+    _require_live_gate(str(state.get("required_gate") or service.get("required_gate") or ""))
+    account = store.account(str(service.get("account_ref") or ""))
+    authorization = f"Bearer {build_runtime_token(account)}"
+    task_id = str((state.get("task") or {}).get("task_id") or "")
+    query_url = _resume_query_url_template(store, service, account).format(id=task_id)
+    task_response = request_json_with_transport(transport)(
+        query_url,
+        method="GET",
         authorization=authorization,
-        transport=transport,
-        poll_interval_sec=poll_interval_sec,
-        max_polls=max_polls,
         timeout_sec=timeout_sec,
-        started=started,
-        resumed_from_task_state=False,
     )
+    task_data = response_data(task_response)
+    status = str(task_data.get("task_status") or "").lower()
+    output_root = Path(output_dir)
+    if status in {"succeed", "succeeded", "success"}:
+        video_url = task_video_url(task_data)
+        video_bytes, content_type = download_with_transport(transport)(video_url, timeout_sec=timeout_sec)
+        video_ref = f"video_candidates/candidate_001{video_extension(content_type)}"
+        video_path = output_root / video_ref
+        video_path.parent.mkdir(parents=True, exist_ok=True)
+        video_path.write_bytes(video_bytes)
+        success_state = updated_task_state(state, status="succeeded", task_data=task_data)
+        write_task_state(output_root, success_state)
+        manifest = build_success_manifest(
+            state=success_state,
+            task_data=task_data,
+            video_ref=video_ref,
+            video_bytes=video_bytes,
+            content_type=content_type,
+            latency_ms=0,
+            resumed_from_task_state=True,
+        )
+        from agentflow.harness.json_io import write_json
+
+        write_json(output_root / I2V_MANIFEST_NAME, manifest)
+        return manifest
+    if status in {"failed", "fail"}:
+        write_task_state(output_root, updated_task_state(state, status="poll_failed", task_data=task_data))
+        raise ModelProviderError("Kling video task failed")
+    running_state = updated_task_state(state, status="running", task_data=task_data)
+    write_task_state(output_root, running_state)
+    return {
+        "schema_version": "kling_i2v_poll_manifest.v1",
+        "status": "running",
+        "service_id": service_id,
+        "provider": "kling",
+        "api_family": "i2v",
+        "capability": state.get("capability"),
+        "task": running_state.get("task") or {},
+        "outputs": [],
+        "provider_url_persisted": False,
+        "claim_boundary": "provider_task_poll_only_not_creative_quality",
+    }
 
 
 def run_kling_t2v_smoke(

@@ -23,6 +23,13 @@
   object-fit: contain;
   background: #0b0d10;
 }
+.node-preview-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  background: #0b0d10;
+}
 .node-result-text {
   padding: 10px;
   white-space: pre-wrap;
@@ -53,6 +60,11 @@
   color: var(--text-primary);
 }
 .bundle-chip.scene { border-color: rgba(140, 220, 160, 0.4); }
+.bundle-chip.degraded {
+  border-color: rgba(255, 170, 90, 0.45);
+  color: var(--text-secondary);
+  border-style: dashed;
+}
 .bundle-warning {
   color: #ffc285;
   background: rgba(255, 170, 90, 0.08);

@@ -126,3 +126,170 @@ def test_sanitize_studio_state_keeps_only_safe_node_and_asset_fields() -> None:
     assert "private" not in node
     assert next(iter(sanitized["edges"].values()))["relation_type"] == "reference"
     assert sanitized["assets"][0]["safe_summary"] == "安全摘要"
+
+
+def test_studio_state_preserves_safe_asset_ids_and_feature_cards() -> None:
+    sanitized = sanitize_studio_state(
+        {
+            "assets": [
+                {
+                    "id": "asset 1",
+                    "kind": "visual_asset",
+                    "title": "Zhou Tong",
+                    "safe_summary": "black short hair",
+                    "asset_id": "vas_abc123",
+                    "visual_asset_id": "vas_abc123",
+                    "asset_type": "character",
+                    "signature": "black short hair in school uniform",
+                    "feature_card": {"hair": "black short hair", "wardrobe": "blue white school uniform"},
+                    "negative_locks": ["keep face identity", "keep uniform"],
+                    "preview_url": "/projects/studio-state-demo/image-assets/img_safe_reference_001/preview",
+                }
+            ],
+        },
+        project_id="studio-state-demo",
+    )
+
+    asset = sanitized["assets"][0]
+    assert asset["asset_id"] == "vas_abc123"
+    assert asset["visual_asset_id"] == "vas_abc123"
+    assert asset["asset_type"] == "character"
+    assert asset["signature"] == "black short hair in school uniform"
+    assert asset["feature_card"]["hair"] == "black short hair"
+    assert asset["negative_locks"] == ["keep face identity", "keep uniform"]
+    assert asset["preview_url"].endswith("/image-assets/img_safe_reference_001/preview")
+
+
+def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-video-state"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio video state test"})
+    state = {
+        "nodes": {
+            "video_1": {
+                "id": "video_1",
+                "type": "video",
+                "title": "Kling I2V",
+                "previewUrl": "/projects/studio-video-state/image-assets/img_first_001/preview",
+                "params": {
+                    "model": "kling_i2v",
+                    "firstFrameImageAssetId": "img_first_001",
+                    "lastFrameImageAssetId": "img_last_001",
+                    "lastVideoJobId": "video_job_001",
+                    "lastVideoPreviewUrl": (
+                        "/projects/studio-video-state/video-generations/"
+                        "video_job_001/candidates/candidate_001/preview"
+                    ),
+                    "quotaOverrideConfirmed": True,
+                },
+                "status": "generating",
+            }
+        }
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+    assert saved.status_code == 200
+
+    restored = client.get(f"/projects/{project_id}/studio-state")
+    params = restored.json()["state"]["nodes"]["video_1"]["params"]
+    assert params["firstFrameImageAssetId"] == "img_first_001"
+    assert params["lastFrameImageAssetId"] == "img_last_001"
+    assert params["lastVideoJobId"] == "video_job_001"
+    assert params["lastVideoPreviewUrl"].endswith("/video-generations/video_job_001/candidates/candidate_001/preview")
+    assert params["quotaOverrideConfirmed"] is True
+    assert "previewUrl" not in restored.json()["state"]["nodes"]["video_1"]
+
+
+def test_studio_state_preserves_safe_context_bundle_summary() -> None:
+    sanitized = sanitize_studio_state(
+        {
+            "nodes": {
+                "image_1": {
+                    "type": "image",
+                    "params": {
+                        "lastContextBundle": {
+                            "schema_version": "0.1",
+                            "resolver_version": "resolver-v1",
+                            "mode": "generate",
+                            "subject_reference_asset_id": "vas_character_001",
+                            "included_assets": [
+                                {
+                                    "asset_id": "vas_character_001",
+                                    "asset_type": "character",
+                                    "label": "Character A",
+                                    "signature": "black short hair",
+                                    "feature_card_hash": "hash123",
+                                    "subject_reference": True,
+                                }
+                            ],
+                            "excluded_assets": [
+                                {
+                                    "asset_id": "vas_character_002",
+                                    "asset_type": "character",
+                                    "label": "Character B",
+                                    "reason": "degraded_to_signature_over_limit",
+                                }
+                            ],
+                            "warnings": [
+                                {
+                                    "warning_id": "best_effort_lock_conflict",
+                                    "asset_id": "vas_character_001",
+                                    "lock_text": "keep black short hair",
+                                    "attribute": "hair_color",
+                                    "lock_value": "black",
+                                    "prompt_value": "red",
+                                }
+                            ],
+                            "temporary_lock_overrides": [
+                                {
+                                    "asset_id": "vas_character_001",
+                                    "lock_text": "keep black short hair",
+                                    "reason": "one-off-ui-unlock",
+                                }
+                            ],
+                            "budget": {
+                                "enforcement_applied": True,
+                                "segments": {"visible_prompt": {"allocated": 550, "used": 420, "truncated": False}},
+                            },
+                            "text_channel": {"provider_prompt": "not persisted"},
+                            "provider_raw": {"unsafe": True},
+                        }
+                    },
+                }
+            }
+        }
+    )
+
+    bundle = sanitized["nodes"]["image_1"]["params"]["lastContextBundle"]
+    assert bundle["included_assets"][0]["asset_id"] == "vas_character_001"
+    assert bundle["included_assets"][0]["subject_reference"] is True
+    assert bundle["excluded_assets"][0]["reason"] == "degraded_to_signature_over_limit"
+    assert bundle["warnings"][0]["prompt_value"] == "red"
+    assert bundle["temporary_lock_overrides"][0]["lock_text"] == "keep black short hair"
+    assert bundle["budget"]["segments"]["visible_prompt"]["allocated"] == 550
+    assert "text_channel" not in bundle
+    assert "provider_raw" not in bundle
+
+
+def test_studio_state_rejects_unsafe_video_preview_url(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-video-state-unsafe"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio video state safety test"})
+
+    response = client.put(
+        f"/projects/{project_id}/studio-state",
+        json={
+            "state": {
+                "nodes": {
+                    "video_1": {
+                        "type": "video",
+                        "params": {
+                            "lastVideoPreviewUrl": "D:\\provider\\raw\\candidate_001.mp4",
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    assert response.status_code == 400

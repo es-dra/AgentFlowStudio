@@ -41,7 +41,8 @@ def test_studio_state_prunes_runtime_bundle_details_before_safety_scan(tmp_path)
 
     assert response.status_code == 200
     params = response.json()["state"]["nodes"]["image_1"]["params"]
-    assert "lastContextBundle" not in params
+    assert params["lastContextBundle"]["included_assets"] == [{"asset_id": "va_1"}]
+    assert "trace_summary" not in params["lastContextBundle"]
     assert "temporaryLockOverrides" not in params
     assert params["visualAssets"][0]["asset_id"] == "va_fixed_1"
 

@@ -121,6 +121,7 @@ function syncNodeElement(elNode, node, state, relations) {
 
   const collapseBtn = elNode.querySelector('[data-action="toggle-collapse"]');
   if (collapseBtn) collapseBtn.innerHTML = icon(node.collapsed ? "chevronDown" : "chevronUp", 13);
+  syncRunAction(elNode, node);
 
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
@@ -142,6 +143,28 @@ function syncNodeElement(elNode, node, state, relations) {
     body.dataset.signature = signature;
     body.replaceChildren(...buildNodeBody(node, def));
   }
+}
+
+function syncRunAction(elNode, node) {
+  const runBtn = elNode.querySelector('[data-action="run"], [data-action="video-poll"]');
+  if (!runBtn) return;
+  runBtn.disabled = false;
+  if (node.type === "video" && node.status === "generating") {
+    if (node.params?.lastVideoJobId) {
+      runBtn.dataset.action = "video-poll";
+      runBtn.title = "继续轮询视频任务";
+      runBtn.innerHTML = icon("retry", 13);
+    } else {
+      runBtn.dataset.action = "run";
+      runBtn.title = "视频任务提交中";
+      runBtn.disabled = true;
+      runBtn.innerHTML = icon("clock", 13);
+    }
+    return;
+  }
+  runBtn.dataset.action = "run";
+  runBtn.title = "生成";
+  runBtn.innerHTML = icon("play", 13);
 }
 
 function buildNodeBody(node, def) {
@@ -206,7 +229,7 @@ function buildNodeBody(node, def) {
   glyph.className = "node-glyph";
   glyph.innerHTML = icon(def.icon, 38);
   out.push(glyph);
-  if (def.intents.length) {
+    if (def.intents.length && !["image", "video"].includes(node.type)) {
     const label = document.createElement("div");
     label.className = "node-empty-label";
     label.textContent = "尝试:";

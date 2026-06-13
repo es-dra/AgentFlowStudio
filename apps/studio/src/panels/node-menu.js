@@ -1,7 +1,7 @@
 import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
-import { fixNodeVisualAsset, setNodeVideoFrame, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
+import { fixNodeVisualAsset, pollNodeVideoGeneration, setNodeVideoFrame, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
 
 export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
@@ -40,6 +40,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) setNodeVideoFrame(store, fresh, "last");
     });
+    if (node.params?.lastVideoJobId) {
+      addItem("retry", "继续轮询视频任务", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) pollNodeVideoGeneration(store, runtime, fresh);
+      });
+    }
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.params.isReference = !n.params.isReference; }));

@@ -53,7 +53,7 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     stateLabel.textContent = "已优化";
     body.replaceChildren();
 
-    body.appendChild(sourceChips(request));
+    body.appendChild(sourceChips(request, outcome));
     const bundle = contextBundleView(outcome.context_bundle);
     if (bundle) body.appendChild(bundle);
 
@@ -124,20 +124,27 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     requestAnimationFrame(() => close.reposition?.());
   }
 
-  function sourceChips(request) {
+  function sourceChips(request, outcome = null) {
     const chips = el("div", "opt-source-chips");
-    for (const label of optimizationSources(request)) {
+    for (const label of optimizationSources(request, outcome)) {
       chips.appendChild(el("span", "opt-source-chip", label));
     }
     return chips;
   }
 
-  function optimizationSources(request) {
-    const labels = ["影视结构"];
+  function optimizationSources(request, outcome = null) {
+    const labels = [optimizationModeLabel(outcome?.optimization_mode), "影视结构"].filter(Boolean);
     if (request.style) labels.push("项目风格");
     if (request.director_setup) labels.push("导演台布置");
     if (request.asset_refs?.length) labels.push("角色/场景设定");
     return labels;
+  }
+
+  function optimizationModeLabel(mode) {
+    if (mode === "t2i") return "文生图扩写";
+    if (mode === "i2i") return "图生图编辑";
+    if (mode === "text") return "文本结构化";
+    return "";
   }
 
   function contextBundleView(bundle) {
@@ -146,13 +153,15 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
     const included = Array.isArray(bundle.included_assets) ? bundle.included_assets : [];
     const available = Array.isArray(bundle.available_project_assets) ? bundle.available_project_assets : [];
     const warnings = Array.isArray(bundle.warnings) ? bundle.warnings : [];
+    const availableForPanel = available.filter((asset) => !asset.injected).slice(0, 6);
+    if (!included.length && !availableForPanel.length && !warnings.length) return null;
     const title = el("div", "opt-section-label", "项目资产引用");
     const chips = el("div", "opt-source-chips");
     for (const item of included) {
       const suffix = item.connected ? "已连线" : "未连线";
       chips.appendChild(el("span", `opt-source-chip${item.connected ? " linked" : " unlinked"}`, `${item.label || item.asset_id} · ${suffix}`));
     }
-    for (const item of available.filter((asset) => !asset.injected).slice(0, 6)) {
+    for (const item of availableForPanel) {
       chips.appendChild(el("span", "opt-source-chip muted", `${item.label || item.asset_id} · 未引用 · 可连线`));
     }
     wrap.append(title, chips);
@@ -176,7 +185,7 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
   }
 
   function renderLockWarnings(wrap, warnings) {
-    for (const warning of warnings.filter((item) => item.warning_id === "best_effort_lock_conflict")) {
+    for (const warning of uniqueLockWarnings(warnings)) {
       const row = el("div", "opt-asset-warning");
       row.appendChild(document.createTextNode(humanWarning(warning)));
       const alreadyOverridden = hasOverride(warning);
@@ -191,6 +200,18 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
       row.appendChild(unlockBtn);
       wrap.appendChild(row);
     }
+  }
+
+  function uniqueLockWarnings(warnings) {
+    const seen = new Set();
+    const result = [];
+    for (const warning of warnings.filter((item) => item.warning_id === "best_effort_lock_conflict")) {
+      const key = `${warning.asset_id || ""}::${warning.lock_text || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(warning);
+    }
+    return result;
   }
 
   function hasOverride(warning) {
@@ -258,5 +279,9 @@ function stripSectionHeaders(value) {
 
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  if (/provider service not found|remote LLM prompt optimization unavailable|AFS_ALLOW_REMOTE_LLM|NARRATOCUT_ALLOW_REMOTE_LLM/i.test(clean)) {
+    return "提示词优化服务未就绪，请检查 LLM provider 配置与 Runtime 启动环境后重试。";
+  }
+  return clean.slice(0, 180);
 }

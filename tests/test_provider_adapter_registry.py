@@ -61,6 +61,33 @@ def test_provider_registry_exposes_minimax_descriptor(tmp_path) -> None:
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_IMAGE"
 
 
+def test_provider_registry_ignores_company_gateway_aggregate_service(tmp_path) -> None:
+    payload = provider_config()
+    payload["services"]["company_gateway"] = {
+        "provider": "company_gateway",
+        "capability": "llm/asr/image/video",
+        "required_gate": "task_specific_capability_gate",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "llm/asr/image/video",
+            "execution_mode": "sync",
+            "capabilities": ["llm", "image", "video", "asr"],
+            "reference_image_slots": 0,
+            "supported_aspect_ratios": ["1:1"],
+            "prompt_char_limit": 12000,
+            "seed_supported": False,
+            "required_gate": "task_specific_capability_gate",
+        },
+    }
+    store = _store(tmp_path, payload)
+
+    registry = ProviderRegistry.from_store(store)
+
+    assert registry.descriptor("minimax_image").modality == "image"
+    with pytest.raises(ModelConfigError, match="Provider service not found: company_gateway"):
+        registry.descriptor("company_gateway")
+
+
 def test_provider_registry_rejects_disabled_account_pool_entry(tmp_path, monkeypatch) -> None:
     payload = provider_config()
     payload["account_pools"]["minimax_image_pool"]["accounts"][0]["enabled"] = False
@@ -326,19 +353,53 @@ def test_provider_registry_uses_legacy_deepseek_default_model_when_ref_blank(tmp
     assert captured["api_key"] == "fake-deepseek-key"
 
 
+def test_provider_registry_normalizes_legacy_image_gate_before_inner_plan(tmp_path, monkeypatch) -> None:
+    payload = legacy_kling_provider_config()
+    payload["services"]["minimax_image"] = {
+        "provider": "minimax",
+        "account_ref": "minimax",
+        "capability": "image",
+        "required_gate": "NARRATOCUT_ALLOW_REMOTE_IMAGE",
+    }
+    captured: dict[str, object] = {}
+
+    def fake_run_minimax_image_smoke(store, **kwargs):
+        captured["service_required_gate"] = store.service(kwargs["service_id"]).get("required_gate")
+        return {"status": "succeeded", "outputs": []}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.provider_adapter_impl.run_minimax_image_smoke",
+        fake_run_minimax_image_smoke,
+    )
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    result = registry.dispatch(
+        "image",
+        "minimax_image",
+        ProviderDispatchRequest(prompt="A clean keyframe.", output_dir=tmp_path, aspect_ratio="9:16"),
+    )
+
+    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+    assert captured["service_required_gate"] == "AFS_ALLOW_REMOTE_IMAGE"
+    assert result["status"] == "succeeded"
+
+
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
     called = {"count": 0}
 
-    def fake_run_kling_i2v_smoke(*args, **kwargs):
+    def fake_submit_kling_i2v_task(*args, **kwargs):
         called["count"] += 1
-        return {"status": "succeeded"}
+        return {"status": "submitted"}
 
     first_frame = tmp_path / "first.png"
     first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
     monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.run_kling_i2v_smoke",
-        fake_run_kling_i2v_smoke,
+        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
+        fake_submit_kling_i2v_task,
     )
     store = _store(tmp_path, _kling_provider_config())
     registry = ProviderRegistry.from_store(store)
@@ -363,11 +424,43 @@ def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path
 def test_provider_registry_dispatches_kling_i2v_through_adapter(tmp_path, monkeypatch) -> None:
     captured: dict[str, object] = {}
 
-    def fake_run_kling_i2v_smoke(*args, **kwargs):
+    def fake_submit_kling_i2v_task(
+        store,
+        *,
+        service_id,
+        prompt,
+        image_path,
+        output_dir,
+        duration,
+        mode,
+        timeout_sec,
+        transport,
+        model_name_override=None,
+    ):
+        kwargs = {
+            "service_id": service_id,
+            "prompt": prompt,
+            "image_path": image_path,
+            "output_dir": output_dir,
+            "duration": duration,
+            "mode": mode,
+            "timeout_sec": timeout_sec,
+            "transport": transport,
+            "model_name_override": model_name_override,
+        }
         captured["kwargs"] = kwargs
         return {
+            "status": "submitted",
+            "service_id": service_id,
+            "api_family": "i2v",
+            "task": {"task_id": "task_123", "task_status": "submitted"},
+        }
+
+    def fake_poll_kling_i2v_task_once(store, *, output_dir, state, timeout_sec, transport):
+        captured["poll"] = {"output_dir": output_dir, "state": state, "timeout_sec": timeout_sec, "transport": transport}
+        return {
             "status": "succeeded",
-            "service_id": kwargs["service_id"],
+            "service_id": state["service_id"],
             "provider": "kling",
             "outputs": [{"video_path": "video_candidates/candidate_001.mp4"}],
         }
@@ -376,8 +469,12 @@ def test_provider_registry_dispatches_kling_i2v_through_adapter(tmp_path, monkey
     first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.run_kling_i2v_smoke",
-        fake_run_kling_i2v_smoke,
+        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
+        fake_submit_kling_i2v_task,
+    )
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.provider_adapter_impl.poll_kling_i2v_task_once",
+        fake_poll_kling_i2v_task_once,
     )
     store = _store(tmp_path, _kling_provider_config())
     registry = ProviderRegistry.from_store(store)
@@ -392,6 +489,7 @@ def test_provider_registry_dispatches_kling_i2v_through_adapter(tmp_path, monkey
             subject_reference_image_path=first_frame,
             duration_sec=5,
             resolution="720p",
+            motion="slow push in",
         ),
     )
 
@@ -401,7 +499,65 @@ def test_provider_registry_dispatches_kling_i2v_through_adapter(tmp_path, monkey
     assert captured["kwargs"]["prompt"] == "A slow camera push in."
     assert captured["kwargs"]["image_path"] == first_frame
     assert captured["kwargs"]["duration"] == "5"
+    assert captured["kwargs"]["model_name_override"] is None
+    assert captured["poll"]["state"]["task"]["task_id"] == "task_123"
     assert "secret" not in json.dumps(result, ensure_ascii=False).lower()
+
+
+def test_provider_registry_submit_kling_i2v_returns_submitted_without_polling(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_submit_kling_i2v_task(store, *, service_id, prompt, image_path, output_dir, duration, mode, timeout_sec, transport, model_name_override=None):
+        captured["submit"] = {
+            "service_id": service_id,
+            "prompt": prompt,
+            "image_path": image_path,
+            "output_dir": output_dir,
+            "duration": duration,
+            "mode": mode,
+            "timeout_sec": timeout_sec,
+            "transport": transport,
+            "model_name_override": model_name_override,
+        }
+        return {
+            "status": "submitted",
+            "service_id": service_id,
+            "api_family": "i2v",
+            "task": {"task_id": "task_async", "task_status": "submitted"},
+        }
+
+    def fail_if_polled(*args, **kwargs):
+        raise AssertionError("Kling submit must not poll synchronously")
+
+    first_frame = tmp_path / "first.png"
+    first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
+        fake_submit_kling_i2v_task,
+    )
+    monkeypatch.setattr(
+        "agentflow_studio.model_gateway.provider_adapter_impl.poll_kling_i2v_task_once",
+        fail_if_polled,
+    )
+    registry = ProviderRegistry.from_store(_store(tmp_path, _kling_provider_config()))
+
+    task = registry.submit(
+        "video",
+        "kling_i2v",
+        ProviderDispatchRequest(
+            prompt="A slow camera push in.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="9:16",
+            subject_reference_image_path=first_frame,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    assert task["task"]["status"] == "submitted"
+    assert task["task"]["state"]["task"]["task_id"] == "task_async"
+    assert captured["submit"]["image_path"] == first_frame
 
 
 def test_provider_example_config_builds_registry_without_secret_values() -> None:

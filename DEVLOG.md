@@ -1,5 +1,134 @@
 # Devlog
 
+## 2026-06-13 - Browser QA Hardening Loop 6/7 And Final Verification
+
+- Continued agent-led browser QA after the live asset and Kling passes.
+- Fixed Studio state persistence for `lastContextBundle`: safe included/excluded assets, budget, warnings, and temporary lock override summaries now survive refresh, while `trace_summary`, provider prompt, provider raw, and other runtime-only details remain pruned.
+- Added active Runtime save flush after image/video generation and poll success/failure so final node states are not lost to debounce timing.
+- Added drawer actions for selected video nodes to use existing image assets as explicit first/last frames; no implicit last-upload or first-upload fallback is used.
+- Prevented video nodes from hydrating an image preview URL into `<video>` playback; only Runtime video preview routes can become video `previewUrl`.
+- Fixed prompt-bar video behavior: a running video node with `lastVideoJobId` now continues polling instead of submitting another paid video job, and completed nodes return to the normal `生成` action.
+- Updated `.env.example` to remove legacy `NARRATOCUT_*` provider gate names.
+- Rewrote the browser QA maintenance report in Chinese and added Loop 6/7 evidence plus final verification status.
+
+Verification:
+
+```text
+Focused Runtime/Provider/Studio tests: 72 passed, 1 warning
+Studio JS node --check: 37 files passed
+Full pytest: 886 passed, 2 warnings
+maintenance_audit: failed=0, warning=2
+git diff --check: exit 0, CRLF notices only
+Browser final check: current Studio tab has safe video preview, send action title is 生成, app console warn/error count is 0
+```
+
+Boundary: this closes runtime/browser verification for the current hardening loop. It is still not human acceptance; MiniMax identity quality and Kling first-frame creative quality need human scoring.
+
+## 2026-06-13 - Browser QA Hardening Loop 5
+
+- Continued agent-led browser QA on a fresh project and fixed asset semantics discovered during the run.
+- Fixed Runtime-synced visual assets in the drawer: fixed assets now keep `asset_type`, `image_asset_refs`, safe preview URLs, and labels such as `人物资产` instead of falling back to `参考`.
+- Improved visual asset prefill by extracting from optimized prompt sections and deduplicating repeated phrases in signatures and feature cards.
+- Added occupied-region avoidance for dock-created nodes so new nodes no longer land directly on top of existing nodes.
+- Fixed drawer `用于当前节点`: fixed visual assets now populate `node.params.visualAssets`, so node badges, context_subgraph, optimizer asset references, and generation resolver all see the same asset.
+- Hardened selected video toolbar behavior so a running video task exposes `video-poll` rather than a second submit action.
+- Browser evidence covered fresh project creation, T2I optimize/generate, asset fix, refresh drawer restore, readonly asset detail, attached-asset optimization, and attached-asset generation with `本次携带 1 项资产`.
+
+Verification:
+
+```text
+tests/test_web_studio_static.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_creative_agent_keyframes.py: 42 passed, 1 warning
+Studio JS node --check for all apps/studio/src/**/*.js: passed
+Browser console warn/error: none
+Evidence: runs/loop-fresh-asset-drawer-20260613.png, runs/loop-attached-asset-optimize-20260613.png, runs/loop-attached-asset-generation-20260613.png
+```
+
+Boundary: live MiniMax image/LLM output remains runtime/provider verification only. Character identity similarity still needs human scoring.
+
+## 2026-06-13 - Browser QA Hardening Loop 4
+
+- Fixed Studio video resume persistence: safe `firstFrameImageAssetId`, `lastFrameImageAssetId`, `lastVideoJobId`, `lastVideoPreviewUrl`, and quota override state now survive `studio-state` save/restore.
+- Extended safe preview URL validation to Runtime video preview routes while still rejecting local paths and provider URLs.
+- Added the video node `继续轮询视频任务` path after refresh and verified it against a live Kling I2V job.
+- Fixed successful video poll rendering: the node `previewUrl` now switches to the video preview endpoint and video nodes render a `<video controls>` player instead of the image preview component.
+- Recorded a UX risk: the selected-node toolbar can make `生成` and `更多` easy to mis-hit during QA; one accidental Kling submit was safely completed and reused as resume evidence.
+
+Verification:
+
+```text
+tests/test_api_runtime_studio_state.py tests/test_web_studio_static.py: 20 passed
+node --check apps/studio/src/node-result-view.js apps/studio/src/node-actions.js apps/studio/src/panels/node-menu.js: passed
+Browser QA: refresh -> node menu -> continue poll -> succeeded -> video player rendered
+Evidence: runs/kling-poll-ui-video-preview-20260613.png
+```
+
+Boundary: this is runtime/browser verification only. The Kling video is technically playable; creative quality and first-frame suitability still need human scoring.
+
+## 2026-06-13 - Browser QA Hardening Loop 3
+
+- Fixed the live Kling I2V browser path discovered during agent-led QA.
+- Split Kling Studio execution into true async submit/poll: submit now creates the provider task and returns `submitted`; poll returns `running` or `succeeded`.
+- Hardened the Kling adapter against generic provider-plan field leakage and added a safe Runtime manifest fallback for unexpected adapter exceptions.
+- Verified a live Studio video-node path with explicit first frame: upload -> set first frame -> submit -> poll -> safe preview.
+- Live Kling output succeeded with a safe `video/mp4` preview, H.264 1924x1076, 24fps, 5.04s, 9.13MB. First/last frame evidence was extracted under `runs/`.
+
+Verification:
+
+```text
+tests/test_provider_adapter_registry.py tests/test_api_runtime_video_generations.py tests/test_kling_video_smoke.py tests/test_kling_video_request_plan.py tests/test_kling_video_task_recovery.py tests/test_kling_video_completion.py: 44 passed
+node --check apps/studio/src/node-actions.js: passed
+ffprobe media sanity: passed
+```
+
+Boundary: Kling live execution is runtime/provider verification only. The generated clip is technically valid, but quality still needs human scoring; multi-view sheets can produce crop artifacts and should not be treated as ideal video first frames.
+
+## 2026-06-13 - Browser QA Hardening Loop 2
+
+- Continued agent-led browser QA on `codex/afs-browser-qa-hardening-002`.
+- Fixed empty-project meta drift between URL/project select/drawer after async project-list refresh.
+- Removed demo seed assets from new Studio projects and deduplicated Runtime-synced assets by safe `asset_id` / `visual_asset_id`.
+- Extended Studio state sanitization to preserve safe asset ids, feature cards, negative locks, signatures, and safe preview URLs for asset drawer/details restore.
+- Strengthened I2I prompt optimization: uploaded image filename summaries now reach Runtime, and generic MiniMax-M3 outputs that miss reference/short-hair/school-uniform locks are replaced by a traceable guardrail fallback.
+- Simplified image and video node prompt bars by hiding unimplemented operation-mode controls.
+- Browser evidence covered asset fix prefill, asset drawer/detail restore, live MiniMax I2I optimization, live MiniMax I2I generation, and video first-frame guard behavior.
+
+Verification:
+
+```text
+tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_studio_state.py tests/test_web_studio_static.py: 31 passed
+tests/test_web_studio_static.py: 14 passed after video UI cleanup
+node --check touched Studio JS: passed
+py_compile touched Runtime modules: passed
+```
+
+Boundary: live MiniMax I2I generation is provider/runtime evidence, not human acceptance. It improved hair/uniform preservation but still showed identity/background drift.
+
+## 2026-06-13 - Browser QA Hardening Follow-up
+
+- Fixed project isolation after Claude walkthrough: project switch no longer reads the unscoped legacy canvas key as a runtime fallback; legacy keys are migrated once and removed.
+- Replaced native `window.prompt` / `window.confirm` project/director flows with in-app modals.
+- Normalized legacy `NARRATOCUT_ALLOW_REMOTE_*` provider gates to `AFS_ALLOW_REMOTE_*` in the registry and MiniMax/Kling plan fallbacks.
+- Skipped `company_gateway` aggregate services in ProviderRegistry so local full provider configs do not block concrete adapters.
+- Split prompt optimization into T2I expansion and I2I edit modes, surfaced `optimization_mode` to Studio, and removed user-facing raw provider/gate error text.
+- Flushed Studio state immediately after image upload so refresh restores safe preview URLs.
+
+Verification:
+
+```text
+Focused static/provider/optimizer tests: 17 passed, 1 warning
+Studio JS node --check for touched files: passed
+Browser QA report: runs/browser_qa_hardening_1781302404.json status=passed
+MiniMax image API smoke: succeeded, provider_calls_started=true
+Kling I2V preflight: ready, secrets_printed=false
+git diff --check: passed with CRLF notices only
+```
+
+Boundary:
+
+- Live LLM optimization and one MiniMax image generation were used as runtime verification only.
+- Kling was preflighted but no live I2V job was submitted in this slice.
+- No provider secrets or raw provider payloads were written to tracked files.
+
 ## 2026-06-13 - LLM Optimizer Runtime Fallback Fix
 
 - Fixed the remaining Studio prompt optimization 422 when the external provider config has blank legacy LLM default model refs.

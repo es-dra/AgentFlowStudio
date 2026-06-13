@@ -1,10 +1,12 @@
 const STORAGE_KEY_PREFIX = "afs_studio_canvas_v2:";
 const STORAGE_KEY = "afs_studio_canvas_v2";
 const LEGACY_STORAGE_KEY = "afs_studio_canvas_v1";
+const LEGACY_MIGRATION_MARKER = "afs_studio_canvas_v2:legacy_migrated";
 const SAVE_DEBOUNCE_MS = 700;
 const HISTORY_LIMIT = 80;
 
 export function createStore(projectId = "studio-local-001") {
+  migrateLegacyCanvasStorage(projectId);
   let state = loadPersisted(projectId) || initialState(projectId);
   const listeners = new Set();
   const history = { past: [], future: [] };
@@ -49,12 +51,17 @@ export function createStore(projectId = "studio-local-001") {
 
   async function hydrateRuntime(runtime = runtimeClient) {
     if (!runtime?.loadStudioState) return { source: "local" };
+    const targetProjectId = runtime.projectId || state.meta.projectId;
     try {
       state.ui.saveState = "同步中";
       notifySoon();
       const payload = await runtime.loadStudioState();
-      const remote = normalizeSnapshot(payload?.state);
-      if (payload?.source === "runtime" && hasStudioContent(remote)) {
+      if (targetProjectId && state.meta.projectId !== targetProjectId) {
+        return { source: "stale", projectId: targetProjectId };
+      }
+      const remoteState = payload?.state;
+      const remote = normalizeSnapshot(remoteState);
+      if (payload?.source === "runtime" && (hasStudioContent(remote) || hasStudioMeta(remoteState))) {
         remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
         persist(state);
@@ -96,8 +103,11 @@ export function createStore(projectId = "studio-local-001") {
 
   async function switchProject(projectId, runtime) {
     runtimeClient = runtime;
+    clearTimeout(saveTimer);
     state = loadPersisted(projectId) || initialState(projectId);
     state.meta.projectId = projectId;
+    history.past = [];
+    history.future = [];
     notifySoon();
     return hydrateRuntime(runtime);
   }
@@ -107,16 +117,24 @@ export function createStore(projectId = "studio-local-001") {
     clearTimeout(saveTimer);
     state.ui.saveState = "保存中";
     saveTimer = setTimeout(async () => {
-      try {
-        await runtimeClient.saveStudioState(snapshotStudioState(state));
-        state.ui.saveState = "已保存";
-        state.ui.saveMessage = "";
-      } catch {
-        state.ui.saveState = "本地暂存";
-        state.ui.saveMessage = "运行服务保存失败，已保留本地暂存";
-      }
-      notifySoon();
+      await flushRuntimeSave();
     }, SAVE_DEBOUNCE_MS);
+  }
+
+  async function flushRuntimeSave() {
+    if (!runtimeClient?.saveStudioState) return;
+    clearTimeout(saveTimer);
+    try {
+      state.ui.saveState = "保存中";
+      notifySoon();
+      await runtimeClient.saveStudioState(snapshotStudioState(state));
+      state.ui.saveState = "已保存";
+      state.ui.saveMessage = "";
+    } catch {
+      state.ui.saveState = "本地暂存";
+      state.ui.saveMessage = "运行服务保存失败，已保留本地暂存";
+    }
+    notifySoon();
   }
 
   function notifySoon() {
@@ -128,7 +146,7 @@ export function createStore(projectId = "studio-local-001") {
     });
   }
 
-  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, undo, redo };
+  return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, flushRuntimeSave, undo, redo };
 }
 
 function initialState(projectId = "studio-local-001") {
@@ -146,7 +164,7 @@ function initialState(projectId = "studio-local-001") {
     groups: {},
     order: [],
     selection: { nodeIds: [], edgeId: null },
-    assets: seedAssets(),
+    assets: [],
     ui: {
       drawerOpen: true,
       drawerTab: "canvas",
@@ -156,38 +174,6 @@ function initialState(projectId = "studio-local-001") {
       saveMessage: "",
     },
   };
-}
-
-function seedAssets() {
-  return [
-    {
-      id: "asset_director_seed",
-      kind: "director_setup",
-      title: "夜间卧室布光参考",
-      safe_summary: "1 个机位 / 1 个主体 / 3 盏灯，低照度情绪场景。",
-      thumbnail_ref: "director-board",
-      source_node_id: null,
-      status: "reference",
-    },
-    {
-      id: "asset_character_seed",
-      kind: "character_turnaround",
-      title: "角色三视图占位",
-      safe_summary: "保持服装、发型、体态连续性的角色参考。",
-      thumbnail_ref: "character-sheet",
-      source_node_id: null,
-      status: "reference",
-    },
-    {
-      id: "asset_keyframe_seed",
-      kind: "keyframe",
-      title: "电影感关键帧占位",
-      safe_summary: "用于测试关键帧提示词、镜头和灯光约束。",
-      thumbnail_ref: "keyframe",
-      source_node_id: null,
-      status: "reference",
-    },
-  ];
 }
 
 function persist(state) {
@@ -200,7 +186,7 @@ function persist(state) {
 
 function loadPersisted(projectId = "studio-local-001") {
   try {
-    const raw = localStorage.getItem(storageKey(projectId)) || localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(projectId));
     if (!raw) return null;
     const snap = normalizeSnapshot(JSON.parse(raw));
     if (!hasStudioContent(snap)) return null;
@@ -210,6 +196,27 @@ function loadPersisted(projectId = "studio-local-001") {
     return base;
   } catch {
     return null;
+  }
+}
+
+function migrateLegacyCanvasStorage(projectId = "studio-local-001") {
+  try {
+    if (localStorage.getItem(LEGACY_MIGRATION_MARKER)) return;
+    const targetKey = storageKey(projectId);
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (raw && !localStorage.getItem(targetKey)) {
+      const snap = normalizeSnapshot(JSON.parse(raw));
+      if (hasStudioContent(snap)) {
+        snap.meta.projectId = projectId;
+        localStorage.setItem(targetKey, JSON.stringify(snap));
+      }
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    localStorage.setItem(LEGACY_MIGRATION_MARKER, new Date().toISOString());
+  } catch {
+    /* Legacy storage cleanup is best-effort; project-scoped state remains authoritative. */
   }
 }
 
@@ -264,10 +271,15 @@ function hydrateNodePreviews(nodes) {
   for (const [id, node] of Object.entries(nodes || {})) {
     if (!node || typeof node !== "object") continue;
     const next = { ...node, params: { ...(node.params || {}) } };
-    if (!next.previewUrl) {
+    if (!next.previewUrl && next.type === "video" && next.params.lastVideoPreviewUrl) {
+      next.previewUrl = next.params.lastVideoPreviewUrl;
+    } else if (!next.previewUrl && next.type !== "video") {
       const uploads = Array.isArray(next.params.uploads) ? next.params.uploads : [];
       const last = uploads[uploads.length - 1] || null;
       if (last?.preview_url) next.previewUrl = last.preview_url;
+    }
+    if (next.type === "video" && next.previewUrl && !String(next.previewUrl).includes("/video-generations/")) {
+      delete next.previewUrl;
     }
     result[id] = next;
   }
@@ -275,7 +287,27 @@ function hydrateNodePreviews(nodes) {
 }
 
 function hasStudioContent(snap) {
-  return Boolean(snap && (Object.keys(snap.nodes || {}).length || Object.keys(snap.edges || {}).length || (snap.assets || []).length));
+  return Boolean(
+    snap
+      && (
+        Object.keys(snap.nodes || {}).length
+        || Object.keys(snap.edges || {}).length
+        || (Array.isArray(snap.order) && snap.order.length)
+      ),
+  );
+}
+
+function hasStudioMeta(snap) {
+  const meta = snap && typeof snap === "object" ? snap.meta : null;
+  return Boolean(
+    meta
+      && typeof meta === "object"
+      && (
+        String(meta.projectName || "").trim()
+        || String(meta.canvasName || "").trim()
+        || String(meta.updated_at || "").trim()
+      ),
+  );
 }
 
 function serializableChanged(before, after) {

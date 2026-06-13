@@ -210,7 +210,60 @@
   padding: 7px 14px;
 }
 .primary-btn { background: var(--text-primary); color: #15161a; }
+.primary-btn.danger { background: var(--danger); color: #fff; }
 .ghost-btn { border: 1px solid var(--border-soft); color: var(--text-secondary); }
+
+.project-create-modal,
+.director-confirm-modal {
+  width: min(440px, 92vw);
+}
+.project-create-body,
+.director-confirm-body {
+  display: grid;
+  gap: 10px;
+}
+.modal-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.modal-field input,
+.modal-field textarea {
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  color: var(--text-primary);
+  padding: 8px 10px;
+}
+.modal-field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.modal-error {
+  color: #ff8f7a;
+  background: rgba(255, 122, 92, 0.1);
+  border: 1px solid rgba(255, 122, 92, 0.3);
+  border-radius: var(--radius-chip);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.director-confirm-body p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.director-confirm-preview {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
 
 /* 历史资产 */
 .history-toolbar { display: flex; align-items: center; gap: 10px; padding: 0 16px 8px; color: var(--text-secondary); font-size: 12px; }

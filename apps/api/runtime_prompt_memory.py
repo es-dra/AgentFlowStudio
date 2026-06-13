@@ -78,6 +78,7 @@ def build_prompt_optimization(
         "provider_calls_started": llm_enhancement["provider_calls_started"],
         "original_prompt": request.prompt_text,
         "optimized_prompt": assembled_prompt,
+        "optimization_mode": str(llm_enhancement.get("optimization_mode") or "not_applicable"),
         "user_prompt": user_prompt,
         "user_prompt_plain": user_prompt_plain,
         "user_prompt_sections": user_prompt_sections,
@@ -131,6 +132,7 @@ def _creative_brief(
         "generation_target": request.generation_target,
         "target_platform": request.target_platform,
         "style": request.style,
+        "optimization_mode": str(llm_enhancement.get("optimization_mode") or "not_applicable"),
         "negative_constraints": [
             "Do not claim provider execution unless an explicit provider gate is opened.",
             "Do not treat background context as durable project memory.",
@@ -165,6 +167,7 @@ def _prompt_trace(
         "node_type": request.node_type,
         "input_prompt_ref": "request_body.prompt_text",
         "generation_target": request.generation_target,
+        "optimization_mode": str(llm_enhancement.get("optimization_mode") or "not_applicable"),
         "context_priority": CONTEXT_PRIORITY,
         "knowledge_rules": assembly["knowledge_rules"],
         "creative_agent": assembly["creative_agent"],
@@ -204,6 +207,7 @@ def _safe_manifest(
         "status": "succeeded",
         "provider_gate": provider_gate(),
         "provider_calls_started": llm_enhancement["provider_calls_started"],
+        "optimization_mode": str(llm_enhancement.get("optimization_mode") or "not_applicable"),
         "raw_provider_response_stored": False,
         "generated_media_bytes_stored": False,
         "llm_enhancement": _public_llm_enhancement(llm_enhancement),
@@ -235,9 +239,11 @@ def _public_llm_enhancement(value: dict[str, Any]) -> dict[str, Any]:
         "status": str(value.get("status") or "not_requested"),
         "provider": str(value.get("provider") or "not_requested"),
         "model": str(value.get("model") or "not_requested"),
+        "optimization_mode": str(value.get("optimization_mode") or "not_applicable"),
         "provider_calls_started": bool(value.get("provider_calls_started")),
         "raw_response_stored": False,
         "discard_reason": value.get("discard_reason"),
+        "guardrail_fallback_used": bool(value.get("guardrail_fallback_used")),
     }
 
 
