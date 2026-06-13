@@ -10,7 +10,7 @@ from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
-from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke
+from agentflow_studio.model_gateway.kling_video_smoke import poll_kling_i2v_task_once, submit_kling_i2v_task
 from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
@@ -300,11 +300,40 @@ class KlingVideoAdapter:
         }
 
     def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        manifest = run_kling_i2v_smoke(self.store, **plan)
-        return {"status": "already_complete", "raw": manifest}
+        state = submit_kling_i2v_task(
+            self.store,
+            service_id=str(plan["service_id"]),
+            prompt=str(plan["prompt"]),
+            image_path=plan["image_path"],
+            output_dir=plan["output_dir"],
+            duration=str(plan["duration"]),
+            mode=str(plan["mode"]),
+            timeout_sec=float(plan["timeout_sec"]),
+            transport=str(plan["transport"]),
+            model_name_override=plan.get("model_name_override"),
+        )
+        return {
+            "status": "submitted",
+            "state": state,
+            "output_dir": str(plan["output_dir"]),
+            "timeout_sec": float(plan["timeout_sec"]),
+            "transport": str(plan["transport"]),
+        }
 
     def poll(self, task: dict[str, Any]) -> dict[str, Any]:
-        return task["raw"]
+        status = str(task.get("status") or "")
+        if status == "already_complete":
+            return task["raw"]
+        state = task.get("state")
+        if not isinstance(state, dict):
+            raise ModelGatewayError("Kling adapter task state is missing")
+        return poll_kling_i2v_task_once(
+            self.store,
+            output_dir=task.get("output_dir") or ".",
+            state=state,
+            timeout_sec=float(task.get("timeout_sec") or 120.0),
+            transport=str(task.get("transport") or "httpx"),
+        )
 
     def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         return raw

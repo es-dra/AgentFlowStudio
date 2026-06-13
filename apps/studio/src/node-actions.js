@@ -120,6 +120,7 @@ async function uploadSelectedImage(store, runtime, nodeId, file) {
         created_at: new Date().toISOString(),
       });
     });
+    await store.flushRuntimeSave?.();
   } catch (error) {
     setNodeError(store, nodeId, `图片上传失败: ${safeError(error)}`);
   }
@@ -157,6 +158,28 @@ export async function startNodeGeneration(store, runtime, node, resultText) {
   );
 }
 
+export async function pollNodeVideoGeneration(store, runtime, node) {
+  const jobId = node.params?.lastVideoJobId;
+  if (!jobId || !runtime?.pollVideo) {
+    setNodeError(store, node.id, "没有可继续轮询的视频任务。");
+    return;
+  }
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    n.status = "generating";
+    n.result = `正在轮询 Kling 视频任务...\nJob: ${jobId}`;
+  });
+  try {
+    const response = await runtime.pollVideo(jobId);
+    applyVideoResponse(store, node.id, response);
+    await store.flushRuntimeSave?.();
+  } catch (error) {
+    setNodeError(store, node.id, `Kling video poll failed: ${safeError(error)}`);
+    await store.flushRuntimeSave?.();
+  }
+}
+
 async function startRemoteVideoGeneration(store, runtime, node) {
   const firstFrame = node.params?.firstFrameImageAssetId;
   if (!firstFrame) {
@@ -188,8 +211,10 @@ async function startRemoteVideoGeneration(store, runtime, node) {
       generated_at: new Date().toISOString(),
     });
     applyVideoResponse(store, node.id, response);
+    await store.flushRuntimeSave?.();
   } catch (error) {
     setNodeError(store, node.id, `Kling video request failed: ${safeError(error)}`);
+    await store.flushRuntimeSave?.();
   }
 }
 
@@ -198,9 +223,11 @@ function applyVideoResponse(store, nodeId, response) {
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
+    const previewUrl = response?.candidate_previews?.[0]?.preview_url || null;
     n.params.lastVideoJobId = response?.job?.job_id || null;
-    n.params.lastVideoPreviewUrl = response?.candidate_previews?.[0]?.preview_url || null;
-    n.status = status === "succeeded" ? "complete" : status === "submitted" ? "generating" : "error";
+    n.params.lastVideoPreviewUrl = previewUrl;
+    if (previewUrl) n.previewUrl = previewUrl;
+    n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
     n.result = videoResultText(response);
   });
 }
@@ -209,6 +236,7 @@ function videoResultText(response) {
   const status = response?.job?.status || "blocked";
   if (status === "succeeded") return "Kling 视频已完成，预览已通过 Runtime 安全端点加载。";
   if (status === "submitted") return `Kling 视频已提交，可继续轮询。\nJob: ${response?.job?.job_id || "unknown"}`;
+  if (status === "running") return `Kling video task is still running.\nJob: ${response?.job?.job_id || "unknown"}`;
   const reason = response?.safe_manifest?.blocks?.[0]?.reason || "video provider is not ready";
   return `视频生成未开始或未完成。\n状态: ${status}\n原因: ${reason}`;
 }
@@ -257,22 +285,21 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
         created_at: new Date().toISOString(),
       });
     });
+    await store.flushRuntimeSave?.();
   } catch (error) {
     setNodeError(store, node.id, `MiniMax keyframe request failed: ${safeError(error)}`);
+    await store.flushRuntimeSave?.();
   }
 }
 
 function keyframeResultText(response, request, succeeded) {
-  const gate = response?.provider_gate?.status || "unknown";
   const jobId = response?.job?.job_id || "not_available";
   const outputCount = response?.safe_manifest?.output_count ?? 0;
   if (!succeeded) {
-    const blocker = response?.safe_manifest?.blocks?.[0]?.reason || "remote image provider is not ready";
     return [
-      "生成未开始，当前图像 provider gate 未开启或 provider 不可用。",
-      `Gate: ${gate}`,
-      `原因: ${blocker}`,
-      "处理：确认本机已设置 AFS_ALLOW_REMOTE_IMAGE=true，并重启 Runtime Service 后重试。",
+      "图像生成服务未就绪，本次没有发起有效生成。",
+      "处理：请检查本机图像 provider 配置与 Runtime 启动环境，然后在节点菜单重试。",
+      "技术细节已写入本次 safe manifest 与 run trace。",
     ].join("\n");
   }
   return [
@@ -287,7 +314,11 @@ function keyframeResultText(response, request, succeeded) {
 
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
+  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  if (/AFS_ALLOW_REMOTE_|NARRATOCUT_ALLOW_REMOTE_|provider service not found|provider gate is closed|Remote .* calls are disabled/i.test(clean)) {
+    return "provider 服务未就绪，请检查本机配置与 Runtime 启动环境后重试。";
+  }
+  return clean.slice(0, 160);
 }
 
 function setNodeError(store, nodeId, message) {

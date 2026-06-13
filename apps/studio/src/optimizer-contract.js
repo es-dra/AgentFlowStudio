@@ -66,6 +66,8 @@ function nodeParameterSnapshot(node) {
   if (p.styleRef) snapshot.style_ref = p.styleRef;
   if (p.directorSetup) snapshot.director_summary = directorPromptSummary(normalizeDirectorSetup(p.directorSetup));
   if (p.directorRef) snapshot.director_ref = String(p.directorRef);
+  const uploadedImages = uploadReferenceSummaries(node);
+  if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
   return snapshot;
 }
 
@@ -205,6 +207,15 @@ function nodeImageAssetRefs(node) {
     .filter(Boolean);
 }
 
+function uploadReferenceSummaries(node) {
+  const uploads = Array.isArray(node?.params?.uploads) ? node.params.uploads : [];
+  return uploads.map((item) => ({
+    asset_id: String(item?.asset_id || item?.assetId || "").trim().slice(0, 80),
+    filename: String(item?.filename || item?.label || "").replace(/[\\/]/g, "").slice(0, 120),
+    role: String(item?.role || "").slice(0, 60),
+  })).filter((item) => item.asset_id || item.filename).slice(-4);
+}
+
 function nodeVisualAssetIds(node) {
   const values = [
     ...(Array.isArray(node?.params?.visualAssets) ? node.params.visualAssets : []),
@@ -247,6 +258,7 @@ export function normalizeOptimization(result, request) {
     optimized: userPrompt || sections.map((s) => `${s.name}：${s.text}`).join("\n"),
     plain: String(result?.user_prompt_plain || "").trim() || sections.map((s) => s.text).filter(Boolean).join("\n"),
     sections,
+    optimization_mode: result?.optimization_mode || "not_applicable",
     context_bundle: result?.context_bundle || null,
   };
 }

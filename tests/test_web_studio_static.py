@@ -25,6 +25,35 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert "/workbench" not in index
 
 
+def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -> None:
+    source = _source()
+    store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    env_example = Path(".env.example").read_text(encoding="utf-8")
+
+    for forbidden in ("window.prompt(", "window.confirm(", "window.alert("):
+        assert forbidden not in source
+    assert '|| localStorage.getItem(STORAGE_KEY)' not in store_source
+    assert '|| localStorage.getItem(LEGACY_STORAGE_KEY)' not in store_source
+    assert "migrateLegacyCanvasStorage" in store_source
+    assert "localStorage.removeItem(STORAGE_KEY)" in store_source
+    assert "localStorage.removeItem(LEGACY_STORAGE_KEY)" in store_source
+    assert 'return { source: "stale", projectId: targetProjectId }' in store_source
+    assert "hasStudioMeta(remoteState)" in store_source
+    assert 'next.type === "video" && next.params.lastVideoPreviewUrl' in store_source
+    assert '!String(next.previewUrl).includes("/video-generations/")' in store_source
+    main_source = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    assert "syncCurrentProjectMetaFromSummaries" in main_source
+    assert "const currentId = runtime.projectId || state.meta.projectId;" in main_source
+    assert 'input.type = "text";' in main_source
+    drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    assert "state.meta.projectId, state.meta.projectName, state.meta.canvasName" in drawer_source
+    canvas_source = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    assert '!["image", "video"].includes(node.type)' in canvas_source
+    prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    assert 'node.type === "video" || node.type === "script"' in prompt_bar_source
+    assert "NARRATOCUT_ALLOW_REMOTE_" not in env_example
+
+
 def test_studio_user_surface_does_not_reintroduce_old_workbench_terms() -> None:
     combined = "\n".join(
         path.read_text(encoding="utf-8")
@@ -52,6 +81,7 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
         "reusable_image_assets",
         "mergeImageAssets",
         "node-preview-img",
+        "node-preview-video",
         "resizeNodeForImagePreview",
         "previewAspectRatio",
         "has-image-preview",
@@ -85,6 +115,7 @@ def test_studio_asset_context_workflow_is_single_canvas() -> None:
         "connect-named-asset",
         "temporary-unlock",
         "temporaryLockOverrides",
+        "uniqueLockWarnings",
         "visual-asset-panel",
     ):
         assert marker in source
@@ -111,12 +142,40 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     ):
         assert removed not in prompt_bar
     assert "isRemoteVideoModel" in prompt_bar
-    assert 'node.type !== "image"' in prompt_bar
+    assert "pollNodeVideoGeneration" in prompt_bar
+    assert "runPromptBarGeneration" in prompt_bar
+    assert 'send.title = "继续轮询"' in prompt_bar
+    assert "isPromptTextEditing" in prompt_bar
+    assert '["TEXTAREA", "INPUT"].includes' in prompt_bar
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    assert '!["image", "video"].includes(node.type)' in canvas_view
     assert "bar-cost" not in prompt_bar
     assert "当前版本仅图片节点支持真实生成" in prompt_bar
     assert "uploadNodeImage" in node_menu
     assert "setNodeVideoFrame" in node_menu
+    assert "pollNodeVideoGeneration" in node_menu
+    assert "openPositionNear" in (STUDIO_ROOT / "src" / "panels" / "add-node-menu.js").read_text(encoding="utf-8")
+    assert "syncRunAction" in canvas_view
+    assert 'dataset.action = "video-poll"' in canvas_view
+    assert "pollNodeVideoGeneration" in (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    assert 'asset.kind === "visual_asset" && asset.asset_type === "character"' in drawer_source
+    assert 'asset.kind === "character_asset"' in drawer_source
+    assert 'character_asset: "人物资产"' in drawer_source
+    assert "asset.preview_url" in drawer_source
+    assert "node.params.visualAssets" in drawer_source
+    assert "visualAssetRef" in drawer_source
+    assert "setVideoFrameFromAsset" in drawer_source
+    assert "firstFrameImageAssetId" in drawer_source
+    assert "设为首帧" in drawer_source
+    assert "retireVisualAsset" in drawer_source
+    assert "applyRetiredAsset" in drawer_source
+    assert "确认退役" in drawer_source
+    assert "asset.runtime_status" in drawer_source
     assert "上传/替换参考图" in node_menu
+    assert "VIDEO_MODES" not in prompt_bar
+    assert "VIDEO_COUNTS" not in prompt_bar
+    assert "mode-tabs" not in prompt_bar
 
 
 def test_studio_hardening_static_contract_markers() -> None:
@@ -131,7 +190,8 @@ def test_studio_hardening_static_contract_markers() -> None:
     assert "user_prompt_plain" in optimizer_contract
     assert "referenceDepth" in optimizer_contract
     assert "costHop" in optimizer_contract
-    assert "degraded_to_signature_over_limit" not in source
+    assert "degraded_to_signature_over_limit" in source
+    assert "superseded_by_newer_label_version" in source
     assert "不采用" in visual_asset_panel
     assert "asset_fix" not in visual_asset_panel
     assert "fix visual asset" not in source
@@ -145,11 +205,30 @@ def test_studio_hardening_static_contract_markers() -> None:
 def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
     panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
     defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
+    assert "sectionText" in defaults
+    assert "inferIdentity" in defaults
+    assert "inferFace" in defaults
+    assert "uniqueTextParts" in defaults
 
     assert "visualAssetDefaults" in panel
     assert "data-card" in panel
     assert "短发" in defaults
     assert "保持参考图人物身份和脸部辨识度" in defaults
+
+
+def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_assets() -> None:
+    store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+
+    assert "seedAssets()" not in store
+    for placeholder in ("asset_director_seed", "asset_character_seed", "asset_keyframe_seed"):
+        assert placeholder not in store
+    assert "assetStableKey" in main
+    assert "mergeAsset" in main
+    assert "visual_asset_id: asset.asset_id" in main
+    assert "visualAssetPreviewUrl" in main
+    assert "image_asset_refs" in main
+    assert "uploaded_images" in (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
 
 
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
@@ -203,7 +282,8 @@ def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:
     assert "activeSubjectIds" in director_data
     assert "visual_asset_id" in director_data
     assert "Array.isArray(value) ? clone(value) : clone(fallback)" in director_data
-    assert "window.confirm" in director_shell
+    assert "confirmDirectorPromptAppend" in director_shell
+    assert "window.confirm" not in director_shell
     assert "current.prompt = prompt" not in director_shell
     assert "join(\"\\n\\n\")" in director_shell
     assert "directorVisualAssetIds" in director_shell

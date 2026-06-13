@@ -104,7 +104,7 @@ export function createNode(store, type, wx, wy) {
   const id = store.nextId("node");
   let seq = 0;
   store.set((s) => {
-    seq = s.order.length + 2;
+    seq = s.order.length + 1;
   });
   const node = {
     id,

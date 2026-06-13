@@ -1,5 +1,5 @@
-import { NODE_TYPES, NODE_MENU_ORDER, RESOURCE_ENTRIES, createNode, connect, downstreamTypesFor } from "../nodes.js";
-import { screenToWorld } from "../geometry.js";
+import { NODE_TYPES, NODE_MENU_ORDER, RESOURCE_ENTRIES, createNode, connect, downstreamTypesFor, effectiveHeight } from "../nodes.js";
+import { screenToWorld, rectsIntersect } from "../geometry.js";
 import { showPopover, el } from "../overlay.js";
 import { icon } from "../icons.js";
 
@@ -7,7 +7,8 @@ export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   let closeRef = () => {};
   const pop = buildMenu(store, (type) => {
     const world = screenToWorld(store.get().viewport, screenPoint.x, screenPoint.y);
-    spawn(store, type, world.x - 140, world.y - 40);
+    const position = openPositionNear(store, type, world.x - 140, world.y - 40);
+    spawn(store, type, position.x, position.y);
   }, () => closeRef());
   if (anchorEl) {
     closeRef = showPopover(anchorEl, pop, { place: "top" });
@@ -91,6 +92,37 @@ function spawn(store, type, wx, wy) {
     return node;
   }
   return createNode(store, type, wx, wy);
+}
+
+function openPositionNear(store, type, wx, wy) {
+  const nodeType = type === "library" ? "text" : type;
+  const def = NODE_TYPES[nodeType] || NODE_TYPES.text;
+  const base = { x: Math.round(wx), y: Math.round(wy), w: def.size.w, h: def.size.h };
+  const existing = Object.values(store.get().nodes || {}).map((node) => ({
+    x: node.x - 28,
+    y: node.y - 28,
+    w: node.w + 56,
+    h: effectiveHeight(node) + 56,
+  }));
+  const stepX = Math.max(base.w + 80, 360);
+  const stepY = Math.max(base.h + 80, 330);
+  const offsets = [
+    [0, 0],
+    [stepX, 0],
+    [0, stepY],
+    [stepX, stepY],
+    [-stepX, 0],
+    [0, -stepY],
+    [stepX * 2, 0],
+    [-stepX, stepY],
+    [stepX, -stepY],
+    [0, stepY * 2],
+  ];
+  for (const [dx, dy] of offsets) {
+    const candidate = { ...base, x: base.x + dx, y: base.y + dy };
+    if (!existing.some((rect) => rectsIntersect(candidate, rect))) return candidate;
+  }
+  return { ...base, x: base.x + stepX * (existing.length + 1), y: base.y };
 }
 
 function menuItem(iconName, label, tag) {

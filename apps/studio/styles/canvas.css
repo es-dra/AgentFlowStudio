@@ -153,6 +153,10 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 .na-btn:hover { background: var(--bg-chip-active); color: var(--text-primary); }
+.na-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 .node-title {
   position: absolute;

@@ -429,3 +429,156 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
 
     assert result.status_code == 422
     assert "enhancement missing required sections" in result.json()["detail"]
+
+
+def test_visual_prompt_optimizer_uses_t2i_instruction_without_references(tmp_path, monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            captured["prompt"] = request.prompt
+            return {"text": "\n".join(
+                [
+                    "意图：根据一个来自未来的机器人生成一张完整概念图。",
+                    "人物/主体：未来机器人主体清晰，金属结构与发光部件具有辨识度。",
+                    "场景/美术：星际屋顶场景宽阔，远处星空和城市轮廓补足空间层次。",
+                    "动作/情节：机器人安静站立，像是在观察远处星空。",
+                    "镜头/构图：低机位中景，主体居中偏右，保留环境纵深。",
+                    "灯光：冷色星光与柔和边缘光突出金属轮廓。",
+                    "运动/时间推进：单帧概念图，强调静态瞬间和氛围。",
+                    "连续性：保持未来科幻主题，不漂移到其他题材。",
+                    "负面约束：不要水印、乱码、畸形肢体或无关角色。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_t2i_prompt_mode/prompt-optimizations",
+        json={
+            "node_id": "image-node-t2i",
+            "node_type": "image",
+            "prompt_text": "一个来自未来的机器人，在屋顶看星星",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-13T15:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["optimization_mode"] == "t2i"
+    assert "参考图中的同一个人物" not in captured["prompt"]
+    assert "不改变参考图" not in captured["prompt"]
+    assert "扩写" in captured["prompt"] or "补足" in captured["prompt"]
+
+
+def test_visual_prompt_optimizer_uses_i2i_instruction_with_references(tmp_path, monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            captured["prompt"] = request.prompt
+            return {"text": "\n".join(
+                [
+                    "意图：只根据用户要求调整参考人物发型。",
+                    "人物/主体：保持参考图中的同一人物身份，只将头发改为短发。",
+                    "场景/美术：保留参考图原有背景和整体氛围，不新增地点。",
+                    "动作/情节：人物保持原有静态姿态，仅呈现发型变化。",
+                    "镜头/构图：保持参考图主体关系和构图稳定。",
+                    "灯光：不改变参考图的主要光感和明暗关系。",
+                    "运动/时间推进：单帧编辑画面，不制造多阶段动作。",
+                    "连续性：保持脸部辨识度、服装、体型比例和整体风格。",
+                    "负面约束：不要水印、乱码、身份漂移或背景大幅变化。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_i2i_prompt_mode/prompt-optimizations",
+        json={
+            "node_id": "image-node-i2i",
+            "node_type": "image",
+            "prompt_text": "将这个人物的头发改为短发",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "asset_refs": ["img_reference_001"],
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-13T15:10:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    assert result.json()["optimization_mode"] == "i2i"
+    assert "参考图中的同一个人物" in captured["prompt"]
+    assert "只改变用户明确要求改变的部分" in captured["prompt"]
+
+
+def test_i2i_prompt_optimizer_guardrail_uses_uploaded_image_filename_hint(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            return {"text": "\n".join(
+                [
+                    "意图：围绕“将这个人物的头发改为短发”完成本次生成。",
+                    "人物/主体：保留原始提示词中的主体；若写到“这个人物”，必须理解为参考图中的同一个人物。",
+                    "场景/美术：保持参考图或原提示中的场景信息；未指定时不要新增具体地点。",
+                    "动作/情节：只执行“将这个人物的头发改为短发”这一项变化，不扩写新剧情。",
+                    "镜头/构图：关键帧清晰呈现主体变化，构图稳定，主体可辨识。",
+                    "灯光：保持自然可读的光线，不改变参考图的主要光感。",
+                    "运动/时间推进：单帧关键画面，不制造多阶段动作。",
+                    "连续性：保持参考图人物身份、脸部辨识度、服装、体型比例和整体风格；只改变用户明确要求改变的部分。",
+                    "负面约束：不要水印、文字乱码、五官畸形、身份漂移、服装漂移、背景大幅变化。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_i2i_prompt_guardrail/prompt-optimizations",
+        json={
+            "node_id": "image-node-i2i",
+            "node_type": "image",
+            "prompt_text": "将这个人物的头发改为短发",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "asset_refs": ["img_reference_001"],
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+                "uploaded_images": [
+                    {"asset_id": "img_reference_001", "filename": "校服周彤v1.png", "role": "reference_image"}
+                ],
+            },
+            "generated_at": "2026-06-13T15:10:00+08:00",
+        },
+    )
+
+    payload = result.json()
+    assert result.status_code == 200
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert "校服周彤" in payload["optimized_prompt"]
+    assert "不要染发变浅" in payload["optimized_prompt"]

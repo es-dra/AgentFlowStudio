@@ -70,9 +70,9 @@ export function openDirectorShell(store, node) {
     saveSetup(store, node.id, setup, `二维导演台已应用到 ${count} 个相连节点`);
     close();
   });
-  promptBtn.addEventListener("click", () => {
+  promptBtn.addEventListener("click", async () => {
     const prompt = directorPromptSummary(setup);
-    if (!window.confirm("将导演台提示词片段追加到当前节点，不会覆盖原提示词。")) return;
+    if (!(await confirmDirectorPromptAppend(prompt))) return;
     store.set((s) => {
       const current = s.nodes[node.id];
       if (!current) return;
@@ -239,6 +239,38 @@ export function openDirectorShell(store, node) {
     props.appendChild(textField("导演备注", setup.notes || "", (value) => { setup.notes = value; }, true));
   }
 
+}
+
+function confirmDirectorPromptAppend(prompt) {
+  return new Promise((resolve) => {
+    const modal = el("div", "modal compact director-confirm-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "追加导演台提示词"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.innerHTML = icon("x", 15);
+    head.appendChild(el("span", "head-spacer"));
+    head.appendChild(closeBtn);
+    const body = el("div", "modal-body director-confirm-body");
+    body.appendChild(el("p", "", "将以下片段追加到当前节点，不会覆盖原提示词。"));
+    const preview = el("div", "director-confirm-preview", prompt);
+    body.appendChild(preview);
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const confirm = el("button", "primary-btn", "追加");
+    actions.append(cancel, confirm);
+    modal.append(head, body, actions);
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve(false); } });
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(value);
+    };
+    closeBtn.addEventListener("click", () => finish(false));
+    cancel.addEventListener("click", () => finish(false));
+    confirm.addEventListener("click", () => finish(true));
+  });
 }
 
 function saveSetup(store, nodeId, setup, message) {

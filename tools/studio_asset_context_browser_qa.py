@@ -7,6 +7,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from playwright.sync_api import Page, expect, sync_playwright
 
@@ -23,7 +24,8 @@ from studio_asset_context_browser_qa_support import (
 )
 
 
-PROJECT_ID = "studio-local-001"
+PROJECT_ID = f"studio-browser-qa-{int(time.time())}"
+STUDIO_STORAGE_KEY = f"afs_studio_canvas_v2:{PROJECT_ID}"
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
@@ -43,6 +45,7 @@ def main() -> int:
     server = start_runtime(repo, runtime_root, port)
     try:
         wait_for_http(f"{base_url}/studio/")
+        prepare_clean_project(runtime_root)
         report = run_browser_qa(repo, base_url, runtime_root, headed=args.headed)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"status": "passed", "report": str(report_path)}, ensure_ascii=False))
@@ -60,6 +63,50 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def prepare_clean_project(runtime_root: Path) -> None:
+    client = runtime_test_client(runtime_root)
+    response = client.post("/projects", json={"project_id": PROJECT_ID, "goal": "Studio browser QA isolated project"})
+    if response.status_code not in {200, 409}:
+        raise AssertionError(f"project setup failed: {response.status_code} {response.text}")
+    state = {
+        "meta": {
+            "projectName": "Studio Browser QA",
+            "canvasName": "QA Canvas",
+            "seq": 1,
+            "updated_at": "",
+        },
+        "viewport": {"x": 0, "y": 0, "scale": 1},
+        "nodes": {},
+        "edges": {},
+        "order": [],
+        "assets": [],
+    }
+    saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": state})
+    if saved.status_code != 200:
+        raise AssertionError(f"studio-state setup failed: {saved.status_code} {saved.text}")
+
+
+def make_studio_static_route(repo: Path):
+    studio_root = (repo / "apps" / "studio").resolve()
+
+    def route_studio_static(route: Any) -> None:
+        parsed = urlsplit(route.request.url)
+        relative = parsed.path.removeprefix("/studio/").replace("/", "\\")
+        path = (studio_root / relative).resolve()
+        try:
+            path.relative_to(studio_root)
+        except ValueError:
+            route.fulfill(status=404, body=b"")
+            return
+        if not path.is_file():
+            route.fulfill(status=404, body=b"")
+            return
+        content_type = "text/javascript; charset=utf-8" if path.suffix.lower() == ".js" else "text/css; charset=utf-8"
+        route.fulfill(status=200, content_type=content_type, body=path.read_bytes())
+
+    return route_studio_static
+
+
 def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: bool) -> dict[str, Any]:
     upload_file = runtime_root / "qa-lin-wan.png"
     upload_file.write_bytes(PNG_BYTES)
@@ -72,11 +119,12 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
         page = browser.new_page(viewport={"width": 1440, "height": 950})
         page.set_default_timeout(20_000)
         expect.set_options(timeout=20_000)
+        page.route("**/studio/src/**", make_studio_static_route(repo))
+        page.route("**/studio/styles/**", make_studio_static_route(repo))
         page.route("**/projects/**", make_mutating_runtime_proxy(runtime_root))
         try:
-            page.goto(f"{base_url}/studio/?qa={int(time.time())}", wait_until="commit")
-            expect(page.locator("#starter-row")).to_be_visible()
-            page.wait_for_function("() => document.readyState === 'complete'")
+            page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa={int(time.time())}", wait_until="commit")
+            expect(page.locator("#canvas-root")).to_be_visible()
 
             create_character_asset(page, upload_file)
             create_target_node(page)
@@ -141,7 +189,7 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
 
 
 def create_character_asset(page: Page, upload_file: Path) -> None:
-    page.locator("#starter-row .starter-card").nth(1).click()
+    create_image_node(page, {"x": 520, "y": 360})
     node = page.locator(".node").first
     expect(node).to_be_visible()
     with page.expect_file_chooser() as chooser:
@@ -150,7 +198,10 @@ def create_character_asset(page: Page, upload_file: Path) -> None:
         chooser.value.set_files(str(upload_file))
     if upload_response.value.status != 200:
         raise AssertionError(f"image upload failed: {upload_response.value.status} {upload_response.value.text()}")
-    page.wait_for_function("() => window.localStorage.getItem('afs_studio_canvas_v2')?.includes('image_reference')")
+    page.wait_for_function(
+        "(key) => window.localStorage.getItem(key)?.includes('image_reference')",
+        arg=STUDIO_STORAGE_KEY,
+    )
 
     node.locator('[data-action="fix-visual-asset"]').click()
     panel = page.locator(".visual-asset-panel")
@@ -165,20 +216,34 @@ def create_character_asset(page: Page, upload_file: Path) -> None:
         "keep black short hair\nkeep red trench coat\nkeep left brow scar"
     )
     panel.locator('[data-action="fix"]').click()
-    page.wait_for_function("() => window.localStorage.getItem('afs_studio_canvas_v2')?.includes('visualAssets')")
+    page.wait_for_function(
+        "(key) => window.localStorage.getItem(key)?.includes('visualAssets')",
+        arg=STUDIO_STORAGE_KEY,
+    )
+
+
+def create_image_node(page: Page, position: dict[str, int]) -> None:
+    page.locator("#canvas-root").click(position=position)
+    page.locator("#dock .dock-btn.primary").click()
+    page.locator(".popover .menu-item").nth(1).click()
 
 
 def create_target_node(page: Page) -> None:
     page.locator("#canvas-root").click(position={"x": 900, "y": 440})
-    page.keyboard.press("Tab")
+    page.locator("#dock .dock-btn.primary").click()
     page.locator(".popover .menu-item").nth(1).click()
-    page.wait_for_function("() => JSON.parse(window.localStorage.getItem('afs_studio_canvas_v2')).order.length >= 2")
+    page.wait_for_function(
+        "(key) => JSON.parse(window.localStorage.getItem(key)).order.length >= 2",
+        arg=STUDIO_STORAGE_KEY,
+    )
     page.locator(".prompt-bar textarea").fill(PROMPT)
 
 
 def optimize(page: Page) -> dict[str, Any]:
     with page.expect_response(lambda r: "/prompt-optimizations" in r.url and r.request.method == "POST") as response:
         page.locator('.prompt-bar [data-action="optimize-prompt"]').click()
+    if response.value.status != 200:
+        raise AssertionError(f"prompt optimization failed: {response.value.status} {response.value.text()}")
     payload = response.value.json()
     expect(page.locator(".optimizer-pop")).to_be_visible()
     return payload
@@ -193,7 +258,8 @@ def click_connect_suggestion(page: Page) -> dict[str, Any]:
 def click_temporary_unlock(page: Page) -> None:
     page.locator('.optimizer-pop [data-action="temporary-unlock"]').first.click()
     page.wait_for_function(
-        "() => window.localStorage.getItem('afs_studio_canvas_v2')?.includes('one-off-ui-unlock')"
+        "(key) => window.localStorage.getItem(key)?.includes('one-off-ui-unlock')",
+        arg=STUDIO_STORAGE_KEY,
     )
     page.locator(".optimizer-pop .opt-close").click()
 
@@ -243,7 +309,10 @@ def assert_context_indicator(page: Page) -> None:
 
 
 def assert_warning(payload: dict[str, Any], warning_id: str) -> None:
-    warnings = payload["context_bundle"]["warnings"]
+    bundle = payload.get("context_bundle")
+    if not isinstance(bundle, dict):
+        raise AssertionError(f"prompt optimization response missing context_bundle: {payload}")
+    warnings = bundle["warnings"]
     assert any(item.get("warning_id") == warning_id for item in warnings), warnings
 
 
@@ -270,7 +339,7 @@ def target_node_id(page: Page) -> str:
 
 
 def studio_state(page: Page) -> dict[str, Any]:
-    raw = page.evaluate("window.localStorage.getItem('afs_studio_canvas_v2')")
+    raw = page.evaluate("(key) => window.localStorage.getItem(key)", STUDIO_STORAGE_KEY)
     assert raw
     return json.loads(raw)
 

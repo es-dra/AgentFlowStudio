@@ -2,13 +2,25 @@ export function resultView(node) {
   const result = document.createElement("div");
   result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
   if (node.previewUrl) {
-    const img = document.createElement("img");
-    img.className = "node-preview-img";
-    img.src = node.previewUrl;
+    if (node.type === "video") {
+      const video = document.createElement("video");
+      video.className = "node-preview-video";
+      video.src = node.previewUrl;
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.style.aspectRatio = previewAspectRatio(node);
+      video.setAttribute("aria-label", "generated video");
+      result.appendChild(video);
+    } else {
+      const img = document.createElement("img");
+      img.className = "node-preview-img";
+      img.src = node.previewUrl;
     img.alt = "生成的关键帧";
-    img.loading = "lazy";
-    img.style.aspectRatio = previewAspectRatio(node);
-    result.appendChild(img);
+      img.loading = "lazy";
+      img.style.aspectRatio = previewAspectRatio(node);
+      result.appendChild(img);
+    }
   }
   const text = document.createElement("div");
   text.className = "node-result-text";
@@ -42,6 +54,25 @@ export function bundleSummary(node) {
       const chip = document.createElement("span");
       chip.className = `bundle-chip ${item.asset_type === "scene" ? "scene" : "character"}`;
       chip.textContent = `${item.asset_type === "scene" ? "场景" : "人物"} · ${item.label || item.asset_id}${subjectSuffix(item, bundle)}`;
+      chips.appendChild(chip);
+    }
+    detail.appendChild(chips);
+  }
+
+  // 超限降级与同名替代的资产不在 included 里,但用户必须看到它们的真实状态,
+  // 否则"凡固定且连线即遵守"的契约出现静默例外。
+  const excluded = Array.isArray(bundle.excluded_assets) ? bundle.excluded_assets : [];
+  const notable = excluded.filter((item) =>
+    item.reason === "degraded_to_signature_over_limit" || item.reason === "superseded_by_newer_label_version");
+  if (notable.length) {
+    const chips = document.createElement("div");
+    chips.className = "bundle-chips";
+    for (const item of notable) {
+      const chip = document.createElement("span");
+      chip.className = "bundle-chip degraded";
+      chip.textContent = item.reason === "degraded_to_signature_over_limit"
+        ? `${item.label || item.asset_id} · 超出上限，仅签名参与，锁定未生效`
+        : `${item.label || item.asset_id} · 已被同名新版本替代，本次未携带`;
       chips.appendChild(chip);
     }
     detail.appendChild(chips);

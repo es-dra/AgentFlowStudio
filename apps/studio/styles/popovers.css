@@ -167,6 +167,7 @@
   padding: 9px 10px;
   color: var(--text-secondary);
   font-size: 12px;
+  min-height: 58px;
   max-height: 84px;
   overflow-y: auto;
   white-space: pre-wrap;

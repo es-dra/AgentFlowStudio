@@ -4,7 +4,7 @@ import { getPendingEdgeGroup } from "./canvas-view.js";
 import { openAddNodeMenu, openReferenceMenu } from "./panels/add-node-menu.js";
 import { openNodeMenu } from "./panels/node-menu.js";
 import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
-import { fixNodeVisualAsset, handleNodeIntent, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
+import { fixNodeVisualAsset, handleNodeIntent, pollNodeVideoGeneration, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { hasOpenOverlay } from "./overlay.js";
 
@@ -179,6 +179,7 @@ export function bindCanvasInput(store, runtime) {
     else if (action === "upload") uploadNodeImage(store, runtime, node);
     else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
     else if (action === "run") startNodeGeneration(store, runtime, node);
+    else if (action === "video-poll") pollNodeVideoGeneration(store, runtime, node);
     else if (action === "duplicate") duplicateNode(store, nodeId);
     else if (action === "toggle-collapse") store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; });
     else if (action === "node-menu") openNodeMenu(store, runtime, nodeId, actionEl);
