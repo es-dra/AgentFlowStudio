@@ -405,6 +405,105 @@ def test_lock_conflict_warning_uses_attribute_vocabulary_and_enforcement_is_inde
     assert "keep black short hair" in plan["provider_prompt"]
 
 
+def test_keyframe_preflight_is_gate_free_stable_and_reports_conflicts(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_keyframe_preflight"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+    request = {
+        "node_id": "target-node",
+        "prompt_text": "Draw Lin Wan with red long hair.",
+        "optimized_prompt": "Draw Lin Wan with red long hair.",
+        "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+        "generated_at": "2026-06-12T11:24:00+08:00",
+    }
+
+    first = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    second = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    changed_prompt = client.post(
+        f"/projects/{project_id}/keyframe-generations/preflight",
+        json={**request, "optimized_prompt": "Draw Lin Wan in a quiet classroom."},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert changed_prompt.status_code == 200
+    payload = first.json()
+    token = payload["preflight_token"]
+
+    assert payload["provider_calls_started"] is False
+    assert payload["requires_provider_gate"] is False
+    assert payload["included_assets"][0]["asset_id"] == asset["asset_id"]
+    assert payload["subject_reference_asset_id"] == asset["asset_id"]
+    assert payload["reference_image_channel"][0]["asset_id"] == image_id
+    assert payload["asset_conflicts"]
+    assert payload["context_bundle"]["asset_conflicts"] == payload["asset_conflicts"]
+    assert second.json()["preflight_token"] == token
+    assert changed_prompt.json()["preflight_token"] != token
+
+
+def test_keyframe_submit_rejects_stale_preflight_token(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_stale_preflight"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Lin Wan")
+    request = {
+        "node_id": "target-node",
+        "prompt_text": "Draw Lin Wan.",
+        "optimized_prompt": "Draw Lin Wan.",
+        "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+        "generated_at": "2026-06-12T11:25:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+
+    stale_submit = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={**request, "optimized_prompt": "Draw a different scene.", "preflight_token": preflight.json()["preflight_token"]},
+    )
+
+    assert stale_submit.status_code == 409
+    assert "stale_preflight" in stale_submit.text
+
+
+def test_temporary_asset_exclusion_removes_asset_from_prompt_reference_and_subject(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_temporary_asset_exclusion"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "Excluded Actor")
+    request = {
+        "node_id": "target-node",
+        "prompt_text": "A rainy portrait.",
+        "optimized_prompt": "A rainy portrait.",
+        "context_subgraph": _subgraph("target-node", "char-node", asset["asset_id"]),
+        "temporary_asset_exclusions": [{"asset_id": asset["asset_id"], "reason": "one-off female variant"}],
+        "generated_at": "2026-06-12T11:26:00+08:00",
+    }
+
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    response = client.post(f"/projects/{project_id}/keyframe-generations", json=request)
+
+    assert preflight.status_code == 200
+    assert response.status_code == 200
+    plan = client.get(f"/artifacts/{response.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    bundle = plan["context_bundle"]
+
+    assert bundle["included_assets"] == []
+    assert bundle["reference_image_channel"] == []
+    assert bundle["subject_reference_asset_id"] is None
+    assert any(
+        item["asset_id"] == asset["asset_id"] and item["reason"] == "temporary_asset_excluded_by_user"
+        for item in bundle["excluded_assets"]
+    )
+    assert "Excluded Actor" not in plan["provider_prompt"]
+    assert "keep Excluded Actor identity" not in plan["provider_prompt"]
+    assert preflight.json()["included_assets"] == []
+    assert preflight.json()["subject_reference_asset_id"] is None
+
+
 def test_generate_degrades_assets_over_character_and_scene_limits(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))

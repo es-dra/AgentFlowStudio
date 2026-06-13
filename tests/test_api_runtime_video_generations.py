@@ -111,6 +111,65 @@ def test_video_generation_gate_closed_blocks_before_provider_submit(tmp_path, mo
     assert "fake-video-key" not in serialized
 
 
+def test_video_generation_preflight_needs_no_video_gate_and_is_stable(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-preflight"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video preflight"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
+
+    first = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    second = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    changed = client.post(
+        f"/projects/{project_id}/video-generations/preflight",
+        json={**request, "prompt_text": "A fast tracking shot."},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["provider_calls_started"] is False
+    assert first.json()["requires_provider_gate"] is False
+    assert first.json()["preflight_token"] == second.json()["preflight_token"]
+    assert first.json()["preflight_token"] != changed.json()["preflight_token"]
+
+
+def test_video_generation_rejects_stale_preflight_token(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-stale-preflight"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video stale preflight"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
+
+    stale = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={**request, "prompt_text": "A different motion.", "preflight_token": preflight.json()["preflight_token"]},
+    )
+
+    assert stale.status_code == 409
+    assert "stale_preflight" in stale.text
+
+
 def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))

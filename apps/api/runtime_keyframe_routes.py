@@ -11,6 +11,7 @@ from apps.api.runtime_artifacts import keyframe_generation_artifacts
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
+from apps.api.runtime_generation_preflight import keyframe_generation_preflight, preflight_token_matches
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
 from apps.api.runtime_models import KeyframeGenerationRequest
@@ -29,9 +30,24 @@ IMAGE_SUFFIX_TYPES = {
 
 
 def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
+    @app.post("/projects/{project_id}/keyframe-generations/preflight")
+    def keyframe_generation_preflight_route(project_id: str, request: KeyframeGenerationRequest) -> dict[str, Any]:
+        store.ensure_project_manifest(project_id)
+        try:
+            return keyframe_generation_preflight(store, project_id, request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_keyframe_generation")) from exc
+
     @app.post("/projects/{project_id}/keyframe-generations")
     def keyframe_generation(project_id: str, request: KeyframeGenerationRequest) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        if request.preflight_token:
+            try:
+                expected_preflight = keyframe_generation_preflight(store, project_id, request)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=safe_error_detail("invalid_keyframe_generation")) from exc
+            if not preflight_token_matches(expected_preflight, request.preflight_token):
+                raise HTTPException(status_code=409, detail=safe_error_detail("stale_preflight"))
         job_id = store.new_job_id("keyframe_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         try:

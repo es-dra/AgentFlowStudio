@@ -45,6 +45,16 @@ def register_runtime_visual_asset_routes(app: FastAPI, store: RuntimeStore) -> N
         assets = [public_visual_asset(item) for item in list_visual_assets(store, project_id, status=status)]
         return {"project_id": project_id, "status": status, "assets": assets}
 
+    @app.get("/projects/{project_id}/visual-assets/{asset_id}")
+    def get_visual_asset(project_id: str, asset_id: str) -> dict[str, Any]:
+        try:
+            record = visual_asset_record(store, project_id, asset_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="visual asset not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_visual_asset")) from exc
+        return {"project_id": project_id, "asset": public_visual_asset_detail(record)}
+
 
 def create_visual_asset(
     store: RuntimeStore,
@@ -162,6 +172,33 @@ def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def public_visual_asset_detail(record: dict[str, Any]) -> dict[str, Any]:
+    payload = public_visual_asset(record)
+    payload.update(
+        {
+            "feature_card": dict(record.get("feature_card") or {}),
+            "negative_locks": list(record.get("negative_locks") or []),
+            "promotion_review": _public_review(record.get("promotion_review")),
+            "retirement_review": _public_review(record.get("retirement_review")),
+            "claim_boundary": record.get("claim_boundary"),
+            "safe_fields_only": True,
+            "media_bytes_returned_by_api": False,
+            "provider_raw_response_stored": False,
+        }
+    )
+    return payload
+
+
+def _public_review(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    return {
+        key: value.get(key)
+        for key in ("action", "reviewed_at", "server_recorded_at", "human_confirmed", "claim_boundary", "reason", "retired_at")
+        if key in value
+    }
+
+
 def _validate_promote_request(store: RuntimeStore, project_id: str, request: VisualAssetPromoteRequest) -> None:
     if not request.signature.strip():
         raise ValueError("signature is required")
@@ -237,6 +274,7 @@ __all__ = (
     "fixed_visual_assets_by_id",
     "list_visual_assets",
     "public_visual_asset",
+    "public_visual_asset_detail",
     "register_runtime_visual_asset_routes",
     "visual_asset_record",
 )

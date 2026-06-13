@@ -12,7 +12,9 @@ from fastapi.responses import FileResponse
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
+from apps.api.runtime_context_resolver import provider_prompt_from_bundle
 from apps.api.runtime_errors import safe_error_detail
+from apps.api.runtime_generation_preflight import preflight_token_matches, video_generation_preflight
 from apps.api.runtime_image_assets import image_asset_file_path
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_models import VideoGenerationRequest
@@ -37,9 +39,24 @@ VIDEO_NON_CLAIMS = [
 
 
 def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
+    @app.post("/projects/{project_id}/video-generations/preflight")
+    def video_generation_preflight_route(project_id: str, request: VideoGenerationRequest) -> dict[str, Any]:
+        store.ensure_project_manifest(project_id)
+        try:
+            return video_generation_preflight(store, project_id, request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_video_generation")) from exc
+
     @app.post("/projects/{project_id}/video-generations")
     def video_generation(project_id: str, request: VideoGenerationRequest) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        if request.preflight_token:
+            try:
+                expected_preflight = video_generation_preflight(store, project_id, request)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=safe_error_detail("invalid_video_generation")) from exc
+            if not preflight_token_matches(expected_preflight, request.preflight_token):
+                raise HTTPException(status_code=409, detail=safe_error_detail("stale_preflight"))
         job_id = store.new_job_id("video_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -114,6 +131,8 @@ def _submit_video_generation(
     first_frame_path = image_asset_file_path(store, project_id, request.first_frame_image_asset_id)
     if request.last_frame_image_asset_id:
         image_asset_file_path(store, project_id, request.last_frame_image_asset_id)
+    preflight = video_generation_preflight(store, project_id, request)
+    context_bundle = preflight.get("context_bundle")
     registry = None
     descriptor = None
     try:
@@ -125,9 +144,10 @@ def _submit_video_generation(
             status="blocked",
             provider_calls_started=False,
             blocks=[_provider_not_ready_block(str(exc))],
+            context_bundle=context_bundle,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="blocked", safe_manifest=manifest)
+        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
 
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_VIDEO_ENV) or REMOTE_VIDEO_ENV)
     gate = _video_gate(required_gate)
@@ -138,15 +158,16 @@ def _submit_video_generation(
             provider_calls_started=False,
             provider_gate=gate,
             blocks=[_gate_closed_block(required_gate)],
+            context_bundle=context_bundle,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="blocked", safe_manifest=manifest)
+        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
 
     if _daily_submit_count(store, project_id) >= DAILY_VIDEO_SUBMIT_LIMIT and not request.quota_override_confirmed:
         raise ValueError("daily video submit quota requires quota_override_confirmed")
 
     dispatch_request = ProviderDispatchRequest(
-        prompt=request.optimized_prompt or request.prompt_text,
+        prompt=provider_prompt_from_bundle(context_bundle) if context_bundle else (request.optimized_prompt or request.prompt_text),
         output_dir=output_dir,
         aspect_ratio=request.aspect_ratio,
         candidate_count=1,
@@ -165,9 +186,10 @@ def _submit_video_generation(
             provider_calls_started=True,
             provider_gate=gate,
             blocks=[_provider_not_ready_block(str(exc))],
+            context_bundle=context_bundle,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="poll_failed", safe_manifest=manifest)
+        return _result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle)
     except Exception as exc:
         manifest = _safe_manifest(
             project_id,
@@ -175,9 +197,10 @@ def _submit_video_generation(
             provider_calls_started=True,
             provider_gate=gate,
             blocks=[_provider_not_ready_block(str(exc))],
+            context_bundle=context_bundle,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="poll_failed", safe_manifest=manifest)
+        return _result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle)
 
     _increment_daily_submit_count(store, project_id)
     task_state = {
@@ -190,14 +213,15 @@ def _submit_video_generation(
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "provider_raw_persisted": False,
+        "context_bundle": context_bundle,
     }
     _write_task_state(output_dir, task_state)
     if task_state["status"] == "already_complete":
         raw = provider_task.get("task", {}).get("raw") or {}
         return _complete_video_result(output_dir, project_id, raw, task_state, gate)
-    manifest = _safe_manifest(project_id, status="submitted", provider_calls_started=True, provider_gate=gate)
+    manifest = _safe_manifest(project_id, status="submitted", provider_calls_started=True, provider_gate=gate, context_bundle=context_bundle)
     _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-    return _result_from_manifest(status="submitted", safe_manifest=manifest, task_state=task_state)
+    return _result_from_manifest(status="submitted", safe_manifest=manifest, task_state=task_state, context_bundle=context_bundle)
 
 
 def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path) -> dict[str, Any]:
@@ -215,6 +239,7 @@ def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Pat
             status="poll_failed",
             provider_calls_started=True,
             blocks=[_provider_not_ready_block(str(exc))],
+            context_bundle=state.get("context_bundle") if isinstance(state.get("context_bundle"), dict) else None,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "poll_failed"
@@ -226,6 +251,7 @@ def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Pat
             status="poll_failed",
             provider_calls_started=True,
             blocks=[_provider_not_ready_block(str(exc))],
+            context_bundle=state.get("context_bundle") if isinstance(state.get("context_bundle"), dict) else None,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "poll_failed"
@@ -237,6 +263,7 @@ def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Pat
             status="running",
             provider_calls_started=True,
             blocks=[],
+            context_bundle=state.get("context_bundle") if isinstance(state.get("context_bundle"), dict) else None,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "running"
@@ -259,6 +286,7 @@ def _complete_video_result(
     provider_gate: dict[str, str],
 ) -> dict[str, Any]:
     outputs = _safe_outputs(output_dir, raw)
+    context_bundle = task_state.get("context_bundle") if isinstance(task_state.get("context_bundle"), dict) else None
     task_state["status"] = "succeeded"
     _write_task_state(output_dir, task_state)
     manifest = _safe_manifest(
@@ -267,9 +295,16 @@ def _complete_video_result(
         provider_calls_started=True,
         provider_gate=provider_gate,
         outputs=outputs,
+        context_bundle=context_bundle,
     )
     _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-    return _result_from_manifest(status="succeeded", safe_manifest=manifest, task_state=task_state, outputs=outputs)
+    return _result_from_manifest(
+        status="succeeded",
+        safe_manifest=manifest,
+        task_state=task_state,
+        outputs=outputs,
+        context_bundle=context_bundle,
+    )
 
 
 def _safe_outputs(output_dir: Path, raw: dict[str, Any]) -> list[dict[str, Any]]:
@@ -359,6 +394,7 @@ def _video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], r
         "provider_gate": (result.get("safe_manifest") or {}).get("provider_gate") or _video_gate(REMOTE_VIDEO_ENV),
         "provider_calls_started": bool((result.get("safe_manifest") or {}).get("provider_calls_started")),
         "safe_manifest": result.get("safe_manifest"),
+        "context_bundle": result.get("context_bundle"),
         "candidate_previews": _candidate_previews(project_id, job_id, outputs),
         "flow": {"project_id": project_id},
         "non_claims": VIDEO_NON_CLAIMS,
@@ -382,12 +418,17 @@ def _result_from_manifest(
     safe_manifest: dict[str, Any],
     task_state: dict[str, Any] | None = None,
     outputs: list[dict[str, Any]] | None = None,
+    context_bundle: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    bundle = context_bundle
+    if bundle is None and isinstance(task_state, dict) and isinstance(task_state.get("context_bundle"), dict):
+        bundle = task_state.get("context_bundle")
     return {
         "status": status,
         "safe_manifest": safe_manifest,
         "task_state": task_state,
         "outputs": outputs or safe_manifest.get("outputs") or [],
+        "context_bundle": bundle,
     }
 
 
@@ -399,8 +440,9 @@ def _safe_manifest(
     provider_gate: dict[str, str] | None = None,
     blocks: list[dict[str, str]] | None = None,
     outputs: list[dict[str, Any]] | None = None,
+    context_bundle: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    manifest = {
         "schema_version": "afs_video_generation_safe_manifest.v0.1",
         "status": status,
         "project_id": project_id,
@@ -417,6 +459,12 @@ def _safe_manifest(
         "writes_company_kb": False,
         "non_claims": VIDEO_NON_CLAIMS,
     }
+    if context_bundle:
+        manifest["context_bundle_mode"] = context_bundle.get("mode")
+        manifest["context_included_asset_count"] = len(context_bundle.get("included_assets") or [])
+        manifest["context_excluded_asset_count"] = len(context_bundle.get("excluded_assets") or [])
+        manifest["context_asset_conflict_count"] = len(context_bundle.get("asset_conflicts") or [])
+    return manifest
 
 
 def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:

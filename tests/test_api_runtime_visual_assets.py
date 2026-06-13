@@ -122,3 +122,33 @@ def test_visual_asset_rejected_default_list_retire_and_duplicate_warning(tmp_pat
     assert retired.status_code == 200
     assert retired.json()["asset"]["status"] == "retired"
     assert asset_id not in {asset["asset_id"] for asset in client.get(f"/projects/{project_id}/visual-assets").json()["assets"]}
+
+
+def test_visual_asset_detail_returns_safe_card_and_locks(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_visual_asset_detail"
+    image_id = _upload_image(client, project_id, "node-detail")
+    promoted = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(image_id, label="Detail Lin"),
+    )
+    assert promoted.status_code == 200
+    asset_id = promoted.json()["asset"]["asset_id"]
+
+    detail = client.get(f"/projects/{project_id}/visual-assets/{asset_id}")
+    missing = client.get(f"/projects/{project_id}/visual-assets/vas_missing")
+
+    assert detail.status_code == 200
+    payload = detail.json()["asset"]
+    serialized = json.dumps(detail.json(), ensure_ascii=False).lower()
+
+    assert payload["asset_id"] == asset_id
+    assert payload["feature_card"] == {"appearance": "young woman with black short hair"}
+    assert payload["negative_locks"] == ["keep black short hair", "do not remove brow scar"]
+    assert payload["promotion_review"]["human_confirmed"] is True
+    assert payload["media_bytes_returned_by_api"] is False
+    assert payload["provider_raw_response_stored"] is False
+    assert "data_base64" not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+    assert missing.status_code == 404

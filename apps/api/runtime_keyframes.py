@@ -53,12 +53,11 @@ def build_keyframe_generation(
     assembly = assemble_prompt_context(prompt_request, assembly_state)
     registry = None
     descriptor = _default_descriptor()
-    if os.environ.get(REMOTE_IMAGE_ENV, "").strip().lower() in REMOTE_TRUE_VALUES:
-        try:
-            registry = load_provider_registry()
-            descriptor = registry.descriptor(request.provider_service_id)
-        except ModelGatewayError:
-            registry = None
+    try:
+        registry = load_provider_registry()
+        descriptor = registry.descriptor(request.provider_service_id)
+    except (ModelGatewayError, OSError, ValueError):
+        registry = None
     context_bundle = _context_bundle(
         store,
         project_id,
@@ -197,6 +196,7 @@ def _context_bundle(
         visible_prompt=visible_prompt,
         context_subgraph=request.context_subgraph,
         temporary_lock_overrides=request.temporary_lock_overrides,
+        temporary_asset_exclusions=request.temporary_asset_exclusions,
         include_fixed_assets=include_fixed_assets,
         style_preference=request.style,
         prompt_char_limit=prompt_char_limit,

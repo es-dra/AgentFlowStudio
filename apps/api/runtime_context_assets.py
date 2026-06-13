@@ -166,6 +166,24 @@ def excluded_assets(
     return excluded
 
 
+def temporary_asset_exclusion_records(
+    assets: dict[str, dict[str, Any]],
+    asset_ids: set[str],
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for asset_id in sorted(asset_ids):
+        asset = assets.get(asset_id)
+        records.append(
+            {
+                "asset_id": asset_id,
+                "label": asset.get("label") if asset else None,
+                "asset_type": asset.get("asset_type") if asset else None,
+                "reason": "temporary_asset_excluded_by_user",
+            }
+        )
+    return records
+
+
 def available_assets(
     assets: dict[str, dict[str, Any]],
     included_ids: list[str],
@@ -263,4 +281,5 @@ __all__ = (
     "optimize_asset_ids",
     "reference_image_channel",
     "subject_reference_asset",
+    "temporary_asset_exclusion_records",
 )

@@ -114,6 +114,11 @@ class TemporaryLockOverride(BaseModel):
     reason: str = Field(min_length=1)
 
 
+class AssetExclusion(BaseModel):
+    asset_id: str = Field(min_length=1)
+    reason: str | None = None
+
+
 class PromptOptimizationRequest(BaseModel):
     node_id: str | None = None
     node_type: Literal["text", "image", "video", "audio", "script", "director", "video_merge"] = "text"
@@ -143,6 +148,8 @@ class KeyframeGenerationRequest(BaseModel):
     node_parameters: dict[str, Any] | None = None
     context_subgraph: ContextSubgraph | None = None
     temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
+    temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)
+    preflight_token: str | None = None
     generated_at: str = Field(min_length=1)
 
 
@@ -160,6 +167,8 @@ class VideoGenerationRequest(BaseModel):
     candidate_count: int = Field(default=1, ge=1, le=1)
     context_subgraph: ContextSubgraph | None = None
     temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
+    temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)
+    preflight_token: str | None = None
     quota_override_confirmed: bool = False
     generated_at: str = Field(min_length=1)
 
@@ -214,6 +223,7 @@ class FeedbackRecordRequest(BaseModel):
 
 __all__ = (
     "CanvasDraftRequest",
+    "AssetExclusion",
     "ContentCardRegisterRequest",
     "ContextSubgraph",
     "ContextSubgraphEdge",
