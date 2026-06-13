@@ -19,6 +19,7 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     (tmp_path / "apps" / "web_bridge" / "server.py").write_text("", encoding="utf-8")
     (tmp_path / ".github" / "workflows").mkdir(parents=True)
     (tmp_path / ".github" / "workflows" / "maintenance.yml").write_text("name: test\n", encoding="utf-8")
+    (tmp_path / ".gitattributes").write_text("* text=auto eol=lf\n", encoding="utf-8")
     (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
     (tmp_path / "agentflow_studio").mkdir()
     (tmp_path / "agentflow_studio" / "memory_advantage_demo_012.py").write_text("", encoding="utf-8")
@@ -36,6 +37,8 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     assert files["apps/web_bridge/server.py"]["status"] == "legacy_runtime_surface"
     assert files[".github/workflows/maintenance.yml"]["product_surface"] == "operations_spine"
     assert files[".github/workflows/maintenance.yml"]["status"] == "current"
+    assert files[".gitattributes"]["product_surface"] == "production_spine"
+    assert files[".gitattributes"]["status"] == "current"
     assert files["uv.lock"]["product_surface"] == "production_spine"
     assert files["uv.lock"]["status"] == "current"
     assert files["agentflow_studio/memory_advantage_demo_012.py"]["product_surface"] == "delete_candidate"
