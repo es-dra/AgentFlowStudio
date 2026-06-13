@@ -16,6 +16,7 @@ try:
         HISTORICAL_DOC_GLOBS,
         HISTORICAL_DOC_PREFIXES,
         HISTORICAL_SUMMARY_PATH,
+        LEGACY_FROZEN_PREFIXES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
         TEXT_SUFFIXES,
@@ -28,6 +29,7 @@ except ModuleNotFoundError:
         HISTORICAL_DOC_GLOBS,
         HISTORICAL_DOC_PREFIXES,
         HISTORICAL_SUMMARY_PATH,
+        LEGACY_FROZEN_PREFIXES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
         TEXT_SUFFIXES,
@@ -51,12 +53,14 @@ class Finding:
 def build_maintenance_audit(root: Path) -> dict[str, Any]:
     root = root.resolve()
     files = list(_iter_text_files(root))
+    active_files = [path for path in files if not _is_legacy_frozen_path(root, path)]
     checks = [
         _check_contract_shape(),
         _check_legacy_company_paths(root, files),
-        _check_chinese_doc_coverage(root, files),
+        _check_legacy_frozen_surface(root, files),
+        _check_chinese_doc_coverage(root, active_files),
         check_secret_like_fragments(root, files),
-        _check_oversized_files(root, files),
+        _check_oversized_files(root, active_files),
         _check_tracked_runtime_artifacts(root),
     ]
     summary = _summarize_checks(checks)
@@ -117,8 +121,29 @@ def _check_legacy_company_paths(root: Path, files: list[Path]) -> dict[str, Any]
     return _check("legacy_company_path", "warning" if findings else "passed", findings)
 
 
+def _check_legacy_frozen_surface(root: Path, files: list[Path]) -> dict[str, Any]:
+    frozen_prefixes = sorted(
+        {
+            prefix
+            for path in files
+            for prefix in LEGACY_FROZEN_PREFIXES
+            if _rel(root, path).startswith(prefix)
+        }
+    )
+    findings = [
+        Finding(prefix.rstrip("/"), "legacy-frozen: excluded from active maintainability checks")
+        for prefix in frozen_prefixes
+    ]
+    return _check("legacy_frozen_surface", "warning" if findings else "passed", findings)
+
+
 def _check_contract_shape() -> dict[str, Any]:
     return _check("audit_contract_shape", "passed", [])
+
+
+def _is_legacy_frozen_path(root: Path, path: Path) -> bool:
+    relative = _rel(root, path)
+    return any(relative.startswith(prefix) for prefix in LEGACY_FROZEN_PREFIXES)
 
 
 def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]:

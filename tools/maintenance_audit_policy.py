@@ -19,6 +19,19 @@ DEFAULT_EXCLUDE_DIRS = {
     "node_modules",
 }
 
+LEGACY_FROZEN_PREFIXES = (
+    "agentflow/memory/",
+    "agentflow_studio/asr_sop/",
+    "agentflow_studio/audio_sop/",
+    "agentflow_studio/candidate_sop/",
+    "agentflow_studio/highlight_sop/",
+    "agentflow_studio/ocr_sop/",
+    "agentflow_studio/production/",
+    "agentflow_studio/slicing_sop/",
+    "agentflow_studio/workflow_engine/",
+    "apps/cli/production_memory_",
+)
+
 TEXT_SUFFIXES = {
     ".css",
     ".html",

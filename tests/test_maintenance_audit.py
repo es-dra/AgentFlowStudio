@@ -103,6 +103,24 @@ def test_maintenance_audit_still_flags_real_high_confidence_secret(tmp_path) -> 
     assert checks["secret_like_fragments"]["high_confidence_count"] == 1
 
 
+def test_maintenance_audit_lists_legacy_frozen_surface_without_skipping_secret_scan(tmp_path) -> None:
+    legacy_dir = tmp_path / "agentflow" / "memory"
+    legacy_dir.mkdir(parents=True)
+    (legacy_dir / "large_loop.py").write_text("\n".join(f"line_{index} = 1" for index in range(550)), encoding="utf-8")
+    secret_value = "sk-" + "live-secret-value-123456"
+    (legacy_dir / "secret.py").write_text(f'value = "{secret_value}"\n', encoding="utf-8")
+    (tmp_path / "README.md").write_text("# 当前说明\n\n这是当前中文入口。\n", encoding="utf-8")
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+
+    assert checks["legacy_frozen_surface"]["status"] == "warning"
+    assert checks["legacy_frozen_surface"]["count"] == 1
+    assert checks["oversized_files"]["status"] == "passed"
+    assert checks["secret_like_fragments"]["status"] == "warning"
+    assert checks["secret_like_fragments"]["high_confidence_count"] == 1
+
+
 def test_maintenance_audit_skips_permission_errors_during_stat_and_read(tmp_path, monkeypatch) -> None:
     (tmp_path / "README.md").write_text("# 当前说明\n\n这是当前中文入口。\n", encoding="utf-8")
     (tmp_path / "blocked_stat.py").write_text("value = 1\n", encoding="utf-8")

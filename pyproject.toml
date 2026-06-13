@@ -35,5 +35,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
     "live: tests that require an explicitly authorized remote provider call",
+    "legacy: frozen legacy island (distribution chain + production-memory), not a merge gate",
     "slow: slower end-to-end or browser/runtime tests skipped during daily focused runs",
 ]
+addopts = "-m 'not legacy'"
