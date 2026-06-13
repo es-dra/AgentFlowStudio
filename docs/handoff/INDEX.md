@@ -49,6 +49,7 @@ responses, or media bytes.
 
 ## Current Maintenance Evidence
 
+- `../maintenance/AFS-LEGACY-FREEZE-20260613.md`
 - `AFS-PROJECT-INVENTORY-001.md`
 - `../maintenance/AFS-PROJECT-INVENTORY-20260612.md`
 - `../maintenance/AFS-STUDIO-HARD-CLEANUP-001.zh-CN.md`

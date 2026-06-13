@@ -78,21 +78,24 @@ Frontend code must not expose:
 - Creative intent control agent v1: deterministic constraint layering, candidate scoring, selected canonical prompt, and provider translation trace.
 - Fixed visual asset APIs and graph-scoped context resolver.
 - Provider Gateway v0.1 descriptor registry, account pools, Runtime image dispatch, registry-backed LLM prompt enhancement, and fake async video lifecycle contract.
+- Provider descriptors use `AFS_ALLOW_REMOTE_*` gates only; legacy `NARRATOCUT_ALLOW_REMOTE_*` gate compatibility has been retired.
 - Director Compiler v1 for deterministic 2D director setup translation.
 - Keyframe generation Runtime API with `AFS_ALLOW_REMOTE_IMAGE` gate closed by default.
 - Project Manifest v0.1.
 - Safe Runtime artifacts: run trace, safe manifest, request plan, context bundle, handoff record, maintenance audit report.
 
-Legacy/optional capabilities still exist for compatibility, but are not the
-current product surface:
+Legacy/optional capabilities still exist as frozen reference implementations,
+but are not the current product surface or default merge gate:
 
 - subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata distribution chain.
 - Production Memory asset loop and related review/promotion harnesses, kept behind CLI/function tests rather than current Runtime HTTP routes.
+- Frozen production-memory and distribution-chain tests run with `pytest -m legacy`; default `pytest` runs the current Runtime/Studio/contract gate.
 - Runtime Service v0.2 list/import/source-assets/content-cards/canvas-draft/scene-inspector/review-decisions/export routes, hidden unless `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
 
 ## Governance
 
 - Remote provider calls are closed by default and opened only by explicit capability gates.
+- Capability gates use the `AFS_ALLOW_REMOTE_*` prefix; old `NARRATOCUT_ALLOW_REMOTE_*` names are not accepted.
 - Feedback is raw evidence, not automatic memory.
 - Candidate memory is not durable memory.
 - Runtime Service outputs safe refs and must not leak private paths or secrets.

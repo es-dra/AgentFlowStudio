@@ -1,5 +1,30 @@
 # Devlog
 
+## 2026-06-13 - Legacy Freeze And Repository Hygiene
+
+- Added `.gitattributes` and confirmed renormalization did not create broad
+  line-ending churn.
+- Tagged and pushed `legacy-frozen-20260613` at the pre-cleanup baseline.
+- Froze production-memory and distribution-chain tests behind the `legacy`
+  marker; default `pytest` now runs the current Runtime/Studio/contract gate,
+  while `pytest -m legacy` runs the frozen reference suite.
+- Updated maintenance audit to list legacy-frozen paths separately while still
+  scanning the full repository for secret-like fragments and runtime artifacts.
+- Retired current code/test compatibility for `NARRATOCUT_ALLOW_REMOTE_*`;
+  provider gates now use `AFS_ALLOW_REMOTE_*` only.
+- Deleted the stale v0.2 Runtime frontend handoff and the orphan
+  `ComplianceResult` schema.
+
+Verification so far:
+
+```text
+Default pytest: 363 passed, 527 deselected, 2 warnings
+Legacy pytest: 527 passed, 363 deselected, 1 warning
+Focused provider/schema/runtime/static tests: 66 passed, 1 warning
+maintenance_audit: failed=0, passed=4, warning=3
+git diff --check: exit 0, Windows LF conversion notices only
+```
+
 ## 2026-06-13 - Runtime Legacy Route Removal
 
 - Removed Production Memory HTTP business routes from Runtime Service:
