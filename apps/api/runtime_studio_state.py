@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_errors import safe_exception_detail
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -85,7 +86,10 @@ def register_runtime_studio_state_routes(app: FastAPI, store: RuntimeStore) -> N
             state = sanitize_studio_state(request.state, project_id=project_id)
             reject_unsafe_payload(state)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=400,
+                detail=safe_exception_detail(exc, "invalid_studio_state"),
+            ) from exc
 
         payload = {
             "artifact_type": "afs_studio_state",

@@ -61,18 +61,26 @@ def test_runtime_service_v02_lists_imports_and_exports_projects_without_private_
 def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
-
-    result = client.post(
-        "/provider/validation-plan",
+    client.post(
+        "/projects",
         json={
             "project_id": "proj_runtime_demo",
-            "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
+            "project_type": "short_video_campaign",
+            "goal": "Track a current Runtime job.",
+        },
+    )
+
+    result = client.post(
+        "/feedback",
+        json={
+            "project_id": "proj_runtime_demo",
             "generated_at": "2026-06-08T16:30:00+08:00",
+            "feedback": {"note": "Current Runtime job progress smoke."},
         },
     ).json()
     job = client.get(f"/runs/{result['job']['job_id']}").json()["job"]
 
-    assert job["progress"] == {"stage": "provider_validation_plan", "percent": 100, "terminal": True}
+    assert job["progress"] == {"stage": "record_feedback", "percent": 100, "terminal": True}
 
     output_path = tmp_path / "frontend" / "afs-runtime-service.openapi.json"
     exported_path = export_openapi_schema(output_path, runtime_root=tmp_path / "openapi_runtime")
@@ -89,6 +97,10 @@ def test_runtime_service_v02_reports_job_progress_and_exports_openapi(tmp_path, 
     assert "/projects/{project_id}/review-decisions" in schema["paths"]
     assert "/projects/{project_id}/workbench-state" not in schema["paths"]
     assert "/runs/{job_id}" in schema["paths"]
+    assert "/runs/asset-test" not in schema["paths"]
+    assert "/runs/two-round-validate" not in schema["paths"]
+    assert "/provider/validation-plan" not in schema["paths"]
+    assert "/provider/script-draft-plan" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 
 
@@ -130,3 +142,9 @@ def test_runtime_service_v02_routes_are_hidden_by_default(tmp_path, monkeypatch)
     assert "/projects/{project_id}/source-assets" not in schema["paths"]
     assert "/projects/{project_id}/content-cards" not in schema["paths"]
     assert "/projects/{project_id}/canvas-draft" not in schema["paths"]
+    assert "/projects/{project_id}/scene-inspector" not in schema["paths"]
+    assert "/projects/{project_id}/review-decisions" not in schema["paths"]
+    assert "/runs/asset-test" not in schema["paths"]
+    assert "/runs/two-round-validate" not in schema["paths"]
+    assert "/provider/validation-plan" not in schema["paths"]
+    assert "/provider/script-draft-plan" in schema["paths"]

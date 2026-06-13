@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
@@ -31,7 +32,7 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
         try:
             report = build_generation_comparison_report(store, project_id, request, output_dir)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_generation_comparison")) from exc
         artifact = store.register_artifact(output_dir / "generation_comparison_report.json", role="generation_comparison_report")
         artifacts = {"generation_comparison_report": artifact}
         status = str(report["status"])

@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.minimax_image_runtime import image_dimensions
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_models import ImageAssetUploadRequest
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -56,7 +57,7 @@ def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> No
             write_json(metadata_path, metadata)
             artifact = store.register_artifact(metadata_path, role="image_asset_metadata")
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_image_asset")) from exc
         return {
             "asset": public_image_asset(metadata),
             "artifact": artifact,

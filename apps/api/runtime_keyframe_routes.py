@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 from apps.api.runtime_artifacts import keyframe_generation_artifacts
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
 from apps.api.runtime_jobs import runtime_job
@@ -61,7 +62,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
                 tool_gate_state=dict(result["tool_gate_state"]),
             )
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_keyframe_generation")) from exc
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         job = runtime_job(job_id, project_id, "keyframe_generation", status, artifacts=artifacts)
         job["ui_summary"] = {

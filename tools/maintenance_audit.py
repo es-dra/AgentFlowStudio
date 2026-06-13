@@ -94,13 +94,16 @@ def main() -> int:
 
 def _iter_text_files(root: Path) -> Iterable[Path]:
     for path in root.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
-            continue
         relative_path = path.relative_to(root)
         if any(part.endswith(".egg-info") for part in relative_path.parts):
             continue
         relative = relative_path.as_posix()
         if any(relative == excluded or relative.startswith(f"{excluded}/") for excluded in DEFAULT_EXCLUDE_DIRS):
+            continue
+        try:
+            if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
+                continue
+        except (PermissionError, OSError):
             continue
         yield path
 
@@ -123,7 +126,7 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]
     exempted_historical = 0
     doc_files = [path for path in files if path.suffix.lower() == ".md"]
     for path in doc_files:
-        text = path.read_text(encoding="utf-8", errors="ignore")
+        text = _read_text(path)
         if _is_machine_or_archive_doc(path):
             continue
         if _is_historical_doc_with_summary(root, path):
@@ -190,11 +193,14 @@ def _overall_status(summary: dict[str, int]) -> str:
 
 
 def _read_lines(path: Path) -> Iterable[tuple[int, str]]:
+    return enumerate(_read_text(path).splitlines(), start=1)
+
+
+def _read_text(path: Path) -> str:
     try:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except OSError:
-        return []
-    return enumerate(lines, start=1)
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except (PermissionError, OSError):
+        return ""
 
 
 def _chinese_ratio(text: str) -> float:

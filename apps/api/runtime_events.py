@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
-from agentflow.memory.production_loop import SCHEMA_VERSION
+SCHEMA_VERSION = "production-memory-loop/v1"
 
 
 def runtime_feedback_event(project_id: str, feedback: dict[str, Any], generated_at: str) -> dict[str, Any]:

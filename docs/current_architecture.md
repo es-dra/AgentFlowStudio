@@ -4,7 +4,7 @@
 
 执行标准：任何生成链路都先保留 canonical brief、safe manifest、trace 和非声明边界，再考虑调用真实模型。secret、signed URL、本地绝对路径、媒体字节、provider 原始响应不得写入仓库或返回前端。用户偏好只是软约束，专业规则、节点参数、角色身份和场景连续性优先。
 
-AgentFlow Studio is a local-first, provider-gated content production system. The current web product is **AFS Studio**, an infinite-canvas creation graph for prompt-first creative workflows.
+AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。当前 Web 产品是 **AFS Studio**：一个面向 prompt-first 创作流程的无限画布创作图谱。
 
 The product surface is flow-native:
 
@@ -87,8 +87,8 @@ Legacy/optional capabilities still exist for compatibility, but are not the
 current product surface:
 
 - subtitle/text -> hooks -> scripts -> clip_plans -> videos -> metadata distribution chain.
-- Production Memory asset loop and related review/promotion harnesses.
-- Runtime Service v0.2 list/import/source-assets/content-cards/canvas-draft routes, hidden unless `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
+- Production Memory asset loop and related review/promotion harnesses, kept behind CLI/function tests rather than current Runtime HTTP routes.
+- Runtime Service v0.2 list/import/source-assets/content-cards/canvas-draft/scene-inspector/review-decisions/export routes, hidden unless `AFS_ENABLE_LEGACY_RUNTIME_V02=true`.
 
 ## Governance
 

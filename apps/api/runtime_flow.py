@@ -12,7 +12,7 @@ ACTION_LABELS = {
     "start_first_generation_check": "Run first generation check",
     "record_review_note": "Record review note",
     "start_next_round": "Start next round",
-    "run_provider_preflight": "Run provider preflight",
+    "request_gated_generation": "Request gated generation",
 }
 
 
@@ -43,20 +43,20 @@ def _command(current_action: str) -> dict[str, Any]:
         "label": ACTION_LABELS.get(current_action, "Continue"),
         "ui_action": _ui_action(current_action),
         "view": "Studio",
-        "enabled": current_action != "run_provider_preflight",
-        "blocked_reason": "remote providers remain gated" if current_action == "run_provider_preflight" else "",
+        "enabled": current_action != "request_gated_generation",
+        "blocked_reason": "remote providers remain gated" if current_action == "request_gated_generation" else "",
         "requires_input": _requires_input(current_action),
     }
 
 
 def _current_action(manifest: dict[str, Any], jobs: list[dict[str, Any]], provider_status: str) -> str:
     if provider_status == "blocked":
-        return "run_provider_preflight"
+        return "request_gated_generation"
     if not _list(manifest.get("source_assets")):
         return "add_reference"
     if not _list(manifest.get("content_cards")):
         return "draft_canvas"
-    if not _has_job(jobs, {"asset_test_run", "keyframe_generation"}):
+    if not _has_job(jobs, {"keyframe_generation", "video_generation", "llm_script_draft_plan"}):
         return "start_first_generation_check"
     if str(manifest.get("status") or "") == "ready_for_next_round":
         return "start_next_round"
@@ -67,7 +67,7 @@ def _provider_status(jobs: list[dict[str, Any]]) -> str:
     provider_jobs = [
         job
         for job in jobs
-        if str(job.get("action") or "") in {"provider_validation_plan", "keyframe_generation"}
+        if str(job.get("action") or "") in {"keyframe_generation", "video_generation", "llm_script_draft_plan"}
     ]
     if not provider_jobs:
         return "blocked_by_default"
@@ -89,7 +89,7 @@ def _readiness_status(current_action: str, provider_status: str) -> str:
         "start_first_generation_check": "ready_for_generation_check",
         "record_review_note": "needs_review",
         "start_next_round": "ready_for_next_round",
-        "run_provider_preflight": "blocked",
+        "request_gated_generation": "blocked",
     }.get(current_action, "in_progress")
 
 
@@ -108,7 +108,7 @@ def _ui_action(current_action: str) -> str:
         "start_first_generation_check": "open_studio_canvas",
         "record_review_note": "open_review_panel",
         "start_next_round": "open_studio_canvas",
-        "run_provider_preflight": "open_provider_gate",
+        "request_gated_generation": "open_provider_gate",
     }.get(current_action, "")
 
 
@@ -119,7 +119,7 @@ def _requires_input(current_action: str) -> list[str]:
         "start_first_generation_check": ["node_prompt"],
         "record_review_note": ["review_decision"],
         "start_next_round": ["next_prompt"],
-        "run_provider_preflight": ["explicit_provider_gate_authorization"],
+        "request_gated_generation": ["explicit_provider_gate_authorization"],
     }.get(current_action, [])
 
 

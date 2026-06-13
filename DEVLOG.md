@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-13 - Runtime Legacy Route Removal
+
+- Removed Production Memory HTTP business routes from Runtime Service:
+  `POST /runs/asset-test`, `POST /runs/two-round-validate`, and
+  `POST /provider/validation-plan`.
+- Kept production-memory CLI commands, `agentflow/memory`, and production-memory
+  harness/function tests intact.
+- Regenerated the default Runtime OpenAPI snapshot with
+  `AFS_ENABLE_LEGACY_RUNTIME_V02` closed; the snapshot no longer contains the
+  removed Production Memory routes or stale v02 routes.
+- Kept `/provider/script-draft-plan` as the current LLM script vertical.
+- Replaced current default route exception projection with safe error details;
+  remaining `detail=str(exc)` usage is legacy-v02-only residual risk.
+- Updated the positioning sentence to:
+  `AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。`
+- Added dependency upper bounds without generating a lock file.
+
+Verification so far:
+
+```text
+Focused Runtime contract set: 31 passed, 2 warnings
+Default OpenAPI export: passed
+maintenance_audit: failed=0, passed=4, warning=2
+CLI --help: passed
+CLI version: 0.1.0
+Full pytest: 886 passed, 2 warnings
+git diff --check: exit 0, Windows CRLF notices only
+```
+
 ## 2026-06-13 - Browser QA Hardening Loop 6/7 And Final Verification
 
 - Continued agent-led browser QA after the live asset and Kling passes.

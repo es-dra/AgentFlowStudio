@@ -1,6 +1,6 @@
 # AgentFlow Studio
 
-AgentFlow Studio 是一个本地优先、provider-gated 的内容生产工作台。当前用户侧 Web 是 **AFS Studio**：一个面向提示词记忆闭环的无限画布创作图谱。
+AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。当前用户侧 Web 是 **AFS Studio**：一个面向提示词记忆闭环的无限画布创作图谱。
 
 当前产品不是复制某个外部工具，而是基于 AFS 自己的生产流程组织界面：
 

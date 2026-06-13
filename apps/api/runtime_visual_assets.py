@@ -8,6 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_image_assets import image_asset_metadata
 from apps.api.runtime_models import VisualAssetPromoteRequest, VisualAssetRetireRequest
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
@@ -25,7 +26,7 @@ def register_runtime_visual_asset_routes(app: FastAPI, store: RuntimeStore) -> N
             record, warnings = create_visual_asset(store, project_id, request)
             artifact = store.register_artifact(_visual_asset_path(store, project_id, record["asset_id"]), role="visual_asset")
         except (KeyError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_visual_asset")) from exc
         return {"asset": public_visual_asset(record), "warnings": warnings, "artifact": artifact}
 
     @app.post("/projects/{project_id}/visual-assets/{asset_id}/retire")
@@ -34,7 +35,7 @@ def register_runtime_visual_asset_routes(app: FastAPI, store: RuntimeStore) -> N
             record = retire_fixed_visual_asset(store, project_id, asset_id, request)
             artifact = store.register_artifact(_visual_asset_path(store, project_id, asset_id), role="visual_asset")
         except (KeyError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_visual_asset")) from exc
         return {"asset": public_visual_asset(record), "artifact": artifact}
 
     @app.get("/projects/{project_id}/visual-assets")

@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from apps.api.runtime_artifacts import script_provider_artifacts
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_models import ProviderScriptDraftPlanRequest
@@ -53,7 +54,7 @@ def register_runtime_provider_script_routes(app: FastAPI, store: RuntimeStore) -
                 tool_gate_state=dict(plan["tool_gate_state"]),
             )
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_script_draft_plan")) from exc
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         job = runtime_job(job_id, request.project_id, "llm_script_draft_plan", status, artifacts=artifacts)
         job["ui_summary"] = {

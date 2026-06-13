@@ -45,17 +45,17 @@ D:\Learning materials\Learning_notes\10-Startup
 AFS 当前对外和对内主打主题是：
 
 ```text
-Harness-first Agentic Delivery System
+AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。
 ```
 
-它在本项目中的含义是：用 provider-gated 的工程工作台验证 Agent 项目交付方法，把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目执行闭环。
+它在本项目中的含义是：用 provider-gated 的工程工作台组织 AI 内容生产，把提示词、上下文、工具、规则、执行轨迹、质量报告和反馈信号组织成可重复、可审计、可维护的项目执行闭环。
 
 术语分工：
 
 | 术语 | 在 AFS 中的用途 |
 |---|---|
 | AI-Native Company OS | 公司级总系统，源头在 `10-Startup`。 |
-| Harness-first Agentic Delivery System | AFS 当前主打项目交付主题。 |
+| Harness-first Agentic Delivery System | AFS 当前工程方法，不作为产品定位句。 |
 | Evidence-backed Context Runtime | 任务执行时的上下文装配层。 |
 | Governed Memory / Memory OS | 记忆、候选经验和知识晋升子系统，不作为当前主标题。 |
 | AgentFlow Studio | 第一条本地验证项目线。 |

@@ -103,6 +103,32 @@ def test_maintenance_audit_still_flags_real_high_confidence_secret(tmp_path) -> 
     assert checks["secret_like_fragments"]["high_confidence_count"] == 1
 
 
+def test_maintenance_audit_skips_permission_errors_during_stat_and_read(tmp_path, monkeypatch) -> None:
+    (tmp_path / "README.md").write_text("# 当前说明\n\n这是当前中文入口。\n", encoding="utf-8")
+    (tmp_path / "blocked_stat.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "blocked_read.md").write_text("# Blocked\n\nEnglish only.\n", encoding="utf-8")
+    original_is_file = Path.is_file
+    original_read_text = Path.read_text
+
+    def guarded_is_file(path: Path) -> bool:
+        if path.name == "blocked_stat.py":
+            raise PermissionError("stat blocked")
+        return original_is_file(path)
+
+    def guarded_read_text(path: Path, *args, **kwargs) -> str:
+        if path.name == "blocked_read.md":
+            raise PermissionError("read blocked")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "is_file", guarded_is_file)
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+
+    report = build_maintenance_audit(tmp_path)
+
+    assert report["artifact_type"] == "agentflow_maintenance_audit_report"
+    assert report["summary"]["failed"] == 0
+
+
 def test_chinese_doc_coverage_ignores_machine_contract_blocks(tmp_path) -> None:
     (tmp_path / "README.md").write_text(
         """# 中文说明

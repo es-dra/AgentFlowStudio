@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
+from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_image_assets import image_asset_file_path
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_models import VideoGenerationRequest
@@ -45,7 +46,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
         try:
             result = _submit_video_generation(store, project_id, job_id, request, output_dir)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_video_generation")) from exc
         job = _write_video_job(store, project_id, job_id, result)
         return _video_response(store, project_id, job, result)
 
@@ -61,7 +62,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
         try:
             result = _poll_video_generation(store, project_id, output_dir)
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_video_generation")) from exc
         job = _write_video_job(store, project_id, job_id, result)
         return _video_response(store, project_id, job, result)
 

@@ -5,7 +5,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_path) -> None:
@@ -18,12 +20,23 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert health["service"] == "agentflow_runtime_service"
     assert health["status"] == "ready"
     assert health["runtime_root_persisted"] is False
-    assert "asset_test_run" in capabilities["actions"]
-    assert "two_round_validate" in capabilities["actions"]
-    assert "provider_validation_plan" in capabilities["actions"]
-    assert "register_source_asset" in capabilities["actions"]
-    assert "draft_canvas" in capabilities["actions"]
-    assert "record_review_decision" in capabilities["actions"]
+    assert capabilities["actions"] == [
+        "create_project",
+        "list_projects",
+        "read_project_manifest",
+        "read_artifact",
+        "read_job",
+        "record_feedback",
+        "prompt_optimization",
+        "script_draft_plan",
+        "image_asset_upload",
+        "visual_asset_register",
+        "keyframe_generation",
+        "video_generation",
+        "generation_comparison",
+        "studio_state",
+        "export_openapi_schema",
+    ]
     assert capabilities["studio_flow"]["target_status"] == "ready_for_next_round"
     assert capabilities["studio_flow"]["actions"] == [
         "add_reference",
@@ -31,8 +44,11 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "start_first_generation_check",
         "record_review_note",
         "start_next_round",
-        "run_provider_preflight",
+        "request_gated_generation",
     ]
+    assert "asset_test_run" not in capabilities["actions"]
+    assert "two_round_validate" not in capabilities["actions"]
+    assert "provider_validation_plan" not in capabilities["actions"]
     assert "api_key" not in serialized
     assert "token" not in serialized
     assert "d:\\" not in serialized
@@ -120,97 +136,32 @@ def test_runtime_service_creates_project_manifest_and_reads_safe_artifact(tmp_pa
     assert "path" not in json.dumps(artifact, ensure_ascii=False).lower()
 
 
-def test_runtime_service_runs_round_1_asset_harness_with_safe_job_artifacts(tmp_path) -> None:
+def test_runtime_service_removed_production_memory_http_routes_return_404(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/runs/asset-test",
-        json={
-            "project_id": "proj_runtime_demo",
-            "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
-            "promotion_decision": "promoted",
-            "promotion_rationale": "Runtime service fixture smoke; not durable memory.",
-            "generated_at": "2026-06-04T08:00:00+08:00",
-            "decided_at": "2026-06-04T08:20:00+08:00",
-            "reviewed_at": "2026-06-04T08:30:00+08:00",
-        },
-    ).json()
-
-    assert result["job"]["action"] == "asset_test_run"
-    assert result["job"]["status"] == "blocked"
-    assert result["report"]["run_status"] == "completed_with_blocks"
-    assert result["report"]["provider_calls_started"] is False
-    assert result["report"]["writes_long_term_memory"] is False
-    assert result["artifacts"]["real_asset_test_report"]["artifact_id"]
-    assert result["artifacts"]["agentflow_run_trace"]["artifact_type"] == "agentflow_run_trace"
-    trace = client.get(f"/artifacts/{result['artifacts']['agentflow_run_trace']['artifact_id']}").json()["payload"]
-    assert trace["tool_gate_state"]["remote_image"] == "blocked_by_default"
-    assert trace["non_claims"] == ["not human acceptance", "not business validation", "not durable memory"]
-    serialized = json.dumps(result, ensure_ascii=False).lower()
-    assert "c:\\" not in serialized
-    assert "d:\\" not in serialized
-    assert "data/processed/runs" not in serialized
+    for path in ("/runs/asset-test", "/runs/two-round-validate", "/provider/validation-plan"):
+        response = client.post(path, json={"project_id": "proj_runtime_demo"})
+        assert response.status_code == 404, path
 
 
-def test_runtime_service_runs_two_round_validation_from_round_1_job(tmp_path) -> None:
-    client = TestClient(create_runtime_app(runtime_root=tmp_path))
-    round_1 = client.post(
-        "/runs/asset-test",
-        json={
-            "project_id": "proj_runtime_demo",
-            "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
-            "promotion_decision": "promoted",
-            "promotion_rationale": "Runtime service fixture smoke; not durable memory.",
-            "generated_at": "2026-06-04T08:00:00+08:00",
-            "decided_at": "2026-06-04T08:20:00+08:00",
-            "reviewed_at": "2026-06-04T08:30:00+08:00",
-        },
-    ).json()
+def test_runtime_service_current_error_projection_does_not_leak_unsafe_exception_text(tmp_path, monkeypatch) -> None:
+    def raise_unsafe_error(self: RuntimeStore, project_id: str) -> dict:
+        raise ValueError(r"D:\private\providers.local.json api_key token signed_url provider raw response")
 
-    result = client.post(
-        "/runs/two-round-validate",
-        json={
-            "project_id": "proj_runtime_demo",
-            "round_1_job_id": round_1["job"]["job_id"],
-            "generated_at": "2026-06-04T08:40:00+08:00",
-            "reviewed_at": "2026-06-04T08:50:00+08:00",
-        },
-    ).json()
-
-    assert result["job"]["action"] == "two_round_validate"
-    assert result["job"]["status"] == "succeeded"
-    assert result["report"]["runtime_verification_status"] == "verified"
-    assert result["report"]["improvement_assessment"] == "no_clear_improvement"
-    assert result["artifacts"]["two_round_context_runtime_report"]["artifact_id"]
-    assert result["artifacts"]["agentflow_run_trace"]["artifact_type"] == "agentflow_run_trace"
-
-
-def test_runtime_service_provider_validation_plan_is_blocked_without_live_calls(tmp_path) -> None:
+    monkeypatch.setattr(RuntimeStore, "ensure_project_manifest", raise_unsafe_error)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/provider/validation-plan",
-        json={
-            "project_id": "proj_runtime_demo",
-            "asset_profile_seed": "examples/agentflow/production_memory_asset_profile_seed.example.json",
-            "generated_at": "2026-06-04T09:00:00+08:00",
-        },
-    ).json()
+    response = client.get("/projects/proj_runtime_demo/manifest")
 
-    assert result["job"]["action"] == "provider_validation_plan"
-    assert result["job"]["status"] == "blocked"
-    assert result["safe_manifest"]["status"] == "blocked"
-    assert result["safe_manifest"]["provider_calls_started"] is False
-    assert result["safe_manifest"]["request_summary"]["private_paths_persisted"] is False
-    assert result["artifacts"]["agentflow_run_trace"]["artifact_type"] == "agentflow_run_trace"
-    serialized = json.dumps(result, ensure_ascii=False).lower()
-    assert "providers.local.json" not in serialized
-    assert "api_key" not in serialized
-    assert "d:\\" not in serialized
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "error": "invalid_project_manifest",
+        "detail_code": "invalid_request",
+    }
+    assert response_contains_unsafe_marker(response.json()) is False
 
 
-def test_frontend_runtime_service_request_examples_match_api_contract(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("AFS_ENABLE_LEGACY_RUNTIME_V02", "true")
+def test_frontend_runtime_service_request_examples_match_current_api_contract(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     fixture_dir = Path("examples/frontend_runtime_service")
 
@@ -218,26 +169,45 @@ def test_frontend_runtime_service_request_examples_match_api_contract(tmp_path, 
     project = client.post("/projects", json=project_request).json()
     assert project["manifest"]["project_id"] == project_request["project_id"]
 
-    import_request = _load_fixture(fixture_dir / "project_import.request.example.json")
-    imported = client.post("/projects/import", json=import_request).json()
-    assert imported["manifest"]["project_id"] == import_request["manifest"]["project_id"]
-
-    round_1_request = _load_fixture(fixture_dir / "asset_test_run.request.example.json")
-    round_1 = client.post("/runs/asset-test", json=round_1_request).json()
-    assert round_1["job"]["job_id"]
-
     feedback_request = _load_fixture(fixture_dir / "feedback_record.request.example.json")
     feedback = client.post("/feedback", json=feedback_request).json()
     assert feedback["feedback_event"]["feedback_is_memory"] is False
 
-    round_2_request = _load_fixture(fixture_dir / "two_round_validate.request.example.json")
-    round_2_request["round_1_job_id"] = round_1["job"]["job_id"]
-    round_2 = client.post("/runs/two-round-validate", json=round_2_request).json()
-    assert round_2["report"]["runtime_verification_status"] == "verified"
+    prompt_fixture = _load_fixture(fixture_dir / "prompt_optimizer_nodes" / "text_node.zh.json")
+    prompt = client.post(
+        f"/projects/{project_request['project_id']}/prompt-optimizations",
+        json=prompt_fixture["request"],
+    ).json()
+    assert prompt["job"]["action"] == "prompt_optimization"
+    assert prompt["provider_calls_started"] is False
 
-    provider_request = _load_fixture(fixture_dir / "provider_validation_plan.request.example.json")
-    provider = client.post("/provider/validation-plan", json=provider_request).json()
-    assert provider["safe_manifest"]["provider_calls_started"] is False
+    keyframe = client.post(
+        f"/projects/{project_request['project_id']}/keyframe-generations",
+        json={
+            "node_id": "image-node-fixture-001",
+            "prompt_text": "A quiet cinematic street scene.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "candidate_count": 1,
+            "generated_at": "2026-06-13T12:00:00+08:00",
+        },
+    ).json()
+    assert keyframe["job"]["action"] == "keyframe_generation"
+    assert keyframe["job"]["status"] == "blocked"
+    assert keyframe["provider_calls_started"] is False
+
+    script = client.post(
+        "/provider/script-draft-plan",
+        json={
+            "project_id": project_request["project_id"],
+            "goal": "Draft a short scene script from the current canvas.",
+            "target_platform": "short_video",
+            "style": "clear_demo",
+            "generated_at": "2026-06-13T12:10:00+08:00",
+        },
+    ).json()
+    assert script["job"]["action"] == "llm_script_draft_plan"
+    assert script["provider_calls_started"] is False
 
 
 def _load_fixture(path: Path) -> dict:

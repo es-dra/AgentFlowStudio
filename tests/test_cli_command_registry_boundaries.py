@@ -121,6 +121,15 @@ def test_runtime_service_openapi_export_command_writes_frontend_schema(tmp_path)
     assert schema["info"]["version"] == "0.2.0"
     assert "/projects" in schema["paths"]
     assert "/projects/import" not in schema["paths"]
+    assert "/projects/{project_id}/source-assets" not in schema["paths"]
+    assert "/projects/{project_id}/content-cards" not in schema["paths"]
+    assert "/projects/{project_id}/canvas-draft" not in schema["paths"]
+    assert "/projects/{project_id}/scene-inspector" not in schema["paths"]
+    assert "/projects/{project_id}/review-decisions" not in schema["paths"]
+    assert "/projects/{project_id}/export" not in schema["paths"]
+    assert "/runs/asset-test" not in schema["paths"]
+    assert "/runs/two-round-validate" not in schema["paths"]
+    assert "/provider/validation-plan" not in schema["paths"]
     assert "/provider/script-draft-plan" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
 

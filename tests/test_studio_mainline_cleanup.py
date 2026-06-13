@@ -4,16 +4,10 @@ from pathlib import Path
 
 
 def test_runtime_and_studio_do_not_add_new_legacy_memory_imports() -> None:
-    allowed = {
-        Path("apps/api/runtime_events.py"),
-        Path("apps/api/runtime_service.py"),
-    }
     offenders = []
     for root in (Path("apps/api"), Path("apps/studio")):
         for path in root.rglob("*"):
             if path.suffix not in {".py", ".js"}:
-                continue
-            if path in allowed:
                 continue
             if "agentflow.memory" in path.read_text(encoding="utf-8"):
                 offenders.append(path.as_posix())

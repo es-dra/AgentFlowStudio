@@ -2,7 +2,7 @@
 
 ## 项目使命
 
-AgentFlow Studio 是一个面向 Agent 的 provider-gated 内容生产与执行投影工作台。
+AgentFlow Studio 是 AI 内容生产的 Agent-native 生产操作层。
 
 当前仓库分层：
 

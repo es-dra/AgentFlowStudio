@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 
 from apps.api.runtime_artifacts import prompt_memory_artifacts
+from apps.api.runtime_errors import safe_exception_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_models import PromptOptimizationRequest
@@ -48,7 +49,10 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
                 },
             )
         except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=422,
+                detail=safe_exception_detail(exc, "invalid_prompt_optimization"),
+            ) from exc
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         public_job = store.write_job(runtime_job(job_id, project_id, "prompt_optimization", "succeeded", artifacts=artifacts))
         return {

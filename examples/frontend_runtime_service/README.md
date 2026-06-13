@@ -20,11 +20,7 @@ Current OpenAPI export:
 Core fixtures:
 
 - `create_project.request.example.json`
-- `project_import.request.example.json`
-- `asset_test_run.request.example.json`
-- `two_round_validate.request.example.json`
 - `feedback_record.request.example.json`
-- `provider_validation_plan.request.example.json`
 
 Node prompt optimizer fixtures:
 
@@ -39,5 +35,4 @@ Key Runtime endpoints for Studio:
 
 Provider gates are closed by default. Fixtures must not contain provider
 secrets, local private paths, signed URLs, provider raw responses, or media
-bytes. Replace the placeholder `round_1_job_id` in `two_round_validate` with the
-`job.job_id` returned by `/runs/asset-test` during live local smoke.
+bytes.
