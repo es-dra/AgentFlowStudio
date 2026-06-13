@@ -280,7 +280,7 @@ function stripSectionHeaders(value) {
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/provider service not found|remote LLM prompt optimization unavailable|AFS_ALLOW_REMOTE_LLM|NARRATOCUT_ALLOW_REMOTE_LLM/i.test(clean)) {
+  if (/provider service not found|remote LLM prompt optimization unavailable|AFS_ALLOW_REMOTE_LLM/i.test(clean)) {
     return "提示词优化服务未就绪，请检查 LLM provider 配置与 Runtime 启动环境后重试。";
   }
   return clean.slice(0, 180);

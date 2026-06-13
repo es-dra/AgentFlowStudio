@@ -164,7 +164,7 @@ class ProviderRegistry:
 
     @classmethod
     def from_store(cls, store: CompanyProviderSecrets) -> "ProviderRegistry":
-        store = _normalize_store_required_gates(store)
+        store = _fill_default_required_gates(store)
         adapters: dict[str, ProviderAdapter] = {}
         descriptors: dict[str, ProviderDescriptor] = {}
         legacy_descriptorless = _is_legacy_descriptorless_kling_store(store)
@@ -243,7 +243,7 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
             return _legacy_descriptor_for_service(service_id, service)
         raise ModelConfigError(f"Provider service descriptor is required: {service_id}")
     capability = str(service.get("capability") or payload.get("modality") or "image")
-    payload = _normalize_descriptor_required_gate(payload, capability)
+    payload = _descriptor_with_default_required_gate(payload, capability)
     try:
         descriptor = ProviderDescriptor.model_validate(payload)
     except ValidationError as exc:
@@ -271,7 +271,7 @@ def _is_adapter_service(provider: str, capability: str) -> bool:
     return True
 
 
-def _normalize_store_required_gates(store: CompanyProviderSecrets) -> CompanyProviderSecrets:
+def _fill_default_required_gates(store: CompanyProviderSecrets) -> CompanyProviderSecrets:
     services: dict[str, dict[str, Any]] = {}
     changed = False
     for service_id, service in store.services.items():
@@ -280,13 +280,17 @@ def _normalize_store_required_gates(store: CompanyProviderSecrets) -> CompanyPro
         descriptor = next_service.get("descriptor")
         if not capability and isinstance(descriptor, dict):
             capability = str(descriptor.get("modality") or "")
+        provider = str(next_service.get("provider") or "")
+        if not _is_adapter_service(provider, capability):
+            services[service_id] = next_service
+            continue
         configured = str(next_service.get("required_gate") or "")
-        normalized = _legacy_required_gate(capability or "image", configured)
+        normalized = _required_gate_or_default(capability or "image", configured)
         if normalized != configured:
             next_service["required_gate"] = normalized
             changed = True
         if isinstance(descriptor, dict):
-            normalized_descriptor = _normalize_descriptor_required_gate(descriptor, capability or "image")
+            normalized_descriptor = _descriptor_with_default_required_gate(descriptor, capability or "image")
             if normalized_descriptor != descriptor:
                 next_service["descriptor"] = normalized_descriptor
                 changed = True
@@ -296,9 +300,9 @@ def _normalize_store_required_gates(store: CompanyProviderSecrets) -> CompanyPro
     return store.model_copy(update={"services": services})
 
 
-def _normalize_descriptor_required_gate(payload: dict[str, Any], capability: str) -> dict[str, Any]:
+def _descriptor_with_default_required_gate(payload: dict[str, Any], capability: str) -> dict[str, Any]:
     configured = str(payload.get("required_gate") or "")
-    normalized = _legacy_required_gate(capability, configured)
+    normalized = _required_gate_or_default(capability, configured)
     if normalized == configured:
         return payload
     next_payload = dict(payload)
@@ -318,7 +322,7 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
     capability = str(service.get("capability") or "image")
     provider = str(service.get("provider") or "")
     api_family = str(service.get("api_family") or "")
-    required_gate = _legacy_required_gate(capability, str(service.get("required_gate") or ""))
+    required_gate = _required_gate_or_default(capability, str(service.get("required_gate") or ""))
     if capability == "video":
         is_kling_i2v = provider == "kling" and (api_family == "i2v" or "i2v" in service_id)
         payload: dict[str, Any] = {
@@ -382,11 +386,11 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
     )
 
 
-def _legacy_required_gate(capability: str, configured: str) -> str:
+def _required_gate_or_default(capability: str, configured: str) -> str:
     if configured.startswith("AFS_ALLOW_REMOTE_"):
         return configured
-    if configured and not configured.startswith("NARRATOCUT_ALLOW_REMOTE_"):
-        return configured
+    if configured:
+        raise ModelConfigError("required_gate must be an AFS_ALLOW_REMOTE_* environment variable")
     defaults = {
         "image": "AFS_ALLOW_REMOTE_IMAGE",
         "video": "AFS_ALLOW_REMOTE_VIDEO",

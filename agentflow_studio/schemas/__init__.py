@@ -2,7 +2,6 @@
 
 from agentflow_studio.schemas.asset import Asset
 from agentflow_studio.schemas.clip import ClipPlan, ClipSegment, RenderSpec, SubtitleStyle
-from agentflow_studio.schemas.compliance import ComplianceResult
 from agentflow_studio.schemas.cost import CostRecord
 from agentflow_studio.schemas.harness import EvidenceCard, GateResult, TaskPacket
 from agentflow_studio.schemas.highlight import HighlightPlan, HighlightSegment
@@ -23,7 +22,6 @@ __all__ = [
     "Asset",
     "ClipPlan",
     "ClipSegment",
-    "ComplianceResult",
     "ClipPlanValidationReport",
     "CostRecord",
     "EvidenceCard",

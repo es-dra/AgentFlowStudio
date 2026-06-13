@@ -32,6 +32,7 @@ def test_provider_registry_rejects_missing_descriptor(tmp_path) -> None:
     ("field", "value", "match"),
     [
         ("required_gate", "MINIMAX_API_KEY", "required_gate"),
+        ("required_gate", "NARRATO" + "CUT_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE"),
         ("reference_image_slots", -1, "reference_image_slots"),
         ("supported_aspect_ratios", ["wide"], "supported_aspect_ratios"),
     ],
@@ -280,7 +281,7 @@ def test_provider_registry_derives_legacy_kling_i2v_descriptor(tmp_path) -> None
     assert descriptor.prompt_profile == "video_i2v_v1"
 
 
-def test_provider_registry_supports_legacy_minimax_llm_service(tmp_path, monkeypatch) -> None:
+def test_provider_registry_supports_minimax_llm_service_without_legacy_gate(tmp_path, monkeypatch) -> None:
     payload = legacy_kling_provider_config()
     payload["accounts"]["minimax"]["default_models"]["llm"] = "MiniMax-M3"
     payload["services"]["minimax_llm"] = {
@@ -288,7 +289,7 @@ def test_provider_registry_supports_legacy_minimax_llm_service(tmp_path, monkeyp
         "account_ref": "minimax",
         "capability": "llm",
         "default_model_ref": "accounts.minimax.default_models.llm",
-        "required_gate": "NARRATOCUT_ALLOW_REMOTE_LLM",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
     }
     captured: dict[str, object] = {}
 
@@ -314,7 +315,7 @@ def test_provider_registry_supports_legacy_minimax_llm_service(tmp_path, monkeyp
     assert captured["api_key"] == "fake-minimax-key"
 
 
-def test_provider_registry_uses_legacy_deepseek_default_model_when_ref_blank(tmp_path, monkeypatch) -> None:
+def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, monkeypatch) -> None:
     payload = legacy_kling_provider_config()
     payload["accounts"]["deepseek"] = {
         "auth_type": "bearer",
@@ -327,7 +328,7 @@ def test_provider_registry_uses_legacy_deepseek_default_model_when_ref_blank(tmp
         "account_ref": "deepseek",
         "capability": "llm",
         "default_model_ref": "accounts.deepseek.default_models.llm",
-        "required_gate": "NARRATOCUT_ALLOW_REMOTE_LLM",
+        "required_gate": "AFS_ALLOW_REMOTE_LLM",
     }
     captured: dict[str, object] = {}
 
@@ -353,38 +354,18 @@ def test_provider_registry_uses_legacy_deepseek_default_model_when_ref_blank(tmp
     assert captured["api_key"] == "fake-deepseek-key"
 
 
-def test_provider_registry_normalizes_legacy_image_gate_before_inner_plan(tmp_path, monkeypatch) -> None:
+def test_provider_registry_rejects_legacy_image_gate_before_inner_plan(tmp_path) -> None:
     payload = legacy_kling_provider_config()
     payload["services"]["minimax_image"] = {
         "provider": "minimax",
         "account_ref": "minimax",
         "capability": "image",
-        "required_gate": "NARRATOCUT_ALLOW_REMOTE_IMAGE",
+        "required_gate": "NARRATO" + "CUT_ALLOW_REMOTE_IMAGE",
     }
-    captured: dict[str, object] = {}
-
-    def fake_run_minimax_image_smoke(store, **kwargs):
-        captured["service_required_gate"] = store.service(kwargs["service_id"]).get("required_gate")
-        return {"status": "succeeded", "outputs": []}
-
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
-    monkeypatch.delenv("NARRATOCUT_ALLOW_REMOTE_IMAGE", raising=False)
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.run_minimax_image_smoke",
-        fake_run_minimax_image_smoke,
-    )
     store = _store(tmp_path, payload)
-    registry = ProviderRegistry.from_store(store)
 
-    result = registry.dispatch(
-        "image",
-        "minimax_image",
-        ProviderDispatchRequest(prompt="A clean keyframe.", output_dir=tmp_path, aspect_ratio="9:16"),
-    )
-
-    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
-    assert captured["service_required_gate"] == "AFS_ALLOW_REMOTE_IMAGE"
-    assert result["status"] == "succeeded"
+    with pytest.raises(ModelConfigError, match="AFS_ALLOW_REMOTE"):
+        ProviderRegistry.from_store(store)
 
 
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:

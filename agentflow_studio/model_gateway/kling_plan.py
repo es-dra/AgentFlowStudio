@@ -33,7 +33,7 @@ def build_kling_request_plan(
     if account.get("auth_type") != "jwt_hs256_from_ak_sk":
         raise ModelConfigError("Kling account must use jwt_hs256_from_ak_sk auth")
 
-    required_gate = _normalized_required_gate(str(service.get("required_gate") or ""))
+    required_gate = str(service.get("required_gate") or "")
     gate_enabled = _gate_enabled(required_gate)
     if require_live_gate and not gate_enabled:
         raise ModelProviderError(
@@ -178,9 +178,3 @@ def _join_url(base_url: str, path: str) -> str:
 
 def _gate_enabled(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in REMOTE_TRUE_VALUES
-
-
-def _normalized_required_gate(name: str) -> str:
-    if name.startswith("NARRATOCUT_ALLOW_REMOTE_"):
-        return name.replace("NARRATOCUT_ALLOW_REMOTE_", "AFS_ALLOW_REMOTE_", 1)
-    return name

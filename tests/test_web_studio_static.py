@@ -51,7 +51,7 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert '!["image", "video"].includes(node.type)' in canvas_source
     prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     assert 'node.type === "video" || node.type === "script"' in prompt_bar_source
-    assert "NARRATOCUT_ALLOW_REMOTE_" not in env_example
+    assert "AFS_ALLOW_REMOTE_IMAGE" in env_example
 
 
 def test_studio_user_surface_does_not_reintroduce_old_workbench_terms() -> None:

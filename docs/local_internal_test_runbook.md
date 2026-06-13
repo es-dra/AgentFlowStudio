@@ -1,8 +1,8 @@
 # AFS 本地内测 Runbook
 
-状态：AgentFlow Studio 本地内测操作说明。
+状态：legacy CLI-only 本地内测操作说明。
 
-本文把当前 Production Memory asset loop 变成测试人员可重复执行的本地流程。它不是 SaaS validation，不是 human acceptance，不是 business validation，也不会写入 durable `10-Startup` memory。
+本文保留 Production Memory asset loop 的 CLI/harness 本地流程，作为冻结遗产参考规格。它不描述当前 Runtime HTTP 或 AFS Studio 前端契约；`/runs/asset-test`、`/runs/two-round-validate`、`/provider/validation-plan` 已退役，当前前端只使用 Runtime Service 的安全 Studio/API 面。它不是 SaaS validation，不是 human acceptance，不是 business validation，也不会写入 durable `10-Startup` memory。
 
 ## 适用范围
 
@@ -100,7 +100,7 @@ review_screen_selected_files.json
 
 ## Review Screen
 
-打开 Web Memory Workbench，选择 Round 1 输出的本地 JSON。Review Screen 必须回答：
+如需复查历史 Review Screen 语义，只读取 Round 1 输出的本地 JSON；旧 Web Memory Workbench 不再是当前产品入口。Review Screen 必须回答：
 
 - 当前测试哪个 character、scene、profile、profile version。
 - 哪些 refs included。

@@ -9,7 +9,6 @@ from agentflow_studio.schemas import (
     Asset,
     ClipPlan,
     ClipSegment,
-    ComplianceResult,
     CostRecord,
     EvidenceCard,
     ExportPackage,
@@ -102,8 +101,6 @@ def test_major_schemas_create_and_roundtrip_json() -> None:
         output_refs=["hooks.json"],
     )
     gate = GateResult(gate_id="gate_001", task_id="task_001", passed=True, score=0.9)
-    compliance = ComplianceResult(passed=True, risk_level="low", checked_at=created_at)
-
     models = [
         project,
         asset,
@@ -119,7 +116,6 @@ def test_major_schemas_create_and_roundtrip_json() -> None:
         task,
         evidence,
         gate,
-        compliance,
     ]
 
     for model in models:

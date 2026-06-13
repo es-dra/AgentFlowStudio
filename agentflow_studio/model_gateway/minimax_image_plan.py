@@ -32,7 +32,7 @@ def build_minimax_image_request_plan(
     ensure_minimax_image_service(service, service_id)
     ensure_prompt(prompt)
 
-    required_gate = _normalized_required_gate(str(service.get("required_gate") or ""))
+    required_gate = str(service.get("required_gate") or "")
     gate_enabled = gate_enabled_for(required_gate)
     if require_live_gate and not gate_enabled:
         raise ModelProviderError(f"Remote image calls are disabled; set {required_gate}=true to enable them")
@@ -174,12 +174,6 @@ def api_key(account: dict[str, Any]) -> str:
 
 def gate_enabled_for(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in REMOTE_TRUE_VALUES
-
-
-def _normalized_required_gate(name: str) -> str:
-    if name.startswith("NARRATOCUT_ALLOW_REMOTE_"):
-        return name.replace("NARRATOCUT_ALLOW_REMOTE_", "AFS_ALLOW_REMOTE_", 1)
-    return name
 
 
 def subject_reference_plan(image_ref: str | None) -> dict[str, Any] | None:

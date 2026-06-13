@@ -315,7 +315,7 @@ function keyframeResultText(response, request, succeeded) {
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/AFS_ALLOW_REMOTE_|NARRATOCUT_ALLOW_REMOTE_|provider service not found|provider gate is closed|Remote .* calls are disabled/i.test(clean)) {
+  if (/AFS_ALLOW_REMOTE_|provider service not found|provider gate is closed|Remote .* calls are disabled/i.test(clean)) {
     return "provider 服务未就绪，请检查本机配置与 Runtime 启动环境后重试。";
   }
   return clean.slice(0, 160);

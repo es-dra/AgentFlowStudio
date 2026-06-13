@@ -38,7 +38,6 @@ knowledgebase rules, and hidden background context policy.
 
 ## Runtime Service
 
-- `AFS-RUNTIME-SERVICE-V0-2-FRONTEND-CONTRACT-001.md`
 - `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
 - `AFS-PROVIDER-ADAPTER-V0-1.md`
 - `AFS-PROVIDER-GATEWAY-V0-1.md`
