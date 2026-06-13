@@ -61,6 +61,23 @@ def test_repository_retention_review_marks_deleted_redundant_entry_as_applied(tm
     assert report["summary"]["delete_candidate_count"] == 0
 
 
+def test_repository_retention_review_classifies_untracked_cleanup_inputs(tmp_path: Path) -> None:
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "README.md").write_text("# 项目入口\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "AFS-CLEANUP-INSTRUCTIONS-20260613.md").write_text("# 本地清理指令\n", encoding="utf-8")
+    (tmp_path / "AFS-PROJECT-HEALTH-REVIEW-20260613.md").write_text("# 外部评审输入\n", encoding="utf-8")
+
+    report = build_repository_retention_review(tmp_path)
+    files = {item["path"]: item for item in report["files"]}
+
+    assert files["AFS-CLEANUP-INSTRUCTIONS-20260613.md"]["product_surface"] == "local_workspace_input"
+    assert files["AFS-CLEANUP-INSTRUCTIONS-20260613.md"]["status"] == "local_input_not_tracked"
+    assert files["AFS-PROJECT-HEALTH-REVIEW-20260613.md"]["product_surface"] == "local_workspace_input"
+    assert files["AFS-PROJECT-HEALTH-REVIEW-20260613.md"]["status"] == "local_input_not_tracked"
+    assert report["summary"]["manual_review_required_count"] == 0
+
+
 def test_repository_retention_review_cli_outputs_summary_json() -> None:
     result = subprocess.run(
         [sys.executable, "tools/repository_retention_review.py", "--root", ".", "--summary-only"],

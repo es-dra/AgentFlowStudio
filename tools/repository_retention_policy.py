@@ -101,6 +101,15 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
             "已按当前维护账本在工作树删除，等待提交完成退休。",
             "提交删除后完成退休；如需恢复，必须重新证明其服务当前产品主干。",
         )
+    if git_state == "untracked" and _is_local_cleanup_input(path):
+        return _file(
+            path,
+            git_state,
+            "local_workspace_input",
+            "local_input_not_tracked",
+            "本地清理指令或外部评审输入文件，不属于仓库 retention 面；除非用户明确要求，否则不提交。",
+            "完成对应清理或人工转为正式账本后，可删除本地输入文件。",
+        )
     if path == "README.zh-CN.md":
         if git_state == "deleted":
             return _file(
@@ -195,6 +204,13 @@ def is_excluded(path: str) -> bool:
 def _is_memory_advantage_demo_file(path: str) -> bool:
     name = Path(path).name
     return path.startswith("agentflow_studio/") and name.startswith("memory_advantage_demo_")
+
+
+def _is_local_cleanup_input(path: str) -> bool:
+    name = Path(path).name
+    return "/" not in path and name.endswith(".md") and (
+        name.startswith("AFS-CLEANUP-INSTRUCTIONS-") or name.startswith("AFS-PROJECT-HEALTH-REVIEW-")
+    )
 
 
 def _dir(path: str, product_surface: str, status: str, rationale: str) -> ReviewedPath:
