@@ -33,7 +33,7 @@ const SCENE_LOCK_CHIPS = [
   ["保持光线基调", "lighting_mood"],
 ];
 
-export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
+export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character" }) {
   if (!runtime?.promoteVisualAsset) {
     markNodeError(store, node.id, "运行服务的资产接口不可用，请确认 Runtime Service 已启动。");
     return;
@@ -43,7 +43,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset }) {
     return;
   }
 
-  let assetType = "character";
+  let assetType = initialAssetType === "scene" ? "scene" : "character";
   const modal = el("div", "modal-card visual-asset-panel");
   const close = showModal(modal);
   render();

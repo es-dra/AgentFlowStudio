@@ -69,7 +69,7 @@ export function findModel(nodeType, modelId) {
 }
 
 export function isRemoteImageModel(modelId) {
-  return IMAGE_MODELS.some((m) => m.id === modelId && m.providerServiceId);
+  return Boolean(findModel("image", modelId).providerServiceId);
 }
 
 export function providerServiceForImageModel(modelId) {
@@ -77,7 +77,7 @@ export function providerServiceForImageModel(modelId) {
 }
 
 export function isRemoteVideoModel(modelId) {
-  return VIDEO_MODELS.some((m) => m.id === modelId && m.providerServiceId);
+  return Boolean(findModel("video", modelId).providerServiceId);
 }
 
 export function providerServiceForVideoModel(modelId) {

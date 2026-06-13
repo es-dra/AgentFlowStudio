@@ -20,7 +20,7 @@ export function defaultImageSpec() {
 }
 
 export function defaultVideoSpec() {
-  return { ratio: "16:9", resolution: "720P", duration: "5s", sound: true, count: 1, mode: "文生视频" };
+  return { ratio: "16:9", resolution: "720P", duration: "5s", sound: false, count: 1, mode: "文生视频" };
 }
 
 export function imageSpecLabel(spec) {
@@ -28,5 +28,5 @@ export function imageSpecLabel(spec) {
 }
 
 export function videoSpecLabel(spec) {
-  return `${spec.ratio} · ${spec.resolution} · ${spec.duration}${spec.sound ? " · 声音" : ""}`;
+  return `${spec.ratio} · ${spec.resolution} · ${spec.duration}`;
 }

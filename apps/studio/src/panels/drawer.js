@@ -3,6 +3,7 @@ import { el, showModal } from "../overlay.js";
 import { fitViewport } from "../geometry.js";
 import { icon } from "../icons.js";
 import { openAssetDetailPopover } from "./asset-detail-popover.js";
+import { openVisualAssetPanel } from "./visual-asset-panel.js";
 
 export function renderDrawer(state, store, runtime) {
   const drawer = document.getElementById("drawer");
@@ -146,12 +147,12 @@ function assetCard(state, store, runtime, asset) {
     thumb.innerHTML = `<span>${icon(iconForAsset(asset), 18)}</span>`;
   }
   thumb.title = "查看资产详情";
-  thumb.addEventListener("click", () => openAssetDetailPopover(store, asset, thumb));
+  thumb.addEventListener("click", () => openAssetDetailPopover(store, runtime, asset, thumb));
   const meta = el("div", "asset-meta");
   meta.appendChild(el("div", "asset-title", asset.title || "未命名资产"));
   meta.appendChild(el("div", "asset-kind", `${kindLabel(asset)}${retired ? " · 已退役" : ""}`));
   meta.appendChild(el("div", "asset-summary", asset.safe_summary || "安全摘要将在生成后出现。"));
-  meta.addEventListener("click", () => openAssetDetailPopover(store, asset, meta));
+  meta.addEventListener("click", () => openAssetDetailPopover(store, runtime, asset, meta));
   const actions = el("div", "asset-actions");
   actions.appendChild(assetAction("设为参考", () => markAssetReference(store, asset)));
   const selectedNode = state.nodes[state.selection.nodeIds[0]];
@@ -162,6 +163,10 @@ function assetCard(state, store, runtime, asset) {
     actions.appendChild(assetAction("用于当前节点", () => attachAssetToSelection(state, store, asset)));
   }
   actions.appendChild(assetAction("从画布定位", () => focusAssetSource(store, asset)));
+  if (isImageAsset(asset)) {
+    actions.appendChild(assetAction("固定为人物", () => promoteImageAssetFromDrawer(state, store, runtime, asset, "character")));
+    actions.appendChild(assetAction("固定为场景", () => promoteImageAssetFromDrawer(state, store, runtime, asset, "scene")));
+  }
   if (isFixedVisualAsset(asset) && !retired) {
     actions.appendChild(assetAction("退役", () => openRetireAssetModal(store, runtime, asset)));
   }
@@ -306,6 +311,22 @@ function setVideoFrameFromAsset(state, store, asset, slot) {
     node.params.uploads = [ref, ...uploads.filter((item) => item?.asset_id !== asset.asset_id)].slice(0, 4);
     node.status = "complete";
     node.result = slot === "last" ? `已设为尾帧 ${asset.asset_id}` : `已设为首帧 ${asset.asset_id}`;
+  });
+}
+
+function promoteImageAssetFromDrawer(state, store, runtime, asset, assetType) {
+  const node = state.nodes[asset.source_node_id] || state.nodes[state.selection.nodeIds[0]] || {
+    id: asset.source_node_id || "drawer_asset",
+    title: asset.title || asset.asset_id || "image asset",
+    prompt: asset.safe_summary || "",
+    result: asset.safe_summary || "",
+  };
+  openVisualAssetPanel({
+    store,
+    runtime,
+    node,
+    imageAsset: imageAssetUploadRef(asset, assetType === "scene" ? "scene_reference" : "character_reference"),
+    initialAssetType: assetType,
   });
 }
 

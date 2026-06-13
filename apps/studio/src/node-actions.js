@@ -1,9 +1,10 @@
 import { createNode, connect } from "./nodes.js";
-import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
+import { buildContextSubgraph, buildKeyframeGenerationRequest } from "./optimizer-contract.js";
 import { isRemoteImageModel, isRemoteVideoModel, providerServiceForVideoModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { lastImageAsset, mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
+import { el, showModal } from "./overlay.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -186,14 +187,16 @@ async function startRemoteVideoGeneration(store, runtime, node) {
     setNodeError(store, node.id, "请先在节点菜单中上传图片并设为首帧，再生成图生视频。");
     return;
   }
+  const previousNodeState = generationRestoreSnapshot(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
     n.result = "视频任务提交中...";
   });
+  let submitAttempted = false;
   try {
-    const response = await runtime.generateVideo({
+    let request = {
       node_id: node.id,
       prompt_text: node.prompt || "保持首帧主体身份，生成自然克制的镜头运动。",
       optimized_prompt: node.params?.lastOptimizedPromptPlain || null,
@@ -205,15 +208,26 @@ async function startRemoteVideoGeneration(store, runtime, node) {
       aspect_ratio: node.params?.spec?.ratio || "9:16",
       motion: node.params?.motion || "",
       candidate_count: 1,
-      context_subgraph: null,
+      context_subgraph: buildContextSubgraph(store.get(), node, "context_generate"),
       temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
+      temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],
       quota_override_confirmed: Boolean(node.params?.quotaOverrideConfirmed),
       generated_at: new Date().toISOString(),
-    });
+    };
+    request = await prepareGenerationRequest(store, runtime, node, request, "video");
+    if (!request) {
+      restoreCancelledGeneration(store, node.id, previousNodeState);
+      await store.flushRuntimeSave?.();
+      return;
+    }
+    submitAttempted = true;
+    const response = await runtime.generateVideo(request);
     applyVideoResponse(store, node.id, response);
+    clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   } catch (error) {
     setNodeError(store, node.id, `Kling video request failed: ${safeError(error)}`);
+    if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }
 }
@@ -226,6 +240,8 @@ function applyVideoResponse(store, nodeId, response) {
     const previewUrl = response?.candidate_previews?.[0]?.preview_url || null;
     n.params.lastVideoJobId = response?.job?.job_id || null;
     n.params.lastVideoPreviewUrl = previewUrl;
+    n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
+    reconcileVisualAssetBadges(n, response?.context_bundle || null);
     if (previewUrl) n.previewUrl = previewUrl;
     n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
     n.result = videoResultText(response);
@@ -247,6 +263,7 @@ function parseDuration(value) {
 }
 
 async function startRemoteKeyframeGeneration(store, runtime, node) {
+  const previousNodeState = generationRestoreSnapshot(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
@@ -254,8 +271,16 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
     n.result = null;
     n.previewUrl = null;
   });
+  let submitAttempted = false;
   try {
-    const request = buildKeyframeGenerationRequest(store.get(), node);
+    let request = buildKeyframeGenerationRequest(store.get(), node);
+    request = await prepareGenerationRequest(store, runtime, node, request, "keyframe");
+    if (!request) {
+      restoreCancelledGeneration(store, node.id, previousNodeState);
+      await store.flushRuntimeSave?.();
+      return;
+    }
+    submitAttempted = true;
     const response = await runtime.generateKeyframe(request);
     const succeeded = response?.job?.status === "succeeded";
     store.set((s) => {
@@ -271,8 +296,7 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
       }
       n.params.lastContextBundle = response?.context_bundle || null;
       reconcileVisualAssetBadges(n, response?.context_bundle || null);
-      // “本次解除”语义:锁定解除只随单次请求生效,请求发出后即清空,避免静默延续到下一次生成。
-      n.params.temporaryLockOverrides = [];
+      clearOneRunOverrides(store, node.id);
       n.result = keyframeResultText(response, request, succeeded);
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({
@@ -288,8 +312,165 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
     await store.flushRuntimeSave?.();
   } catch (error) {
     setNodeError(store, node.id, `MiniMax keyframe request failed: ${safeError(error)}`);
+    if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }
+}
+
+async function prepareGenerationRequest(store, runtime, node, request, kind) {
+  const preflight = kind === "video" ? runtime?.preflightVideo : runtime?.preflightKeyframe;
+  if (!preflight) return request;
+  let working = {
+    ...request,
+    temporary_asset_exclusions: normalizeAssetExclusions(request.temporary_asset_exclusions),
+  };
+  while (true) {
+    const outcome = await preflight(working);
+    const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
+    if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
+    const decision = await showCarryConfirmModal(outcome, node, kind);
+    if (decision.action === "cancel") return null;
+    if (decision.action === "continue") return { ...working, preflight_token: outcome?.preflight_token || null };
+    const nextExclusions = mergeAssetExclusions(working.temporary_asset_exclusions, decision.assetIds);
+    if (nextExclusions.length === working.temporary_asset_exclusions.length) continue;
+    store.set((s) => {
+      const n = s.nodes[node.id];
+      if (n) n.params.temporaryAssetExclusions = nextExclusions;
+    }, { history: false });
+    working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
+  }
+}
+
+function showCarryConfirmModal(preflight, node, kind) {
+  return new Promise((resolve) => {
+    const included = Array.isArray(preflight?.included_assets) ? preflight.included_assets : [];
+    const excluded = Array.isArray(preflight?.excluded_assets) ? preflight.excluded_assets : [];
+    const conflicts = Array.isArray(preflight?.asset_conflicts) ? preflight.asset_conflicts : [];
+    const overrides = Array.isArray(preflight?.context_bundle?.temporary_lock_overrides)
+      ? preflight.context_bundle.temporary_lock_overrides
+      : [];
+    const tempExcluded = excluded.filter((item) => item.reason === "temporary_asset_excluded_by_user");
+    const subjectId = preflight?.subject_reference_asset_id || "";
+    const modal = el("div", "modal compact generation-carry-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "生成前确认"));
+    head.appendChild(el("span", "head-spacer"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.textContent = "×";
+    head.appendChild(closeBtn);
+
+    const body = el("div", "modal-body generation-carry-body");
+    body.appendChild(el("p", "carry-note", `${kind === "video" ? "视频" : "图片"}生成将携带以下固定资产。固定资产会约束结果，即使未检测到冲突也会生效。`));
+    const list = el("div", "carry-asset-list");
+    const checks = new Map();
+    for (const asset of included) {
+      const row = el("label", "carry-asset-row");
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = asset.asset_id;
+      checks.set(asset.asset_id, input);
+      const text = el("span", "carry-asset-text");
+      text.textContent = `${asset.asset_type === "scene" ? "场景" : "人物"} · ${asset.label || asset.asset_id}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
+      const sig = el("small", "", asset.signature || asset.detail_level || "");
+      row.append(input, text, sig);
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+    const warningBox = el("div", conflicts.length ? "carry-warning" : "carry-muted");
+    warningBox.textContent = conflicts.length
+      ? `检测到 ${conflicts.length} 条疑似冲突；未排除资产或解除锁定时，固定资产约束优先生效。`
+      : "未检测到明显冲突，但固定资产仍会约束结果。";
+    body.appendChild(warningBox);
+    if (overrides.length) {
+      body.appendChild(el("div", "carry-muted", `本次已解除 ${overrides.length} 条锁定。`));
+    }
+    if (tempExcluded.length) {
+      body.appendChild(el("div", "carry-muted", `本次已排除 ${tempExcluded.length} 项资产。`));
+    }
+
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const exclude = el("button", "ghost-btn", "本次不携带选中项");
+    const submit = el("button", "primary-btn", "继续生成");
+    exclude.disabled = true;
+    actions.append(cancel, exclude, submit);
+    modal.append(head, body, actions);
+
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve({ action: "cancel" }); } });
+    const finish = (decision) => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(decision);
+    };
+    const selectedIds = () => [...checks.entries()].filter(([, input]) => input.checked).map(([assetId]) => assetId);
+    list.addEventListener("change", () => {
+      exclude.disabled = selectedIds().length === 0;
+    });
+    closeBtn.addEventListener("click", () => finish({ action: "cancel" }));
+    cancel.addEventListener("click", () => finish({ action: "cancel" }));
+    submit.addEventListener("click", () => finish({ action: "continue" }));
+    exclude.addEventListener("click", () => finish({ action: "exclude", assetIds: selectedIds() }));
+  });
+}
+
+function normalizeAssetExclusions(values) {
+  const seen = new Set();
+  const result = [];
+  for (const item of Array.isArray(values) ? values : []) {
+    const assetId = String(item?.asset_id || item?.assetId || item || "").trim();
+    if (!assetId || seen.has(assetId)) continue;
+    seen.add(assetId);
+    result.push({ asset_id: assetId, reason: String(item?.reason || "one_run_asset_exclusion").slice(0, 120) });
+  }
+  return result;
+}
+
+function mergeAssetExclusions(existing, assetIds) {
+  const result = normalizeAssetExclusions(existing);
+  const seen = new Set(result.map((item) => item.asset_id));
+  for (const assetId of assetIds || []) {
+    const id = String(assetId || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push({ asset_id: id, reason: "user_excluded_from_preflight_confirmation" });
+  }
+  return result;
+}
+
+function clearOneRunOverrides(store, nodeId, options = {}) {
+  const clearLocks = options.locks !== false;
+  const clearAssets = options.assets !== false;
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    if (clearLocks) n.params.temporaryLockOverrides = [];
+    if (clearAssets) n.params.temporaryAssetExclusions = [];
+  }, { history: false });
+}
+
+function generationRestoreSnapshot(node) {
+  return {
+    status: node.status,
+    result: node.result,
+    previewUrl: node.previewUrl,
+  };
+}
+
+function restoreCancelledGeneration(store, nodeId, previous = null) {
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    if (previous) {
+      n.status = previous.status || ((previous.previewUrl || previous.result) ? "complete" : "empty");
+      n.result = previous.result || "";
+      n.previewUrl = previous.previewUrl || null;
+      return;
+    }
+    n.status = (n.previewUrl || n.result) ? "complete" : "empty";
+    n.result = n.result || "";
+  }, { history: false });
 }
 
 function keyframeResultText(response, request, succeeded) {

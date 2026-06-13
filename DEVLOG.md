@@ -1,5 +1,54 @@
 # Devlog
 
+## 2026-06-14 - Asset Exclusion Preflight And Browser Repair Loop 004
+
+- Added generation preflight support for fixed-asset carry review before paid
+  submit: keyframe/video preflight, request-level temporary asset exclusions,
+  preflight consistency token, and safe visual asset detail endpoint.
+- Added Studio generation confirmation when fixed assets will be carried. The
+  confirmation always lists carried assets, even when lexical conflict detection
+  has no hit, and supports one-run exclusion of a whole asset.
+- Changed asset detail popovers to fetch Runtime-backed visual asset details
+  instead of trusting node cache only; exposed `从当前节点移除` and `本次不携带`.
+- Added fixed-asset entrypoints from drawer image assets and kept generated
+  image/node paths compatible with the existing visual asset panel.
+- Fixed two browser-discovered P1 issues: stale/legacy model ids now resolve
+  through the same model picker path used for display, and canceling the carry
+  confirmation now flushes restored node state to Runtime.
+- Hid unsupported Kling audio/sound controls unless future descriptors expose
+  audio support; the current I2V spec UI shows only ratio, resolution, and
+  duration.
+- Recorded browser QA evidence and human acceptance runbook for the handoff.
+
+Verification so far:
+
+```text
+Focused Runtime preflight/video/visual asset tests: 27 passed, 1 warning
+Studio static tests: 14 passed
+Changed Studio JS node --check: passed
+Browser QA on http://127.0.0.1:8794/studio/?project=loop004-browser-qa:
+  carry confirmation passed
+  one-run exclusion passed
+  cancel persistence passed
+  Runtime-backed asset detail popover passed
+  Kling video spec no-sound UI passed
+```
+
+Evidence:
+
+```text
+docs/maintenance/AFS-BROWSER-QA-LOOP-004.md
+docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-004.md
+runs/agent_browser_qa_loop_004/
+```
+
+Boundaries:
+
+- Browser/runtime verification only; human acceptance still requires the
+  runbook to be executed by the user.
+- MiniMax/Kling creative quality remains human-scored.
+- No provider raw, signed URL, secret, or private local material was recorded.
+
 ## 2026-06-13 - Legacy Freeze And Repository Hygiene
 
 - Added `.gitattributes` and confirmed renormalization did not create broad

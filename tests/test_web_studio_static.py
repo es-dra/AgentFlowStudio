@@ -128,6 +128,7 @@ def test_studio_asset_context_workflow_is_single_canvas() -> None:
 def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
 
     assert "openModelPopover" in prompt_bar
     assert "openOptimizer" in prompt_bar
@@ -144,6 +145,7 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "isRemoteVideoModel" in prompt_bar
     assert "pollNodeVideoGeneration" in prompt_bar
     assert "runPromptBarGeneration" in prompt_bar
+    assert "声音" not in prompt_bar
     assert 'send.title = "继续轮询"' in prompt_bar
     assert "isPromptTextEditing" in prompt_bar
     assert '["TEXTAREA", "INPUT"].includes' in prompt_bar
@@ -158,6 +160,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "syncRunAction" in canvas_view
     assert 'dataset.action = "video-poll"' in canvas_view
     assert "pollNodeVideoGeneration" in (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    assert node_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 2
+    assert node_actions.count("await store.flushRuntimeSave?.();\n      return;") >= 2
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert 'asset.kind === "visual_asset" && asset.asset_type === "character"' in drawer_source
     assert 'asset.kind === "character_asset"' in drawer_source
@@ -236,6 +240,8 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
 
     assert "提示词优化" in source
     assert "MiniMax image-01" in source
+    assert 'return Boolean(findModel("image", modelId).providerServiceId);' in source
+    assert 'return Boolean(findModel("video", modelId).providerServiceId);' in source
     assert "local-creative-agent" not in source
     assert "remote_optimizer_required" in _source()
     assert 'providerServiceId: "minimax_image"' in source

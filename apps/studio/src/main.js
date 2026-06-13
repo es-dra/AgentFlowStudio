@@ -15,12 +15,14 @@ import { fitViewport, zoomAt } from "./geometry.js";
 import { icon } from "./icons.js";
 
 const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
+const RECENT_PROJECTS_KEY = "afs_studio_recent_project_ids";
 let runtime = createRuntimeClient(initialProjectId());
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
 let projectSummaries = [];
 let showAllProjects = false;
+rememberProject(runtime.projectId);
 
 renderStarters();
 renderDock(store, runtimeRef);
@@ -72,6 +74,7 @@ function syncCurrentProjectMetaFromSummaries() {
 async function switchProject(projectId) {
   const safe = safeProjectId(projectId) || "studio-local-001";
   localStorage.setItem(ACTIVE_PROJECT_KEY, safe);
+  rememberProject(safe);
   syncProjectUrl(safe);
   runtime = createRuntimeClient(safe);
   store.attachRuntime(runtime);
@@ -96,6 +99,7 @@ async function createNewProject() {
     runtime = createRuntimeClient(projectId);
     await runtime.createProject({ project_id: projectId, goal: projectName });
     localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+    rememberProject(projectId);
     syncProjectUrl(projectId);
     await store.switchProject(projectId, runtime);
     store.set((s) => {
@@ -295,7 +299,9 @@ function projectOptions(state) {
   const current = { project_id: currentId, studio_state_meta: { projectName: state.meta.projectName, canvasName: state.meta.canvasName } };
   const known = projectSummaries.length ? [...projectSummaries] : [];
   if (currentId && !known.some((item) => item.project_id === currentId)) known.unshift(current);
-  const visible = showAllProjects ? known : known.filter((item) => item.project_id === currentId || !isTestProject(item));
+  const recent = recentProjectIds();
+  const visible = showAllProjects ? known : known.filter((item) =>
+    item.project_id === currentId || recent.includes(item.project_id) || !isTestProject(item));
   return visible.length ? visible : [current];
 }
 
@@ -310,6 +316,26 @@ function isTestProject(item) {
   const goal = String(item?.goal || "").toLowerCase();
   const name = String(item?.studio_state_meta?.projectName || "").toLowerCase();
   return /(smoke|qa|debug|test|browser|walkthrough|proj_)/.test(`${id} ${goal} ${name}`);
+}
+
+function rememberProject(projectId) {
+  const safe = safeProjectId(projectId);
+  if (!safe) return;
+  const ids = [safe, ...recentProjectIds().filter((item) => item !== safe)].slice(0, 8);
+  try {
+    localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(ids));
+  } catch {
+    /* local recent project cache is best-effort */
+  }
+}
+
+function recentProjectIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_PROJECTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.map(safeProjectId).filter(Boolean).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
 }
 
 function renderAll(state) {

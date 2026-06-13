@@ -196,8 +196,6 @@ function openVideoSpecPopover(store, node, anchor) {
     updateNode(store, node.id, (n) => { n.params.spec.resolution = v; })));
   pop.appendChild(specSection("时长", VIDEO_DURATIONS, node.params.spec.duration, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.duration = v; })));
-  pop.appendChild(specSection("声音", ["开", "关"], node.params.spec.sound ? "开" : "关", (v) =>
-    updateNode(store, node.id, (n) => { n.params.spec.sound = v === "开"; })));
   showPopover(anchor, pop, { place: "top" });
 }
 

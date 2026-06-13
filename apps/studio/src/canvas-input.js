@@ -175,7 +175,7 @@ export function bindCanvasInput(store, runtime) {
     if (!action) return;
     if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
     else if (action === "open-director") openDirectorShell(store, node);
-    else if (action === "asset-detail") openAssetDetailPopover(store, node.params?.visualAssets?.[0], actionEl);
+    else if (action === "asset-detail") openAssetDetailPopover(store, runtime, node.params?.visualAssets?.[0], actionEl);
     else if (action === "upload") uploadNodeImage(store, runtime, node);
     else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
     else if (action === "run") startNodeGeneration(store, runtime, node);

@@ -289,3 +289,20 @@
   color: var(--text-faint);
   font-size: 12px;
 }
+.asset-detail-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+.asset-detail-action {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  color: var(--text-secondary);
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.asset-detail-action:hover {
+  color: var(--text-primary);
+  border-color: var(--border-card);
+}

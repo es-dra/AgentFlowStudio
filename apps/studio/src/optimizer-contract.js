@@ -89,6 +89,7 @@ export function buildKeyframeGenerationRequest(state, node) {
     node_parameters: optimizationRequest.node_parameters,
     context_subgraph: buildContextSubgraph(state, node, "context_generate"),
     temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
+    temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],
     seed: node.params?.seed ?? null,
     generated_at: new Date().toISOString(),
   };
