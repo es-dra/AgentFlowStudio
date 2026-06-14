@@ -46,7 +46,7 @@ class OpenAICompatibleProvider:
         self._ensure_remote_calls_allowed()
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": _messages_for_task(prompt, task_type),
             "temperature": 0.2 if self.temperature is None else self.temperature,
         }
         if self.max_completion_tokens is not None:
@@ -105,3 +105,18 @@ class OpenAICompatibleProvider:
         if not isinstance(decoded, dict):
             raise ModelProviderError("OpenAI-compatible response JSON must be an object")
         return decoded
+
+
+def _messages_for_task(prompt: str, task_type: str | None) -> list[dict[str, str]]:
+    if str(task_type or "").startswith("prompt_enhancement"):
+        return [
+            {
+                "role": "system",
+                "content": (
+                    "You are AFS Studio's strict prompt formatter. Return only the requested Chinese section lines. "
+                    "Do not explain, do not use Markdown, do not add tables, do not write tutorials, and do not include code blocks."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ]
+    return [{"role": "user", "content": prompt}]

@@ -179,10 +179,63 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
     assert "d:\\" not in serialized
 
 
+def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    class GuardedRegistry:
+        def descriptor(self, service_id: str):
+            return _FakeDescriptor(min_reference_image_edge_px=256)
+
+        def dispatch(self, capability: str, service_id: str, request):
+            raise AssertionError("tiny reference image should be blocked before provider dispatch")
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: GuardedRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    upload = client.post(
+        "/projects/proj_tiny_ref_guard/image-assets",
+        json={
+            "node_id": "tiny-ref-node",
+            "filename": "tiny.png",
+            "mime_type": "image/png",
+            "data_base64": PNG_B64,
+            "role": "character_reference",
+            "generated_at": "2026-06-12T10:25:00+08:00",
+        },
+    )
+    assert upload.status_code == 200
+    asset_id = upload.json()["asset"]["asset_id"]
+
+    result = client.post(
+        "/projects/proj_tiny_ref_guard/keyframe-generations",
+        json={
+            "node_id": "image-node-with-tiny-ref",
+            "prompt_text": "Use the tiny reference image for a portrait.",
+            "optimized_prompt": "Use the tiny reference image for a portrait.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "asset_refs": [asset_id],
+            "generated_at": "2026-06-12T10:26:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["job"]["status"] == "blocked"
+    assert payload["provider_calls_started"] is False
+    assert payload["safe_manifest"]["provider_calls_started"] is False
+    assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_image_reference_image_too_small"
+
+
 class _FakeDescriptor:
     prompt_char_limit = 1500
     reference_image_slots = 1
     required_gate = "AFS_ALLOW_REMOTE_IMAGE"
+
+    def __init__(self, min_reference_image_edge_px: int = 0) -> None:
+        self.min_reference_image_edge_px = min_reference_image_edge_px
 
 
 class _FakeRegistry:

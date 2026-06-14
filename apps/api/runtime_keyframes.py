@@ -13,6 +13,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
+from apps.api.runtime_media_validation import reference_image_size_blocks
 from apps.api.runtime_provider_dispatch import dispatch_provider_with_retry
 from apps.api.runtime_keyframe_payloads import (
     keyframe_candidate_summary,
@@ -90,6 +91,7 @@ def build_keyframe_generation(
         )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
     provider_gate = image_provider_gate(required_gate)
+    min_reference_edge = int(getattr(descriptor, "min_reference_image_edge_px", 0) or 0)
 
     provider_outputs: list[dict[str, Any]] = []
     status = "blocked"
@@ -98,6 +100,13 @@ def build_keyframe_generation(
     retry_count = 0
     if provider_gate["status"] == "blocked":
         blocks.append(_gate_closed_block(required_gate))
+    elif size_blocks := reference_image_size_blocks(
+        reference_images,
+        min_edge_px=min_reference_edge,
+        capability="image",
+        required_gate=required_gate,
+    ):
+        blocks.extend(size_blocks)
     else:
         try:
             if registry is None:

@@ -15,8 +15,9 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequ
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_generation_preflight import preflight_token_matches, video_generation_preflight
-from apps.api.runtime_image_assets import image_asset_file_path
+from apps.api.runtime_image_assets import image_asset_file_path, image_asset_metadata
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_media_validation import reference_image_size_blocks
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -129,8 +130,10 @@ def _submit_video_generation(
     if request.candidate_count != 1:
         raise ValueError("video candidate_count must be 1")
     first_frame_path = image_asset_file_path(store, project_id, request.first_frame_image_asset_id)
+    frame_metadata = [image_asset_metadata(store, project_id, request.first_frame_image_asset_id)]
     if request.last_frame_image_asset_id:
         image_asset_file_path(store, project_id, request.last_frame_image_asset_id)
+        frame_metadata.append(image_asset_metadata(store, project_id, request.last_frame_image_asset_id))
     preflight = video_generation_preflight(store, project_id, request)
     context_bundle = preflight.get("context_bundle")
     registry = None
@@ -158,6 +161,24 @@ def _submit_video_generation(
             provider_calls_started=False,
             provider_gate=gate,
             blocks=[_gate_closed_block(required_gate)],
+            context_bundle=context_bundle,
+        )
+        _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
+        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
+
+    min_reference_edge = int(getattr(descriptor, "min_reference_image_edge_px", 0) or 0)
+    if size_blocks := reference_image_size_blocks(
+        frame_metadata,
+        min_edge_px=min_reference_edge,
+        capability="video",
+        required_gate=required_gate,
+    ):
+        manifest = _safe_manifest(
+            project_id,
+            status="blocked",
+            provider_calls_started=False,
+            provider_gate=gate,
+            blocks=size_blocks,
             context_bundle=context_bundle,
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
@@ -208,7 +229,7 @@ def _submit_video_generation(
         "status": str((provider_task.get("task") or {}).get("status") or "submitted"),
         "provider_service_id": request.provider_service_id,
         "capability": "video",
-        "task": provider_task,
+        "task": _provider_task_for_state(provider_task),
         "first_frame_image_asset_id": request.first_frame_image_asset_id,
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -232,7 +253,7 @@ def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Pat
     registry = load_provider_registry()
     provider_service_id = str(state.get("provider_service_id") or "")
     try:
-        raw = registry.poll("video", provider_service_id, dict(state.get("task") or {}))
+        raw = registry.poll("video", provider_service_id, _provider_task_for_poll(state.get("task"), output_dir))
     except ModelGatewayError as exc:
         manifest = _safe_manifest(
             project_id,
@@ -474,6 +495,29 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
 
 def _write_task_state(output_dir: Path, state: dict[str, Any]) -> None:
     _write_json_checked(output_dir / "video_task_state.json", state)
+
+
+def _provider_task_for_state(provider_task: dict[str, Any]) -> dict[str, Any]:
+    task = dict(provider_task)
+    inner = task.get("task")
+    if isinstance(inner, dict):
+        safe_inner = dict(inner)
+        safe_inner.pop("output_dir", None)
+        task["task"] = safe_inner
+    task.pop("output_dir", None)
+    return task
+
+
+def _provider_task_for_poll(task: Any, output_dir: Path) -> dict[str, Any]:
+    payload = dict(task) if isinstance(task, dict) else {}
+    inner = payload.get("task")
+    if isinstance(inner, dict):
+        poll_inner = dict(inner)
+        poll_inner["output_dir"] = str(output_dir)
+        payload["task"] = poll_inner
+    else:
+        payload["output_dir"] = str(output_dir)
+    return payload
 
 
 def _load_task_state(output_dir: Path) -> dict[str, Any]:

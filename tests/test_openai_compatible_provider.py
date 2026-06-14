@@ -83,6 +83,28 @@ def test_openai_compatible_provider_returns_chat_completion(monkeypatch) -> None
     assert captured["timeout"] == 12.5
 
 
+def test_openai_compatible_provider_adds_formatter_system_message_for_prompt_enhancement(monkeypatch) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse({"choices": [{"message": {"content": "enhanced prompt"}}]})
+
+    monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+
+    provider = OpenAICompatibleProvider(
+        base_url="https://example.test/v1",
+        api_key="fake-key",
+        model="fake-model",
+    )
+
+    assert provider.generate("hello", task_type="prompt_enhancement_retry") == "enhanced prompt"
+    assert captured["payload"]["messages"][0]["role"] == "system"
+    assert "strict prompt formatter" in captured["payload"]["messages"][0]["content"]
+    assert captured["payload"]["messages"][1] == {"role": "user", "content": "hello"}
+
+
 def test_openai_compatible_provider_sends_extra_body(monkeypatch) -> None:
     captured = {}
 

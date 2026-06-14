@@ -244,6 +244,8 @@ def _public_llm_enhancement(value: dict[str, Any]) -> dict[str, Any]:
         "raw_response_stored": False,
         "discard_reason": value.get("discard_reason"),
         "guardrail_fallback_used": bool(value.get("guardrail_fallback_used")),
+        "format_retry_count": int(value.get("format_retry_count") or 0),
+        "format_salvage_used": bool(value.get("format_salvage_used")),
     }
 
 

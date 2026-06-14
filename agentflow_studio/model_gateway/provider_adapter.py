@@ -45,6 +45,7 @@ class ProviderDescriptor(BaseModel):
     async_max_polls: int | None = Field(default=None, gt=0)
     prompt_profile: str | None = None
     cost_estimate: dict[str, Any] = Field(default_factory=dict)
+    min_reference_image_edge_px: int = Field(default=0, ge=0, le=8192)
 
     @field_validator("required_gate")
     @classmethod
@@ -252,6 +253,12 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
         descriptor = descriptor.model_copy(update={"capabilities": [descriptor.modality]})
     if descriptor.modality not in descriptor.capabilities:
         raise ModelConfigError(f"Provider service descriptor capabilities must include modality: {service_id}")
+    provider = str(service.get("provider") or "")
+    if descriptor.min_reference_image_edge_px == 0 and (
+        (provider == "minimax" and descriptor.modality == "image")
+        or (provider == "kling" and descriptor.modality == "video")
+    ):
+        descriptor = descriptor.model_copy(update={"min_reference_image_edge_px": 256})
     return descriptor
 
 
@@ -337,6 +344,7 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
             "cost_hint": "legacy-local-config",
             "rate_limit_hint": "legacy-local-config",
             "required_gate": required_gate,
+            "min_reference_image_edge_px": 256,
         }
         if is_kling_i2v:
             payload.update(
@@ -382,6 +390,7 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
             "cost_hint": "legacy-local-config",
             "rate_limit_hint": "legacy-local-config",
             "required_gate": required_gate,
+            "min_reference_image_edge_px": 256,
         }
     )
 
@@ -389,6 +398,8 @@ def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> 
 def _required_gate_or_default(capability: str, configured: str) -> str:
     if configured.startswith("AFS_ALLOW_REMOTE_"):
         return configured
+    if configured.startswith("NARRATOCUT_ALLOW_REMOTE_"):
+        return f"AFS_ALLOW_REMOTE_{configured.removeprefix('NARRATOCUT_ALLOW_REMOTE_')}"
     if configured:
         raise ModelConfigError("required_gate must be an AFS_ALLOW_REMOTE_* environment variable")
     defaults = {

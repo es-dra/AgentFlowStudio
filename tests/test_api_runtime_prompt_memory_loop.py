@@ -206,6 +206,28 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
     assert "d:\\" not in serialized
 
 
+def test_studio_prompt_optimizer_uses_llm_fields_even_when_image_model_is_selected() -> None:
+    from apps.api.runtime_llm_enhancement import minimax_text_requested
+    from apps.api.runtime_models import PromptOptimizationRequest
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-studio-llm-fields",
+        node_type="image",
+        prompt_text="A young woman turns back on a rainy neon street.",
+        generation_target="image",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "model": "minimax_image",
+            "llm_provider": "minimax_m3",
+            "llm_model": "minimax-m3-enhance",
+            "remote_optimizer_required": True,
+        },
+        generated_at="2026-06-14T05:20:00+08:00",
+    )
+
+    assert minimax_text_requested(request) is True
+
 def test_prompt_optimizer_falls_back_to_available_minimax_llm_service(tmp_path, monkeypatch) -> None:
     class Descriptor:
         modality = "llm"
@@ -313,7 +335,7 @@ def test_prompt_optimizer_skips_incompatible_llm_endpoint_404(tmp_path, monkeypa
     )
 
     assert result.status_code == 200
-    assert registry.calls == ["minimax_m3", "minimax_llm", "deepseek_llm"]
+    assert registry.calls == ["minimax_m3", "minimax_llm", "deepseek_llm", "minimax_m3", "minimax_llm", "deepseek_llm"]
     assert result.json()["provider_calls_started"] is True
 
 
@@ -322,7 +344,7 @@ def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
             assert service_id == "minimax_m3"
-            assert request.task_type == "prompt_enhancement"
+            assert request.task_type in {"prompt_enhancement", "prompt_enhancement_retry"}
             return {"text": "\n".join(
                 [
                     "Intent: generic scene.",
@@ -362,6 +384,7 @@ def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated
     assert "Primary character" not in payload["optimized_prompt"]
     assert trace["llm_enhancement"]["status"] == "discarded"
     assert trace["llm_enhancement"]["discard_reason"] == "enhancement missing required sections"
+    assert trace["llm_enhancement"]["format_retry_count"] == 1
 
 
 def test_prompt_optimizer_llm_enhancement_uses_provider_registry_not_legacy_gateway() -> None:
@@ -429,6 +452,172 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
 
     assert result.status_code == 422
     assert "enhancement missing required sections" in result.json()["detail"]
+
+
+def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            return {"text": "\n".join(
+                [
+                    "1. 【意图】生成一张未来机器人屋顶观星的完整概念图。",
+                    "2. [人物] 未来机器人主体清晰，金属结构和发光部件具备辨识度。",
+                    "3. 场景：星际屋顶场景宽阔，远处星空和城市轮廓补足空间层次。",
+                    "- 动作：机器人安静站立，像是在观察远处星空。",
+                    "- 镜头：低机位中景，主体居中偏右，保留环境纵深。",
+                    "- 灯光：冷色星光与柔和边缘光突出金属轮廓。",
+                    "- 运动：单帧概念图，强调静态瞬间和氛围。",
+                    "- 连续性：保持未来科幻主题，不漂移到其他题材。",
+                    "- 负面：不要水印、乱码、畸形肢体或无关角色。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_section_variants/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-section-variants",
+            "node_type": "image",
+            "prompt_text": "一个来自未来的机器人，在屋顶看星星",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-14T03:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    titles = [section["title"] for section in payload["user_prompt_sections"]]
+    assert "人物/主体" in titles
+    assert "场景/美术" in titles
+    assert "镜头/构图" in titles
+    assert "负面约束" in titles
+    assert "【意图】" not in payload["optimized_prompt"]
+
+
+def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tmp_path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            calls.append(request.task_type)
+            if len(calls) == 1:
+                return {
+                    "text": "\n".join(
+                        [
+                            "下面为您把原始提示词扩展成适合图像生成模型的完整提示词。",
+                            "## 强化版 Prompt",
+                            "A cinematic rooftop scene with dramatic rain and city lights.",
+                            "## Negative Prompt",
+                            "low quality, watermark, bad anatomy",
+                        ]
+                    )
+                }
+            return {"text": "\n".join(
+                [
+                    "意图：生成一张雨夜屋顶红发人物的电影关键帧。",
+                    "人物/主体：Lin Wan 站在屋顶边缘，红色长发被风吹动，神情坚定。",
+                    "场景/美术：雨夜城市屋顶，远处霓虹和湿润地面形成反光。",
+                    "动作/情节：人物静立在雨中，像是在等待关键时刻。",
+                    "镜头/构图：低角度中景，主体位于画面中央偏右，背景保留城市纵深。",
+                    "灯光：冷色雨夜环境光与暖色轮廓光共同塑造电影感。",
+                    "运动/时间推进：单帧关键画面，保留雨丝和发丝的短时间动势。",
+                    "连续性：保持红发人物、雨夜屋顶和电影化风格一致。",
+                    "负面约束：不要水印、文字乱码、畸形肢体、身份漂移或无关角色。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_retry/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-retry",
+            "node_type": "image",
+            "prompt_text": "Lin Wan stands on a rain rooftop with red long hair, cinematic keyframe.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-14T03:40:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert calls == ["prompt_enhancement", "prompt_enhancement_retry"]
+    assert payload["optimized_prompt"].startswith("意图：")
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    assert trace["llm_enhancement"]["format_retry_count"] == 1
+
+
+def test_studio_prompt_optimizer_salvages_repeated_chatty_llm_article(tmp_path, monkeypatch) -> None:
+    chatty = "\n".join(
+        [
+            "下面为您把原始提示词扩展成适合图像生成模型的完整提示词。",
+            "## 中文版 Prompt",
+            "> **电影感关键帧，逼真的雨夜屋顶场景，林晚站在屋顶边缘，长长的红色长发随风飘动，雨滴在发丝和肩头闪烁，远处城市灯光被雾气模糊，湿润反光表面，低角度拍摄，冷暖对比灯光，体积雾和镜头雨点散射。**",
+            "## Negative Prompt",
+            "```",
+            "low quality, blurry, watermark, deformed hands, extra limbs, bad anatomy",
+            "```",
+        ]
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "minimax_m3"
+            return {"text": chatty}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_salvage/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-salvage",
+            "node_type": "image",
+            "prompt_text": "Lin Wan stands on a rain rooftop with red long hair, cinematic keyframe.",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "minimax-image-01",
+                "llm_provider": "minimax_m3",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-14T03:50:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["optimized_prompt"].startswith("意图：")
+    assert "中文版 Prompt" not in payload["optimized_prompt"]
+    assert "林晚站在屋顶边缘" in payload["optimized_prompt"]
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    assert trace["llm_enhancement"]["format_retry_count"] == 1
+    assert trace["llm_enhancement"]["format_salvage_used"] is True
 
 
 def test_visual_prompt_optimizer_uses_t2i_instruction_without_references(tmp_path, monkeypatch) -> None:

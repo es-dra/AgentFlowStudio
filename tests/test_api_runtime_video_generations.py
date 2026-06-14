@@ -111,6 +111,44 @@ def test_video_generation_gate_closed_blocks_before_provider_submit(tmp_path, mo
     assert "fake-video-key" not in serialized
 
 
+def test_tiny_video_first_frame_blocks_before_provider_submit(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class GuardedRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO", min_reference_image_edge_px=256)
+
+        def submit(self, capability: str, service_id: str, request):
+            raise AssertionError("tiny first frame should be blocked before provider submit")
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: GuardedRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-tiny-first-frame-guard"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video tiny first frame guard"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "prompt_text": "A slow camera push in.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "generated_at": "2026-06-13T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "blocked"
+    assert payload["safe_manifest"]["status"] == "blocked"
+    assert payload["provider_calls_started"] is False
+    assert payload["safe_manifest"]["provider_calls_started"] is False
+    assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_video_reference_image_too_small"
+
+
 def test_video_generation_preflight_needs_no_video_gate_and_is_stable(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
@@ -210,6 +248,77 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert "data/processed/runs" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class PathReturningRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO")
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            return {
+                "service_id": service_id,
+                "capability": capability,
+                "task": {
+                    "status": "submitted",
+                    "task_id": "path-returning-task",
+                    "output_dir": str(request.output_dir),
+                    "timeout_sec": 120.0,
+                },
+            }
+
+        def poll(self, capability: str, service_id: str, task):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            assert task["task"]["output_dir"]
+            return {"status": "running", "task": {"task_id": "path-returning-task"}}
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: PathReturningRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-path-safe-task-state"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video task state path hygiene"})
+    asset_id = _upload_image(client, project_id)
+
+    submitted = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_1",
+            "prompt_text": "A slow camera push in.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "aspect_ratio": "9:16",
+            "generated_at": "2026-06-13T10:00:00+08:00",
+        },
+    )
+
+    assert submitted.status_code == 200
+    payload = submitted.json()
+    assert payload["job"]["status"] == "submitted"
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "output_dir" not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+    job_id = payload["job"]["job_id"]
+    state_path = tmp_path / "runtime" / "runs" / project_id / job_id / "video_task_state.json"
+    state_text = state_path.read_text(encoding="utf-8").lower()
+    assert "output_dir" not in state_text
+    assert "c:\\" not in state_text
+    assert "d:\\" not in state_text
+
+    polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
+
+    assert polled.status_code == 200
+    assert polled.json()["job"]["status"] == "running"
 
 
 def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path, monkeypatch) -> None:

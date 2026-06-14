@@ -498,6 +498,16 @@ def test_temporary_asset_exclusion_removes_asset_from_prompt_reference_and_subje
         item["asset_id"] == asset["asset_id"] and item["reason"] == "temporary_asset_excluded_by_user"
         for item in bundle["excluded_assets"]
     )
+    assert [
+        item for item in bundle["excluded_assets"] if item["asset_id"] == asset["asset_id"]
+    ] == [
+        {
+            "asset_id": asset["asset_id"],
+            "label": "Excluded Actor",
+            "asset_type": "character",
+            "reason": "temporary_asset_excluded_by_user",
+        }
+    ]
     assert "Excluded Actor" not in plan["provider_prompt"]
     assert "keep Excluded Actor identity" not in plan["provider_prompt"]
     assert preflight.json()["included_assets"] == []

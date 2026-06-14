@@ -46,7 +46,7 @@ def main() -> int:
     try:
         wait_for_http(f"{base_url}/studio/")
         prepare_clean_project(runtime_root)
-        report = run_browser_qa(repo, base_url, runtime_root, headed=args.headed)
+        report = run_browser_qa(repo, base_url, runtime_root, headed=args.headed, timeout_ms=args.timeout_ms)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"status": "passed", "report": str(report_path)}, ensure_ascii=False))
         return 0
@@ -60,6 +60,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runtime-root", default="")
     parser.add_argument("--report", default="")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--timeout-ms",
+        type=int,
+        default=120_000,
+        help="Playwright timeout for remote optimizer/provider paths. Defaults to 120 seconds.",
+    )
     return parser.parse_args()
 
 
@@ -107,7 +113,7 @@ def make_studio_static_route(repo: Path):
     return route_studio_static
 
 
-def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: bool) -> dict[str, Any]:
+def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: bool, timeout_ms: int) -> dict[str, Any]:
     upload_file = runtime_root / "qa-lin-wan.png"
     upload_file.write_bytes(PNG_BYTES)
     with sync_playwright() as p:
@@ -117,8 +123,8 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
             args=["--proxy-server=direct://", "--proxy-bypass-list=*"],
         )
         page = browser.new_page(viewport={"width": 1440, "height": 950})
-        page.set_default_timeout(20_000)
-        expect.set_options(timeout=20_000)
+        page.set_default_timeout(timeout_ms)
+        expect.set_options(timeout=timeout_ms)
         page.route("**/studio/src/**", make_studio_static_route(repo))
         page.route("**/studio/styles/**", make_studio_static_route(repo))
         page.route("**/projects/**", make_mutating_runtime_proxy(runtime_root))
@@ -133,8 +139,10 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
             assert_warning(first_opt, "named_asset_not_connected")
 
             second_opt = click_connect_suggestion(page)
-            assert_no_warning(second_opt, "named_asset_not_connected")
             assert_edge_created(page)
+            if second_opt.get("context_bundle"):
+                assert_no_warning(second_opt, "named_asset_not_connected")
+            assert_no_connect_suggestion(page)
 
             click_temporary_unlock(page)
             keyframe = generate_keyframe(page)
@@ -252,7 +260,14 @@ def optimize(page: Page) -> dict[str, Any]:
 def click_connect_suggestion(page: Page) -> dict[str, Any]:
     with page.expect_response(lambda r: "/prompt-optimizations" in r.url and r.request.method == "POST") as response:
         page.locator('.optimizer-pop [data-action="connect-named-asset"]').click()
-    return response.value.json()
+    if response.value.status != 200:
+        raise AssertionError(f"connect suggestion re-optimization failed: {response.value.status} {response.value.text()}")
+    payload = response.value.json()
+    page.wait_for_function(
+        "(key) => Object.keys(JSON.parse(window.localStorage.getItem(key) || '{}').edges || {}).length === 1",
+        arg=STUDIO_STORAGE_KEY,
+    )
+    return payload if isinstance(payload, dict) else {}
 
 
 def click_temporary_unlock(page: Page) -> None:
@@ -267,9 +282,23 @@ def click_temporary_unlock(page: Page) -> None:
 def generate_keyframe(page: Page) -> dict[str, Any]:
     target_id = target_node_id(page)
     target = page.locator(f'.node[data-node-id="{target_id}"]')
-    with page.expect_request(lambda r: "/keyframe-generations" in r.url and r.method == "POST") as request_info:
-        with page.expect_response(lambda r: "/keyframe-generations" in r.url and r.request.method == "POST") as response:
-            target.locator('[data-action="run"]').click()
+    with page.expect_response(
+        lambda r: "/keyframe-generations/preflight" in r.url and r.request.method == "POST"
+    ) as preflight_response:
+        target.locator('[data-action="run"]').click()
+    if preflight_response.value.status != 200:
+        raise AssertionError(f"keyframe preflight failed: {preflight_response.value.status} {preflight_response.value.text()}")
+    expect(page.locator(".generation-carry-modal")).to_be_visible()
+
+    def is_submit_request(request: Any) -> bool:
+        return "/keyframe-generations" in request.url and not request.url.endswith("/preflight") and request.method == "POST"
+
+    def is_submit_response(response: Any) -> bool:
+        return "/keyframe-generations" in response.url and not response.url.endswith("/preflight") and response.request.method == "POST"
+
+    with page.expect_request(is_submit_request) as request_info:
+        with page.expect_response(is_submit_response) as response:
+            page.locator(".generation-carry-modal .primary-btn").click()
     payload = response.value.json()
     payload["_request_body"] = json.loads(request_info.value.post_data or "{}")
     return payload
@@ -324,6 +353,10 @@ def assert_no_warning(payload: dict[str, Any], warning_id: str) -> None:
 def assert_edge_created(page: Page) -> None:
     state = studio_state(page)
     assert len(state["edges"]) == 1
+
+
+def assert_no_connect_suggestion(page: Page) -> None:
+    expect(page.locator('.optimizer-pop [data-action="connect-named-asset"]')).to_have_count(0)
 
 
 def keyframe_request_body(response: dict[str, Any]) -> dict[str, Any]:

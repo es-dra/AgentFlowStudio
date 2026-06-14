@@ -44,6 +44,17 @@ SECTION_ORDER = (
     "连续性",
     "负面约束",
 )
+SECTION_LABEL_ALIASES = {
+    "意图": ("意图", "目标", "创作意图"),
+    "人物/主体": ("人物/主体", "人物", "主体", "角色", "人物设定", "主体设定"),
+    "场景/美术": ("场景/美术", "场景", "美术", "环境", "空间", "场景设定"),
+    "动作/情节": ("动作/情节", "动作", "情节", "剧情", "行为"),
+    "镜头/构图": ("镜头/构图", "镜头", "构图", "画面", "机位"),
+    "灯光": ("灯光", "光线", "光影", "照明"),
+    "运动/时间推进": ("运动/时间推进", "运动", "时间推进", "动态", "节奏"),
+    "连续性": ("连续性", "连贯性", "保持项", "一致性"),
+    "负面约束": ("负面约束", "负面", "负面提示", "禁止项", "反向提示词"),
+}
 BANNED_GENERIC_PHRASES = (
     "primary character",
     "primary scene",
@@ -87,20 +98,53 @@ def maybe_enhance_prompt_with_llm(
     except ModelGatewayError as exc:
         return {**base, "status": "discarded", "discard_reason": _safe_reason(str(exc))}
 
+    retry_count = 0
     try:
         prompt = sanitize_enhanced_prompt(enhanced)
     except ValueError as exc:
-        fallback = deterministic_chinese_fallback_prompt(request, assembly)
-        return {
-            **base,
-            "status": "discarded",
-            "provider_calls_started": True,
-            "discard_reason": _safe_reason(str(exc)),
-            "optimized_prompt": fallback,
-            "user_prompt": fallback,
-            "user_prompt_plain": strip_user_prompt_section_headers(fallback),
-            "user_prompt_sections": _sections_from_canonical(fallback),
-        }
+        if str(exc) == "enhancement missing required sections":
+            try:
+                retry_request = ProviderDispatchRequest(
+                    prompt=_strict_format_retry_instruction(request),
+                    output_dir=Path("."),
+                    task_type="prompt_enhancement_retry",
+                )
+                result = _dispatch_llm_with_fallback(registry, request, retry_request)
+                enhanced = str(result.get("text") or "")
+                prompt = sanitize_enhanced_prompt(enhanced)
+                retry_count = 1
+            except (ModelGatewayError, ValueError) as retry_exc:
+                try:
+                    prompt = _salvage_prompt_from_llm_article(enhanced, request)
+                    retry_count = 1
+                    base["format_salvage_used"] = True
+                except ValueError:
+                    fallback = deterministic_chinese_fallback_prompt(request, assembly)
+                    return {
+                        **base,
+                        "status": "discarded",
+                        "provider_calls_started": True,
+                        "discard_reason": _safe_reason(str(retry_exc)),
+                        "format_retry_count": 1,
+                        "format_salvage_used": False,
+                        "optimized_prompt": fallback,
+                        "user_prompt": fallback,
+                        "user_prompt_plain": strip_user_prompt_section_headers(fallback),
+                        "user_prompt_sections": _sections_from_canonical(fallback),
+                    }
+        else:
+            fallback = deterministic_chinese_fallback_prompt(request, assembly)
+            return {
+                **base,
+                "status": "discarded",
+                "provider_calls_started": True,
+                "discard_reason": _safe_reason(str(exc)),
+                "format_retry_count": retry_count,
+                "optimized_prompt": fallback,
+                "user_prompt": fallback,
+                "user_prompt_plain": strip_user_prompt_section_headers(fallback),
+                "user_prompt_sections": _sections_from_canonical(fallback),
+            }
     try:
         validate_enhanced_prompt_specificity(prompt, request)
     except ValueError as exc:
@@ -122,6 +166,8 @@ def maybe_enhance_prompt_with_llm(
         **base,
         "status": "applied",
         "provider_calls_started": True,
+        "format_retry_count": retry_count,
+        "format_salvage_used": bool(base.get("format_salvage_used")),
         "optimized_prompt": prompt,
         "user_prompt": prompt,
         "user_prompt_plain": plain_prompt_from_sections(sections) or strip_user_prompt_section_headers(prompt),
@@ -131,9 +177,16 @@ def maybe_enhance_prompt_with_llm(
 
 def minimax_text_requested(request: PromptOptimizationRequest) -> bool:
     params = request.node_parameters or {}
-    value = str(params.get("model") or params.get("llm_model") or "").strip().lower()
-    normalized = value.replace(" ", "-")
-    return normalized in MINIMAX_MODEL_IDS
+    values = [
+        params.get("llm_provider"),
+        params.get("llm_model"),
+        params.get("model"),
+    ]
+    for value in values:
+        normalized = str(value or "").strip().lower().replace(" ", "-")
+        if normalized in MINIMAX_MODEL_IDS:
+            return True
+    return False
 
 
 def llm_provider_gate() -> dict[str, str]:
@@ -178,6 +231,7 @@ def sanitize_enhanced_prompt(value: str) -> str:
     text = _strip_code_fence(value).strip()
     if not text:
         raise ValueError("empty enhancement")
+    text = _normalize_enhancement_sections(text)
     lowered = text.lower()
     if "<think" in lowered or "reasoning_content" in lowered or "\nthinking:" in lowered:
         raise ValueError("reasoning content is not allowed")
@@ -322,6 +376,98 @@ def _visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
     )
 
 
+def _strict_format_retry_instruction(request: PromptOptimizationRequest) -> str:
+    labels = "、".join(SECTION_ORDER)
+    return "\n".join(
+        [
+            "上一次输出没有按 AFS Studio 的机器可解析格式返回，已经被系统拒绝。",
+            "现在必须重新输出。不要解释，不要标题，不要 Markdown，不要表格，不要英文教程，不要 negative prompt 代码块。",
+            f"原始提示词：{request.prompt_text}",
+            f"当前模式：{prompt_optimization_mode(request)}；目标：{request.generation_target}；风格：{request.style or 'cinematic'}。",
+            f"只允许输出以下九行，顺序和标签必须保持：{labels}。",
+            "意图：围绕原始提示词说明本次生成目标。",
+            "人物/主体：写主体身份、外观、姿态和情绪；图生图时保留参考主体。",
+            "场景/美术：写空间、时间、环境元素、质感和视觉风格。",
+            "动作/情节：写单帧可读的动作或情境，不扩写复杂剧情。",
+            "镜头/构图：写景别、视角、主体位置和前中后景关系。",
+            "灯光：写光源方向、明暗关系和色温氛围。",
+            "运动/时间推进：写短时间感；关键帧以单帧可读为主。",
+            "连续性：写需要保持一致的身份、服装、场景或项目风格。",
+            "负面约束：写不要出现的画面错误。",
+        ]
+    )
+
+
+def _salvage_prompt_from_llm_article(value: str, request: PromptOptimizationRequest) -> str:
+    candidate = _extract_article_prompt_candidate(value)
+    if not candidate:
+        raise ValueError("enhancement missing required sections")
+    negative = _extract_article_negative_prompt(value)
+    prompt = "\n".join(
+        [
+            f"意图：围绕“{_compact(request.prompt_text, 160)}”生成可直接用于本节点的画面提示词。",
+            f"人物/主体：{_compact(candidate, 260)}",
+            f"场景/美术：{_compact(candidate, 260)}",
+            f"动作/情节：{_compact(request.prompt_text, 180)}",
+            f"镜头/构图：{_compact(candidate, 220)}",
+            f"灯光：{_compact(candidate, 220)}",
+            "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读；视频节点再强调短时间动作方向。",
+            "连续性：保持上文主体、场景、服装、身份和项目风格一致，不漂移到无关题材。",
+            f"负面约束：{negative or '不要水印、文字乱码、畸形肢体、身份漂移、无关人物或不合理背景元素。'}",
+        ]
+    )
+    reject_unsafe_text(prompt)
+    return prompt
+
+
+def _extract_article_prompt_candidate(value: str) -> str:
+    lines = str(value or "").splitlines()
+    candidates: list[tuple[int, str]] = []
+    prefer_chinese = False
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "中文" in line and "Prompt" in line:
+            prefer_chinese = True
+            continue
+        cleaned = line.lstrip(">").strip().strip("*` ")
+        if len(cleaned) < 40:
+            continue
+        lowered = cleaned.lower()
+        if any(phrase in lowered for phrase in BANNED_GENERIC_PHRASES):
+            continue
+        if "negative prompt" in lowered or lowered.startswith(("low quality", "使用技巧", "要素 |")):
+            continue
+        if "|" in cleaned and cleaned.count("|") >= 2:
+            continue
+        score = len(cleaned)
+        if prefer_chinese or _contains_cjk(cleaned):
+            score += 500
+        if "prompt" in lowered:
+            score -= 80
+        candidates.append((score, cleaned))
+    if not candidates:
+        return ""
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _extract_article_negative_prompt(value: str) -> str:
+    lowered = str(value or "").lower()
+    if "negative prompt" not in lowered and "负向提示" not in str(value) and "负面" not in str(value):
+        return ""
+    fenced = re.findall(r"```(?:[a-zA-Z0-9_-]+)?\s*(.*?)```", str(value), flags=re.DOTALL)
+    for block in fenced:
+        text = " ".join(block.split())
+        if len(text) >= 20:
+            return _compact(text, 220)
+    return ""
+
+
+def _contains_cjk(value: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in value)
+
+
 def _visual_reference_hint(request: PromptOptimizationRequest) -> str:
     terms = _reference_hint_terms(request)
     if terms:
@@ -394,10 +540,10 @@ def _sections_from_canonical(prompt: str) -> list[dict[str, str]]:
         line = raw_line.strip()
         if not line:
             continue
-        matched = _section_label(line)
-        if matched:
-            text = line[len(matched):].lstrip("：: ").strip()
-            current = {"title": matched, "text": text}
+        parsed = _parse_section_line(line)
+        if parsed:
+            matched, text = parsed
+            current = {"title": matched, "text": text.strip()}
             sections.append(current)
             continue
         if current:
@@ -406,14 +552,56 @@ def _sections_from_canonical(prompt: str) -> list[dict[str, str]]:
 
 
 def _section_label(line: str) -> str:
-    for label in SECTION_ORDER:
-        if line.startswith(f"{label}：") or line.startswith(f"{label}:"):
-            return label
-    return ""
+    parsed = _parse_section_line(line)
+    return parsed[0] if parsed else ""
 
 
 def _has_section(text: str, label: str) -> bool:
-    return any(line.strip().startswith(f"{label}：") or line.strip().startswith(f"{label}:") for line in text.splitlines())
+    return any(_section_label(line.strip()) == label for line in text.splitlines())
+
+
+def _normalize_enhancement_sections(text: str) -> str:
+    lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parsed = _parse_section_line(line)
+        if parsed:
+            label, content = parsed
+            lines.append(f"{label}：{content}".strip())
+        else:
+            lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _parse_section_line(line: str) -> tuple[str, str] | None:
+    cleaned = re.sub(r"^\s*(?:#{1,6}\s*)?(?:[-*•]\s*)?(?:\d+[\.、)]\s*)?", "", line).strip()
+    if not cleaned:
+        return None
+
+    bracket = re.match(r"^[\[【](?P<label>[^\]】]+)[\]】]\s*(?P<rest>.*)$", cleaned)
+    if bracket:
+        raw_label = bracket.group("label")
+        rest = bracket.group("rest").lstrip("：: -—").strip()
+    else:
+        match = re.match(r"^(?P<label>[^：:\-—]{1,24})\s*[：:\-—]\s*(?P<rest>.*)$", cleaned)
+        if not match:
+            return None
+        raw_label = match.group("label")
+        rest = match.group("rest").strip()
+
+    label = _canonical_section_label(raw_label)
+    return (label, rest) if label else None
+
+
+def _canonical_section_label(value: str) -> str:
+    normalized = str(value or "").strip().strip("*_ `[]【】")
+    normalized = re.sub(r"\s+", "", normalized)
+    for canonical, aliases in SECTION_LABEL_ALIASES.items():
+        if normalized in aliases:
+            return canonical
+    return ""
 
 
 def _slot(slots: Any, key: str) -> str:

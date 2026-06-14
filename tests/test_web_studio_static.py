@@ -249,6 +249,70 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
         assert retired not in source
 
 
+def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers() -> None:
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+
+    assert "preflightKeyframe" in runtime_client
+    assert "preflightVideo" in runtime_client
+    assert "prepareGenerationRequest" in node_actions
+    assert "showCarryConfirmModal" in node_actions
+    assert "preflight_token" in node_actions
+    assert "temporary_asset_exclusions" in node_actions
+    assert "temporary_asset_exclusions" in optimizer_contract
+    assert "asset_conflicts" in node_actions
+
+
+def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_markers() -> None:
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+
+    assert 'data-action="fix-visual-asset"' in canvas_view
+    assert "fixNodeVisualAsset" in node_actions
+    assert "candidate_previews" in node_actions
+    assert "reusable_image_assets" in node_actions
+    assert 'initialAssetType: assetType' in drawer
+    assert 'initialAssetType = "character"' in visual_asset_panel
+
+
+def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    asset_detail = (STUDIO_ROOT / "src" / "panels" / "asset-detail-popover.js").read_text(encoding="utf-8")
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+
+    assert "getVisualAsset(assetId)" in runtime_client
+    assert "runtime.getVisualAsset(assetId)" in asset_detail
+    assert "removeAssetFromSelectedNode" in asset_detail
+    assert "excludeAssetForNextRun" in asset_detail
+    assert "temporaryAssetExclusions" in asset_detail
+    assert "openAssetDetailPopover(store, runtime" in canvas_input
+    assert "openAssetDetailPopover(store, runtime" in drawer
+
+
+def test_loop003_qal003_004_recent_or_current_projects_are_not_hidden_by_filter() -> None:
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+
+    assert "RECENT_PROJECTS_KEY" in main
+    assert "rememberProject" in main
+    assert "recentProjectIds" in main
+    assert "item.project_id === currentId || recent.includes(item.project_id)" in main
+    assert "hiddenProjectCount" in main
+
+
+def test_loop003_qal003_005_kling_sound_control_stays_hidden_without_descriptor_support() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    specs = (STUDIO_ROOT / "src" / "presets" / "specs.js").read_text(encoding="utf-8")
+
+    assert "VIDEO_SOUND" not in prompt_bar
+    assert "VIDEO_SOUND" not in specs
+    assert "videoSpecLabel" in specs
+    assert "spec.sound" not in specs
+
+
 def test_studio_v02_flow_native_surface_is_visible() -> None:
     source = _source()
     styles = _styles()

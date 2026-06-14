@@ -1,5 +1,113 @@
 # Devlog
 
+## 2026-06-14 - Browser Repair Loop 005 Baseline And Guards
+
+- Brought the Loop 003 browser QA red baseline into the active line as
+  `docs/maintenance/AFS-AGENT-BROWSER-QA-LOOP-003.md`, so the known issues are
+  auditable from the current branch instead of only from a stale QA branch.
+- Added an L1 gap audit for the current north-star objective:
+  `docs/maintenance/AFS-BROWSER-QA-LOOP-005-GAP-AUDIT.md`.
+- Added explicit QAL003 regression anchors to Studio static tests for:
+  fixed-asset pre-submit interlock, generated-image promotion entrypoints,
+  Runtime-backed asset detail/remove/exclude actions, recent/current project
+  visibility, and Kling no-sound UI.
+- Added keyframe/video generation manifest safety tests that assert generated
+  responses and persisted safe manifests do not expose provider raw payloads,
+  provider URLs, media bytes, secrets, or local absolute paths.
+- Hardened live LLM prompt optimization after browser QA reproduced the prior
+  422 class: prompt-enhancement calls now send a formatter system message,
+  retry once on chatty/non-sectional output, and salvage actual prompt text
+  from repeated LLM article output without restoring the old local deterministic
+  optimizer as the primary path.
+- Normalized legacy provider descriptor gates such as `NARRATOCUT_ALLOW_REMOTE_*`
+  to the current `AFS_ALLOW_REMOTE_*` names in the provider registry path, so
+  ignored external provider configs no longer disagree with Studio gate state.
+- Fixed a live Kling I2V P0 found during agent-led QA: the remote submit could
+  succeed, but Runtime returned 422 before writing the safe manifest because an
+  adapter `output_dir` absolute path was persisted into video task state. Runtime
+  now strips `output_dir` before persistence and injects it only transiently for
+  polling.
+- Fixed a context bundle trace duplicate where a one-run excluded asset also
+  appeared as `not_connected_to_target`.
+- Ran Round A browser/live checks for T2I optimize, MiniMax image generation,
+  generated image asset fixation, Runtime-backed asset detail, carry
+  confirmation, one-run asset exclusion, refresh persistence, project isolation,
+  video first-frame guard, Kling no-sound UI, and Kling I2V submit/poll/preview.
+- Ran Round B valid-media runtime/browser checks with a real 1672x941 reference:
+  I2I succeeded, fixed-asset carry preflight/submit succeeded, one-run asset
+  exclusion succeeded, Kling I2V reached `succeeded` with a preview, and the
+  Studio page loaded the target project with no console warn/error and no
+  unsupported audio/sound UI.
+- Fixed a new Round B P1 guardrail gap: tiny reference media could reach paid
+  MiniMax/Kling provider paths and fail remotely. Provider descriptors now carry
+  `min_reference_image_edge_px`; MiniMax image and Kling video default to 256px,
+  and Runtime blocks too-small references before dispatch/submit with
+  `provider_calls_started=false`.
+- Ran Round C after the guardrail fix. It covered T2I, upload, I2I, fixed asset
+  promote/detail, fixed-asset carry, one-run exclusion, Kling I2V recovery, and
+  Studio load. Round C found one new P1: Studio image-model selection could mask
+  the LLM provider fields and return 422 `not_requested`. `minimax_text_requested`
+  now checks `llm_provider`, `llm_model`, then `model`, and the live retry
+  returned `provider_calls_started=true` / `status=applied`.
+- Ran Round D and Round E as two consecutive clean role-matrix rounds. Each
+  round used one remote LLM optimization, four MiniMax image submits, and one
+  Kling I2V submit. Both rounds passed remote optimize, T2I, upload/I2I, fixed
+  asset promote/detail, fixed carry preflight+submit, one-run exclusion, Kling
+  I2V safe preview, and Studio load with no unsupported sound/audio UI and no
+  console warn/error.
+- Added `docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-005.md` as the current
+  human acceptance entrypoint. The project can claim runtime/browser
+  verification for the tested MVP paths, but not human acceptance until the user
+  runs the runbook and records pass/fail plus creative-quality scores.
+
+Verification so far:
+
+```text
+Loop 005 focused tests:
+tests/test_web_studio_static.py
+tests/test_api_runtime_generation_manifest_safety.py
+selected preflight/token/exclusion tests
+
+26 passed, 1 warning
+
+Additional focused tests:
+tests/test_openai_compatible_provider.py
+selected prompt optimizer retry/salvage tests
+selected provider registry gate-normalization test
+selected context resolver asset-exclusion test
+selected video task-state path hygiene tests
+
+All selected tests passed.
+
+Round B focused reference/provider guards:
+tests/test_api_runtime_keyframe_reference_assets.py
+tests/test_api_runtime_video_generations.py
+tests/test_provider_adapter_registry.py
+
+37 passed, 1 warning
+
+Prompt optimizer regression after Round C:
+tests/test_api_runtime_prompt_memory_loop.py
+
+17 passed, 1 warning
+
+Browser/runtime evidence:
+runs/agent_browser_qa_loop_005/round_c_runtime_summary.json
+runs/agent_browser_qa_loop_005/round_d3_runtime_summary.json
+runs/agent_browser_qa_loop_005/loop005-round-e-clean-1_runtime_summary.json
+runs/agent_browser_qa_loop_005/round_d3_studio_load.png
+runs/agent_browser_qa_loop_005/round_e_studio_load.png
+```
+
+Boundary:
+
+- Loop 005 runtime/browser verification is closed for the tested MVP paths after
+  two consecutive clean rounds.
+- This is not human acceptance, business validation, or durable-memory
+  promotion.
+- MiniMax identity similarity and Kling first-frame/motion quality remain
+  human-scored through `docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-005.md`.
+
 ## 2026-06-14 - Asset Exclusion Preflight And Browser Repair Loop 004
 
 - Added generation preflight support for fixed-asset carry review before paid

@@ -139,12 +139,14 @@ def excluded_assets(
 ) -> list[dict[str, Any]]:
     excluded: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
+    explicitly_excluded_asset_ids: set[str] = set()
     for item in extra_exclusions or []:
         asset_id = str(item.get("asset_id") or "")
         reason = str(item.get("reason") or "")
         if not asset_id or not reason:
             continue
         seen.add((asset_id, reason))
+        explicitly_excluded_asset_ids.add(asset_id)
         excluded.append(item)
     for asset_id in sorted(refs):
         if asset_id in assets or asset_id in included_ids:
@@ -155,7 +157,7 @@ def excluded_assets(
         seen.add((asset_id, reason))
         excluded.append({"asset_id": asset_id, "label": None, "asset_type": None, "reason": reason})
     for asset_id, asset in sorted(assets.items()):
-        if asset_id in included_ids:
+        if asset_id in included_ids or asset_id in explicitly_excluded_asset_ids:
             continue
         reason = "not_selected_for_optimize" if mode == "optimize" else "not_connected_to_target"
         if mode == "generate" and not include_fixed_assets and asset_id in refs:

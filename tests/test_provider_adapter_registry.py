@@ -32,7 +32,6 @@ def test_provider_registry_rejects_missing_descriptor(tmp_path) -> None:
     ("field", "value", "match"),
     [
         ("required_gate", "MINIMAX_API_KEY", "required_gate"),
-        ("required_gate", "NARRATO" + "CUT_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE"),
         ("reference_image_slots", -1, "reference_image_slots"),
         ("supported_aspect_ratios", ["wide"], "supported_aspect_ratios"),
     ],
@@ -60,6 +59,16 @@ def test_provider_registry_exposes_minimax_descriptor(tmp_path) -> None:
     assert descriptor.prompt_char_limit == 1500
     assert descriptor.rate_limit_hint == "test-only"
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+
+
+def test_provider_registry_normalizes_legacy_narratocut_gate_prefix(tmp_path) -> None:
+    payload = provider_config()
+    payload["services"]["minimax_image"]["descriptor"]["required_gate"] = "NARRATOCUT_ALLOW_REMOTE_IMAGE"
+    store = _store(tmp_path, payload)
+
+    registry = ProviderRegistry.from_store(store)
+
+    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
 
 
 def test_provider_registry_ignores_company_gateway_aggregate_service(tmp_path) -> None:
@@ -146,7 +155,9 @@ def test_provider_registry_dispatches_openai_compatible_llm(tmp_path, monkeypatc
     assert result["text"] == "enhanced text"
     assert result["provider_calls_started"] is True
     assert captured["payload"]["model"] == "gpt-test"
-    assert captured["payload"]["messages"] == [{"role": "user", "content": "Improve this prompt"}]
+    assert captured["payload"]["messages"][0]["role"] == "system"
+    assert "strict prompt formatter" in captured["payload"]["messages"][0]["content"]
+    assert captured["payload"]["messages"][1] == {"role": "user", "content": "Improve this prompt"}
     assert captured["api_key"] == "secret-value"
 
 
@@ -354,7 +365,7 @@ def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, 
     assert captured["api_key"] == "fake-deepseek-key"
 
 
-def test_provider_registry_rejects_legacy_image_gate_before_inner_plan(tmp_path) -> None:
+def test_provider_registry_normalizes_legacy_image_gate_before_inner_plan(tmp_path) -> None:
     payload = legacy_kling_provider_config()
     payload["services"]["minimax_image"] = {
         "provider": "minimax",
@@ -363,9 +374,9 @@ def test_provider_registry_rejects_legacy_image_gate_before_inner_plan(tmp_path)
         "required_gate": "NARRATO" + "CUT_ALLOW_REMOTE_IMAGE",
     }
     store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
 
-    with pytest.raises(ModelConfigError, match="AFS_ALLOW_REMOTE"):
-        ProviderRegistry.from_store(store)
+    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
 
 
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
