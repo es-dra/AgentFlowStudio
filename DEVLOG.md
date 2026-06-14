@@ -1,5 +1,51 @@
 # Devlog
 
+## 2026-06-15 - Joint QA Image/Video Gate Open Closeout
+
+- Fixed the Studio stale Runtime symptom seen as `MiniMax keyframe request
+  failed (404)`: Runtime client errors now carry HTTP status and route, and
+  Studio generation preflight reports a specific stale-Runtime restart message
+  when a branch-local `/preflight` route is missing.
+- Opened image and video gates for the active Runtime 8790 per user direction;
+  ASR stayed closed. MiniMax image live smoke succeeded with `candidate_count=1`
+  and registered one reusable image asset. Kling I2V preflight, submit, poll,
+  preview, and offline `ffprobe` inspection succeeded with `candidate_count=1`.
+- Cleared the previous MiniMax arm B P1 with a B-only live retry using the ready
+  REST config: no fixed assets, no subject reference, one candidate, provider
+  calls started, safe manifest succeeded, and no provider raw or secret values
+  were persisted.
+- Updated the readiness audit to recognize successful B-only retry evidence.
+  The final no-cost audit now reports `recommended`, seven role checks passed,
+  and zero provider blockers. This remains AI pre-acceptance only, not human
+  acceptance or business validation.
+- Hardened provider evidence boundaries: Kling preflight reports
+  `AFS_PROVIDER_CONFIG` as a source label rather than an external local path,
+  and Studio browser QA proxy isolation now closes image/video/ASR gates while
+  allowing an explicit `--allow-live-llm` mode for the prompt-optimization path.
+- Re-ran the asset-context browser QA with explicit live LLM allowed; the first
+  optimize reached live LLM and the second re-optimize hit an upstream SSL EOF.
+  No image/video provider call was started by that QA path, and the transient
+  LLM failure was not retried further to avoid unnecessary provider calls.
+
+Verification:
+
+```text
+tests/test_studio_asset_context_browser_qa_tool.py tests/test_web_studio_static.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_kling_provider_preflight_tool.py: 35 passed, 1 warning
+pytest -q: 404 passed, 527 deselected, 2 warnings
+pytest -m legacy -q: 527 passed, 404 deselected, 1 warning
+Studio JS node --check: 37 files passed
+tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
+```
+
+Boundary:
+
+- Repository records contain safe summaries only. External evidence remains
+  under the joint QA evidence root and generated media remains in ignored
+  runtime output paths.
+- The recommendation is ready for the user's human acceptance decision; it is
+  not a claim that human acceptance has happened.
+
 ## 2026-06-14 - MiniMax B Readiness Preflight
 
 - Added `tools/minimax_image_provider_preflight.py`, a no-cost MiniMax image

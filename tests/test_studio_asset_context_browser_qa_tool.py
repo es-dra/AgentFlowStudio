@@ -9,6 +9,7 @@ if str(TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(TOOLS_ROOT))
 
 from tools import studio_asset_context_browser_qa as browser_qa
+from tools import studio_asset_context_browser_qa_support as browser_qa_support
 
 
 def test_browser_qa_screenshot_defaults_next_to_report(tmp_path) -> None:
@@ -57,3 +58,29 @@ def test_prompt_optimization_summary_marks_gate_closed() -> None:
         "prompt_optimization_provider_calls_started_count": 0,
         "live_llm_provider_smoke": False,
     }
+
+
+def test_browser_qa_proxy_closes_all_remote_provider_gates_by_default(monkeypatch) -> None:
+    for key in browser_qa_support.REMOTE_PROVIDER_GATES:
+        monkeypatch.setenv(key, "true")
+
+    with browser_qa_support.remote_provider_gates_closed():
+        for key in browser_qa_support.REMOTE_PROVIDER_GATES:
+            assert key not in browser_qa_support.os.environ
+
+    for key in browser_qa_support.REMOTE_PROVIDER_GATES:
+        assert browser_qa_support.os.environ[key] == "true"
+    assert "AFS_ALLOW_REMOTE_VIDEO" in browser_qa_support.REMOTE_PROVIDER_GATES
+
+
+def test_browser_qa_proxy_can_keep_explicit_llm_gate(monkeypatch) -> None:
+    for key in browser_qa_support.REMOTE_PROVIDER_GATES:
+        monkeypatch.setenv(key, "true")
+
+    with browser_qa_support.remote_provider_gates_closed(allow_live_llm=True):
+        assert browser_qa_support.os.environ["AFS_ALLOW_REMOTE_LLM"] == "true"
+        for key in browser_qa_support.MEDIA_PROVIDER_GATES:
+            assert key not in browser_qa_support.os.environ
+
+    for key in browser_qa_support.REMOTE_PROVIDER_GATES:
+        assert browser_qa_support.os.environ[key] == "true"

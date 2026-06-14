@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -21,12 +22,20 @@ from fastapi.testclient import TestClient
 from apps.api.runtime_service import create_runtime_app
 
 
-def start_runtime(repo: Path, runtime_root: Path, port: int) -> subprocess.Popen[str]:
+REMOTE_PROVIDER_GATES = ("AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_LLM", "AFS_ALLOW_REMOTE_ASR", "AFS_ALLOW_REMOTE_VIDEO")
+MEDIA_PROVIDER_GATES = ("AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_ASR", "AFS_ALLOW_REMOTE_VIDEO")
+
+
+def gates_to_close(*, allow_live_llm: bool = False) -> tuple[str, ...]:
+    return MEDIA_PROVIDER_GATES if allow_live_llm else REMOTE_PROVIDER_GATES
+
+
+def start_runtime(repo: Path, runtime_root: Path, port: int, *, allow_live_llm: bool = False) -> subprocess.Popen[str]:
     env = os.environ.copy()
     env["AFS_RUNTIME_SERVICE_ROOT"] = str(runtime_root)
     env["AFS_RUNTIME_SERVICE_HOST"] = "127.0.0.1"
     env["AFS_RUNTIME_SERVICE_PORT"] = str(port)
-    for key in ("AFS_ALLOW_REMOTE_IMAGE", "AFS_ALLOW_REMOTE_LLM", "AFS_ALLOW_REMOTE_ASR"):
+    for key in gates_to_close(allow_live_llm=allow_live_llm):
         env.pop(key, None)
     return subprocess.Popen(
         [
@@ -72,7 +81,7 @@ def wait_for_http(url: str, timeout: float = 30.0) -> None:
     raise RuntimeError(f"Runtime did not become ready at {url}: {last_error}")
 
 
-def make_mutating_runtime_proxy(runtime_root: Path):
+def make_mutating_runtime_proxy(runtime_root: Path, *, allow_live_llm: bool = False):
     client = runtime_test_client(runtime_root)
 
     def proxy_mutating_runtime_request(route: Any) -> None:
@@ -82,15 +91,16 @@ def make_mutating_runtime_proxy(runtime_root: Path):
             return
         parsed = urlsplit(request.url)
         path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
-        response = client.request(
-            request.method,
-            path,
-            content=(request.post_data or "").encode("utf-8"),
-            headers={
-                "Content-Type": request.headers.get("content-type", "application/json"),
-                "Accept": request.headers.get("accept", "application/json"),
-            },
-        )
+        with remote_provider_gates_closed(allow_live_llm=allow_live_llm):
+            response = client.request(
+                request.method,
+                path,
+                content=(request.post_data or "").encode("utf-8"),
+                headers={
+                    "Content-Type": request.headers.get("content-type", "application/json"),
+                    "Accept": request.headers.get("accept", "application/json"),
+                },
+            )
         route.fulfill(
             status=response.status_code,
             headers={"content-type": response.headers.get("content-type", "application/json")},
@@ -98,6 +108,21 @@ def make_mutating_runtime_proxy(runtime_root: Path):
         )
 
     return proxy_mutating_runtime_request
+
+
+@contextmanager
+def remote_provider_gates_closed(*, allow_live_llm: bool = False):
+    previous = {key: os.environ.get(key) for key in REMOTE_PROVIDER_GATES}
+    try:
+        for key in gates_to_close(allow_live_llm=allow_live_llm):
+            os.environ.pop(key, None)
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def runtime_test_client(runtime_root: Path) -> TestClient:

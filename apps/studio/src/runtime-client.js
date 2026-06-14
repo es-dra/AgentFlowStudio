@@ -66,7 +66,12 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
     body: payload == null ? undefined : JSON.stringify(payload),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(runtimeErrorMessage(response, body));
+  if (!response.ok) {
+    const error = new Error(runtimeErrorMessage(response, body));
+    error.status = response.status;
+    error.route = route;
+    throw error;
+  }
   return body ? JSON.parse(body) : {};
 }
 

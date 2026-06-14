@@ -13,9 +13,20 @@ workspace. The repository stores this safe summary only.
 
 - Branch/worktree: `codex/afs-mvp-joint-qa-closeout`.
 - Product entry: Runtime-hosted `/studio/`.
-- Provider scope: LLM, MiniMax image, Kling I2V attempt.
+- Provider scope: LLM, MiniMax image, Kling I2V.
 - Excluded scope: ASR and external downloads.
 - Added role: frontend UI reviewer.
+
+## 2026-06-15 Final Update
+
+The previous MiniMax image B blocker has been cleared by a B-only live retry
+with `candidate_count=1`. Per user direction, image and video gates were opened
+for Runtime 8790; ASR remained closed. MiniMax image live smoke succeeded and
+registered one reusable image asset. Kling I2V preflight, submit, poll, Runtime
+preview, and offline inspection succeeded with `candidate_count=1`.
+
+The final readiness audit reports `recommended`, seven role checks passed, zero
+provider blockers, and `human_acceptance_claim=not_claimed`.
 
 ## Verification Summary
 
@@ -27,12 +38,13 @@ workspace. The repository stores this safe summary only.
 | Studio JS syntax | Passed, 37 files | `studio_node_check.txt` and rerun output |
 | Product browser smoke | Passed | `gate_closed_8790_ui_smoke_corrected_report.json` |
 | LLM prompt optimization smoke | Passed with two prompt optimization manifests | `live_llm_browser_runtime/*prompt_optimization_safe_manifest.json` |
-| MiniMax image smoke | Partial: A and C succeeded, B blocked after retry | `live_minimax_image_comparison_report.json` |
-| Kling I2V smoke | Passed after external-config preflight, one live submit, and poll-only recovery of the same job | `live_kling_i2v_startup_config_report.json`, `live_kling_i2v_startup_config_recovery_poll_report.json`, `live_kling_i2v_video_inspection.json` |
+| MiniMax image smoke | Passed: A/C comparison evidence plus B-only retry and direct image gate-open smoke | `live_minimax_image_comparison_report.json`, `minimax_b_only_live_retry_20260615.json`, `user_image_gate_open_live_smoke_20260615.json` |
+| Kling I2V smoke | Passed: earlier recovery evidence plus direct video gate-open preflight/submit/poll/preview/offline inspection | `live_kling_i2v_startup_config_report.json`, `live_kling_i2v_startup_config_recovery_poll_report.json`, `live_kling_i2v_video_inspection.json`, `user_video_gate_open_preflight_20260615.json`, `user_video_gate_open_live_smoke_20260615.json`, `user_video_gate_open_live_smoke_ffprobe_20260615.json` |
 | Frontend UI reviewer | Failed first pass, passed after responsive shell fix | `frontend_ui_reviewer_after_fix2_report.json` |
-| AI role pre-acceptance | Needs fixes / inconclusive | `ai_role_pre_acceptance_summary.json` |
-| Continued blocker preflight | Passed deterministic hardening checks; startup-config Kling preflight reached ready with command-scoped video gate; MiniMax image REST preflight reached ready with command-scoped image gate | `kling_provider_preflight_after_blocker_hardening.json`, `kling_provider_preflight_startup_secrets_config_gate_open.json`, `minimax_image_provider_preflight_startup_secrets_config_gate_open.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
-| Readiness audit | Needs fixes, no-cost aggregation; only MiniMax image B provider readiness remains open | `afs_mvp_joint_qa_readiness_audit.latest.json` |
+| AI role pre-acceptance | Recommended for user human-acceptance decision; not human acceptance | `ai_role_pre_acceptance_summary.json`, `afs_mvp_joint_qa_readiness_audit_final_20260615.json` |
+| Continued blocker preflight | Passed deterministic hardening checks; startup-config Kling and MiniMax preflights reached ready with command-scoped gates; final image/video gate-open preflights passed | `kling_provider_preflight_after_blocker_hardening.json`, `kling_provider_preflight_startup_secrets_config_gate_open.json`, `minimax_image_provider_preflight_startup_secrets_config_gate_open.json`, `minimax_image_provider_preflight_image_video_gate_open_20260615.json`, `kling_provider_preflight_image_video_gate_open_20260615.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
+| Readiness audit | Recommended, zero provider blockers, seven role checks passed, no human acceptance claim | `afs_mvp_joint_qa_readiness_audit_final_20260615.json` |
+| Final verification | Passed with warnings only where already classified | default pytest 404 passed / 527 deselected; legacy pytest 527 passed / 404 deselected; Studio JS 37 files passed; maintenance audit failed=0; `git diff --check` exit 0 |
 
 ## Findings
 
@@ -69,15 +81,27 @@ workspace. The repository stores this safe summary only.
   command-scoped image gate-open preflight is `ready`, with effective backend
   `rest_api`, model `image-01`, `config_source=AFS_PROVIDER_CONFIG`, and
   `secrets_printed=false`.
+- Studio now distinguishes stale Runtime preflight 404 from provider failure:
+  Runtime client errors carry status and route, and the generation flow tells
+  the user to restart the 8790 Runtime Service when a branch-local preflight
+  route is missing.
+- MiniMax B-only retry succeeded with no fixed asset, no subject reference, one
+  candidate, safe manifest success, and no persisted provider raw or secret
+  values. This cleared the last readiness-audit provider blocker.
+- The asset-context browser QA proxy now closes image/video/ASR gates while
+  allowing an explicit `--allow-live-llm` mode for the prompt-optimization path.
+  A post-fix live-LLM rerun reached the first optimize and then hit an upstream
+  SSL EOF on the second re-optimize; no image/video provider call was started by
+  that QA path and it was not retried further.
 
 ### Open P1 / Blockers
 
-- `P1-IMAGE-B-PROVIDER-READINESS`: MiniMax comparison arm B, the no-reference
-  context-subgraph arm, blocked after one retry with a safe provider readiness
-  error from the historical `mmx_cli` backend. Arms A and C succeeded. No extra
-  live retry was run in this continuation because Claude classified a new image
-  provider retry as requiring explicit cost approval. The next action is now one
-  B-only Runtime retry with `candidate_count=1`, using the ready REST config.
+- None for provider readiness after the B-only live retry and direct
+  image/video gate-open smokes.
+- Residual non-blocking risk: the asset-context browser QA path depends on live
+  LLM for prompt optimization. A post-fix rerun saw an upstream SSL EOF during
+  the second LLM re-optimize. This is recorded as a transient provider-path risk,
+  not an image/video readiness blocker.
 
 ### Human-Scored Quality Risks
 
@@ -105,10 +129,9 @@ workspace. The repository stores this safe summary only.
 
 ## Recommendation
 
-Do not claim internal-test acceptance yet. The correct AI recommendation is
-`needs fixes / inconclusive` until the image B provider-readiness issue is
-either reproduced/fixed by the B-only live retry or classified with stronger
-provider evidence. Kling is no longer a config blocker for this branch, but its
-creative quality remains a human-scored item. The current MiniMax REST preflight
-is ready, so the next paid action should be a single B-only image retry after
-explicit approval. Human acceptance still requires the user to run the runbook.
+AI recommendation is now `recommended` for the user's human-acceptance decision.
+The deterministic tests, Runtime/browser evidence, MiniMax image provider
+smoke, Kling I2V provider smoke, B-only retry, and readiness audit have no open
+P0/P1 provider blocker. This is still not human acceptance, business validation,
+or durable-memory promotion. Human acceptance still requires the user to run the
+runbook and score creative quality.

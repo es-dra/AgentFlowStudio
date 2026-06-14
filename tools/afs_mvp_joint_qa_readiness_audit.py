@@ -56,6 +56,8 @@ def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
 
 
 def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
+    if _successful_minimax_b_only_retry(evidence_root).is_file():
+        return None
     manifests = sorted(evidence_root.glob("live_minimax_image_runtime/**/B/keyframe_generation_safe_manifest.json"))
     preflight_path = _preferred_minimax_preflight(evidence_root)
     if not manifests:
@@ -240,6 +242,21 @@ def _preferred_minimax_preflight(root: Path) -> Path:
     if ready_paths:
         return max(ready_paths, key=lambda path: path.stat().st_mtime)
     return max(paths, key=lambda path: path.stat().st_mtime)
+
+
+def _successful_minimax_b_only_retry(root: Path) -> Path:
+    paths = [path for path in root.glob("minimax_b_only_live_retry*.json") if path.is_file()]
+    for path in sorted(paths, key=lambda item: item.stat().st_mtime, reverse=True):
+        payload = _read_json(path)
+        if (
+            payload.get("status") == "succeeded"
+            and payload.get("provider_calls_started") is True
+            and payload.get("arm_id") == "B"
+            and payload.get("include_fixed_assets") is False
+            and int(payload.get("provider_output_count") or 0) > 0
+        ):
+            return path
+    return root / "minimax_b_only_live_retry*.json"
 
 
 def _first_existing_ref(root: Path, relative_paths: list[str]) -> str:

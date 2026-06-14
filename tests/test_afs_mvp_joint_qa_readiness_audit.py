@@ -171,6 +171,43 @@ def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(t
     ]
 
 
+def test_joint_qa_readiness_audit_clears_image_blocker_after_b_only_retry_success(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        {
+            "status": "blocked",
+            "provider_calls_started": True,
+            "retry_count": 1,
+            "blocks": [{"block_id": "remote_image_provider_not_ready", "reason": "safe reason"}],
+        },
+    )
+    _write_json(
+        tmp_path / "minimax_b_only_live_retry_20260615.json",
+        {
+            "status": "succeeded",
+            "provider_calls_started": True,
+            "arm_id": "B",
+            "include_fixed_assets": False,
+            "provider_output_count": 1,
+        },
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True},
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
+    )
+
+    audit = build_readiness_audit(tmp_path)
+
+    blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
+    assert "P1-IMAGE-B-PROVIDER-READINESS" not in blockers
+    assert audit["status"] == "recommended"
+    assert audit["next_actions"] == []
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

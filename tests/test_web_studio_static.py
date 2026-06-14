@@ -262,6 +262,11 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "temporary_asset_exclusions" in node_actions
     assert "temporary_asset_exclusions" in optimizer_contract
     assert "asset_conflicts" in node_actions
+    assert "error.status = response.status" in runtime_client
+    assert "error.route = route" in runtime_client
+    assert "missingPreflightRouteError" in node_actions
+    assert "Runtime Service version is stale or not started from this branch" in node_actions
+    assert "Restart the 8790 Runtime Service and retry" in node_actions
 
 
 def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:

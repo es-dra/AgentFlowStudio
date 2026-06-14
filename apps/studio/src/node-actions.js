@@ -325,7 +325,15 @@ async function prepareGenerationRequest(store, runtime, node, request, kind) {
     temporary_asset_exclusions: normalizeAssetExclusions(request.temporary_asset_exclusions),
   };
   while (true) {
-    const outcome = await preflight(working);
+    let outcome;
+    try {
+      outcome = await preflight(working);
+    } catch (error) {
+      if (missingPreflightRouteError(error)) {
+        throw new Error(staleRuntimePreflightMessage(kind));
+      }
+      throw error;
+    }
     const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
     if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
     const decision = await showCarryConfirmModal(outcome, node, kind);
@@ -339,6 +347,15 @@ async function prepareGenerationRequest(store, runtime, node, request, kind) {
     }, { history: false });
     working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
   }
+}
+
+function missingPreflightRouteError(error) {
+  return Number(error?.status) === 404 && String(error?.route || "").endsWith("/preflight");
+}
+
+function staleRuntimePreflightMessage(kind) {
+  const label = kind === "video" ? "video" : "keyframe";
+  return `Runtime Service version is stale or not started from this branch: missing ${label} preflight route. Restart the 8790 Runtime Service and retry.`;
 }
 
 function showCarryConfirmModal(preflight, node, kind) {

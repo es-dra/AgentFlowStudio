@@ -25,11 +25,14 @@ def test_kling_preflight_reports_missing_service_without_secrets(tmp_path, monke
     assert exit_code == 1
     report = json.loads(capsys.readouterr().out)
     assert report["status"] == "blocked"
+    assert report["config_source"] == "AFS_PROVIDER_CONFIG"
     assert report["checks"]["block_id"] == "provider_service_missing"
     assert report["checks"]["service_present"] is False
     assert report["checks"]["available_video_service_ids"] == []
     assert report["secrets_printed"] is False
-    assert "fake" not in json.dumps(report).lower()
+    serialized = json.dumps(report).lower()
+    assert str(config_path).lower() not in serialized
+    assert "fake" not in serialized
 
 
 def test_kling_preflight_reports_missing_credentials_for_present_service(tmp_path, monkeypatch, capsys) -> None:
@@ -45,6 +48,7 @@ def test_kling_preflight_reports_missing_credentials_for_present_service(tmp_pat
     assert exit_code == 0
     report = json.loads(capsys.readouterr().out)
     assert report["status"] == "missing_credentials"
+    assert report["config_source"] == "AFS_PROVIDER_CONFIG"
     assert report["checks"]["block_id"] == "provider_credentials_missing"
     assert report["checks"]["service_present"] is True
     assert report["checks"]["gate"]["enabled"] is True

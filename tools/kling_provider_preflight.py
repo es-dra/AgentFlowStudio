@@ -22,10 +22,10 @@ DEFAULT_SERVICE_ID = "kling_i2v"
 
 def main() -> int:
     service_id = os.environ.get("AFS_KLING_PREFLIGHT_SERVICE", DEFAULT_SERVICE_ID).strip() or DEFAULT_SERVICE_ID
-    config_path = _config_path()
+    config_path, config_source = _config_source()
     report = {
         "schema_version": "kling_provider_preflight.v0.1",
-        "config_source": str(config_path),
+        "config_source": config_source,
         "service_id": service_id,
         "status": "unknown",
         "checks": {},
@@ -98,14 +98,14 @@ def main() -> int:
     return 0 if report["status"] in {"ready", "missing_credentials", "gate_closed"} else 1
 
 
-def _config_path() -> Path:
+def _config_source() -> tuple[Path, str]:
     env_path = os.environ.get("AFS_PROVIDER_CONFIG", "").strip()
     if env_path:
-        return Path(env_path)
+        return Path(env_path), "AFS_PROVIDER_CONFIG"
     local = Path("configs/providers.local.json")
     if local.is_file():
-        return local
-    return Path("configs/providers.example.json")
+        return local, "configs/providers.local.json"
+    return Path("configs/providers.example.json"), "configs/providers.example.json"
 
 
 def _credential_presence(account: dict[str, Any]) -> dict[str, Any]:
