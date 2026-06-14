@@ -1,5 +1,54 @@
 # Devlog
 
+## 2026-06-15 - Browser Acceptance Drill
+
+- Created `codex/afs-browser-acceptance-drill-20260615` from the joint QA
+  closeout branch and ran a Browser-led acceptance drill against Runtime-hosted
+  `/studio/` on 8790. Evidence is stored outside the repo under
+  `20260615-afs-browser-acceptance-drill`; repository records contain safe
+  summaries only.
+- Opened only the approved live gates for this drill: LLM, MiniMax image, and
+  Kling I2V. ASR and external download stayed closed. Browser coverage passed
+  project create/switch/refresh, prompt persistence, T2I optimize + image
+  generation, fixed asset promotion/detail/refresh, explicit video first frame,
+  one Kling submit, UI polling, Runtime video preview, and refresh recovery.
+- Used two MiniMax image calls. Both succeeded with one output each, but the
+  second call did not count as true I2I because its safe manifest recorded
+  `reference_image_count=0`. The drill therefore remains `needs_fixes` for
+  Path 3 until one extra authorized reference-backed I2I call is run.
+- Found an I2I optimization quality risk: the LLM optimizer switched to
+  reference-preserving tone, but also contradicted explicit requested edits by
+  telling the model to keep background/clothing unchanged. The optimized text
+  was not used for the second image call and is recorded as a follow-up.
+- Kling I2V passed with one submit and same-job polling. Runtime preview
+  returned `video/mp4`; `ffprobe` recorded a 5.04s H.264 video at 1080x1920.
+  Safe manifests did not persist provider raw responses, provider URLs, local
+  absolute paths, or media bytes returned by API.
+- Fixed `tools/afs_mvp_joint_qa_readiness_audit.py` so the no-cost audit can
+  recognize browser-drill evidence rooted at `runtime_service/**` plus
+  `browser_qa_summary.json`, while preserving the older joint-QA evidence
+  format. The current audit now reports zero provider blockers and `needs_fixes`
+  only for the Path 3/I2I role gap.
+
+Verification:
+
+```text
+focused gate-closed pytest: 58 passed, 1 warning
+Studio JS node --check: 37 files passed
+tests/test_afs_mvp_joint_qa_readiness_audit.py: 8 passed
+readiness_audit.json: needs_fixes, provider_blocker_count=0
+pytest -q: 406 passed, 527 deselected, 2 warnings
+pytest -m legacy -q: 527 passed, 406 deselected, 1 warning
+maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
+```
+
+Boundary:
+
+- This is AI/browser pre-acceptance, not human acceptance, business validation,
+  or durable-memory promotion.
+- No third MiniMax image call was made without explicit approval.
+
 ## 2026-06-15 - Joint QA Image/Video Gate Open Closeout
 
 - Fixed the Studio stale Runtime symptom seen as `MiniMax keyframe request

@@ -208,6 +208,64 @@ def test_joint_qa_readiness_audit_clears_image_blocker_after_b_only_retry_succes
     assert audit["next_actions"] == []
 
 
+def test_readiness_audit_accepts_browser_drill_manifests_and_preserves_role_gaps(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "browser_qa_summary.json",
+        {
+            "artifact_type": "afs_browser_acceptance_drill_summary",
+            "role_checks": [
+                {"role_id": "ordinary_internal_tester", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "creative_director", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "asset_manager", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "video_qa", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "safety_release_qa", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "runbook_paths_1_6", "status": "needs_fixes", "evidence_ref": "browser_qa_summary.json"},
+                {"role_id": "frontend_ui_reviewer", "status": "passed", "evidence_ref": "browser_qa_summary.json"},
+            ],
+            "next_actions": ["Run one extra authorized I2I live reference call."],
+        },
+    )
+    _write_json(
+        tmp_path / "runtime_service" / "runs" / "project" / "image_job" / "keyframe_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True, "output_count": 1},
+    )
+    _write_json(
+        tmp_path / "runtime_service" / "runs" / "project" / "video_job" / "video_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True, "outputs": [{"candidate_id": "candidate_001"}]},
+    )
+
+    audit = build_readiness_audit(tmp_path)
+
+    roles = {item["role_id"]: item for item in audit["role_checks"]}
+    assert audit["provider_blockers"] == []
+    assert audit["status"] == "needs_fixes"
+    assert roles["runbook_paths_1_6"]["status"] == "needs_fixes"
+    assert audit["next_actions"] == ["Run one extra authorized I2I live reference call."]
+
+
+def test_readiness_audit_marks_browser_drill_missing_roles_as_needs_fixes(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "browser_qa_summary.json",
+        {
+            "artifact_type": "afs_browser_acceptance_drill_summary",
+            "role_checks": [],
+        },
+    )
+    _write_json(
+        tmp_path / "runtime_service" / "runs" / "project" / "image_job" / "keyframe_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True, "output_count": 1},
+    )
+    _write_json(
+        tmp_path / "runtime_service" / "runs" / "project" / "video_job" / "video_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True, "outputs": [{"candidate_id": "candidate_001"}]},
+    )
+
+    audit = build_readiness_audit(tmp_path)
+
+    assert audit["provider_blockers"] == []
+    assert audit["status"] == "needs_fixes"
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

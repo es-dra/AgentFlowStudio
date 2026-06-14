@@ -2,8 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.append(str(Path(__file__).resolve().parent))
+from afs_browser_drill_readiness import (
+    browser_drill_next_actions,
+    browser_drill_provider_blockers,
+    browser_drill_role_checks,
+    browser_drill_summary,
+)
 
 
 def main() -> int:
@@ -26,11 +35,16 @@ def parse_args() -> argparse.Namespace:
 
 def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
     evidence_root = evidence_root.resolve()
-    image_blocker = _image_provider_blocker(evidence_root)
-    kling_blocker = _kling_provider_blocker(evidence_root)
-    provider_blockers = [item for item in (kling_blocker, image_blocker) if item is not None]
-    role_checks = _role_checks(evidence_root, provider_blockers)
-    status = "needs_fixes" if provider_blockers else "recommended"
+    browser_summary = browser_drill_summary(evidence_root)
+    if browser_summary:
+        provider_blockers = browser_drill_provider_blockers(evidence_root)
+    else:
+        image_blocker = _image_provider_blocker(evidence_root)
+        kling_blocker = _kling_provider_blocker(evidence_root)
+        provider_blockers = [item for item in (kling_blocker, image_blocker) if item is not None]
+    role_checks = browser_drill_role_checks(browser_summary) if browser_summary else _role_checks(evidence_root, provider_blockers)
+    role_gap = _has_browser_role_gap(role_checks) if browser_summary else _has_legacy_role_blocker(role_checks)
+    status = "needs_fixes" if provider_blockers or role_gap else "recommended"
     return {
         "artifact_type": "afs_mvp_joint_qa_readiness_audit",
         "schema_version": "0.1.0",
@@ -44,7 +58,7 @@ def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
             "passed_role_count": sum(1 for item in role_checks if item["status"] == "passed"),
             "blocked_role_count": sum(1 for item in role_checks if item["status"] == "blocked"),
         },
-        "next_actions": _next_actions(provider_blockers),
+        "next_actions": _next_actions(provider_blockers) + browser_drill_next_actions(browser_summary),
         "non_claims": [
             "no-cost evidence audit only",
             "not live provider smoke",
@@ -53,6 +67,14 @@ def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
             "not durable memory",
         ],
     }
+
+
+def _has_browser_role_gap(role_checks: list[dict[str, str]]) -> bool:
+    return not role_checks or any(item["status"] != "passed" for item in role_checks)
+
+
+def _has_legacy_role_blocker(role_checks: list[dict[str, str]]) -> bool:
+    return any(item["status"] in {"blocked", "needs_fixes"} for item in role_checks)
 
 
 def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
