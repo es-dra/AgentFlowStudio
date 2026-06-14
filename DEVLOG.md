@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-14 - Provider Blocker Preflight Evidence Hardening
+
+- Continued the MVP joint QA closeout branch after the blocker-marked push.
+  Current local provider config still exposes MiniMax image/LLM services only;
+  no video/Kling service is present, and Kling credential environment variables
+  are absent.
+- Hardened `tools/kling_provider_preflight.py` so no-cost Kling readiness now
+  reports structured blocker IDs such as `provider_service_missing`,
+  `provider_credentials_missing`, and `video_gate_closed`, while preserving
+  `secrets_printed=false`.
+- Hardened generation comparison evidence: Runtime A/B/C arm reports now include
+  safe `blocks` and `retry_count`, and the live-comparison runner summarizes
+  `block_ids` plus `retry_count` per arm.
+- Added focused regression tests for Kling preflight blocker classification and
+  comparison arm block summaries. Focused verification:
+  `tests/test_kling_provider_preflight_tool.py`,
+  `tests/test_api_runtime_generation_comparison.py`, and
+  `tests/test_studio_asset_context_live_comparison_tool.py` passed 8 tests.
+- Added no-cost external evidence files for the continued blocker diagnosis:
+  `kling_provider_preflight_after_blocker_hardening.json` and
+  `gate_closed_live_comparison_after_arm_block_summary.json`.
+- Verification after this hardening: focused blocker tests 8 passed, default
+  `pytest -q` 393 passed / 527 deselected, legacy `pytest -m legacy -q` 527
+  passed / 393 deselected, maintenance audit failed=0 with existing warnings,
+  and `git diff --check` exited clean.
+
+Boundary:
+
+- This hardening improves diagnosis and repeatability only. It does not run a
+  new live Kling task or retry MiniMax arm B, and it does not change the
+  `needs fixes / inconclusive` acceptance recommendation.
+
 ## 2026-06-14 - MVP Joint QA Closeout And Frontend Reviewer Fix
 
 - Ran the joint Codex + Claude closeout lane on

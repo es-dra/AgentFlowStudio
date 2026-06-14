@@ -137,11 +137,14 @@ def _keyframe_request(
 
 
 def _arm_report(arm: dict[str, Any], result: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    safe_manifest = result.get("safe_manifest") if isinstance(result.get("safe_manifest"), dict) else {}
     return {
         "arm_id": arm["arm_id"],
         "status": result["status"],
         "provider_gate": result["provider_gate"],
         "provider_calls_started": result["provider_calls_started"],
+        "retry_count": int(safe_manifest.get("retry_count") or 0),
+        "blocks": safe_manifest.get("blocks") or [],
         "fixed_asset_injection": bool(arm["include_fixed_assets"]),
         "context_path": plan.get("context_path"),
         "provider_prompt": plan.get("provider_prompt"),

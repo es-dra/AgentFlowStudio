@@ -224,6 +224,12 @@ def _runner_report(
                 "arm_id": item.get("arm_id"),
                 "status": item.get("status"),
                 "provider_calls_started": item.get("provider_calls_started") is True,
+                "retry_count": int(item.get("retry_count") or 0),
+                "block_ids": [
+                    str(block.get("block_id"))
+                    for block in (item.get("blocks") or [])
+                    if isinstance(block, dict) and block.get("block_id")
+                ],
                 "fixed_asset_injection": item.get("fixed_asset_injection") is True,
                 "result_ref_count": len(item.get("result_refs") or []),
                 "subject_reference_asset_id": item.get("subject_reference_asset_id"),

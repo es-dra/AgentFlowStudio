@@ -21,6 +21,13 @@ The useful pattern was the hard-call ledger:
 - video submit and video poll are separate counters;
 - ASR and external downloads stay at zero unless explicitly scoped.
 
+A second useful pattern was the blocker taxonomy:
+
+- distinguish missing service, closed gate, missing credentials, provider
+  readiness, and provider result-quality risk;
+- include retry count beside blocked provider arms;
+- keep blocker IDs machine-readable while keeping reasons safe for handoff.
+
 ## Proposed Rule Shape
 
 When a task opens remote model/provider gates:
@@ -29,7 +36,9 @@ When a task opens remote model/provider gates:
 2. Treat retries as provider calls unless the provider contract proves otherwise.
 3. Save checkpoint prompts/responses as sanitized evidence outside repo raw runs.
 4. Record only safe summaries in the project repo.
-5. Do not claim human acceptance from provider smoke or AI role pre-acceptance.
+5. Require machine-readable blocker IDs before deciding whether to retry, fix
+   local config, or repair product code.
+6. Do not claim human acceptance from provider smoke or AI role pre-acceptance.
 
 ## Limits
 

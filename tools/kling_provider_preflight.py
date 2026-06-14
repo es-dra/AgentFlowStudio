@@ -33,7 +33,29 @@ def main() -> int:
     }
     try:
         store = load_company_provider_secrets(config_path)
+    except (ModelConfigError, ValueError) as exc:
+        report["status"] = "blocked"
+        report["checks"] = {
+            "block_id": _block_id_for_error(str(exc)),
+            "error": _safe_error(str(exc)),
+        }
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1
+
+    try:
         service = store.service(service_id)
+    except (ModelConfigError, ValueError) as exc:
+        report["status"] = "blocked"
+        report["checks"] = {
+            "block_id": "provider_service_missing",
+            "service_present": False,
+            "available_video_service_ids": _video_service_ids(store),
+            "error": _safe_error(str(exc)),
+        }
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1
+
+    try:
         account = store.account(str(service.get("account_ref") or ""))
         registry = ProviderRegistry.from_store(store)
         descriptor = registry.descriptor(service_id)
@@ -55,12 +77,25 @@ def main() -> int:
             "credential_presence": _credential_presence(account),
             "jwt_self_check": _jwt_self_check(account),
         }
-        report["status"] = "ready" if report["checks"]["credential_presence"]["access_key_present"] and report["checks"]["credential_presence"]["secret_key_present"] else "missing_credentials"
+        credentials_ready = (
+            report["checks"]["credential_presence"]["access_key_present"]
+            and report["checks"]["credential_presence"]["secret_key_present"]
+        )
+        gate_ready = report["checks"]["gate"]["enabled"]
+        if credentials_ready and gate_ready:
+            report["status"] = "ready"
+        elif not credentials_ready:
+            report["status"] = "missing_credentials"
+            report["checks"]["block_id"] = "provider_credentials_missing"
+        else:
+            report["status"] = "gate_closed"
+            report["checks"]["block_id"] = "video_gate_closed"
     except (ModelConfigError, ValueError) as exc:
         report["status"] = "blocked"
+        report["checks"]["block_id"] = _block_id_for_error(str(exc))
         report["checks"]["error"] = _safe_error(str(exc))
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if report["status"] in {"ready", "missing_credentials"} else 1
+    return 0 if report["status"] in {"ready", "missing_credentials", "gate_closed"} else 1
 
 
 def _config_path() -> Path:
@@ -86,6 +121,17 @@ def _credential_presence(account: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _video_service_ids(store: Any) -> list[str]:
+    services = getattr(store, "services", {})
+    if not isinstance(services, dict):
+        return []
+    return sorted(
+        str(service_id)
+        for service_id, service in services.items()
+        if isinstance(service, dict) and (service.get("capability") == "video" or service.get("provider") == "kling")
+    )
+
+
 def _jwt_self_check(account: dict[str, Any]) -> dict[str, Any]:
     access_key = str(account.get("access_key") or os.environ.get(str(account.get("access_key_env") or ""), "") or "")
     secret_key = str(account.get("secret_key") or os.environ.get(str(account.get("secret_key_env") or ""), "") or "")
@@ -108,6 +154,19 @@ def _safe_error(value: str) -> str:
     if "key" in lowered or "secret" in lowered or "token" in lowered or "authorization" in lowered:
         return "Provider configuration is not ready."
     return value[:180]
+
+
+def _block_id_for_error(value: str) -> str:
+    lowered = value.lower()
+    if "not found" in lowered and "service" in lowered:
+        return "provider_service_missing"
+    if "not found" in lowered and "account" in lowered:
+        return "provider_account_missing"
+    if "file not found" in lowered or "config path is required" in lowered:
+        return "provider_config_missing"
+    if "json is invalid" in lowered or "schema is invalid" in lowered:
+        return "provider_config_invalid"
+    return "provider_config_not_ready"
 
 
 if __name__ == "__main__":

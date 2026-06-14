@@ -78,12 +78,18 @@ def test_generation_comparison_report_defines_a_b_c_arms_without_gate_network(tm
     assert report["status"] == "blocked"
     assert report["provider_calls_started"] is False
     assert arms["A"]["context_path"] == "legacy_asset_refs"
+    assert arms["A"]["retry_count"] == 0
+    assert arms["A"]["blocks"][0]["block_id"] == "remote_image_gate_closed"
     assert arms["A"]["reference_images"] == []
     assert "keep Lin Wan identity" not in arms["A"]["provider_prompt"]
     assert arms["B"]["context_path"] == "context_subgraph_v0.1"
     assert arms["B"]["fixed_asset_injection"] is False
+    assert arms["B"]["retry_count"] == 0
+    assert arms["B"]["blocks"][0]["block_id"] == "remote_image_gate_closed"
     assert "keep Lin Wan identity" not in arms["B"]["provider_prompt"]
     assert arms["C"]["fixed_asset_injection"] is True
+    assert arms["C"]["retry_count"] == 0
+    assert arms["C"]["blocks"][0]["block_id"] == "remote_image_gate_closed"
     assert "keep Lin Wan identity" in arms["C"]["provider_prompt"]
     assert arms["C"]["subject_reference_asset_id"] == asset["asset_id"]
     assert report["arm_definitions"]["A"].startswith("original prompt")

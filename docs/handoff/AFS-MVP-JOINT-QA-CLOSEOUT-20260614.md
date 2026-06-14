@@ -22,8 +22,8 @@ workspace. The repository stores this safe summary only.
 | Layer | Result | Evidence |
 |---|---|---|
 | Gate-closed focused tests | Passed, 53 tests | `gate_closed_focused_pytest_after_tool_patch_retry.txt` and rerun output |
-| Default pytest | Passed, 391 tests | Final rerun output |
-| Legacy pytest | Passed, 527 tests | Final rerun output |
+| Default pytest | Passed, 393 tests | Final rerun output after blocker preflight hardening |
+| Legacy pytest | Passed, 527 tests | Final rerun output after blocker preflight hardening |
 | Studio JS syntax | Passed, 37 files | `studio_node_check.txt` and rerun output |
 | Product browser smoke | Passed | `gate_closed_8790_ui_smoke_corrected_report.json` |
 | LLM prompt optimization smoke | Passed with two prompt optimization manifests | `live_llm_browser_runtime/*prompt_optimization_safe_manifest.json` |
@@ -31,6 +31,7 @@ workspace. The repository stores this safe summary only.
 | Kling I2V smoke | Blocked before provider call by local provider config | `live_kling_i2v_report.json` |
 | Frontend UI reviewer | Failed first pass, passed after responsive shell fix | `frontend_ui_reviewer_after_fix2_report.json` |
 | AI role pre-acceptance | Needs fixes / inconclusive | `ai_role_pre_acceptance_summary.json` |
+| Continued blocker preflight | Passed deterministic hardening checks | `kling_provider_preflight_after_blocker_hardening.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
 
 ## Findings
 
@@ -46,6 +47,14 @@ workspace. The repository stores this safe summary only.
 - Runtime API example-contract and legacy provider-validation tests now clear
   local provider gates/config before asserting deterministic gate-closed
   behavior, so developer-machine live config cannot alter those expectations.
+- Kling preflight now reports structured blocker IDs. The current no-cost
+  preflight classifies the remaining video blocker as
+  `provider_service_missing`, with no available video service IDs and
+  `secrets_printed=false`.
+- Generation comparison arm evidence now includes safe `blocks` and
+  `retry_count`; the live-comparison runner summarizes per-arm `block_ids` and
+  `retry_count`, so future MiniMax arm B failures no longer collapse into an
+  opaque `blocked` status.
 
 ### Open P1 / Blockers
 
@@ -53,11 +62,13 @@ workspace. The repository stores this safe summary only.
   service and the Kling credential environment variables were not present.
   Runtime correctly blocked before provider calls started. A real Kling smoke
   needs a local ignored config that includes `kling_i2v` plus valid credential
-  environment variables.
+  environment variables. Continued no-cost preflight now confirms this as
+  `provider_service_missing`.
 - `P1-IMAGE-B-PROVIDER-READINESS`: MiniMax comparison arm B, the no-reference
   context-subgraph arm, blocked after one retry with a safe provider readiness
   error. Arms A and C succeeded. No extra retry was run because the image-call
-  cap was already consumed.
+  cap was already consumed. Future reruns will expose arm-level `block_ids` and
+  `retry_count` in the runner summary.
 
 ### Human-Scored Quality Risks
 
