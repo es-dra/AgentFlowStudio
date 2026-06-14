@@ -1,5 +1,46 @@
 # Devlog
 
+## 2026-06-14 - MVP Joint QA Closeout And Frontend Reviewer Fix
+
+- Ran the joint Codex + Claude closeout lane on
+  `codex/afs-mvp-joint-qa-closeout` with external evidence under
+  `20260614-afs-mvp-joint-qa`; repo records contain only safe summaries.
+- Re-ran gate-closed focused tests for manifest safety, prompt loop, keyframe
+  reference guards, video generation, Studio static checks, and the browser QA
+  tool: 53 passed, 1 warning. Studio JS `node --check` passed for 37 files.
+- Ran Runtime-hosted `/studio/` browser smoke for project create, reload,
+  second project create, and switch-back; no `Failed to fetch` and no warn/error
+  logs were observed.
+- Ran LLM browser smoke with image/video gates closed. Two prompt optimization
+  safe manifests show provider calls started and raw responses were not stored;
+  keyframe/comparison stayed image-gate blocked.
+- Ran MiniMax image comparison within the live image cap. Arms A and C
+  succeeded; arm B blocked after one retry with a safe provider-readiness error.
+  No extra image retry was run because the conservative call cap was consumed.
+- Attempted Kling I2V with explicit first-frame asset and `candidate_count=1`.
+  Runtime preflight passed, but submit blocked before provider calls because the
+  current local provider config has no video/Kling service and Kling credential
+  environment variables were absent.
+- Added the seventh AI pre-acceptance role, frontend UI reviewer. The first pass
+  found mobile/narrow topbar and starter-card clipping; the responsive Studio
+  shell fix now passes desktop/mobile/narrow Playwright checks.
+- Hardened QA evidence tooling: browser QA screenshots default next to the
+  external report path, and prompt optimization provider-call counts are exposed
+  in future browser QA reports.
+- Hardened provider-gate test isolation for Runtime API contract examples and
+  legacy provider-validation subprocess tests so local live provider config or
+  open gates cannot change deterministic expectations.
+- Added `docs/handoff/AFS-MVP-JOINT-QA-CLOSEOUT-20260614.md` with seven-role
+  pre-acceptance results and open P1 blockers.
+
+Boundary:
+
+- This run is AI role pre-acceptance and provider smoke where providers ran. It
+  is not human acceptance, business validation, or durable-memory promotion.
+- Current recommendation is `needs fixes / inconclusive`, not ready-to-accept,
+  until Kling local provider config is present and the image B provider
+  readiness issue is resolved or reclassified with stronger evidence.
+
 ## 2026-06-14 - Browser Repair Loop 005 Baseline And Guards
 
 - Brought the Loop 003 browser QA red baseline into the active line as

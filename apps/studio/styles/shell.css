@@ -276,16 +276,52 @@
 .starter-card .starter-icon { font-size: 15px; color: var(--text-secondary); }
 
 @media (max-width: 520px) {
+  :root {
+    --drawer-w: min(156px, 40vw);
+  }
   #topbar.drawer-open {
     left: var(--drawer-w);
     padding: 0 6px;
     overflow: hidden;
+    gap: 6px;
   }
-  #topbar.drawer-open .topbar-right .icon-btn { display: none; }
-  .save-pill {
-    max-width: 88px;
+  #topbar.drawer-open .project-select {
+    width: clamp(88px, calc(100vw - var(--drawer-w) - 88px), 146px);
+    min-width: 0;
+    max-width: none;
+  }
+  #topbar.drawer-open .icon-btn {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+  }
+  #topbar.drawer-open .topbar-right { display: none; }
+  #topbar.drawer-open .save-pill {
+    max-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  #canvas-empty-hint {
+    left: calc(var(--drawer-w) + (100vw - var(--drawer-w)) / 2);
+    width: calc(100vw - var(--drawer-w) - 24px);
+    justify-content: center;
+    text-align: center;
+  }
+  #starter-row {
+    left: calc(var(--drawer-w) + (100vw - var(--drawer-w)) / 2);
+    top: 50%;
+    width: calc(100vw - var(--drawer-w) - 24px);
+    max-width: calc(100vw - var(--drawer-w) - 24px);
+    flex-direction: column;
+    gap: 8px;
+    overflow-x: visible;
+    overflow-y: auto;
+    max-height: 42vh;
+  }
+  .starter-card {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 8px;
   }
   #corner-controls { display: none; }
 }

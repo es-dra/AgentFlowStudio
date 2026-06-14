@@ -355,6 +355,20 @@ def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
     assert "max-height: none" in styles
 
 
+def test_studio_mobile_shell_keeps_topbar_and_starters_inside_canvas() -> None:
+    styles = (STUDIO_ROOT / "styles" / "shell.css").read_text(encoding="utf-8")
+
+    assert "--drawer-w: min(156px, 40vw);" in styles
+    assert "width: clamp(88px, calc(100vw - var(--drawer-w) - 88px), 146px);" in styles
+    assert "#topbar.drawer-open .topbar-right { display: none; }" in styles
+    assert "left: calc(var(--drawer-w) + (100vw - var(--drawer-w)) / 2);" in styles
+    assert "top: 50%;" in styles
+    assert "width: calc(100vw - var(--drawer-w) - 24px);" in styles
+    assert "flex-direction: column;" in styles
+    assert "overflow-x: visible;" in styles
+    assert "max-height: 42vh;" in styles
+
+
 def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:
     director_data = (STUDIO_ROOT / "src" / "director-data.js").read_text(encoding="utf-8")
     director_shell = (STUDIO_ROOT / "src" / "panels" / "director-shell.js").read_text(encoding="utf-8")

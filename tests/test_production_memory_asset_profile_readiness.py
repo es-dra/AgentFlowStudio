@@ -173,6 +173,7 @@ def test_asset_profile_provider_validation_gate_writes_blockers_without_network(
     env = os.environ.copy()
     env.pop("AFS_ALLOW_REMOTE_IMAGE", None)
     env.pop("AFS_ALLOW_REMOTE_VIDEO", None)
+    env.pop("AFS_PROVIDER_CONFIG", None)
     output_dir = tmp_path / "package"
 
     result = subprocess.run(
