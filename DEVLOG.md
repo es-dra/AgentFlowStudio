@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-06-14 - MiniMax B Readiness Preflight
+
+- Added `tools/minimax_image_provider_preflight.py`, a no-cost MiniMax image
+  readiness check mirroring the Kling preflight pattern. It reports service
+  shape, effective backend, normalized gate, credential presence, and dry-run
+  request plan metadata without provider network calls or secret values.
+- TDD coverage now verifies ready REST/API-key config and gate-closed behavior,
+  including legacy `NARRATOCUT_ALLOW_REMOTE_IMAGE` normalization to
+  `AFS_ALLOW_REMOTE_IMAGE`.
+- Ran the preflight against the external provider config. Gate-closed evidence
+  reports `image_gate_closed`; command-scoped gate-open evidence reports
+  `ready`, effective backend `rest_api`, model `image-01`, and
+  `secrets_printed=false`.
+- Updated the readiness audit so `P1-IMAGE-B-PROVIDER-READINESS` includes the
+  MiniMax preflight evidence and its next action is now one B-only live retry
+  with `candidate_count=1` after explicit image retry approval.
+- Hardened the preflight/audit evidence boundary: reports identify
+  `AFS_PROVIDER_CONFIG` as the source label without writing the external config
+  path, and the readiness audit now reads BOM-encoded JSON evidence correctly
+  while preferring a ready gate-open preflight when both default gate-closed and
+  command-scoped gate-open evidence exist.
+
+Boundary:
+
+- This does not clear the MiniMax B P1 because no new image provider call was
+  made. It only proves the current REST/API-key configuration is ready for the
+  next controlled retry.
+
 ## 2026-06-14 - Kling Startup Config Live Recovery
 
 - Used an external provider config as a secret source only; inspected safe

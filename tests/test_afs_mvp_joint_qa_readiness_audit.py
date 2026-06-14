@@ -112,6 +112,65 @@ def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(
     assert roles["video_qa"]["evidence_ref"] == "live_kling_i2v_startup_config_recovery_poll_report.json"
 
 
+def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        {
+            "status": "blocked",
+            "provider_calls_started": True,
+            "retry_count": 1,
+            "blocks": [{"block_id": "remote_image_provider_not_ready", "reason": "safe reason"}],
+        },
+    )
+    preflight_path = tmp_path / "minimax_image_provider_preflight_startup_secrets_config_gate_open.json"
+    preflight_path.write_text(
+        json.dumps(
+            {
+                "status": "ready",
+                "checks": {
+                    "service_present": True,
+                    "execution_backend": "rest_api",
+                    "gate": {"env": "AFS_ALLOW_REMOTE_IMAGE", "enabled": True},
+                },
+                "secrets_printed": False,
+            }
+        ),
+        encoding="utf-8-sig",
+    )
+    _write_json(
+        tmp_path / "minimax_image_provider_preflight_startup_secrets_config.json",
+        {
+            "status": "gate_closed",
+            "checks": {
+                "service_present": True,
+                "execution_backend": "rest_api",
+                "gate": {"env": "AFS_ALLOW_REMOTE_IMAGE", "enabled": False},
+            },
+            "secrets_printed": False,
+        },
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True},
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
+    )
+
+    audit = build_readiness_audit(tmp_path)
+
+    blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
+    image_blocker = blockers["P1-IMAGE-B-PROVIDER-READINESS"]
+    assert image_blocker["status"] == "blocked"
+    assert image_blocker["preflight_status"] == "ready"
+    assert "minimax_image_provider_preflight_startup_secrets_config_gate_open.json" in image_blocker["evidence_refs"]
+    assert "minimax_image_provider_preflight_startup_secrets_config.json" not in image_blocker["evidence_refs"]
+    assert audit["next_actions"] == [
+        "MiniMax image REST preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1."
+    ]
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

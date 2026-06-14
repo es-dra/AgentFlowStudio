@@ -31,7 +31,7 @@ workspace. The repository stores this safe summary only.
 | Kling I2V smoke | Passed after external-config preflight, one live submit, and poll-only recovery of the same job | `live_kling_i2v_startup_config_report.json`, `live_kling_i2v_startup_config_recovery_poll_report.json`, `live_kling_i2v_video_inspection.json` |
 | Frontend UI reviewer | Failed first pass, passed after responsive shell fix | `frontend_ui_reviewer_after_fix2_report.json` |
 | AI role pre-acceptance | Needs fixes / inconclusive | `ai_role_pre_acceptance_summary.json` |
-| Continued blocker preflight | Passed deterministic hardening checks; startup-config Kling preflight reached ready with command-scoped video gate | `kling_provider_preflight_after_blocker_hardening.json`, `kling_provider_preflight_startup_secrets_config_gate_open.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
+| Continued blocker preflight | Passed deterministic hardening checks; startup-config Kling preflight reached ready with command-scoped video gate; MiniMax image REST preflight reached ready with command-scoped image gate | `kling_provider_preflight_after_blocker_hardening.json`, `kling_provider_preflight_startup_secrets_config_gate_open.json`, `minimax_image_provider_preflight_startup_secrets_config_gate_open.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
 | Readiness audit | Needs fixes, no-cost aggregation; only MiniMax image B provider readiness remains open | `afs_mvp_joint_qa_readiness_audit.latest.json` |
 
 ## Findings
@@ -64,14 +64,20 @@ workspace. The repository stores this safe summary only.
   httpx-to-curl fallback, and poll-only recovery of the already submitted job
   returned a safe `video/mp4` Runtime preview. Offline inspection recorded a
   5.04s H.264 vertical video and a safe midframe thumbnail.
+- MiniMax image preflight now separates the old B-arm `mmx_cli`
+  authentication/configuration blocker from the current external REST config:
+  command-scoped image gate-open preflight is `ready`, with effective backend
+  `rest_api`, model `image-01`, `config_source=AFS_PROVIDER_CONFIG`, and
+  `secrets_printed=false`.
 
 ### Open P1 / Blockers
 
 - `P1-IMAGE-B-PROVIDER-READINESS`: MiniMax comparison arm B, the no-reference
   context-subgraph arm, blocked after one retry with a safe provider readiness
-  error. Arms A and C succeeded. No extra retry was run because the image-call
-  cap was already consumed. Future reruns will expose arm-level `block_ids` and
-  `retry_count` in the runner summary.
+  error from the historical `mmx_cli` backend. Arms A and C succeeded. No extra
+  live retry was run in this continuation because Claude classified a new image
+  provider retry as requiring explicit cost approval. The next action is now one
+  B-only Runtime retry with `candidate_count=1`, using the ready REST config.
 
 ### Human-Scored Quality Risks
 
@@ -101,8 +107,8 @@ workspace. The repository stores this safe summary only.
 
 Do not claim internal-test acceptance yet. The correct AI recommendation is
 `needs fixes / inconclusive` until the image B provider-readiness issue is
-either reproduced/fixed or classified with stronger provider evidence. Kling is
-no longer a config blocker for this branch, but its creative quality remains a
-human-scored item. Before the next image live retry, rerun the no-cost readiness
-audit so the blocker state is explicit. Human acceptance still requires the user
-to run the runbook.
+either reproduced/fixed by the B-only live retry or classified with stronger
+provider evidence. Kling is no longer a config blocker for this branch, but its
+creative quality remains a human-scored item. The current MiniMax REST preflight
+is ready, so the next paid action should be a single B-only image retry after
+explicit approval. Human acceptance still requires the user to run the runbook.

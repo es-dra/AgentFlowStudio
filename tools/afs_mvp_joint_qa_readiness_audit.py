@@ -57,6 +57,7 @@ def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
 
 def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
     manifests = sorted(evidence_root.glob("live_minimax_image_runtime/**/B/keyframe_generation_safe_manifest.json"))
+    preflight_path = _preferred_minimax_preflight(evidence_root)
     if not manifests:
         return _missing_evidence_blocker(
             "P1-IMAGE-B-PROVIDER-READINESS",
@@ -67,13 +68,17 @@ def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
     blocks = _safe_blocks(manifest.get("blocks"))
     if str(manifest.get("status")) != "blocked":
         return None
+    refs = [_relative_ref(evidence_root, manifest_path)]
+    if preflight_path.is_file():
+        refs.append(_relative_ref(evidence_root, preflight_path))
     return {
         "blocker_id": "P1-IMAGE-B-PROVIDER-READINESS",
         "status": "blocked",
         "root_cause_block_id": _first_block_id(blocks, "remote_image_provider_not_ready"),
         "provider_calls_started": manifest.get("provider_calls_started") is True,
         "retry_count": int(manifest.get("retry_count") or 0),
-        "evidence_refs": [_relative_ref(evidence_root, manifest_path)],
+        "preflight_status": _read_json(preflight_path).get("status") if preflight_path.is_file() else "",
+        "evidence_refs": refs,
     }
 
 
@@ -164,7 +169,10 @@ def _next_actions(provider_blockers: list[dict[str, Any]]) -> list[str]:
         if blocker["blocker_id"] == "P1-KLING-CONFIG-MISSING":
             actions.append("Add an ignored local provider config containing kling_i2v plus valid Kling credential env vars before the next live video smoke.")
         if blocker["blocker_id"] == "P1-IMAGE-B-PROVIDER-READINESS":
-            actions.append("After explicit image retry approval, rerun MiniMax comparison and inspect arm-level block_ids/retry_count.")
+            if blocker.get("preflight_status") == "ready":
+                actions.append("MiniMax image REST preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1.")
+            else:
+                actions.append("After explicit image retry approval, rerun MiniMax comparison and inspect arm-level block_ids/retry_count.")
     return actions
 
 
@@ -174,10 +182,12 @@ def _read_json(path: Path) -> dict[str, Any]:
         try:
             payload = json.loads(path.read_text(encoding=encoding))
             break
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):
             continue
-        except (OSError, json.JSONDecodeError):
+        except OSError:
             return {}
+    else:
+        return {}
     return payload if isinstance(payload, dict) else {}
 
 
@@ -220,6 +230,16 @@ def _latest_existing(paths: list[Path]) -> Path:
     if not existing:
         return paths[0]
     return max(existing, key=lambda path: path.stat().st_mtime)
+
+
+def _preferred_minimax_preflight(root: Path) -> Path:
+    paths = [path for path in root.glob("minimax_image_provider_preflight*.json") if path.is_file()]
+    if not paths:
+        return root / "minimax_image_provider_preflight*.json"
+    ready_paths = [path for path in paths if _read_json(path).get("status") == "ready"]
+    if ready_paths:
+        return max(ready_paths, key=lambda path: path.stat().st_mtime)
+    return max(paths, key=lambda path: path.stat().st_mtime)
 
 
 def _first_existing_ref(root: Path, relative_paths: list[str]) -> str:
