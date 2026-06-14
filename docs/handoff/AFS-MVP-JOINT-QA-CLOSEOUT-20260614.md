@@ -22,8 +22,8 @@ workspace. The repository stores this safe summary only.
 | Layer | Result | Evidence |
 |---|---|---|
 | Gate-closed focused tests | Passed, 53 tests | `gate_closed_focused_pytest_after_tool_patch_retry.txt` and rerun output |
-| Default pytest | Passed, 393 tests | Final rerun output after blocker preflight hardening |
-| Legacy pytest | Passed, 527 tests | Final rerun output after blocker preflight hardening |
+| Default pytest | Passed, 396 tests | Final rerun output after readiness audit |
+| Legacy pytest | Passed, 527 tests | Final rerun output after readiness audit |
 | Studio JS syntax | Passed, 37 files | `studio_node_check.txt` and rerun output |
 | Product browser smoke | Passed | `gate_closed_8790_ui_smoke_corrected_report.json` |
 | LLM prompt optimization smoke | Passed with two prompt optimization manifests | `live_llm_browser_runtime/*prompt_optimization_safe_manifest.json` |
@@ -32,6 +32,7 @@ workspace. The repository stores this safe summary only.
 | Frontend UI reviewer | Failed first pass, passed after responsive shell fix | `frontend_ui_reviewer_after_fix2_report.json` |
 | AI role pre-acceptance | Needs fixes / inconclusive | `ai_role_pre_acceptance_summary.json` |
 | Continued blocker preflight | Passed deterministic hardening checks | `kling_provider_preflight_after_blocker_hardening.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
+| Readiness audit | Needs fixes, no-cost aggregation | `afs_mvp_joint_qa_readiness_audit.json` |
 
 ## Findings
 
@@ -55,6 +56,9 @@ workspace. The repository stores this safe summary only.
   `retry_count`; the live-comparison runner summarizes per-arm `block_ids` and
   `retry_count`, so future MiniMax arm B failures no longer collapse into an
   opaque `blocked` status.
+- Added a no-cost readiness audit tool that aggregates the external evidence
+  root into seven role checks and provider blockers. The current audit status is
+  `needs_fixes`, with two provider blockers and no human acceptance claim.
 
 ### Open P1 / Blockers
 
@@ -96,4 +100,6 @@ workspace. The repository stores this safe summary only.
 Do not claim internal-test acceptance yet. The correct AI recommendation is
 `needs fixes / inconclusive` until the Kling config is present and the image B
 provider-readiness issue is either reproduced/fixed or classified with stronger
-provider evidence. Human acceptance still requires the user to run the runbook.
+provider evidence. Before the next live retry, rerun the no-cost readiness audit
+so the blocker state is explicit. Human acceptance still requires the user to
+run the runbook.
