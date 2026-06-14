@@ -67,14 +67,20 @@ def test_repository_retention_review_classifies_untracked_cleanup_inputs(tmp_pat
     subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True, capture_output=True)
     (tmp_path / "AFS-CLEANUP-INSTRUCTIONS-20260613.md").write_text("# 本地清理指令\n", encoding="utf-8")
     (tmp_path / "AFS-PROJECT-HEALTH-REVIEW-20260613.md").write_text("# 外部评审输入\n", encoding="utf-8")
+    (tmp_path / "AFS-BROWSER-TAKEOVER-PLAN-20260613.md").write_text("# 浏览器接管输入\n", encoding="utf-8")
+    (tmp_path / "LOCAL-REVIEW-NOTES.md").write_text("# 任意本地输入\n", encoding="utf-8")
 
     report = build_repository_retention_review(tmp_path)
     files = {item["path"]: item for item in report["files"]}
 
-    assert files["AFS-CLEANUP-INSTRUCTIONS-20260613.md"]["product_surface"] == "local_workspace_input"
-    assert files["AFS-CLEANUP-INSTRUCTIONS-20260613.md"]["status"] == "local_input_not_tracked"
-    assert files["AFS-PROJECT-HEALTH-REVIEW-20260613.md"]["product_surface"] == "local_workspace_input"
-    assert files["AFS-PROJECT-HEALTH-REVIEW-20260613.md"]["status"] == "local_input_not_tracked"
+    for path in (
+        "AFS-CLEANUP-INSTRUCTIONS-20260613.md",
+        "AFS-PROJECT-HEALTH-REVIEW-20260613.md",
+        "AFS-BROWSER-TAKEOVER-PLAN-20260613.md",
+        "LOCAL-REVIEW-NOTES.md",
+    ):
+        assert files[path]["product_surface"] == "local_workspace_input"
+        assert files[path]["status"] == "local_input_not_tracked"
     assert report["summary"]["manual_review_required_count"] == 0
 
 

@@ -723,6 +723,30 @@ maintenance_audit: 仅剩既有 human-facing Markdown 中文覆盖 warning；ove
 - 未生成图片/视频字节，也未保存 provider 原始响应。
 - 这不是 human acceptance、business validation、provider smoke 或 durable-memory promotion。
 
+## 2026-06-14 - Loop 005 Closeout Baseline Fix
+
+- Moved three local review/input Markdown files out of the repository root to `D:\Projects\AgentFlowStudio-local-inputs\20260614`, because they are not formal repository ledgers and should not affect repository retention review.
+- Generalized repository retention policy: root-level untracked Markdown files are classified as `local_workspace_input` instead of relying on hard-coded `AFS-*` filename prefixes.
+- Fixed Studio `Failed to fetch` when the page is opened from a local static/dev port such as `8796`: `runtime-client.js` now falls back to the local Runtime Service at `http://127.0.0.1:8790`, while still using same-origin when served from Runtime and allowing explicit local overrides.
+- Navigated the in-app browser from stale `http://127.0.0.1:8796/studio/` to Runtime-hosted `http://127.0.0.1:8790/studio/`; browser console warnings/errors were empty after reload.
+
+Verification:
+
+```text
+tests/test_repository_retention_review.py tests/test_web_studio_static.py: 24 passed
+pytest -q: 386 passed, 527 deselected, 2 warnings
+pytest -m legacy -q: 527 passed, 386 deselected, 1 warning
+Studio JS node --check: 37 files passed
+tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: passed
+```
+
+Boundaries:
+
+- This is runtime/browser verification, not human creative acceptance.
+- Moved local input files are outside the repository and were not committed.
+- Provider creative quality scoring remains a human-role QA task.
+
 ## 2026-06-12 - Creative Intent Agent And Keyframe Gate
 
 - Added deterministic `creative_intent_control_agent_v1` trace for prompt optimization.

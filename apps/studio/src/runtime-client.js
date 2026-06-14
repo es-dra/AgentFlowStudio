@@ -2,12 +2,61 @@
 // safe manifests, Studio state JSON, and explicit user-selected image uploads.
 
 const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
+const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
+const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
 
 export function runtimeBaseUrl() {
   if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) {
-    return window.location.origin;
+    const override = explicitRuntimeBaseUrl();
+    if (override) return override;
+    const current = new URL(window.location.href);
+    if (isLocalHost(current.hostname) && current.port && current.port !== "8790") {
+      return FALLBACK_BASE_URL;
+    }
+    return current.origin;
   }
   return FALLBACK_BASE_URL;
+}
+
+function explicitRuntimeBaseUrl() {
+  const values = [];
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    for (const key of RUNTIME_BASE_QUERY_KEYS) values.push(params.get(key));
+  } catch {
+    // Ignore malformed URL state and use the local Runtime default.
+  }
+  try {
+    values.push(window.localStorage?.getItem(RUNTIME_BASE_STORAGE_KEY));
+  } catch {
+    // Ignore inaccessible storage and use the local Runtime default.
+  }
+  values.push(window.__AFS_RUNTIME_BASE_URL__);
+  for (const value of values) {
+    const normalized = normalizeRuntimeBaseUrl(value);
+    if (normalized) return normalized;
+  }
+  return "";
+}
+
+function normalizeRuntimeBaseUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (!["http:", "https:"].includes(url.protocol)) return "";
+    if (!isLocalHost(url.hostname)) return "";
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function isLocalHost(hostname) {
+  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
 }
 
 async function requestJson(route, { method = "GET", payload = null } = {}) {

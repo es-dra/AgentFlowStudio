@@ -6,11 +6,20 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-13 by Codex
+Last updated: 2026-06-14 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current closeout note: Loop 005 baseline is green after moving local input
+Markdown files out of the repository root and generalizing retention review for
+root-level untracked Markdown inputs. Studio pages opened on local static/dev
+ports now fall back to Runtime Service `http://127.0.0.1:8790`, fixing the
+`Failed to fetch` path seen on stale `8796/studio` sessions. Verification:
+`pytest -q` 386 passed / 527 deselected; `pytest -m legacy -q` 527 passed / 386
+deselected; Studio JS `node --check` 37 files passed; maintenance audit
+failed=0; `git diff --check` exit 0.
 
 ## Current Work
 

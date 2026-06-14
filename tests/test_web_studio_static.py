@@ -264,6 +264,18 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "asset_conflicts" in node_actions
 
 
+def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+
+    assert 'const FALLBACK_BASE_URL = "http://127.0.0.1:8790"' in runtime_client
+    assert 'const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url"' in runtime_client
+    assert 'current.port !== "8790"' in runtime_client
+    assert "return FALLBACK_BASE_URL;" in runtime_client
+    assert "explicitRuntimeBaseUrl" in runtime_client
+    assert "normalizeRuntimeBaseUrl" in runtime_client
+    assert "isLocalHost(url.hostname)" in runtime_client
+
+
 def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_markers() -> None:
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")

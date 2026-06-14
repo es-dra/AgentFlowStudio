@@ -208,9 +208,7 @@ def _is_memory_advantage_demo_file(path: str) -> bool:
 
 def _is_local_cleanup_input(path: str) -> bool:
     name = Path(path).name
-    return "/" not in path and name.endswith(".md") and (
-        name.startswith("AFS-CLEANUP-INSTRUCTIONS-") or name.startswith("AFS-PROJECT-HEALTH-REVIEW-")
-    )
+    return "/" not in path and name.endswith(".md")
 
 
 def _dir(path: str, product_surface: str, status: str, rationale: str) -> ReviewedPath:
