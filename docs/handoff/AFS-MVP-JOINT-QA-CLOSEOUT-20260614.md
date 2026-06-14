@@ -33,8 +33,8 @@ provider blockers, and `human_acceptance_claim=not_claimed`.
 | Layer | Result | Evidence |
 |---|---|---|
 | Gate-closed focused tests | Passed, 53 tests | `gate_closed_focused_pytest_after_tool_patch_retry.txt` and rerun output |
-| Default pytest | Passed, 396 tests | Final rerun output after readiness audit |
-| Legacy pytest | Passed, 527 tests | Final rerun output after readiness audit |
+| Default pytest | Passed, 404 tests / 527 deselected | Final rerun output after readiness audit |
+| Legacy pytest | Passed, 527 tests / 404 deselected | Final rerun output after readiness audit |
 | Studio JS syntax | Passed, 37 files | `studio_node_check.txt` and rerun output |
 | Product browser smoke | Passed | `gate_closed_8790_ui_smoke_corrected_report.json` |
 | LLM prompt optimization smoke | Passed with two prompt optimization manifests | `live_llm_browser_runtime/*prompt_optimization_safe_manifest.json` |
@@ -69,8 +69,8 @@ provider blockers, and `human_acceptance_claim=not_claimed`.
   `retry_count`, so future MiniMax arm B failures no longer collapse into an
   opaque `blocked` status.
 - Added a no-cost readiness audit tool that aggregates the external evidence
-  root into seven role checks and provider blockers. The current audit status is
-  `needs_fixes`, with one provider blocker and no human acceptance claim.
+  root into seven role checks and provider blockers. The final audit status is
+  `recommended`, with zero provider blockers and no human acceptance claim.
 - Kling Runtime I2V was recovered without a second submit: the first live submit
   succeeded, a later poll hit a transient `ConnectError`, TDD added a poll-once
   httpx-to-curl fallback, and poll-only recovery of the already submitted job
@@ -123,8 +123,8 @@ provider blockers, and `human_acceptance_claim=not_claimed`.
 | Creative director | Needs human scoring; image quality has clear risks. |
 | Asset manager | Passed runtime asset carry/exclusion evidence with quality notes. |
 | Video QA | Passed provider-smoke path after poll-only recovery; human creative scoring still required. |
-| Safety/release QA | Needs fixes before release recommendation because MiniMax image B remains open. |
-| Runbook paths 1-6 | Partial-to-passed for path 6 provider smoke; final runbook acceptance remains user-only. |
+| Safety/release QA | Passed for AI pre-acceptance after MiniMax B-only retry cleared the final provider blocker. |
+| Runbook paths 1-6 | Passed for AI pre-acceptance; final runbook acceptance remains user-only. |
 | Frontend UI reviewer | Passed after responsive shell fix. |
 
 ## Recommendation
