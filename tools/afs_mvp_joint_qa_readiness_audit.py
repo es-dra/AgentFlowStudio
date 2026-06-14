@@ -78,18 +78,28 @@ def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
 
 
 def _kling_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
-    preflight_path = evidence_root / "kling_provider_preflight_after_blocker_hardening.json"
-    video_manifest_paths = sorted(evidence_root.glob("live_kling_i2v_runtime/**/video_generation_safe_manifest.json"))
+    preflight_path = _latest_existing(
+        [
+            evidence_root / "kling_provider_preflight_after_blocker_hardening.json",
+            evidence_root / "kling_provider_preflight_startup_secrets_config.json",
+            evidence_root / "kling_provider_preflight_startup_secrets_config_gate_open.json",
+        ]
+    )
+    video_manifest_paths = sorted(evidence_root.glob("live_kling_i2v*runtime/**/video_generation_safe_manifest.json"))
     if not preflight_path.is_file() and not video_manifest_paths:
         return _missing_evidence_blocker(
             "P1-KLING-CONFIG-MISSING",
-            "kling_provider_preflight_after_blocker_hardening.json or live_kling_i2v_runtime/**/video_generation_safe_manifest.json",
+            "kling_provider_preflight*.json or live_kling_i2v*runtime/**/video_generation_safe_manifest.json",
         )
     preflight = _read_json(preflight_path) if preflight_path.is_file() else {}
     video_manifest = _read_json(video_manifest_paths[-1]) if video_manifest_paths else {}
-    root_block = str(_nested(preflight, "checks", "block_id") or _first_block_id(_safe_blocks(video_manifest.get("blocks")), "remote_video_provider_not_ready"))
-    if root_block in {"", "none"} and str(video_manifest.get("status")) != "blocked":
+    video_status = str(video_manifest.get("status") or "")
+    video_blocks = _safe_blocks(video_manifest.get("blocks"))
+    root_block = str(_nested(preflight, "checks", "block_id") or _first_block_id(video_blocks, ""))
+    if root_block in {"", "none"} and video_status not in {"blocked", "poll_failed"}:
         return None
+    if root_block in {"", "none"}:
+        root_block = "remote_video_provider_not_ready"
     refs = []
     if preflight_path.is_file():
         refs.append(_relative_ref(evidence_root, preflight_path))
@@ -110,11 +120,7 @@ def _role_checks(evidence_root: Path, provider_blockers: list[dict[str, Any]]) -
         _file_check("ordinary_internal_tester", evidence_root, "gate_closed_8790_ui_smoke_corrected_report.json"),
         _file_check("creative_director", evidence_root, "live_minimax_image_comparison_report.json"),
         _file_check("asset_manager", evidence_root, "live_minimax_image_comparison_report.json"),
-        {
-            "role_id": "video_qa",
-            "status": "blocked" if any(item["blocker_id"] == "P1-KLING-CONFIG-MISSING" for item in provider_blockers) else "passed",
-            "evidence_ref": "live_kling_i2v_report.json",
-        },
+        _video_qa_check(evidence_root, provider_blockers),
         _file_check("safety_release_qa", evidence_root, "ai_role_pre_acceptance_summary.json"),
         _file_check("runbook_paths_1_6", evidence_root, "ai_role_pre_acceptance_summary.json"),
         _file_check("frontend_ui_reviewer", evidence_root, "frontend_ui_reviewer_after_fix2_report.json"),
@@ -127,6 +133,28 @@ def _file_check(role_id: str, evidence_root: Path, relative_path: str) -> dict[s
         "role_id": role_id,
         "status": "passed" if path.is_file() else "missing_evidence",
         "evidence_ref": relative_path,
+    }
+
+
+def _video_qa_check(evidence_root: Path, provider_blockers: list[dict[str, Any]]) -> dict[str, str]:
+    evidence_ref = _first_existing_ref(
+        evidence_root,
+        [
+            "live_kling_i2v_startup_config_recovery_poll_report.json",
+            "live_kling_i2v_video_inspection.json",
+            "live_kling_i2v_report.json",
+        ],
+    )
+    if any(item["blocker_id"] == "P1-KLING-CONFIG-MISSING" for item in provider_blockers):
+        return {
+            "role_id": "video_qa",
+            "status": "blocked",
+            "evidence_ref": evidence_ref or "live_kling_i2v_report.json",
+        }
+    return {
+        "role_id": "video_qa",
+        "status": "passed" if evidence_ref else "missing_evidence",
+        "evidence_ref": evidence_ref or "missing:kling_video_report",
     }
 
 
@@ -185,6 +213,20 @@ def _nested(payload: dict[str, Any], *keys: str) -> Any:
             return None
         current = current.get(key)
     return current
+
+
+def _latest_existing(paths: list[Path]) -> Path:
+    existing = [path for path in paths if path.is_file()]
+    if not existing:
+        return paths[0]
+    return max(existing, key=lambda path: path.stat().st_mtime)
+
+
+def _first_existing_ref(root: Path, relative_paths: list[str]) -> str:
+    for relative_path in relative_paths:
+        if (root / relative_path).is_file():
+            return relative_path
+    return ""
 
 
 def _relative_ref(root: Path, path: Path) -> str:

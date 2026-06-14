@@ -28,11 +28,11 @@ workspace. The repository stores this safe summary only.
 | Product browser smoke | Passed | `gate_closed_8790_ui_smoke_corrected_report.json` |
 | LLM prompt optimization smoke | Passed with two prompt optimization manifests | `live_llm_browser_runtime/*prompt_optimization_safe_manifest.json` |
 | MiniMax image smoke | Partial: A and C succeeded, B blocked after retry | `live_minimax_image_comparison_report.json` |
-| Kling I2V smoke | Blocked before provider call by local provider config | `live_kling_i2v_report.json` |
+| Kling I2V smoke | Passed after external-config preflight, one live submit, and poll-only recovery of the same job | `live_kling_i2v_startup_config_report.json`, `live_kling_i2v_startup_config_recovery_poll_report.json`, `live_kling_i2v_video_inspection.json` |
 | Frontend UI reviewer | Failed first pass, passed after responsive shell fix | `frontend_ui_reviewer_after_fix2_report.json` |
 | AI role pre-acceptance | Needs fixes / inconclusive | `ai_role_pre_acceptance_summary.json` |
-| Continued blocker preflight | Passed deterministic hardening checks | `kling_provider_preflight_after_blocker_hardening.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
-| Readiness audit | Needs fixes, no-cost aggregation | `afs_mvp_joint_qa_readiness_audit.json` |
+| Continued blocker preflight | Passed deterministic hardening checks; startup-config Kling preflight reached ready with command-scoped video gate | `kling_provider_preflight_after_blocker_hardening.json`, `kling_provider_preflight_startup_secrets_config_gate_open.json`, `gate_closed_live_comparison_after_arm_block_summary.json` |
+| Readiness audit | Needs fixes, no-cost aggregation; only MiniMax image B provider readiness remains open | `afs_mvp_joint_qa_readiness_audit.latest.json` |
 
 ## Findings
 
@@ -48,26 +48,25 @@ workspace. The repository stores this safe summary only.
 - Runtime API example-contract and legacy provider-validation tests now clear
   local provider gates/config before asserting deterministic gate-closed
   behavior, so developer-machine live config cannot alter those expectations.
-- Kling preflight now reports structured blocker IDs. The current no-cost
-  preflight classifies the remaining video blocker as
-  `provider_service_missing`, with no available video service IDs and
-  `secrets_printed=false`.
+- Kling preflight now reports structured blocker IDs. The initial no-cost
+  preflight classified the video blocker as `provider_service_missing`; after
+  using a safe external provider-config shape, startup-config preflight reached
+  `ready` with `secrets_printed=false`.
 - Generation comparison arm evidence now includes safe `blocks` and
   `retry_count`; the live-comparison runner summarizes per-arm `block_ids` and
   `retry_count`, so future MiniMax arm B failures no longer collapse into an
   opaque `blocked` status.
 - Added a no-cost readiness audit tool that aggregates the external evidence
   root into seven role checks and provider blockers. The current audit status is
-  `needs_fixes`, with two provider blockers and no human acceptance claim.
+  `needs_fixes`, with one provider blocker and no human acceptance claim.
+- Kling Runtime I2V was recovered without a second submit: the first live submit
+  succeeded, a later poll hit a transient `ConnectError`, TDD added a poll-once
+  httpx-to-curl fallback, and poll-only recovery of the already submitted job
+  returned a safe `video/mp4` Runtime preview. Offline inspection recorded a
+  5.04s H.264 vertical video and a safe midframe thumbnail.
 
 ### Open P1 / Blockers
 
-- `P1-KLING-CONFIG-MISSING`: current local provider config exposed no video-like
-  service and the Kling credential environment variables were not present.
-  Runtime correctly blocked before provider calls started. A real Kling smoke
-  needs a local ignored config that includes `kling_i2v` plus valid credential
-  environment variables. Continued no-cost preflight now confirms this as
-  `provider_service_missing`.
 - `P1-IMAGE-B-PROVIDER-READINESS`: MiniMax comparison arm B, the no-reference
   context-subgraph arm, blocked after one retry with a safe provider readiness
   error. Arms A and C succeeded. No extra retry was run because the image-call
@@ -80,8 +79,11 @@ workspace. The repository stores this safe summary only.
   reference.
 - MiniMax arm C preserved a female red-coat/black-hair identity with the fixed
   asset, but the brow scar was visually too heavy and needs human scoring.
-- Kling first-frame fidelity, motion adherence, and stability could not be
-  scored because live Kling provider execution did not start.
+- Kling first-frame fidelity and motion adherence now have provider-smoke
+  evidence. AI visual inspection of the extracted midframe found the synthetic
+  portrait composition, black hair, red clothing, and gray-blue background
+  broadly preserved, with no visible text or watermark. This remains
+  pre-acceptance evidence and still needs human creative scoring.
 
 ## Seven-Role Pre-Acceptance
 
@@ -90,16 +92,17 @@ workspace. The repository stores this safe summary only.
 | Ordinary internal tester | Passed runtime basics: create, reload, switch, and browser flow. |
 | Creative director | Needs human scoring; image quality has clear risks. |
 | Asset manager | Passed runtime asset carry/exclusion evidence with quality notes. |
-| Video QA | Blocked by local provider config before live Kling execution. |
-| Safety/release QA | Needs fixes before release recommendation because two P1s remain. |
-| Runbook paths 1-6 | Partial: paths 1-5 have evidence; path 6 blocked at provider config. |
+| Video QA | Passed provider-smoke path after poll-only recovery; human creative scoring still required. |
+| Safety/release QA | Needs fixes before release recommendation because MiniMax image B remains open. |
+| Runbook paths 1-6 | Partial-to-passed for path 6 provider smoke; final runbook acceptance remains user-only. |
 | Frontend UI reviewer | Passed after responsive shell fix. |
 
 ## Recommendation
 
 Do not claim internal-test acceptance yet. The correct AI recommendation is
-`needs fixes / inconclusive` until the Kling config is present and the image B
-provider-readiness issue is either reproduced/fixed or classified with stronger
-provider evidence. Before the next live retry, rerun the no-cost readiness audit
-so the blocker state is explicit. Human acceptance still requires the user to
-run the runbook.
+`needs fixes / inconclusive` until the image B provider-readiness issue is
+either reproduced/fixed or classified with stronger provider evidence. Kling is
+no longer a config blocker for this branch, but its creative quality remains a
+human-scored item. Before the next image live retry, rerun the no-cost readiness
+audit so the blocker state is explicit. Human acceptance still requires the user
+to run the runbook.

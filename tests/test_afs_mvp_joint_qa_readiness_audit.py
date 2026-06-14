@@ -76,6 +76,42 @@ def test_joint_qa_readiness_audit_marks_missing_kling_evidence_as_missing(tmp_pa
     assert blockers["P1-KLING-CONFIG-MISSING"]["root_cause_block_id"] == "missing_evidence"
 
 
+def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(tmp_path: Path) -> None:
+    _write_json(
+        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True},
+    )
+    _write_json(
+        tmp_path / "kling_provider_preflight_startup_secrets_config_gate_open.json",
+        {"status": "ready", "checks": {"service_present": True}, "secrets_printed": False},
+    )
+    _write_json(
+        tmp_path
+        / "live_kling_i2v_startup_config_runtime"
+        / "runs"
+        / "project"
+        / "job"
+        / "video_generation_safe_manifest.json",
+        {"status": "succeeded", "provider_calls_started": True, "outputs": [{"candidate_id": "candidate_001"}]},
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
+    )
+    _write_json(
+        tmp_path / "live_kling_i2v_video_inspection.json",
+        {"format_duration_sec": 5.04, "video_stream": {"width": 1176, "height": 1764}},
+    )
+
+    audit = build_readiness_audit(tmp_path)
+
+    blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
+    roles = {item["role_id"]: item for item in audit["role_checks"]}
+    assert "P1-KLING-CONFIG-MISSING" not in blockers
+    assert roles["video_qa"]["status"] == "passed"
+    assert roles["video_qa"]["evidence_ref"] == "live_kling_i2v_startup_config_recovery_poll_report.json"
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

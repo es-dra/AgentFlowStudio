@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-14 - Kling Startup Config Live Recovery
+
+- Used an external provider config as a secret source only; inspected safe
+  service shape and credential-presence booleans without printing secret values.
+- Kling preflight with `kling_i2v` reached `ready` when `AFS_ALLOW_REMOTE_VIDEO`
+  was scoped to one command. No ASR, LLM, or image gate was opened for the video
+  smoke.
+- Ran one Kling I2V Runtime smoke with a synthetic first frame, `candidate_count=1`,
+  5 seconds, and 720p. Submit succeeded; a later poll hit a transient
+  `ConnectError` and wrote a safe `poll_failed` manifest.
+- Root-caused the failure to the Studio Runtime async poll path lacking the
+  existing CLI path's transient httpx-to-curl fallback. Added TDD coverage and a
+  minimal fallback in `poll_kling_i2v_task_once`; then recovered the already
+  submitted job via poll-only, without a second generation submit.
+- The recovered Runtime preview returned `video/mp4`; offline inspection recorded
+  a 5.04s H.264 vertical video and a safe midframe thumbnail. The readiness audit
+  now recognizes startup-config Kling success evidence and marks Video QA passed.
+- Current closeout status remains `needs_fixes` because
+  `P1-IMAGE-B-PROVIDER-READINESS` is still open for MiniMax arm B.
+
+Verification:
+
+```text
+tests/test_kling_video_task_recovery.py::test_i2v_runtime_single_poll_falls_back_to_curl_for_transient_httpx_error: passed
+tests/test_kling_video_task_recovery.py tests/test_kling_video_smoke.py tests/test_kling_video_runtime_polling.py: 9 passed
+tests/test_afs_mvp_joint_qa_readiness_audit.py: 4 passed
+tools/afs_mvp_joint_qa_readiness_audit.py on external evidence: needs_fixes with only P1-IMAGE-B-PROVIDER-READINESS remaining
+```
+
+Boundary:
+
+- The Kling result is provider smoke plus AI pre-acceptance evidence, not human
+  acceptance or business validation. The provider config path and secret values
+  are not recorded in repository files.
+
 ## 2026-06-14 - Joint QA Readiness Audit Gate
 
 - Added `tools/afs_mvp_joint_qa_readiness_audit.py`, a no-cost evidence

@@ -19,6 +19,7 @@ from agentflow_studio.model_gateway.kling_video_task_state import (
     write_task_state,
 )
 from agentflow_studio.model_gateway.kling_video_runtime import (
+    _is_transient_poll_error,
     build_runtime_payload,
     build_runtime_token,
     download_with_transport,
@@ -145,11 +146,11 @@ def poll_kling_i2v_task_once(
     authorization = f"Bearer {build_runtime_token(account)}"
     task_id = str((state.get("task") or {}).get("task_id") or "")
     query_url = _resume_query_url_template(store, service, account).format(id=task_id)
-    task_response = request_json_with_transport(transport)(
+    task_response = _request_task_response_with_fallback(
         query_url,
-        method="GET",
         authorization=authorization,
         timeout_sec=timeout_sec,
+        transport=transport,
     )
     task_data = response_data(task_response)
     status = str(task_data.get("task_status") or "").lower()
@@ -253,6 +254,31 @@ def run_kling_t2v_smoke(
         started=started,
         resumed_from_task_state=False,
     )
+
+
+def _request_task_response_with_fallback(
+    query_url: str,
+    *,
+    authorization: str,
+    timeout_sec: float,
+    transport: str,
+) -> dict[str, Any]:
+    try:
+        return request_json_with_transport(transport)(
+            query_url,
+            method="GET",
+            authorization=authorization,
+            timeout_sec=timeout_sec,
+        )
+    except ModelProviderError as exc:
+        if transport == "httpx" and _is_transient_poll_error(str(exc)):
+            return request_json_with_transport("curl")(
+                query_url,
+                method="GET",
+                authorization=authorization,
+                timeout_sec=timeout_sec,
+            )
+        raise
 
 
 def resume_kling_video_task(
