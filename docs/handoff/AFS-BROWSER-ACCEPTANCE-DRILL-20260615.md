@@ -21,7 +21,8 @@ evidence.
 Provider gates:
 
 - LLM: opened for prompt optimization smoke
-- Image: opened for two MiniMax calls
+- Image: opened for two planned MiniMax calls, then one additional Path 3
+  rerun explicitly authorized by the user
 - Video: opened for one Kling I2V submit
 - ASR: closed
 - External download: closed
@@ -32,12 +33,16 @@ files.
 
 ## Result
 
-Overall status: `needs_fixes`.
+Overall status: AI/browser pre-acceptance `recommended`, pending human
+acceptance.
 
 Passed:
 
 - Path 1: project create, switch, refresh, node and prompt persistence
 - Path 2: T2I LLM optimization plus MiniMax image generation
+- Path 3: reference-backed I2I MiniMax rerun after explicit user approval;
+  safe manifest recorded `reference_image_count=1`, `candidate_count=1`, and
+  `context_included_asset_count=1`
 - Path 4: fixed visual asset promotion, signature, feature card, locks, detail,
   and refresh re-display
 - Path 5: fixed asset carry/exclusion passed through the auxiliary browser QA
@@ -50,21 +55,20 @@ Passed:
   provider URLs, media bytes returned by API, signed URLs, or local absolute
   paths
 
-Needs fixes:
+Residual risks:
 
-- Path 3 true reference-backed I2I was not completed. Two MiniMax image calls
-  were used. Both succeeded, but the second safe manifest recorded
-  `reference_image_count=0`, so it cannot count as I2I.
-- I2I optimizer explicit-edit preservation needs a regression: the optimizer
+- I2I optimizer explicit-edit preservation still needs a regression: the
+  earlier optimizer path
   used reference-preserving tone but contradicted requested background/clothing
-  edits. The contradictory optimized text was not used for the second image
-  call.
+  edits. The passing Path 3 rerun used the original explicit edit prompt rather
+  than relying on that optimized text.
+- Human acceptance and creative quality scoring have not been performed by the
+  user.
 
 Next action:
 
-Get explicit approval for one extra MiniMax image call, then rerun Path 3 in
-Browser with an uploaded or selected reference image and require
-`reference_image_count > 0` in the safe manifest.
+The user should run the human acceptance runbook and score MiniMax/Kling
+creative quality before deciding whether to enter internal testing.
 
 ## Evidence Files
 
@@ -79,6 +83,10 @@ External evidence files:
 - `path2_after_minimax_t2i_confirmed.png`
 - `path3_i2i_after_llm_optimize.png`
 - `path3_second_image_call_not_reference_confirmed.png`
+- `path3_i2i_reference_before_rerun.png`
+- `path3_i2i_reference_carry_confirm.png`
+- `path3_i2i_reference_after_rerun.png`
+- `path3_i2i_reference_rerun_summary.json`
 - `path4_asset_detail_popover.png`
 - `path6_after_reload_video_preview.png`
 - `ui_desktop_1440x950_final.png`
@@ -90,6 +98,9 @@ Safe provider IDs:
 - Project: `studio-1781460479681-37qe3g`
 - T2I image asset: `img_5369204bd11e`
 - Fixed visual asset: `vas_d2c98968764c`
+- Path 3 reference-backed I2I job:
+  `studio-1781460479681-37qe3g-keyframe_generation-c8f9612a06c1`
+- Path 3 reference image asset: `img_a0bf51f39e90`
 - Kling job: `studio-1781460479681-37qe3g-video_generation-13a94915d320`
 
 ## Code Change
@@ -113,9 +124,18 @@ Completed:
 focused gate-closed pytest: 58 passed, 1 warning
 Studio JS node --check: 37 files passed
 tests/test_afs_mvp_joint_qa_readiness_audit.py: 8 passed
-readiness_audit.json: needs_fixes, provider_blocker_count=0
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
 pytest -q: 406 passed, 527 deselected, 2 warnings
 pytest -m legacy -q: 527 passed, 406 deselected, 1 warning
+maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
+```
+
+Continuation verification after the authorized Path 3 rerun:
+
+```text
+tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_api_runtime_keyframe_reference_assets.py: 11 passed, 1 warning
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
 maintenance_audit.py: failed=0, warnings only
 git diff --check: exit 0
 ```

@@ -12,10 +12,15 @@
   project create/switch/refresh, prompt persistence, T2I optimize + image
   generation, fixed asset promotion/detail/refresh, explicit video first frame,
   one Kling submit, UI polling, Runtime video preview, and refresh recovery.
-- Used two MiniMax image calls. Both succeeded with one output each, but the
-  second call did not count as true I2I because its safe manifest recorded
-  `reference_image_count=0`. The drill therefore remains `needs_fixes` for
-  Path 3 until one extra authorized reference-backed I2I call is run.
+- Used two MiniMax image calls in the initial drill. Both succeeded with one
+  output each, but the second call did not count as true I2I because its safe
+  manifest recorded `reference_image_count=0`.
+- After explicit user authorization, ran one additional MiniMax Path 3
+  reference-backed I2I call from Browser. The rerun succeeded as
+  `studio-1781460479681-37qe3g-keyframe_generation-c8f9612a06c1` with
+  `candidate_count=1`, `reference_image_count=1`,
+  `context_included_asset_count=1`, and no provider raw/media-byte persistence
+  in the safe manifest.
 - Found an I2I optimization quality risk: the LLM optimizer switched to
   reference-preserving tone, but also contradicted explicit requested edits by
   telling the model to keep background/clothing unchanged. The optimized text
@@ -27,8 +32,8 @@
 - Fixed `tools/afs_mvp_joint_qa_readiness_audit.py` so the no-cost audit can
   recognize browser-drill evidence rooted at `runtime_service/**` plus
   `browser_qa_summary.json`, while preserving the older joint-QA evidence
-  format. The current audit now reports zero provider blockers and `needs_fixes`
-  only for the Path 3/I2I role gap.
+  format. After the authorized Path 3 rerun, the current audit reports
+  `recommended`, seven passed role checks, and zero provider blockers.
 
 Verification:
 
@@ -36,9 +41,18 @@ Verification:
 focused gate-closed pytest: 58 passed, 1 warning
 Studio JS node --check: 37 files passed
 tests/test_afs_mvp_joint_qa_readiness_audit.py: 8 passed
-readiness_audit.json: needs_fixes, provider_blocker_count=0
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
 pytest -q: 406 passed, 527 deselected, 2 warnings
 pytest -m legacy -q: 527 passed, 406 deselected, 1 warning
+maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
+```
+
+Continuation verification after the authorized Path 3 rerun:
+
+```text
+tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_api_runtime_keyframe_reference_assets.py: 11 passed, 1 warning
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
 maintenance_audit.py: failed=0, warnings only
 git diff --check: exit 0
 ```
@@ -47,7 +61,10 @@ Boundary:
 
 - This is AI/browser pre-acceptance, not human acceptance, business validation,
   or durable-memory promotion.
-- No third MiniMax image call was made without explicit approval.
+- The third MiniMax image call was made only after explicit user approval; no
+  further live provider retry was run.
+- I2I optimizer explicit-edit preservation remains a non-blocking follow-up
+  before relying on optimized I2I text in a future live path.
 
 ## 2026-06-15 - Joint QA Image/Video Gate Open Closeout
 
