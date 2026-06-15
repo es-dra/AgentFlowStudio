@@ -28,10 +28,14 @@ def test_live_comparison_runner_writes_gate_closed_no_call_report(tmp_path, monk
     assert report["runner_mode"] == "gate_closed_readiness"
     assert report["provider_calls_started"] is False
     assert report["comparison_status"] == "blocked"
+    assert arms["A"]["retry_count"] == 0
+    assert arms["A"]["block_ids"] == ["remote_image_gate_closed"]
     assert arms["A"]["fixed_asset_injection"] is False
     assert arms["A"]["result_ref_count"] == 0
+    assert arms["B"]["block_ids"] == ["remote_image_gate_closed"]
     assert arms["B"]["fixed_asset_injection"] is False
     assert arms["C"]["fixed_asset_injection"] is True
+    assert arms["C"]["block_ids"] == ["remote_image_gate_closed"]
     assert arms["C"]["subject_reference_asset_id"]
 
 

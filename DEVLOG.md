@@ -18,6 +18,40 @@
 - Added a safe-error guard so unsafe `video_revision` base identifiers are
   rejected as `invalid_video_revision` without leaking paths or secret-like
   fragments.
+## 2026-06-15 - Browser Acceptance Drill
+
+- Created `codex/afs-browser-acceptance-drill-20260615` from the joint QA
+  closeout branch and ran a Browser-led acceptance drill against Runtime-hosted
+  `/studio/` on 8790. Evidence is stored outside the repo under
+  `20260615-afs-browser-acceptance-drill`; repository records contain safe
+  summaries only.
+- Opened only the approved live gates for this drill: LLM, MiniMax image, and
+  Kling I2V. ASR and external download stayed closed. Browser coverage passed
+  project create/switch/refresh, prompt persistence, T2I optimize + image
+  generation, fixed asset promotion/detail/refresh, explicit video first frame,
+  one Kling submit, UI polling, Runtime video preview, and refresh recovery.
+- Used two MiniMax image calls in the initial drill. Both succeeded with one
+  output each, but the second call did not count as true I2I because its safe
+  manifest recorded `reference_image_count=0`.
+- After explicit user authorization, ran one additional MiniMax Path 3
+  reference-backed I2I call from Browser. The rerun succeeded as
+  `studio-1781460479681-37qe3g-keyframe_generation-c8f9612a06c1` with
+  `candidate_count=1`, `reference_image_count=1`,
+  `context_included_asset_count=1`, and no provider raw/media-byte persistence
+  in the safe manifest.
+- Found an I2I optimization quality risk: the LLM optimizer switched to
+  reference-preserving tone, but also contradicted explicit requested edits by
+  telling the model to keep background/clothing unchanged. The optimized text
+  was not used for the second image call and is recorded as a follow-up.
+- Kling I2V passed with one submit and same-job polling. Runtime preview
+  returned `video/mp4`; `ffprobe` recorded a 5.04s H.264 video at 1080x1920.
+  Safe manifests did not persist provider raw responses, provider URLs, local
+  absolute paths, or media bytes returned by API.
+- Fixed `tools/afs_mvp_joint_qa_readiness_audit.py` so the no-cost audit can
+  recognize browser-drill evidence rooted at `runtime_service/**` plus
+  `browser_qa_summary.json`, while preserving the older joint-QA evidence
+  format. After the authorized Path 3 rerun, the current audit reports
+  `recommended`, seven passed role checks, and zero provider blockers.
 
 Verification:
 
@@ -31,6 +65,23 @@ pytest -m legacy -q -> 527 passed / 390 deselected
 tools/maintenance_audit.py -> failed=0, warning=4
 runtime-service-openapi-export -> docs/openapi/afs-runtime-service.openapi.json updated
 git diff --check -> exit 0, CRLF notices only
+focused gate-closed pytest: 58 passed, 1 warning
+Studio JS node --check: 37 files passed
+tests/test_afs_mvp_joint_qa_readiness_audit.py: 8 passed
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
+pytest -q: 406 passed, 527 deselected, 2 warnings
+pytest -m legacy -q: 527 passed, 406 deselected, 1 warning
+maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
+```
+
+Continuation verification after the authorized Path 3 rerun:
+
+```text
+tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_api_runtime_keyframe_reference_assets.py: 11 passed, 1 warning
+readiness_audit.json: recommended, provider_blocker_count=0, passed_role_count=7
+maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
 ```
 
 Boundary:
@@ -51,11 +102,50 @@ Boundary:
   accepted base video -> targeted prompt edit -> preserve unrelated content.
 - Added backlog items for multi-node asset/carry consistency, video revision
   contract design, and A/B drift scoring.
+- This is AI/browser pre-acceptance, not human acceptance, business validation,
+  or durable-memory promotion.
+- The third MiniMax image call was made only after explicit user approval; no
+  further live provider retry was run.
+- I2I optimizer explicit-edit preservation remains a non-blocking follow-up
+  before relying on optimized I2I text in a future live path.
+
+## 2026-06-15 - Joint QA Image/Video Gate Open Closeout
+
+- Fixed the Studio stale Runtime symptom seen as `MiniMax keyframe request
+  failed (404)`: Runtime client errors now carry HTTP status and route, and
+  Studio generation preflight reports a specific stale-Runtime restart message
+  when a branch-local `/preflight` route is missing.
+- Opened image and video gates for the active Runtime 8790 per user direction;
+  ASR stayed closed. MiniMax image live smoke succeeded with `candidate_count=1`
+  and registered one reusable image asset. Kling I2V preflight, submit, poll,
+  preview, and offline `ffprobe` inspection succeeded with `candidate_count=1`.
+- Cleared the previous MiniMax arm B P1 with a B-only live retry using the ready
+  REST config: no fixed assets, no subject reference, one candidate, provider
+  calls started, safe manifest succeeded, and no provider raw or secret values
+  were persisted.
+- Updated the readiness audit to recognize successful B-only retry evidence.
+  The final no-cost audit now reports `recommended`, seven role checks passed,
+  and zero provider blockers. This remains AI pre-acceptance only, not human
+  acceptance or business validation.
+- Hardened provider evidence boundaries: Kling preflight reports
+  `AFS_PROVIDER_CONFIG` as a source label rather than an external local path,
+  and Studio browser QA proxy isolation now closes image/video/ASR gates while
+  allowing an explicit `--allow-live-llm` mode for the prompt-optimization path.
+- Re-ran the asset-context browser QA with explicit live LLM allowed; the first
+  optimize reached live LLM and the second re-optimize hit an upstream SSL EOF.
+  No image/video provider call was started by that QA path, and the transient
+  LLM failure was not retried further to avoid unnecessary provider calls.
 
 Verification:
 
 ```text
 Documentation-only change; no provider call, code execution, or generated media.
+tests/test_studio_asset_context_browser_qa_tool.py tests/test_web_studio_static.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_kling_provider_preflight_tool.py: 35 passed, 1 warning
+pytest -q: 404 passed, 527 deselected, 2 warnings
+pytest -m legacy -q: 527 passed, 404 deselected, 1 warning
+Studio JS node --check: 37 files passed
+tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: exit 0
 ```
 
 Boundary:
@@ -64,7 +154,170 @@ Boundary:
   not guaranteed localized video editing.
 - This record is not human acceptance, business validation, or durable Company
   OS rule promotion.
+- Repository records contain safe summaries only. External evidence remains
+  under the joint QA evidence root and generated media remains in ignored
+  runtime output paths.
+- The recommendation is ready for the user's human acceptance decision; it is
+  not a claim that human acceptance has happened.
 
+## 2026-06-14 - MiniMax B Readiness Preflight
+
+- Added `tools/minimax_image_provider_preflight.py`, a no-cost MiniMax image
+  readiness check mirroring the Kling preflight pattern. It reports service
+  shape, effective backend, normalized gate, credential presence, and dry-run
+  request plan metadata without provider network calls or secret values.
+- TDD coverage now verifies ready REST/API-key config and gate-closed behavior,
+  including legacy `NARRATOCUT_ALLOW_REMOTE_IMAGE` normalization to
+  `AFS_ALLOW_REMOTE_IMAGE`.
+- Ran the preflight against the external provider config. Gate-closed evidence
+  reports `image_gate_closed`; command-scoped gate-open evidence reports
+  `ready`, effective backend `rest_api`, model `image-01`, and
+  `secrets_printed=false`.
+- Updated the readiness audit so `P1-IMAGE-B-PROVIDER-READINESS` includes the
+  MiniMax preflight evidence and its next action is now one B-only live retry
+  with `candidate_count=1` after explicit image retry approval.
+- Hardened the preflight/audit evidence boundary: reports identify
+  `AFS_PROVIDER_CONFIG` as the source label without writing the external config
+  path, and the readiness audit now reads BOM-encoded JSON evidence correctly
+  while preferring a ready gate-open preflight when both default gate-closed and
+  command-scoped gate-open evidence exist.
+
+Boundary:
+
+- This does not clear the MiniMax B P1 because no new image provider call was
+  made. It only proves the current REST/API-key configuration is ready for the
+  next controlled retry.
+
+## 2026-06-14 - Kling Startup Config Live Recovery
+
+- Used an external provider config as a secret source only; inspected safe
+  service shape and credential-presence booleans without printing secret values.
+- Kling preflight with `kling_i2v` reached `ready` when `AFS_ALLOW_REMOTE_VIDEO`
+  was scoped to one command. No ASR, LLM, or image gate was opened for the video
+  smoke.
+- Ran one Kling I2V Runtime smoke with a synthetic first frame, `candidate_count=1`,
+  5 seconds, and 720p. Submit succeeded; a later poll hit a transient
+  `ConnectError` and wrote a safe `poll_failed` manifest.
+- Root-caused the failure to the Studio Runtime async poll path lacking the
+  existing CLI path's transient httpx-to-curl fallback. Added TDD coverage and a
+  minimal fallback in `poll_kling_i2v_task_once`; then recovered the already
+  submitted job via poll-only, without a second generation submit.
+- The recovered Runtime preview returned `video/mp4`; offline inspection recorded
+  a 5.04s H.264 vertical video and a safe midframe thumbnail. The readiness audit
+  now recognizes startup-config Kling success evidence and marks Video QA passed.
+- Current closeout status remains `needs_fixes` because
+  `P1-IMAGE-B-PROVIDER-READINESS` is still open for MiniMax arm B.
+
+Verification:
+
+```text
+tests/test_kling_video_task_recovery.py::test_i2v_runtime_single_poll_falls_back_to_curl_for_transient_httpx_error: passed
+tests/test_kling_video_task_recovery.py tests/test_kling_video_smoke.py tests/test_kling_video_runtime_polling.py: 9 passed
+tests/test_afs_mvp_joint_qa_readiness_audit.py: 4 passed
+tools/afs_mvp_joint_qa_readiness_audit.py on external evidence: needs_fixes with only P1-IMAGE-B-PROVIDER-READINESS remaining
+```
+
+Boundary:
+
+- The Kling result is provider smoke plus AI pre-acceptance evidence, not human
+  acceptance or business validation. The provider config path and secret values
+  are not recorded in repository files.
+
+## 2026-06-14 - Joint QA Readiness Audit Gate
+
+- Added `tools/afs_mvp_joint_qa_readiness_audit.py`, a no-cost evidence
+  aggregator for the MVP joint QA closeout. It reads the external evidence root
+  and emits only relative evidence refs, provider blocker IDs, retry counts, and
+  role-check status.
+- Added TDD coverage in `tests/test_afs_mvp_joint_qa_readiness_audit.py`,
+  including UTF-16 JSON evidence generated by PowerShell redirects.
+- Generated the external safe audit
+  `afs_mvp_joint_qa_readiness_audit.json`. Current status is `needs_fixes`:
+  `P1-KLING-CONFIG-MISSING` is rooted at `provider_service_missing` with
+  `provider_calls_started=false`, and `P1-IMAGE-B-PROVIDER-READINESS` is rooted
+  at `remote_image_provider_not_ready` with `retry_count=1`.
+- Verification after adding the audit: focused readiness/provider tests 11
+  passed, default `pytest -q` 396 passed / 527 deselected, legacy
+  `pytest -m legacy -q` 527 passed / 396 deselected, maintenance audit failed=0
+  with existing warnings, and `git diff --check` exited clean.
+
+Boundary:
+
+- The audit is structure/readiness evidence only. It performs no provider calls,
+  reads no secret values, and does not upgrade the closeout to human acceptance.
+
+## 2026-06-14 - Provider Blocker Preflight Evidence Hardening
+
+- Continued the MVP joint QA closeout branch after the blocker-marked push.
+  Current local provider config still exposes MiniMax image/LLM services only;
+  no video/Kling service is present, and Kling credential environment variables
+  are absent.
+- Hardened `tools/kling_provider_preflight.py` so no-cost Kling readiness now
+  reports structured blocker IDs such as `provider_service_missing`,
+  `provider_credentials_missing`, and `video_gate_closed`, while preserving
+  `secrets_printed=false`.
+- Hardened generation comparison evidence: Runtime A/B/C arm reports now include
+  safe `blocks` and `retry_count`, and the live-comparison runner summarizes
+  `block_ids` plus `retry_count` per arm.
+- Added focused regression tests for Kling preflight blocker classification and
+  comparison arm block summaries. Focused verification:
+  `tests/test_kling_provider_preflight_tool.py`,
+  `tests/test_api_runtime_generation_comparison.py`, and
+  `tests/test_studio_asset_context_live_comparison_tool.py` passed 8 tests.
+- Added no-cost external evidence files for the continued blocker diagnosis:
+  `kling_provider_preflight_after_blocker_hardening.json` and
+  `gate_closed_live_comparison_after_arm_block_summary.json`.
+- Verification after this hardening: focused blocker tests 8 passed, default
+  `pytest -q` 393 passed / 527 deselected, legacy `pytest -m legacy -q` 527
+  passed / 393 deselected, maintenance audit failed=0 with existing warnings,
+  and `git diff --check` exited clean.
+
+Boundary:
+
+- This hardening improves diagnosis and repeatability only. It does not run a
+  new live Kling task or retry MiniMax arm B, and it does not change the
+  `needs fixes / inconclusive` acceptance recommendation.
+
+## 2026-06-14 - MVP Joint QA Closeout And Frontend Reviewer Fix
+
+- Ran the joint Codex + Claude closeout lane on
+  `codex/afs-mvp-joint-qa-closeout` with external evidence under
+  `20260614-afs-mvp-joint-qa`; repo records contain only safe summaries.
+- Re-ran gate-closed focused tests for manifest safety, prompt loop, keyframe
+  reference guards, video generation, Studio static checks, and the browser QA
+  tool: 53 passed, 1 warning. Studio JS `node --check` passed for 37 files.
+- Ran Runtime-hosted `/studio/` browser smoke for project create, reload,
+  second project create, and switch-back; no `Failed to fetch` and no warn/error
+  logs were observed.
+- Ran LLM browser smoke with image/video gates closed. Two prompt optimization
+  safe manifests show provider calls started and raw responses were not stored;
+  keyframe/comparison stayed image-gate blocked.
+- Ran MiniMax image comparison within the live image cap. Arms A and C
+  succeeded; arm B blocked after one retry with a safe provider-readiness error.
+  No extra image retry was run because the conservative call cap was consumed.
+- Attempted Kling I2V with explicit first-frame asset and `candidate_count=1`.
+  Runtime preflight passed, but submit blocked before provider calls because the
+  current local provider config has no video/Kling service and Kling credential
+  environment variables were absent.
+- Added the seventh AI pre-acceptance role, frontend UI reviewer. The first pass
+  found mobile/narrow topbar and starter-card clipping; the responsive Studio
+  shell fix now passes desktop/mobile/narrow Playwright checks.
+- Hardened QA evidence tooling: browser QA screenshots default next to the
+  external report path, and prompt optimization provider-call counts are exposed
+  in future browser QA reports.
+- Hardened provider-gate test isolation for Runtime API contract examples and
+  legacy provider-validation subprocess tests so local live provider config or
+  open gates cannot change deterministic expectations.
+- Added `docs/handoff/AFS-MVP-JOINT-QA-CLOSEOUT-20260614.md` with seven-role
+  pre-acceptance results and open P1 blockers.
+
+Boundary:
+
+- This run is AI role pre-acceptance and provider smoke where providers ran. It
+  is not human acceptance, business validation, or durable-memory promotion.
+- Current recommendation is `needs fixes / inconclusive`, not ready-to-accept,
+  until Kling local provider config is present and the image B provider
+  readiness issue is resolved or reclassified with stronger evidence.
 ## 2026-06-14 - Browser Repair Loop 005 Baseline And Guards
 
 - Brought the Loop 003 browser QA red baseline into the active line as

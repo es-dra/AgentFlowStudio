@@ -262,6 +262,11 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "temporary_asset_exclusions" in node_actions
     assert "temporary_asset_exclusions" in optimizer_contract
     assert "asset_conflicts" in node_actions
+    assert "error.status = response.status" in runtime_client
+    assert "error.route = route" in runtime_client
+    assert "missingPreflightRouteError" in node_actions
+    assert "Runtime Service version is stale or not started from this branch" in node_actions
+    assert "Restart the 8790 Runtime Service and retry" in node_actions
 
 
 def test_video_revision_and_fail_closed_submit_markers() -> None:
@@ -376,6 +381,20 @@ def test_studio_layout_and_director_prompt_link_are_explicit() -> None:
     for marker in ("director_setup", "director_summary", "relation_type"):
         assert marker in source
     assert "max-height: none" in styles
+
+
+def test_studio_mobile_shell_keeps_topbar_and_starters_inside_canvas() -> None:
+    styles = (STUDIO_ROOT / "styles" / "shell.css").read_text(encoding="utf-8")
+
+    assert "--drawer-w: min(156px, 40vw);" in styles
+    assert "width: clamp(88px, calc(100vw - var(--drawer-w) - 88px), 146px);" in styles
+    assert "#topbar.drawer-open .topbar-right { display: none; }" in styles
+    assert "left: calc(var(--drawer-w) + (100vw - var(--drawer-w)) / 2);" in styles
+    assert "top: 50%;" in styles
+    assert "width: calc(100vw - var(--drawer-w) - 24px);" in styles
+    assert "flex-direction: column;" in styles
+    assert "overflow-x: visible;" in styles
+    assert "max-height: 42vh;" in styles
 
 
 def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:

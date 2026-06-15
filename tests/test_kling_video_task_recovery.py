@@ -188,3 +188,59 @@ def test_kling_video_resume_polls_safe_state_and_writes_manifest(monkeypatch, tm
     assert "fake-secret-key" not in serialized
     assert "provider-secret-url" not in serialized
     assert "https://signed.example" not in serialized
+
+
+def test_i2v_runtime_single_poll_falls_back_to_curl_for_transient_httpx_error(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    provider_store = store(tmp_path)
+    output_dir = tmp_path / "run"
+    output_dir.mkdir()
+    state = {
+        "schema_version": "kling_video_task_state.v1",
+        "status": "running",
+        "provider": "kling",
+        "service_id": "kling_i2v",
+        "api_family": "i2v",
+        "capability": "video",
+        "model": "kling-v3",
+        "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+        "task": {
+            "task_id": "recoverable_i2v_task_456",
+            "task_status": "submitted",
+        },
+    }
+    calls: list[str] = []
+
+    def fake_request_json_with_transport(transport: str):
+        def fake_request(url, *, method, authorization, timeout_sec, payload=None):
+            calls.append(transport)
+            assert method == "GET"
+            assert authorization.startswith("Bearer ")
+            assert url.endswith("/v1/videos/image2video/recoverable_i2v_task_456")
+            if transport == "httpx":
+                raise ModelProviderError("Kling video request failed: ConnectError")
+            return {
+                "code": 0,
+                "data": {
+                    "task_id": "recoverable_i2v_task_456",
+                    "task_status": "processing",
+                },
+            }
+
+        return fake_request
+
+    monkeypatch.setattr(kling_video_smoke, "request_json_with_transport", fake_request_json_with_transport)
+
+    manifest = kling_video_smoke.poll_kling_i2v_task_once(
+        provider_store,
+        output_dir=output_dir,
+        state=state,
+        timeout_sec=1,
+        transport="httpx",
+    )
+
+    assert calls == ["httpx", "curl"]
+    assert manifest["status"] == "running"
+    updated_state = json.loads((output_dir / "kling_i2v_task_state.json").read_text(encoding="utf-8"))
+    assert updated_state["status"] == "running"
+    assert updated_state["task"]["task_id"] == "recoverable_i2v_task_456"

@@ -37,16 +37,26 @@ def main() -> int:
     repo = Path(__file__).resolve().parents[1]
     runtime_root = Path(args.runtime_root or tempfile.mkdtemp(prefix="afs-studio-s1-runtime-")).resolve()
     report_path = Path(args.report or repo / "runs" / "studio_asset_context_browser_qa_report.json").resolve()
+    screenshot_path = resolve_screenshot_path(report_path, args.screenshot)
     port = args.port or free_port()
     base_url = f"http://127.0.0.1:{port}"
     runtime_root.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    screenshot_path.parent.mkdir(parents=True, exist_ok=True)
 
-    server = start_runtime(repo, runtime_root, port)
+    server = start_runtime(repo, runtime_root, port, allow_live_llm=args.allow_live_llm)
     try:
         wait_for_http(f"{base_url}/studio/")
         prepare_clean_project(runtime_root)
-        report = run_browser_qa(repo, base_url, runtime_root, headed=args.headed, timeout_ms=args.timeout_ms)
+        report = run_browser_qa(
+            repo,
+            base_url,
+            runtime_root,
+            screenshot_path=screenshot_path,
+            headed=args.headed,
+            timeout_ms=args.timeout_ms,
+            allow_live_llm=args.allow_live_llm,
+        )
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"status": "passed", "report": str(report_path)}, ensure_ascii=False))
         return 0
@@ -59,7 +69,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--runtime-root", default="")
     parser.add_argument("--report", default="")
+    parser.add_argument("--screenshot", default="", help="Optional screenshot output path. Defaults next to --report.")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument(
+        "--allow-live-llm",
+        action="store_true",
+        help="Keep AFS_ALLOW_REMOTE_LLM for prompt optimization while image/video/ASR gates stay closed.",
+    )
     parser.add_argument(
         "--timeout-ms",
         type=int,
@@ -67,6 +83,21 @@ def parse_args() -> argparse.Namespace:
         help="Playwright timeout for remote optimizer/provider paths. Defaults to 120 seconds.",
     )
     return parser.parse_args()
+
+
+def resolve_screenshot_path(report_path: Path, screenshot_arg: str) -> Path:
+    if screenshot_arg:
+        return Path(screenshot_arg).resolve()
+    return report_path.with_suffix(".png")
+
+
+def prompt_optimization_summary(payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    provider_started = sum(1 for payload in payloads if payload.get("provider_calls_started") is True)
+    return {
+        "prompt_optimization_count": len(payloads),
+        "prompt_optimization_provider_calls_started_count": provider_started,
+        "live_llm_provider_smoke": provider_started > 0,
+    }
 
 
 def prepare_clean_project(runtime_root: Path) -> None:
@@ -113,7 +144,16 @@ def make_studio_static_route(repo: Path):
     return route_studio_static
 
 
-def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: bool, timeout_ms: int) -> dict[str, Any]:
+def run_browser_qa(
+    repo: Path,
+    base_url: str,
+    runtime_root: Path,
+    *,
+    screenshot_path: Path,
+    headed: bool,
+    timeout_ms: int,
+    allow_live_llm: bool,
+) -> dict[str, Any]:
     upload_file = runtime_root / "qa-lin-wan.png"
     upload_file.write_bytes(PNG_BYTES)
     with sync_playwright() as p:
@@ -127,7 +167,7 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
         expect.set_options(timeout=timeout_ms)
         page.route("**/studio/src/**", make_studio_static_route(repo))
         page.route("**/studio/styles/**", make_studio_static_route(repo))
-        page.route("**/projects/**", make_mutating_runtime_proxy(runtime_root))
+        page.route("**/projects/**", make_mutating_runtime_proxy(runtime_root, allow_live_llm=allow_live_llm))
         try:
             page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa={int(time.time())}", wait_until="commit")
             expect(page.locator("#canvas-root")).to_be_visible()
@@ -166,9 +206,8 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
             assert comparison["report"]["arms"][1]["context_path"] == "context_subgraph_v0.1"
             assert comparison["report"]["arms"][2]["fixed_asset_injection"] is True
 
-            screenshot = repo / "runs" / "studio_asset_context_browser_qa.png"
-            screenshot.parent.mkdir(parents=True, exist_ok=True)
-            page.screenshot(path=str(screenshot), full_page=True)
+            page.screenshot(path=str(screenshot_path), full_page=True)
+            llm_summary = prompt_optimization_summary([first_opt, second_opt])
 
             return {
                 "artifact_type": "studio_asset_context_browser_qa_report",
@@ -176,7 +215,9 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
                 "status": "passed",
                 "base_url": base_url,
                 "runtime_root": str(runtime_root),
-                "screenshot": str(screenshot),
+                "screenshot": str(screenshot_path),
+                **llm_summary,
+                "live_llm_gate_allowed": allow_live_llm,
                 "provider_gate": keyframe["provider_gate"],
                 "provider_calls_started": keyframe["provider_calls_started"],
                 "included_asset_count": len(keyframe["context_bundle"]["included_assets"]),
@@ -189,7 +230,7 @@ def run_browser_qa(repo: Path, base_url: str, runtime_root: Path, *, headed: boo
                     "browser/runtime verification only",
                     "not human acceptance",
                     "not business validation",
-                    "not live provider smoke",
+                    "not image/video live provider smoke",
                 ],
             }
         finally:
