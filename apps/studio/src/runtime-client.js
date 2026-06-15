@@ -66,8 +66,22 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
     body: payload == null ? undefined : JSON.stringify(payload),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(runtimeErrorMessage(response, body));
+  if (!response.ok) {
+    const error = new Error(staleRuntimeRouteMessage(response, route, body) || runtimeErrorMessage(response, body));
+    error.status = response.status;
+    error.route = route;
+    throw error;
+  }
   return body ? JSON.parse(body) : {};
+}
+
+function staleRuntimeRouteMessage(response, route, body) {
+  if (response.status !== 404) return "";
+  const missingPreflight = /\/(keyframe-generations|video-generations|video-revisions)\/preflight$/.test(route);
+  const missingRevisionRoute = /\/video-revisions$/.test(route);
+  if (!missingPreflight && !missingRevisionRoute) return "";
+  const detail = runtimeErrorMessage(response, body);
+  return `${detail}. Runtime Service route is missing for ${route}. Restart the 8790 Runtime Service from the current branch and retry.`;
 }
 
 function runtimeErrorMessage(response, body) {
@@ -124,6 +138,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     generateVideo(payload) {
       return requestJson(`/projects/${encoded}/video-generations`, { method: "POST", payload });
+    },
+    preflightVideoRevision(payload) {
+      return requestJson(`/projects/${encoded}/video-revisions/preflight`, { method: "POST", payload });
+    },
+    generateVideoRevision(payload) {
+      return requestJson(`/projects/${encoded}/video-revisions`, { method: "POST", payload });
     },
     pollVideo(jobId) {
       return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/poll`, { method: "POST" });

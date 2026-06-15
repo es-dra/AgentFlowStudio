@@ -160,7 +160,7 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "syncRunAction" in canvas_view
     assert 'dataset.action = "video-poll"' in canvas_view
     assert "pollNodeVideoGeneration" in (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
-    assert node_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 2
+    assert node_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 3
     assert node_actions.count("await store.flushRuntimeSave?.();\n      return;") >= 2
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert 'asset.kind === "visual_asset" && asset.asset_type === "character"' in drawer_source
@@ -262,6 +262,29 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "temporary_asset_exclusions" in node_actions
     assert "temporary_asset_exclusions" in optimizer_contract
     assert "asset_conflicts" in node_actions
+
+
+def test_video_revision_and_fail_closed_submit_markers() -> None:
+    source = _source()
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "preflightVideoRevision" in runtime_client
+    assert "generateVideoRevision" in runtime_client
+    assert "/video-revisions/preflight" in runtime_client
+    assert "/video-revisions" in runtime_client
+    assert "staleRuntimeRouteMessage" in runtime_client
+    assert "error.status = response.status" in runtime_client
+    assert "Restart the 8790 Runtime Service" in runtime_client
+    assert "unconnectedLabelMatchedAssets" in node_actions
+    assert "label_matched" in node_actions
+    assert "named_asset_not_connected_fail_closed" in node_actions
+    assert "startRemoteVideoRevision" in node_actions
+    assert "videoRevision" in node_actions
+    assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in node_actions
+    assert "enableVideoRevisionDraft" in source
+    assert "video-revision-draft" in node_menu
 
 
 def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:

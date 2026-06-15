@@ -173,6 +173,36 @@ class VideoGenerationRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class VideoRevisionRequest(BaseModel):
+    node_id: str | None = None
+    base_video_job_id: str = Field(min_length=1)
+    base_video_artifact_id: str | None = None
+    base_lineage_root_job_id: str | None = None
+    parent_revision_job_id: str | None = None
+    revision_intent: str = Field(min_length=1)
+    editable_targets: list[str] = Field(default_factory=list)
+    locked_aspects: list[str] = Field(default_factory=list)
+    temporal_scope: dict[str, Any] = Field(default_factory=dict)
+    preserve_policy: str = "best_effort"
+    provider_capability_mode: Literal["i2v_revision_attempt", "v2v_edit", "masked_edit", "unsupported"] = (
+        "i2v_revision_attempt"
+    )
+    provider_service_id: str = "kling_i2v"
+    first_frame_image_asset_id: str = Field(min_length=1)
+    last_frame_image_asset_id: str | None = None
+    duration_sec: int = Field(default=5, gt=0)
+    resolution: str = "720p"
+    aspect_ratio: str = "9:16"
+    motion: str = ""
+    candidate_count: int = Field(default=1, ge=1, le=1)
+    context_subgraph: ContextSubgraph | None = None
+    temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
+    temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)
+    preflight_token: str | None = None
+    quota_override_confirmed: bool = False
+    generated_at: str = Field(min_length=1)
+
+
 class GenerationComparisonRequest(BaseModel):
     node_id: str | None = None
     prompt_text: str = Field(min_length=1)
@@ -245,4 +275,5 @@ __all__ = (
     "VisualAssetPromoteRequest",
     "VisualAssetRetireRequest",
     "VideoGenerationRequest",
+    "VideoRevisionRequest",
 )

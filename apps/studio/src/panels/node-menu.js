@@ -1,7 +1,16 @@
 import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
-import { fixNodeVisualAsset, pollNodeVideoGeneration, setNodeVideoFrame, startNodeGeneration, uploadNodeImage } from "../node-actions.js";
+import {
+  enableVideoRevisionDraft,
+  fixNodeVisualAsset,
+  pollNodeVideoGeneration,
+  setNodeVideoFrame,
+  startNodeGeneration,
+  uploadNodeImage,
+} from "../node-actions.js";
+
+const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
 
 export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
@@ -41,6 +50,11 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       if (fresh) setNodeVideoFrame(store, fresh, "last");
     });
     if (node.params?.lastVideoJobId) {
+      addItem("pencil", "Video revision draft (experimental)", () => {
+        void VIDEO_REVISION_DRAFT_MARKER;
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) enableVideoRevisionDraft(store, fresh);
+      });
       addItem("retry", "继续轮询视频任务", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) pollNodeVideoGeneration(store, runtime, fresh);

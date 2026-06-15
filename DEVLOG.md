@@ -1,5 +1,70 @@
 # Devlog
 
+## 2026-06-15 - Experimental Video Revision Contract And Fail-Closed Carry Guard
+
+- Added an experimental `video_revision` Runtime contract behind
+  `AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION`:
+  `VideoRevisionRequest`, `/video-revisions/preflight`, and `/video-revisions`.
+- The new route records best-effort preserve/change intent, temporal scope,
+  locked aspects, original base lineage, and a safe
+  `afs_video_revision_safe_manifest.v0.1`; it does not submit to Kling yet.
+- Added Studio Runtime client methods and a video-node menu entry to enable an
+  experimental revision draft from an accepted base video job.
+- Hardened Studio generation preflight so fixed assets that are mentioned by
+  label but not connected/injected/excluded fail closed before any paid
+  image/video submit.
+- Improved stale Runtime route failures with route/status metadata and an
+  explicit "Restart the 8790 Runtime Service from the current branch" message.
+- Added a safe-error guard so unsafe `video_revision` base identifiers are
+  rejected as `invalid_video_revision` without leaking paths or secret-like
+  fragments.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_video_generations.py tests/test_api_runtime_video_revisions.py -q -> 11 passed
+pytest tests/test_api_runtime_context_resolver.py -q -> 17 passed
+pytest tests/test_web_studio_static.py -q -> 21 passed
+Studio JS node --check all files -> passed
+pytest -q -> 390 passed / 527 deselected
+pytest -m legacy -q -> 527 passed / 390 deselected
+tools/maintenance_audit.py -> failed=0, warning=4
+runtime-service-openapi-export -> docs/openapi/afs-runtime-service.openapi.json updated
+git diff --check -> exit 0, CRLF notices only
+```
+
+Boundary:
+
+- This is a contract/UI safety slice, not proof that Kling can perform localized
+  video editing. It supports the desired workflow vocabulary while preserving
+  the claim boundary: targeted revisions are best-effort until provider-specific
+  V2V/masked/temporal controls are verified.
+
+## 2026-06-15 - Video Localized Regeneration Requirement Record
+
+- Recorded the current Claude/browser feedback issues as project follow-up:
+  stale Runtime route mismatch after code updates, multi-node fixed-asset
+  detection inconsistency, fixed-asset carry confirmation inconsistency, and
+  provider framing preference for wide/full shots.
+- Added `docs/handoff/AFS-VIDEO-LOCALIZED-REGEN-20260615.md` to distinguish the
+  current Kling I2V plumbing from the user's desired video revision behavior:
+  accepted base video -> targeted prompt edit -> preserve unrelated content.
+- Added backlog items for multi-node asset/carry consistency, video revision
+  contract design, and A/B drift scoring.
+
+Verification:
+
+```text
+Documentation-only change; no provider call, code execution, or generated media.
+```
+
+Boundary:
+
+- Current Studio video support remains I2V-oriented runtime/provider plumbing,
+  not guaranteed localized video editing.
+- This record is not human acceptance, business validation, or durable Company
+  OS rule promotion.
+
 ## 2026-06-14 - Browser Repair Loop 005 Baseline And Guards
 
 - Brought the Loop 003 browser QA red baseline into the active line as

@@ -161,7 +161,10 @@ def test_runtime_service_current_error_projection_does_not_leak_unsafe_exception
     assert response_contains_unsafe_marker(response.json()) is False
 
 
-def test_frontend_runtime_service_request_examples_match_current_api_contract(tmp_path) -> None:
+def test_frontend_runtime_service_request_examples_match_current_api_contract(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     fixture_dir = Path("examples/frontend_runtime_service")
 

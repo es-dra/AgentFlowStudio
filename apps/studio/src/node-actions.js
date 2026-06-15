@@ -81,6 +81,38 @@ export function setNodeVideoFrame(store, node, slot = "first") {
   });
 }
 
+export function enableVideoRevisionDraft(store, node) {
+  const baseVideoJobId = node.params?.lastVideoJobId;
+  if (!baseVideoJobId) {
+    setNodeError(store, node.id, "No accepted base video job is available for an experimental revision.");
+    return;
+  }
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    const previous = n.params.videoRevision || {};
+    n.params.videoRevision = {
+      enabled: true,
+      experimental: true,
+      base_video_job_id: previous.base_video_job_id || baseVideoJobId,
+      base_lineage_root_job_id: previous.base_lineage_root_job_id || previous.base_video_job_id || baseVideoJobId,
+      parent_revision_job_id: previous.parent_revision_job_id || null,
+      preserve_policy: "best_effort",
+      provider_capability_mode: "i2v_revision_attempt",
+      editable_targets: previous.editable_targets || ["other"],
+      locked_aspects: previous.locked_aspects || ["character_identity", "scene_layout", "camera_path", "duration"],
+      temporal_scope: previous.temporal_scope || { kind: "whole_clip" },
+      feature_flag_env: "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION",
+    };
+    n.result = [
+      "Experimental video revision draft is enabled.",
+      "Edit this node prompt to describe only the intended change.",
+      "Preservation is best-effort, not pixel-identical.",
+      "Requires AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION for submit.",
+    ].join("\n");
+  });
+}
+
 async function uploadSelectedImage(store, runtime, nodeId, file) {
   store.set((s) => {
     const n = s.nodes[nodeId];
@@ -149,6 +181,10 @@ export async function startNodeGeneration(store, runtime, node, resultText) {
     return;
   }
   if (fresh.type === "video" && isRemoteVideoModel(fresh.params?.model) && runtime?.generateVideo) {
+    if (fresh.params?.videoRevision?.enabled && runtime?.generateVideoRevision) {
+      await startRemoteVideoRevision(store, runtime, fresh);
+      return;
+    }
     await startRemoteVideoGeneration(store, runtime, fresh);
     return;
   }
@@ -230,6 +266,103 @@ async function startRemoteVideoGeneration(store, runtime, node) {
     if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }
+}
+
+async function startRemoteVideoRevision(store, runtime, node) {
+  const firstFrame = node.params?.firstFrameImageAssetId;
+  const revision = node.params?.videoRevision || {};
+  const baseVideoJobId = revision.base_video_job_id || node.params?.lastVideoJobId;
+  if (!baseVideoJobId) {
+    setNodeError(store, node.id, "No accepted base video job is available for an experimental revision.");
+    return;
+  }
+  if (!firstFrame) {
+    setNodeError(store, node.id, "Upload or select a first frame before starting an experimental video revision.");
+    return;
+  }
+  const previousNodeState = generationRestoreSnapshot(node);
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    n.status = "generating";
+    n.result = "Preparing experimental video revision...";
+  });
+  let submitAttempted = false;
+  try {
+    let request = {
+      node_id: node.id,
+      base_video_job_id: baseVideoJobId,
+      base_video_artifact_id: revision.base_video_artifact_id || null,
+      base_lineage_root_job_id: revision.base_lineage_root_job_id || baseVideoJobId,
+      parent_revision_job_id: revision.parent_revision_job_id || null,
+      revision_intent: node.prompt || revision.revision_intent || "Adjust the requested detail while keeping unrelated aspects stable.",
+      editable_targets: normalizeStringList(revision.editable_targets || ["other"]),
+      locked_aspects: normalizeStringList(revision.locked_aspects || ["character_identity", "scene_layout", "camera_path", "duration"]),
+      temporal_scope: revision.temporal_scope || { kind: "whole_clip" },
+      preserve_policy: "best_effort",
+      provider_capability_mode: "i2v_revision_attempt",
+      provider_service_id: providerServiceForVideoModel(node.params?.model),
+      first_frame_image_asset_id: firstFrame,
+      last_frame_image_asset_id: node.params?.lastFrameImageAssetId || null,
+      duration_sec: parseDuration(node.params?.spec?.duration),
+      resolution: String(node.params?.spec?.resolution || "720P").toLowerCase(),
+      aspect_ratio: node.params?.spec?.ratio || "9:16",
+      motion: node.params?.motion || "",
+      candidate_count: 1,
+      context_subgraph: buildContextSubgraph(store.get(), node, "context_generate"),
+      temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
+      temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],
+      quota_override_confirmed: Boolean(node.params?.quotaOverrideConfirmed),
+      generated_at: new Date().toISOString(),
+    };
+    request = await prepareGenerationRequest(store, runtime, node, request, "video_revision");
+    if (!request) {
+      restoreCancelledGeneration(store, node.id, previousNodeState);
+      await store.flushRuntimeSave?.();
+      return;
+    }
+    submitAttempted = true;
+    const response = await runtime.generateVideoRevision(request);
+    applyVideoRevisionResponse(store, node.id, response);
+    clearOneRunOverrides(store, node.id);
+    await store.flushRuntimeSave?.();
+  } catch (error) {
+    setNodeError(store, node.id, `Experimental video revision request failed: ${safeError(error)}`);
+    if (submitAttempted) clearOneRunOverrides(store, node.id);
+    await store.flushRuntimeSave?.();
+  }
+}
+
+function applyVideoRevisionResponse(store, nodeId, response) {
+  const status = response?.job?.status || "blocked";
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    const previewUrl = response?.candidate_previews?.[0]?.preview_url || null;
+    if (previewUrl) n.previewUrl = previewUrl;
+    n.params.videoRevision = {
+      ...(n.params.videoRevision || {}),
+      enabled: true,
+      experimental: true,
+      lastRevisionJobId: response?.job?.job_id || null,
+      lastSafeManifest: response?.safe_manifest || null,
+    };
+    n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
+    n.result = videoRevisionResultText(response);
+  });
+}
+
+function videoRevisionResultText(response) {
+  const status = response?.job?.status || "blocked";
+  const manifest = response?.safe_manifest || {};
+  const block = manifest.blocks?.[0] || {};
+  if (status === "succeeded") return "Experimental video revision completed through Runtime safe preview.";
+  return [
+    "Experimental video revision did not start.",
+    `Status: ${status}`,
+    `Reason: ${block.reason || "video revision provider path is not enabled"}`,
+    "Goal: change requested effects while keeping unrelated aspects as stable as possible.",
+  ].join("\n");
 }
 
 function applyVideoResponse(store, nodeId, response) {
@@ -318,7 +451,11 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
 }
 
 async function prepareGenerationRequest(store, runtime, node, request, kind) {
-  const preflight = kind === "video" ? runtime?.preflightVideo : runtime?.preflightKeyframe;
+  const preflight = kind === "video_revision"
+    ? runtime?.preflightVideoRevision
+    : kind === "video"
+      ? runtime?.preflightVideo
+      : runtime?.preflightKeyframe;
   if (!preflight) return request;
   let working = {
     ...request,
@@ -326,6 +463,13 @@ async function prepareGenerationRequest(store, runtime, node, request, kind) {
   };
   while (true) {
     const outcome = await preflight(working);
+    const unconnectedNamed = unconnectedLabelMatchedAssets(outcome);
+    if (unconnectedNamed.length) {
+      const labels = unconnectedNamed.map((asset) => asset.label || asset.asset_id).join(", ");
+      throw new Error(
+        `named_asset_not_connected_fail_closed: prompt mentions fixed asset(s) that are not connected to this node: ${labels}. Connect them first or exclude them for this run.`,
+      );
+    }
     const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
     if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
     const decision = await showCarryConfirmModal(outcome, node, kind);
@@ -339,6 +483,22 @@ async function prepareGenerationRequest(store, runtime, node, request, kind) {
     }, { history: false });
     working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
   }
+}
+
+function unconnectedLabelMatchedAssets(preflight) {
+  const bundle = preflight?.context_bundle || {};
+  const available = Array.isArray(bundle.available_project_assets) ? bundle.available_project_assets : [];
+  const excludedByUser = new Set(
+    (Array.isArray(preflight?.excluded_assets) ? preflight.excluded_assets : [])
+      .filter((item) => ["temporary_asset_excluded_by_user", "user_excluded_from_preflight_confirmation"].includes(item.reason))
+      .map((item) => String(item.asset_id || "")),
+  );
+  return available.filter((asset) => (
+    asset?.label_matched
+    && !asset.connected
+    && !asset.injected
+    && !excludedByUser.has(String(asset.asset_id || ""))
+  ));
 }
 
 function showCarryConfirmModal(preflight, node, kind) {
@@ -413,6 +573,18 @@ function showCarryConfirmModal(preflight, node, kind) {
     submit.addEventListener("click", () => finish({ action: "continue" }));
     exclude.addEventListener("click", () => finish({ action: "exclude", assetIds: selectedIds() }));
   });
+}
+
+function normalizeStringList(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const item = String(value || "").trim().slice(0, 80);
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    result.push(item);
+  }
+  return result;
 }
 
 function normalizeAssetExclusions(values) {

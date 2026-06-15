@@ -28,6 +28,7 @@ from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_visual_assets import register_runtime_visual_asset_routes
+from apps.api.runtime_video_revision_routes import register_runtime_video_revision_routes
 from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
@@ -162,6 +163,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT) -> FastAPI:
     register_runtime_visual_asset_routes(app, store)
     register_runtime_keyframe_routes(app, store)
     register_runtime_video_routes(app, store)
+    register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
     register_runtime_studio_state_routes(app, store)
     configure_studio_static(app)
