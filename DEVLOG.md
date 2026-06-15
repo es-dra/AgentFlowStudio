@@ -1,5 +1,52 @@
 # Devlog
 
+## 2026-06-15 - MVP Experience Hardening
+
+- Added Runtime `/health` projection for Studio static readiness and isolated
+  provider gates. The payload reports only booleans and static readiness; it
+  does not expose provider config paths, secrets, or local private paths.
+- Added `tools/run_studio_internal_test.ps1` so internal-test runs can open
+  LLM/image/video gates explicitly while keeping ASR closed.
+- Added a bounded node-level fixed-asset carry chain and a shared pure
+  `asset-reference-inspector` for label-matched unconnected asset actions. This
+  keeps the node/menu/optimizer paths aligned instead of duplicating detection
+  logic.
+- Added video local-cancel UX: submitted/running/cancelled video states now
+  warn that local cancel only stops Studio polling and does not guarantee
+  provider-side cancellation or stopping billing.
+- Added `quality-feedback.js` and `/feedback` client wiring for structured
+  image/video scoring: identity similarity, wardrobe consistency, scene
+  continuity, text/watermark, target-change success, and drift notes. Feedback
+  remains raw evidence and does not write durable memory.
+- After the Claude closeout checkpoint, hardened the boundary further:
+  `/feedback` now applies a server-side whitelist/sanitizer, the internal-test
+  launcher forces `AFS_ALLOW_EXTERNAL_DOWNLOAD=false`, and the feedback UI reads
+  preview URL presence plainly while still storing only `safe_preview_ref`.
+- In-app Browser smoke against localhost was blocked by Browser URL policy and
+  recorded as blocked evidence. No alternate browser was used to bypass that
+  policy.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_service.py tests/test_studio_internal_launcher.py tests/test_web_studio_static.py -q -> 37 passed, 1 warning
+pytest tests/test_api_runtime_video_generations.py tests/test_api_runtime_video_revisions.py tests/test_kling_video_runtime_polling.py -q -> 13 passed, 1 warning
+pytest tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_visual_assets.py tests/test_studio_asset_context_browser_qa_tool.py -q -> 12 passed, 1 warning
+Studio JS node --check -> passed
+Runtime /health smoke -> ready; Studio static ready; all provider gates closed
+pytest -q -> 417 passed, 527 deselected, 2 warnings
+pytest -m legacy -q -> 527 passed, 417 deselected, 1 warning
+maintenance_audit.py -> failed=0, warnings only
+git diff --check -> exit 0
+```
+
+Boundary:
+
+- This is an internal-test readiness hardening slice. It is not human
+  acceptance, business validation, or proof that Kling supports localized video
+  editing. Video targeted revision remains best-effort/experimental until a
+  provider-specific V2V/masked/temporal path is verified.
+
 ## 2026-06-15 - Experimental Video Revision Contract And Fail-Closed Carry Guard
 
 - Added an experimental `video_revision` Runtime contract behind

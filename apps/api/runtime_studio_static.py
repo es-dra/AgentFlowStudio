@@ -32,4 +32,20 @@ def configure_studio_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROO
     )
 
 
-__all__ = ("DEFAULT_STUDIO_ROOT", "NoStoreStaticFiles", "configure_studio_static")
+def studio_static_status(studio_root: Path = DEFAULT_STUDIO_ROOT) -> dict[str, bool | str]:
+    root = Path(studio_root)
+    root_exists = root.exists()
+    index_exists = (root / "index.html").is_file()
+    entry_js_exists = (root / "src" / "main.js").is_file()
+    ready = root_exists and index_exists and entry_js_exists
+    status = "ready" if ready else "missing" if not root_exists else "incomplete"
+    return {
+        "mounted": root_exists,
+        "root_exists": root_exists,
+        "index_exists": index_exists,
+        "entry_js_exists": entry_js_exists,
+        "status": status,
+    }
+
+
+__all__ = ("DEFAULT_STUDIO_ROOT", "NoStoreStaticFiles", "configure_studio_static", "studio_static_status")

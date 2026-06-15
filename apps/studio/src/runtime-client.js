@@ -151,6 +151,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     cancelVideo(jobId) {
       return requestJson(`/projects/${encoded}/video-generations/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
     },
+    recordFeedback(feedback) {
+      return requestJson("/feedback", {
+        method: "POST",
+        payload: { project_id: projectId, feedback, generated_at: new Date().toISOString() },
+      });
+    },
     loadStudioState() {
       return requestJson(`/projects/${encoded}/studio-state`);
     },

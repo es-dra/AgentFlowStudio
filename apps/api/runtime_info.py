@@ -1,15 +1,27 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 
-def runtime_health_payload() -> dict[str, Any]:
+TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
+def runtime_health_payload(studio_static: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "service": "agentflow_runtime_service",
         "status": "ready",
         "service_version": "0.2.0",
         "schema_version": "0.1.0",
         "runtime_root_persisted": False,
+        "studio_static": studio_static or {
+            "mounted": False,
+            "root_exists": False,
+            "index_exists": False,
+            "entry_js_exists": False,
+            "status": "missing",
+        },
+        "provider_gates": runtime_provider_gates(),
         "boundaries": {
             "local_only": True,
             "no_database": True,
@@ -19,6 +31,21 @@ def runtime_health_payload() -> dict[str, Any]:
             "no_durable_memory_write": True,
         },
     }
+
+
+def runtime_provider_gates(env: dict[str, str] | None = None) -> dict[str, bool]:
+    source = env if env is not None else os.environ
+    return {
+        "llm": _enabled(source.get("AFS_ALLOW_REMOTE_LLM")),
+        "image": _enabled(source.get("AFS_ALLOW_REMOTE_IMAGE")),
+        "video": _enabled(source.get("AFS_ALLOW_REMOTE_VIDEO")),
+        "asr": _enabled(source.get("AFS_ALLOW_REMOTE_ASR")),
+        "external_download": _enabled(source.get("AFS_ALLOW_EXTERNAL_DOWNLOAD")),
+    }
+
+
+def _enabled(value: str | None) -> bool:
+    return str(value or "").strip().lower() in TRUE_VALUES
 
 
 def runtime_capabilities_payload() -> dict[str, Any]:
@@ -57,4 +84,4 @@ def runtime_capabilities_payload() -> dict[str, Any]:
     }
 
 
-__all__ = ("runtime_capabilities_payload", "runtime_health_payload")
+__all__ = ("runtime_capabilities_payload", "runtime_health_payload", "runtime_provider_gates")

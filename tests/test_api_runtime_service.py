@@ -10,7 +10,16 @@ from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 
 
-def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_path) -> None:
+def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_path, monkeypatch) -> None:
+    for name in (
+        "AFS_ALLOW_REMOTE_LLM",
+        "AFS_ALLOW_REMOTE_IMAGE",
+        "AFS_ALLOW_REMOTE_VIDEO",
+        "AFS_ALLOW_REMOTE_ASR",
+        "AFS_ALLOW_EXTERNAL_DOWNLOAD",
+        "AFS_PROVIDER_CONFIG",
+    ):
+        monkeypatch.delenv(name, raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     health = client.get("/health").json()
@@ -20,6 +29,20 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert health["service"] == "agentflow_runtime_service"
     assert health["status"] == "ready"
     assert health["runtime_root_persisted"] is False
+    assert health["studio_static"] == {
+        "mounted": True,
+        "root_exists": True,
+        "index_exists": True,
+        "entry_js_exists": True,
+        "status": "ready",
+    }
+    assert health["provider_gates"] == {
+        "llm": False,
+        "image": False,
+        "video": False,
+        "asr": False,
+        "external_download": False,
+    }
     assert capabilities["actions"] == [
         "create_project",
         "list_projects",
@@ -51,6 +74,50 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "provider_validation_plan" not in capabilities["actions"]
     assert "api_key" not in serialized
     assert "token" not in serialized
+    assert "d:\\" not in serialized
+    assert "providers.local" not in serialized
+    assert "afs_provider_config" not in serialized
+
+
+def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_path) -> None:
+    missing_studio_root = tmp_path / "missing-studio"
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime", studio_root=missing_studio_root))
+
+    health = client.get("/health").json()
+    serialized = json.dumps(health, ensure_ascii=False).lower()
+
+    assert health["studio_static"] == {
+        "mounted": False,
+        "root_exists": False,
+        "index_exists": False,
+        "entry_js_exists": False,
+        "status": "missing",
+    }
+    assert str(tmp_path).lower() not in serialized
+    assert "d:\\" not in serialized
+    assert "c:\\" not in serialized
+
+
+def test_runtime_health_provider_gate_projection_is_isolated_and_secret_free(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", r"D:\private\providers.local.json")
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_ASR", raising=False)
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    health = client.get("/health").json()
+    serialized = json.dumps(health, ensure_ascii=False).lower()
+
+    assert health["provider_gates"] == {
+        "llm": True,
+        "image": True,
+        "video": True,
+        "asr": False,
+        "external_download": False,
+    }
+    assert "providers.local" not in serialized
+    assert "afs_provider_config" not in serialized
     assert "d:\\" not in serialized
 
 

@@ -13,6 +13,7 @@ import { startNodeGeneration, spawnSampleScriptFlow } from "./node-actions.js";
 import { STARTERS } from "./presets/starters.js";
 import { fitViewport, zoomAt } from "./geometry.js";
 import { icon } from "./icons.js";
+import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality-feedback.js";
 
 const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
 const RECENT_PROJECTS_KEY = "afs_studio_recent_project_ids";
@@ -28,6 +29,7 @@ renderStarters();
 renderDock(store, runtimeRef);
 bindCanvasInput(store, runtimeRef);
 bindKeyboard();
+bindQualityFeedback();
 
 store.subscribe(renderAll);
 renderAll(store.get());
@@ -194,6 +196,32 @@ function showProjectCreateError(error) {
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+}
+
+function bindQualityFeedback() {
+  window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => {
+    handleQualityFeedback(event);
+  });
+}
+
+async function handleQualityFeedback(event) {
+  const requestId = String(event.detail?.request_id || "");
+  try {
+    const feedback = event.detail?.feedback;
+    if (!feedback || typeof feedback !== "object") throw new Error("feedback payload is empty");
+    const response = await runtime.recordFeedback(feedback);
+    window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_RESULT_EVENT, {
+      detail: {
+        request_id: requestId,
+        ok: true,
+        feedback_id: response?.feedback_event?.feedback_id || response?.artifact?.artifact_id || "",
+      },
+    }));
+  } catch (error) {
+    window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_RESULT_EVENT, {
+      detail: { request_id: requestId, ok: false, error: safeError(error) },
+    }));
+  }
 }
 
 async function syncRuntimeAssets() {

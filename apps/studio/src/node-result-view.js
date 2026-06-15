@@ -1,6 +1,10 @@
+import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
+import { qualityFeedbackView } from "./quality-feedback.js";
+
 export function resultView(node) {
   const result = document.createElement("div");
   result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
+  result.dataset.feedbackEvent = "afs:studio-quality-feedback";
   if (node.previewUrl) {
     if (node.type === "video") {
       const video = document.createElement("video");
@@ -26,6 +30,8 @@ export function resultView(node) {
   text.className = "node-result-text";
   text.textContent = node.result;
   result.appendChild(text);
+  const feedback = qualityFeedbackView(node);
+  if (feedback) result.appendChild(feedback);
   return result;
 }
 
@@ -53,7 +59,7 @@ export function bundleSummary(node) {
     for (const item of included) {
       const chip = document.createElement("span");
       chip.className = `bundle-chip ${item.asset_type === "scene" ? "scene" : "character"}`;
-      chip.textContent = `${item.asset_type === "scene" ? "场景" : "人物"} · ${item.label || item.asset_id}${subjectSuffix(item, bundle)}`;
+      chip.textContent = `${assetTypeLabel(item)} · ${assetLabel(item)}${subjectSuffix(item, bundle)}`;
       chips.appendChild(chip);
     }
     detail.appendChild(chips);
@@ -71,8 +77,8 @@ export function bundleSummary(node) {
       const chip = document.createElement("span");
       chip.className = "bundle-chip degraded";
       chip.textContent = item.reason === "degraded_to_signature_over_limit"
-        ? `${item.label || item.asset_id} · 超出上限，仅签名参与，锁定未生效`
-        : `${item.label || item.asset_id} · 已被同名新版本替代，本次未携带`;
+        ? `${assetLabel(item)} · 超出上限，仅签名参与，锁定未生效`
+        : `${assetLabel(item)} · 已被同名新版本替代，本次未携带`;
       chips.appendChild(chip);
     }
     detail.appendChild(chips);
@@ -107,11 +113,6 @@ export function bundleSummary(node) {
 
   box.appendChild(detail);
   return box;
-}
-
-function subjectSuffix(item, bundle) {
-  if (bundle.subject_reference_asset_id && item.asset_id === bundle.subject_reference_asset_id) return "（含参考图）";
-  return "";
 }
 
 export function humanWarning(warning) {

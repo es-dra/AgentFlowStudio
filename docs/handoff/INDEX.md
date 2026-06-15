@@ -26,6 +26,7 @@ archived.
 - `AFS-KLING-PREFLIGHT-001.md`
 - `AFS-VIDEO-LOCALIZED-REGEN-20260615.md`
 - `AFS-BROWSER-ACCEPTANCE-DRILL-20260615.md`
+- `AFS-MVP-EXPERIENCE-HARDENING-20260615.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.

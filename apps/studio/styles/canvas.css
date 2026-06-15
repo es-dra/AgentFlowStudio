@@ -193,6 +193,46 @@
   justify-content: flex-start;
   padding: 34px 18px 18px;
 }
+.carry-chain-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: -4px 0 7px;
+  max-height: 52px;
+  overflow: hidden;
+}
+.carry-chain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px 7px;
+  border-radius: var(--radius-chip);
+  border: 1px solid rgba(90, 200, 250, 0.32);
+  background: rgba(90, 200, 250, 0.08);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.carry-chain-chip span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.carry-chain-chip:hover {
+  color: var(--text-primary);
+  border-color: rgba(90, 200, 250, 0.55);
+}
+.carry-chain-chip.invalid {
+  color: var(--text-faint);
+  border-color: rgba(255, 122, 122, 0.35);
+  background: rgba(255, 122, 122, 0.08);
+}
+.carry-chain-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
 .node-glyph {
   align-self: center;
   font-size: 38px;
@@ -227,6 +267,10 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 .node-status.success { color: var(--port-out); margin-top: 12px; }
 .node-status.error { color: var(--danger); margin-top: 12px; }
+.node-status.cancelled {
+  color: #ffc285;
+  margin-top: 12px;
+}
 
 /* 端口 */
 .node-port {

@@ -2,6 +2,7 @@ import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
 import {
+  cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
   fixNodeVisualAsset,
   pollNodeVideoGeneration,
@@ -59,6 +60,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
         const fresh = store.get().nodes[nodeId];
         if (fresh) pollNodeVideoGeneration(store, runtime, fresh);
       });
+      if (node.status === "generating") {
+        addItem("x", "本地取消轮询", () => {
+          const fresh = store.get().nodes[nodeId];
+          if (fresh) cancelNodeVideoGeneration(store, runtime, fresh);
+        });
+      }
     }
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>

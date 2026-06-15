@@ -3,6 +3,7 @@ import { showPopover, el } from "./overlay.js";
 import { icon } from "./icons.js";
 import { connect } from "./nodes.js";
 import { humanWarning } from "./node-result-view.js";
+import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
 
 // Prompt optimization stays anchored to the node input and hides internal assembly details.
 
@@ -171,7 +172,8 @@ export function openOptimizer(store, runtime, nodeId, anchorEl, textarea) {
   }
 
   function renderConnectionWarnings(wrap, warnings) {
-    for (const warning of warnings.filter((item) => item.warning_id === "named_asset_not_connected")) {
+    for (const action of buildAssetReferenceActions({ warnings })) {
+      const warning = action.warning || action;
       const row = el("div", "opt-asset-warning");
       row.appendChild(document.createTextNode(`已引用但未连线，生成时不会携带：${warning.label || warning.asset_id}`));
       const connectBtn = el("button", "opt-inline-btn", "一键连线");

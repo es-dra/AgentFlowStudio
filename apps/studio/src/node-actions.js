@@ -5,6 +5,7 @@ import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { lastImageAsset, mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
 import { el, showModal } from "./overlay.js";
+import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -217,6 +218,28 @@ export async function pollNodeVideoGeneration(store, runtime, node) {
   }
 }
 
+export async function cancelNodeVideoGeneration(store, runtime, node) {
+  const jobId = node.params?.lastVideoJobId;
+  if (!jobId || !runtime?.cancelVideo) {
+    setNodeError(store, node.id, "没有可本地取消轮询的视频任务。");
+    return;
+  }
+  store.set((s) => {
+    const n = s.nodes[node.id];
+    if (!n) return;
+    n.status = "cancelled";
+    n.result = `本地取消请求已发送。\nJob: ${jobId}\n注意：本地取消只停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
+  });
+  try {
+    const response = await runtime.cancelVideo(jobId);
+    applyVideoResponse(store, node.id, response);
+    await store.flushRuntimeSave?.();
+  } catch (error) {
+    setNodeError(store, node.id, `Kling video local cancel failed: ${safeError(error)}`);
+    await store.flushRuntimeSave?.();
+  }
+}
+
 async function startRemoteVideoGeneration(store, runtime, node) {
   const firstFrame = node.params?.firstFrameImageAssetId;
   if (!firstFrame) {
@@ -228,7 +251,7 @@ async function startRemoteVideoGeneration(store, runtime, node) {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    n.result = "视频任务提交中...";
+    n.result = "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
   });
   let submitAttempted = false;
   try {
@@ -376,7 +399,7 @@ function applyVideoResponse(store, nodeId, response) {
     n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
     if (previewUrl) n.previewUrl = previewUrl;
-    n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
+    n.status = status === "succeeded" ? "complete" : status === "cancelled_local_only" ? "cancelled" : ["submitted", "running"].includes(status) ? "generating" : "error";
     n.result = videoResultText(response);
   });
 }
@@ -384,8 +407,11 @@ function applyVideoResponse(store, nodeId, response) {
 function videoResultText(response) {
   const status = response?.job?.status || "blocked";
   if (status === "succeeded") return "Kling 视频已完成，预览已通过 Runtime 安全端点加载。";
-  if (status === "submitted") return `Kling 视频已提交，可继续轮询。\nJob: ${response?.job?.job_id || "unknown"}`;
-  if (status === "running") return `Kling video task is still running.\nJob: ${response?.job?.job_id || "unknown"}`;
+  if (status === "submitted") return `Kling 视频已提交，可继续轮询。\nJob: ${response?.job?.job_id || "unknown"}\n本地取消只会停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
+  if (status === "running") return `Kling video task is still running.\nJob: ${response?.job?.job_id || "unknown"}\n本地取消只会停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
+  if (status === "cancelled_local_only") {
+    return `本地已取消继续轮询（cancelled_local_only）。\nJob: ${response?.job?.job_id || "unknown"}\n这只更新 Runtime/Studio 状态，不代表厂商侧任务已经取消，也不保证停止计费。`;
+  }
   const reason = response?.safe_manifest?.blocks?.[0]?.reason || "video provider is not ready";
   return `视频生成未开始或未完成。\n状态: ${status}\n原因: ${reason}`;
 }
@@ -494,19 +520,7 @@ async function prepareGenerationRequest(store, runtime, node, request, kind) {
 }
 
 function unconnectedLabelMatchedAssets(preflight) {
-  const bundle = preflight?.context_bundle || {};
-  const available = Array.isArray(bundle.available_project_assets) ? bundle.available_project_assets : [];
-  const excludedByUser = new Set(
-    (Array.isArray(preflight?.excluded_assets) ? preflight.excluded_assets : [])
-      .filter((item) => ["temporary_asset_excluded_by_user", "user_excluded_from_preflight_confirmation"].includes(item.reason))
-      .map((item) => String(item.asset_id || "")),
-  );
-  return available.filter((asset) => (
-    asset?.label_matched
-    && !asset.connected
-    && !asset.injected
-    && !excludedByUser.has(String(asset.asset_id || ""))
-  ));
+  return buildAssetReferenceActions(preflight).filter((action) => action.blocking);
 }
 
 function missingPreflightRouteError(error) {

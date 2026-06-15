@@ -7,6 +7,7 @@ import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
 import { fixNodeVisualAsset, handleNodeIntent, pollNodeVideoGeneration, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { hasOpenOverlay } from "./overlay.js";
+import { assetIdFromRef } from "./asset-reference-summary.js";
 
 const CLICK_SLOP = 5;
 
@@ -175,7 +176,7 @@ export function bindCanvasInput(store, runtime) {
     if (!action) return;
     if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
     else if (action === "open-director") openDirectorShell(store, node);
-    else if (action === "asset-detail") openAssetDetailPopover(store, runtime, node.params?.visualAssets?.[0], actionEl);
+    else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
     else if (action === "upload") uploadNodeImage(store, runtime, node);
     else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
     else if (action === "run") startNodeGeneration(store, runtime, node);
@@ -184,6 +185,12 @@ export function bindCanvasInput(store, runtime) {
     else if (action === "toggle-collapse") store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; });
     else if (action === "node-menu") openNodeMenu(store, runtime, nodeId, actionEl);
   });
+}
+
+function assetRefForAction(node, assetId) {
+  const assets = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+  if (!assetId) return assets[0];
+  return assets.find((asset) => assetIdFromRef(asset) === String(assetId)) || { asset_id: assetId };
 }
 
 function dragSession(store, nodeIds, e) {

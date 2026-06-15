@@ -274,6 +274,7 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js").read_text(encoding="utf-8")
 
     assert "preflightVideoRevision" in runtime_client
     assert "generateVideoRevision" in runtime_client
@@ -283,13 +284,83 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     assert "error.status = response.status" in runtime_client
     assert "Restart the 8790 Runtime Service" in runtime_client
     assert "unconnectedLabelMatchedAssets" in node_actions
-    assert "label_matched" in node_actions
+    assert "label_matched" in inspector
     assert "named_asset_not_connected_fail_closed" in node_actions
     assert "startRemoteVideoRevision" in node_actions
     assert "videoRevision" in node_actions
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in node_actions
     assert "enableVideoRevisionDraft" in source
     assert "video-revision-draft" in node_menu
+
+
+def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> None:
+    summary = (STUDIO_ROOT / "src" / "asset-reference-summary.js")
+    inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js")
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    result_view = (STUDIO_ROOT / "src" / "node-result-view.js").read_text(encoding="utf-8")
+    optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    styles = _styles()
+
+    assert summary.is_file()
+    assert inspector.is_file()
+    summary_source = summary.read_text(encoding="utf-8")
+    inspector_source = inspector.read_text(encoding="utf-8")
+    assert "import { assetsFromNode, carryChainItems" in canvas_view
+    assert "import { assetTypeLabel, assetLabel, subjectSuffix" in result_view
+    assert "carry-chain-strip" in canvas_view
+    assert "carry-chain-chip" in canvas_view
+    assert "lastContextBundle" in canvas_view
+    assert "visualAssets" in canvas_view
+    assert "MAX_CARRY_CHAIN_ITEMS" in summary_source
+    assert "function buildAssetReferenceActions" in inspector_source
+    assert "buildAssetReferenceActions" in optimizer
+    assert "buildAssetReferenceActions" in node_actions
+    assert "named_asset_not_connected_fail_closed" in node_actions
+    assert "connect-named-asset" in optimizer
+    assert "carry-chain-strip" in styles
+    assert "carry-chain-chip.invalid" in styles
+
+
+def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
+    feedback = STUDIO_ROOT / "src" / "quality-feedback.js"
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    result_view = (STUDIO_ROOT / "src" / "node-result-view.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    styles = _styles()
+
+    assert feedback.is_file()
+    feedback_source = feedback.read_text(encoding="utf-8")
+    assert "studio_quality_feedback" in feedback_source
+    assert "identity_similarity" in feedback_source
+    assert "wardrobe_consistency" in feedback_source
+    assert "scene_continuity" in feedback_source
+    assert "text_or_watermark" in feedback_source
+    assert "target_change_success" in feedback_source
+    assert "drift_notes" in feedback_source
+    assert "raw_evidence_not_memory" in feedback_source
+    assert "safe_preview_ref" in feedback_source
+    assert "sanitizeFeedbackText" in feedback_source
+    assert "prompt_text" not in feedback_source
+    assert "node?.previewUrl" in feedback_source
+    assert "preview_url" not in feedback_source
+    assert "recordFeedback(feedback)" in runtime_client
+    assert 'return requestJson("/feedback"' in runtime_client
+    assert "afs:studio-quality-feedback" in result_view
+    assert "qualityFeedbackView" in result_view
+    assert "handleQualityFeedback" in main
+    assert "runtime.recordFeedback" in main
+    assert "cancelNodeVideoGeneration" in node_actions
+    assert "cancelVideo(jobId)" in node_actions
+    assert "cancelled_local_only" in node_actions
+    assert "厂商侧任务" in node_actions
+    assert "停止计费" in node_actions
+    assert "本地取消轮询" in node_menu
+    assert "node-status cancelled" in node_actions or "node-status cancelled" in (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    assert "quality-feedback" in styles
+    assert "node-status.cancelled" in styles
 
 
 def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:

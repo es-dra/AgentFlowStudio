@@ -3,6 +3,7 @@ import { bezier } from "./geometry.js";
 import { icon } from "./icons.js";
 import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
+import { assetsFromNode, carryChainItems, assetCarryLabel, assetCarryState, assetLabel, assetTypeLabel } from "./asset-reference-summary.js";
 
 const EDGE_OFFSET = 20000;
 
@@ -112,7 +113,7 @@ function syncNodeElement(elNode, node, state, relations) {
 
   const title = elNode.querySelector('[data-role="title"]');
   const refBadge = node.params?.isReference ? `<span class="ref-badge">${icon("bookmark", 11)}参考</span>` : "";
-  const visualAssets = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+  const visualAssets = assetsFromNode(node);
   const hasInvalidAsset = visualAssets.some((asset) => asset?.runtime_status === "excluded" || asset?.status === "retired");
   const fixedBadge = visualAssets.length
     ? `<button class="ref-badge asset-badge${hasInvalidAsset ? " invalid" : ""}" data-action="asset-detail" title="${hasInvalidAsset ? "已失效，本次未携带" : "查看固定资产"}">${icon("lock", 11)}${visualAssets.length}资产</button>`
@@ -134,6 +135,7 @@ function syncNodeElement(elNode, node, state, relations) {
     node.params?.previewAspectRatio || "",
     node.params?.visualAssets?.length || 0,
     node.params?.lastContextBundle?.included_assets?.length || 0,
+    carryChainItems(node).map((asset) => `${asset.asset_id || asset.assetId || ""}:${assetCarryState(asset)}`).join(","),
     node.type,
     node.collapsed ? 1 : 0,
     directorSig,
@@ -170,6 +172,8 @@ function syncRunAction(elNode, node) {
 function buildNodeBody(node, def) {
   const out = [];
   if (node.collapsed) return out;
+  const carry = carryChainView(node);
+  if (carry) out.push(carry);
   if (node.content) {
     const view = document.createElement("div");
     view.className = "text-content-view";
@@ -204,6 +208,15 @@ function buildNodeBody(node, def) {
     status.className = "node-status";
     status.innerHTML = '<span class="spinner"></span><span>生成中…</span>';
     out.push(status);
+    if (node.result) out.push(resultView(node));
+    return out;
+  }
+  if (node.status === "cancelled") {
+    const cancelled = document.createElement("div");
+    cancelled.className = "node-status cancelled";
+    cancelled.innerHTML = `${icon("x", 13)}<span>本地已取消</span>`;
+    out.push(cancelled);
+    if (node.result) out.push(resultView(node));
     return out;
   }
   if (node.status === "complete" && node.result) {
@@ -246,6 +259,24 @@ function buildNodeBody(node, def) {
     out.push(label, list);
   }
   return out;
+}
+
+function carryChainView(node) {
+  const items = carryChainItems(node);
+  if (!items.length) return null;
+  const strip = document.createElement("div");
+  strip.className = "carry-chain-strip";
+  for (const item of items) {
+    const state = assetCarryState(item);
+    const chip = document.createElement("button");
+    chip.className = `carry-chain-chip${state === "excluded" || state === "superseded" ? " invalid" : ""}`;
+    chip.dataset.action = "asset-detail";
+    chip.dataset.assetId = item.asset_id || item.assetId || "";
+    chip.title = `${assetTypeLabel(item)} · ${assetLabel(item)} · ${assetCarryLabel(item)}`;
+    chip.innerHTML = `<span class="carry-chain-icon">${icon(item.asset_type === "scene" ? "image" : "bookmark", 11)}</span><span>${escapeHtml(assetLabel(item))}</span>`;
+    strip.appendChild(chip);
+  }
+  return strip;
 }
 
 function renderEdges(state, relations) {
