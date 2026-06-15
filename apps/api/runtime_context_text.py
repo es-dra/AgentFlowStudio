@@ -10,9 +10,23 @@ def provider_prompt_from_bundle(bundle: dict[str, Any]) -> str:
     # Identity/locks lead the prompt: if the provider hard limit ever tail-cuts
     # the joined text, the loss order matches the priority order.
     text = bundle.get("text_channel") if isinstance(bundle.get("text_channel"), dict) else {}
+    visible_prompt = str(text.get("visible_prompt") or "").strip()
+    if _is_reference_localized_edit(bundle, visible_prompt):
+        parts = [
+            (
+                "Requested change / preserve policy: "
+                f"{visible_prompt}\n"
+                "Reference/base descriptors are anchors, not instructions to undo the requested change."
+            ),
+            str(text.get("asset_identity_segment") or "").strip(),
+            str(text.get("scene_director_segment") or "").strip(),
+            str(text.get("upstream_summary_segment") or "").strip(),
+            str(text.get("preference_segment") or "").strip(),
+        ]
+        return "\n".join(part for part in parts if part)
     parts = [
         str(text.get("asset_identity_segment") or "").strip(),
-        str(text.get("visible_prompt") or "").strip(),
+        visible_prompt,
         str(text.get("scene_director_segment") or "").strip(),
         str(text.get("upstream_summary_segment") or "").strip(),
         str(text.get("preference_segment") or "").strip(),
@@ -101,6 +115,28 @@ def _director_lines(director_compile: dict[str, Any] | None) -> list[str]:
         if title and text:
             lines.append(f"{title}: {text}")
     return lines
+
+
+def _is_reference_localized_edit(bundle: dict[str, Any], visible_prompt: str) -> bool:
+    if not bundle.get("reference_image_channel") or not visible_prompt:
+        return False
+    prompt = visible_prompt.casefold()
+    edit_terms = (
+        "add ",
+        "adjust ",
+        "change ",
+        "edit ",
+        "replace ",
+        "only ",
+        "subtle ",
+        "局部",
+        "调整",
+        "改",
+        "增加",
+        "只",
+    )
+    preserve_terms = ("preserve", "keep", "保持", "不变")
+    return any(term in prompt for term in edit_terms) and any(term in prompt for term in preserve_terms)
 
 
 __all__ = (

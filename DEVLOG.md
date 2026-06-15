@@ -218,6 +218,40 @@ Boundary:
   does not yet prove that the server-installed `codex exec` path can generate a
   real image; that remains a separate provider smoke before human testing.
 
+## 2026-06-15 - Full-Chain Localized QA
+
+- Merged the safe summary from the isolated
+  `codex/afs-full-chain-localized-qa-20260615` branch into mainline before
+  branch cleanup.
+- The run covered a full-chain browser/runtime/live-provider QA path with LLM,
+  image, and video gates explicitly controlled while ASR and external download
+  stayed closed.
+- MiniMax T2I, MiniMax reference-backed I2I, and Kling I2V completed in that
+  run, but the localized image quality sample failed the requested subtle
+  left-eyebrow scar edit.
+- Hardened provider prompt ordering for reference-backed localized edits:
+  requested delta and preserve policy now lead, while base descriptors are
+  framed as anchors rather than instructions to undo the requested change.
+- Added deterministic regression coverage in `tests/test_runtime_context_text.py`.
+
+Verification recorded by the source branch:
+
+```text
+tests/test_runtime_context_text.py -> 3 passed
+tests/test_api_runtime_context_resolver.py tests/test_api_runtime_creative_agent_keyframes.py -> 26 passed, 1 warning
+```
+
+Boundary:
+
+- The localized image quality fix has not been paid-provider retested. Do not
+  claim localized image editing is solved.
+- Full-frame I2I drift remains a likely architecture limit for small-region
+  requests until a masked/regional edit provider path is verified.
+- Video localized editing remains experimental and not productized; current
+  live video evidence is Kling I2V provider smoke only.
+- Evidence stays outside the repo under `20260615-afs-full-chain-localized-qa`;
+  repository records contain safe summaries only.
+
 ## 2026-06-15 - MVP Experience Hardening
 
 - Added Runtime `/health` projection for Studio static readiness and isolated
