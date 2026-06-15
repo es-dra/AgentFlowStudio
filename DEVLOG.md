@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-15 - Full-Chain Localized QA
+
+- Created isolated branch/worktree `codex/afs-full-chain-localized-qa-20260615`
+  for a full-chain QA pass with Claude checkpoints.
+- Detected a stale Runtime on 8790: `/health` lacked the current Studio static
+  and provider gate projection. Stopped that process and restarted Runtime from
+  the current worktree. The active `/health` then reported Studio static ready
+  with LLM/image/video open and ASR/external download closed.
+- Ran gate-closed deterministic verification: default pytest, legacy pytest,
+  Studio JS `node --check`, maintenance audit, and `git diff --check`.
+- Ran in-app Browser load check against `/studio/`: canvas mounted and console
+  warn/error count was zero.
+- Ran `studio_asset_context_browser_qa.py --allow-live-llm` as browser/runtime
+  regression for fixed-asset carry, one-click connection, temporary unlock, and
+  comparison flow while image/video/ASR stayed closed in that isolated QA run.
+- Ran a bounded live provider round against the active Runtime:
+  - MiniMax T2I base image, `candidate_count=1`, succeeded.
+  - MiniMax reference-backed I2I, `candidate_count=1`, succeeded with
+    `reference_image_count=1` and `context_included_asset_count=1`.
+  - Kling I2V submitted once and succeeded as a 5.04s H.264 vertical video.
+  - `video_revision` preflight/submit remained blocked with no provider call.
+- Found a P1 localized image quality failure: the I2I path technically carried
+  the reference and fixed asset, but the requested subtle left-eyebrow scar
+  drifted into prominent forehead/brow wrinkles and face drift. This is not a
+  provider-network failure; it is a localized-edit prompt-contract quality gap.
+- Hardened `provider_prompt_from_bundle` for reference-backed localized edits:
+  requested delta and preserve policy now lead the provider prompt, and base
+  descriptors are explicitly framed as anchors, not instructions to undo the
+  requested change. Ordinary fixed-asset generation keeps identity-first order.
+- Added deterministic regression coverage for localized edit ordering,
+  ordinary fixed-asset ordering, and common `Modify only ... Keep ...`
+  localized-edit wording.
+
+Verification after the fix:
+
+```text
+tests/test_runtime_context_text.py -> 3 passed
+tests/test_api_runtime_context_resolver.py tests/test_api_runtime_creative_agent_keyframes.py -> 26 passed, 1 warning
+```
+
+Boundary:
+
+- The live chain is complete, but the localized image quality fix has not yet
+  been paid-provider retested. Do not claim image localized editing is solved.
+- Claude closeout review also flagged full-frame I2I as a likely architectural
+  limit for "change only this small region" requests. Prompt ordering is useful
+  hardening, but true localized stability likely requires a masked/regional edit
+  provider path or an explicit best-effort limitation.
+- Video localized editing remains experimental and not productized; current
+  live video evidence is Kling I2V provider smoke only.
+- Evidence is outside the repo under `20260615-afs-full-chain-localized-qa`.
+  Repository records contain safe summaries only.
+
 ## 2026-06-15 - MVP Experience Hardening
 
 - Added Runtime `/health` projection for Studio static readiness and isolated
