@@ -63,6 +63,11 @@ function nodeParameterSnapshot(node) {
     if (p.motion) snapshot.motion = p.motion;
     if (p.effect) snapshot.effect = p.effect;
   }
+  if (node.type === "video" || node.type === "video_merge") {
+    if (p.firstFrameImageAssetId) snapshot.first_frame_image_asset_id = String(p.firstFrameImageAssetId);
+    if (p.lastFrameImageAssetId) snapshot.last_frame_image_asset_id = String(p.lastFrameImageAssetId);
+    if (p.spec?.duration) snapshot.duration = String(p.spec.duration);
+  }
   if (p.styleRef) snapshot.style_ref = p.styleRef;
   if (p.directorSetup) snapshot.director_summary = directorPromptSummary(normalizeDirectorSetup(p.directorSetup));
   if (p.directorRef) snapshot.director_ref = String(p.directorRef);
@@ -181,6 +186,8 @@ function linkedDirectorSetup(state, node) {
 
 function safeAssetRefs(state, node) {
   const refs = collectConnectedImageAssetRefs(state, node);
+  if (node.params?.firstFrameImageAssetId) refs.push(String(node.params.firstFrameImageAssetId));
+  if (node.params?.lastFrameImageAssetId) refs.push(String(node.params.lastFrameImageAssetId));
   for (const att of node.params?.attachments || []) refs.push(String(att.id || att));
   return refs
     .map((v) => String(v).trim())

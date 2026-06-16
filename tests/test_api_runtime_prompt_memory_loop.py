@@ -6,6 +6,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
+from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
+from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
 
@@ -719,6 +721,60 @@ def test_visual_prompt_optimizer_uses_i2i_instruction_with_references(tmp_path, 
     assert result.json()["optimization_mode"] == "i2i"
     assert "参考图中的同一个人物" in captured["prompt"]
     assert "只改变用户明确要求改变的部分" in captured["prompt"]
+
+
+def test_video_prompt_optimizer_uses_i2v_instruction_with_first_frame(tmp_path, monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            captured["prompt"] = request.prompt
+            return {"text": "\n".join(
+                [
+                    "意图：基于首帧生成角色在沙漠中行走的视频，保持连续运动。",
+                    "人物/主体：保持首帧中的同一人物身份、蓝白校服、发型轮廓和体态比例。",
+                    "场景/美术：延续首帧画风与沙漠空间，背景自然变化。",
+                    "动作/情节：人物从首帧姿态开始向前行走，步伐自然克制。",
+                    "镜头/构图：以首帧构图为起点，轻微跟随主体运动。",
+                    "灯光：保持首帧主要光源方向、曝光和色温。",
+                    "运动/时间推进：5秒连续视频，动作方向明确，节奏稳定。",
+                    "连续性：首帧是强约束，保持身份、服装、体态、场景和画风一致。",
+                    "负面约束：不要身份漂移、换脸、换装、静止不动、突兀转场、文字或水印。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    request = PromptOptimizationRequest(
+        node_id="video-node-i2v",
+        node_type="video",
+        prompt_text="基于当前关键帧生成视频",
+        generation_target="video",
+        target_platform="short_video",
+        style="cinematic",
+        asset_refs=["img_first_frame"],
+        node_parameters={
+            "llm_provider": "minimax_m3",
+            "remote_optimizer_required": True,
+            "first_frame_image_asset_id": "img_first_frame",
+            "motion": "角色在沙漠中行走",
+            "connected_reference_nodes": [
+                {
+                    "title": "角色三视图",
+                    "prompt": "意图：生成角色在沙漠中行走的图片，保持服装、发型、体态一致。",
+                }
+            ],
+        },
+        generated_at="2026-06-13T15:20:00+08:00",
+    )
+
+    payload = maybe_enhance_prompt_with_llm(request, {"selected_slots": {}})
+    assert payload["optimization_mode"] == "i2v"
+    assert "基于首帧生成视频" in captured["prompt"]
+    assert "不要把上游节点标题或完整旧提示词当成人物名字" in captured["prompt"]
+    assert "图生图编辑" not in payload["user_prompt"]
+    assert "单帧图像编辑" not in payload["user_prompt"]
 
 
 def test_i2i_prompt_optimizer_guardrail_uses_uploaded_image_filename_hint(tmp_path, monkeypatch) -> None:

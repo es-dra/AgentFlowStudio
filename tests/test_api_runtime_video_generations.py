@@ -250,6 +250,43 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert "d:\\" not in serialized
 
 
+def test_video_provider_prompt_removes_image_edit_language() -> None:
+    request = runtime_video_routes.VideoGenerationRequest(
+        prompt_text="基于当前关键帧生成视频",
+        optimized_prompt=(
+            "意图：本次只做这一项图生图编辑。\n"
+            "动作/情节：人物保持参考图原有静态姿态和身体朝向。\n"
+            "运动/时间推进：单帧图像编辑，不制造多阶段动作或剧情。"
+        ),
+        provider_service_id="fake_video",
+        first_frame_image_asset_id="img_first_frame",
+        duration_sec=5,
+        motion="角色在沙漠中行走",
+        generated_at="2026-06-13T10:00:00+08:00",
+    )
+
+    prompt = runtime_video_routes._video_provider_prompt(
+        request,
+        {
+            "text_channel": {
+                "visible_prompt": "旧关键帧提示词不应被直接拼入",
+                "asset_signature_segment": "周彤: 蓝白校服，体态比例稳定",
+                "asset_identity_segment": "保持周彤身份",
+                "scene_director_segment": "镜头轻微跟随",
+                "preference_segment": "cinematic",
+            }
+        },
+    )
+
+    assert "图生图编辑" not in prompt
+    assert "单帧图像编辑" not in prompt
+    assert "静态姿态" not in prompt
+    assert "旧关键帧提示词不应被直接拼入" not in prompt
+    assert "first frame as a strict visual anchor" in prompt
+    assert "角色在沙漠中行走" in prompt
+    assert "周彤" in prompt
+
+
 def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
