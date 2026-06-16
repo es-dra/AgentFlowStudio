@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from agentflow.algorithms.provider_gate_manifest.video_prompt import strip_image_edit_language, video_provider_prompt
+
 
 ALGORITHM_ID = "afs.provider_gate_manifest.v0.1"
 INPUT_CONTRACT = "capability, required gate, provider outcome metadata"
@@ -123,5 +125,7 @@ __all__ = (
     "blocked_manifest",
     "provider_gate_status",
     "required_gate_for",
+    "strip_image_edit_language",
     "succeeded_manifest",
+    "video_provider_prompt",
 )
