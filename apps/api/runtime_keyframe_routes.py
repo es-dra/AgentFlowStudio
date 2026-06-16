@@ -13,6 +13,7 @@ from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
 from apps.api.runtime_generation_preflight import keyframe_generation_preflight, preflight_token_matches
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_keyframe_async import poll_keyframe_generation
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
 from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_store import safe_id
@@ -101,6 +102,56 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             job_id=job_id,
             output_dir=output_dir,
             outputs=result.get("provider_outputs") or [],
+        )
+        return {
+            "job": public_job,
+            "provider_gate": result["provider_gate"],
+            "provider_calls_started": result["provider_calls_started"],
+            "writes_long_term_memory": False,
+            "writes_company_kb": False,
+            "safe_manifest": safe_manifest,
+            "context_bundle": result.get("context_bundle"),
+            "artifacts": artifacts,
+            "candidate_previews": candidate_previews,
+            "reusable_image_assets": reusable_image_assets,
+            "flow": build_flow_summary(store, project_id),
+            "non_claims": KEYFRAME_NON_CLAIMS,
+        }
+
+    @app.post("/projects/{project_id}/keyframe-generations/{job_id}/poll")
+    def poll_keyframe_generation_route(project_id: str, job_id: str) -> dict[str, Any]:
+        try:
+            existing = store.load_job(job_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="job not found") from exc
+        if existing.get("project_id") != project_id or existing.get("action") != "keyframe_generation":
+            raise HTTPException(status_code=404, detail="job not found")
+        output_dir = store.run_dir(project_id, job_id)
+        try:
+            result = poll_keyframe_generation(store, project_id, output_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=safe_error_detail("invalid_keyframe_generation")) from exc
+        artifacts = keyframe_generation_artifacts(store, output_dir)
+        safe_manifest = dict(result["safe_manifest"])
+        status = str(result["status"])
+        job = runtime_job(job_id, project_id, "keyframe_generation", status, artifacts=artifacts)
+        job["ui_summary"] = {
+            "provider_gate": {
+                "status": safe_manifest.get("status", status),
+                "provider_calls_started": result["provider_calls_started"],
+                "blockers": safe_manifest.get("blocks") or [],
+            }
+        }
+        public_job = store.write_job(job)
+        provider_outputs = result.get("provider_outputs") or []
+        candidate_previews = _candidate_previews(project_id, job_id, provider_outputs)
+        reusable_image_assets = _reusable_image_assets(
+            store,
+            project_id,
+            source_node_id=safe_manifest.get("node_id"),
+            job_id=job_id,
+            output_dir=output_dir,
+            outputs=provider_outputs,
         )
         return {
             "job": public_job,

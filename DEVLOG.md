@@ -1,5 +1,54 @@
 # Devlog
 
+## 2026-06-17 - Codex Image Handoff Worker
+
+- Added `codex_handoff` as an async image provider adapter. Runtime keyframe
+  submit now writes a per-run safe job package for async image providers, and
+  `apps/api/runtime_keyframe_async.py` backs
+  `POST /projects/{project_id}/keyframe-generations/{job_id}/poll` to publish
+  safe previews and reusable generated image assets.
+- Added `agentflow_studio/model_gateway/codex_image_worker.py` plus
+  `tools/codex_image_worker.py`. The fake executor proves the file contract in
+  tests; the production executor shells out to `codex exec` from the job
+  directory and keeps the full prompt out of the process command line.
+- Added Studio keyframe auto-polling. Image nodes stay in normal generating,
+  complete, or error states; Studio text does not expose internal worker,
+  handoff, request file, or job directory names.
+- Hardened repeated keyframe polling so the same `source_job_id` +
+  `source_candidate_id` reuses the existing generated image asset instead of
+  creating duplicate reusable assets.
+- Hardened async keyframe poll after Runtime restart/provider config loss: the
+  route now returns a failed safe manifest instead of leaking config paths or
+  surfacing a 500.
+- Updated `configs/providers.example.json` with a secret-free `codex_image`
+  service using `auth_type: none`, `execution_mode: async`, and
+  `AFS_ALLOW_REMOTE_IMAGE`.
+- Added the handoff record
+  `docs/handoff/AFS-CODEX-IMAGE-HANDOFF-WORKER-20260617.md`.
+
+Verification so far:
+
+```text
+pytest tests/test_codex_image_handoff.py -q -> 2 passed, 1 warning
+pytest tests/test_provider_adapter_registry.py -q -> 25 passed
+pytest tests/test_api_runtime_keyframe_reference_assets.py -q -> 3 passed, 1 warning
+pytest tests/test_web_studio_static.py -q -> 25 passed
+node --check apps/studio/src/runtime-client.js -> passed
+node --check apps/studio/src/node-actions.js -> passed
+pytest -q -> 421 passed, 527 deselected, 2 warnings
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> exit 0
+Studio JS node --check all files -> passed
+```
+
+Boundary:
+
+- This proves the Runtime/job-package/worker contract with a fake executor. It
+  does not yet prove that the server-installed `codex exec` path can generate a
+  real image; that remains a separate provider smoke before human testing.
+
 ## 2026-06-15 - MVP Experience Hardening
 
 - Added Runtime `/health` projection for Studio static readiness and isolated

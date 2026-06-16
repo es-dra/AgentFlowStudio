@@ -150,6 +150,7 @@ from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     MiniMaxImageAdapter,
     OpenAICompatibleLLMAdapter,
 )
+from agentflow_studio.model_gateway.provider_codex_handoff import CodexImageHandoffAdapter  # noqa: E402
 
 
 class ProviderRegistry:
@@ -179,6 +180,9 @@ class ProviderRegistry:
             capability = str(service.get("capability") or descriptor.modality)
             if capability == "image" and provider == "minimax":
                 adapters[service_id] = MiniMaxImageAdapter(store, service_id, descriptor)
+                continue
+            if capability == "image" and provider == "codex_handoff":
+                adapters[service_id] = CodexImageHandoffAdapter(store, service_id, descriptor)
                 continue
             if capability == "llm" and provider in {"openai_compatible", "minimax", "deepseek"}:
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
@@ -417,6 +421,7 @@ __all__ = (
     "FakeAsyncVideoAdapter",
     "KlingVideoAdapter",
     "MiniMaxCliLLMAdapter",
+    "CodexImageHandoffAdapter",
     "ProviderAdapter",
     "ProviderCapability",
     "ProviderDescriptor",

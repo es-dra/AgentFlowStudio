@@ -559,6 +559,7 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
 
     assert registry.descriptor("minimax_image").account_pool_id == "minimax_image_pool"
     assert registry.descriptor("minimax_m3").modality == "llm"
+    assert registry.descriptor("codex_image").execution_mode == "async"
     assert registry.descriptor("fake_video").execution_mode == "async"
     assert registry.descriptor("kling_i2v").prompt_profile == "video_i2v_v1"
     assert "api_key" in serialized

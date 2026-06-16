@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -122,14 +123,30 @@ def build_keyframe_generation(
                 reference_image_paths=tuple(item["path"] for item in reference_images),
                 subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
             )
-            manifest, retry_count = dispatch_provider_with_retry(
-                registry,
-                "image",
-                request.provider_service_id,
-                dispatch_request,
-            )
-            status = "succeeded"
-            provider_outputs = _provider_outputs(manifest)
+            if str(getattr(descriptor, "execution_mode", "sync") or "sync") == "async":
+                provider_task = registry.submit("image", request.provider_service_id, dispatch_request)
+                status = str((provider_task.get("task") or {}).get("status") or "submitted")
+                _write_task_state(
+                    output_dir,
+                    _task_state(
+                        request=request,
+                        provider_task=provider_task,
+                        status=status,
+                        provider_prompt=provider_prompt,
+                        provider_gate=provider_gate,
+                        reference_image_count=len(reference_images),
+                        context_bundle=context_bundle,
+                    ),
+                )
+            else:
+                manifest, retry_count = dispatch_provider_with_retry(
+                    registry,
+                    "image",
+                    request.provider_service_id,
+                    dispatch_request,
+                )
+                status = "succeeded"
+                provider_outputs = _provider_outputs(manifest)
         except ModelGatewayError as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
@@ -184,7 +201,6 @@ def build_keyframe_generation(
             "remote_video": "blocked_by_default",
         },
     }
-
 
 def _context_bundle(
     store: RuntimeStore,
@@ -280,6 +296,52 @@ def _provider_outputs(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return outputs
+
+
+def _task_state(
+    *,
+    request: KeyframeGenerationRequest,
+    provider_task: dict[str, Any],
+    status: str,
+    provider_prompt: str,
+    provider_gate: dict[str, str],
+    reference_image_count: int,
+    context_bundle: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "afs_keyframe_generation_task_state.v0.1",
+        "status": status,
+        "provider_service_id": request.provider_service_id,
+        "capability": "image",
+        "task": _provider_task_for_state(provider_task),
+        "request": request.model_dump(mode="json"),
+        "provider_prompt": provider_prompt,
+        "provider_gate": provider_gate,
+        "reference_image_count": reference_image_count,
+        "context_bundle": context_bundle,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "provider_raw_persisted": False,
+    }
+
+
+def _provider_task_for_state(provider_task: dict[str, Any]) -> dict[str, Any]:
+    task = dict(provider_task)
+    inner = task.get("task")
+    if isinstance(inner, dict):
+        safe_inner = dict(inner)
+        safe_inner.pop("output_dir", None)
+        task["task"] = safe_inner
+    task.pop("output_dir", None)
+    return task
+
+
+def _write_task_state(output_dir: Path, state: dict[str, Any]) -> None:
+    _write_json_checked(output_dir / "keyframe_task_state.json", state)
+
+
+def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
+    reject_unsafe_payload(payload)
+    write_json(path, payload)
 
 
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:

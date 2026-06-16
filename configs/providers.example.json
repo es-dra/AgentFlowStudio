@@ -27,6 +27,14 @@
         "video": "fake-video"
       }
     },
+    "local_codex": {
+      "auth_type": "none",
+      "execution_backend": "codex_exec",
+      "cli_command": "codex",
+      "default_models": {
+        "image": "codex-image-worker"
+      }
+    },
     "kling": {
       "auth_type": "jwt_hs256_from_ak_sk",
       "base_url": "https://api-beijing.klingai.com",
@@ -84,6 +92,20 @@
           "enabled_capabilities": ["video"],
           "enabled": true,
           "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "codex_image_pool": {
+      "accounts": [
+        {
+          "account_id": "local_codex",
+          "service_id": "codex_image",
+          "enabled_capabilities": ["image"],
+          "enabled": true,
+          "priority": 20,
           "weight": 1,
           "concurrency_limit": 1,
           "health_state": "unknown"
@@ -175,6 +197,29 @@
         "cost_hint": "Fake adapter only; no provider cost.",
         "rate_limit_hint": "Fake adapter is deterministic and local.",
         "required_gate": "AFS_ALLOW_REMOTE_VIDEO"
+      }
+    },
+    "codex_image": {
+      "provider": "codex_handoff",
+      "account_ref": "local_codex",
+      "capability": "image",
+      "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "image",
+        "execution_mode": "async",
+        "capabilities": ["image"],
+        "account_pool_id": "codex_image_pool",
+        "reference_image_slots": 4,
+        "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+        "prompt_char_limit": 4000,
+        "seed_supported": true,
+        "cost_hint": "Server-local Codex worker. Downstream model/API usage is controlled by the server Codex setup.",
+        "rate_limit_hint": "Use one worker process per Runtime root during MVP validation.",
+        "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+        "async_poll_interval_sec": 2,
+        "async_timeout_sec": 900,
+        "async_max_polls": 450
       }
     },
     "kling_i2v": {

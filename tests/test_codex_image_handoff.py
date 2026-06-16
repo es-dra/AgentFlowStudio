@@ -1,0 +1,225 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from agentflow_studio.model_gateway.codex_image_worker import FakeCodexImageExecutor, process_one
+from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
+from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
+from apps.api.runtime_service import create_runtime_app
+
+
+def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    store = _store(tmp_path, _codex_provider_config())
+    registry = ProviderRegistry.from_store(store)
+    output_dir = tmp_path / "run"
+    reference = tmp_path / "reference.png"
+    reference.write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+
+    task = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(
+            prompt="Generate a clean cinematic keyframe.",
+            output_dir=output_dir,
+            aspect_ratio="9:16",
+            reference_image_paths=(reference,),
+            subject_reference_image_path=reference,
+            candidate_count=1,
+            seed=120617,
+        ),
+    )
+
+    assert task["task"]["status"] == "submitted"
+    request_path = next((output_dir / "codex_image_job" / "pending").glob("*/request.json"))
+    request_payload = json.loads(request_path.read_text(encoding="utf-8"))
+    serialized = json.dumps(request_payload, ensure_ascii=False).lower()
+    assert request_payload["reference_images"][0]["path"] == "references/reference_001.png"
+    assert str(reference).lower() not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+    assert "api_key" not in serialized
+    assert "http://" not in serialized
+    assert "https://" not in serialized
+
+    running = registry.poll("image", "codex_image", task)
+    assert running["status"] == "running"
+    assert running["provider_calls_started"] is True
+
+    processed = process_one(output_dir, executor=FakeCodexImageExecutor())
+    assert processed is not None
+    assert processed.status == "succeeded"
+
+    result = registry.poll("image", "codex_image", task)
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    assert result["provider_raw_response_stored"] is False
+    assert result["outputs"][0]["candidate_id"] == "candidate_001"
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert (output_dir / "image_candidates" / "candidate_001.png").read_bytes() == FakeCodexImageExecutor.PNG_BYTES
+    serialized = json.dumps(result, ensure_ascii=False).lower()
+    assert str(output_dir).lower() not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+
+def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path, monkeypatch) -> None:
+    provider_path = tmp_path / "providers.local.json"
+    provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    submit = client.post(
+        "/projects/proj_codex_image/keyframe-generations",
+        json={
+            "node_id": "image-node-1",
+            "prompt_text": "Generate a controlled character keyframe.",
+            "optimized_prompt": "A controlled character keyframe, cinematic lighting.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "provider_service_id": "codex_image",
+            "seed": 120617,
+            "generated_at": "2026-06-17T10:26:00+08:00",
+        },
+    )
+    assert submit.status_code == 200
+    submitted_payload = submit.json()
+    job_id = submitted_payload["job"]["job_id"]
+    assert submitted_payload["job"]["status"] == "submitted"
+    assert submitted_payload["candidate_previews"] == []
+
+    running = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
+    assert running.status_code == 200
+    assert running.json()["job"]["status"] == "running"
+
+    processed = process_one(tmp_path, executor=FakeCodexImageExecutor())
+    assert processed is not None
+    assert processed.status == "succeeded"
+
+    completed = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
+    assert completed.status_code == 200
+    payload = completed.json()
+    assert payload["job"]["status"] == "succeeded"
+    assert payload["provider_calls_started"] is True
+    assert payload["candidate_previews"][0]["preview_url"].endswith("/candidate_001/preview")
+    assert payload["reusable_image_assets"][0]["source_candidate_id"] == "candidate_001"
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "codex_image_job" not in serialized
+    assert "request.json" not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+    preview = client.get(payload["candidate_previews"][0]["preview_url"])
+    assert preview.status_code == 200
+    assert preview.content == FakeCodexImageExecutor.PNG_BYTES
+
+    repeated = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
+    assert repeated.status_code == 200
+    assert repeated.json()["reusable_image_assets"][0]["asset_id"] == payload["reusable_image_assets"][0]["asset_id"]
+    assets = client.get("/projects/proj_codex_image/image-assets").json()["assets"]
+    generated = [
+        item
+        for item in assets
+        if item.get("source_job_id") == job_id and item.get("source_candidate_id") == "candidate_001"
+    ]
+    assert len(generated) == 1
+
+
+def test_codex_image_handoff_poll_fails_safely_when_provider_config_disappears(tmp_path, monkeypatch) -> None:
+    provider_path = tmp_path / "providers.local.json"
+    provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    submit = client.post(
+        "/projects/proj_codex_missing_config/keyframe-generations",
+        json={
+            "node_id": "image-node-1",
+            "prompt_text": "Generate a controlled keyframe.",
+            "optimized_prompt": "A controlled keyframe.",
+            "provider_service_id": "codex_image",
+            "generated_at": "2026-06-17T10:26:00+08:00",
+        },
+    )
+    assert submit.status_code == 200
+    job_id = submit.json()["job"]["job_id"]
+    monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
+
+    poll = client.post(f"/projects/proj_codex_missing_config/keyframe-generations/{job_id}/poll")
+
+    assert poll.status_code == 200
+    payload = poll.json()
+    assert payload["job"]["status"] == "failed"
+    assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_image_provider_not_ready"
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert str(provider_path).lower() not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+
+def _store(tmp_path: Path, payload: dict):
+    path = tmp_path / "providers.local.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return load_company_provider_secrets(path)
+
+
+def _codex_provider_config() -> dict:
+    return {
+        "schema_version": "company_provider_secrets.local.v2",
+        "accounts": {
+            "local_codex": {
+                "auth_type": "none",
+                "execution_backend": "codex_exec",
+                "cli_command": "codex",
+                "default_models": {"image": "codex-image-worker"},
+            }
+        },
+        "account_pools": {
+            "codex_image_pool": {
+                "accounts": [
+                    {
+                        "account_id": "local_codex",
+                        "service_id": "codex_image",
+                        "enabled_capabilities": ["image"],
+                        "enabled": True,
+                        "priority": 10,
+                        "weight": 1,
+                        "concurrency_limit": 1,
+                        "health_state": "healthy",
+                    }
+                ]
+            }
+        },
+        "services": {
+            "codex_image": {
+                "provider": "codex_handoff",
+                "account_ref": "local_codex",
+                "capability": "image",
+                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                "descriptor": {
+                    "schema_version": "provider_descriptor.v0.1",
+                    "modality": "image",
+                    "execution_mode": "async",
+                    "capabilities": ["image"],
+                    "account_pool_id": "codex_image_pool",
+                    "reference_image_slots": 4,
+                    "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+                    "prompt_char_limit": 4000,
+                    "seed_supported": True,
+                    "cost_hint": "Server-local Codex image worker; downstream model cost depends on server configuration.",
+                    "rate_limit_hint": "Run one worker per runtime root for MVP validation.",
+                    "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                    "async_poll_interval_sec": 2,
+                    "async_timeout_sec": 900,
+                    "async_max_polls": 450,
+                },
+            }
+        },
+    }

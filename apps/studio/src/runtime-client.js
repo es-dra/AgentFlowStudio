@@ -133,6 +133,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     generateKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });
     },
+    pollKeyframe(jobId) {
+      return requestJson(`/projects/${encoded}/keyframe-generations/${encodeURIComponent(jobId)}/poll`, { method: "POST" });
+    },
     preflightVideo(payload) {
       return requestJson(`/projects/${encoded}/video-generations/preflight`, { method: "POST", payload });
     },

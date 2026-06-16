@@ -218,6 +218,20 @@ export async function pollNodeVideoGeneration(store, runtime, node) {
   }
 }
 
+export async function pollNodeKeyframeGeneration(store, runtime, node) {
+  const jobId = node.params?.lastKeyframeJobId;
+  if (!jobId || !runtime?.pollKeyframe) {
+    setNodeError(store, node.id, "没有可继续轮询的图像生成任务。");
+    return;
+  }
+  try {
+    await pollKeyframeUntilTerminal(store, runtime, node.id, jobId, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
+  } catch (error) {
+    setNodeError(store, node.id, `图像生成轮询失败: ${safeError(error)}`);
+    await store.flushRuntimeSave?.();
+  }
+}
+
 export async function cancelNodeVideoGeneration(store, runtime, node) {
   const jobId = node.params?.lastVideoJobId;
   if (!jobId || !runtime?.cancelVideo) {
@@ -441,39 +455,77 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
     }
     submitAttempted = true;
     const response = await runtime.generateKeyframe(request);
-    const succeeded = response?.job?.status === "succeeded";
-    store.set((s) => {
-      const n = s.nodes[node.id];
-      if (!n) return;
-      n.status = succeeded ? "complete" : "error";
-      const preview = response?.candidate_previews?.[0] || null;
-      const reusableAsset = response?.reusable_image_assets?.[0] || null;
-      n.previewUrl = preview?.preview_url || null;
-      if (n.previewUrl) resizeNodeForImagePreview(n, preview, request.aspect_ratio);
-      if (succeeded && reusableAsset?.asset_id) {
-        n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
-      }
-      n.params.lastContextBundle = response?.context_bundle || null;
-      reconcileVisualAssetBadges(n, response?.context_bundle || null);
-      clearOneRunOverrides(store, node.id);
-      n.result = keyframeResultText(response, request, succeeded);
+    applyKeyframeResponse(store, node.id, response, request);
+    clearOneRunOverrides(store, node.id);
+    await store.flushRuntimeSave?.();
+    if (isKeyframeInProgress(response) && response?.job?.job_id && runtime?.pollKeyframe) {
+      await pollKeyframeUntilTerminal(store, runtime, node.id, response.job.job_id, request);
+    }
+  } catch (error) {
+    setNodeError(store, node.id, `图像生成请求失败: ${safeError(error)}`);
+    if (submitAttempted) clearOneRunOverrides(store, node.id);
+    await store.flushRuntimeSave?.();
+  }
+}
+
+async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
+  let lastResponse = null;
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (attempt > 0) await sleep(2000);
+    const response = await runtime.pollKeyframe(jobId);
+    lastResponse = response;
+    applyKeyframeResponse(store, nodeId, response, request);
+    await store.flushRuntimeSave?.();
+    if (!isKeyframeInProgress(response)) return response;
+  }
+  throw new Error(`图像生成仍在处理中，请稍后重试轮询。Job: ${lastResponse?.job?.job_id || jobId}`);
+}
+
+function applyKeyframeResponse(store, nodeId, response, request) {
+  const status = response?.job?.status || "blocked";
+  const succeeded = status === "succeeded";
+  const inProgress = isKeyframeInProgress(response);
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    const preview = response?.candidate_previews?.[0] || null;
+    const reusableAsset = response?.reusable_image_assets?.[0] || null;
+    const jobId = response?.job?.job_id || null;
+    const shouldRecordAsset = succeeded && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
+    n.params.lastKeyframeJobId = jobId || n.params.lastKeyframeJobId || null;
+    n.status = succeeded ? "complete" : inProgress ? "generating" : "error";
+    if (preview?.preview_url) {
+      n.previewUrl = preview.preview_url;
+      resizeNodeForImagePreview(n, preview, request.aspect_ratio);
+    }
+    if (succeeded && reusableAsset?.asset_id) {
+      n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
+    }
+    n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
+    reconcileVisualAssetBadges(n, response?.context_bundle || null);
+    n.result = keyframeResultText(response, request, succeeded);
+    if (shouldRecordAsset) {
+      n.params.lastKeyframeCompletedJobId = jobId;
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({
         ...asset,
         safe_summary: (n.prompt || "").slice(0, 90),
-        job_id: response?.job?.job_id || null,
+        job_id: jobId,
         artifact_id: response?.artifacts?.keyframe_generation_safe_manifest?.artifact_id || null,
         asset_id: reusableAsset?.asset_id || null,
         preview_url: n.previewUrl,
         created_at: new Date().toISOString(),
       });
-    });
-    await store.flushRuntimeSave?.();
-  } catch (error) {
-    setNodeError(store, node.id, `MiniMax keyframe request failed: ${safeError(error)}`);
-    if (submitAttempted) clearOneRunOverrides(store, node.id);
-    await store.flushRuntimeSave?.();
-  }
+    }
+  });
+}
+
+function isKeyframeInProgress(response) {
+  return ["submitted", "running", "pending"].includes(String(response?.job?.status || ""));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function prepareGenerationRequest(store, runtime, node, request, kind) {
@@ -677,6 +729,33 @@ function restoreCancelledGeneration(store, nodeId, previous = null) {
 }
 
 function keyframeResultText(response, request, succeeded) {
+  {
+    const jobId = response?.job?.job_id || "not_available";
+    const status = response?.job?.status || "blocked";
+    const outputCount = response?.safe_manifest?.output_count ?? 0;
+    if (["submitted", "running", "pending"].includes(status)) {
+      return [
+        "图像生成中，预览完成后会自动更新到节点。",
+        `Job: ${jobId}`,
+      ].join("\n");
+    }
+    if (!succeeded) {
+      const reason = response?.safe_manifest?.blocks?.[0]?.reason || "image generation service is not ready";
+      return [
+        "图像生成未完成，本次没有可用预览。",
+        `状态: ${status}`,
+        `原因: ${reason}`,
+      ].join("\n");
+    }
+    return [
+      "关键帧已生成",
+      `Job: ${jobId}`,
+      `请求比例: ${request.aspect_ratio}`,
+      `候选数量: ${outputCount}`,
+      response?.reusable_image_assets?.[0]?.asset_id ? `Reference Asset: ${response.reusable_image_assets[0].asset_id}` : null,
+      response?.candidate_previews?.[0]?.preview_url ? "预览已从 Runtime 安全端点加载。" : "未返回预览地址。",
+    ].filter(Boolean).join("\n");
+  }
   const jobId = response?.job?.job_id || "not_available";
   const outputCount = response?.safe_manifest?.output_count ?? 0;
   if (!succeeded) {
@@ -687,7 +766,7 @@ function keyframeResultText(response, request, succeeded) {
     ].join("\n");
   }
   return [
-    "MiniMax 关键帧已生成",
+    "关键帧已生成",
     `Job: ${jobId}`,
     `请求比例: ${request.aspect_ratio}`,
     `候选数量: ${outputCount}`,

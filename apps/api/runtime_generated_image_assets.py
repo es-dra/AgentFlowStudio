@@ -8,7 +8,7 @@ from uuid import uuid4
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.minimax_image_runtime import image_dimensions
 from apps.api.runtime_image_assets import public_image_asset
-from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload, safe_id
+from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
 def register_generated_image_asset(
@@ -28,6 +28,17 @@ def register_generated_image_asset(
         raise ValueError("generated image asset must stay inside runtime root") from exc
     if not resolved.is_file():
         raise ValueError("generated image asset is missing")
+
+    existing = _existing_generated_asset(
+        store,
+        project_id,
+        source_job_id=source_job_id,
+        source_candidate_id=source_candidate_id,
+    )
+    if existing:
+        metadata, metadata_path = existing
+        artifact = store.register_artifact(metadata_path, role="image_asset_metadata")
+        return {"asset": public_image_asset(metadata), "artifact": artifact}
 
     image_bytes = resolved.read_bytes()
     suffix, mime_type = _image_kind(image_bytes)
@@ -55,6 +66,31 @@ def register_generated_image_asset(
     write_json(metadata_path, metadata)
     artifact = store.register_artifact(metadata_path, role="image_asset_metadata")
     return {"asset": public_image_asset(metadata), "artifact": artifact}
+
+
+def _existing_generated_asset(
+    store: RuntimeStore,
+    project_id: str,
+    *,
+    source_job_id: str,
+    source_candidate_id: str,
+) -> tuple[dict[str, Any], Path] | None:
+    image_assets_dir = store.projects_dir / safe_id(project_id) / "image_assets"
+    if not image_assets_dir.is_dir():
+        return None
+    expected_job_id = safe_id(source_job_id)
+    expected_candidate_id = safe_id(source_candidate_id)
+    for metadata_path in sorted(image_assets_dir.glob("*/image_asset.json")):
+        metadata = read_json(metadata_path)
+        if metadata.get("source_kind") != "keyframe_candidate":
+            continue
+        if metadata.get("source_job_id") != expected_job_id:
+            continue
+        if metadata.get("source_candidate_id") != expected_candidate_id:
+            continue
+        reject_unsafe_payload(metadata)
+        return metadata, metadata_path
+    return None
 
 
 def _generated_metadata(

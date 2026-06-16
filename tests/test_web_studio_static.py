@@ -269,6 +269,20 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "Restart the 8790 Runtime Service and retry" in node_actions
 
 
+def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+
+    assert "pollKeyframe(jobId)" in runtime_client
+    assert "/keyframe-generations/${encodeURIComponent(jobId)}/poll" in runtime_client
+    assert "pollNodeKeyframeGeneration" in node_actions
+    assert "pollKeyframeUntilTerminal" in node_actions
+    assert "lastKeyframeJobId" in node_actions
+    assert "MiniMax keyframe request failed" not in node_actions
+    for forbidden in ("Codex", "codex", "handoff", "request.json", "codex_image_job"):
+        assert forbidden not in node_actions
+
+
 def test_video_revision_and_fail_closed_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")

@@ -27,6 +27,7 @@ archived.
 - `AFS-VIDEO-LOCALIZED-REGEN-20260615.md`
 - `AFS-BROWSER-ACCEPTANCE-DRILL-20260615.md`
 - `AFS-MVP-EXPERIENCE-HARDENING-20260615.md`
+- `AFS-CODEX-IMAGE-HANDOFF-WORKER-20260617.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.
@@ -45,6 +46,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-PROVIDER-ADAPTER-V0-1.md`
 - `AFS-PROVIDER-GATEWAY-V0-1.md`
 - `AFS-KLING-PREFLIGHT-001.md`
+- `AFS-CODEX-IMAGE-HANDOFF-WORKER-20260617.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider
