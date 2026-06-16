@@ -21,6 +21,7 @@ from agentflow.algorithms.context_resolver.assets import (
     temporary_asset_exclusion_records,
 )
 from agentflow.algorithms.context_resolver.budget import apply_context_budget, context_warnings
+from agentflow.algorithms.context_resolver.references import merged_reference_image_refs
 from agentflow.algorithms.context_resolver.subgraph import connected_asset_refs, sort_asset_ids, upstream_summary_lines, validate_subgraph
 from agentflow.algorithms.context_resolver.text import (
     director_compile_result,
@@ -155,6 +156,7 @@ __all__ = (
     "INPUT_CONTRACT",
     "OUTPUT_CONTRACT",
     "RESOLVER_VERSION",
+    "merged_reference_image_refs",
     "provider_prompt_from_bundle",
     "resolve_context_bundle_core",
 )

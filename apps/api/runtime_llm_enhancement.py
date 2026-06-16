@@ -5,6 +5,14 @@ import re
 from pathlib import Path
 from typing import Any
 
+from agentflow.algorithms.creative_intent_control import (
+    deterministic_video_fallback_prompt as algorithm_video_fallback_prompt,
+    has_visual_reference as algorithm_has_visual_reference,
+    prompt_optimization_mode as algorithm_prompt_optimization_mode,
+    video_enhancement_instruction as algorithm_video_enhancement_instruction,
+    video_reference_subject as algorithm_video_reference_subject,
+    video_strict_format_retry_instruction as algorithm_video_strict_format_retry_instruction,
+)
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_models import PromptOptimizationRequest
@@ -195,38 +203,20 @@ def llm_provider_gate() -> dict[str, str]:
 
 
 def prompt_optimization_mode(request: PromptOptimizationRequest) -> str:
-    if request.node_type in {"video", "video_merge"} or request.generation_target == "video":
-        return "i2v" if _has_visual_reference(request) else "t2v"
-    if request.node_type in {"text", "script"}:
-        return "text"
-    return "i2i" if _has_visual_reference(request) else "t2i"
+    return algorithm_prompt_optimization_mode(
+        node_type=request.node_type,
+        generation_target=request.generation_target,
+        has_visual_reference=_has_visual_reference(request),
+    )
 
 
 def _has_visual_reference(request: PromptOptimizationRequest) -> bool:
-    if request.asset_refs:
-        return True
-    params = request.node_parameters or {}
-    for key in (
-        "reference_image_count",
-        "has_reference_image",
-        "first_frame_image_asset_id",
-        "last_frame_image_asset_id",
-    ):
-        if params.get(key):
-            return True
-    for key in ("connected_reference_nodes", "uploads", "image_asset_refs", "reference_images"):
-        value = params.get(key)
-        if isinstance(value, list) and value:
-            return True
-    graph = request.context_subgraph
-    if graph and isinstance(getattr(graph, "nodes", None), list):
-        target_id = str(getattr(graph, "target_node_id", "") or request.node_id or "")
-        for node in graph.nodes:
-            if str(getattr(node, "id", "") or "") == target_id:
-                continue
-            if getattr(node, "image_asset_refs", None):
-                return True
-    return False
+    return algorithm_has_visual_reference(
+        asset_refs=list(request.asset_refs),
+        node_parameters=request.node_parameters or {},
+        context_subgraph=request.context_subgraph,
+        node_id=request.node_id,
+    )
 
 
 def sanitize_enhanced_prompt(value: str) -> str:
@@ -327,25 +317,10 @@ def deterministic_i2i_fallback_prompt(request: PromptOptimizationRequest) -> str
 
 def deterministic_video_fallback_prompt(request: PromptOptimizationRequest, assembly: dict[str, Any]) -> str:
     slots = assembly.get("selected_slots") if isinstance(assembly, dict) else {}
-    params = request.node_parameters or {}
-    prompt_text = _compact(request.prompt_text)
-    subject = _slot(slots, "subject") or _video_reference_subject(request) or "首帧中的主体"
-    scene = _slot(slots, "scene") or "延续首帧场景与空间关系"
-    motion = str(params.get("motion") or "").strip() or _slot(slots, "motion") or prompt_text
-    duration = str(params.get("duration_sec") or params.get("duration") or "").strip()
-    duration_text = f"时长约 {duration}，" if duration else ""
-    prompt = "\n".join(
-        [
-            f"意图：基于首帧生成视频，围绕“{prompt_text}”设计连续运动，不改写为单帧图片编辑。",
-            f"人物/主体：{subject}。保持首帧中的人物身份、脸部辨识度、服装、发型轮廓、体态比例和画风一致。",
-            f"场景/美术：{scene}。延续首帧的空间、道具、色彩和光影气氛，只做视频运动需要的自然变化。",
-            f"动作/情节：{motion}。动作从首帧自然开始，幅度克制、连贯，不突然换人、换装或换场景。",
-            "镜头/构图：以首帧构图为起点，保持主体位置关系稳定，可做轻微推近、跟随或平移。",
-            "灯光：保持首帧主要光源方向、曝光和色温，避免无来源强光和闪烁。",
-            f"运动/时间推进：{duration_text}描述明确的时间推进、动作方向、速度和镜头关系，形成可执行的视频段落。",
-            "连续性：首帧是强约束；保持身份、服装、体态、场景、镜头关系和资产签名一致。",
-            "负面约束：不要单帧图像编辑口吻、不要静止不动、不要身份漂移、换脸、换服装、肢体畸形、文字水印、突兀转场或背景跳变。",
-        ]
+    prompt = algorithm_video_fallback_prompt(
+        prompt_text=request.prompt_text,
+        node_parameters=request.node_parameters or {},
+        slots=slots,
     )
     reject_unsafe_text(prompt)
     return prompt
@@ -363,35 +338,11 @@ def _enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[
 
 
 def _video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:
-    params = request.node_parameters or {}
-    reference_hint = _video_reference_subject(request)
-    first_frame_line = (
-        f"首帧/参考线索：{reference_hint}"
-        if reference_hint
-        else "首帧/参考线索：当前请求会携带首帧图片；必须把首帧作为主体、构图、服装和场景连续性的强约束。"
-    )
-    motion = str(params.get("motion") or "").strip()
-    parts = [
-        f"意图：基于首帧生成视频，围绕“{request.prompt_text}”组织连续运动，不写成图生图或单帧编辑。",
-        "人物/主体：明确首帧中的主体；保持身份、脸部辨识度、服装、发型轮廓、体态比例和整体画风一致。",
-        "场景/美术：延续首帧空间、道具、背景层次、色彩和氛围，只补足视频运动所需的环境连续性。",
-        f"动作/情节：描述从首帧开始发生的动作和节奏；{('用户运动要求：' + motion) if motion else '若用户只说生成视频，则设计轻微、自然、克制的动作。'}",
-        "镜头/构图：以首帧构图为起点，说明镜头推近、跟随、平移或保持稳定的方式，避免突然换景。",
-        "灯光：保持首帧主要光源方向、曝光、明暗关系和色温，避免闪烁或无来源强光。",
-        "运动/时间推进：写清楚时间推进、运动方向、速度、幅度和镜头关系；必须是视频段落，不是静态图。",
-        "连续性：首帧是强约束；资产签名只转写成身份、服装、体态、场景和画风一致性约束。",
-        "负面约束：不要图生图编辑口吻、不要单帧图像编辑、不要静止不动、不要身份漂移、换脸、换装、肢体畸形、文字水印、突兀转场或背景跳变。",
-    ]
-    return "\n".join(
-        [
-            f"原始视频节点提示词：{request.prompt_text}",
-            first_frame_line,
-            f"当前模式：{mode}；目标：video；风格：{request.style or 'cinematic'}。",
-            "硬性要求：只输出可直接用于图生视频/首帧生视频的中文提示词；不要解释、不输出思考过程、不添加标题。",
-            "禁止事项：不要写“本次只做图生图编辑”“单帧图像编辑”“不制造多阶段动作或剧情”；不要把上游节点标题或完整旧提示词当成人物名字。",
-            "输出必须只有以下九行，标签不可改名：意图、人物/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
-            " ".join(parts),
-        ]
+    return algorithm_video_enhancement_instruction(
+        prompt_text=request.prompt_text,
+        style=request.style,
+        node_parameters=request.node_parameters or {},
+        mode=mode,
     )
 
 
@@ -444,43 +395,31 @@ def _visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
 
 
 def _strict_format_retry_instruction(request: PromptOptimizationRequest) -> str:
-    if prompt_optimization_mode(request) in {"i2v", "t2v"}:
-        labels = "、".join(SECTION_ORDER)
-        return "\n".join(
-            [
-                "上一次输出没有按 AFS Studio 的视频提示词格式返回，已经被系统拒绝。",
-                "现在必须重新输出。不要解释，不要标题，不要 Markdown，不要表格，不要英文教程。",
-                f"原始视频节点提示词：{request.prompt_text}",
-                f"当前模式：{prompt_optimization_mode(request)}；目标：video；风格：{request.style or 'cinematic'}。",
-                f"只允许输出以下九行，顺序和标签必须保持：{labels}。",
-                "意图：写基于首帧生成视频的目标，不写图生图编辑。",
-                "人物/主体：写首帧主体身份、外观、服装、体态和情绪连续性。",
-                "场景/美术：写首帧场景延续与视频环境连续性。",
-                "动作/情节：写从首帧开始发生的动作和节奏。",
-                "镜头/构图：写视频镜头运动、景别和主体位置关系。",
-                "灯光：写首帧光源延续、曝光和色温。",
-                "运动/时间推进：写时间推进、动作方向、速度、幅度和镜头关系。",
-                "连续性：写首帧、身份、服装、场景、画风和资产签名一致性。",
-                "负面约束：写不要出现的视频错误，包括身份漂移、换装、突兀转场、背景跳变、水印和文字乱码。",
-            ]
+    mode = prompt_optimization_mode(request)
+    if mode in {"i2v", "t2v"}:
+        return algorithm_video_strict_format_retry_instruction(
+            prompt_text=request.prompt_text,
+            style=request.style,
+            mode=mode,
+            section_order=SECTION_ORDER,
         )
-    labels = "、".join(SECTION_ORDER)
+    labels = "?".join(SECTION_ORDER)
     return "\n".join(
         [
-            "上一次输出没有按 AFS Studio 的机器可解析格式返回，已经被系统拒绝。",
-            "现在必须重新输出。不要解释，不要标题，不要 Markdown，不要表格，不要英文教程，不要 negative prompt 代码块。",
-            f"原始提示词：{request.prompt_text}",
-            f"当前模式：{prompt_optimization_mode(request)}；目标：{request.generation_target}；风格：{request.style or 'cinematic'}。",
-            f"只允许输出以下九行，顺序和标签必须保持：{labels}。",
-            "意图：围绕原始提示词说明本次生成目标。",
-            "人物/主体：写主体身份、外观、姿态和情绪；图生图时保留参考主体。",
-            "场景/美术：写空间、时间、环境元素、质感和视觉风格。",
-            "动作/情节：写单帧可读的动作或情境，不扩写复杂剧情。",
-            "镜头/构图：写景别、视角、主体位置和前中后景关系。",
-            "灯光：写光源方向、明暗关系和色温氛围。",
-            "运动/时间推进：写短时间感；关键帧以单帧可读为主。",
-            "连续性：写需要保持一致的身份、服装、场景或项目风格。",
-            "负面约束：写不要出现的画面错误。",
+            "???????? AFS Studio ???????????????????",
+            "????????????????????? Markdown??????????????? negative prompt ????",
+            f"??????{request.prompt_text}",
+            f"?????{mode}????{request.generation_target}????{request.style or 'cinematic'}?",
+            f"????????????????????{labels}?",
+            "???????????????????",
+            "??/?????????????????????????????",
+            "??/???????????????????????",
+            "??/???????????????????????",
+            "??/??????????????????????",
+            "???????????????????",
+            "??/??????????????????????",
+            "??????????????????????????",
+            "????????????????",
         ]
     )
 
@@ -587,29 +526,7 @@ def _reference_hint_terms(request: PromptOptimizationRequest) -> list[str]:
 
 
 def _video_reference_subject(request: PromptOptimizationRequest) -> str:
-    params = request.node_parameters or {}
-    terms: list[str] = []
-    for item in params.get("uploaded_images") or []:
-        if isinstance(item, dict):
-            term = _filename_hint(item.get("filename") or item.get("label"))
-            if term:
-                terms.append(term)
-    for item in params.get("connected_reference_nodes") or []:
-        if not isinstance(item, dict):
-            continue
-        title = _compact(str(item.get("title") or ""), 40)
-        if title and not title.startswith(("图片节点", "文本节点")):
-            terms.append(title)
-    for key in ("first_frame_image_asset_id", "last_frame_image_asset_id"):
-        value = str(params.get(key) or "").strip()
-        if value:
-            terms.append("首帧参考图")
-            break
-    result: list[str] = []
-    for term in terms:
-        if term and term not in result:
-            result.append(term)
-    return "、".join(result[:4])
+    return algorithm_video_reference_subject(request.node_parameters or {})
 
 
 def _filename_hint(value: Any) -> str:

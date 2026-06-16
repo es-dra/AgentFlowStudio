@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agentflow.algorithms.context_resolver import merged_reference_image_refs
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
@@ -238,17 +239,10 @@ def _reference_images(
     *,
     limit: int,
 ) -> list[dict[str, Any]]:
-    if not context_bundle:
-        return resolve_reference_images(store, project_id, request.asset_refs, limit=limit)
-    refs = [
-        str(item.get("asset_id") or "")
-        for item in context_bundle.get("reference_image_channel", [])
-        if isinstance(item, dict)
-    ]
-    for asset_id in request.asset_refs:
-        clean_id = str(asset_id or "").strip()
-        if clean_id and clean_id not in refs:
-            refs.append(clean_id)
+    refs = merged_reference_image_refs(
+        request_asset_refs=request.asset_refs,
+        context_bundle=context_bundle,
+    )
     return resolve_reference_images(store, project_id, refs, limit=limit)
 
 

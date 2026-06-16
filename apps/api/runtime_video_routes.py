@@ -10,6 +10,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 from agentflow.harness.json_io import write_json
+from agentflow.algorithms.provider_gate_manifest import (
+    strip_image_edit_language as algorithm_strip_image_edit_language,
+    video_provider_prompt as algorithm_video_provider_prompt,
+)
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_errors import safe_error_detail
@@ -369,46 +373,18 @@ def _safe_outputs(output_dir: Path, raw: dict[str, Any]) -> list[dict[str, Any]]
 
 
 def _video_provider_prompt(request: VideoGenerationRequest, context_bundle: dict[str, Any] | None) -> str:
-    base = _strip_image_edit_language(request.optimized_prompt or request.prompt_text)
-    parts = [
-        base,
-        f"Video task: generate a continuous {request.duration_sec}s image-to-video clip from the first frame.",
-        "Use the first frame as a strict visual anchor for identity, clothing, hairstyle silhouette, body proportions, scene layout, lighting, color palette, and composition.",
-    ]
-    if request.motion:
-        parts.append(f"Motion: {_strip_image_edit_language(request.motion)}")
-    if request.last_frame_image_asset_id:
-        parts.append("Use the last frame as the ending visual anchor; interpolate motion smoothly between first and last frame.")
-    text_channel = context_bundle.get("text_channel") if isinstance(context_bundle, dict) else None
-    if isinstance(text_channel, dict):
-        for label, key in (
-            ("Asset identity", "asset_identity_segment"),
-            ("Asset signatures", "asset_signature_segment"),
-            ("Director setup", "scene_director_segment"),
-            ("Style", "preference_segment"),
-        ):
-            value = _strip_image_edit_language(str(text_channel.get(key) or "").strip())
-            if value:
-                parts.append(f"{label}: {value}")
-    parts.append(
-        "Avoid static single-frame language, image-edit wording, identity drift, face changes, wardrobe changes, sudden scene changes, text, watermark, distorted limbs, or abrupt transitions."
+    return algorithm_video_provider_prompt(
+        prompt_text=request.prompt_text,
+        optimized_prompt=request.optimized_prompt,
+        duration_sec=request.duration_sec,
+        motion=request.motion,
+        last_frame_image_asset_id=request.last_frame_image_asset_id,
+        context_bundle=context_bundle,
     )
-    prompt = "\n".join(part for part in parts if part.strip())
-    return prompt[:4000]
 
 
 def _strip_image_edit_language(value: str) -> str:
-    text = str(value or "")
-    replacements = {
-        "本次只做这一项图生图编辑": "本次生成连续视频段落",
-        "单帧图像编辑，不制造多阶段动作或剧情": "连续视频运动，动作自然推进",
-        "单帧关键画面，不制造多阶段动作": "连续视频运动，动作自然推进",
-        "人物保持参考图原有静态姿态和身体朝向": "人物从首帧姿态自然开始运动，保持身体比例和身份一致",
-        "只呈现": "以连续运动呈现",
-    }
-    for before, after in replacements.items():
-        text = text.replace(before, after)
-    return re.sub(r"\s+", " ", text).strip()
+    return algorithm_strip_image_edit_language(value)
 
 
 def _candidate_previews(project_id: str, job_id: str, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:

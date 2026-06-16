@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-17 - Algorithm Core Wave 2
+
+- Moved PR #87 video creative-intent semantics into
+  `agentflow.algorithms.creative_intent_control.video_prompt`.
+- Moved video-safe provider prompt projection and image-edit wording stripping
+  into `agentflow.algorithms.provider_gate_manifest.video_prompt`.
+- Moved reference image channel + request asset ref merging into
+  `agentflow.algorithms.context_resolver.references`.
+- Slimmed `apps/studio/src/node-actions.js` by moving video first-frame
+  inference and auto-poll scheduling into `apps/studio/src/video-node-flow.js`.
+- Kept Runtime and Studio behavior stable through focused tests. No live
+  provider call was started.
+
+Verification:
+
+```text
+python -m py_compile changed Python files -> pass
+node --check apps/studio/src/node-actions.js -> pass
+node --check apps/studio/src/video-node-flow.js -> pass
+node --check apps/studio/src/node-result-view.js -> pass
+node --check apps/studio/src/optimizer-contract.js -> pass
+pytest tests/test_algorithm_library_contracts.py -q -> 7 passed
+pytest tests/test_web_studio_static.py tests/test_api_runtime_prompt_memory_loop.py::test_video_prompt_optimizer_uses_i2v_instruction_with_first_frame tests/test_api_runtime_video_generations.py::test_video_provider_prompt_removes_image_edit_language tests/test_api_runtime_keyframe_reference_assets.py::test_uploaded_image_asset_survives_context_bundle_reference_fallback -q -> 28 passed, 1 warning
+pytest tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_video_generations.py tests/test_api_runtime_keyframe_reference_assets.py -q -> 32 passed, 1 warning
+pytest tests/test_web_studio_static.py tests/test_algorithm_library_contracts.py -q -> 32 passed
+tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> pass
+```
+
 ## 2026-06-17 - Provider Video Flow Intake
 
 - Integrated server-side PR #87 onto the GFR baseline branch without conflicts.

@@ -342,6 +342,7 @@ def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> N
 def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     feedback = STUDIO_ROOT / "src" / "quality-feedback.js"
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    video_node_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     result_view = (STUDIO_ROOT / "src" / "node-result-view.js").read_text(encoding="utf-8")
@@ -382,11 +383,12 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "厂商侧任务" in node_actions
     assert "停止计费" in node_actions
     assert "ensureVideoFirstFrameAsset" in node_actions
-    assert "inferConnectedFirstFrameAsset" in node_actions
-    assert "已自动使用上游关键帧作为首帧" in node_actions
-    assert "VIDEO_AUTO_POLL_INTERVAL_MS" in node_actions
-    assert "scheduleVideoAutoPoll" in node_actions
-    assert "clearVideoAutoPoll" in node_actions
+    assert "ensureVideoFirstFrameAsset" in video_node_flow
+    assert "inferConnectedFirstFrameAsset" in video_node_flow
+    assert "已自动使用上游关键帧作为首帧" in video_node_flow
+    assert "VIDEO_AUTO_POLL_INTERVAL_MS" in video_node_flow
+    assert "scheduleVideoAutoPoll" in video_node_flow
+    assert "clearVideoAutoPoll" in video_node_flow
     assert "本地取消轮询" in node_menu
     assert "node-status cancelled" in node_actions or "node-status cancelled" in (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     assert "quality-feedback" in styles

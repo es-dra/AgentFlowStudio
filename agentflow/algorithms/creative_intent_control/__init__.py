@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.creative_intent_control.video_prompt import (
+    VIDEO_MODES,
+    deterministic_video_fallback_prompt,
+    has_visual_reference,
+    prompt_optimization_mode,
+    video_enhancement_instruction,
+    video_reference_subject,
+    video_strict_format_retry_instruction,
+)
+
 
 ALGORITHM_ID = "afs.creative_intent_control.v0.1"
 INPUT_CONTRACT = "user intent, context bundle, director parameters, provider capability descriptor"
@@ -26,5 +36,12 @@ __all__ = (
     "FAILURE_MODES",
     "INPUT_CONTRACT",
     "OUTPUT_CONTRACT",
+    "VIDEO_MODES",
     "canonical_brief",
+    "deterministic_video_fallback_prompt",
+    "has_visual_reference",
+    "prompt_optimization_mode",
+    "video_enhancement_instruction",
+    "video_reference_subject",
+    "video_strict_format_retry_instruction",
 )
