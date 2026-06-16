@@ -85,7 +85,7 @@ def build_keyframe_generation(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
-    if reference_images and not context_bundle:
+    if reference_images:
         provider_prompt = minimax_keyframe_prompt(
             f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}",
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
@@ -245,6 +245,10 @@ def _reference_images(
         for item in context_bundle.get("reference_image_channel", [])
         if isinstance(item, dict)
     ]
+    for asset_id in request.asset_refs:
+        clean_id = str(asset_id or "").strip()
+        if clean_id and clean_id not in refs:
+            refs.append(clean_id)
     return resolve_reference_images(store, project_id, refs, limit=limit)
 
 
