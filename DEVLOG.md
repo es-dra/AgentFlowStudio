@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-06-17 - Provider Video Flow Intake
+
+- Integrated server-side PR #87 onto the GFR baseline branch without conflicts.
+- Preserved uploaded/reference image assets for keyframe provider prompts when
+  a context bundle exists.
+- Added video-specific prompt optimization behavior for i2v/t2v, video-safe
+  Kling provider prompt projection, Studio first-frame inference from upstream
+  keyframes, video auto-polling, and safe image/video download links.
+- Refreshed no-cost provider-connected readiness and saved the safe report at
+  `docs/handoff/AFS-PROVIDER-FLOW-INTAKE-READINESS-20260617.json`.
+- Kept live provider calls out of this local integration step. The server-side
+  Kling smoke note remains provider-smoke evidence only, not human acceptance.
+
+Verification:
+
+```text
+node --check apps/studio/src/node-actions.js -> pass
+node --check apps/studio/src/node-result-view.js -> pass
+node --check apps/studio/src/optimizer-contract.js -> pass
+pytest tests/test_web_studio_static.py tests/test_api_runtime_prompt_memory_loop.py::test_video_prompt_optimizer_uses_i2v_instruction_with_first_frame tests/test_api_runtime_video_generations.py::test_video_provider_prompt_removes_image_edit_language tests/test_api_runtime_keyframe_reference_assets.py::test_uploaded_image_asset_survives_context_bundle_reference_fallback -q -> 28 passed, 1 warning
+pytest tests/test_afs_provider_connected_validation_readiness.py -q -> 4 passed, 1 warning
+```
+
 ## 2026-06-17 - COS / GFR V1 Projection
 
 - Added `docs/GFR_EXECUTION_PROJECTION.md` as the repo-local projection of the
