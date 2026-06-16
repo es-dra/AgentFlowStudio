@@ -210,7 +210,10 @@ Source control entry:
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
 D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+D:\Projects\AgentFlowStudio\docs\GFR_EXECUTION_PROJECTION.md
 ```
 
 For each substantial AFS task, GFR should produce or internally apply a task
@@ -224,3 +227,9 @@ identity -> task type -> context pack -> read/write scope -> non-goals
 
 Old AFS drafts, old presentation materials, and old Memory OS / local-first /
 provider-gate-first narratives are not default read scope.
+
+GFR projection verification:
+
+```powershell
+python "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\tools\gfr_audit.py" --root "D:\Learning materials\Learning_notes\10-Startup" --pack-index "D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json" --packets-dir "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\task-startup-packets"
+```

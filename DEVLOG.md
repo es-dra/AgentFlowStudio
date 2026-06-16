@@ -1,5 +1,24 @@
 # Devlog
 
+## 2026-06-17 - COS / GFR V1 Projection
+
+- Added `docs/GFR_EXECUTION_PROJECTION.md` as the repo-local projection of the
+  COS/GFR V1 baseline.
+- Updated `AGENTS.md` and `docs/company_operating_model.md` to include
+  `COS-V1-BASELINE.md`, `context-pack-index.json`, and the AFS Project Capsule
+  as default source-KB control files.
+- Added handoff `docs/handoff/COS-GFR-V1-PROJECTION-20260617.md` and indexed it
+  for future AFS work.
+- Kept this as a rules/projection change only: no Runtime, Studio, provider,
+  secret, customer, cost, contract, or media-byte change.
+
+Verification:
+
+```text
+gfr_audit.py -> pass, checked_paths=37, checked_packets=3
+validate_ai_native_contracts.py -> all contract fixtures and GFR packet fixtures passed
+```
+
 ## 2026-06-17 - Algorithm Library / GFR Operationalization
 
 - Added the first executable AFS algorithm-library slice: draft asset-card

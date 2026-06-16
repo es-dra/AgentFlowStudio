@@ -37,6 +37,23 @@ D:\Learning materials\Learning_notes\10-Startup
 
 `10-Startup` 是公司源头知识库。AFS 仓库只保存执行投影：代码、测试、contract、runbook、handoff、可公开或半公开工程说明。
 
+当前 COS/GFR 源头控制文件：
+
+```text
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
+D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+```
+
+AFS 仓库内执行投影：
+
+```text
+docs\GFR_EXECUTION_PROJECTION.md
+```
+
 禁止把以下内容写入仓库：
 
 - secret、token、cookie、provider key、signed URL。
@@ -173,7 +190,10 @@ When connecting this repo to Company OS, use the source-KB control entry first:
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
 D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+D:\Projects\AgentFlowStudio\docs\GFR_EXECUTION_PROJECTION.md
 ```
 
 GFR compiles each task into identity, context pack, read/write scope, evidence

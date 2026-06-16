@@ -30,6 +30,7 @@ archived.
 - `AFS-CODEX-IMAGE-HANDOFF-WORKER-20260617.md`
 - `AFS-ALGORITHM-LIBRARY-HARD-REFACTOR-20260617.md`
 - `AFS-PROVIDER-CONNECTED-VALIDATION-READINESS-20260617.md`
+- `COS-GFR-V1-PROJECTION-20260617.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
 `/workbench/` or `apps/web` work from historical references.
@@ -51,6 +52,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-CODEX-IMAGE-HANDOFF-WORKER-20260617.md`
 - `AFS-ALGORITHM-LIBRARY-HARD-REFACTOR-20260617.md`
 - `AFS-PROVIDER-CONNECTED-VALIDATION-READINESS-20260617.md`
+- `COS-GFR-V1-PROJECTION-20260617.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider
@@ -71,4 +73,6 @@ responses, or media bytes.
 - Prompt optimization work starts from the prompt/knowledge runtime handoffs.
 - Provider work starts from provider-gated Runtime contracts and requires an
   explicit capability gate.
+- COS/GFR-aware work starts from `docs/GFR_EXECUTION_PROJECTION.md` and the
+  source-KB Project Capsule, not old AFS drafts.
 - Historical Web terms are not task entry points.
