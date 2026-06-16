@@ -29,6 +29,7 @@ export function resultView(node) {
       img.style.aspectRatio = previewAspectRatio(node);
       result.appendChild(img);
     }
+    result.appendChild(downloadPreviewLink(node));
   }
   const text = document.createElement("div");
   text.className = "node-result-text";
@@ -167,4 +168,22 @@ function segmentLabel(name) {
 function previewAspectRatio(node) {
   const value = String(node.params?.previewAspectRatio || node.params?.spec?.ratio || "9:16");
   return /^\d+:\d+$/.test(value) ? value.replace(":", " / ") : "9 / 16";
+}
+
+function downloadPreviewLink(node) {
+  const link = document.createElement("a");
+  link.className = "mini-btn node-preview-download";
+  link.href = node.previewUrl;
+  link.download = previewDownloadName(node);
+  link.textContent = node.type === "video" ? "下载视频" : "下载图片";
+  return link;
+}
+
+function previewDownloadName(node) {
+  const fallback = node.type === "video" ? "afs-video" : "afs-image";
+  const base = String(node.title || node.id || fallback)
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .trim()
+    .slice(0, 80) || fallback;
+  return `${base}.${node.type === "video" ? "mp4" : "png"}`;
 }

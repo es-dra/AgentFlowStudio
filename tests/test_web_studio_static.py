@@ -370,6 +370,9 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "afs:studio-quality-feedback" in result_view
     assert "afs:video-asset-card-draft" in result_view
     assert "video-asset-card-draft" in result_view
+    assert "node-preview-download" in result_view
+    assert "下载视频" in result_view
+    assert "下载图片" in result_view
     assert "qualityFeedbackView" in result_view
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
@@ -378,6 +381,12 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "cancelled_local_only" in node_actions
     assert "厂商侧任务" in node_actions
     assert "停止计费" in node_actions
+    assert "ensureVideoFirstFrameAsset" in node_actions
+    assert "inferConnectedFirstFrameAsset" in node_actions
+    assert "已自动使用上游关键帧作为首帧" in node_actions
+    assert "VIDEO_AUTO_POLL_INTERVAL_MS" in node_actions
+    assert "scheduleVideoAutoPoll" in node_actions
+    assert "clearVideoAutoPoll" in node_actions
     assert "本地取消轮询" in node_menu
     assert "node-status cancelled" in node_actions or "node-status cancelled" in (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     assert "quality-feedback" in styles

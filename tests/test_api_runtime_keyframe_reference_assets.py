@@ -6,7 +6,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_keyframes import _reference_images
+from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 
 PNG_BYTES = base64.b64decode(
@@ -100,6 +103,61 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
     assert "data_base64" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_uploaded_image_asset_survives_context_bundle_reference_fallback(tmp_path, monkeypatch) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_context_ref_fallback"
+    asset_id = "img_uploaded_ref"
+    asset_dir = tmp_path / "projects" / project_id / "image_assets" / asset_id
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "source.png").write_bytes(PNG_BYTES)
+    (asset_dir / "image_asset.json").write_text(
+        json.dumps(
+            {
+                "artifact_type": "agentflow_uploaded_image_asset",
+                "schema_version": "0.1.0",
+                "project_id": project_id,
+                "asset_id": asset_id,
+                "source_node_id": "node_2",
+                "role": "reference_image",
+                "filename": "front.png",
+                "mime_type": "image/png",
+                "file_suffix": ".png",
+                "byte_count": len(PNG_BYTES),
+                "sha256": "fake-sha256",
+                "width": 1,
+                "height": 1,
+                "aspect_ratio": "1:1",
+                "preview_url": f"/projects/{project_id}/image-assets/{asset_id}/preview",
+            }
+        ),
+        encoding="utf-8",
+    )
+    request = KeyframeGenerationRequest(
+        node_id="node_2",
+        prompt_text="Move the uploaded character to a desert while preserving identity.",
+        optimized_prompt="Move the uploaded character to a desert while preserving identity.",
+        asset_refs=[asset_id],
+        context_subgraph={
+            "target_node_id": "node_2",
+            "nodes": [{"id": "node_2", "type": "image", "image_asset_refs": [asset_id]}],
+            "edges": [],
+        },
+        generated_at="2026-06-12T10:26:00+08:00",
+    )
+
+    refs = _reference_images(
+        store,
+        project_id,
+        request,
+        {"reference_image_channel": []},
+        limit=1,
+    )
+
+    assert len(refs) == 1
+    assert refs[0]["path"] == asset_dir / "source.png"
+    assert refs[0]["public"]["asset_id"] == asset_id
 
 
 def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, monkeypatch) -> None:
