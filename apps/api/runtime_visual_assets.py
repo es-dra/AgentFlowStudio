@@ -7,6 +7,17 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 
+from agentflow.algorithms.fixed_asset_memory import (
+    VISUAL_ASSET_SCHEMA_VERSION,
+    build_visual_asset_record,
+    clean_feature_card,
+    clean_locks,
+    clean_refs,
+    fixed_context_assets,
+    public_review,
+    public_visual_asset as project_visual_asset,
+    public_visual_asset_detail as project_visual_asset_detail,
+)
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_image_assets import image_asset_metadata
@@ -14,7 +25,6 @@ from apps.api.runtime_models import VisualAssetPromoteRequest, VisualAssetRetire
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
-VISUAL_ASSET_SCHEMA_VERSION = "0.2.0"
 VISUAL_ASSET_STATUSES = {"fixed", "rejected", "retired"}
 
 
@@ -64,36 +74,13 @@ def create_visual_asset(
     _validate_promote_request(store, project_id, request)
     warnings = _duplicate_label_warnings(store, project_id, request.asset_type, request.label)
     asset_id = f"vas_{uuid4().hex[:12]}"
-    record = {
-        "artifact_type": "agentflow_visual_asset",
-        "schema_version": VISUAL_ASSET_SCHEMA_VERSION,
-        "project_id": project_id,
-        "asset_id": asset_id,
-        "asset_type": request.asset_type,
-        "label": request.label.strip(),
-        "status": request.review_decision,
-        "version": 1,
-        "source_node_id": request.source_node_id,
-        "supersedes_asset_id": request.supersedes_asset_id.strip() if request.supersedes_asset_id else None,
-        "created_at": _server_now(),
-        "image_asset_refs": _clean_refs(request.source_image_asset_refs),
-        "signature": request.signature.strip(),
-        "feature_card": _clean_feature_card(request.feature_card),
-        "negative_locks": _clean_locks(request.negative_locks),
-        "promotion_review": {
-            "action": request.review_decision,
-            "reviewed_at": request.reviewed_at,
-            "server_recorded_at": _server_now(),
-            "human_confirmed": True,
-            "claim_boundary": "operator_review_record_not_human_acceptance",
-        },
-        "claim_boundary": "fixed_asset_runtime_contract_not_provider_validation",
-        "safe_fields_only": True,
-        "media_bytes_returned_by_api": False,
-        "provider_raw_response_stored": False,
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-    }
+    record = build_visual_asset_record(
+        project_id=project_id,
+        asset_id=asset_id,
+        request=request,
+        created_at=_server_now(),
+        server_recorded_at=_server_now(),
+    )
     reject_unsafe_payload(record)
     path = _visual_asset_path(store, project_id, asset_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,65 +133,27 @@ def visual_asset_record(store: RuntimeStore, project_id: str, asset_id: str) -> 
 
 
 def fixed_visual_assets_by_id(store: RuntimeStore, project_id: str) -> dict[str, dict[str, Any]]:
-    return {str(item["asset_id"]): item for item in list_visual_assets(store, project_id, status="fixed")}
+    return fixed_context_assets({str(item["asset_id"]): item for item in list_visual_assets(store, project_id, status="fixed")})
 
 
 def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
-    review = record.get("promotion_review") if isinstance(record.get("promotion_review"), dict) else {}
-    retirement = record.get("retirement_review") if isinstance(record.get("retirement_review"), dict) else {}
-    payload = {
-        "asset_id": record.get("asset_id"),
-        "asset_type": record.get("asset_type"),
-        "label": record.get("label"),
-        "status": record.get("status"),
-        "version": record.get("version"),
-        "signature": record.get("signature"),
-        "image_asset_refs": list(record.get("image_asset_refs") or []),
-        "source_node_id": record.get("source_node_id"),
-        "supersedes_asset_id": record.get("supersedes_asset_id"),
-        "created_at": record.get("created_at"),
-        "reviewed_at": review.get("reviewed_at"),
-        "server_recorded_at": review.get("server_recorded_at"),
-    }
-    if retirement:
-        payload["retired_at"] = retirement.get("retired_at")
-        payload["retirement_server_recorded_at"] = retirement.get("server_recorded_at")
-    return payload
+    return project_visual_asset(record)
 
 
 def public_visual_asset_detail(record: dict[str, Any]) -> dict[str, Any]:
-    payload = public_visual_asset(record)
-    payload.update(
-        {
-            "feature_card": dict(record.get("feature_card") or {}),
-            "negative_locks": list(record.get("negative_locks") or []),
-            "promotion_review": _public_review(record.get("promotion_review")),
-            "retirement_review": _public_review(record.get("retirement_review")),
-            "claim_boundary": record.get("claim_boundary"),
-            "safe_fields_only": True,
-            "media_bytes_returned_by_api": False,
-            "provider_raw_response_stored": False,
-        }
-    )
-    return payload
+    return project_visual_asset_detail(record)
 
 
 def _public_review(value: Any) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
-        return None
-    return {
-        key: value.get(key)
-        for key in ("action", "reviewed_at", "server_recorded_at", "human_confirmed", "claim_boundary", "reason", "retired_at")
-        if key in value
-    }
+    return public_review(value)
 
 
 def _validate_promote_request(store: RuntimeStore, project_id: str, request: VisualAssetPromoteRequest) -> None:
     if not request.signature.strip():
         raise ValueError("signature is required")
-    if not _clean_feature_card(request.feature_card):
+    if not clean_feature_card(request.feature_card):
         raise ValueError("feature_card must contain at least one item")
-    refs = _clean_refs(request.source_image_asset_refs)
+    refs = clean_refs(request.source_image_asset_refs)
     if not refs:
         raise ValueError("source_image_asset_refs is required")
     for asset_id in refs:
@@ -237,25 +186,15 @@ def _duplicate_label_warnings(
 
 
 def _clean_refs(values: list[str]) -> list[str]:
-    refs: list[str] = []
-    for value in values:
-        ref = str(value or "").strip()
-        if ref and ref not in refs:
-            refs.append(ref)
-    return refs
+    return clean_refs(values)
 
 
 def _clean_feature_card(value: dict[str, Any]) -> dict[str, Any]:
-    return {str(key): item for key, item in value.items() if str(key).strip() and item not in (None, "", [], {})}
+    return clean_feature_card(value)
 
 
 def _clean_locks(values: list[str]) -> list[str]:
-    locks: list[str] = []
-    for value in values:
-        lock = str(value or "").strip()
-        if lock and lock not in locks:
-            locks.append(lock)
-    return locks[:24]
+    return clean_locks(values)
 
 
 def _server_now() -> str:

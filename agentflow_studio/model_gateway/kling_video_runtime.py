@@ -8,7 +8,7 @@ from typing import Any, Callable
 import httpx
 
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelProviderError
-from agentflow_studio.model_gateway.kling_auth import encode_kling_jwt
+from agentflow_studio.model_gateway.kling_auth import encode_kling_jwt, kling_account_credentials
 from agentflow_studio.model_gateway.kling_transport import (
     download_curl,
     provider_code_hint,
@@ -28,9 +28,10 @@ def build_runtime_payload(plan_payload: dict[str, Any], image_path: Path) -> dic
 
 def build_runtime_token(account: dict[str, Any]) -> str:
     jwt_config = account.get("jwt") if isinstance(account.get("jwt"), dict) else {}
+    access_key, secret_key = kling_account_credentials(account)
     return encode_kling_jwt(
-        access_key=str(account.get("access_key") or ""),
-        secret_key=str(account.get("secret_key") or ""),
+        access_key=access_key,
+        secret_key=secret_key,
         ttl_seconds=int(jwt_config.get("ttl_seconds") or 1800),
         nbf_skew_seconds=int(jwt_config.get("nbf_skew_seconds") or -5),
     )

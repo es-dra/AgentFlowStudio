@@ -229,6 +229,69 @@ def test_provider_registry_blocks_llm_before_network_when_gate_closed(tmp_path, 
     assert called["count"] == 0
 
 
+def test_provider_registry_supports_fake_vision_descriptor_and_gate(tmp_path, monkeypatch) -> None:
+    payload = _provider_gateway_config()
+    payload["accounts"]["fake_vision_account"] = {
+        "auth_type": "none",
+        "base_url": "https://vision.example.test",
+        "default_models": {"vision": "fake-vision"},
+    }
+    payload["account_pools"]["vision_pool"] = {
+        "accounts": [
+            {
+                "account_id": "fake_vision_account",
+                "service_id": "fake_vision",
+                "enabled_capabilities": ["vision"],
+                "enabled": True,
+                "priority": 10,
+                "weight": 1,
+                "concurrency_limit": 1,
+                "health_state": "healthy",
+            }
+        ]
+    }
+    payload["services"]["fake_vision"] = {
+        "provider": "fake",
+        "account_ref": "fake_vision_account",
+        "capability": "vision",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "vision",
+            "execution_mode": "sync",
+            "capabilities": ["vision"],
+            "account_pool_id": "vision_pool",
+            "reference_image_slots": 8,
+            "supported_aspect_ratios": ["1:1"],
+            "prompt_char_limit": 3000,
+            "seed_supported": False,
+            "cost_hint": "fake-only",
+            "rate_limit_hint": "fake-only",
+        },
+    }
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VISION", raising=False)
+    registry = ProviderRegistry.from_store(_store(tmp_path, payload))
+
+    descriptor = registry.descriptor("fake_vision")
+    assert descriptor.modality == "vision"
+    assert descriptor.required_gate == "AFS_ALLOW_REMOTE_VISION"
+    with pytest.raises(ModelGatewayError, match="AFS_ALLOW_REMOTE_VISION"):
+        registry.dispatch(
+            "vision",
+            "fake_vision",
+            ProviderDispatchRequest(prompt="Describe this image", output_dir=tmp_path, reference_image_paths=("img_1",)),
+        )
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    result = registry.dispatch(
+        "vision",
+        "fake_vision",
+        ProviderDispatchRequest(prompt="Describe this image", output_dir=tmp_path, reference_image_paths=("img_1",)),
+    )
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    assert result["safe_manifest"]["provider_raw_response_stored"] is False
+
+
 def test_provider_registry_supports_fake_async_video_lifecycle(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
     store = _store(tmp_path, _provider_gateway_config())

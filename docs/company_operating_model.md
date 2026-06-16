@@ -199,3 +199,28 @@ AFS 执行投影采用 `10-Startup/80-Workflow/ai-native-company-workflow/agent-
 - 不为外部项目默认创建单独 intake 文档；只有用户明确要求时才创建。
 - 涉及共享 contract、schema、Runtime Service、CLI、provider adapter 或维护清理时，先做仓库结构和影响面理解，再执行修改。
 - 项目经验只能作为 evidence / candidate memory 回流 `10-Startup`，不能在 AFS repo 内直接晋升为 Company OS active rule。
+## GFR / Project Capsule Projection
+
+AFS tasks should now enter Company OS through GFR rather than broad source-KB
+reading.
+
+Source control entry:
+
+```text
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
+D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+```
+
+For each substantial AFS task, GFR should produce or internally apply a task
+startup packet:
+
+```text
+identity -> task type -> context pack -> read/write scope -> non-goals
+  -> evidence standard -> provider/tool gates -> verification route
+  -> feedback route
+```
+
+Old AFS drafts, old presentation materials, and old Memory OS / local-first /
+provider-gate-first narratives are not default read scope.

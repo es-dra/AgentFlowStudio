@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import time
 from typing import Any
 
@@ -65,6 +66,14 @@ def encode_kling_jwt(
         hashlib.sha256,
     ).digest()
     return f"{signing_input}.{_base64url(signature)}"
+
+
+def kling_account_credentials(account: dict[str, Any]) -> tuple[str, str]:
+    access_env = str(account.get("access_key_env") or "").strip()
+    secret_env = str(account.get("secret_key_env") or "").strip()
+    access_key = str(account.get("access_key") or (os.environ.get(access_env) if access_env else "") or "")
+    secret_key = str(account.get("secret_key") or (os.environ.get(secret_env) if secret_env else "") or "")
+    return access_key, secret_key
 
 
 def _encode_segment(payload: dict[str, Any]) -> str:

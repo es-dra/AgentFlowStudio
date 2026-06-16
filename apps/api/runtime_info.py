@@ -40,6 +40,7 @@ def runtime_provider_gates(env: dict[str, str] | None = None) -> dict[str, bool]
         "image": _enabled(source.get("AFS_ALLOW_REMOTE_IMAGE")),
         "video": _enabled(source.get("AFS_ALLOW_REMOTE_VIDEO")),
         "asr": _enabled(source.get("AFS_ALLOW_REMOTE_ASR")),
+        "vision": _enabled(source.get("AFS_ALLOW_REMOTE_VISION")),
         "external_download": _enabled(source.get("AFS_ALLOW_EXTERNAL_DOWNLOAD")),
     }
 
@@ -60,7 +61,9 @@ def runtime_capabilities_payload() -> dict[str, Any]:
             "prompt_optimization",
             "script_draft_plan",
             "image_asset_upload",
+            "asset_card_draft",
             "visual_asset_register",
+            "video_asset_register",
             "keyframe_generation",
             "video_generation",
             "generation_comparison",

@@ -165,3 +165,21 @@ git diff --check
 - `docs/maintenance/`
 
 需要反馈到 COS 的经验只能进入 `10-Startup` 的 candidate/limited 流程，不能由 Agent 自动晋升为 active rule。
+## COS / GFR Projection
+
+When connecting this repo to Company OS, use the source-KB control entry first:
+
+```text
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
+D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+```
+
+GFR compiles each task into identity, context pack, read/write scope, evidence
+standard, provider/tool gates, verification route, and Company OS feedback
+route. Do not read old AFS drafts by default.
+
+AFS repo remains the execution projection. Company OS source rules, private
+strategy, secrets, customer material, real costs, and unpublished commercial
+judgments stay in `10-Startup` or secure local storage, not this repo.

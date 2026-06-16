@@ -44,6 +44,8 @@ def review_directory(path: str) -> ReviewedPath:
         return _dir(path, "operations_spine", "current", "GitHub Actions 维护门禁和协作自动化配置。")
     if path in {"agentflow", "agentflow/contracts", "agentflow/harness", "agentflow/memory", "agentflow/router", "agentflow/skills"}:
         return _dir(path, "production_spine", "current", "平台 contract、harness、memory、router 或 skill 核心代码。")
+    if path == "agentflow/algorithms" or path.startswith("agentflow/algorithms/"):
+        return _dir(path, "production_spine", "current", "AFS reusable algorithm library for context selection, asset memory, provider safety, feedback scoring, and future product reuse.")
     if path == "agentflow/knowledge" or path.startswith("agentflow/knowledge/"):
         return _dir(path, "supporting_contract", "current", "Repo-safe professional prompt knowledgebase used by prompt assembly.")
     if path.startswith("agentflow_studio"):

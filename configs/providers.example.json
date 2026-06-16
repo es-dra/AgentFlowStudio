@@ -27,6 +27,11 @@
         "video": "fake-video"
       }
     },
+    "fake_vision": {
+      "auth_type": "none",
+      "base_url": "https://vision.example.invalid",
+      "default_models": { "vision": "fake-vision" }
+    },
     "local_codex": {
       "auth_type": "none",
       "execution_backend": "codex_exec",
@@ -96,6 +101,11 @@
           "concurrency_limit": 1,
           "health_state": "unknown"
         }
+      ]
+    },
+    "vision_pool": {
+      "accounts": [
+        { "account_id": "fake_vision", "service_id": "fake_vision", "enabled_capabilities": ["vision"], "enabled": true, "priority": 10, "weight": 1, "concurrency_limit": 1, "health_state": "unknown" }
       ]
     },
     "codex_image_pool": {
@@ -197,6 +207,23 @@
         "cost_hint": "Fake adapter only; no provider cost.",
         "rate_limit_hint": "Fake adapter is deterministic and local.",
         "required_gate": "AFS_ALLOW_REMOTE_VIDEO"
+      }
+    },
+    "fake_vision": {
+      "provider": "fake",
+      "account_ref": "fake_vision",
+      "capability": "vision",
+      "required_gate": "AFS_ALLOW_REMOTE_VISION",
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.1",
+        "modality": "vision",
+        "execution_mode": "sync",
+        "capabilities": ["vision"],
+        "account_pool_id": "vision_pool",
+        "reference_image_slots": 8,
+        "supported_aspect_ratios": ["1:1"],
+        "prompt_char_limit": 3000,
+        "seed_supported": false
       }
     },
     "codex_image": {

@@ -13,12 +13,14 @@ DEFAULT_TOOL_GATE_STATE = {
     "remote_asr": "blocked_by_default",
     "remote_image": "blocked_by_default",
     "remote_video": "blocked_by_default",
+    "remote_vision": "blocked_by_default",
 }
 PROVIDER_PLAN_TOOL_GATE_STATE = {
     "remote_llm": "blocked_by_default",
     "remote_asr": "blocked_by_default",
     "remote_image": "plan_only",
     "remote_video": "plan_only",
+    "remote_vision": "blocked_by_default",
 }
 DEFAULT_NON_CLAIMS = [
     "not human acceptance",

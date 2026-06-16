@@ -126,6 +126,7 @@ def test_studio_asset_context_workflow_is_single_canvas() -> None:
 
 
 def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls() -> None:
+    source = _source()
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
@@ -173,6 +174,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "firstFrameImageAssetId" in drawer_source
     assert "设为首帧" in drawer_source
     assert "retireVisualAsset" in drawer_source
+    assert "draftAssetCard" in source
+    assert "asset-card-drafts" in source
     assert "applyRetiredAsset" in drawer_source
     assert "确认退役" in drawer_source
     assert "asset.runtime_status" in drawer_source
@@ -361,8 +364,12 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node?.previewUrl" in feedback_source
     assert "preview_url" not in feedback_source
     assert "recordFeedback(feedback)" in runtime_client
+    assert "promoteVideoAsset(payload)" in runtime_client
+    assert "/video-assets/promote" in runtime_client
     assert 'return requestJson("/feedback"' in runtime_client
     assert "afs:studio-quality-feedback" in result_view
+    assert "afs:video-asset-card-draft" in result_view
+    assert "video-asset-card-draft" in result_view
     assert "qualityFeedbackView" in result_view
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
@@ -401,6 +408,11 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
     assert "reusable_image_assets" in node_actions
     assert 'initialAssetType: assetType' in drawer
     assert 'initialAssetType = "character"' in visual_asset_panel
+    assert 'data-action="draft-card"' in visual_asset_panel
+    assert "runtime.draftAssetCard" in visual_asset_panel
+    assert "candidate_locks" in visual_asset_panel
+    assert "missing_fields" in visual_asset_panel
+    assert "draft-status" in visual_asset_panel
 
 
 def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions() -> None:

@@ -5,7 +5,7 @@ from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelProviderError
-from agentflow_studio.model_gateway.kling_auth import build_kling_jwt_self_check
+from agentflow_studio.model_gateway.kling_auth import build_kling_jwt_self_check, kling_account_credentials
 
 
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -53,8 +53,7 @@ def build_kling_request_plan(
         mode=mode,
         aspect_ratio=aspect_ratio,
     )
-    access_key = str(account.get("access_key") or "")
-    secret_key = str(account.get("secret_key") or "")
+    access_key, secret_key = kling_account_credentials(account)
     jwt_config = account.get("jwt") if isinstance(account.get("jwt"), dict) else {}
     jwt_self_check = build_kling_jwt_self_check(
         access_key=access_key,

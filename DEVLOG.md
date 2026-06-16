@@ -1,5 +1,103 @@
 # Devlog
 
+## 2026-06-17 - Algorithm Library / GFR Operationalization
+
+- Added the first executable AFS algorithm-library slice: draft asset-card
+  contracts, fixed-asset context filtering, provider safe manifest handling,
+  and quality-feedback sanitization contracts.
+- Added independent `vision` provider capability with `AFS_ALLOW_REMOTE_VISION`
+  and fake vision adapter coverage.
+- Added Runtime routes for asset-card drafts and video-asset promotion. Drafts
+  stay out of fixed asset context until human promotion.
+- Added Studio client/static hooks for asset-card drafts and video asset-card
+  draft markers.
+- Kept any external Company OS / GFR feedback candidate-only and outside the
+  repository; no COS rule was promoted.
+
+Verification so far:
+
+```text
+pytest tests/test_api_runtime_visual_assets.py tests/test_provider_adapter_registry.py tests/test_web_studio_static.py -q -> 54 passed, 1 warning
+pytest tests/test_api_runtime_context_resolver.py tests/test_api_runtime_video_revisions.py -q -> 20 passed, 1 warning
+pytest tests/test_api_runtime_creative_agent_keyframes.py tests/test_api_runtime_prompt_memory_loop.py -q -> 26 passed, 1 warning
+pytest tests/test_algorithm_library_contracts.py tests/test_api_runtime_asset_card_drafts.py tests/test_api_runtime_service.py -q -> 17 passed, 1 warning
+node --check changed Studio files -> passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+runtime-service-openapi-export -> docs/openapi/afs-runtime-service.openapi.json updated
+tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> exit 0, CRLF notices only
+```
+
+Boundary:
+
+- No real provider smoke, no provider config changes, no secrets, no customer or
+  business raw material, no media bytes, and no durable Company OS memory writes.
+
+Verification addendum:
+
+- Default pytest initially exposed a real architecture issue: the new
+  `agentflow.algorithms.context_resolver` package imported `apps.api`
+  helpers, creating a package-level cycle. The resolver helper logic is now
+  owned by algorithm submodules, and Runtime passes its director compiler as an
+  adapter callback.
+- The repository retention review initially required manual review for the new
+  `agentflow/algorithms` directories. The retention policy now classifies the
+  algorithm library as current production spine.
+
+```text
+pytest tests/test_architecture_audit_gates.py::test_package_level_cycles_are_not_allowed tests/test_repository_retention_review.py::test_repository_retention_review_cli_outputs_summary_json -q -> 2 passed
+pytest focused algorithm/provider/static/context/retention suite -q -> 57 passed, 1 warning
+pytest -q -> 433 passed, 527 deselected, 2 warnings
+repository_retention_review --summary-only -> manual_review_required_count=0
+```
+
+## 2026-06-17 - Provider-Connected Validation Readiness
+
+- Added `tools/afs_provider_connected_validation_readiness.py`, a no-cost
+  readiness gate for the next provider-connected validation. It checks the GFR
+  provider validation packet, Runtime action surface, provider config source,
+  current gate projection, and required human authorizations.
+- Added tests for missing GFR packet, example-only provider config, gate-closed
+  authorization readiness, and env-config readiness without leaking local paths
+  or secret-like values.
+- Ran the tool on the current machine. It reported
+  `ready_for_provider_smoke`: GFR packet present, Runtime ready, required
+  actions present, provider config source present through `AFS_PROVIDER_CONFIG`,
+  LLM/image gates projected open, video/vision closed, provider calls not
+  started, secrets not printed. The report explicitly keeps
+  `human_approval_required=true` and
+  `current_session_approval_inferred_from_env=false`.
+- Added handoff record
+  `docs/handoff/AFS-PROVIDER-CONNECTED-VALIDATION-READINESS-20260617.md`.
+
+Verification so far:
+
+```text
+pytest tests/test_afs_provider_connected_validation_readiness.py -q -> 4 passed, 1 warning
+pytest tests/test_algorithm_library_contracts.py tests/test_api_runtime_asset_card_drafts.py tests/test_provider_adapter_registry.py::test_provider_registry_supports_fake_vision_descriptor_and_gate tests/test_api_runtime_service.py::test_runtime_service_reports_health_and_capabilities_without_secrets tests/test_api_runtime_service.py::test_runtime_health_provider_gate_projection_is_isolated_and_secret_free -q -> 10 passed, 1 warning
+focused algorithm/provider/static/context/retention suite -q -> 57 passed, 1 warning
+pytest -q -> 433 passed, 527 deselected, 2 warnings
+```
+
+Boundary:
+
+- No live provider call was run. Environment gates being open is not treated as
+  human authorization for this session. Next live smoke still needs explicit
+  capability and candidate-count approval.
+
+Verification addendum:
+
+- The readiness tool reports `ready_for_provider_smoke` on this machine, but
+  this is only a no-cost readiness state. It is not authorization to spend
+  provider calls.
+- The tool now exposes the approval boundary in machine-readable form:
+  `human_approval_required=true` and
+  `current_session_approval_inferred_from_env=false`.
+- Next live run still needs an explicit instruction such as: authorize one live
+  LLM + image/keyframe provider smoke with `candidate_count=1`; do not
+  authorize video, ASR, vision, or external download.
+
 ## 2026-06-17 - Codex Image Handoff Worker
 
 - Added `codex_handoff` as an async image provider adapter. Runtime keyframe

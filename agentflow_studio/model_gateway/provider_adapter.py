@@ -17,7 +17,7 @@ from agentflow_studio.model_gateway.provider_account_pool import (
 )
 
 
-ProviderCapability = Literal["image", "video", "llm", "asr"]
+ProviderCapability = Literal["image", "video", "llm", "asr", "vision"]
 ProviderModality = ProviderCapability
 ProviderExecutionMode = Literal["sync", "async"]
 FrameSlotRequirement = Literal["required", "optional", "unsupported"]
@@ -151,6 +151,7 @@ from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     OpenAICompatibleLLMAdapter,
 )
 from agentflow_studio.model_gateway.provider_codex_handoff import CodexImageHandoffAdapter  # noqa: E402
+from agentflow_studio.model_gateway.provider_fake_vision import FakeVisionAdapter  # noqa: E402
 
 
 class ProviderRegistry:
@@ -192,6 +193,9 @@ class ProviderRegistry:
                 continue
             if capability == "video" and provider == "fake":
                 adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
+                continue
+            if capability == "vision" and provider == "fake":
+                adapters[service_id] = FakeVisionAdapter(service_id, descriptor)
                 continue
             if capability == "video" and provider == "kling":
                 adapters[service_id] = KlingVideoAdapter(store, service_id, descriptor)
@@ -411,6 +415,7 @@ def _required_gate_or_default(capability: str, configured: str) -> str:
         "video": "AFS_ALLOW_REMOTE_VIDEO",
         "llm": "AFS_ALLOW_REMOTE_LLM",
         "asr": "AFS_ALLOW_REMOTE_ASR",
+        "vision": "AFS_ALLOW_REMOTE_VISION",
     }
     return defaults.get(capability, "AFS_ALLOW_REMOTE_IMAGE")
 
@@ -419,6 +424,7 @@ __all__ = (
     "MiniMaxImageAdapter",
     "OpenAICompatibleLLMAdapter",
     "FakeAsyncVideoAdapter",
+    "FakeVisionAdapter",
     "KlingVideoAdapter",
     "MiniMaxCliLLMAdapter",
     "CodexImageHandoffAdapter",

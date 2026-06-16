@@ -17,6 +17,7 @@ import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality
 
 const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
 const RECENT_PROJECTS_KEY = "afs_studio_recent_project_ids";
+const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 let runtime = createRuntimeClient(initialProjectId());
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
@@ -30,6 +31,7 @@ renderDock(store, runtimeRef);
 bindCanvasInput(store, runtimeRef);
 bindKeyboard();
 bindQualityFeedback();
+bindVideoAssetCardDraft();
 
 store.subscribe(renderAll);
 renderAll(store.get());
@@ -202,6 +204,44 @@ function bindQualityFeedback() {
   window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => {
     handleQualityFeedback(event);
   });
+}
+
+function bindVideoAssetCardDraft() {
+  window.addEventListener(VIDEO_ASSET_CARD_DRAFT_EVENT, (event) => {
+    handleVideoAssetCardDraft(event);
+  });
+}
+
+async function handleVideoAssetCardDraft(event) {
+  const node = event.detail?.node;
+  const nodeId = String(node?.id || "");
+  if (!nodeId || !runtime?.draftAssetCard) return;
+  const sourceVideoArtifactId = String(node?.params?.lastVideoArtifactId || node?.params?.lastVideoJobId || "").trim();
+  if (!sourceVideoArtifactId) return;
+  try {
+    const response = await runtime.draftAssetCard({
+      asset_type: "video",
+      source_video_artifact_id: sourceVideoArtifactId,
+      sampled_image_asset_refs: [],
+      node_id: nodeId,
+      prompt_text: node.prompt || node.result || node.title || "",
+      provider_service_id: "fake_vision",
+      generated_at: new Date().toISOString(),
+    });
+    store.set((s) => {
+      const current = s.nodes[nodeId];
+      if (!current) return;
+      current.params.lastVideoAssetCardDraft = response?.draft || null;
+      current.params.lastVideoAssetCardDraftStatus = response?.job?.status || "unknown";
+      current.result = `${current.result || ""}\nVideo asset draft: ${response?.job?.status || "unknown"}`.trim();
+    });
+  } catch (error) {
+    store.set((s) => {
+      const current = s.nodes[nodeId];
+      if (!current) return;
+      current.result = `${current.result || ""}\nVideo asset draft failed: ${safeError(error)}`.trim();
+    });
+  }
 }
 
 async function handleQualityFeedback(event) {

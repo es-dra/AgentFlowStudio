@@ -84,8 +84,10 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
         ${lockChips.map(([label], index) => `<button class="va-chip" data-chip="${index}">+ ${label}</button>`).join("")}
       </div>
       <textarea data-field="negative_locks" rows="3" placeholder="保持黑色短发&#10;保持左眉尾疤痕">${escapeHtml(previous.locks || defaults.locks || "")}</textarea>
+      <div class="draft-status" data-role="draft-status" hidden></div>
       <div class="va-error" data-role="error" hidden></div>
       <div class="modal-actions">
+        <button class="ghost-btn" data-action="draft-card">Draft card</button>
         <button class="ghost-btn" data-action="reject">不采用</button>
         <button class="primary-btn" data-action="fix">确认固定</button>
       </div>
@@ -105,6 +107,10 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
       applyLockChip(Number(target.dataset.chip));
       return;
     }
+    if (action === "draft-card") {
+      await draftCard();
+      return;
+    }
     if (action === "fix" || action === "reject") {
       await submit(action === "fix" ? "fixed" : "rejected");
     }
@@ -119,6 +125,50 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     const textareaEl = modal.querySelector('[data-field="negative_locks"]');
     const current = lines(textareaEl.value);
     if (!current.includes(lockText)) textareaEl.value = [...current, lockText].join("\n");
+  }
+
+  async function draftCard() {
+    if (!runtime?.draftAssetCard) return showError("Runtime draft asset card route is not available.");
+    setBusy(true);
+    try {
+      const response = await runtime.draftAssetCard({
+        asset_type: assetType,
+        source_image_asset_refs: [imageAsset.asset_id],
+        node_id: node.id,
+        prompt_text: node.prompt || node.result || node.title || "",
+        provider_service_id: "fake_vision",
+        generated_at: new Date().toISOString(),
+      });
+      const draft = response?.draft || {};
+      const status = modal.querySelector('[data-role="draft-status"]');
+      if (!draft?.draft_id) {
+        if (status) {
+          status.hidden = false;
+          status.textContent = response?.safe_manifest?.failure_class || response?.job?.status || "draft blocked";
+        }
+        return;
+      }
+      setInputValue(modal, "label", draft.label_suggestion || "");
+      setInputValue(modal, "signature", draft.signature || "");
+      for (const [key, value] of Object.entries(draft.feature_card || {})) {
+        setInputValue(modal, key, value, "data-card");
+      }
+      const textareaEl = modal.querySelector('[data-field="negative_locks"]');
+      if (textareaEl) {
+        const merged = [...lines(textareaEl.value), ...(draft.candidate_locks || [])];
+        textareaEl.value = [...new Set(merged.map((item) => String(item || "").trim()).filter(Boolean))].join("\n");
+      }
+      if (status) {
+        status.hidden = false;
+        status.dataset.candidate_locks = JSON.stringify(draft.candidate_locks || []);
+        status.dataset.missing_fields = JSON.stringify(draft.missing_fields || []);
+        status.textContent = `草稿，确认前不会生效。缺失项：${(draft.missing_fields || []).join(", ") || "none"}`;
+      }
+    } catch (error) {
+      showError(`Draft card failed: ${safeError(error)}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submit(decision) {
@@ -236,6 +286,11 @@ function lines(value) {
 
 function field(root, name, attr = "data-field") {
   return String(root.querySelector(`[${attr}="${name}"]`)?.value || "").trim();
+}
+
+function setInputValue(root, name, value, attr = "data-field") {
+  const input = root.querySelector(`[${attr}="${name}"]`);
+  if (input) input.value = String(value || "");
 }
 
 function mergeVisualAssets(existing, asset) {

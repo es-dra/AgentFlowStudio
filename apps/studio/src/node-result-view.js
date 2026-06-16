@@ -5,6 +5,10 @@ export function resultView(node) {
   const result = document.createElement("div");
   result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
   result.dataset.feedbackEvent = "afs:studio-quality-feedback";
+  if (node.type === "video") {
+    result.classList.add("video-asset-card-draft");
+    result.dataset.videoAssetCardDraft = "afs:video-asset-card-draft";
+  }
   if (node.previewUrl) {
     if (node.type === "video") {
       const video = document.createElement("video");
@@ -32,6 +36,17 @@ export function resultView(node) {
   result.appendChild(text);
   const feedback = qualityFeedbackView(node);
   if (feedback) result.appendChild(feedback);
+  if (node.type === "video" && node.previewUrl) {
+    const draftButton = document.createElement("button");
+    draftButton.className = "mini-btn video-asset-card-draft";
+    draftButton.type = "button";
+    draftButton.dataset.action = "video-asset-card-draft";
+    draftButton.textContent = "生成视频资产卡草稿";
+    draftButton.addEventListener("click", () => {
+      result.dispatchEvent(new CustomEvent("afs:video-asset-card-draft", { bubbles: true, detail: { node } }));
+    });
+    result.appendChild(draftButton);
+  }
   return result;
 }
 

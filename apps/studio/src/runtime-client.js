@@ -115,8 +115,14 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     listImageAssets() {
       return requestJson(`/projects/${encoded}/image-assets`);
     },
+    draftAssetCard(payload) {
+      return requestJson(`/projects/${encoded}/asset-card-drafts`, { method: "POST", payload });
+    },
     promoteVisualAsset(payload) {
       return requestJson(`/projects/${encoded}/visual-assets/promote`, { method: "POST", payload });
+    },
+    promoteVideoAsset(payload) {
+      return requestJson(`/projects/${encoded}/video-assets/promote`, { method: "POST", payload });
     },
     listVisualAssets(status = "fixed") {
       return requestJson(`/projects/${encoded}/visual-assets?status=${encodeURIComponent(status)}`);

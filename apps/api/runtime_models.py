@@ -218,6 +218,17 @@ class GenerationComparisonRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class AssetCardDraftRequest(BaseModel):
+    asset_type: Literal["character", "scene", "video"]
+    source_image_asset_refs: list[str] = Field(default_factory=list)
+    source_video_artifact_id: str | None = None
+    sampled_image_asset_refs: list[str] = Field(default_factory=list)
+    node_id: str | None = None
+    prompt_text: str = ""
+    provider_service_id: str = "fake_vision"
+    generated_at: str = Field(min_length=1)
+
+
 class VisualAssetPromoteRequest(BaseModel):
     source_image_asset_refs: list[str] = Field(min_length=1)
     asset_type: Literal["character", "scene"]
@@ -227,6 +238,39 @@ class VisualAssetPromoteRequest(BaseModel):
     negative_locks: list[str] = Field(default_factory=list)
     source_node_id: str | None = None
     supersedes_asset_id: str | None = None
+    review_decision: Literal["fixed", "rejected"]
+    reviewed_at: str = Field(min_length=1)
+
+
+class AssetCardDraftRequest(BaseModel):
+    asset_type: Literal["character", "scene", "video"]
+    source_image_asset_refs: list[str] = Field(default_factory=list)
+    source_video_artifact_id: str | None = None
+    sampled_image_asset_refs: list[str] = Field(default_factory=list)
+    node_id: str | None = None
+    prompt_text: str = Field(min_length=1)
+    provider_service_id: str = "fake_vision"
+    generated_at: str = Field(min_length=1)
+
+
+class VideoAssetPromoteRequest(BaseModel):
+    source_video_artifact_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    segments: list[dict[str, Any]] = Field(min_length=1)
+    feature_card: dict[str, Any] = Field(default_factory=dict)
+    source_node_id: str | None = None
+    review_decision: Literal["fixed", "rejected"]
+    reviewed_at: str = Field(min_length=1)
+
+
+class VideoAssetPromoteRequest(BaseModel):
+    source_video_artifact_id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    segments: list[dict[str, Any]] = Field(default_factory=list)
+    feature_card: dict[str, Any] = Field(default_factory=dict)
+    source_node_id: str | None = None
     review_decision: Literal["fixed", "rejected"]
     reviewed_at: str = Field(min_length=1)
 
@@ -252,7 +296,9 @@ class FeedbackRecordRequest(BaseModel):
 
 
 __all__ = (
+    "AssetCardDraftRequest",
     "CanvasDraftRequest",
+    "AssetCardDraftRequest",
     "AssetExclusion",
     "ContentCardRegisterRequest",
     "ContextSubgraph",
@@ -274,6 +320,8 @@ __all__ = (
     "TemporaryLockOverride",
     "VisualAssetPromoteRequest",
     "VisualAssetRetireRequest",
+    "VideoAssetPromoteRequest",
     "VideoGenerationRequest",
+    "VideoAssetPromoteRequest",
     "VideoRevisionRequest",
 )

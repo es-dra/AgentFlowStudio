@@ -43,14 +43,15 @@ class CodexExecImageExecutor:
         self.timeout_sec = timeout_sec
 
     def execute(self, request: dict[str, Any], work_dir: Path) -> Path:
+        work_dir = Path(work_dir).resolve()
         prompt_path = work_dir / "worker_prompt.md"
         prompt_path.write_text(_worker_prompt(request), encoding="utf-8")
         completed = subprocess.run(
             [
                 self.cli_command,
                 "exec",
-                "--ask-for-approval",
-                "never",
+                "-c",
+                'approval_policy="never"',
                 "--sandbox",
                 "workspace-write",
                 "--skip-git-repo-check",

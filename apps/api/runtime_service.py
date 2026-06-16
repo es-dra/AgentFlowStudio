@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
+from agentflow.harness.json_io import write_json
 from apps.api.runtime_cors import configure_runtime_cors
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_info import runtime_capabilities_payload, runtime_health_payload
@@ -27,6 +28,7 @@ from apps.api.runtime_provider_script_routes import register_runtime_provider_sc
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
+from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
 from apps.api.runtime_studio_state import register_runtime_studio_state_routes
 from apps.api.runtime_visual_assets import register_runtime_visual_asset_routes
 from apps.api.runtime_video_revision_routes import register_runtime_video_revision_routes
@@ -35,20 +37,11 @@ from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import DEFAULT_STUDIO_ROOT, configure_studio_static, studio_static_status
-from agentflow.harness.json_io import write_json
 
 
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/runtime_service")
 LEGACY_RUNTIME_V02_ENV = "AFS_ENABLE_LEGACY_RUNTIME_V02"
 TRUE_VALUES = {"1", "true", "yes", "on"}
-QUALITY_FEEDBACK_METRICS = {
-    "identity_similarity",
-    "wardrobe_consistency",
-    "scene_continuity",
-    "text_or_watermark",
-    "target_change_success",
-}
-SAFE_TOKEN_RE = re.compile(r"[^a-zA-Z0-9_.:-]+")
 
 
 def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, Any]) -> dict[str, Any]:
@@ -169,6 +162,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT, studio_root: P
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
     register_runtime_image_asset_routes(app, store)
+    register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
     register_runtime_keyframe_routes(app, store)
     register_runtime_video_routes(app, store)
@@ -185,74 +179,7 @@ def legacy_runtime_v02_enabled() -> bool:
 
 
 def sanitize_runtime_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
-    if feedback.get("kind") == "studio_quality_feedback":
-        ratings = {
-            key: value
-            for key, value in (feedback.get("ratings") or {}).items()
-            if key in QUALITY_FEEDBACK_METRICS and _rating_or_none(value) is not None
-        }
-        return {
-            "kind": "studio_quality_feedback",
-            "node_id": _safe_token(feedback.get("node_id")),
-            "node_type": _safe_token(feedback.get("node_type")),
-            "video_job_id": _safe_token(feedback.get("video_job_id")),
-            "video_revision_job_id": _safe_token(feedback.get("video_revision_job_id")),
-            "artifact_ref": _safe_token(feedback.get("artifact_ref")),
-            "safe_preview_ref": "runtime_preview_endpoint"
-            if feedback.get("safe_preview_ref") == "runtime_preview_endpoint"
-            else "none",
-            "ratings": ratings,
-            "target_change_success": _rating_or_none(feedback.get("target_change_success")),
-            "drift_notes": _sanitize_feedback_text(feedback.get("drift_notes")),
-            "prompt_char_count": _bounded_int(feedback.get("prompt_char_count")),
-            "result_char_count": _bounded_int(feedback.get("result_char_count")),
-            "raw_evidence_policy": "raw_evidence_not_memory",
-            "feedback_is_memory": False,
-            "writes_long_term_memory": False,
-            "writes_company_kb": False,
-            "safety_boundary": {
-                "no_provider_raw": True,
-                "no_signed_url": True,
-                "no_local_path": True,
-                "no_media_bytes": True,
-            },
-        }
-    return {
-        "kind": _safe_token(feedback.get("kind")) or "runtime_feedback",
-        "note": _sanitize_feedback_text(feedback.get("note") or feedback.get("summary")),
-        "raw_evidence_policy": "raw_evidence_not_memory",
-        "feedback_is_memory": False,
-        "writes_long_term_memory": False,
-        "writes_company_kb": False,
-    }
-
-
-def _safe_token(value: Any) -> str:
-    return SAFE_TOKEN_RE.sub("_", str(value or "")).strip("_")[:120]
-
-
-def _sanitize_feedback_text(value: Any) -> str:
-    text = str(value or "")
-    text = re.sub(r"Bearer\s+\S+", "Bearer <redacted>", text, flags=re.IGNORECASE)
-    text = re.sub(r"[A-Za-z]:\\[^\s\"'<>]+", "<local-path-redacted>", text)
-    text = re.sub(r"https?://[^\s\"'<>]+", "<url-redacted>", text)
-    return text[:600]
-
-
-def _rating_or_none(value: Any) -> int | None:
-    try:
-        rating = int(value)
-    except (TypeError, ValueError):
-        return None
-    return rating if 1 <= rating <= 5 else None
-
-
-def _bounded_int(value: Any) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, min(number, 200_000))
+    return sanitize_quality_feedback(feedback)
 
 
 __all__ = (
