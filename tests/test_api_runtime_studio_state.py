@@ -75,6 +75,58 @@ def test_studio_state_can_save_and_restore_safe_canvas(tmp_path) -> None:
     assert restored_params["previewAspectRatio"] == "1:1"
 
 
+def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-progress-demo"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio progress state test"})
+    candidate_url = (
+        "/projects/studio-progress-demo/keyframe-generations/"
+        "job_keyframe_001/candidates/candidate_001/preview"
+    )
+    state = {
+        "nodes": {
+            "image_1": {
+                "id": "image_1",
+                "type": "image",
+                "title": "生成中",
+                "status": "generating",
+                "params": {
+                    "progressPercent": 42,
+                    "jobProgress": {
+                        "percent": 42,
+                        "label": "图片生成进行中",
+                        "hint": "任务正在处理",
+                        "status": "running",
+                        "terminal": False,
+                    },
+                    "terminalProgress": {"percent": 100, "label": "图片生成已完成", "terminal": True},
+                    "candidatePreviewUrls": [
+                        {
+                            "url": candidate_url,
+                            "width": 1536,
+                            "height": 864,
+                            "aspect_ratio": "16:9",
+                            "artifact_id": "artifact_safe_001",
+                        }
+                    ],
+                },
+            }
+        },
+        "order": ["image_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+    assert saved.status_code == 200
+    restored = client.get(f"/projects/{project_id}/studio-state").json()["state"]
+    params = restored["nodes"]["image_1"]["params"]
+    assert params["progressPercent"] == 42
+    assert params["jobProgress"]["label"] == "图片生成进行中"
+    assert params["terminalProgress"]["percent"] == 100
+    assert params["candidatePreviewUrls"][0]["url"] == candidate_url
+    assert params["candidatePreviewUrls"][0]["preview_url"] == candidate_url
+    assert params["candidatePreviewUrls"][0]["artifact_id"] == "artifact_safe_001"
+
+
 def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "studio-state-unsafe"
@@ -85,6 +137,7 @@ def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> 
         {"assets": [{"id": "a", "provider_raw": {"text": "raw"}}]},
         {"nodes": {"a": {"params": {"provider_config": "unsafe"}}}},
         {"nodes": {"a": {"params": {"signed_url": "https://example.invalid/signed"}}}},
+        {"nodes": {"a": {"params": {"candidatePreviewUrls": [{"url": "https://example.invalid/private.png"}]}}}},
     ]
 
     for state in unsafe_payloads:

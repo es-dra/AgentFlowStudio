@@ -4,9 +4,16 @@ import { isRemoteImageModel, isRemoteVideoModel, providerServiceForVideoModel } 
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { lastImageAsset, mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
-import { el, showModal } from "./overlay.js";
-import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
 import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll } from "./video-node-flow.js";
+import { safeError, setNodeError } from "./node-action-utils.js";
+import { visibleAssetForNode } from "./node-visible-assets.js";
+import { firstCandidatePreview, setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
+import { isKeyframeInProgress, keyframeResultText, parseDuration, videoResultText, videoRevisionResultText } from "./node-generation-results.js";
+import { clearOneRunOverrides, normalizeStringList, prepareGenerationRequest } from "./node-generation-guards.js";
+import { reconcileVisualAssetBadges } from "./node-generation-context.js";
+
+export { uploadNodeImage } from "./node-upload-actions.js";
+export { visibleAssetForNode } from "./node-visible-assets.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -42,25 +49,6 @@ export function spawnSampleScriptFlow(store, scriptNode) {
     s.selection = { nodeIds: [scriptNode.id], edgeId: null };
   });
   connect(store, textNode.id, scriptNode.id);
-}
-
-export function uploadNodeImage(store, runtime, node) {
-  if (!runtime?.uploadImageAsset) {
-    setNodeError(store, node.id, "Runtime image upload API is not available.");
-    return;
-  }
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/png,image/jpeg";
-  input.style.display = "none";
-  document.body.appendChild(input);
-  input.addEventListener("change", async () => {
-    const file = input.files?.[0];
-    input.remove();
-    if (!file) return;
-    await uploadSelectedImage(store, runtime, node.id, file);
-  }, { once: true });
-  input.click();
 }
 
 export function fixNodeVisualAsset(store, runtime, node) {
@@ -115,66 +103,6 @@ export function enableVideoRevisionDraft(store, node) {
   });
 }
 
-async function uploadSelectedImage(store, runtime, nodeId, file) {
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    n.status = "generating";
-    n.result = "正在上传参考图...";
-  });
-  try {
-    const dataBase64 = await readFileAsBase64(file);
-    const response = await runtime.uploadImageAsset({
-      node_id: nodeId,
-      filename: file.name || "reference.png",
-      mime_type: file.type || "application/octet-stream",
-      data_base64: dataBase64,
-      role: "reference_image",
-      generated_at: new Date().toISOString(),
-    });
-    const asset = response?.asset;
-    if (!asset?.asset_id || !asset?.preview_url) throw new Error("Runtime did not return an image asset");
-    store.set((s) => {
-      const n = s.nodes[nodeId];
-      if (!n) return;
-      n.status = "complete";
-      n.previewUrl = asset.preview_url;
-      n.result = `已上传参考图\nAsset: ${asset.asset_id}\nSize: ${asset.width || "?"}x${asset.height || "?"}`;
-      n.params.uploads = mergeImageAssets(n.params.uploads || [], asset).slice(-4);
-      resizeNodeForImagePreview(n, asset, n.params?.spec?.ratio);
-      s.assets.unshift({
-        id: store.nextId("asset"),
-        kind: "image_reference",
-        title: n.title,
-        safe_summary: file.name || asset.asset_id,
-        thumbnail_ref: "keyframe",
-        source_node_id: n.id,
-        status: "ready",
-        asset_id: asset.asset_id,
-        preview_url: asset.preview_url,
-        created_at: new Date().toISOString(),
-      });
-    });
-    await store.flushRuntimeSave?.();
-  } catch (error) {
-    setNodeError(store, nodeId, `图片上传失败: ${safeError(error)}`);
-  }
-}
-
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("image file read failed"));
-    reader.onload = () => {
-      const text = String(reader.result || "");
-      const marker = ";base64,";
-      const index = text.indexOf(marker);
-      resolve(index >= 0 ? text.slice(index + marker.length) : text);
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
 // 发送（Ctrl+Enter / 发送按钮）：当前 MVP 只允许图片节点触发真实 keyframe。
 export async function startNodeGeneration(store, runtime, node, resultText) {
   const fresh = store.get().nodes[node.id] || node;
@@ -207,7 +135,12 @@ export async function pollNodeVideoGeneration(store, runtime, node) {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    n.result = `正在轮询 Kling 视频任务...\nJob: ${jobId}`;
+    updateNodeGenerationState(n, { job: { job_id: jobId, status: "running" } }, {
+      kind: "video",
+      label: "正在刷新视频进度",
+      percent: n.params?.progressPercent || 62,
+    });
+    n.result = `正在刷新视频生成进度...\n任务编号：${jobId}`;
   });
   try {
     const response = await runtime.pollVideo(jobId);
@@ -215,7 +148,7 @@ export async function pollNodeVideoGeneration(store, runtime, node) {
     await store.flushRuntimeSave?.();
     scheduleVideoAutoPoll({ store, runtime, nodeId: node.id, response, applyVideoResponse, setNodeError, safeError });
   } catch (error) {
-    setNodeError(store, node.id, `Kling video poll failed: ${safeError(error)}`);
+    setNodeError(store, node.id, `视频进度刷新失败：${safeError(error)}`);
     await store.flushRuntimeSave?.();
   }
 }
@@ -244,7 +177,7 @@ export async function cancelNodeVideoGeneration(store, runtime, node) {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "cancelled";
-    n.result = `本地取消请求已发送。\nJob: ${jobId}\n注意：本地取消只停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
+    n.result = `本地取消请求已发送。\n任务编号：${jobId}\n注意：本地取消只停止页面继续刷新，不代表生成平台侧任务已经取消，也不保证停止计费。`;
   });
   try {
     const response = await runtime.cancelVideo(jobId);
@@ -252,7 +185,7 @@ export async function cancelNodeVideoGeneration(store, runtime, node) {
     applyVideoResponse(store, node.id, response);
     await store.flushRuntimeSave?.();
   } catch (error) {
-    setNodeError(store, node.id, `Kling video local cancel failed: ${safeError(error)}`);
+    setNodeError(store, node.id, `本地取消视频进度刷新失败：${safeError(error)}`);
     await store.flushRuntimeSave?.();
   }
 }
@@ -270,6 +203,7 @@ async function startRemoteVideoGeneration(store, runtime, node) {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
+    setSubmittingGenerationState(n, "video", { label: "正在提交视频任务", percent: 8 });
     n.result = "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
   });
   let submitAttempted = false;
@@ -305,7 +239,7 @@ async function startRemoteVideoGeneration(store, runtime, node) {
     await store.flushRuntimeSave?.();
     scheduleVideoAutoPoll({ store, runtime, nodeId: node.id, response, applyVideoResponse, setNodeError, safeError });
   } catch (error) {
-    setNodeError(store, node.id, `Kling video request failed: ${safeError(error)}`);
+    setNodeError(store, node.id, `视频生成请求失败：${safeError(error)}`);
     if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }
@@ -330,6 +264,7 @@ async function startRemoteVideoRevision(store, runtime, node) {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
+    setSubmittingGenerationState(n, "video_revision", { label: "正在提交视频修订", percent: 8 });
     n.result = "Preparing experimental video revision...";
   });
   let submitAttempted = false;
@@ -383,8 +318,12 @@ function applyVideoRevisionResponse(store, nodeId, response) {
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
-    const previewUrl = response?.candidate_previews?.[0]?.preview_url || null;
-    if (previewUrl) n.previewUrl = previewUrl;
+    const preview = firstCandidatePreview(response);
+    updateNodeGenerationState(n, response, { kind: "video_revision" });
+    if (preview?.url) {
+      n.previewUrl = preview.url;
+      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
+    }
     n.params.videoRevision = {
       ...(n.params.videoRevision || {}),
       enabled: true,
@@ -397,51 +336,26 @@ function applyVideoRevisionResponse(store, nodeId, response) {
   });
 }
 
-function videoRevisionResultText(response) {
-  const status = response?.job?.status || "blocked";
-  const manifest = response?.safe_manifest || {};
-  const block = manifest.blocks?.[0] || {};
-  if (status === "succeeded") return "Experimental video revision completed through Runtime safe preview.";
-  return [
-    "Experimental video revision did not start.",
-    `Status: ${status}`,
-    `Reason: ${block.reason || "video revision provider path is not enabled"}`,
-    "Goal: change requested effects while keeping unrelated aspects as stable as possible.",
-  ].join("\n");
-}
-
 function applyVideoResponse(store, nodeId, response) {
   const status = response?.job?.status || "blocked";
   if (!["submitted", "running"].includes(status)) clearVideoAutoPoll(nodeId);
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
-    const previewUrl = response?.candidate_previews?.[0]?.preview_url || null;
+    const preview = firstCandidatePreview(response);
+    const previewUrl = preview?.url || null;
+    updateNodeGenerationState(n, response, { kind: "video" });
     n.params.lastVideoJobId = response?.job?.job_id || null;
     n.params.lastVideoPreviewUrl = previewUrl;
     n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
-    if (previewUrl) n.previewUrl = previewUrl;
+    if (previewUrl) {
+      n.previewUrl = previewUrl;
+      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
+    }
     n.status = status === "succeeded" ? "complete" : status === "cancelled_local_only" ? "cancelled" : ["submitted", "running"].includes(status) ? "generating" : "error";
     n.result = videoResultText(response);
   });
-}
-
-function videoResultText(response) {
-  const status = response?.job?.status || "blocked";
-  if (status === "succeeded") return "Kling 视频已完成，预览已通过 Runtime 安全端点加载。";
-  if (status === "submitted") return `Kling 视频已提交，可继续轮询。\nJob: ${response?.job?.job_id || "unknown"}\n本地取消只会停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
-  if (status === "running") return `Kling video task is still running.\nJob: ${response?.job?.job_id || "unknown"}\n本地取消只会停止 Studio 继续轮询，不代表厂商侧任务已经取消，也不保证停止计费。`;
-  if (status === "cancelled_local_only") {
-    return `本地已取消继续轮询（cancelled_local_only）。\nJob: ${response?.job?.job_id || "unknown"}\n这只更新 Runtime/Studio 状态，不代表厂商侧任务已经取消，也不保证停止计费。`;
-  }
-  const reason = response?.safe_manifest?.blocks?.[0]?.reason || "video provider is not ready";
-  return `视频生成未开始或未完成。\n状态: ${status}\n原因: ${reason}`;
-}
-
-function parseDuration(value) {
-  const match = String(value || "5").match(/\d+/);
-  return match ? Number(match[0]) : 5;
 }
 
 async function startRemoteKeyframeGeneration(store, runtime, node) {
@@ -452,6 +366,7 @@ async function startRemoteKeyframeGeneration(store, runtime, node) {
     n.status = "generating";
     n.result = null;
     n.previewUrl = null;
+    setSubmittingGenerationState(n, "keyframe", { label: "正在提交图片生成", percent: 8 });
   });
   let submitAttempted = false;
   try {
@@ -487,7 +402,7 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
     await store.flushRuntimeSave?.();
     if (!isKeyframeInProgress(response)) return response;
   }
-  throw new Error(`图像生成仍在处理中，请稍后重试轮询。Job: ${lastResponse?.job?.job_id || jobId}`);
+  throw new Error(`图像生成仍在处理中，请稍后重试刷新。任务编号：${lastResponse?.job?.job_id || jobId}`);
 }
 
 function applyKeyframeResponse(store, nodeId, response, request) {
@@ -501,6 +416,7 @@ function applyKeyframeResponse(store, nodeId, response, request) {
     const reusableAsset = response?.reusable_image_assets?.[0] || null;
     const jobId = response?.job?.job_id || null;
     const shouldRecordAsset = succeeded && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
+    updateNodeGenerationState(n, response, { kind: "keyframe" });
     n.params.lastKeyframeJobId = jobId || n.params.lastKeyframeJobId || null;
     n.status = succeeded ? "complete" : inProgress ? "generating" : "error";
     if (preview?.preview_url) {
@@ -529,189 +445,8 @@ function applyKeyframeResponse(store, nodeId, response, request) {
   });
 }
 
-function isKeyframeInProgress(response) {
-  return ["submitted", "running", "pending"].includes(String(response?.job?.status || ""));
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function prepareGenerationRequest(store, runtime, node, request, kind) {
-  const preflight = kind === "video_revision"
-    ? runtime?.preflightVideoRevision
-    : kind === "video"
-      ? runtime?.preflightVideo
-      : runtime?.preflightKeyframe;
-  if (!preflight) return request;
-  let working = {
-    ...request,
-    temporary_asset_exclusions: normalizeAssetExclusions(request.temporary_asset_exclusions),
-  };
-  while (true) {
-    let outcome;
-    try {
-      outcome = await preflight(working);
-    } catch (error) {
-      if (missingPreflightRouteError(error)) {
-        throw new Error(staleRuntimePreflightMessage(kind));
-      }
-      throw error;
-    }
-    const unconnectedNamed = unconnectedLabelMatchedAssets(outcome);
-    if (unconnectedNamed.length) {
-      const labels = unconnectedNamed.map((asset) => asset.label || asset.asset_id).join(", ");
-      throw new Error(
-        `named_asset_not_connected_fail_closed: prompt mentions fixed asset(s) that are not connected to this node: ${labels}. Connect them first or exclude them for this run.`,
-      );
-    }
-    const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
-    if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
-    const decision = await showCarryConfirmModal(outcome, node, kind);
-    if (decision.action === "cancel") return null;
-    if (decision.action === "continue") return { ...working, preflight_token: outcome?.preflight_token || null };
-    const nextExclusions = mergeAssetExclusions(working.temporary_asset_exclusions, decision.assetIds);
-    if (nextExclusions.length === working.temporary_asset_exclusions.length) continue;
-    store.set((s) => {
-      const n = s.nodes[node.id];
-      if (n) n.params.temporaryAssetExclusions = nextExclusions;
-    }, { history: false });
-    working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
-  }
-}
-
-function unconnectedLabelMatchedAssets(preflight) {
-  return buildAssetReferenceActions(preflight).filter((action) => action.blocking);
-}
-
-function missingPreflightRouteError(error) {
-  return Number(error?.status) === 404 && String(error?.route || "").endsWith("/preflight");
-}
-
-function staleRuntimePreflightMessage(kind) {
-  const label = kind === "video_revision" ? "video revision" : kind === "video" ? "video" : "keyframe";
-  return `Runtime Service version is stale or not started from this branch: missing ${label} preflight route. Restart the 8790 Runtime Service and retry.`;
-}
-
-function showCarryConfirmModal(preflight, node, kind) {
-  return new Promise((resolve) => {
-    const included = Array.isArray(preflight?.included_assets) ? preflight.included_assets : [];
-    const excluded = Array.isArray(preflight?.excluded_assets) ? preflight.excluded_assets : [];
-    const conflicts = Array.isArray(preflight?.asset_conflicts) ? preflight.asset_conflicts : [];
-    const overrides = Array.isArray(preflight?.context_bundle?.temporary_lock_overrides)
-      ? preflight.context_bundle.temporary_lock_overrides
-      : [];
-    const tempExcluded = excluded.filter((item) => item.reason === "temporary_asset_excluded_by_user");
-    const subjectId = preflight?.subject_reference_asset_id || "";
-    const modal = el("div", "modal compact generation-carry-modal");
-    const head = el("div", "modal-head");
-    head.appendChild(el("strong", "", "生成前确认"));
-    head.appendChild(el("span", "head-spacer"));
-    const closeBtn = el("button", "modal-close");
-    closeBtn.textContent = "×";
-    head.appendChild(closeBtn);
-
-    const body = el("div", "modal-body generation-carry-body");
-    body.appendChild(el("p", "carry-note", `${kind === "video" ? "视频" : "图片"}生成将携带以下固定资产。固定资产会约束结果，即使未检测到冲突也会生效。`));
-    const list = el("div", "carry-asset-list");
-    const checks = new Map();
-    for (const asset of included) {
-      const row = el("label", "carry-asset-row");
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = asset.asset_id;
-      checks.set(asset.asset_id, input);
-      const text = el("span", "carry-asset-text");
-      text.textContent = `${asset.asset_type === "scene" ? "场景" : "人物"} · ${asset.label || asset.asset_id}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
-      const sig = el("small", "", asset.signature || asset.detail_level || "");
-      row.append(input, text, sig);
-      list.appendChild(row);
-    }
-    body.appendChild(list);
-    const warningBox = el("div", conflicts.length ? "carry-warning" : "carry-muted");
-    warningBox.textContent = conflicts.length
-      ? `检测到 ${conflicts.length} 条疑似冲突；未排除资产或解除锁定时，固定资产约束优先生效。`
-      : "未检测到明显冲突，但固定资产仍会约束结果。";
-    body.appendChild(warningBox);
-    if (overrides.length) {
-      body.appendChild(el("div", "carry-muted", `本次已解除 ${overrides.length} 条锁定。`));
-    }
-    if (tempExcluded.length) {
-      body.appendChild(el("div", "carry-muted", `本次已排除 ${tempExcluded.length} 项资产。`));
-    }
-
-    const actions = el("div", "modal-actions");
-    const cancel = el("button", "ghost-btn", "取消");
-    const exclude = el("button", "ghost-btn", "本次不携带选中项");
-    const submit = el("button", "primary-btn", "继续生成");
-    exclude.disabled = true;
-    actions.append(cancel, exclude, submit);
-    modal.append(head, body, actions);
-
-    let settled = false;
-    const close = showModal(modal, { onClose: () => { if (!settled) resolve({ action: "cancel" }); } });
-    const finish = (decision) => {
-      if (settled) return;
-      settled = true;
-      close();
-      resolve(decision);
-    };
-    const selectedIds = () => [...checks.entries()].filter(([, input]) => input.checked).map(([assetId]) => assetId);
-    list.addEventListener("change", () => {
-      exclude.disabled = selectedIds().length === 0;
-    });
-    closeBtn.addEventListener("click", () => finish({ action: "cancel" }));
-    cancel.addEventListener("click", () => finish({ action: "cancel" }));
-    submit.addEventListener("click", () => finish({ action: "continue" }));
-    exclude.addEventListener("click", () => finish({ action: "exclude", assetIds: selectedIds() }));
-  });
-}
-
-function normalizeStringList(values) {
-  const seen = new Set();
-  const result = [];
-  for (const value of Array.isArray(values) ? values : []) {
-    const item = String(value || "").trim().slice(0, 80);
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    result.push(item);
-  }
-  return result;
-}
-
-function normalizeAssetExclusions(values) {
-  const seen = new Set();
-  const result = [];
-  for (const item of Array.isArray(values) ? values : []) {
-    const assetId = String(item?.asset_id || item?.assetId || item || "").trim();
-    if (!assetId || seen.has(assetId)) continue;
-    seen.add(assetId);
-    result.push({ asset_id: assetId, reason: String(item?.reason || "one_run_asset_exclusion").slice(0, 120) });
-  }
-  return result;
-}
-
-function mergeAssetExclusions(existing, assetIds) {
-  const result = normalizeAssetExclusions(existing);
-  const seen = new Set(result.map((item) => item.asset_id));
-  for (const assetId of assetIds || []) {
-    const id = String(assetId || "").trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    result.push({ asset_id: id, reason: "user_excluded_from_preflight_confirmation" });
-  }
-  return result;
-}
-
-function clearOneRunOverrides(store, nodeId, options = {}) {
-  const clearLocks = options.locks !== false;
-  const clearAssets = options.assets !== false;
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    if (clearLocks) n.params.temporaryLockOverrides = [];
-    if (clearAssets) n.params.temporaryAssetExclusions = [];
-  }, { history: false });
 }
 
 function generationRestoreSnapshot(node) {
@@ -719,6 +454,10 @@ function generationRestoreSnapshot(node) {
     status: node.status,
     result: node.result,
     previewUrl: node.previewUrl,
+    jobProgress: node.params?.jobProgress ? { ...node.params.jobProgress } : null,
+    terminalProgress: node.params?.terminalProgress ? { ...node.params.terminalProgress } : null,
+    progressPercent: node.params?.progressPercent ?? null,
+    candidatePreviewUrls: Array.isArray(node.params?.candidatePreviewUrls) ? [...node.params.candidatePreviewUrls] : null,
   };
 }
 
@@ -730,153 +469,13 @@ function restoreCancelledGeneration(store, nodeId, previous = null) {
       n.status = previous.status || ((previous.previewUrl || previous.result) ? "complete" : "empty");
       n.result = previous.result || "";
       n.previewUrl = previous.previewUrl || null;
+      n.params.jobProgress = previous.jobProgress || null;
+      n.params.terminalProgress = previous.terminalProgress || null;
+      n.params.progressPercent = previous.progressPercent;
+      n.params.candidatePreviewUrls = previous.candidatePreviewUrls || [];
       return;
     }
     n.status = (n.previewUrl || n.result) ? "complete" : "empty";
     n.result = n.result || "";
   }, { history: false });
-}
-
-function keyframeResultText(response, request, succeeded) {
-  {
-    const jobId = response?.job?.job_id || "not_available";
-    const status = response?.job?.status || "blocked";
-    const outputCount = response?.safe_manifest?.output_count ?? 0;
-    if (["submitted", "running", "pending"].includes(status)) {
-      return [
-        "图像生成中，预览完成后会自动更新到节点。",
-        `Job: ${jobId}`,
-      ].join("\n");
-    }
-    if (!succeeded) {
-      const reason = response?.safe_manifest?.blocks?.[0]?.reason || "image generation service is not ready";
-      return [
-        "图像生成未完成，本次没有可用预览。",
-        `状态: ${status}`,
-        `原因: ${reason}`,
-      ].join("\n");
-    }
-    return [
-      "关键帧已生成",
-      `Job: ${jobId}`,
-      `请求比例: ${request.aspect_ratio}`,
-      `候选数量: ${outputCount}`,
-      response?.reusable_image_assets?.[0]?.asset_id ? `Reference Asset: ${response.reusable_image_assets[0].asset_id}` : null,
-      response?.candidate_previews?.[0]?.preview_url ? "预览已从 Runtime 安全端点加载。" : "未返回预览地址。",
-    ].filter(Boolean).join("\n");
-  }
-  const jobId = response?.job?.job_id || "not_available";
-  const outputCount = response?.safe_manifest?.output_count ?? 0;
-  if (!succeeded) {
-    return [
-      "图像生成服务未就绪，本次没有发起有效生成。",
-      "处理：请检查本机图像 provider 配置与 Runtime 启动环境，然后在节点菜单重试。",
-      "技术细节已写入本次 safe manifest 与 run trace。",
-    ].join("\n");
-  }
-  return [
-    "关键帧已生成",
-    `Job: ${jobId}`,
-    `请求比例: ${request.aspect_ratio}`,
-    `候选数量: ${outputCount}`,
-    response?.reusable_image_assets?.[0]?.asset_id ? `Reference Asset: ${response.reusable_image_assets[0].asset_id}` : null,
-    response?.candidate_previews?.[0]?.preview_url ? "预览已从 Runtime 安全 artifact 端点加载。" : "未返回预览地址。",
-  ].filter(Boolean).join("\n");
-}
-
-function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/AFS_ALLOW_REMOTE_|provider service not found|provider gate is closed|Remote .* calls are disabled/i.test(clean)) {
-    return "provider 服务未就绪，请检查本机配置与 Runtime 启动环境后重试。";
-  }
-  return clean.slice(0, 160);
-}
-
-function setNodeError(store, nodeId, message) {
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    n.status = "error";
-    n.result = message;
-  });
-}
-
-export function visibleAssetForNode(store, node) {
-  const kind = assetKind(node.type);
-  return {
-    id: store.nextId("asset"),
-    kind,
-    title: assetTitle(node),
-    safe_summary: assetSummary(node),
-    thumbnail_ref: thumbnailForKind(kind),
-    source_node_id: node.id,
-    status: "ready",
-  };
-}
-
-function reconcileVisualAssetBadges(node, bundle) {
-  const current = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
-  if (!current.length || !bundle) return;
-  const included = new Set((bundle.included_assets || []).map((item) => String(item.asset_id || "")));
-  const excluded = new Map((bundle.excluded_assets || []).map((item) => [String(item.asset_id || ""), item]));
-  node.params.visualAssets = current.map((asset) => {
-    const assetId = String(asset?.asset_id || asset?.assetId || asset || "");
-    if (included.has(assetId)) return { ...asset, runtime_status: "included", disabled_reason: "" };
-    const miss = excluded.get(assetId);
-    if (!miss) return asset;
-    if (["retired_or_missing_visual_asset", "superseded_by_newer_label_version"].includes(miss.reason)) {
-      return {
-        ...asset,
-        status: asset.status || "fixed",
-        runtime_status: "excluded",
-        disabled_reason: "已失效，本次未携带",
-        excluded_reason: miss.reason,
-      };
-    }
-    return asset;
-  });
-}
-
-function assetKind(type) {
-  return {
-    text: "text_brief",
-    image: "keyframe",
-    video: "video_clip",
-    audio: "audio_clip",
-    script: "storyboard",
-    director: "director_setup",
-    video_merge: "video_comp",
-  }[type] || "reference";
-}
-
-function assetTitle(node) {
-  const fallback = {
-    text: "文本创作摘要",
-    image: "关键帧预览",
-    video: "5s 视频片段预览",
-    audio: "音频预览",
-    script: "分镜脚本预览",
-    director: "导演台布置",
-    video_merge: "合成预览",
-  }[node.type] || "显性资产";
-  return node.title || fallback;
-}
-
-function assetSummary(node) {
-  if (node.type === "director" && node.params?.directorSummary) return node.params.directorSummary;
-  const prompt = (node.prompt || node.result || node.content || "").replace(/\s+/g, " ").trim();
-  return prompt.slice(0, 90) || "生成后的安全摘要会在这里显示。";
-}
-
-function thumbnailForKind(kind) {
-  return {
-    text_brief: "text",
-    keyframe: "keyframe",
-    video_clip: "video",
-    audio_clip: "audio",
-    storyboard: "storyboard",
-    director_setup: "director-board",
-    video_comp: "video",
-  }[kind] || "reference";
 }

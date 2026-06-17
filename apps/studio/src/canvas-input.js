@@ -1,37 +1,55 @@
-import { screenToWorld, zoomAt, snap, rectsIntersect, bezier } from "./geometry.js";
-import { effectiveHeight, connect, duplicateNode } from "./nodes.js";
-import { getPendingEdgeGroup } from "./canvas-view.js";
-import { openAddNodeMenu, openReferenceMenu } from "./panels/add-node-menu.js";
-import { openNodeMenu } from "./panels/node-menu.js";
-import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
-import { fixNodeVisualAsset, handleNodeIntent, pollNodeVideoGeneration, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
-import { openDirectorShell } from "./panels/director-shell.js";
+import { findOutputPortAtPoint, finishConnectSession, moveConnectSession, startConnectSession } from "./canvas-connection.js";
+import { handleCanvasNodeClick } from "./canvas-node-action-handler.js";
+import { dragSession, isEditable, selectInRect, updatePortHover } from "./canvas-selection.js";
+import { zoomAt, snap } from "./geometry.js";
+import { duplicateNode } from "./nodes.js";
 import { hasOpenOverlay } from "./overlay.js";
-import { assetIdFromRef } from "./asset-reference-summary.js";
+import { openAddNodeMenu } from "./panels/add-node-menu.js";
+import { openNodeMenu } from "./panels/node-menu.js";
 
-const CLICK_SLOP = 5;
-
-// 指针输入状态机：pan / marquee / drag-node / connect（端口拖线）。
 export function bindCanvasInput(store, runtime) {
   const viewportEl = document.getElementById("canvas-viewport");
   const rootEl = document.getElementById("canvas-root");
   let spaceHeld = false;
   let session = null;
 
+  bindSpacePan(viewportEl, (value) => { spaceHeld = value; });
+  bindViewportWheel(rootEl, store);
+  bindQuickMenus(rootEl, store, runtime);
+  rootEl.addEventListener("pointerover", updatePortHover);
+  rootEl.addEventListener("pointerout", updatePortHover);
+  rootEl.addEventListener("pointerdown", (e) => {
+    session = handlePointerDown(e, { store, runtime, rootEl, viewportEl, spaceHeld });
+  });
+  rootEl.addEventListener("pointermove", (e) => {
+    if (!session) return;
+    handlePointerMove(e, { store, session });
+  });
+  rootEl.addEventListener("pointerup", (e) => {
+    if (!session) return;
+    handlePointerUp(e, { store, runtime, session, viewportEl });
+    session = null;
+  });
+  rootEl.addEventListener("click", (e) => handleCanvasNodeClick(store, runtime, e));
+}
+
+function bindSpacePan(viewportEl, setSpaceHeld) {
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space" && !isEditable(e.target)) {
-      spaceHeld = true;
+      setSpaceHeld(true);
       viewportEl.classList.add("space-pan");
       e.preventDefault();
     }
   });
   window.addEventListener("keyup", (e) => {
     if (e.code === "Space") {
-      spaceHeld = false;
+      setSpaceHeld(false);
       viewportEl.classList.remove("space-pan");
     }
   });
+}
 
+function bindViewportWheel(rootEl, store) {
   rootEl.addEventListener("wheel", (e) => {
     if (e.target.closest(".prompt-bar") || e.target.closest(".popover") || e.target.closest(".modal-backdrop")) return;
     e.preventDefault();
@@ -45,259 +63,139 @@ export function bindCanvasInput(store, runtime) {
       }
     }, { history: false, persist: false });
   }, { passive: false });
+}
 
+function bindQuickMenus(rootEl, store, runtime) {
   rootEl.addEventListener("dblclick", (e) => {
     if (e.target.closest(".node") || e.target.closest(".prompt-bar") || e.target.closest("#dock")) return;
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
-
   rootEl.addEventListener("contextmenu", (e) => {
     const nodeEl = e.target.closest(".node");
     if (!nodeEl) return;
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
+}
 
-  rootEl.addEventListener("pointerdown", (e) => {
-    if (e.button === 1 || (spaceHeld && e.button === 0)) {
-      session = { kind: "pan", startX: e.clientX, startY: e.clientY, vp: { ...store.get().viewport } };
-      viewportEl.classList.add("panning");
-      rootEl.setPointerCapture(e.pointerId);
-      e.preventDefault();
-      return;
-    }
-    if (e.button !== 0) return;
-    if (e.target.closest(".prompt-bar") || e.target.closest("#dock") || e.target.closest("#drawer") || e.target.closest("#topbar") || e.target.closest("#corner-controls") || e.target.closest("#starter-row")) return;
-
-    const stackedOutputPort = findOutputPortAtPoint(e);
-    const portBtn = stackedOutputPort || e.target.closest(".node-port");
-    const nodeEl = stackedOutputPort ? stackedOutputPort.closest(".node") : e.target.closest(".node");
-
-    if (portBtn && nodeEl && portBtn.dataset.port === "out") {
-      session = startConnectSession(store, nodeEl.dataset.nodeId, e);
-      rootEl.setPointerCapture(e.pointerId);
-      e.preventDefault();
-      return;
-    }
-    if (portBtn) return; // 输入端口：暂不发起反向连线
-
-    if (nodeEl) {
-      const nodeId = nodeEl.dataset.nodeId;
-      if (e.target.closest("button")) return; // 节点内按钮走 click
-      const state = store.get();
-      const selected = state.selection.nodeIds.includes(nodeId) ? [...state.selection.nodeIds] : [nodeId];
-      if (!state.selection.nodeIds.includes(nodeId)) {
-        store.set((s) => { s.selection = { nodeIds: [nodeId], edgeId: null }; }, { history: false, persist: false });
-      }
-      if (e.altKey) {
-        const clone = duplicateNode(store, nodeId);
-        if (!clone) return;
-        session = dragSession(store, [clone.id], e);
-      } else {
-        session = dragSession(store, selected, e);
-      }
-      rootEl.setPointerCapture(e.pointerId);
-      return;
-    }
-
-    session = { kind: "marquee", startX: e.clientX, startY: e.clientY, el: null };
+function handlePointerDown(e, env) {
+  const { rootEl, viewportEl, spaceHeld, store, runtime } = env;
+  if (e.button === 1 || (spaceHeld && e.button === 0)) {
+    const session = { kind: "pan", startX: e.clientX, startY: e.clientY, vp: { ...store.get().viewport } };
+    viewportEl.classList.add("panning");
     rootEl.setPointerCapture(e.pointerId);
-  });
+    e.preventDefault();
+    return session;
+  }
+  if (e.button !== 0 || isChromeTarget(e)) return null;
 
-  rootEl.addEventListener("pointermove", (e) => {
-    if (!session) return;
-    if (session.kind === "pan") {
-      store.set((s) => {
-        s.viewport.x = session.vp.x + (e.clientX - session.startX);
-        s.viewport.y = session.vp.y + (e.clientY - session.startY);
-      }, { history: false, persist: false });
-      return;
-    }
-    if (session.kind === "connect") {
-      moveConnectSession(store, session, e);
-      return;
-    }
-    if (session.kind === "drag-node") {
-      const scale = store.get().viewport.scale;
-      const dx = (e.clientX - session.startX) / scale;
-      const dy = (e.clientY - session.startY) / scale;
-      if (Math.abs(dx) + Math.abs(dy) > 2) session.moved = true;
-      store.set((s) => {
-        for (const id of session.nodeIds) {
-          const node = s.nodes[id];
-          const origin = session.origins[id];
-          if (!node || !origin) continue;
-          node.x = snap(origin.x + dx);
-          node.y = snap(origin.y + dy);
-        }
-      }, { history: false });
-      return;
-    }
-    if (session.kind === "marquee") {
-      if (!session.el) {
-        session.el = document.createElement("div");
-        session.el.id = "marquee";
-        document.getElementById("canvas-root").appendChild(session.el);
-      }
-      const x = Math.min(session.startX, e.clientX);
-      const y = Math.min(session.startY, e.clientY);
-      const w = Math.abs(e.clientX - session.startX);
-      const h = Math.abs(e.clientY - session.startY);
-      Object.assign(session.el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
-      session.rect = { x, y, w, h };
-    }
-  });
+  const stackedOutputPort = findOutputPortAtPoint(e);
+  const portBtn = stackedOutputPort || e.target.closest(".node-port");
+  const nodeEl = stackedOutputPort ? stackedOutputPort.closest(".node") : e.target.closest(".node");
+  if (portBtn && nodeEl && portBtn.dataset.port === "out") {
+    const session = startConnectSession(store, nodeEl.dataset.nodeId, e);
+    rootEl.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    return session;
+  }
+  if (portBtn) return null;
+  if (nodeEl) return beginNodeDrag(e, { store, rootEl, nodeEl });
 
-  rootEl.addEventListener("pointerup", (e) => {
-    if (!session) return;
-    if (session.kind === "pan") viewportEl.classList.remove("panning");
-    if (session.kind === "connect") finishConnectSession(store, runtime, session, e);
-    if (session.kind === "marquee") {
-      if (session.el) session.el.remove();
-      const rect = session.rect;
-      if (rect && (rect.w > 6 || rect.h > 6)) {
-        selectInRect(store, rect);
-      } else if (!hasOpenOverlay()) {
-        store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; }, { history: false, persist: false });
-      }
-    }
-    session = null;
-  });
-
-  // 节点内按钮点击
-  rootEl.addEventListener("click", (e) => {
-    const nodeEl = e.target.closest(".node");
-    if (!nodeEl) return;
-    const nodeId = nodeEl.dataset.nodeId;
-    const node = store.get().nodes[nodeId];
-    if (!node) return;
-    const actionEl = e.target.closest("[data-action]");
-    const action = actionEl?.dataset.action;
-    if (!action) return;
-    if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
-    else if (action === "open-director") openDirectorShell(store, node);
-    else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
-    else if (action === "upload") uploadNodeImage(store, runtime, node);
-    else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
-    else if (action === "run") startNodeGeneration(store, runtime, node);
-    else if (action === "video-poll") pollNodeVideoGeneration(store, runtime, node);
-    else if (action === "duplicate") duplicateNode(store, nodeId);
-    else if (action === "toggle-collapse") store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; });
-    else if (action === "node-menu") openNodeMenu(store, runtime, nodeId, actionEl);
-  });
+  const session = { kind: "marquee", startX: e.clientX, startY: e.clientY, el: null };
+  rootEl.setPointerCapture(e.pointerId);
+  return session;
 }
 
-function assetRefForAction(node, assetId) {
-  const assets = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
-  if (!assetId) return assets[0];
-  return assets.find((asset) => assetIdFromRef(asset) === String(assetId)) || { asset_id: assetId };
-}
-
-function dragSession(store, nodeIds, e) {
-  return {
-    kind: "drag-node",
-    nodeIds,
-    startX: e.clientX,
-    startY: e.clientY,
-    origins: Object.fromEntries(nodeIds.map((id) => {
-      const n = store.get().nodes[id];
-      return [id, { x: n.x, y: n.y }];
-    })),
-    moved: false,
-  };
-}
-
-// ---------- 端口拖线 ----------
-
-function startConnectSession(store, fromId, e) {
-  const from = store.get().nodes[fromId];
-  const group = getPendingEdgeGroup();
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.classList.add("pending");
-  group.appendChild(path);
-  return {
-    kind: "connect",
-    fromId,
-    startX: e.clientX,
-    startY: e.clientY,
-    path,
-    targetId: null,
-    targetEl: null,
-    start: { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 },
-  };
-}
-
-function moveConnectSession(store, session, e) {
+function beginNodeDrag(e, { store, rootEl, nodeEl }) {
+  const nodeId = nodeEl.dataset.nodeId;
+  if (e.target.closest("button")) return null;
   const state = store.get();
-  const cursor = screenToWorld(state.viewport, e.clientX, e.clientY);
-  const target = hitTargetNode(session, e);
-  if (session.targetEl && session.targetEl !== target?.el) {
-    session.targetEl.classList.remove("drop-target");
-    session.targetEl = null;
-    session.targetId = null;
+  const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+  const alreadySelected = state.selection.nodeIds.includes(nodeId);
+  let selected = alreadySelected ? [...state.selection.nodeIds] : [nodeId];
+  if (additive) {
+    selected = alreadySelected
+      ? state.selection.nodeIds.filter((id) => id !== nodeId)
+      : [...state.selection.nodeIds, nodeId];
   }
-  let end = cursor;
-  if (target) {
-    session.targetId = target.id;
-    session.targetEl = target.el;
-    target.el.classList.add("drop-target");
-    const node = state.nodes[target.id];
-    if (node) end = { x: node.x, y: node.y + effectiveHeight(node) / 2 };
-    session.path.classList.add("target-locked");
-  } else {
-    session.path.classList.remove("target-locked");
+  if (additive || !alreadySelected) {
+    store.set((s) => { s.selection = { nodeIds: selected, edgeId: null }; }, { history: false, persist: false });
   }
-  session.path.setAttribute("d", bezier(session.start.x, session.start.y, end.x, end.y));
+  if (!selected.includes(nodeId)) return null;
+  const session = e.altKey ? cloneDragSession(store, nodeId, e) : dragSession(store, selected, e, { primaryId: nodeId, additive });
+  if (session) rootEl.setPointerCapture(e.pointerId);
+  return session;
 }
 
-function finishConnectSession(store, runtime, session, e) {
-  session.path.remove();
-  if (session.targetEl) session.targetEl.classList.remove("drop-target");
-  const moved = Math.abs(e.clientX - session.startX) + Math.abs(e.clientY - session.startY) > CLICK_SLOP;
-  if (!moved) {
-    // 视为点击端口：打开「引用该节点生成」菜单
-    const from = store.get().nodes[session.fromId];
-    const portEl = document.querySelector(`[data-node-id="${session.fromId}"] .node-port.out`);
-    if (from && portEl) openReferenceMenu(store, runtime, from, portEl);
+function cloneDragSession(store, nodeId, e) {
+  const clone = duplicateNode(store, nodeId);
+  return clone ? dragSession(store, [clone.id], e, { primaryId: clone.id }) : null;
+}
+
+function handlePointerMove(e, { store, session }) {
+  if (session.kind === "pan") {
+    store.set((s) => {
+      s.viewport.x = session.vp.x + (e.clientX - session.startX);
+      s.viewport.y = session.vp.y + (e.clientY - session.startY);
+    }, { history: false, persist: false });
     return;
   }
-  if (session.targetId && session.targetId !== session.fromId) {
-    connect(store, session.fromId, session.targetId);
-  }
+  if (session.kind === "connect") return moveConnectSession(store, session, e);
+  if (session.kind === "drag-node") return moveNodeSession(store, session, e);
+  if (session.kind === "marquee") return moveMarquee(session, e);
 }
 
-function hitTargetNode(session, e) {
-  const stack = document.elementsFromPoint(e.clientX, e.clientY);
-  for (const el of stack) {
-    const nodeEl = el.closest?.(".node");
-    if (nodeEl && nodeEl.dataset.nodeId !== session.fromId) {
-      return { id: nodeEl.dataset.nodeId, el: nodeEl };
+function moveNodeSession(store, session, e) {
+  const scale = store.get().viewport.scale;
+  const dx = (e.clientX - session.startX) / scale;
+  const dy = (e.clientY - session.startY) / scale;
+  if (Math.abs(dx) + Math.abs(dy) > 2) session.moved = true;
+  store.set((s) => {
+    for (const id of session.nodeIds) {
+      const node = s.nodes[id];
+      const origin = session.origins[id];
+      if (!node || !origin) continue;
+      node.x = snap(origin.x + dx);
+      node.y = snap(origin.y + dy);
     }
+  }, { history: false });
+}
+
+function moveMarquee(session, e) {
+  if (!session.el) {
+    session.el = document.createElement("div");
+    session.el.id = "marquee";
+    document.getElementById("canvas-root").appendChild(session.el);
   }
-  return null;
+  const x = Math.min(session.startX, e.clientX);
+  const y = Math.min(session.startY, e.clientY);
+  const w = Math.abs(e.clientX - session.startX);
+  const h = Math.abs(e.clientY - session.startY);
+  Object.assign(session.el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+  session.rect = { x, y, w, h };
 }
 
-function findOutputPortAtPoint(e) {
-  const stack = document.elementsFromPoint(e.clientX, e.clientY);
-  for (const el of stack) {
-    const port = el.closest?.(".node-port.out");
-    if (port) return port;
+function handlePointerUp(e, { store, runtime, session, viewportEl }) {
+  if (session.kind === "pan") viewportEl.classList.remove("panning");
+  if (session.kind === "connect") finishConnectSession(store, runtime, session, e);
+  if (session.kind === "drag-node" && !session.moved && session.primaryId && !session.additive) {
+    store.set((s) => { s.selection = { nodeIds: [session.primaryId], edgeId: null }; }, { history: false, persist: false });
   }
-  return null;
+  if (session.kind === "marquee") finishMarquee(store, session);
 }
 
-function selectInRect(store, rectScreen) {
-  const state = store.get();
-  const vp = state.viewport;
-  const topLeft = screenToWorld(vp, rectScreen.x, rectScreen.y);
-  const bottomRight = screenToWorld(vp, rectScreen.x + rectScreen.w, rectScreen.y + rectScreen.h);
-  const worldRect = { x: topLeft.x, y: topLeft.y, w: bottomRight.x - topLeft.x, h: bottomRight.y - topLeft.y };
-  const hit = Object.values(state.nodes)
-    .filter((n) => rectsIntersect(worldRect, { x: n.x, y: n.y, w: n.w, h: effectiveHeight(n) }))
-    .map((n) => n.id);
-  store.set((s) => { s.selection = { nodeIds: hit, edgeId: null }; }, { history: false, persist: false });
+function finishMarquee(store, session) {
+  if (session.el) session.el.remove();
+  const rect = session.rect;
+  if (rect && (rect.w > 6 || rect.h > 6)) selectInRect(store, rect);
+  else if (!hasOpenOverlay()) store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; }, { history: false, persist: false });
 }
 
-function isEditable(target) {
-  return target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable);
+function isChromeTarget(e) {
+  return e.target.closest(".prompt-bar")
+    || e.target.closest("#dock")
+    || e.target.closest("#drawer")
+    || e.target.closest("#topbar")
+    || e.target.closest("#corner-controls")
+    || e.target.closest("#starter-row");
 }

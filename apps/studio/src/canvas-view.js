@@ -1,9 +1,8 @@
-import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
+import { assetsFromNode } from "./asset-reference-summary.js";
+import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { bezier } from "./geometry.js";
 import { icon } from "./icons.js";
-import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
-import { bundleSummary, resultView } from "./node-result-view.js";
-import { assetsFromNode, carryChainItems, assetCarryLabel, assetCarryState, assetLabel, assetTypeLabel } from "./asset-reference-summary.js";
+import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
 const EDGE_OFFSET = 20000;
 
@@ -44,55 +43,95 @@ function renderNodes(state, relations) {
 }
 
 function buildNodeElement(node) {
-  const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   const elNode = document.createElement("div");
   elNode.className = `node type-${node.type}`;
   elNode.dataset.nodeId = node.id;
+  elNode.appendChild(nodeTitle());
+  elNode.appendChild(nodeStateStrip());
+  elNode.appendChild(nodeActions());
+  elNode.appendChild(uploadButton());
+  elNode.appendChild(contextToolbar());
+  elNode.appendChild(nodeBody());
+  elNode.appendChild(portButton("in"));
+  elNode.appendChild(portButton("out"));
+  return elNode;
+}
 
+function nodeTitle() {
   const title = document.createElement("div");
   title.className = "node-title";
   title.dataset.role = "title";
-  elNode.appendChild(title);
+  return title;
+}
 
-  // hover 操作条：生成 / 复制 / 折叠 / 更多
+function nodeStateStrip() {
+  const strip = document.createElement("div");
+  strip.className = "node-state-strip";
+  strip.dataset.role = "state-strip";
+  return strip;
+}
+
+function nodeActions() {
   const actions = document.createElement("div");
   actions.className = "node-actions";
   actions.dataset.role = "actions";
   actions.innerHTML = [
-    `<button class="na-btn" data-action="fix-visual-asset" title="固定为资产">${icon("bookmark", 13)}</button>`,
+    `<button class="na-btn" data-action="fix-visual-asset" title="保存为素材">${icon("bookmark", 13)}</button>`,
     `<button class="na-btn" data-action="run" title="生成">${icon("play", 13)}</button>`,
     `<button class="na-btn" data-action="duplicate" title="复制节点">${icon("copy", 13)}</button>`,
     `<button class="na-btn" data-action="toggle-collapse" title="折叠/展开">${icon("chevronUp", 13)}</button>`,
     `<button class="na-btn" data-action="node-menu" title="更多">${icon("more", 13)}</button>`,
   ].join("");
-  elNode.appendChild(actions);
+  return actions;
+}
 
+function uploadButton() {
   const upload = document.createElement("button");
   upload.className = "node-float-action";
   upload.dataset.action = "upload";
   upload.innerHTML = `${icon("upload", 13)}<span>上传</span>`;
-  elNode.appendChild(upload);
+  return upload;
+}
 
+function contextToolbar() {
+  const workflow = document.createElement("div");
+  workflow.className = "node-context-toolbar";
+  workflow.dataset.role = "context-toolbar";
+  workflow.innerHTML = [
+    `<button data-action="continue-generate" title="继续生成">${icon("play", 13)}<span>继续生成</span></button>`,
+    `<button data-action="fix-visual-asset" title="保存为素材">${icon("bookmark", 13)}<span>保存素材</span></button>`,
+    `<button data-action="content-card" title="整理卡片">${icon("frames", 13)}<span>整理卡片</span></button>`,
+    `<button data-action="open-creation-process" title="查看创作过程">${icon("layers", 13)}<span>看过程</span></button>`,
+  ].join("");
+  return workflow;
+}
+
+function nodeBody() {
   const body = document.createElement("div");
   body.className = "node-body";
   body.dataset.role = "body";
-  elNode.appendChild(body);
+  return body;
+}
 
-  const portIn = document.createElement("button");
-  portIn.className = "node-port in";
-  portIn.dataset.port = "in";
-  portIn.innerHTML = icon("plus", 12);
-  const portOut = document.createElement("button");
-  portOut.className = "node-port out";
-  portOut.dataset.port = "out";
-  portOut.innerHTML = icon("plus", 12);
-  elNode.appendChild(portIn);
-  elNode.appendChild(portOut);
-  return elNode;
+function portButton(port) {
+  const button = document.createElement("button");
+  button.className = `node-port ${port}`;
+  button.dataset.port = port;
+  button.innerHTML = icon("plus", 12);
+  return button;
 }
 
 function syncNodeElement(elNode, node, state, relations) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
+  syncNodeFrame(elNode, node, state);
+  syncNodeRelations(elNode, node, relations);
+  syncNodeTitle(elNode, node, def);
+  syncNodeStateStrip(elNode, node, def);
+  syncRunAction(elNode, node);
+  syncNodeBody(elNode, node, def);
+}
+
+function syncNodeFrame(elNode, node, state) {
   elNode.style.transform = `translate(${node.x}px, ${node.y}px)`;
   elNode.style.width = `${node.w}px`;
   elNode.style.minHeight = `${effectiveHeight(node)}px`;
@@ -103,14 +142,20 @@ function syncNodeElement(elNode, node, state, relations) {
   elNode.classList.toggle("text-content", Boolean(node.content));
   elNode.classList.toggle("is-reference", Boolean(node.params?.isReference));
   elNode.classList.toggle("has-image-preview", Boolean(node.previewUrl));
+  elNode.classList.toggle("has-media-result", Boolean(node.previewUrl || candidatePreviews(node).length));
+  elNode.classList.toggle("is-generating", node.status === "generating");
+  elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
+}
 
+function syncNodeRelations(elNode, node, relations) {
   elNode.classList.remove("rel-upstream", "rel-downstream", "rel-dimmed");
-  if (relations && node.id !== relations.focus) {
-    if (relations.upstream.has(node.id)) elNode.classList.add("rel-upstream");
-    else if (relations.downstream.has(node.id)) elNode.classList.add("rel-downstream");
-    else elNode.classList.add("rel-dimmed");
-  }
+  if (!relations || node.id === relations.focus) return;
+  if (relations.upstream.has(node.id)) elNode.classList.add("rel-upstream");
+  else if (relations.downstream.has(node.id)) elNode.classList.add("rel-downstream");
+  else elNode.classList.add("rel-dimmed");
+}
 
+function syncNodeTitle(elNode, node, def) {
   const title = elNode.querySelector('[data-role="title"]');
   const refBadge = node.params?.isReference ? `<span class="ref-badge">${icon("bookmark", 11)}参考</span>` : "";
   const visualAssets = assetsFromNode(node);
@@ -119,28 +164,20 @@ function syncNodeElement(elNode, node, state, relations) {
     ? `<button class="ref-badge asset-badge${hasInvalidAsset ? " invalid" : ""}" data-action="asset-detail" title="${hasInvalidAsset ? "已失效，本次未携带" : "查看固定资产"}">${icon("lock", 11)}${visualAssets.length}资产</button>`
     : "";
   title.innerHTML = `${icon(def.icon, 13)}<span>${escapeHtml(node.title)}</span>${refBadge}${fixedBadge}`;
+}
 
-  const collapseBtn = elNode.querySelector('[data-action="toggle-collapse"]');
-  if (collapseBtn) collapseBtn.innerHTML = icon(node.collapsed ? "chevronDown" : "chevronUp", 13);
-  syncRunAction(elNode, node);
+function syncNodeStateStrip(elNode, node, def) {
+  const stateStrip = elNode.querySelector('[data-role="state-strip"]');
+  if (!stateStrip) return;
+  const nodeStatus = node.status || "empty";
+  stateStrip.className = `node-state-strip ${nodeStatus}`;
+  stateStrip.innerHTML = `<span class="dot"></span><span>${escapeHtml(statusLabel(nodeStatus))}</span><span>${escapeHtml(def.label)}</span>`;
+}
 
+function syncNodeBody(elNode, node, def) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
-  const directorSig = node.params?.directorSetup ? directorSummary(normalizeDirectorSetup(node.params.directorSetup)) : "";
-  const signature = [
-    node.status,
-    node.content ? node.content.length : 0,
-    node.result ? node.result.length : 0,
-    node.previewUrl || "",
-    node.params?.previewAspectRatio || "",
-    node.params?.visualAssets?.length || 0,
-    node.params?.lastContextBundle?.included_assets?.length || 0,
-    carryChainItems(node).map((asset) => `${asset.asset_id || asset.assetId || ""}:${assetCarryState(asset)}`).join(","),
-    node.type,
-    node.collapsed ? 1 : 0,
-    directorSig,
-    node.params?.appliedDownstreamCount || 0,
-  ].join("|");
+  const signature = nodeBodySignature(node);
   if (body.dataset.signature !== signature) {
     body.dataset.signature = signature;
     body.replaceChildren(...buildNodeBody(node, def));
@@ -169,186 +206,80 @@ function syncRunAction(elNode, node) {
   runBtn.innerHTML = icon("play", 13);
 }
 
-function buildNodeBody(node, def) {
-  const out = [];
-  if (node.collapsed) return out;
-  const carry = carryChainView(node);
-  if (carry) out.push(carry);
-  if (node.content) {
-    const view = document.createElement("div");
-    view.className = "text-content-view";
-    view.textContent = node.content;
-    out.push(view);
-    return out;
-  }
-  if (node.type === "director") {
-    const summary = directorSummary(normalizeDirectorSetup(node.params?.directorSetup));
-    const applied = node.params?.appliedDownstreamCount
-      ? ` / 已应用到 ${node.params.appliedDownstreamCount} 个相连节点`
-      : "";
-    const glyph = document.createElement("div");
-    glyph.className = "node-glyph";
-    glyph.innerHTML = icon(def.icon, 38);
-    const desc = document.createElement("div");
-    desc.className = "node-empty-label";
-    desc.textContent = "二维顶视图布置机位、人物、灯光和道具";
-    const badge = document.createElement("div");
-    badge.className = "director-node-summary";
-    badge.textContent = `${summary}${applied}`;
-    const open = document.createElement("button");
-    open.className = "director-open-btn";
-    open.dataset.action = "open-director";
-    open.textContent = "打开二维导演台";
-    out.push(glyph, desc, badge, open);
-    if (node.result) out.push(resultView(node));
-    return out;
-  }
-  if (node.status === "generating") {
-    const status = document.createElement("div");
-    status.className = "node-status";
-    status.innerHTML = '<span class="spinner"></span><span>生成中…</span>';
-    out.push(status);
-    if (node.result) out.push(resultView(node));
-    return out;
-  }
-  if (node.status === "cancelled") {
-    const cancelled = document.createElement("div");
-    cancelled.className = "node-status cancelled";
-    cancelled.innerHTML = `${icon("x", 13)}<span>本地已取消</span>`;
-    out.push(cancelled);
-    if (node.result) out.push(resultView(node));
-    return out;
-  }
-  if (node.status === "complete" && node.result) {
-    const ok = document.createElement("div");
-    ok.className = "node-status success";
-    ok.innerHTML = `${icon("check", 13)}<span>已完成</span>`;
-    const bundle = bundleSummary(node);
-    if (bundle) out.push(ok, bundle, resultView(node));
-    else out.push(ok, resultView(node));
-    return out;
-  }
-  if (node.status === "error") {
-    const err = document.createElement("div");
-    err.className = "node-status error";
-    err.innerHTML = `${icon("x", 13)}<span>生成失败，可在节点菜单重试</span>`;
-    const bundle = bundleSummary(node);
-    if (bundle) out.push(err, bundle);
-    else out.push(err);
-    if (node.result) out.push(resultView(node));
-    return out;
-  }
-  const glyph = document.createElement("div");
-  glyph.className = "node-glyph";
-  glyph.innerHTML = icon(def.icon, 38);
-  out.push(glyph);
-    if (def.intents.length && !["image", "video"].includes(node.type)) {
-    const label = document.createElement("div");
-    label.className = "node-empty-label";
-    label.textContent = "尝试:";
-    const list = document.createElement("div");
-    list.className = "node-intents";
-    for (const intent of def.intents) {
-      const btn = document.createElement("button");
-      btn.className = "node-intent";
-      btn.dataset.action = "intent";
-      btn.dataset.intent = intent.label;
-      btn.innerHTML = `<span class="intent-icon">${icon(intent.icon, 13)}</span><span>${intent.label}</span>`;
-      list.appendChild(btn);
-    }
-    out.push(label, list);
-  }
-  return out;
-}
-
-function carryChainView(node) {
-  const items = carryChainItems(node);
-  if (!items.length) return null;
-  const strip = document.createElement("div");
-  strip.className = "carry-chain-strip";
-  for (const item of items) {
-    const state = assetCarryState(item);
-    const chip = document.createElement("button");
-    chip.className = `carry-chain-chip${state === "excluded" || state === "superseded" ? " invalid" : ""}`;
-    chip.dataset.action = "asset-detail";
-    chip.dataset.assetId = item.asset_id || item.assetId || "";
-    chip.title = `${assetTypeLabel(item)} · ${assetLabel(item)} · ${assetCarryLabel(item)}`;
-    chip.innerHTML = `<span class="carry-chain-icon">${icon(item.asset_type === "scene" ? "image" : "bookmark", 11)}</span><span>${escapeHtml(assetLabel(item))}</span>`;
-    strip.appendChild(chip);
-  }
-  return strip;
-}
-
 function renderEdges(state, relations) {
-  const svg = document.getElementById("edge-layer");
-  let group = svg.querySelector("g[data-role='edges']");
-  if (!group) {
-    group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.dataset.role = "edges";
-    group.setAttribute("transform", `translate(${EDGE_OFFSET}, ${EDGE_OFFSET})`);
-    svg.appendChild(group);
-  }
+  const group = edgeGroup("edges");
   const seen = new Set();
   for (const edge of Object.values(state.edges)) {
     const from = state.nodes[edge.from];
     const to = state.nodes[edge.to];
     if (!from || !to) continue;
     seen.add(edge.id);
-    let item = group.querySelector(`[data-edge-id="${edge.id}"]`);
-    if (!item) {
-      item = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      item.dataset.edgeId = edge.id;
-      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.classList.add("edge-label");
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.classList.add("edge-flow");
-      item.append(path, label);
-      group.appendChild(item);
-    }
-    const path = item.querySelector("path");
-    const label = item.querySelector(".edge-label");
-    const x1 = from.x + from.w;
-    const y1 = from.y + effectiveHeight(from) / 2;
-    const x2 = to.x;
-    const y2 = to.y + effectiveHeight(to) / 2;
-    path.setAttribute("d", bezier(x1, y1, x2, y2));
-    const relation = edge.relation_type || edge.relationType || "generation";
-    path.classList.toggle("director-edge", relation === "director");
-    path.classList.toggle("reference-edge", relation === "reference");
-    path.classList.toggle("selected-edge", state.selection.edgeId === edge.id);
-    path.classList.toggle("just-connected", state.ui.lastConnectedEdgeId === edge.id);
-    path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
-    label.textContent = relation === "director" ? "导演台" : relation === "reference" ? "参考" : "";
-    label.setAttribute("x", String((x1 + x2) / 2));
-    label.setAttribute("y", String((y1 + y2) / 2 - 8));
-    label.classList.toggle("visible", Boolean(label.textContent));
-    if (relations) {
-      const upSide = (relations.upstream.has(edge.from) || edge.from === relations.focus)
-        && (relations.upstream.has(edge.to) || edge.to === relations.focus);
-      const downSide = (relations.downstream.has(edge.to) || edge.to === relations.focus)
-        && (relations.downstream.has(edge.from) || edge.from === relations.focus);
-      if (edge.to === relations.focus || (upSide && relations.upstream.has(edge.from))) path.classList.add("rel-up-edge");
-      else if (edge.from === relations.focus || (downSide && relations.downstream.has(edge.to))) path.classList.add("rel-down-edge");
-      else path.classList.add("rel-dim-edge");
-    }
+    const item = edgeElement(group, edge.id);
+    syncEdgeElement(item, edge, from, to, state, relations);
   }
   for (const item of [...group.children]) {
     if (!seen.has(item.dataset.edgeId)) item.remove();
   }
 }
 
+function edgeElement(group, edgeId) {
+  let item = group.querySelector(`[data-edge-id="${edgeId}"]`);
+  if (item) return item;
+  item = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  item.dataset.edgeId = edgeId;
+  const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  label.classList.add("edge-label");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.classList.add("edge-flow");
+  item.append(path, label);
+  group.appendChild(item);
+  return item;
+}
+
+function syncEdgeElement(item, edge, from, to, state, relations) {
+  const path = item.querySelector("path");
+  const label = item.querySelector(".edge-label");
+  const x1 = from.x + from.w;
+  const y1 = from.y + effectiveHeight(from) / 2;
+  const x2 = to.x;
+  const y2 = to.y + effectiveHeight(to) / 2;
+  const relation = edge.relation_type || edge.relationType || "generation";
+  path.setAttribute("d", bezier(x1, y1, x2, y2));
+  path.classList.toggle("director-edge", relation === "director");
+  path.classList.toggle("reference-edge", relation === "reference");
+  path.classList.toggle("selected-edge", state.selection.edgeId === edge.id);
+  path.classList.toggle("just-connected", state.ui.lastConnectedEdgeId === edge.id);
+  path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
+  label.textContent = relation === "director" ? "导演台" : relation === "reference" ? "参考" : "";
+  label.setAttribute("x", String((x1 + x2) / 2));
+  label.setAttribute("y", String((y1 + y2) / 2 - 8));
+  label.classList.toggle("visible", Boolean(label.textContent));
+  syncEdgeRelationClass(path, edge, relations);
+}
+
+function syncEdgeRelationClass(path, edge, relations) {
+  if (!relations) return;
+  const upSide = (relations.upstream.has(edge.from) || edge.from === relations.focus)
+    && (relations.upstream.has(edge.to) || edge.to === relations.focus);
+  const downSide = (relations.downstream.has(edge.to) || edge.to === relations.focus)
+    && (relations.downstream.has(edge.from) || edge.from === relations.focus);
+  if (edge.to === relations.focus || (upSide && relations.upstream.has(edge.from))) path.classList.add("rel-up-edge");
+  else if (edge.from === relations.focus || (downSide && relations.downstream.has(edge.to))) path.classList.add("rel-down-edge");
+  else path.classList.add("rel-dim-edge");
+}
+
 export function getPendingEdgeGroup() {
+  return edgeGroup("pending");
+}
+
+function edgeGroup(role) {
   const svg = document.getElementById("edge-layer");
-  let group = svg.querySelector("g[data-role='pending']");
+  let group = svg.querySelector(`g[data-role='${role}']`);
   if (!group) {
     group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.dataset.role = "pending";
+    group.dataset.role = role;
     group.setAttribute("transform", `translate(${EDGE_OFFSET}, ${EDGE_OFFSET})`);
     svg.appendChild(group);
   }
   return group;
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }

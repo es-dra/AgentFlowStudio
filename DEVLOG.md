@@ -1,5 +1,120 @@
 # Devlog
 
+## 2026-06-18 - Studio Final Interaction And Progress Pass
+
+- Added a shared generation-state projection for Studio nodes: submit state,
+  status-derived percentage fallback, provider progress passthrough,
+  terminal progress, and safe candidate preview lists.
+- Made image and video result previews size from the preview container itself,
+  so generated media fills the node frame with stable aspect-ratio layout.
+- Preserved generation progress and candidate preview state through Runtime
+  `studio-state` save/restore with safe Runtime preview route validation.
+- Added visible-canvas safe-area fitting so arrange/fit/add-node placement avoids
+  the drawer, inspector, topbar, and dock instead of centering under panels.
+- Split more frontend/runtime responsibilities:
+  `node-generation-progress.js`, `node-generation-results.js`,
+  `node-generation-guards.js`, `node-generation-context.js`,
+  `canvas-safe-area.js`, `studio-topbar.js`, and
+  `runtime_studio_generation_state.py`.
+- Reduced active file pressure: `main.js` is 431 lines and `node-actions.js` is
+  481 lines after this pass.
+
+Verification:
+
+```text
+Studio JS node --check: passed for all apps/studio/src/**/*.js
+tests/test_web_studio_frontend_wave.py tests/test_web_studio_static.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py tests/test_api_runtime_service.py: 57 passed, 1 existing Starlette/httpx warning
+In-app browser takeover: starter flow, canvas right-click menu, node right-click menu, drag connection, marquee selection, safe-area fit, progress percent, candidate grid, and media preview DOM passed with console error/warn count 0
+Screenshot: C:\Users\chenzy\.codex\backups\AgentFlowStudio\frontend-flow-takeover-20260618\final-progress-media-20260618.png
+tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: passed with existing CRLF notices only
+```
+
+Boundaries:
+
+- No live provider call, production server mutation, secret, provider raw
+  response, signed URL, or media bytes were used.
+- Browser media/progress validation used safe Runtime preview route strings and
+  a temporary local Runtime on 8797 with explicit `runtimeBaseUrl`, then stopped it.
+- This is frontend/runtime verification, not provider smoke, human acceptance,
+  business validation, or durable memory promotion.
+- Maintenance audit still reports historical oversized files and active
+  Runtime/Studio warnings; this pass reduces the main frontend pressure but does
+  not claim total maintainability debt is cleared.
+
+## 2026-06-18 - Studio Frontend UX Polish
+
+- Tightened the Studio desktop canvas experience after the LibTV reference pass:
+  clearer first-run starter cards, node-local action toolbar, friendlier drawer
+  tabs, richer empty states, and simpler Chinese labels for user-facing actions.
+- Improved canvas interaction details: port hover affordance, additive
+  selection, single-click selection collapse after starter templates, and
+  no browser text selection during context/menu interactions.
+- Reframed the right inspector as a current-node operation center with direct
+  actions for continuing generation, saving materials, opening process evidence,
+  and reviewing the material library.
+- Adjusted the first-screen starter row so all five desktop entry cards fit
+  inside the usable workspace beside the right inspector.
+
+Verification:
+
+```text
+Studio JS node --check: passed
+tests/test_web_studio_frontend_wave.py tests/test_web_studio_static.py: 33 passed
+Playwright desktop render smoke: empty state, node selection, toolbar, context menu, drawer states passed with no console errors
+tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: passed with existing CRLF notices only
+```
+
+Boundaries:
+
+- No live provider call, server mutation, secret, provider raw response, signed
+  URL, or media bytes were used.
+- This is local frontend/runtime verification, not provider smoke, human
+  acceptance, business validation, or durable memory promotion.
+- Maintenance audit still warns about historical oversized files, including
+  some active Studio files that should be split in a later architecture pass.
+
+## 2026-06-18 - Studio Interaction Flow And File Slimming
+
+- Split the Studio canvas shell further into smaller interaction modules:
+  `canvas-selection.js`, `canvas-connection.js`, `canvas-node-action-handler.js`,
+  `canvas-node-body.js`, `studio-keyboard.js`, `runtime-asset-sync.js`,
+  `node-upload-actions.js`, `node-visible-assets.js`, and
+  `node-action-utils.js`.
+- Kept the public `node-actions.js` import surface compatible while moving
+  upload and visible-asset projection logic out of the generation orchestrator.
+- Reduced active Studio file pressure: `main.js` is now under 500 lines, and
+  `drawer.js`, `canvas-input.js`, and `canvas-view.js` are thin coordinators.
+- Improved arrange behavior so keyboard/context-menu canvas arrangement also
+  fits the nodes back into the visible viewport.
+- Ran an isolated no-provider project takeover flow through the local Studio:
+  starter flow, single selection, shift multi-select, marquee selection without
+  browser text selection, right-click node menu, port hover affordance,
+  keyboard arrange, and drawer tab switching.
+
+Verification:
+
+```text
+Studio JS node --check: passed for all apps/studio/src/**/*.js
+tests/test_web_studio_frontend_wave.py tests/test_web_studio_static.py: 33 passed
+Playwright takeover flow: passed, 0 console errors
+Report: C:\Users\chenzy\.codex\backups\AgentFlowStudio\frontend-flow-takeover-20260618\frontend-takeover-flow-final-1781723841.json
+Screenshot: C:\Users\chenzy\.codex\backups\AgentFlowStudio\frontend-flow-takeover-20260618\frontend-takeover-flow-final-1781723841.png
+git diff --check: passed with existing CRLF notices only
+```
+
+Boundaries:
+
+- In-app Browser was attempted first, but its tab registry became inconsistent;
+  local Playwright was used as the browser fallback.
+- No live provider call, server mutation, secret, provider raw response, signed
+  URL, or media bytes were used.
+- This is runtime/frontend verification, not provider smoke, human acceptance,
+  business validation, or durable memory promotion.
+- `node-actions.js` remains oversized and should be split again around
+  keyframe/video generation orchestration in a future focused pass.
+
 ## 2026-06-17 - Algorithm Core Wave 2
 
 - Moved PR #87 video creative-intent semantics into

@@ -156,13 +156,21 @@ def test_runtime_service_serves_studio_static_entry_without_private_paths(tmp_pa
 
     redirect = client.get("/studio", follow_redirects=False)
     index = client.get("/studio/")
+    favicon_redirect = client.get("/favicon.ico", follow_redirects=False)
+    favicon = client.get("/studio/favicon.svg")
     app_js = client.get("/studio/src/main.js")
     serialized = (index.text + app_js.text).lower()
 
     assert redirect.status_code in {307, 308}
     assert redirect.headers["location"] == "/studio/"
+    assert favicon_redirect.status_code in {307, 308}
+    assert favicon_redirect.headers["location"] == "/studio/favicon.svg"
+    assert favicon.status_code == 200
+    assert favicon.headers["cache-control"] == "no-store"
+    assert "<svg" in favicon.text
     assert index.status_code == 200
     assert '<div id="app">' in index.text
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in index.text
     assert '<script type="module" src="./src/main.js"></script>' in index.text
     assert app_js.status_code == 200
     assert index.headers["cache-control"] == "no-store"

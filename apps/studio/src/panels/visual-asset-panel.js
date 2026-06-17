@@ -35,7 +35,7 @@ const SCENE_LOCK_CHIPS = [
 
 export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character" }) {
   if (!runtime?.promoteVisualAsset) {
-    markNodeError(store, node.id, "运行服务的资产接口不可用，请确认 Runtime Service 已启动。");
+    markNodeError(store, node.id, "资产确认服务不可用，请确认本地创作服务已启动。");
     return;
   }
   if (!imageAsset?.asset_id) {
@@ -87,7 +87,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
       <div class="draft-status" data-role="draft-status" hidden></div>
       <div class="va-error" data-role="error" hidden></div>
       <div class="modal-actions">
-        <button class="ghost-btn" data-action="draft-card">Draft card</button>
+        <button class="ghost-btn" data-action="draft-card">自动识别草稿</button>
         <button class="ghost-btn" data-action="reject">不采用</button>
         <button class="primary-btn" data-action="fix">确认固定</button>
       </div>
@@ -128,7 +128,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
   }
 
   async function draftCard() {
-    if (!runtime?.draftAssetCard) return showError("Runtime draft asset card route is not available.");
+    if (!runtime?.draftAssetCard) return showError("自动识别服务暂不可用。");
     setBusy(true);
     try {
       const response = await runtime.draftAssetCard({
@@ -144,7 +144,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
       if (!draft?.draft_id) {
         if (status) {
           status.hidden = false;
-          status.textContent = response?.safe_manifest?.failure_class || response?.job?.status || "draft blocked";
+          status.textContent = response?.safe_manifest?.failure_class || response?.job?.status || "暂时无法生成草稿";
         }
         return;
       }
@@ -162,10 +162,10 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
         status.hidden = false;
         status.dataset.candidate_locks = JSON.stringify(draft.candidate_locks || []);
         status.dataset.missing_fields = JSON.stringify(draft.missing_fields || []);
-        status.textContent = `草稿，确认前不会生效。缺失项：${(draft.missing_fields || []).join(", ") || "none"}`;
+        status.textContent = `草稿，确认前不会生效。待补充：${(draft.missing_fields || []).join(", ") || "无"}`;
       }
     } catch (error) {
-      showError(`Draft card failed: ${safeError(error)}`);
+      showError(`自动识别失败：${safeError(error)}`);
     } finally {
       setBusy(false);
     }

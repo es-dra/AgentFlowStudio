@@ -1,15 +1,20 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
 import { qualityFeedbackView } from "./quality-feedback.js";
+import { icon } from "./icons.js";
 
 export function resultView(node) {
   const result = document.createElement("div");
-  result.className = `node-result${node.previewUrl ? " has-preview" : ""}`;
+  const candidates = candidatePreviews(node);
+  result.className = `node-result${node.previewUrl ? " has-preview" : ""}${candidates.length > 1 ? " has-candidates" : ""}`;
   result.dataset.feedbackEvent = "afs:studio-quality-feedback";
   if (node.type === "video") {
     result.classList.add("video-asset-card-draft");
     result.dataset.videoAssetCardDraft = "afs:video-asset-card-draft";
   }
   if (node.previewUrl) {
+    const frame = document.createElement("div");
+    frame.className = `node-preview-frame ${node.type === "video" ? "video" : "image"}`;
+    frame.style.aspectRatio = previewAspectRatio(node);
     if (node.type === "video") {
       const video = document.createElement("video");
       video.className = "node-preview-video";
@@ -17,19 +22,20 @@ export function resultView(node) {
       video.controls = true;
       video.playsInline = true;
       video.preload = "metadata";
-      video.style.aspectRatio = previewAspectRatio(node);
-      video.setAttribute("aria-label", "generated video");
-      result.appendChild(video);
+      video.setAttribute("aria-label", "生成的视频预览");
+      frame.appendChild(video);
     } else {
       const img = document.createElement("img");
       img.className = "node-preview-img";
       img.src = node.previewUrl;
-    img.alt = "生成的关键帧";
+      img.alt = "生成的关键帧";
       img.loading = "lazy";
-      img.style.aspectRatio = previewAspectRatio(node);
-      result.appendChild(img);
+      frame.appendChild(img);
     }
-    result.appendChild(downloadPreviewLink(node));
+    frame.appendChild(previewOverlay(node));
+    result.appendChild(frame);
+    if (candidates.length > 1) result.appendChild(candidateGrid(candidates));
+    result.appendChild(resultActions(node, result));
   }
   const text = document.createElement("div");
   text.className = "node-result-text";
@@ -37,18 +43,85 @@ export function resultView(node) {
   result.appendChild(text);
   const feedback = qualityFeedbackView(node);
   if (feedback) result.appendChild(feedback);
-  if (node.type === "video" && node.previewUrl) {
+  return result;
+}
+
+function previewOverlay(node) {
+  const overlay = document.createElement("div");
+  overlay.className = "node-preview-overlay";
+  overlay.innerHTML = [
+    `<span>${icon(node.type === "video" ? "video" : "image", 12)}${node.type === "video" ? "视频预览" : "关键帧预览"}</span>`,
+    `<span>${previewAspectRatio(node).replace(" / ", ":")}</span>`,
+  ].join("");
+  return overlay;
+}
+
+function resultActions(node, result) {
+  const actions = document.createElement("div");
+  actions.className = "media-result-actions";
+  const continueButton = document.createElement("button");
+  continueButton.className = "mini-btn";
+  continueButton.type = "button";
+  continueButton.dataset.action = "continue-generate";
+  continueButton.innerHTML = `${icon("play", 12)}<span>继续生成</span>`;
+  actions.appendChild(continueButton);
+
+  const assetButton = document.createElement("button");
+  assetButton.className = "mini-btn";
+  assetButton.type = "button";
+  assetButton.dataset.action = "fix-visual-asset";
+  assetButton.innerHTML = `${icon("bookmark", 12)}<span>固定素材</span>`;
+  actions.appendChild(assetButton);
+
+  const download = downloadPreviewLink(node);
+  download.innerHTML = `${icon("archive", 12)}<span>${node.type === "video" ? "下载视频" : "下载图片"}</span>`;
+  actions.appendChild(download);
+  if (node.type === "video") {
     const draftButton = document.createElement("button");
     draftButton.className = "mini-btn video-asset-card-draft";
     draftButton.type = "button";
     draftButton.dataset.action = "video-asset-card-draft";
-    draftButton.textContent = "生成视频资产卡草稿";
+    draftButton.innerHTML = `${icon("frames", 12)}<span>整理视频卡片</span>`;
     draftButton.addEventListener("click", () => {
       result.dispatchEvent(new CustomEvent("afs:video-asset-card-draft", { bubbles: true, detail: { node } }));
     });
-    result.appendChild(draftButton);
+    actions.appendChild(draftButton);
   }
-  return result;
+  return actions;
+}
+
+function candidateGrid(candidates) {
+  const grid = document.createElement("div");
+  grid.className = "candidate-grid";
+  candidates.slice(0, 9).forEach((candidate, index) => {
+    const item = document.createElement("button");
+    item.className = "candidate-card";
+    item.type = "button";
+    item.title = `候选 ${index + 1}`;
+    const img = document.createElement("img");
+    img.src = candidate.url || candidate.preview_url;
+    img.alt = `候选 ${index + 1}`;
+    img.loading = "lazy";
+    item.appendChild(img);
+    item.appendChild(candidateBadge(index + 1));
+    grid.appendChild(item);
+  });
+  return grid;
+}
+
+function candidateBadge(index) {
+  const badge = document.createElement("span");
+  badge.className = "candidate-badge";
+  badge.textContent = String(index).padStart(2, "0");
+  return badge;
+}
+
+function candidatePreviews(node) {
+  const raw = node.params?.candidatePreviewUrls || node.params?.candidate_previews || node.params?.candidates || [];
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => (typeof item === "string" ? { url: item } : item))
+    .filter((item) => item?.url || item?.preview_url);
 }
 
 export function bundleSummary(node) {

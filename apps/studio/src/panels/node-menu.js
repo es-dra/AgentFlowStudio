@@ -51,7 +51,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       if (fresh) setNodeVideoFrame(store, fresh, "last");
     });
     if (node.params?.lastVideoJobId) {
-      addItem("pencil", "Video revision draft (experimental)", () => {
+      addItem("pencil", "创建视频修改草稿", () => {
         void VIDEO_REVISION_DRAFT_MARKER;
         const fresh = store.get().nodes[nodeId];
         if (fresh) enableVideoRevisionDraft(store, fresh);

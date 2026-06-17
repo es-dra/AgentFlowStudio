@@ -1,5 +1,5 @@
 // Minimal Studio API client. It sends only project ids, safe node context,
-// safe manifests, Studio state JSON, and explicit user-selected image uploads.
+// safe generation summaries, Studio state JSON, and explicit user-selected image uploads.
 
 const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
@@ -100,6 +100,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
   const encoded = encodeURIComponent(projectId);
   return {
     projectId,
+    health() {
+      return requestJson("/health");
+    },
     listProjects() {
       return requestJson("/projects");
     },

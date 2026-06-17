@@ -168,6 +168,9 @@ function initialState(projectId = "studio-local-001") {
     ui: {
       drawerOpen: true,
       drawerTab: "canvas",
+      drawerSearch: "",
+      navigatorSearch: "",
+      inspectorOpen: true,
       promptExpand: false,
       lastConnectedEdgeId: null,
       saveState: "本地暂存",

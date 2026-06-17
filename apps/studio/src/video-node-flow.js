@@ -55,7 +55,7 @@ export function scheduleVideoAutoPoll({
       await store.flushRuntimeSave?.();
       scheduleVideoAutoPoll({ store, runtime, nodeId, response: next, applyVideoResponse, setNodeError, safeError, attempts: attempts + 1 });
     } catch (error) {
-      setNodeError(store, nodeId, `Kling video poll failed: ${safeError(error)}`);
+      setNodeError(store, nodeId, `视频进度刷新失败：${safeError(error)}`);
       await store.flushRuntimeSave?.();
     }
   }, VIDEO_AUTO_POLL_INTERVAL_MS);

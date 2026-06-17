@@ -50,16 +50,22 @@ export function nodesBounds(nodes) {
   return { minX, minY, maxX, maxY };
 }
 
-export function fitViewport(nodes, viewW, viewH, padding = 90) {
+export function fitViewport(nodes, viewW, viewH, padding = 90, safeArea = {}) {
   const b = nodesBounds(nodes);
   if (!b) return { x: 0, y: 0, scale: 1 };
   const w = b.maxX - b.minX;
   const h = b.maxY - b.minY;
-  const scale = clampScale(Math.min((viewW - padding * 2) / w, (viewH - padding * 2) / h, 1));
+  const left = Math.max(0, Number(safeArea.left || 0));
+  const right = Math.max(0, Number(safeArea.right || 0));
+  const top = Math.max(0, Number(safeArea.top || 0));
+  const bottom = Math.max(0, Number(safeArea.bottom || 0));
+  const availableW = Math.max(160, viewW - left - right);
+  const availableH = Math.max(160, viewH - top - bottom);
+  const scale = clampScale(Math.min((availableW - padding * 2) / w, (availableH - padding * 2) / h, 1));
   return {
     scale,
-    x: (viewW - w * scale) / 2 - b.minX * scale,
-    y: (viewH - h * scale) / 2 - b.minY * scale,
+    x: left + (availableW - w * scale) / 2 - b.minX * scale,
+    y: top + (availableH - h * scale) / 2 - b.minY * scale,
   };
 }
 

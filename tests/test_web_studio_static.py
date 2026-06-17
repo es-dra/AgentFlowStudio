@@ -20,9 +20,31 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert not Path("apps/web").exists()
 
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    assert '<html lang="zh-CN">' in index
+    assert '<meta charset="utf-8" />' in index
+    assert "<title>AFS Studio 创作图谱</title>" in index
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in index
+    assert (STUDIO_ROOT / "favicon.svg").is_file()
     assert './src/main.js' in index
     assert './styles/director.css' in index
     assert "/workbench" not in index
+
+
+def test_studio_user_surface_has_no_common_mojibake_markers() -> None:
+    combined = "\n".join(
+        path.read_text(encoding="utf-8")
+        for suffix in ("*.html", "*.css", "*.js", "*.md")
+        for path in STUDIO_ROOT.rglob(suffix)
+    )
+
+    for marker in (
+        "\u9352",  # common mojibake marker seen when 创 is corrupted
+        "\u9422",  # common mojibake marker seen when 画 is corrupted
+        "\u93bb",  # common mojibake marker seen when 提 is corrupted
+        "\u93c8",  # common mojibake marker seen when 本 is corrupted
+        "\ufffd",
+    ):
+        assert marker not in combined
 
 
 def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -> None:
@@ -47,8 +69,8 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert 'input.type = "text";' in main_source
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert "state.meta.projectId, state.meta.projectName, state.meta.canvasName" in drawer_source
-    canvas_source = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
-    assert '!["image", "video"].includes(node.type)' in canvas_source
+    canvas_body_source = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    assert '!["image", "video"].includes(node.type)' in canvas_body_source
     prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     assert 'node.type === "video" || node.type === "script"' in prompt_bar_source
     assert "AFS_ALLOW_REMOTE_IMAGE" in env_example
@@ -151,7 +173,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "isPromptTextEditing" in prompt_bar
     assert '["TEXTAREA", "INPUT"].includes' in prompt_bar
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
-    assert '!["image", "video"].includes(node.type)' in canvas_view
+    canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    assert '!["image", "video"].includes(node.type)' in canvas_body
     assert "bar-cost" not in prompt_bar
     assert "当前版本仅图片节点支持真实生成" in prompt_bar
     assert "uploadNodeImage" in node_menu
@@ -160,10 +183,18 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "openPositionNear" in (STUDIO_ROOT / "src" / "panels" / "add-node-menu.js").read_text(encoding="utf-8")
     assert "syncRunAction" in canvas_view
     assert 'dataset.action = "video-poll"' in canvas_view
-    assert "pollNodeVideoGeneration" in (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
+    assert "pollNodeVideoGeneration" in canvas_action_handler
     assert node_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 3
     assert node_actions.count("await store.flushRuntimeSave?.();\n      return;") >= 2
-    drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    drawer_source = "".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            STUDIO_ROOT / "src" / "panels" / "drawer.js",
+            STUDIO_ROOT / "src" / "panels" / "drawer-assets.js",
+            STUDIO_ROOT / "src" / "panels" / "drawer-asset-actions.js",
+        )
+    )
     assert 'asset.kind === "visual_asset" && asset.asset_type === "character"' in drawer_source
     assert 'asset.kind === "character_asset"' in drawer_source
     assert 'character_asset: "人物资产"' in drawer_source
@@ -177,7 +208,7 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert "draftAssetCard" in source
     assert "asset-card-drafts" in source
     assert "applyRetiredAsset" in drawer_source
-    assert "确认退役" in drawer_source
+    assert "确认停用" in drawer_source
     assert "asset.runtime_status" in drawer_source
     assert "上传/替换参考图" in node_menu
     assert "VIDEO_MODES" not in prompt_bar
@@ -226,15 +257,17 @@ def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
 def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_assets() -> None:
     store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    runtime_asset_sync = (STUDIO_ROOT / "src" / "runtime-asset-sync.js").read_text(encoding="utf-8")
 
     assert "seedAssets()" not in store
     for placeholder in ("asset_director_seed", "asset_character_seed", "asset_keyframe_seed"):
         assert placeholder not in store
-    assert "assetStableKey" in main
-    assert "mergeAsset" in main
-    assert "visual_asset_id: asset.asset_id" in main
-    assert "visualAssetPreviewUrl" in main
-    assert "image_asset_refs" in main
+    assert 'from "./runtime-asset-sync.js"' in main
+    assert "assetStableKey" in runtime_asset_sync
+    assert "mergeAsset" in runtime_asset_sync
+    assert "visual_asset_id: asset.asset_id" in runtime_asset_sync
+    assert "visualAssetPreviewUrl" in runtime_asset_sync
+    assert "image_asset_refs" in runtime_asset_sync
     assert "uploaded_images" in (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
 
 
@@ -254,22 +287,24 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
 
 def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers() -> None:
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
+    generation_submit = node_actions + "\n" + generation_guards
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
     assert "preflightKeyframe" in runtime_client
     assert "preflightVideo" in runtime_client
     assert "prepareGenerationRequest" in node_actions
-    assert "showCarryConfirmModal" in node_actions
-    assert "preflight_token" in node_actions
-    assert "temporary_asset_exclusions" in node_actions
+    assert "showCarryConfirmModal" in generation_guards
+    assert "preflight_token" in generation_submit
+    assert "temporary_asset_exclusions" in generation_submit
     assert "temporary_asset_exclusions" in optimizer_contract
-    assert "asset_conflicts" in node_actions
+    assert "asset_conflicts" in generation_guards
     assert "error.status = response.status" in runtime_client
     assert "error.route = route" in runtime_client
-    assert "missingPreflightRouteError" in node_actions
-    assert "Runtime Service version is stale or not started from this branch" in node_actions
-    assert "Restart the 8790 Runtime Service and retry" in node_actions
+    assert "missingPreflightRouteError" in generation_guards
+    assert "Runtime Service version is stale or not started from this branch" in generation_guards
+    assert "Restart the 8790 Runtime Service and retry" in generation_guards
 
 
 def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() -> None:
@@ -290,6 +325,7 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js").read_text(encoding="utf-8")
 
@@ -300,9 +336,9 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     assert "staleRuntimeRouteMessage" in runtime_client
     assert "error.status = response.status" in runtime_client
     assert "Restart the 8790 Runtime Service" in runtime_client
-    assert "unconnectedLabelMatchedAssets" in node_actions
+    assert "unconnectedLabelMatchedAssets" in generation_guards
     assert "label_matched" in inspector
-    assert "named_asset_not_connected_fail_closed" in node_actions
+    assert "named_asset_not_connected_fail_closed" in generation_guards
     assert "startRemoteVideoRevision" in node_actions
     assert "videoRevision" in node_actions
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in node_actions
@@ -314,26 +350,29 @@ def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> N
     summary = (STUDIO_ROOT / "src" / "asset-reference-summary.js")
     inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js")
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     result_view = (STUDIO_ROOT / "src" / "node-result-view.js").read_text(encoding="utf-8")
     optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
     styles = _styles()
 
     assert summary.is_file()
     assert inspector.is_file()
     summary_source = summary.read_text(encoding="utf-8")
     inspector_source = inspector.read_text(encoding="utf-8")
-    assert "import { assetsFromNode, carryChainItems" in canvas_view
+    assert "import { assetsFromNode" in canvas_view
+    assert "import { assetsFromNode, carryChainItems" in canvas_body
     assert "import { assetTypeLabel, assetLabel, subjectSuffix" in result_view
-    assert "carry-chain-strip" in canvas_view
-    assert "carry-chain-chip" in canvas_view
-    assert "lastContextBundle" in canvas_view
-    assert "visualAssets" in canvas_view
+    assert "carry-chain-strip" in canvas_body
+    assert "carry-chain-chip" in canvas_body
+    assert "lastContextBundle" in canvas_body
+    assert "visualAssets" in canvas_body
     assert "MAX_CARRY_CHAIN_ITEMS" in summary_source
     assert "function buildAssetReferenceActions" in inspector_source
     assert "buildAssetReferenceActions" in optimizer
-    assert "buildAssetReferenceActions" in node_actions
-    assert "named_asset_not_connected_fail_closed" in node_actions
+    assert "buildAssetReferenceActions" in generation_guards
+    assert "named_asset_not_connected_fail_closed" in generation_guards
     assert "connect-named-asset" in optimizer
     assert "carry-chain-strip" in styles
     assert "carry-chain-chip.invalid" in styles
@@ -390,7 +429,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "scheduleVideoAutoPoll" in video_node_flow
     assert "clearVideoAutoPoll" in video_node_flow
     assert "本地取消轮询" in node_menu
-    assert "node-status cancelled" in node_actions or "node-status cancelled" in (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    assert "node-status cancelled" in node_actions or "node-status cancelled" in canvas_body
     assert "quality-feedback" in styles
     assert "node-status.cancelled" in styles
 
@@ -409,7 +449,14 @@ def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() 
 
 def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_markers() -> None:
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
-    drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    drawer = "".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            STUDIO_ROOT / "src" / "panels" / "drawer.js",
+            STUDIO_ROOT / "src" / "panels" / "drawer-assets.js",
+            STUDIO_ROOT / "src" / "panels" / "drawer-asset-actions.js",
+        )
+    )
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
 
@@ -429,8 +476,15 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
 def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     asset_detail = (STUDIO_ROOT / "src" / "panels" / "asset-detail-popover.js").read_text(encoding="utf-8")
-    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
-    drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    canvas_input = (
+        (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+        + (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
+    )
+    drawer = (
+        (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+        + (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
+        + (STUDIO_ROOT / "src" / "panels" / "drawer-asset-actions.js").read_text(encoding="utf-8")
+    )
 
     assert "getVisualAsset(assetId)" in runtime_client
     assert "runtime.getVisualAsset(assetId)" in asset_detail

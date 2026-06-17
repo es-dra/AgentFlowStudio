@@ -3,7 +3,7 @@ import { openAddNodeMenu } from "./add-node-menu.js";
 import { openGalleryModal } from "./gallery-modal.js";
 import { openHistoryModal } from "./history-modal.js";
 import { openShortcutsPanel } from "./shortcuts-panel.js";
-import { fitViewport } from "../geometry.js";
+import { fitVisibleCanvasViewport, visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 
 export function renderDock(store, runtime) {
@@ -13,8 +13,7 @@ export function renderDock(store, runtime) {
 
   const addBtn = dockBtn("plus", "添加节点", "primary");
   addBtn.addEventListener("click", () => {
-    const root = document.getElementById("canvas-root").getBoundingClientRect();
-    openAddNodeMenu(store, runtime, { x: root.left + root.width / 2, y: root.top + root.height / 2 }, addBtn);
+    openAddNodeMenu(store, runtime, visibleCanvasCenter(), addBtn);
   });
   dock.appendChild(addBtn);
 
@@ -85,8 +84,7 @@ function renderCorner(store) {
   fit.innerHTML = icon("fit", 14);
   fit.title = "适应画布";
   fit.addEventListener("click", () => store.set((s) => {
-    const root = document.getElementById("canvas-root").getBoundingClientRect();
-    s.viewport = fitViewport(s.nodes, root.width, root.height);
+    s.viewport = fitVisibleCanvasViewport(s.nodes);
   }));
   corner.appendChild(fit);
 

@@ -25,6 +25,10 @@ def configure_studio_static(app: FastAPI, studio_root: Path = DEFAULT_STUDIO_ROO
     def studio_redirect() -> RedirectResponse:
         return RedirectResponse(url="/studio/")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/studio/favicon.svg")
+
     app.mount(
         "/studio",
         NoStoreStaticFiles(directory=root, html=True),

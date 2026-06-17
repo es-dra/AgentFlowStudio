@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_errors import safe_exception_detail
+from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS, sanitize_generation_param
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
 
@@ -55,9 +56,10 @@ SAFE_NODE_PARAM_KEYS = (
     "lastFrameImageAssetId",
     "lastVideoJobId",
     "lastVideoPreviewUrl",
+    *SAFE_GENERATION_PARAM_KEYS,
     "quotaOverrideConfirmed",
     "lastContextBundle",
-    )
+)
 PRUNED_RUNTIME_PARAM_KEYS = {
     "lastContextBundle",
     "temporaryLockOverrides",
@@ -327,6 +329,17 @@ def _node_params(value: dict[str, Any], *, project_id: str | None = None) -> dic
             safe_params[key] = safe_id(str(value[key]))
         elif key == "lastVideoPreviewUrl":
             safe_params[key] = _preview_url(value[key], project_id=project_id)
+        elif key in SAFE_GENERATION_PARAM_KEYS:
+            generation_param = sanitize_generation_param(
+                key,
+                value[key],
+                project_id=project_id,
+                preview_url=_preview_url,
+                text=_text,
+                number=_number,
+            )
+            if generation_param not in (None, "", [], {}):
+                safe_params[key] = generation_param
         elif key == "quotaOverrideConfirmed":
             safe_params[key] = bool(value[key])
         elif key == "lastContextBundle":

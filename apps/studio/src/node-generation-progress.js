@@ -1,0 +1,128 @@
+const KIND_LABELS = {
+  keyframe: "图片生成",
+  video: "视频生成",
+  video_revision: "视频修订",
+};
+
+const STATUS_PROGRESS = {
+  pending: 16,
+  submitted: 24,
+  running: 62,
+  succeeded: 100,
+  failed: 100,
+  blocked: 100,
+  error: 100,
+  cancelled: 100,
+  cancelled_local_only: 100,
+};
+
+export function setSubmittingGenerationState(node, kind, options = {}) {
+  const params = ensureParams(node);
+  const label = options.label || `${kindLabel(kind)}已提交`;
+  const hint = options.hint || "正在等待创作服务返回进度，页面会自动刷新节点。";
+  params.jobProgress = {
+    percent: clampPercent(options.percent ?? 8),
+    label,
+    hint,
+    status: "submitted",
+    terminal: false,
+  };
+  params.progressPercent = params.jobProgress.percent;
+  if (options.clearPreview !== false) {
+    params.candidatePreviewUrls = [];
+  }
+}
+
+export function updateNodeGenerationState(node, response, options = {}) {
+  const params = ensureParams(node);
+  const status = String(options.status || response?.job?.status || "blocked");
+  const kind = options.kind || "keyframe";
+  const progress = {
+    percent: progressPercent(response, status, options.percent),
+    label: options.label || progressLabel(kind, status),
+    hint: options.hint || progressHint(kind, status, response),
+    status,
+    terminal: isTerminalStatus(status),
+  };
+  params.jobProgress = progress;
+  params.progressPercent = progress.percent;
+  if (progress.terminal) params.terminalProgress = progress;
+  const candidates = candidatePreviewItems(response);
+  if (candidates.length) {
+    params.candidatePreviewUrls = candidates;
+  }
+  return progress;
+}
+
+export function candidatePreviewItems(response) {
+  const raw = Array.isArray(response?.candidate_previews) ? response.candidate_previews : [];
+  return raw
+    .map((item) => normalizeCandidatePreview(item))
+    .filter((item) => item.url);
+}
+
+export function firstCandidatePreview(response) {
+  return candidatePreviewItems(response)[0] || null;
+}
+
+function normalizeCandidatePreview(item) {
+  if (typeof item === "string") return { url: item };
+  const url = item?.preview_url || item?.url || "";
+  return {
+    url,
+    preview_url: item?.preview_url || url,
+    width: item?.width || null,
+    height: item?.height || null,
+    aspect_ratio: item?.aspect_ratio || null,
+    artifact_id: item?.artifact_id || null,
+  };
+}
+
+function progressPercent(response, status, override) {
+  const explicit = override
+    ?? response?.job?.progress?.percent
+    ?? response?.job?.progress_percent
+    ?? response?.progress?.percent
+    ?? response?.progress_percent;
+  const explicitPercent = Number(explicit);
+  if (Number.isFinite(explicitPercent)) return clampPercent(explicitPercent);
+  return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : 45);
+}
+
+function progressLabel(kind, status) {
+  const label = kindLabel(kind);
+  if (status === "succeeded") return `${label}已完成`;
+  if (status === "submitted") return `${label}已提交`;
+  if (status === "running" || status === "pending") return `${label}进行中`;
+  if (status === "cancelled_local_only" || status === "cancelled") return "已停止本地刷新";
+  return `${label}需要检查`;
+}
+
+function progressHint(kind, status, response) {
+  const jobId = response?.job?.job_id;
+  if (status === "succeeded") return "预览已加载到节点，可继续生成、保存素材或整理卡片。";
+  if (status === "submitted" || status === "running" || status === "pending") {
+    return jobId ? `任务 ${jobId} 正在处理，保持页面打开即可。` : "任务正在处理，保持页面打开即可。";
+  }
+  if (status === "cancelled_local_only" || status === "cancelled") {
+    return "这里只停止页面继续刷新，不代表平台侧任务已取消。";
+  }
+  return "本次没有拿到可用预览，请检查节点菜单中的错误摘要。";
+}
+
+function kindLabel(kind) {
+  return KIND_LABELS[kind] || "生成";
+}
+
+function isTerminalStatus(status) {
+  return !["submitted", "running", "pending"].includes(status);
+}
+
+function ensureParams(node) {
+  if (!node.params || typeof node.params !== "object") node.params = {};
+  return node.params;
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
