@@ -83,12 +83,12 @@ def test_projects_list_includes_studio_state_meta_and_preview_url_persists(tmp_p
 
     projects = client.get("/projects").json()["projects"]
     item = next(project for project in projects if project["project_id"] == project_id)
-    assert item["studio_state_meta"] == {
-        "projectName": "Kling Test Project",
-        "canvasName": "Video Board",
-        "seq": 7,
-        "updated_at": "2026-06-13T10:00:00+08:00",
-    }
+    assert item["studio_state_meta"]["projectName"] == "Kling Test Project"
+    assert item["studio_state_meta"]["canvasName"] == "Video Board"
+    assert item["studio_state_meta"]["seq"] == 7
+    assert item["studio_state_meta"]["updated_at"] == "2026-06-13T10:00:00+08:00"
+    assert item["studio_state_meta"]["state_version"]
+    assert item["studio_state_meta"]["saved_at"]
 
 
 def test_studio_state_rejects_unsafe_preview_url(tmp_path) -> None:

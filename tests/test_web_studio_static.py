@@ -89,6 +89,8 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "login(payload)" in runtime_client
     assert "register(payload)" in runtime_client
     assert "logout()" in runtime_client
+    assert "saveStudioState(state, expectedVersion" in runtime_client
+    assert "expected_version" in runtime_client
     assert "ensureAuthSession" in main
     assert "ensureAccessibleStartupProject" in main
     assert "closeOnOutside: false" in auth_gate
@@ -96,6 +98,16 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "site-home-btn" in topbar
     assert 'href = "/"' in topbar
     assert "首页" in topbar
+
+
+def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
+    store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+
+    assert "runtimeStateVersion" in store_source
+    assert "payload?.state_version" in store_source
+    assert "saveStudioState(snapshotStudioState(state), runtimeStateVersion)" in store_source
+    assert "error?.status === 409" in store_source
+    assert "项目已在其他窗口更新" in store_source
 
 
 def test_studio_user_surface_does_not_reintroduce_old_workbench_terms() -> None:

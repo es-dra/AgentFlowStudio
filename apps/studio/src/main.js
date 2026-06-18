@@ -115,7 +115,7 @@ async function ensureAccessibleStartupProject() {
     s.meta.projectName = projectName;
     s.meta.canvasName = "画布 1";
   }, { history: false });
-  await runtime.saveStudioState(store.get());
+  await store.flushRuntimeSave();
   await refreshProjectSummaries();
 }
 
@@ -167,7 +167,7 @@ async function createNewProject() {
       s.meta.projectName = projectName;
       s.meta.canvasName = "画布 1";
     }, { history: false });
-    await runtime.saveStudioState(store.get());
+    await store.flushRuntimeSave();
     await syncRuntimeAssets(store, runtime);
     await refreshProjectSummaries();
   } catch (error) {

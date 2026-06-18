@@ -52,6 +52,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "read_artifact",
         "read_job",
         "record_feedback",
+        "company_os_gfr_projection",
         "prompt_optimization",
         "script_draft_plan",
         "image_asset_upload",

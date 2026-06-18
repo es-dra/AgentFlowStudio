@@ -63,16 +63,52 @@ def test_studio_state_can_save_and_restore_safe_canvas(tmp_path) -> None:
     assert saved.status_code == 200
     payload = saved.json()
     assert payload["saved"] is True
+    assert payload["state_version"]
+    assert payload["saved_at"]
     assert payload["state"]["edges"]["edge_3"]["relation_type"] == "director"
     assert payload["state"]["assets"][0]["source_node_id"] == "director_1"
 
     restored = client.get(f"/projects/{project_id}/studio-state")
     assert restored.status_code == 200
     assert restored.json()["source"] == "runtime"
+    assert restored.json()["state_version"] == payload["state_version"]
+    assert restored.json()["saved_at"] == payload["saved_at"]
     restored_params = restored.json()["state"]["nodes"]["director_1"]["params"]
     assert restored_params["directorSetup"]["view"] == "top_down_2d"
     assert restored_params["uploads"][0]["asset_id"] == "img_safe_reference_001"
     assert restored_params["previewAspectRatio"] == "1:1"
+
+
+def test_studio_state_uses_expected_version_to_prevent_stale_overwrite(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-version-conflict"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio version conflict"})
+
+    first = client.put(
+        f"/projects/{project_id}/studio-state",
+        json={"state": {"meta": {"projectName": "First"}, "nodes": {"text_1": {"type": "text"}}}},
+    )
+    assert first.status_code == 200
+    version = first.json()["state_version"]
+
+    second = client.put(
+        f"/projects/{project_id}/studio-state",
+        json={
+            "expected_version": version,
+            "state": {"meta": {"projectName": "Second"}, "nodes": {"text_2": {"type": "text"}}},
+        },
+    )
+    assert second.status_code == 200
+
+    stale = client.put(
+        f"/projects/{project_id}/studio-state",
+        json={
+            "expected_version": version,
+            "state": {"meta": {"projectName": "Stale"}, "nodes": {"text_3": {"type": "text"}}},
+        },
+    )
+    assert stale.status_code == 409
+    assert "version conflict" in stale.json()["detail"]
 
 
 def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path) -> None:

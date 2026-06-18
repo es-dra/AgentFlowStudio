@@ -13,6 +13,7 @@ export function createStore(projectId = "studio-local-001") {
   let scheduled = false;
   let saveTimer = null;
   let runtimeClient = null;
+  let runtimeStateVersion = "";
 
   function get() {
     return state;
@@ -44,6 +45,7 @@ export function createStore(projectId = "studio-local-001") {
 
   function attachRuntime(runtime) {
     runtimeClient = runtime;
+    runtimeStateVersion = "";
     if (runtime?.projectId) state.meta.projectId = runtime.projectId;
     state.ui.saveState = "本地暂存";
     notifySoon();
@@ -61,6 +63,7 @@ export function createStore(projectId = "studio-local-001") {
       }
       const remoteState = payload?.state;
       const remote = normalizeSnapshot(remoteState);
+      runtimeStateVersion = String(payload?.state_version || "");
       if (payload?.source === "runtime" && (hasStudioContent(remote) || hasStudioMeta(remoteState))) {
         remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
@@ -103,6 +106,7 @@ export function createStore(projectId = "studio-local-001") {
 
   async function switchProject(projectId, runtime) {
     runtimeClient = runtime;
+    runtimeStateVersion = "";
     clearTimeout(saveTimer);
     state = loadPersisted(projectId) || initialState(projectId);
     state.meta.projectId = projectId;
@@ -127,12 +131,15 @@ export function createStore(projectId = "studio-local-001") {
     try {
       state.ui.saveState = "保存中";
       notifySoon();
-      await runtimeClient.saveStudioState(snapshotStudioState(state));
+      const payload = await runtimeClient.saveStudioState(snapshotStudioState(state), runtimeStateVersion);
+      runtimeStateVersion = String(payload?.state_version || runtimeStateVersion || "");
       state.ui.saveState = "已保存";
       state.ui.saveMessage = "";
-    } catch {
+    } catch (error) {
       state.ui.saveState = "本地暂存";
-      state.ui.saveMessage = "运行服务保存失败，已保留本地暂存";
+      state.ui.saveMessage = error?.status === 409
+        ? "项目已在其他窗口更新，当前修改已保留在本地暂存；刷新后再继续编辑"
+        : "运行服务保存失败，已保留本地暂存";
     }
     notifySoon();
   }

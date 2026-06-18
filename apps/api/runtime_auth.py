@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import unquote
 from uuid import uuid4
@@ -20,7 +20,9 @@ from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 AUTH_ENABLED_ENV = "AFS_AUTH_ENABLED"
 AUTH_INVITE_CODES_ENV = "AFS_INVITE_CODES"
 AUTH_OPEN_SIGNUP_ENV = "AFS_AUTH_ALLOW_OPEN_SIGNUP"
+AUTH_SESSION_TTL_HOURS_ENV = "AFS_AUTH_SESSION_TTL_HOURS"
 TRUE_VALUES = {"1", "true", "yes", "on"}
+DEFAULT_SESSION_TTL_HOURS = 168
 PUBLIC_PREFIXES = ("/auth", "/health", "/capabilities", "/site", "/studio")
 
 
@@ -56,6 +58,13 @@ class RuntimeAuthStore:
 
     def invite_registration_available(self) -> bool:
         return self.open_signup_enabled() or bool(self._invites().get("invites"))
+
+    def session_ttl_hours(self) -> int:
+        try:
+            value = int(str(self.env.get(AUTH_SESSION_TTL_HOURS_ENV, "")).strip())
+        except ValueError:
+            value = DEFAULT_SESSION_TTL_HOURS
+        return max(1, min(value, 24 * 30))
 
     def seed_invites_from_env(self) -> None:
         invites = self._invites()
@@ -123,12 +132,20 @@ class RuntimeAuthStore:
         token = _bearer_token(request.headers.get("authorization", ""))
         if not token:
             return None
-        session = self._sessions()["sessions"].get(_hash_text(token))
+        token_hash = _hash_text(token)
+        sessions = self._sessions()
+        session = sessions["sessions"].get(token_hash)
         if not session:
+            return None
+        if _session_expired(session, ttl_hours=self.session_ttl_hours()):
+            sessions["sessions"].pop(token_hash, None)
+            write_json(self.sessions_path, sessions)
             return None
         user = self._users()["users"].get(str(session.get("user_id", "")))
         if not user or user.get("status") != "active":
             return None
+        session["last_seen_at"] = _now()
+        write_json(self.sessions_path, sessions)
         return dict(user)
 
     def require_user(self, request: Request) -> dict[str, Any]:
@@ -217,6 +234,7 @@ def register_runtime_auth_routes(app: FastAPI, auth: RuntimeAuthStore) -> None:
             "authenticated": bool(user),
             "user": public_user(user) if user else None,
             "invite_registration_available": auth.invite_registration_available(),
+            "session_ttl_hours": auth.session_ttl_hours(),
         }
 
     @app.get("/auth/me")
@@ -330,6 +348,23 @@ def _enabled(value: str | None) -> bool:
     return str(value or "").strip().lower() in TRUE_VALUES
 
 
+def _session_expired(session: dict[str, Any], *, ttl_hours: int) -> bool:
+    created_at = _parse_datetime(str(session.get("created_at", "")))
+    if not created_at:
+        return True
+    return datetime.now(timezone.utc) - created_at > timedelta(hours=ttl_hours)
+
+
+def _parse_datetime(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -337,6 +372,7 @@ def _now() -> str:
 __all__ = (
     "AUTH_ENABLED_ENV",
     "AUTH_INVITE_CODES_ENV",
+    "AUTH_SESSION_TTL_HOURS_ENV",
     "RuntimeAuthStore",
     "configure_runtime_auth_middleware",
     "public_user",

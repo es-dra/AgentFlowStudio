@@ -16,6 +16,8 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert 'href="/site/styles/site.css"' in index
     assert 'href="/site/styles/site-preview.css"' in index
     assert 'href="/site/styles/site-responsive.css"' in index
+    assert 'src="/site/site.js"' in index
+    assert "data-auth-action" in index
     assert "AI 内容生产的操作层" in index
     assert "product-preview" in index
     assert "提示词智能优化" in index
@@ -39,6 +41,19 @@ def test_site_homepage_styles_remain_small_and_safe() -> None:
 
     for marker in ("api_key", "token", "signed_url", "provider raw", "d:\\", "c:\\"):
         assert marker not in combined
+
+
+def test_site_homepage_auth_entry_script_is_safe_and_status_only() -> None:
+    script = (SITE_ROOT / "site.js").read_text(encoding="utf-8")
+
+    assert 'fetch("/auth/status"' in script
+    assert "data-auth-action" in script
+    assert "entryLabel" in script
+    assert "afs_auth_session_token" in script
+    assert "Authorization" in script
+    assert "http://" not in script
+    assert "https://" not in script
+    assert "provider raw" not in script.lower()
 
 
 def test_site_homepage_preview_uses_non_overlapping_flow_layout() -> None:

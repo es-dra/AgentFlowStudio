@@ -26,6 +26,7 @@ from apps.api.runtime_models import (
 from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory_routes
 from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
+from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
@@ -69,6 +70,8 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
                     "canvasName": state["meta"].get("canvasName", ""),
                     "seq": state["meta"].get("seq", 1),
                     "updated_at": state["meta"].get("updated_at", ""),
+                    "state_version": payload.get("state_version", ""),
+                    "saved_at": payload.get("saved_at", ""),
                 }
         except (ValueError, OSError):
             meta = {}
@@ -193,6 +196,7 @@ def create_runtime_app(
 
     if legacy_runtime_v02_enabled():
         register_runtime_v02_routes(app, store)
+    register_runtime_company_os_routes(app)
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
     register_runtime_image_asset_routes(app, store)

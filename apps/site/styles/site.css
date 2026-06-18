@@ -97,6 +97,18 @@ a {
   font-weight: 750;
 }
 
+.site-account-hint {
+  max-width: 220px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nav-action,
 .secondary-action {
   border: 1px solid var(--line);

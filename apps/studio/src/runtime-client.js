@@ -214,8 +214,10 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     loadStudioState() {
       return requestJson(`/projects/${encoded}/studio-state`);
     },
-    saveStudioState(state) {
-      return requestJson(`/projects/${encoded}/studio-state`, { method: "PUT", payload: { state } });
+    saveStudioState(state, expectedVersion = "") {
+      const payload = { state };
+      if (expectedVersion) payload.expected_version = expectedVersion;
+      return requestJson(`/projects/${encoded}/studio-state`, { method: "PUT", payload });
     },
   };
 }

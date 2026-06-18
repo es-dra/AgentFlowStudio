@@ -16,11 +16,17 @@ D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Co
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-REGISTRY-V0.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\EVIDENCE-LEDGER-V0.json
 D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
 ```
 
 AFS 仓库只保存执行投影。公司源头规则、私有战略、客户材料、真实成本、
 合同原文、provider 配置和密钥不写入本仓库。
+
+`COS-REGISTRY-V0.json` 和 `EVIDENCE-LEDGER-V0.json` 是机读 v0 候选对象。
+它们让 COS/GFR 的身份、上下文包、provider gate、证据状态和反馈路由可被
+系统引用，但不代表 active 规则晋升、完整 runtime enforcement 或商业验证。
 
 ## 启动行为
 
@@ -85,6 +91,31 @@ AFS closeout 必须区分这些状态：
 Provider smoke 不是 human acceptance。Runtime verification 不是 business
 validation。Candidate memory 不是 durable memory。
 
+## Runtime 安全投影
+
+AFS Runtime 提供一个只读安全投影：
+
+```text
+GET /company-os/gfr-projection
+```
+
+这个端点只暴露可公开给 Studio / Runtime 的字段：
+
+```text
+gfr_packet_fields
+context_packs
+provider_gates
+evidence_states
+feedback_routes
+runtime_recording
+non_claim_boundary
+```
+
+它不读取 `10-Startup` 原文，不暴露本地绝对路径、provider secret、客户材料、
+真实成本、合同原文、生成媒体字节或 provider 原始响应。它的证据等级最多是
+Runtime verification：证明 AFS 能读取一份安全的 COS/GFR 投影，不证明完整
+COS 执行器、Studio UI 展示、人类接受、商业验证或 durable memory promotion。
+
 ## 验证命令
 
 修改 COS/GFR 路由或 AFS 投影时，至少运行：
@@ -92,6 +123,7 @@ validation。Candidate memory 不是 durable memory。
 ```powershell
 python "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\tools\gfr_audit.py" --root "D:\Learning materials\Learning_notes\10-Startup" --pack-index "D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json" --packets-dir "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\task-startup-packets"
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\scripts\validate_ai_native_contracts.py"
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_company_os.py tests\test_api_runtime_service.py
 git -C "D:\Projects\AgentFlowStudio" diff --check
 ```
 

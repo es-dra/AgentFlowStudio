@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
@@ -36,6 +38,7 @@ def test_invite_registration_creates_session_and_consumes_code(tmp_path, monkeyp
     assert status["auth_required"] is True
     assert status["authenticated"] is False
     assert status["invite_registration_available"] is True
+    assert status["session_ttl_hours"] == 168
     health = client.get("/health").json()
     assert health["auth_required"] is True
     assert health["boundaries"]["no_account_system"] is False
@@ -60,6 +63,25 @@ def test_invite_registration_creates_session_and_consumes_code(tmp_path, monkeyp
     )
     assert reused.status_code == 400
     assert "invite" in reused.text.lower()
+
+
+def test_expired_session_is_rejected_and_removed(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "alpha-invite")
+    monkeypatch.setenv("AFS_AUTH_SESSION_TTL_HOURS", "1")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    registered = _register(client, invite_code="alpha-invite", email="alpha@example.com")
+
+    sessions_path = tmp_path / "auth" / "sessions.json"
+    sessions = json.loads(sessions_path.read_text(encoding="utf-8"))
+    token_hash = next(iter(sessions["sessions"]))
+    sessions["sessions"][token_hash]["created_at"] = "2026-01-01T00:00:00+00:00"
+    sessions_path.write_text(json.dumps(sessions), encoding="utf-8")
+
+    me = client.get("/auth/me", headers=_auth_headers(registered["session_token"]))
+    assert me.status_code == 401
+    cleaned = json.loads(sessions_path.read_text(encoding="utf-8"))
+    assert cleaned["sessions"] == {}
 
 
 def test_login_returns_new_session_without_exposing_password_hash(tmp_path, monkeypatch) -> None:

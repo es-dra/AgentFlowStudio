@@ -1,5 +1,87 @@
 # Devlog
 
+## 2026-06-18 - Internal Beta Entry And Studio State Conflict Guard
+
+- Added session TTL handling for the invite-gated internal auth slice. Runtime
+  sessions now expire after `AFS_AUTH_SESSION_TTL_HOURS` hours, defaulting to
+  168, and expired session records are removed before user/project access is
+  granted.
+- Added optimistic version protection to `GET/PUT
+  /projects/{project_id}/studio-state`. Runtime responses now include
+  `state_version` and `saved_at`; Studio sends `expected_version` on save and
+  keeps local changes as a local draft when another window has already updated
+  the project.
+- Updated the homepage entry script so `/` reads same-origin `/auth/status`.
+  With auth enabled, anonymous users see a register/login entry; authenticated
+  users see their account-scoped Studio entry without exposing secrets or
+  provider internals.
+- Updated `.env.example` with `AFS_AUTH_SESSION_TTL_HOURS=168` and regenerated
+  the Runtime OpenAPI projection.
+
+Verification:
+
+```text
+Focused auth/state/site/studio/OpenAPI regression: 63 passed / 1 warning
+Studio/site JS node --check: passed for changed JS files
+Browser QA on 127.0.0.1:8810 with all provider gates explicitly false:
+  homepage anonymous auth entry passed, Studio invite registration passed,
+  account-scoped default project created and saved, homepage authenticated
+  entry passed, homepage -> Studio entry passed, console warn/error count=0
+Full default pytest: 480 passed / 527 deselected / 2 warnings
+CLI help/version: passed; version 0.1.0
+maintenance audit: failed=0, warning=4
+git diff --check: passed with Windows CRLF notice only
+```
+
+Boundary:
+
+- No provider gate was opened for verification, no provider call was made, and
+  no local secret provider config was edited.
+- Browser/runtime verification is not human acceptance, provider smoke, business
+  validation, or durable-memory promotion.
+
+## 2026-06-18 - COS / GFR V0 Control Layer Projection
+
+- Added the first safe AFS Runtime projection for Company OS / GFR at
+  `GET /company-os/gfr-projection`. The endpoint exposes only safe control
+  fields: GFR packet fields, context pack ids, default-closed provider gates,
+  evidence states, feedback routes, runtime recording boundaries, and an
+  explicit non-claim line.
+- Added Runtime capability reporting for `company_os_gfr_projection` and
+  focused tests that reject local absolute paths, provider config markers,
+  provider raw markers, API keys, signed URLs, and other unsafe response
+  content.
+- Regenerated `docs/openapi/afs-runtime-service.openapi.json` so the new
+  projection endpoint is visible to frontend/client tooling.
+- Updated `docs/GFR_EXECUTION_PROJECTION.md` so future AFS agents know the
+  source KB now has machine-readable v0 candidate objects:
+  `COS-REGISTRY-V0.json`, `EVIDENCE-LEDGER-V0.json`, and the GFR packet v0
+  schema.
+- Source KB side work created COS Registry v0, Evidence Ledger v0, GFR Packet
+  v0 schema/fixtures, a real task startup packet for this work, and a candidate
+  Company OS feedback packet. Those source files remain outside the AFS repo.
+
+Verification:
+
+```text
+Company OS contract validator: passed; new cos_registry_v0, gfr_packet_v0, and evidence_ledger_v0 fixtures pass valid/invalid checks
+GFR audit: passed; checked_paths=41, checked_packets=4, errors=0, warnings=0
+Focused Runtime tests: 13 passed / 1 warning
+Post-OpenAPI focused Runtime/OpenAPI tests: 17 passed / 2 warnings
+CLI help/version: passed; version 0.1.0
+Full default pytest: 476 passed / 527 deselected / 2 warnings
+git diff --check: passed
+```
+
+Boundary:
+
+- This is a candidate control-layer slice and AFS safe projection only. It does
+  not prove full COS runtime enforcement, a Studio UI display, provider smoke,
+  human acceptance, business validation, or durable memory promotion.
+- No provider gate was opened, no provider call was made, no local secret
+  provider config was edited, and no private Company OS raw material was copied
+  into the AFS repo.
+
 ## 2026-06-18 - Internal Auth And Invite-Gated Project Isolation
 
 - Added an opt-in Runtime auth slice for internal testing. When
