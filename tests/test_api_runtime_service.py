@@ -182,6 +182,35 @@ def test_runtime_service_serves_studio_static_entry_without_private_paths(tmp_pa
     assert "signed_url" not in serialized
 
 
+def test_runtime_service_serves_site_homepage_as_root_entry(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    home = client.get("/")
+    base_css = client.get("/site/styles/site.css")
+    preview_css = client.get("/site/styles/site-preview.css")
+    responsive_css = client.get("/site/styles/site-responsive.css")
+    combined = "\n".join([home.text, base_css.text, preview_css.text, responsive_css.text]).lower()
+
+    assert home.status_code == 200
+    assert home.headers["cache-control"] == "no-store"
+    assert "<title>AFS Studio" in home.text
+    assert 'href="/studio/"' in home.text
+    assert "Agent-native" in home.text
+    assert "AI 内容生产的操作层" in home.text
+    assert "六个算法" in home.text
+    assert base_css.status_code == 200
+    assert preview_css.status_code == 200
+    assert responsive_css.status_code == 200
+    assert base_css.headers["cache-control"] == "no-store"
+    assert preview_css.headers["cache-control"] == "no-store"
+    assert responsive_css.headers["cache-control"] == "no-store"
+    assert response_contains_unsafe_marker(combined) is False
+    assert "provider raw" not in combined
+    assert "signed_url" not in combined
+    assert "d:\\" not in combined
+    assert "c:\\" not in combined
+
+
 def test_runtime_service_does_not_serve_retired_workbench_static_entry(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 

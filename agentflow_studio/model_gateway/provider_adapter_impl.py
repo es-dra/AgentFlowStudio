@@ -351,7 +351,7 @@ def _require_gate(required_gate: str) -> None:
 def _safe_error(value: str) -> str:
     lowered = value.lower()
     if "status_code 2049" in lowered and "invalid api key" in lowered:
-        return "MiniMax image response status_code 2049: invalid API Key"
+        return "Image provider rejected the configured credential."
     if "api" in lowered or "key" in lowered or "secret" in lowered:
         return "Provider configuration is not ready."
     return value[:160]

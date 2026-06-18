@@ -1,202 +1,214 @@
 .project-hub {
-  width: min(1080px, calc(100vw - 80px));
-  max-height: min(760px, calc(100vh - 56px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  width: min(520px, calc(100vw - 56px));
+  height: auto;
+  max-height: min(720px, calc(100vh - 56px));
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
-.project-hub-head {
+.project-menu {
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 148px),
+    rgba(20, 22, 25, 0.96);
+}
+
+.project-menu-head {
   position: relative;
-  padding: 26px 28px 18px;
-  border-bottom: 1px solid var(--border-soft);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
-    rgba(23, 25, 28, 0.72);
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.project-hub-kicker { color: var(--accent); font-size: 12px; margin-bottom: 6px; }
-.project-hub-head h2 { margin: 0; font-size: 28px; letter-spacing: 0; }
-.project-hub-head p { margin: 8px 0 0; color: var(--text-secondary); }
-.project-hub-subtitle { max-width: 720px; }
-.project-hub-close { position: absolute; top: 18px; right: 18px; }
-
-.project-hub-command-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+.project-menu-kicker {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+  margin-bottom: 6px;
 }
 
-.project-hub-command-pill {
-  min-width: 84px;
-  display: inline-flex;
+.project-menu-head h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.project-menu-head p {
+  margin: 7px 36px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.project-hub-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+}
+
+.project-menu-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid var(--border-soft);
-  background: rgba(36, 39, 43, 0.78);
-  border-radius: 8px;
-  padding: 6px 9px;
+  padding: 16px 24px 14px;
 }
 
-.project-hub-command-pill strong { color: var(--text-primary); font-size: 12px; }
-.project-hub-command-pill small { color: var(--text-faint); font-size: 10px; }
-
-.project-hub-grid {
+.project-menu-copy {
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px 28px 6px;
-  flex: 0 0 auto;
+  gap: 4px;
 }
 
-.project-hub-card {
-  border: 1px solid var(--border-soft);
-  background: linear-gradient(135deg, rgba(35, 37, 41, 0.96), rgba(32, 35, 39, 0.78));
-  border-radius: 10px;
-  padding: 14px;
-  display: grid;
-  gap: 6px;
-}
-
-.project-hub-card.featured {
-  border-color: rgba(90, 200, 250, 0.26);
-  background:
-    linear-gradient(135deg, rgba(90, 200, 250, 0.13), rgba(35, 37, 41, 0.92)),
-    rgba(35, 37, 41, 0.92);
-}
-
-.project-hub-card span { color: var(--text-faint); font-size: 11px; }
-.project-hub-card strong { color: var(--text-primary); font-size: 16px; }
-.project-hub-card small { color: var(--text-secondary); line-height: 1.5; }
-.project-hub-card em {
-  color: var(--text-faint);
-  font-style: normal;
-  font-size: 10px;
+.project-menu-copy strong {
   overflow: hidden;
+  color: var(--text-primary);
+  font-size: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.provider-gate-pill {
-  display: inline-flex;
-  margin: 3px 4px 0 0;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(90, 200, 250, 0.12);
-  color: var(--text-secondary);
+.project-menu-copy span {
+  color: var(--text-faint);
+  font-size: 12px;
 }
 
-.project-hub-section {
-  padding: 12px 28px;
-  flex: 0 0 auto;
-}
-
-.starter-section {
-  flex: 0 0 auto;
-}
-
-.recent-projects-section {
-  flex: 1 1 auto;
-  min-height: 116px;
-  overflow: auto;
-  padding-bottom: 10px;
-}
-
-.project-hub-section-head {
+.project-menu-metrics,
+.project-menu-actions,
+.project-menu-links {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
+  gap: 8px;
+}
+
+.project-menu-metric {
+  min-width: 58px;
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.project-menu-metric b {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.project-menu-metric small,
+.project-menu-section-head p,
+.project-menu-empty,
+.project-menu-note {
+  color: var(--text-faint);
+}
+
+.project-menu-actions {
+  padding: 0 24px 18px;
+}
+
+.project-menu-actions button {
+  flex: 1;
+}
+
+.project-menu-section {
+  padding: 14px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.project-menu-section-head {
+  display: grid;
+  gap: 4px;
   margin-bottom: 10px;
 }
 
-.project-hub-section h3,
-.project-hub-section-head h3 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.project-hub-section-head h3 { margin-bottom: 0; color: var(--text-primary); }
-.project-hub-section-head p { margin: 0; color: var(--text-faint); font-size: 11px; }
-
-.workflow-starter-grid,
-.project-hub-projects {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.workflow-starter-card,
-.project-hub-project {
-  min-height: 98px;
-  display: grid;
-  align-content: start;
-  gap: 7px;
-  border: 1px solid var(--border-soft);
-  background: rgba(35, 37, 41, 0.86);
-  border-radius: 10px;
-  padding: 12px;
+.project-menu-section-head h3 {
+  margin: 0;
   color: var(--text-primary);
+  font-size: 13px;
+}
+
+.project-menu-section-head p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.project-menu-list {
+  display: grid;
+  gap: 4px;
+}
+
+.project-menu-row,
+.project-menu-link {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
   text-align: left;
-  position: relative;
-  overflow: hidden;
-  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s ease;
 }
 
-.workflow-starter-card:hover,
-.project-hub-project:hover {
-  border-color: var(--border-card);
-  background: rgba(46, 49, 54, 0.92);
-  transform: translateY(-1px);
+.project-menu-row:hover,
+.project-menu-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  transform: translateX(1px);
 }
 
-.workflow-starter-card small,
-.project-hub-project small,
-.project-hub-note,
-.project-hub-empty { color: var(--text-faint); line-height: 1.45; }
-
-.starter-index {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.starter-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+.project-menu-icon {
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 9px;
   background: rgba(90, 200, 250, 0.12);
   color: var(--accent);
 }
 
-.workflow-starter-card em,
-.project-hub-project span {
+.project-menu-row span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.project-menu-row strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-menu-row small,
+.project-menu-row em {
+  overflow: hidden;
   color: var(--text-faint);
   font-size: 10px;
   font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.project-hub-safe-note {
-  margin-top: 10px;
-  color: var(--text-faint);
+.project-menu-links {
+  padding: 0 24px 12px;
+}
+
+.project-menu-link {
+  flex: 1;
+  display: inline-flex;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.project-menu-note {
+  margin: 10px 0 0;
   font-size: 11px;
-}
-
-.project-hub-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 14px 28px 22px;
-  border-top: 1px solid var(--border-soft);
-  background: rgba(23, 25, 28, 0.92);
-  flex: 0 0 auto;
+  line-height: 1.5;
 }

@@ -620,12 +620,18 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
     registry = ProviderRegistry.from_store(store)
     serialized = json.dumps(store.model_dump(mode="json"), ensure_ascii=False).lower()
 
-    assert registry.descriptor("minimax_image").account_pool_id == "minimax_image_pool"
-    assert registry.descriptor("minimax_m3").modality == "llm"
+    assert registry.descriptor("prompt_optimizer").modality == "llm"
+    assert registry.descriptor("prompt_optimizer").account_pool_id == "prompt_optimizer_pool"
     assert registry.descriptor("codex_image").execution_mode == "async"
+    assert registry.descriptor("codex_image").account_pool_id == "codex_image_pool"
+    assert registry.descriptor("vision_image").modality == "vision"
+    assert registry.descriptor("vision_video").reference_image_slots == 8
     assert registry.descriptor("fake_video").execution_mode == "async"
     assert registry.descriptor("kling_i2v").prompt_profile == "video_i2v_v1"
     assert "api_key" in serialized
+    assert "minimax_image" not in serialized
+    assert "minimax_m3" not in serialized
+    assert "image-01" not in serialized
     assert "bearer " not in serialized
     assert "sk-" not in serialized
     assert "fk-" not in serialized

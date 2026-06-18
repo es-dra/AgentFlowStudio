@@ -2,6 +2,7 @@ import { NODE_TYPES } from "../nodes.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 import { assetsFromNode } from "../asset-reference-summary.js";
+import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
 
 export function renderInspectorPanel(state, store) {
   const panel = document.getElementById("inspector");
@@ -21,51 +22,63 @@ export function renderInspectorPanel(state, store) {
 }
 
 function renderEmptyInspector(state, store, panel) {
-  const head = el("div", "inspector-head");
-  head.innerHTML = `<span>${icon("panel", 14)}</span><strong>项目概览</strong>`;
-  panel.appendChild(head);
-  const stats = el("div", "inspector-grid");
-  stats.appendChild(metric("节点", state.order.length));
-  stats.appendChild(metric("素材", state.assets.length));
-  stats.appendChild(metric("连线", Object.keys(state.edges || {}).length));
-  panel.appendChild(stats);
+  panel.appendChild(panelHead("panel", "创作助手", "画布"));
+  panel.appendChild(emptyGuide(state));
   panel.appendChild(inspectorActions([
     ["素材库", "folder", () => openDrawerTab(store, "assets")],
     ["生成进度", "clock", () => openDrawerTab(store, "jobs")],
     ["作品库", "frames", () => openDrawerTab(store, "history")],
   ]));
-  panel.appendChild(section("下一步", state.order.length
-    ? "选择一个节点后，可以继续生成、保存素材或查看创作过程。"
-    : "先从画布模板开始，或双击画布创建第一个节点。"));
+  panel.appendChild(projectPipelineSection(state));
 }
 
 function renderNodeInspector(panel, node, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
-  const head = el("div", "inspector-head");
-  head.innerHTML = `<span>${icon(def.icon, 14)}</span><strong>${escapeHtml(node.title)}</strong><small>${escapeHtml(def.label)}</small>`;
-  panel.appendChild(head);
-  panel.appendChild(statusStrip(node));
+  panel.appendChild(panelHead(def.icon, node.title, def.label));
+  panel.appendChild(nodeFocus(node));
   panel.appendChild(inspectorActions(nodeActions(node, store)));
   panel.appendChild(section("下一步", nextStepText(node)));
+  panel.appendChild(section("参考与上下文", contextSummary(node)));
   panel.appendChild(section("创作内容", node.prompt || node.content || "还没有填写创作内容。"));
-  panel.appendChild(section("关联参考", contextSummary(node)));
-  panel.appendChild(section("生成状态", manifestSummary(node)));
-  panel.appendChild(section("产物记录", jobSummary(node)));
-  const assets = assetsFromNode(node);
-  panel.appendChild(section("已保存素材", assets.length ? assets.map((asset) => asset.label || asset.asset_id).join("\n") : "还没有保存为角色或场景素材。"));
+  panel.appendChild(algorithmConsoleSection(node));
+  panel.appendChild(section("输出记录", recordSummary(node)));
 }
 
-function statusStrip(node) {
-  const strip = el("div", `inspector-status ${node.status || "draft"}`);
-  strip.appendChild(metric("状态", statusText(node.status)));
-  strip.appendChild(metric("模型", node.params?.model || "未选择"));
-  strip.appendChild(metric("素材", assetsFromNode(node).length));
-  return strip;
+function panelHead(iconName, title, meta) {
+  const head = el("div", "inspector-head");
+  head.innerHTML = `<span>${icon(iconName, 14)}</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(meta)}</small>`;
+  return head;
 }
 
-function metric(label, value) {
-  const item = el("span", "inspector-metric");
-  item.innerHTML = `<strong>${escapeHtml(value)}</strong><small>${escapeHtml(label)}</small>`;
+function emptyGuide(state) {
+  const wrap = el("section", "inspector-section inspector-focus");
+  const hasNodes = state.order.length > 0;
+  wrap.appendChild(el("h3", "", hasNodes ? "选择一个节点继续" : "从画布开始"));
+  wrap.appendChild(el("p", "", hasNodes
+    ? "点击画布中的节点后，可以继续生成、保存素材或查看本次调用参考了什么。"
+    : "选择画布上的创作起点，系统会在生成前自动调度项目上下文和已确认素材。"));
+  const line = el("div", "inspector-quiet-line");
+  line.appendChild(metaPill("节点", state.order.length));
+  line.appendChild(metaPill("素材", state.assets.length));
+  line.appendChild(metaPill("连线", Object.keys(state.edges || {}).length));
+  wrap.appendChild(line);
+  return wrap;
+}
+
+function nodeFocus(node) {
+  const wrap = el("section", `inspector-section inspector-focus ${node.status || "draft"}`);
+  wrap.appendChild(el("h3", "", statusText(node.status)));
+  const detail = el("div", "inspector-quiet-line");
+  detail.appendChild(metaPill("模型", node.params?.model || "未选择"));
+  detail.appendChild(metaPill("素材", assetsFromNode(node).length));
+  detail.appendChild(metaPill("类型", NODE_TYPES[node.type]?.label || node.type || "节点"));
+  wrap.appendChild(detail);
+  return wrap;
+}
+
+function metaPill(label, value) {
+  const item = el("span", "inspector-meta-pill");
+  item.innerHTML = `<small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong>`;
   return item;
 }
 
@@ -90,9 +103,7 @@ function nodeActions(node, store) {
   if (node.type === "video") {
     base.push(["整理卡片", "frames", () => dispatchNodeEvent("afs:video-asset-card-draft", node)]);
   }
-  if (store) {
-    base.push(["素材库", "folder", () => openDrawerTab(store, "assets")]);
-  }
+  if (store) base.push(["素材库", "folder", () => openDrawerTab(store, "assets")]);
   return base;
 }
 
@@ -135,10 +146,15 @@ function contextSummary(node) {
   return `引用节点：${nodes}\n引用素材：${assets}`;
 }
 
+function recordSummary(node) {
+  const parts = [manifestSummary(node), jobSummary(node), assetSummary(node)].filter(Boolean);
+  return parts.length ? parts.join("\n\n") : "还没有生成记录。";
+}
+
 function manifestSummary(node) {
   const manifest = node.params?.lastSafeManifest || node.params?.lastGenerationManifest || {};
   const status = manifest.status || node.params?.lastVideoAssetCardDraftStatus || "";
-  if (!status && !Object.keys(manifest).length) return "还没有生成摘要。";
+  if (!status && !Object.keys(manifest).length) return "";
   return [
     status ? `状态：${statusText(status)}` : "",
     manifest.provider_service_id ? `能力：${providerLabel(manifest.provider_service_id)}` : "",
@@ -147,12 +163,17 @@ function manifestSummary(node) {
 }
 
 function jobSummary(node) {
-  const data = [
+  return [
     node.params?.lastKeyframeJobId ? `关键帧任务：${node.params.lastKeyframeJobId}` : "",
     node.params?.lastVideoJobId ? `视频任务：${node.params.lastVideoJobId}` : "",
     node.params?.lastVideoArtifactId ? `输出编号：${node.params.lastVideoArtifactId}` : "",
-  ].filter(Boolean);
-  return data.length ? data.join("\n") : "还没有生成记录。";
+  ].filter(Boolean).join("\n");
+}
+
+function assetSummary(node) {
+  const assets = assetsFromNode(node);
+  if (!assets.length) return "还没有保存为角色或场景素材。";
+  return `已保存素材：${assets.map((asset) => asset.label || asset.asset_id).join("、")}`;
 }
 
 function statusText(status) {
@@ -165,7 +186,7 @@ function statusText(status) {
     generating: "生成中",
     running: "生成中",
     pending: "排队中",
-    blocked: "已拦截",
+    blocked: "已阻塞",
     error: "失败",
     failed: "失败",
     cancelled: "已取消",
@@ -187,6 +208,7 @@ function inspectorSignature(state, node) {
     state.selection.nodeIds.join(","),
     state.order.length,
     state.assets.length,
+    Object.keys(state.edges || {}).length,
     node?.id || "",
     node?.title || "",
     node?.status || "",
@@ -194,6 +216,9 @@ function inspectorSignature(state, node) {
     node?.result || "",
     JSON.stringify(node?.params?.lastContextBundle || {}),
     JSON.stringify(node?.params?.lastSafeManifest || node?.params?.lastGenerationManifest || {}),
+    JSON.stringify(node?.params?.jobProgress || {}),
+    node?.params?.lastOptimizedPromptPlain || "",
+    node?.params?.lastVideoAssetCardDraftStatus || "",
   ].join("|");
 }
 

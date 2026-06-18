@@ -22,9 +22,11 @@ from apps.api.runtime_store import reject_unsafe_text
 
 
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
+PROMPT_OPTIMIZER_PROVIDER = "prompt_optimizer"
 MINIMAX_TEXT_PROVIDER = "minimax_m3"
-MINIMAX_TEXT_MODEL = "MiniMax-M2.7-highspeed"
 MINIMAX_MODEL_IDS = {
+    "prompt-optimizer",
+    "prompt_optimizer",
     "minimax-m3",
     "minimax_m3",
     "minimax-m3-enhance",
@@ -82,8 +84,8 @@ def maybe_enhance_prompt_with_llm(
     optimization_mode = prompt_optimization_mode(request)
     base = {
         "requested": requested,
-        "provider": MINIMAX_TEXT_PROVIDER if requested else "not_requested",
-        "model": MINIMAX_TEXT_MODEL if requested else "not_requested",
+        "provider": _provider_name(request) if requested else "not_requested",
+        "model": "provider_configured" if requested else "not_requested",
         "optimization_mode": optimization_mode,
         "status": "not_requested",
         "provider_calls_started": False,
@@ -651,21 +653,40 @@ def _compact(value: str, limit: int = 120) -> str:
 def _provider_name(request: PromptOptimizationRequest) -> str:
     params = request.node_parameters or {}
     value = str(params.get("llm_provider") or "").strip()
-    return value or MINIMAX_TEXT_PROVIDER
+    return value or PROMPT_OPTIMIZER_PROVIDER
 
 
 def _provider_candidates(request: PromptOptimizationRequest, registry: Any) -> list[str]:
     params = request.node_parameters or {}
     explicit = str(params.get("llm_provider") or "").strip()
+    descriptors = getattr(registry, "_descriptors", {})
+    descriptor_ids = sorted(descriptors) if isinstance(descriptors, dict) else []
     candidates: list[str] = []
-    for value in (explicit, MINIMAX_TEXT_PROVIDER, "minimax_llm"):
+
+    def add(value: str) -> None:
         if value and value not in candidates:
             candidates.append(value)
-    descriptors = getattr(registry, "_descriptors", {})
+
+    if explicit:
+        add(explicit)
+        if explicit == PROMPT_OPTIMIZER_PROVIDER:
+            for service_id in descriptor_ids:
+                descriptor = descriptors[service_id]
+                if getattr(descriptor, "modality", None) == "llm":
+                    add(service_id)
+        add(MINIMAX_TEXT_PROVIDER)
+        add("minimax_llm")
+    else:
+        if PROMPT_OPTIMIZER_PROVIDER in descriptor_ids:
+            add(PROMPT_OPTIMIZER_PROVIDER)
+        add(MINIMAX_TEXT_PROVIDER)
+        add("minimax_llm")
+
     if isinstance(descriptors, dict):
-        for service_id, descriptor in sorted(descriptors.items()):
-            if getattr(descriptor, "modality", None) == "llm" and service_id not in candidates:
-                candidates.append(service_id)
+        for service_id in descriptor_ids:
+            descriptor = descriptors[service_id]
+            if getattr(descriptor, "modality", None) == "llm":
+                add(service_id)
     return candidates
 
 
@@ -708,7 +729,6 @@ def _safe_reason(value: str) -> str:
 
 
 __all__ = (
-    "MINIMAX_TEXT_MODEL",
     "MINIMAX_TEXT_PROVIDER",
     "llm_provider_gate",
     "maybe_enhance_prompt_with_llm",

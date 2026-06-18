@@ -31,6 +31,7 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
         try:
+            _normalize_asset_card_provider_service(request)
             _validate_asset_card_draft_request(store, project_id, request)
             gate = provider_gate_status("vision")
             model_call_context = visual_inspect_model_call_context(
@@ -192,6 +193,14 @@ def _validate_asset_card_draft_request(store: RuntimeStore, project_id: str, req
         image_asset_metadata(store, project_id, image_ref)
     if request.source_video_artifact_id and safe_id(request.source_video_artifact_id) != request.source_video_artifact_id:
         raise ValueError("source_video_artifact_id must be a safe artifact id")
+
+
+def _normalize_asset_card_provider_service(request: AssetCardDraftRequest) -> None:
+    service_id = str(request.provider_service_id or "").strip()
+    if request.asset_type == "video" and service_id in {"", "fake_vision", "vision_image"}:
+        request.provider_service_id = "vision_video"
+    elif request.asset_type in {"character", "scene"} and service_id in {"", "fake_vision"}:
+        request.provider_service_id = "vision_image"
 
 
 def _write_asset_card_artifacts(

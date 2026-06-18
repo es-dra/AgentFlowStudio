@@ -1,0 +1,180 @@
+.product-preview {
+  overflow: hidden;
+  min-height: 580px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(33, 40, 47, 0.92), rgba(12, 16, 20, 0.96));
+  box-shadow: 0 40px 110px rgba(0, 0, 0, 0.36);
+}
+
+.preview-topbar {
+  justify-content: space-between;
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 20px;
+  color: var(--muted);
+}
+
+.preview-topbar span {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+.preview-topbar strong {
+  color: var(--text);
+}
+
+.preview-topbar em {
+  color: var(--mint);
+  font-style: normal;
+}
+
+.preview-body {
+  align-items: stretch;
+  min-height: 522px;
+}
+
+.preview-sidebar,
+.preview-inspector {
+  width: 150px;
+  border-right: 1px solid var(--line);
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.preview-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.sidebar-pill,
+.sidebar-line {
+  display: block;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-pill {
+  height: 42px;
+}
+
+.sidebar-pill.active {
+  background: rgba(87, 213, 255, 0.2);
+}
+
+.sidebar-line {
+  height: 10px;
+}
+
+.sidebar-line.short {
+  width: 62%;
+}
+
+.preview-canvas {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.canvas-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.56;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+.node-card {
+  position: absolute;
+  z-index: 2;
+  width: 210px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(22, 28, 34, 0.92);
+}
+
+.node-card span {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.node-card strong,
+.node-card small {
+  display: block;
+}
+
+.node-card strong {
+  margin: 12px 0 8px;
+  font-size: 20px;
+}
+
+.node-card small {
+  color: var(--muted);
+}
+
+.node-text {
+  left: 46px;
+  top: 86px;
+}
+
+.node-image {
+  right: 42px;
+  top: 118px;
+}
+
+.node-video {
+  left: 36%;
+  bottom: 72px;
+}
+
+.node-link {
+  position: absolute;
+  inset: 118px 30px auto;
+  width: calc(100% - 60px);
+  height: 220px;
+  fill: none;
+  stroke: rgba(87, 213, 255, 0.42);
+  stroke-width: 2;
+}
+
+.preview-inspector {
+  width: 230px;
+  border-right: 0;
+  border-left: 1px solid var(--line);
+}
+
+.preview-inspector p {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.preview-inspector strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 22px;
+}
+
+.preview-inspector span {
+  display: block;
+  margin-bottom: 24px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.trace-row {
+  width: 72%;
+  height: 12px;
+  margin-top: 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.trace-row.wide {
+  width: 100%;
+}

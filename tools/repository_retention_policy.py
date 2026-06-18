@@ -52,6 +52,8 @@ def review_directory(path: str) -> ReviewedPath:
         return _dir(path, "production_spine", "current", "内容生产与分发 pipeline 模块仍被测试和 CLI 覆盖；旧 demo 文件会在文件级降级。")
     if path.startswith("apps/api"):
         return _dir(path, "production_spine", "current", "Runtime Service 是前后端唯一对接面。")
+    if path.startswith("apps/site"):
+        return _dir(path, "production_spine", "current", "Runtime 根路径网站首页，用于产品入口和 Studio 跳转。")
     if path.startswith("apps/studio"):
         return _dir(path, "production_spine", "current", "AFS Studio 是当前唯一用户侧 Web 画布入口。")
     if path.startswith("apps/workbench"):
@@ -146,6 +148,8 @@ def review_file(path: str, git_state: str) -> ReviewedPath:
         return _file(path, git_state, "production_spine", "current", "内容生产与分发 pipeline 代码。")
     if path.startswith("apps/api/"):
         return _file(path, git_state, "production_spine", "current", "Runtime Service 对接面、模型、job、artifact 或文档。")
+    if path.startswith("apps/site/"):
+        return _file(path, git_state, "production_spine", "current", "Runtime 根路径网站首页源码与静态样式。")
     if path.startswith("apps/studio/"):
         return _file(path, git_state, "production_spine", "current", "AFS Studio 当前用户侧 Web 画布代码。")
     if path.startswith("apps/reporting/"):

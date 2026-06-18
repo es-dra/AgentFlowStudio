@@ -36,7 +36,13 @@ from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_v02 import register_runtime_v02_routes
-from apps.api.runtime_studio_static import DEFAULT_STUDIO_ROOT, configure_studio_static, studio_static_status
+from apps.api.runtime_studio_static import (
+    DEFAULT_SITE_ROOT,
+    DEFAULT_STUDIO_ROOT,
+    configure_site_static,
+    configure_studio_static,
+    studio_static_status,
+)
 
 
 DEFAULT_RUNTIME_ROOT = Path("data/processed/runs/runtime_service")
@@ -64,7 +70,11 @@ def _project_summary_with_studio_meta(store: RuntimeStore, summary: dict[str, An
     return {**summary, "studio_state_meta": meta}
 
 
-def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT, studio_root: Path = DEFAULT_STUDIO_ROOT) -> FastAPI:
+def create_runtime_app(
+    runtime_root: Path = DEFAULT_RUNTIME_ROOT,
+    studio_root: Path = DEFAULT_STUDIO_ROOT,
+    site_root: Path = DEFAULT_SITE_ROOT,
+) -> FastAPI:
     store = RuntimeStore(runtime_root)
     app = FastAPI(
         title="AgentFlow Runtime Service",
@@ -169,6 +179,7 @@ def create_runtime_app(runtime_root: Path = DEFAULT_RUNTIME_ROOT, studio_root: P
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
     register_runtime_studio_state_routes(app, store)
+    configure_site_static(app, site_root)
     configure_studio_static(app, studio_root)
 
     return app

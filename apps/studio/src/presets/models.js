@@ -3,27 +3,27 @@
 
 export const TEXT_MODELS = [
   {
-    id: "minimax-m3-enhance",
+    id: "prompt-optimizer",
     name: "提示词优化",
-    desc: "remote prompt enhancement",
+    desc: "context-aware prompt enhancement",
     eta: "15s",
     cost: 1,
-    provider: "minimax",
+    provider: "runtime",
     capability: "llm_prompt_enhancement",
-    llmProvider: "minimax_m3",
+    llmProvider: "prompt_optimizer",
   },
 ];
 
 export const IMAGE_MODELS = [
   {
-    id: "minimax-image-01",
-    name: "MiniMax image-01",
-    desc: "keyframe provider",
+    id: "image2-keyframe",
+    name: "Image2",
+    desc: "keyframe image generation",
     eta: "60s",
     cost: 1,
-    provider: "minimax",
+    provider: "codex",
     capability: "image_keyframe",
-    providerServiceId: "minimax_image",
+    providerServiceId: "codex_image",
   },
 ];
 
@@ -73,7 +73,7 @@ export function isRemoteImageModel(modelId) {
 }
 
 export function providerServiceForImageModel(modelId) {
-  return findModel("image", modelId).providerServiceId || "minimax_image";
+  return findModel("image", modelId).providerServiceId || "codex_image";
 }
 
 export function isRemoteVideoModel(modelId) {

@@ -68,8 +68,8 @@ function renderCompactTopbar(topbar, options) {
 
 function studioHomeButton(onOpenHome) {
   const home = el("button", "icon-btn studio-home-btn");
-  home.innerHTML = `${icon("grid", 14)}<span>工作台</span>`;
-  home.title = "打开创作工作台";
+  home.innerHTML = `${icon("grid", 14)}<span>项目</span>`;
+  home.title = "打开项目菜单";
   home.addEventListener("click", onOpenHome);
   return home;
 }

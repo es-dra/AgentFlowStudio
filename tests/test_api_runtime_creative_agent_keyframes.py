@@ -67,7 +67,7 @@ def test_prompt_optimizer_records_creative_agent_candidates_and_node_constraints
     assert selected["candidate_id"] in {candidate["candidate_id"] for candidate in agent["candidates"]}
     assert selected["score"]["visual_controllability"] >= selected["score"]["preference_fit"]
     assert agent["provider_translation"]["capability"] == "image_keyframe"
-    assert agent["provider_translation"]["provider"] == "minimax_image"
+    assert agent["provider_translation"]["provider"] == "codex_image"
     assert agent["constraint_layers"]["hard_constraints"]
     assert any(item["key"] == "aspect_ratio" and item["value"] == "9:16" for item in agent["constraint_layers"]["hard_constraints"])
     assert trace["conflict_resolution"]["suppressed_count"] >= 1
