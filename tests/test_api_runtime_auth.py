@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import base64
 import json
 
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
+
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+)
 
 
 def _auth_client(tmp_path, monkeypatch) -> TestClient:
@@ -124,3 +129,71 @@ def test_auth_enabled_projects_are_owner_scoped(tmp_path, monkeypatch) -> None:
     assert beta_projects == []
     assert client.get("/projects/alpha-project/manifest", headers=alpha_headers).status_code == 200
     assert client.get("/projects/alpha-project/manifest", headers=beta_headers).status_code == 403
+
+
+def test_auth_scope_covers_studio_state_assets_jobs_and_artifacts(tmp_path, monkeypatch) -> None:
+    client = _auth_client(tmp_path, monkeypatch)
+    alpha = _register(client, invite_code="alpha-invite", email="alpha@example.com")
+    beta = _register(client, invite_code="beta-invite", email="beta@example.com")
+    alpha_headers = _auth_headers(alpha["session_token"])
+    beta_headers = _auth_headers(beta["session_token"])
+
+    created = client.post(
+        "/projects",
+        json={"project_id": "alpha-project", "goal": "Alpha owned project"},
+        headers=alpha_headers,
+    )
+    assert created.status_code == 200
+    manifest_artifact_id = created.json()["artifact"]["artifact_id"]
+
+    state = {
+        "meta": {"projectName": "Alpha Project", "canvasName": "Board"},
+        "nodes": {"image_1": {"type": "image", "title": "First frame"}},
+        "order": ["image_1"],
+    }
+    assert client.put(
+        "/projects/alpha-project/studio-state",
+        json={"state": state},
+        headers=alpha_headers,
+    ).status_code == 200
+    assert client.get("/projects/alpha-project/studio-state", headers=alpha_headers).status_code == 200
+    assert client.get("/projects/alpha-project/studio-state", headers=beta_headers).status_code == 403
+
+    upload = client.post(
+        "/projects/alpha-project/image-assets",
+        json={
+            "node_id": "image_1",
+            "filename": "first-frame.png",
+            "mime_type": "image/png",
+            "data_base64": base64.b64encode(PNG_BYTES).decode("ascii"),
+            "role": "reference_image",
+            "generated_at": "2026-06-19T12:00:00+08:00",
+        },
+        headers=alpha_headers,
+    )
+    assert upload.status_code == 200, upload.text
+    asset_id = upload.json()["asset"]["asset_id"]
+    asset_artifact_id = upload.json()["artifact"]["artifact_id"]
+    assert client.get("/projects/alpha-project/image-assets", headers=alpha_headers).status_code == 200
+    assert client.get("/projects/alpha-project/image-assets", headers=beta_headers).status_code == 403
+    assert client.get(f"/projects/alpha-project/image-assets/{asset_id}/preview", headers=alpha_headers).status_code == 200
+    assert client.get(f"/projects/alpha-project/image-assets/{asset_id}/preview", headers=beta_headers).status_code == 403
+
+    feedback = client.post(
+        "/feedback",
+        json={
+            "project_id": "alpha-project",
+            "feedback": {"rating": 4, "notes": "Alpha-only feedback"},
+            "generated_at": "2026-06-19T12:01:00+08:00",
+        },
+        headers=alpha_headers,
+    )
+    assert feedback.status_code == 200
+    job_id = feedback.json()["job"]["job_id"]
+    assert client.get(f"/runs/{job_id}", headers=alpha_headers).status_code == 200
+    assert client.get(f"/runs/{job_id}", headers=beta_headers).status_code == 403
+
+    assert client.get(f"/artifacts/{manifest_artifact_id}", headers=alpha_headers).status_code == 200
+    assert client.get(f"/artifacts/{manifest_artifact_id}", headers=beta_headers).status_code == 403
+    assert client.get(f"/artifacts/{asset_artifact_id}", headers=alpha_headers).status_code == 200
+    assert client.get(f"/artifacts/{asset_artifact_id}", headers=beta_headers).status_code == 403

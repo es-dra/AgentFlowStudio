@@ -29,7 +29,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
 
     assert health["service"] == "agentflow_runtime_service"
     assert health["status"] == "ready"
-    assert health["runtime_root_persisted"] is False
+    assert health["runtime_root_persisted"] is True
     assert health["studio_static"] == {
         "mounted": True,
         "root_exists": True,
@@ -82,6 +82,17 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "d:\\" not in serialized
     assert "providers.local" not in serialized
     assert "afs_provider_config" not in serialized
+    assert str(tmp_path).lower() not in serialized
+
+
+def test_runtime_health_keeps_repo_relative_runtime_root_non_persisted(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=Path("data/processed/runs/runtime_service")))
+
+    health = client.get("/health").json()
+    serialized = json.dumps(health, ensure_ascii=False).lower()
+
+    assert health["runtime_root_persisted"] is False
+    assert "data/processed/runs" not in serialized
 
 
 def test_runtime_health_reports_missing_studio_static_without_private_paths(tmp_path) -> None:

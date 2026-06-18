@@ -52,14 +52,16 @@ def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions(
 
 def test_loop003_qal003_004_recent_or_current_projects_are_not_hidden_by_filter() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    controller = (STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
     session = (STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8")
 
     assert "RECENT_PROJECTS_KEY" in session
     assert "rememberProject" in session
     assert "recentProjectIds" in session
-    assert "persistActiveProject" in main
-    assert "item.project_id === currentId || recent.includes(item.project_id)" in main
-    assert "hiddenProjectCount" in main
+    assert "persistActiveProject" in controller
+    assert "item.project_id === currentId || recent.includes(item.project_id)" in controller
+    assert "hiddenProjectCount" in controller
+    assert "createProjectController" in main
 
 
 def test_loop003_qal003_005_kling_sound_control_stays_hidden_without_descriptor_support() -> None:

@@ -30,22 +30,20 @@ export function renderInspectorPanel(state, store) {
 function renderEmptyInspector(state, store, panel) {
   panel.appendChild(panelHead("panel", "创作助手", "下一步"));
   panel.appendChild(emptyGuide(state));
-  panel.appendChild(decisionGuide(state));
   panel.appendChild(projectReferenceSummary(state));
-  panel.appendChild(section("资产确认状态", projectAssetDecisionText(state)));
   panel.appendChild(drawerLinks(store));
+  panel.appendChild(detailsSection("资产确认状态", projectAssetDecisionText(state), "资产"));
   panel.appendChild(projectPipelineSection(state));
 }
 
 function renderNodeInspector(panel, node, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   panel.appendChild(panelHead(def.icon, node.title, def.label));
-  panel.appendChild(nodeFocus(node));
-  panel.appendChild(section("下一步行动", nextStepText(node), "primary"));
+  panel.appendChild(section("下一步行动", nodeActionBrief(node), "primary"));
   panel.appendChild(inspectorActions(nodeActions(node, store)));
   panel.appendChild(section("本次参考摘要", nodeContextSummaryText(node)));
-  panel.appendChild(section("资产确认状态", nodeAssetDecisionText(node)));
   panel.appendChild(drawerLinks(store));
+  panel.appendChild(detailsSection("资产确认状态", nodeAssetDecisionText(node), "资产"));
   panel.appendChild(detailsSection("节点草稿", node.prompt || node.content || "还没有填写创作内容。", "内容"));
   panel.appendChild(algorithmConsoleSection(node));
   panel.appendChild(detailsSection("输出记录", recordSummary(node), "记录"));
@@ -72,25 +70,13 @@ function emptyGuide(state) {
   return wrap;
 }
 
-function decisionGuide(state) {
-  const hasNodes = state.order.length > 0;
-  const assetCount = state.assets.length;
-  const message = hasNodes
-    ? "选择画布节点后，优先处理继续生成、固定资产、查看参考或发起修订。算法 trace 默认折叠在下方，不会抢占主任务。"
-    : "从底部工具栏新建文本、图片或视频节点；固定资产会在后续调用中自动参与调度。";
-  const suffix = assetCount ? `当前已有 ${assetCount} 个可用素材。` : "当前还没有确认素材。";
-  return section("下一步行动", `${message}\n${suffix}`, "primary");
-}
-
-function nodeFocus(node) {
-  const wrap = el("section", `inspector-section inspector-focus ${node.status || "draft"}`);
-  wrap.appendChild(el("h3", "", statusText(node.status)));
-  const detail = el("div", "inspector-quiet-line");
-  detail.appendChild(metaPill("模型", node.params?.model || "未选择"));
-  detail.appendChild(metaPill("素材", assetsFromNode(node).length));
-  detail.appendChild(metaPill("类型", NODE_TYPES[node.type]?.label || node.type || "节点"));
-  wrap.appendChild(detail);
-  return wrap;
+function nodeActionBrief(node) {
+  const model = node.params?.model || "未选择模型";
+  const assetCount = assetsFromNode(node).length;
+  return [
+    `${statusText(node.status)} · ${model} · ${assetCount} 个素材`,
+    nextStepText(node),
+  ].join("\n");
 }
 
 function metaPill(label, value) {

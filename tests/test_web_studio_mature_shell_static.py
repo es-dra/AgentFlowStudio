@@ -39,13 +39,13 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
     assert 'item.reason || item.warning_id || item.label || item.attribute' in (STUDIO_ROOT / "src" / "panels" / "inspector-context-summary.js").read_text(encoding="utf-8")
     assert "创作助手" in inspector
     assert 'panelHead("panel", "创作助手", "下一步")' in inspector
-    assert "decisionGuide(state)" in inspector
     assert "下一步行动" in inspector
     assert "本次参考摘要" in inspector
     assert "资产确认状态" in inspector
     assert "drawerLinks(store)" in inspector
+    assert 'detailsSection("资产确认状态"' in inspector
     assert "detailsSection(\"输出记录\"" in inspector
-    assert "算法 trace 默认折叠在下方" in inspector
+    assert "nodeActionBrief(node)" in inspector
     assert "starterRailState(state)" in canvas_view
     assert 'starterRow.dataset.mode = rail.mode;' in canvas_view
     assert "shouldShowStarterRail" in starter_rail
@@ -129,6 +129,7 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
 
     for path in (
         "src/studio-project-session.js",
+        "src/studio-project-controller.js",
         "src/store-state.js",
         "src/store-persistence.js",
         "src/node-generation-restore.js",
@@ -140,6 +141,7 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
 
     assert './styles/canvas-edges.css' in index
     assert "from \"./studio-project-session.js\"" in main
+    assert "from \"./studio-project-controller.js\"" in main
     assert "from \"./store-persistence.js\"" in store
     assert "from \"./store-state.js\"" in store
     assert "from \"./node-generation-restore.js\"" in node_actions
@@ -151,6 +153,8 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     assert len((STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8").splitlines()) <= 300
     assert len((STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8").splitlines()) <= 140
     assert len((STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8").splitlines()) <= 90
+    assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 300
+    assert len(main.splitlines()) <= 300
     assert len((STUDIO_ROOT / "src" / "node-generation-restore.js").read_text(encoding="utf-8").splitlines()) <= 80
 
 

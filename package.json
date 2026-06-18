@@ -1,4 +1,7 @@
 {
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "check:studio-js": "node tools/check-web-js.mjs"
+  }
 }

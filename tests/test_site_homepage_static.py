@@ -26,7 +26,7 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert "template-stack" in index
     assert "project-lane" in index
     assert "最近作品" in index
-    assert "城市夜景追踪镜头" in index
+    assert "雨夜追踪镜头" in index
     assert "查看底层算法边界" in index
     assert "提示词智能优化" in index
     assert "上下文智能调度" in index

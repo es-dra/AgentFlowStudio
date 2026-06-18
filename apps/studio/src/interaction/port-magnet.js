@@ -1,7 +1,7 @@
-const MAGNET_RANGE = 44;
-const EDGE_INSET = 18;
-const PORT_Y_RANGE = 42;
-const PORT_FOLLOW_Y = 16;
+const MAGNET_RANGE = 50;
+const EDGE_INSET = 14;
+const PORT_Y_RANGE = 26;
+const PORT_FOLLOW_Y = 12;
 
 let activeNode = null;
 

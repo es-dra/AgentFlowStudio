@@ -150,8 +150,9 @@ p {
 
 h1 {
   margin-bottom: 18px;
-  font-size: clamp(60px, 8vw, 108px);
-  line-height: 0.95;
+  max-width: 760px;
+  font-size: clamp(48px, 6.6vw, 88px);
+  line-height: 1.03;
 }
 
 h2 {

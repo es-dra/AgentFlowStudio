@@ -118,7 +118,7 @@ def test_generating_text_shimmer_is_loaded_and_motion_safe() -> None:
     ):
         assert marker in styles
     shimmer_rule = styles.split(".node.is-generating .node-state-strip span:not(.dot)", 1)[1].split("}", 1)[0]
-    assert "generating-text-shimmer 3.2s" in shimmer_rule
+    assert "generating-text-shimmer 4.4s" in shimmer_rule
     reduced_rule = styles.split("@media (prefers-reduced-motion: reduce)", 1)[1].split("}", 1)[0]
     assert "animation: none" in reduced_rule
     assert "-webkit-text-fill-color: currentColor" in reduced_rule
@@ -133,14 +133,14 @@ def test_default_canvas_edges_use_solid_frame_connection() -> None:
 
     assert './styles/canvas-edges.css' in index
     assert "stroke-linecap: round" in base_rule
-    assert "stroke-width: 1.35" in base_rule
+    assert "stroke-width: 1.15" in base_rule
     assert "stroke-dasharray" not in edge_rule
     assert "animation:" not in edge_rule
     assert "edge-spark" in canvas_edges
     assert "syncEdgeSpark" in canvas_edges
     assert "selected.has(edge.from) || selected.has(edge.to)" in canvas_edges
     assert "#edge-layer path.edge-spark" in styles
-    assert "animation: edge-spark-forward 2.6s linear infinite" in styles
+    assert "animation: edge-spark-forward 3.9s linear infinite" in styles
     assert "@keyframes edge-spark-forward" in styles
     assert "@keyframes edge-spark-reverse" in styles
     assert "animation-name: edge-spark-reverse" in styles
@@ -184,8 +184,8 @@ if (hover.nodeId !== 'node_1' || hover.side !== 'right') throw new Error('expect
 if (!classSet.has('port-magnet-right')) throw new Error('expected visual magnet state');
 if (outputPortFromMagnet({ clientX: 408, clientY: 210 }) !== outPort) throw new Error('expected output port');
 if (updatePortMagnet({ clientX: 408, clientY: 300 }) !== null) throw new Error('expected no far vertical magnet');
-updatePortMagnet({ clientX: 408, clientY: 232 });
-if (nodeEl.style.values['--port-magnet-y'] !== '16px') throw new Error('expected bounded vertical follow');
+updatePortMagnet({ clientX: 408, clientY: 225 });
+if (nodeEl.style.values['--port-magnet-y'] !== '12px') throw new Error('expected bounded vertical follow');
 clearPortMagnet();
 if (classSet.has('port-magnet-right')) throw new Error('expected cleared magnet state');
 """
@@ -236,7 +236,7 @@ if (point.x !== 195.5 || point.y !== 100.5) throw new Error(`unexpected point ${
     assert completed.returncode == 0, completed.stderr
 
 
-def test_port_geometry_anchors_persistent_edges_to_node_frame() -> None:
+def test_port_geometry_anchors_persistent_edges_to_visible_button_center() -> None:
     code = r"""
 import { nodeFramePortWorldPoint } from './apps/studio/src/interaction/port-geometry.js';
 
@@ -261,7 +261,7 @@ const point = nodeFramePortWorldPoint(
   'out',
   { x: 10, y: 20, scale: 2 },
 );
-if (point.x !== 380 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
+if (point.x !== 195.5 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
 """
     completed = subprocess.run(
         ["node", "--input-type=module", "-e", code],

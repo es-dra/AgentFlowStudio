@@ -18,7 +18,7 @@
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: generating-text-shimmer 3.2s ease-in-out infinite;
+  animation: generating-text-shimmer 4.4s ease-in-out infinite;
   text-shadow: 0 0 14px rgba(90, 200, 250, 0.12);
 }
 

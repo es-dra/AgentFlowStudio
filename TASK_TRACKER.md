@@ -12,6 +12,26 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current deep hardening addendum: 2026-06-19 pass is running on
+`codex/afs-deep-ux-runtime-hardening-20260619` to strengthen internal beta
+usability, homepage product framing, Studio operation feel, and frontend
+structure while preserving provider gates. Implemented so far: `/health`
+runtime-root persistence is a safe boolean projection; cross-user auth tests now
+cover Studio state, image assets, image previews, jobs, and artifact manifests;
+homepage first viewport is more directly positioned as a professional AI video
+creation entry; inspector defaults to next action and current reference summary
+with details folded; edge anchors use visible port centers; selected edge flow
+is lighter/slower; port magnet vertical range is tighter; generating text
+shimmer is slower; `main.js` project lifecycle logic moved into
+`studio-project-controller.js`; `npm run check:studio-js` added. Verification:
+Studio/Site JS syntax check passed for 86 files; focused Runtime/Studio
+regression passed 69 / 1 warning; full pytest passed 507 / 527 deselected / 2
+warnings; CLI help/version passed with version 0.1.0; maintenance audit
+failed=0 with warnings only; `git diff --check` passed. Boundary: no video gate
+opened, no new provider introduced, no provider raw/signed URL/secret/media byte
+persistence, no human acceptance or business validation claimed. Maintenance ledger:
+`docs/maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`.
+
 Current frontend hardening addendum: 2026-06-19 pass continued Studio UX
 hardening after edge and homepage review. Root `/` now leads with the AI video
 creation entry and keeps the six core algorithms behind a folded technical

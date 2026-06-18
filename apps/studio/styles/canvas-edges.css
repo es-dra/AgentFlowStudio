@@ -12,7 +12,7 @@
 #edge-layer path {
   fill: none;
   stroke: #4a6f86;
-  stroke-width: 1.35;
+  stroke-width: 1.15;
   stroke-linecap: round;
   pointer-events: stroke;
   transition: stroke 0.15s ease, opacity 0.15s ease;
@@ -25,13 +25,13 @@
 
 #edge-layer path.edge-spark {
   stroke: #5ac8fa;
-  stroke-width: 1.95;
+  stroke-width: 1.45;
   stroke-dasharray: 0 26 16 220;
   stroke-dashoffset: 0;
   opacity: 0;
   pointer-events: none;
   filter: drop-shadow(0 0 5px rgba(90, 200, 250, 0.82));
-  animation: edge-spark-forward 2.6s linear infinite;
+  animation: edge-spark-forward 3.9s linear infinite;
   transition: opacity 0.15s ease;
 }
 
@@ -88,35 +88,35 @@
 
 #edge-layer path.pending.target-locked {
   stroke: var(--port-out);
-  stroke-width: 2;
+  stroke-width: 1.65;
   filter: drop-shadow(0 0 4px rgba(56, 212, 192, 0.55));
 }
 
 #edge-layer path.selected-edge {
   stroke: var(--accent);
-  stroke-width: 1.7;
+  stroke-width: 1.45;
 }
 
 #edge-layer path.just-connected {
   stroke: var(--port-out);
-  stroke-width: 2.2;
+  stroke-width: 1.8;
   filter: drop-shadow(0 0 6px rgba(56, 212, 192, 0.7));
   animation: edge-success 1s ease;
 }
 
 @keyframes edge-success {
   0% { stroke-width: 3.5; }
-  100% { stroke-width: 2.2; }
+  100% { stroke-width: 1.8; }
 }
 
 #edge-layer path.rel-up-edge {
   stroke: var(--port-in);
-  stroke-width: 1.75;
+  stroke-width: 1.45;
 }
 
 #edge-layer path.rel-down-edge {
   stroke: var(--port-out);
-  stroke-width: 1.75;
+  stroke-width: 1.45;
 }
 
 #edge-layer path.rel-dim-edge {

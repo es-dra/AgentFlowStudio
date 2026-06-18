@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-19 - Deep UX And Runtime Hardening
+
+- Hardened Runtime `/health` so `runtime_root_persisted` is computed as a safe
+  boolean from the configured runtime root and does not expose absolute paths.
+- Added account isolation regression coverage for Studio state, image assets,
+  previews, jobs, and artifact manifests across two users.
+- Reworked the site first viewport further toward a professional AI video
+  creation entry with concrete project/preview language and less algorithm
+  exposition.
+- Decluttered the Studio inspector around next action, current reference
+  summary, drawer links, and folded detail sections.
+- Refined canvas operation feel: persistent edges anchor to visible port
+  centers, default edge weight is lighter, selected-node directional flow is
+  slower, port magnet vertical range is tighter, and generating text shimmer is
+  less aggressive.
+- Split Studio project lifecycle work out of `main.js` into
+  `studio-project-controller.js`, keeping the entrypoint under the project
+  maintainability target.
+- Added `npm run check:studio-js` to syntax-check Studio and site JavaScript.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed: 86 files
+Focused Runtime/Studio/site regression -> 69 passed / 1 warning
+Full pytest -> 507 passed / 527 deselected / 2 warnings
+CLI help/version -> passed, version 0.1.0
+maintenance_audit -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundary: no video gate was opened, no new provider was introduced, no provider
+raw response, signed URL, secret, or generated media byte was persisted, and no
+human creative acceptance or business validation is claimed.
+
 ## 2026-06-19 - Studio Context Transparency And Edge Flow Polish
 
 - Reworked the site root presentation so the first viewport is a direct

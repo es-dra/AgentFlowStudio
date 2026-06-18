@@ -98,7 +98,10 @@ def create_runtime_app(
 
     @app.get("/health")
     def health() -> dict[str, Any]:
-        return runtime_health_payload(studio_static=studio_static_status(studio_root))
+        return runtime_health_payload(
+            runtime_root=runtime_root,
+            studio_static=studio_static_status(studio_root),
+        )
 
     @app.get("/capabilities")
     def capabilities() -> dict[str, Any]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
@@ -18,6 +19,19 @@ def test_studio_static_entrypoint_is_the_only_user_frontend() -> None:
     assert './src/main.js' in index
     assert './styles/director.css' in index
     assert "/workbench" not in index
+
+
+def test_package_exposes_frontend_js_syntax_check() -> None:
+    package = json.loads(Path("package.json").read_text(encoding="utf-8"))
+    script = Path("tools/check-web-js.mjs")
+
+    assert package["type"] == "module"
+    assert package["scripts"]["check:studio-js"] == "node tools/check-web-js.mjs"
+    assert script.is_file()
+    source = script.read_text(encoding="utf-8")
+    assert "apps/studio" in source
+    assert "apps/site" in source
+    assert "--check" in source
 
 
 def test_studio_user_surface_has_no_common_mojibake_markers() -> None:
@@ -56,9 +70,11 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert 'next.type === "video" && next.params.lastVideoPreviewUrl' in state_source
     assert '!String(next.previewUrl).includes("/video-generations/")' in state_source
     main_source = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
-    assert "syncCurrentProjectMetaFromSummaries" in main_source
-    assert "const currentId = runtime.projectId || state.meta.projectId;" in main_source
-    assert 'input.type = "text";' in main_source
+    project_controller = (STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8")
+    assert "syncCurrentProjectMetaFromSummaries" in project_controller
+    assert "const currentId = runtime.projectId || store.get().meta.projectId;" in project_controller
+    assert 'input.type = "text";' in project_controller
+    assert "createProjectController" in main_source
     drawer_source = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
     assert "state.meta.projectId, state.meta.projectName, state.meta.canvasName" in drawer_source
     canvas_body_source = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")

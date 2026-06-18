@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
-def runtime_health_payload(studio_static: dict[str, Any] | None = None) -> dict[str, Any]:
+def runtime_health_payload(
+    *,
+    runtime_root: str | os.PathLike[str] | None = None,
+    studio_static: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     auth_required = runtime_auth_required()
     return {
         "service": "agentflow_runtime_service",
         "status": "ready",
         "service_version": "0.2.0",
         "schema_version": "0.1.0",
-        "runtime_root_persisted": False,
+        "runtime_root_persisted": runtime_root_is_persisted(runtime_root),
         "studio_static": studio_static or {
             "mounted": False,
             "root_exists": False,
@@ -50,6 +55,19 @@ def runtime_provider_gates(env: dict[str, str] | None = None) -> dict[str, bool]
 def runtime_auth_required(env: dict[str, str] | None = None) -> bool:
     source = env if env is not None else os.environ
     return _enabled(source.get("AFS_AUTH_ENABLED"))
+
+
+def runtime_root_is_persisted(runtime_root: str | os.PathLike[str] | None) -> bool:
+    if runtime_root is None:
+        return False
+    root = Path(runtime_root)
+    if not root.is_absolute():
+        return False
+    try:
+        root.resolve().relative_to(Path.cwd().resolve())
+        return False
+    except ValueError:
+        return True
 
 
 def _enabled(value: str | None) -> bool:
@@ -95,4 +113,10 @@ def runtime_capabilities_payload() -> dict[str, Any]:
     }
 
 
-__all__ = ("runtime_auth_required", "runtime_capabilities_payload", "runtime_health_payload", "runtime_provider_gates")
+__all__ = (
+    "runtime_auth_required",
+    "runtime_capabilities_payload",
+    "runtime_health_payload",
+    "runtime_provider_gates",
+    "runtime_root_is_persisted",
+)
