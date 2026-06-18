@@ -150,7 +150,9 @@ from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     MiniMaxImageAdapter,
     OpenAICompatibleLLMAdapter,
 )
+from agentflow_studio.model_gateway.provider_api_relay import ApiRelayAdapter  # noqa: E402
 from agentflow_studio.model_gateway.provider_codex_handoff import CodexImageHandoffAdapter  # noqa: E402
+from agentflow_studio.model_gateway.provider_codex_local import CodexLocalAdapter  # noqa: E402
 from agentflow_studio.model_gateway.provider_fake_vision import FakeVisionAdapter  # noqa: E402
 
 
@@ -184,6 +186,12 @@ class ProviderRegistry:
                 continue
             if capability == "image" and provider == "codex_handoff":
                 adapters[service_id] = CodexImageHandoffAdapter(store, service_id, descriptor)
+                continue
+            if capability in {"image", "llm", "vision"} and provider == "api_relay":
+                adapters[service_id] = ApiRelayAdapter(store, service_id, descriptor)
+                continue
+            if capability in {"llm", "vision"} and provider == "codex_local":
+                adapters[service_id] = CodexLocalAdapter(store, service_id, descriptor)
                 continue
             if capability == "llm" and provider in {"openai_compatible", "minimax", "deepseek"}:
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
@@ -428,6 +436,8 @@ __all__ = (
     "KlingVideoAdapter",
     "MiniMaxCliLLMAdapter",
     "CodexImageHandoffAdapter",
+    "CodexLocalAdapter",
+    "ApiRelayAdapter",
     "ProviderAdapter",
     "ProviderCapability",
     "ProviderDescriptor",

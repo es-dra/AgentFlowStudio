@@ -74,7 +74,7 @@ function renderCompactTopbar(topbar, options) {
 
 function siteHomeLink() {
   const home = el("a", "icon-btn site-home-btn");
-  home.href = "/";
+  home.href = "/site/";
   home.innerHTML = `${icon("globe", 14)}<span>首页</span>`;
   home.title = "返回网站首页";
   return home;

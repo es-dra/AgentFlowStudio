@@ -144,11 +144,11 @@ def test_prompt_optimizer_uses_professional_knowledgebase_trace_and_chinese_slot
     assert payload["provider_calls_started"] is False
 
 
-def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monkeypatch) -> None:
+def test_prompt_optimizer_can_apply_gated_prompt_optimizer_enhancement(tmp_path, monkeypatch) -> None:
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             assert request.task_type == "prompt_enhancement"
             prompt = request.prompt
             assert "原始提示词：" in prompt
@@ -173,15 +173,19 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
-        "/projects/proj_minimax_llm/prompt-optimizations",
+        "/projects/proj_relay_llm/prompt-optimizations",
         json={
-            "node_id": "image-node-minimax-text",
+            "node_id": "image-node-prompt-text",
             "node_type": "image",
             "prompt_text": "A founder stands in a night studio before a product launch.",
             "generation_target": "keyframe",
             "target_platform": "short_video",
             "style": "cinematic",
-            "node_parameters": {"model": "minimax-image-01"},
+            "node_parameters": {
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+            },
             "generated_at": "2026-06-12T13:00:00+08:00",
         },
     )
@@ -209,7 +213,7 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
 
 
 def test_studio_prompt_optimizer_uses_llm_fields_even_when_image_model_is_selected() -> None:
-    from apps.api.runtime_llm_enhancement import minimax_text_requested
+    from apps.api.runtime_llm_enhancement import provider_text_requested
     from apps.api.runtime_models import PromptOptimizationRequest
 
     request = PromptOptimizationRequest(
@@ -228,14 +232,14 @@ def test_studio_prompt_optimizer_uses_llm_fields_even_when_image_model_is_select
         generated_at="2026-06-14T05:20:00+08:00",
     )
 
-    assert minimax_text_requested(request) is True
+    assert provider_text_requested(request) is True
 
-def test_prompt_optimizer_falls_back_to_available_minimax_llm_service(tmp_path, monkeypatch) -> None:
+def test_prompt_optimizer_falls_back_to_available_relay_llm_service(tmp_path, monkeypatch) -> None:
     class Descriptor:
         modality = "llm"
 
     class FakeRegistry:
-        _descriptors = {"minimax_llm": Descriptor()}
+        _descriptors = {"relay_llm": Descriptor()}
 
         def __init__(self) -> None:
             self.calls: list[str] = []
@@ -243,9 +247,9 @@ def test_prompt_optimizer_falls_back_to_available_minimax_llm_service(tmp_path, 
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
             self.calls.append(service_id)
-            if service_id == "minimax_m3":
-                raise ModelGatewayError("Provider service not found: minimax_m3")
-            assert service_id == "minimax_llm"
+            if service_id == "prompt_optimizer":
+                raise ModelGatewayError("Provider service not found: prompt_optimizer")
+            assert service_id == "relay_llm"
             return {"text": "\n".join(
                 [
                     "鎰忓浘锛氫负瀹夐潤鐨勫垱濮嬩汉鍦烘櫙鐢熸垚涓€寮犲彲鎺у叧閿抚銆?",
@@ -266,24 +270,24 @@ def test_prompt_optimizer_falls_back_to_available_minimax_llm_service(tmp_path, 
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
-        "/projects/proj_minimax_llm_alias/prompt-optimizations",
+        "/projects/proj_relay_llm_alias/prompt-optimizations",
         json={
-            "node_id": "image-node-minimax-alias",
+            "node_id": "image-node-prompt-alias",
             "node_type": "image",
             "prompt_text": "A founder stands in a night studio before a product launch.",
             "generation_target": "keyframe",
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
             },
             "generated_at": "2026-06-13T13:00:00+08:00",
         },
     )
 
     assert result.status_code == 200
-    assert registry.calls[:2] == ["minimax_m3", "minimax_llm"]
+    assert registry.calls[:2] == ["prompt_optimizer", "relay_llm"]
     assert result.json()["provider_calls_started"] is True
 
 
@@ -300,7 +304,7 @@ def test_prompt_optimizer_skips_incompatible_llm_endpoint_404(tmp_path, monkeypa
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
             self.calls.append(service_id)
-            if service_id in {"minimax_m3", "minimax_llm"}:
+            if service_id == "prompt_optimizer":
                 raise ModelGatewayError(f"OpenAI-compatible HTTP error 404: unavailable {service_id}")
             assert service_id == "deepseek_llm"
             return {"text": "\n".join(
@@ -323,29 +327,29 @@ def test_prompt_optimizer_skips_incompatible_llm_endpoint_404(tmp_path, monkeypa
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
-        "/projects/proj_minimax_llm_404_fallback/prompt-optimizations",
+        "/projects/proj_relay_llm_404_fallback/prompt-optimizations",
         json={
-            "node_id": "image-node-minimax-404-fallback",
+            "node_id": "image-node-prompt-404-fallback",
             "node_type": "image",
             "prompt_text": "A founder stands in a night studio before a product launch.",
             "generation_target": "keyframe",
             "target_platform": "short_video",
             "style": "cinematic",
-            "node_parameters": {"model": "minimax-image-01", "llm_provider": "minimax_m3"},
+            "node_parameters": {"model": "image2-keyframe", "llm_provider": "prompt_optimizer"},
             "generated_at": "2026-06-13T13:10:00+08:00",
         },
     )
 
     assert result.status_code == 200
-    assert registry.calls == ["minimax_m3", "minimax_llm", "deepseek_llm", "minimax_m3", "minimax_llm", "deepseek_llm"]
+    assert registry.calls == ["prompt_optimizer", "deepseek_llm", "prompt_optimizer", "deepseek_llm"]
     assert result.json()["provider_calls_started"] is True
 
 
-def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated(tmp_path, monkeypatch) -> None:
+def test_prompt_optimizer_uses_chinese_fallback_when_provider_output_is_templated(tmp_path, monkeypatch) -> None:
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             assert request.task_type in {"prompt_enhancement", "prompt_enhancement_retry"}
             return {"text": "\n".join(
                 [
@@ -363,15 +367,20 @@ def test_prompt_optimizer_uses_chinese_fallback_when_minimax_output_is_templated
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
     result = client.post(
-        "/projects/proj_minimax_llm_fallback/prompt-optimizations",
+        "/projects/proj_relay_llm_fallback/prompt-optimizations",
         json={
-            "node_id": "image-node-minimax-text-fallback",
+            "node_id": "image-node-prompt-text-fallback",
             "node_type": "image",
             "prompt_text": "一个穿黑色风衣的年轻女导演，短发，雨夜天台，城市霓虹在湿地上反光。",
             "generation_target": "keyframe",
             "target_platform": "short_video",
             "style": "cinematic",
-            "node_parameters": {"model": "minimax-image-01", "aspect_ratio": "9:16"},
+            "node_parameters": {
+                "model": "image2-keyframe",
+                "aspect_ratio": "9:16",
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+            },
             "generated_at": "2026-06-12T13:10:00+08:00",
         },
     )
@@ -411,8 +420,8 @@ def test_studio_prompt_optimizer_requires_remote_llm_when_requested(tmp_path, mo
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-13T01:30:00+08:00",
@@ -427,7 +436,7 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             return {"text": "Subject/Character: Primary character with stable identity."}
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
@@ -444,8 +453,8 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-13T01:35:00+08:00",
@@ -460,7 +469,7 @@ def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             return {"text": "\n".join(
                 [
                     "1. 【意图】生成一张未来机器人屋顶观星的完整概念图。",
@@ -489,8 +498,8 @@ def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-14T03:30:00+08:00",
@@ -513,7 +522,7 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             calls.append(request.task_type)
             if len(calls) == 1:
                 return {
@@ -555,8 +564,8 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-14T03:40:00+08:00",
@@ -587,7 +596,7 @@ def test_studio_prompt_optimizer_salvages_repeated_chatty_llm_article(tmp_path, 
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
-            assert service_id == "minimax_m3"
+            assert service_id == "prompt_optimizer"
             return {"text": chatty}
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
@@ -604,8 +613,8 @@ def test_studio_prompt_optimizer_salvages_repeated_chatty_llm_article(tmp_path, 
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-14T03:50:00+08:00",
@@ -657,8 +666,8 @@ def test_visual_prompt_optimizer_uses_t2i_instruction_without_references(tmp_pat
             "target_platform": "short_video",
             "style": "cinematic",
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-13T15:00:00+08:00",
@@ -709,8 +718,8 @@ def test_visual_prompt_optimizer_uses_i2i_instruction_with_references(tmp_path, 
             "style": "cinematic",
             "asset_refs": ["img_reference_001"],
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
             },
             "generated_at": "2026-06-13T15:10:00+08:00",
@@ -755,7 +764,7 @@ def test_video_prompt_optimizer_uses_i2v_instruction_with_first_frame(tmp_path, 
         style="cinematic",
         asset_refs=["img_first_frame"],
         node_parameters={
-            "llm_provider": "minimax_m3",
+            "llm_provider": "prompt_optimizer",
             "remote_optimizer_required": True,
             "first_frame_image_asset_id": "img_first_frame",
             "motion": "角色在沙漠中行走",
@@ -810,8 +819,8 @@ def test_i2i_prompt_optimizer_guardrail_uses_uploaded_image_filename_hint(tmp_pa
             "style": "cinematic",
             "asset_refs": ["img_reference_001"],
             "node_parameters": {
-                "model": "minimax-image-01",
-                "llm_provider": "minimax_m3",
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
                 "remote_optimizer_required": True,
                 "uploaded_images": [
                     {"asset_id": "img_reference_001", "filename": "校服周彤v1.png", "role": "reference_image"}

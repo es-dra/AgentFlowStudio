@@ -6,7 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.minimax_image_runtime import image_dimensions
+from agentflow_studio.model_gateway.image_utils import image_dimensions
 from apps.api.runtime_image_assets import public_image_asset
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 

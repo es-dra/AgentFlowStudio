@@ -12,6 +12,7 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert SITE_ROOT.exists()
     assert '<html lang="zh-CN">' in index
     assert "<title>AFS Studio" in index
+    assert 'class="brand" href="/site/"' in index
     assert 'href="/studio/"' in index
     assert 'href="/site/styles/site.css"' in index
     assert 'href="/site/styles/site-preview.css"' in index

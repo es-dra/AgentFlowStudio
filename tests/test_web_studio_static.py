@@ -98,7 +98,7 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "closeOnOutside: false" in auth_gate
     assert "options.closeOnOutside === false" in overlay
     assert "site-home-btn" in topbar
-    assert 'href = "/"' in topbar
+    assert 'href = "/site/"' in topbar
     assert "首页" in topbar
 
 

@@ -79,17 +79,17 @@ def build_keyframe_generation(
         limit=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
     )
     if context_bundle:
-        provider_prompt = minimax_keyframe_prompt(
+        provider_prompt = provider_keyframe_prompt(
             provider_prompt_from_bundle(context_bundle),
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     else:
-        provider_prompt = minimax_keyframe_prompt(
+        provider_prompt = provider_keyframe_prompt(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     if reference_images:
-        provider_prompt = minimax_keyframe_prompt(
+        provider_prompt = provider_keyframe_prompt(
             f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}",
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
@@ -404,7 +404,7 @@ def _safe_error(value: str) -> str:
     return value[:160]
 
 
-def minimax_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:
+def provider_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:
     lines = []
     for raw_line in strip_user_prompt_section_headers(str(value or "")).splitlines():
         line = raw_line.strip()
@@ -453,5 +453,5 @@ __all__ = (
     "REMOTE_IMAGE_ENV",
     "build_keyframe_generation",
     "image_provider_gate",
-    "minimax_keyframe_prompt",
+    "provider_keyframe_prompt",
 )

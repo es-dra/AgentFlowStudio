@@ -1,27 +1,15 @@
 {
   "schema_version": "company_provider_secrets.local.v2",
   "accounts": {
-    "prompt_optimizer_backend": {
-      "auth_type": "api_key",
-      "base_url": "https://api.example.com/v1",
-      "api_key_env": "AFS_PROMPT_OPTIMIZER_API_KEY",
-      "default_models": {
-        "llm": "server-configured"
-      }
-    },
     "local_codex": {
       "auth_type": "none",
       "execution_backend": "codex_exec",
       "cli_command": "codex",
+      "timeout_sec": 180,
       "default_models": {
+        "llm": "codex-local",
+        "vision": "codex-local",
         "image": "image2"
-      }
-    },
-    "vision_worker": {
-      "auth_type": "none",
-      "base_url": "https://vision.example.invalid",
-      "default_models": {
-        "vision": "server-configured"
       }
     },
     "fake_video": {
@@ -53,9 +41,8 @@
     "prompt_optimizer_pool": {
       "accounts": [
         {
-          "account_id": "prompt_optimizer_backend",
+          "account_id": "local_codex",
           "service_id": "prompt_optimizer",
-          "credential_env": "AFS_PROMPT_OPTIMIZER_API_KEY",
           "enabled_capabilities": ["llm"],
           "enabled": true,
           "priority": 10,
@@ -82,7 +69,7 @@
     "vision_pool": {
       "accounts": [
         {
-          "account_id": "vision_worker",
+          "account_id": "local_codex",
           "service_id": "vision_image",
           "enabled_capabilities": ["vision"],
           "enabled": true,
@@ -92,7 +79,7 @@
           "health_state": "unknown"
         },
         {
-          "account_id": "vision_worker",
+          "account_id": "local_codex",
           "service_id": "vision_video",
           "enabled_capabilities": ["vision"],
           "enabled": true,
@@ -135,12 +122,9 @@
   },
   "services": {
     "prompt_optimizer": {
-      "provider": "openai_compatible",
-      "account_ref": "prompt_optimizer_backend",
+      "provider": "codex_local",
+      "account_ref": "local_codex",
       "capability": "llm",
-      "model": "server-configured",
-      "temperature": 0.2,
-      "max_completion_tokens": 900,
       "required_gate": "AFS_ALLOW_REMOTE_LLM",
       "descriptor": {
         "schema_version": "provider_descriptor.v0.1",
@@ -181,8 +165,8 @@
       }
     },
     "vision_image": {
-      "provider": "fake",
-      "account_ref": "vision_worker",
+      "provider": "codex_local",
+      "account_ref": "local_codex",
       "capability": "vision",
       "required_gate": "AFS_ALLOW_REMOTE_VISION",
       "descriptor": {
@@ -201,8 +185,8 @@
       }
     },
     "vision_video": {
-      "provider": "fake",
-      "account_ref": "vision_worker",
+      "provider": "codex_local",
+      "account_ref": "local_codex",
       "capability": "vision",
       "required_gate": "AFS_ALLOW_REMOTE_VISION",
       "descriptor": {

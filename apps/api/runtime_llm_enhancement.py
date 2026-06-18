@@ -23,17 +23,13 @@ from apps.api.runtime_store import reject_unsafe_text
 
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 PROMPT_OPTIMIZER_PROVIDER = "prompt_optimizer"
-MINIMAX_TEXT_PROVIDER = "minimax_m3"
-MINIMAX_MODEL_IDS = {
+PROMPT_OPTIMIZER_MODEL_IDS = {
     "prompt-optimizer",
     "prompt_optimizer",
-    "minimax-m3",
-    "minimax_m3",
-    "minimax-m3-enhance",
-    "minimax_m3_enhance",
-    "minimax-m3-prompt",
-    "minimax_m3_prompt",
-    "minimax-image-01",
+    "provider-configured",
+    "provider_configured",
+    "server-configured",
+    "server_configured",
 }
 REQUIRED_SECTION_LABELS = (
     "意图",
@@ -80,7 +76,7 @@ def maybe_enhance_prompt_with_llm(
     request: PromptOptimizationRequest,
     assembly: dict[str, Any],
 ) -> dict[str, Any]:
-    requested = minimax_text_requested(request)
+    requested = provider_text_requested(request)
     optimization_mode = prompt_optimization_mode(request)
     base = {
         "requested": requested,
@@ -185,16 +181,15 @@ def maybe_enhance_prompt_with_llm(
     }
 
 
-def minimax_text_requested(request: PromptOptimizationRequest) -> bool:
+def provider_text_requested(request: PromptOptimizationRequest) -> bool:
     params = request.node_parameters or {}
     values = [
         params.get("llm_provider"),
         params.get("llm_model"),
-        params.get("model"),
     ]
     for value in values:
         normalized = str(value or "").strip().lower().replace(" ", "-")
-        if normalized in MINIMAX_MODEL_IDS:
+        if normalized in PROMPT_OPTIMIZER_MODEL_IDS:
             return True
     return False
 
@@ -674,13 +669,9 @@ def _provider_candidates(request: PromptOptimizationRequest, registry: Any) -> l
                 descriptor = descriptors[service_id]
                 if getattr(descriptor, "modality", None) == "llm":
                     add(service_id)
-        add(MINIMAX_TEXT_PROVIDER)
-        add("minimax_llm")
     else:
         if PROMPT_OPTIMIZER_PROVIDER in descriptor_ids:
             add(PROMPT_OPTIMIZER_PROVIDER)
-        add(MINIMAX_TEXT_PROVIDER)
-        add("minimax_llm")
 
     if isinstance(descriptors, dict):
         for service_id in descriptor_ids:
@@ -729,10 +720,10 @@ def _safe_reason(value: str) -> str:
 
 
 __all__ = (
-    "MINIMAX_TEXT_PROVIDER",
+    "PROMPT_OPTIMIZER_PROVIDER",
     "llm_provider_gate",
     "maybe_enhance_prompt_with_llm",
-    "minimax_text_requested",
+    "provider_text_requested",
     "sanitize_enhanced_prompt",
     "deterministic_chinese_fallback_prompt",
 )

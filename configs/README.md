@@ -8,8 +8,9 @@ provider 原始响应、signed URL、媒体字节或机器相关绝对路径。�
 
 - `models.example.yaml`：旧 `ModelGateway` 的 OpenAI-compatible LLM 示例配置。
 - `models.yaml`：本地旧 LLM gateway 覆盖配置，已被 `.gitignore` 忽略。
-- `providers.example.json`：新的统一 provider registry 示例，覆盖 image、LLM、
-  fake async video、descriptor 和 account pool。
+- `providers.example.json`：新的统一 provider registry 示例，覆盖 LLM、vision、
+  image、video、descriptor 和 account pool；默认 LLM、vision、image 通过服务器本机
+  Codex 接入，video 保留独立 provider。
 - `providers.local.json`：本地 provider registry 配置，已被 `.gitignore` 忽略。
 - `ffmpeg.example.yaml` / `ffmpeg.yaml`：FFmpeg 示例配置和本地覆盖。
 - `tool_catalog.yaml` 与 `tool_catalog/`：工具目录示例。
@@ -23,6 +24,7 @@ provider 原始响应、signed URL、媒体字节或机器相关绝对路径。�
 $env:AFS_ALLOW_REMOTE_LLM="true"
 $env:AFS_ALLOW_REMOTE_ASR="true"
 $env:AFS_ALLOW_REMOTE_IMAGE="true"
+$env:AFS_ALLOW_REMOTE_VISION="true"
 $env:AFS_ALLOW_REMOTE_VIDEO="true"
 ```
 
@@ -31,16 +33,15 @@ $env:AFS_ALLOW_REMOTE_VIDEO="true"
 
 ## 统一 Provider Registry
 
-新的 provider 中转站使用 `configs/providers.example.json` 作为模板：
+新的 provider registry 使用 `configs/providers.example.json` 作为模板：
 
 ```powershell
 $env:AFS_PROVIDER_CONFIG="$PWD\configs\providers.local.json"
-$env:MINIMAX_API_KEY="<local-test-key>"
-$env:AFS_OPENAI_COMPATIBLE_API_KEY="<local-test-key>"
 ```
 
 registry 读取 `services.*.descriptor` 判断 provider 能力，读取 `account_pools.*`
-做本地账号选择。账号池只保存环境变量名称，不保存 secret 值。Runtime trace、
+做本地账号选择。默认 `prompt_optimizer`、`vision_image`、`vision_video` 使用
+`codex_local`，`codex_image` 使用 `codex_handoff`；账号池只保存环境变量名称，不保存 secret 值。Runtime trace、
 manifest、OpenAPI 和前端响应只能写 safe summary。
 
 ## 旧 LLM Config

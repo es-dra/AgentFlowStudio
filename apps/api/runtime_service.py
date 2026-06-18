@@ -36,6 +36,7 @@ from apps.api.runtime_video_revision_routes import register_runtime_video_revisi
 from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
+from apps.api.runtime_threadpool_compat import configure_runtime_threadpool_compat
 from apps.api.runtime_auth import (
     RuntimeAuthStore,
     configure_runtime_auth_middleware,
@@ -83,6 +84,7 @@ def create_runtime_app(
     studio_root: Path = DEFAULT_STUDIO_ROOT,
     site_root: Path = DEFAULT_SITE_ROOT,
 ) -> FastAPI:
+    configure_runtime_threadpool_compat()
     store = RuntimeStore(runtime_root)
     auth = RuntimeAuthStore(store)
     app = FastAPI(

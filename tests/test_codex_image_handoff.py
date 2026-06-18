@@ -52,6 +52,7 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     processed = process_one(output_dir, executor=FakeCodexImageExecutor())
     assert processed is not None
     assert processed.status == "succeeded"
+    assert {item.name for item in processed.job_dir.iterdir()} == {"result.json"}
 
     result = registry.poll("image", "codex_image", task)
     assert result["status"] == "succeeded"
@@ -101,6 +102,7 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     processed = process_one(tmp_path, executor=FakeCodexImageExecutor())
     assert processed is not None
     assert processed.status == "succeeded"
+    assert {item.name for item in processed.job_dir.iterdir()} == {"result.json"}
 
     completed = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
     assert completed.status_code == 200
@@ -162,6 +164,39 @@ def test_codex_image_handoff_poll_fails_safely_when_provider_config_disappears(t
     assert str(provider_path).lower() not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_codex_image_handoff_worker_trims_failed_job_payload_after_result(tmp_path, monkeypatch) -> None:
+    class FailingExecutor:
+        def execute(self, request, work_dir):  # noqa: ANN001 - test protocol double.
+            raise RuntimeError("planned failure")
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    store = _store(tmp_path, _codex_provider_config())
+    registry = ProviderRegistry.from_store(store)
+    output_dir = tmp_path / "run"
+
+    task = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(
+            prompt="Generate a clean cinematic keyframe.",
+            output_dir=output_dir,
+            aspect_ratio="9:16",
+            candidate_count=1,
+        ),
+    )
+    processed = process_one(output_dir, executor=FailingExecutor())
+
+    assert processed is not None
+    assert processed.status == "failed"
+    assert {item.name for item in processed.job_dir.iterdir()} == {"result.json"}
+    result = registry.poll("image", "codex_image", task)
+    assert result["status"] == "failed"
+    serialized = json.dumps(result, ensure_ascii=False).lower()
+    assert "request.json" not in serialized
+    assert "worker_prompt.md" not in serialized
+    assert "references/" not in serialized
 
 
 def _store(tmp_path: Path, payload: dict):

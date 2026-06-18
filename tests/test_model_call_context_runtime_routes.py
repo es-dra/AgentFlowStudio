@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 
 
 PNG_B64 = base64.b64encode(
@@ -24,6 +25,64 @@ def _upload_image(client, project_id: str, *, node_id: str, role: str, generated
     )
     assert uploaded.status_code == 200
     return uploaded.json()["asset"]["asset_id"]
+
+
+def _configure_fake_vision_provider(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "providers.local.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "company_provider_secrets.local.v2",
+                "accounts": {
+                    "vision_worker": {
+                        "auth_type": "none",
+                        "base_url": "https://vision.example.invalid",
+                        "default_models": {"vision": "fake-vision"},
+                    }
+                },
+                "account_pools": {
+                    "vision_pool": {
+                        "accounts": [
+                            {
+                                "account_id": "vision_worker",
+                                "service_id": "fake-vision",
+                                "enabled_capabilities": ["vision"],
+                                "enabled": True,
+                                "priority": 10,
+                                "weight": 1,
+                                "concurrency_limit": 1,
+                                "health_state": "healthy",
+                            }
+                        ]
+                    }
+                },
+                "services": {
+                    "fake-vision": {
+                        "provider": "fake",
+                        "account_ref": "vision_worker",
+                        "capability": "vision",
+                        "required_gate": "AFS_ALLOW_REMOTE_VISION",
+                        "descriptor": {
+                            "schema_version": "provider_descriptor.v0.1",
+                            "modality": "vision",
+                            "execution_mode": "sync",
+                            "capabilities": ["vision"],
+                            "account_pool_id": "vision_pool",
+                            "reference_image_slots": 8,
+                            "supported_aspect_ratios": ["1:1"],
+                            "prompt_char_limit": 5000,
+                            "seed_supported": False,
+                            "cost_hint": "fake-only",
+                            "rate_limit_hint": "fake-only",
+                            "required_gate": "AFS_ALLOW_REMOTE_VISION",
+                        },
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(path))
 
 
 def test_runtime_video_generation_registers_model_call_context_and_request_plan(tmp_path, monkeypatch) -> None:
@@ -144,6 +203,7 @@ def test_asset_card_draft_registers_visual_inspect_context_and_observation(tmp_p
     from apps.api.runtime_service import create_runtime_app
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    _configure_fake_vision_provider(tmp_path, monkeypatch)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     image_asset_id = _upload_image(
         client,

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
-from agentflow_studio.model_gateway.minimax_image_runtime import image_dimensions
+from agentflow_studio.model_gateway.image_utils import image_dimensions
 
 
 JOB_ROOT_DIR = "codex_image_job"

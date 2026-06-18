@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import base64
+from pathlib import Path
 
 import pytest
 
@@ -204,6 +206,88 @@ def test_provider_registry_dispatches_minimax_cli_llm_from_token_plan(tmp_path, 
     assert args[args.index("--output") + 1] == "json"
     assert "--non-interactive" in args
     assert "secret" not in json.dumps(captured, ensure_ascii=False).lower()
+
+
+def test_provider_registry_dispatches_codex_local_llm(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run(args, **kwargs):
+        work_dir = Path(kwargs["cwd"])
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        captured["request"] = json.loads((work_dir / "request.json").read_text(encoding="utf-8"))
+        captured["prompt"] = (work_dir / "prompt.md").read_text(encoding="utf-8")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="优化后的提示词", stderr="")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_codex_local.subprocess.run", fake_run)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _codex_local_provider_config()))
+
+    result = registry.dispatch(
+        "llm",
+        "prompt_optimizer",
+        ProviderDispatchRequest(prompt="优化这个提示词", output_dir=tmp_path, task_type="prompt_enhancement"),
+    )
+
+    assert result == {"text": "优化后的提示词", "provider_calls_started": True}
+    assert captured["args"][:2] == ["codex", "exec"]
+    assert Path(captured["kwargs"]["env"]["CODEX_HOME"]) == tmp_path / "runtime" / "codex-home"
+    assert captured["request"]["service_id"] == "prompt_optimizer"
+    assert captured["request"]["capability"] == "llm"
+    assert "AFS_MODEL_RELAY_API_KEY" not in json.dumps(captured, ensure_ascii=False)
+
+
+def test_provider_registry_dispatches_codex_local_vision_with_safe_observation(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    reference = tmp_path / "reference.png"
+    reference.write_bytes(_png_bytes())
+
+    def fake_run(args, **kwargs):
+        work_dir = Path(kwargs["cwd"])
+        captured["kwargs"] = kwargs
+        request = json.loads((work_dir / "request.json").read_text(encoding="utf-8"))
+        copied = work_dir / request["reference_images"][0]["path"]
+        captured["copied_reference_exists"] = copied.is_file()
+        captured["request"] = request
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "observation": {
+                        "description": "A rain rooftop character reference.",
+                        "summary": "Rain rooftop character.",
+                        "labels": ["character"],
+                        "feature_card": {"identity": "Lin Wan"},
+                    }
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_codex_local.subprocess.run", fake_run)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    monkeypatch.setenv("AFS_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _codex_local_provider_config()))
+
+    result = registry.dispatch(
+        "vision",
+        "vision_image",
+        ProviderDispatchRequest(prompt="Describe this image", output_dir=tmp_path, reference_image_paths=(reference,)),
+    )
+
+    assert captured["copied_reference_exists"] is True
+    assert Path(captured["kwargs"]["env"]["CODEX_HOME"]) == tmp_path / "runtime" / "codex-home"
+    assert captured["request"]["service_id"] == "vision_image"
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    assert result["provider_raw_response_stored"] is False
+    assert result["provider_observation"]["description"] == "A rain rooftop character reference."
+    assert result["provider_observation"]["feature_card"] == {"identity": "Lin Wan"}
+    assert result["safe_manifest"]["local_paths_returned_by_api"] is False
 
 
 def test_provider_registry_blocks_llm_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
@@ -615,6 +699,104 @@ def test_provider_registry_submit_kling_i2v_returns_submitted_without_polling(tm
     assert captured["submit"]["image_path"] == first_frame
 
 
+def test_provider_registry_dispatches_api_relay_llm(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["authorization"] = request.get_header("Authorization")
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return _JsonResponse({"text": "relay enhanced text"})
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_BASE_URL", "https://relay.example.test")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _api_relay_provider_config()))
+
+    result = registry.dispatch(
+        "llm",
+        "prompt_optimizer",
+        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
+    )
+
+    assert result == {"text": "relay enhanced text", "provider_calls_started": True}
+    assert captured["url"] == "https://relay.example.test/v1/afs/llm"
+    assert captured["authorization"] == "Bearer secret-relay-key"
+    assert captured["payload"]["service_id"] == "prompt_optimizer"
+    assert captured["payload"]["capability"] == "llm"
+    assert captured["payload"]["prompt"] == "Improve this prompt"
+
+
+def test_provider_registry_dispatches_api_relay_vision_with_safe_evidence(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return _JsonResponse(
+            {
+                "observation": {
+                    "description": "A rain rooftop character reference.",
+                    "summary": "Rain rooftop character.",
+                    "labels": ["character"],
+                    "feature_card": {"identity": "Lin Wan"},
+                },
+                "safe_evidence": {"relay_trace_id": "trace_001"},
+            }
+        )
+
+    reference = tmp_path / "reference.png"
+    reference.write_bytes(_png_bytes())
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_BASE_URL", "https://relay.example.test")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _api_relay_provider_config()))
+
+    result = registry.dispatch(
+        "vision",
+        "vision_image",
+        ProviderDispatchRequest(prompt="Describe this image", output_dir=tmp_path, reference_image_paths=(reference,)),
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    assert result["provider_raw_response_stored"] is False
+    assert result["provider_observation"]["description"] == "A rain rooftop character reference."
+    assert result["provider_observation"]["feature_card"] == {"identity": "Lin Wan"}
+    assert captured["payload"]["reference_images"][0]["mime_type"] == "image/png"
+    assert "data_base64" in captured["payload"]["reference_images"][0]
+    assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_provider_registry_dispatches_api_relay_image_and_writes_candidates(tmp_path, monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        payload = json.loads(request.data.decode("utf-8"))
+        assert payload["capability"] == "image"
+        assert payload["aspect_ratio"] == "9:16"
+        return _JsonResponse({"images": [{"data_base64": base64.b64encode(_png_bytes()).decode("ascii")} ]})
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_BASE_URL", "https://relay.example.test")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _api_relay_provider_config(include_image=True)))
+
+    result = registry.dispatch(
+        "image",
+        "relay_image",
+        ProviderDispatchRequest(prompt="Generate a clean keyframe", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+    )
+
+    assert result["status"] == "succeeded"
+    assert result["provider_calls_started"] is True
+    assert result["outputs"][0]["candidate_id"] == "candidate_001"
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
+    assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_provider_example_config_builds_registry_without_secret_values() -> None:
     store = load_company_provider_secrets("configs/providers.example.json")
     registry = ProviderRegistry.from_store(store)
@@ -622,19 +804,174 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
 
     assert registry.descriptor("prompt_optimizer").modality == "llm"
     assert registry.descriptor("prompt_optimizer").account_pool_id == "prompt_optimizer_pool"
+    assert store.services["prompt_optimizer"]["provider"] == "codex_local"
     assert registry.descriptor("codex_image").execution_mode == "async"
     assert registry.descriptor("codex_image").account_pool_id == "codex_image_pool"
     assert registry.descriptor("vision_image").modality == "vision"
+    assert store.services["vision_image"]["provider"] == "codex_local"
     assert registry.descriptor("vision_video").reference_image_slots == 8
     assert registry.descriptor("fake_video").execution_mode == "async"
     assert registry.descriptor("kling_i2v").prompt_profile == "video_i2v_v1"
-    assert "api_key" in serialized
+    assert "model_relay" not in serialized
+    assert "afs_model_relay" not in serialized
+    assert "api_relay" not in serialized
     assert "minimax_image" not in serialized
     assert "minimax_m3" not in serialized
     assert "image-01" not in serialized
     assert "bearer " not in serialized
     assert "sk-" not in serialized
     assert "fk-" not in serialized
+
+
+class _JsonResponse:
+    def __init__(self, payload: dict):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+def _png_bytes() -> bytes:
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    )
+
+
+def _api_relay_provider_config(*, include_image: bool = False) -> dict:
+    services = {
+        "prompt_optimizer": _api_relay_service("llm", "prompt_optimizer", "llm_pool", "/v1/afs/llm"),
+        "vision_image": _api_relay_service("vision", "vision_image", "vision_pool", "/v1/afs/vision"),
+    }
+    pools = {
+        "llm_pool": {"accounts": [_api_relay_pool_entry("prompt_optimizer", "llm")]},
+        "vision_pool": {"accounts": [_api_relay_pool_entry("vision_image", "vision")]},
+    }
+    if include_image:
+        services["relay_image"] = _api_relay_service("image", "relay_image", "image_pool", "/v1/afs/image")
+        pools["image_pool"] = {"accounts": [_api_relay_pool_entry("relay_image", "image")]}
+    return {
+        "schema_version": "company_provider_secrets.local.v2",
+        "accounts": {
+            "model_relay": {
+                "auth_type": "api_key",
+                "base_url": "https://relay.invalid",
+                "base_url_env": "AFS_MODEL_RELAY_BASE_URL",
+                "api_key_env": "AFS_MODEL_RELAY_API_KEY",
+                "default_models": {"llm": "relay-llm", "vision": "relay-vision", "image": "relay-image"},
+            }
+        },
+        "account_pools": pools,
+        "services": services,
+    }
+
+
+def _api_relay_pool_entry(service_id: str, capability: str) -> dict:
+    return {
+        "account_id": "model_relay",
+        "service_id": service_id,
+        "credential_env": "AFS_MODEL_RELAY_API_KEY",
+        "enabled_capabilities": [capability],
+        "enabled": True,
+        "priority": 10,
+        "weight": 1,
+        "concurrency_limit": 1,
+        "health_state": "healthy",
+    }
+
+
+def _api_relay_service(capability: str, service_id: str, pool_id: str, endpoint: str) -> dict:
+    return {
+        "provider": "api_relay",
+        "account_ref": "model_relay",
+        "capability": capability,
+        "model": "server-configured",
+        "endpoint": endpoint,
+        "required_gate": f"AFS_ALLOW_REMOTE_{capability.upper()}",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": capability,
+            "execution_mode": "sync",
+            "capabilities": [capability],
+            "account_pool_id": pool_id,
+            "reference_image_slots": 8 if capability == "vision" else 4 if capability == "image" else 0,
+            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "prompt_char_limit": 5000,
+            "seed_supported": capability == "image",
+            "cost_hint": "test-only",
+            "rate_limit_hint": "test-only",
+            "required_gate": f"AFS_ALLOW_REMOTE_{capability.upper()}",
+        },
+    }
+
+
+def _codex_local_provider_config() -> dict:
+    return {
+        "schema_version": "company_provider_secrets.local.v2",
+        "accounts": {
+            "local_codex": {
+                "auth_type": "none",
+                "execution_backend": "codex_exec",
+                "cli_command": "codex",
+                "default_models": {"llm": "codex-local", "vision": "codex-local", "image": "image2"},
+            }
+        },
+        "account_pools": {
+            "prompt_optimizer_pool": {"accounts": [_codex_pool_entry("prompt_optimizer", "llm")]},
+            "vision_pool": {"accounts": [_codex_pool_entry("vision_image", "vision")]},
+        },
+        "services": {
+            "prompt_optimizer": _codex_local_service("llm", "prompt_optimizer", "prompt_optimizer_pool", ["1:1"], 0),
+            "vision_image": _codex_local_service("vision", "vision_image", "vision_pool", ["1:1"], 8),
+        },
+    }
+
+
+def _codex_pool_entry(service_id: str, capability: str) -> dict:
+    return {
+        "account_id": "local_codex",
+        "service_id": service_id,
+        "enabled_capabilities": [capability],
+        "enabled": True,
+        "priority": 10,
+        "weight": 1,
+        "concurrency_limit": 1,
+        "health_state": "healthy",
+    }
+
+
+def _codex_local_service(
+    capability: str,
+    service_id: str,
+    pool_id: str,
+    aspect_ratios: list[str],
+    reference_image_slots: int,
+) -> dict:
+    return {
+        "provider": "codex_local",
+        "account_ref": "local_codex",
+        "capability": capability,
+        "required_gate": f"AFS_ALLOW_REMOTE_{capability.upper()}",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": capability,
+            "execution_mode": "sync",
+            "capabilities": [capability],
+            "account_pool_id": pool_id,
+            "reference_image_slots": reference_image_slots,
+            "supported_aspect_ratios": aspect_ratios,
+            "prompt_char_limit": 5000,
+            "seed_supported": False,
+            "cost_hint": "local-codex",
+            "rate_limit_hint": "local-codex",
+            "required_gate": f"AFS_ALLOW_REMOTE_{capability.upper()}",
+        },
+    }
 
 
 def _provider_gateway_config() -> dict:

@@ -10,17 +10,14 @@ from agentflow_studio.model_gateway import (
 )
 
 
-def test_load_model_gateway_config_reads_example() -> None:
+def test_load_model_gateway_config_reads_example(monkeypatch) -> None:
     config = load_model_gateway_config("configs/models.example.yaml")
 
     assert config.default_provider == "mock"
     assert config.providers["mock"].type == "mock"
     assert config.providers["mock"].model == "mock-local"
     assert "openai_compatible" in config.providers
-    assert config.providers["minimax_m3"].base_url == "https://api.minimaxi.com/v1"
-    assert config.providers["minimax_m3"].api_key_env == "MINIMAX_API_KEY"
-    assert config.providers["minimax_m3"].model == "MiniMax-M3"
-    assert config.providers["minimax_m3"].extra_body == {"thinking": {"type": "disabled"}}
+    assert "relay_llm" not in config.providers
 
 
 def test_resolve_model_gateway_config_path_reads_env(monkeypatch, tmp_path) -> None:

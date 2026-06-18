@@ -47,6 +47,79 @@ def _draft_payload(asset_type: str, **overrides: object) -> dict[str, object]:
     return payload
 
 
+def _configure_fake_vision_provider(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "providers.local.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "company_provider_secrets.local.v2",
+                "accounts": {
+                    "vision_worker": {
+                        "auth_type": "none",
+                        "base_url": "https://vision.example.invalid",
+                        "default_models": {"vision": "fake-vision"},
+                    }
+                },
+                "account_pools": {
+                    "vision_pool": {
+                        "accounts": [
+                            {
+                                "account_id": "vision_worker",
+                                "service_id": "vision_image",
+                                "enabled_capabilities": ["vision"],
+                                "enabled": True,
+                                "priority": 10,
+                                "weight": 1,
+                                "concurrency_limit": 1,
+                                "health_state": "healthy",
+                            },
+                            {
+                                "account_id": "vision_worker",
+                                "service_id": "vision_video",
+                                "enabled_capabilities": ["vision"],
+                                "enabled": True,
+                                "priority": 20,
+                                "weight": 1,
+                                "concurrency_limit": 1,
+                                "health_state": "healthy",
+                            },
+                        ]
+                    }
+                },
+                "services": {
+                    "vision_image": _vision_service("vision_image", ["1:1"]),
+                    "vision_video": _vision_service("vision_video", ["16:9", "9:16", "1:1"]),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(path))
+
+
+def _vision_service(service_id: str, ratios: list[str]) -> dict[str, object]:
+    return {
+        "provider": "fake",
+        "account_ref": "vision_worker",
+        "capability": "vision",
+        "required_gate": "AFS_ALLOW_REMOTE_VISION",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "vision",
+            "execution_mode": "sync",
+            "capabilities": ["vision"],
+            "account_pool_id": "vision_pool",
+            "reference_image_slots": 8,
+            "supported_aspect_ratios": ratios,
+            "prompt_char_limit": 5000,
+            "seed_supported": False,
+            "cost_hint": "fake-only",
+            "rate_limit_hint": "fake-only",
+            "required_gate": "AFS_ALLOW_REMOTE_VISION",
+        },
+    }
+
+
 def test_asset_card_draft_gate_closed_blocks_before_provider_and_stays_safe(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_VISION", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -83,6 +156,7 @@ def test_asset_card_draft_gate_closed_blocks_before_provider_and_stays_safe(tmp_
 def test_vision_image_drafts_character_and_scene_cards_without_fixed_asset_pollution(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    _configure_fake_vision_provider(tmp_path, monkeypatch)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_asset_card_fake"
     character_image = _upload_image(client, project_id, "char-node")
@@ -153,6 +227,7 @@ def test_vision_image_drafts_character_and_scene_cards_without_fixed_asset_pollu
 
 def test_vision_video_draft_and_video_asset_promote_use_segment_schema(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    _configure_fake_vision_provider(tmp_path, monkeypatch)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_video_asset_card"
     sampled_frame = _upload_image(client, project_id, "video-frame")

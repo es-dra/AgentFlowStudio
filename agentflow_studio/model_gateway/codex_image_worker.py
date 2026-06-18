@@ -20,6 +20,7 @@ from agentflow_studio.model_gateway.codex_image_handoff import (
     completed_result_payload,
     failed_result_payload,
 )
+from agentflow_studio.model_gateway.codex_runtime_env import codex_subprocess_env, prune_codex_home
 
 
 class CodexImageExecutor(Protocol):
@@ -46,27 +47,32 @@ class CodexExecImageExecutor:
         work_dir = Path(work_dir).resolve()
         prompt_path = work_dir / "worker_prompt.md"
         prompt_path.write_text(_worker_prompt(request), encoding="utf-8")
-        completed = subprocess.run(
-            [
-                self.cli_command,
-                "exec",
-                "-c",
-                'approval_policy="never"',
-                "--sandbox",
-                "workspace-write",
-                "--skip-git-repo-check",
-                "--cd",
-                str(work_dir),
-                "Read worker_prompt.md in the current directory and create candidate_001.png.",
-            ],
-            cwd=str(work_dir),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=self.timeout_sec,
-            check=False,
-        )
+        codex_env = codex_subprocess_env()
+        try:
+            completed = subprocess.run(
+                [
+                    self.cli_command,
+                    "exec",
+                    "-c",
+                    'approval_policy="never"',
+                    "--sandbox",
+                    "workspace-write",
+                    "--skip-git-repo-check",
+                    "--cd",
+                    str(work_dir),
+                    "Read worker_prompt.md in the current directory and create candidate_001.png.",
+                ],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=codex_env,
+                timeout=self.timeout_sec,
+                check=False,
+            )
+        finally:
+            prune_codex_home(codex_env)
         if completed.returncode != 0:
             raise RuntimeError(_safe_process_error(completed.stderr or completed.stdout))
         for candidate in (work_dir / "candidate_001.png", work_dir / "image_candidates" / "candidate_001.png"):
@@ -105,6 +111,7 @@ def process_one(root: str | Path, *, executor: CodexImageExecutor | None = None)
         completed = job_root / "completed" / job_id
         completed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(completed)
+        _trim_finished_job_dir(completed)
         _append_event(job_root, job_id=job_id, status="succeeded", image_path="image_candidates/candidate_001.png")
         return ProcessResult(job_id=job_id, status="succeeded", job_dir=completed)
     except Exception as exc:  # noqa: BLE001 - worker boundary converts all failures to safe job results.
@@ -113,6 +120,7 @@ def process_one(root: str | Path, *, executor: CodexImageExecutor | None = None)
         failed = job_root / "failed" / job_id
         failed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(failed)
+        _trim_finished_job_dir(failed)
         _append_event(job_root, job_id=job_id, status="failed", error_summary=result["blocks"][0]["reason"])
         return ProcessResult(job_id=job_id, status="failed", job_dir=failed)
 
@@ -183,6 +191,16 @@ def _append_event(job_root: Path, *, job_id: str, status: str, image_path: str |
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def _trim_finished_job_dir(job_dir: Path) -> None:
+    for item in Path(job_dir).iterdir():
+        if item.name == RESULT_FILENAME:
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink(missing_ok=True)
 
 
 def _worker_prompt(request: dict[str, Any]) -> str:

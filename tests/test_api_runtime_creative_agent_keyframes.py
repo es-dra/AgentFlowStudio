@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.openapi_export import export_openapi_schema
-from apps.api.runtime_keyframes import DEFAULT_IMAGE_PROMPT_LIMIT, minimax_keyframe_prompt
+from apps.api.runtime_keyframes import DEFAULT_IMAGE_PROMPT_LIMIT, provider_keyframe_prompt
 from apps.api.runtime_service import create_runtime_app
 
 PNG_BYTES = base64.b64decode(
@@ -299,13 +299,13 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
 
 
 def test_keyframe_prompt_for_minimax_removes_internal_runtime_terms() -> None:
-    prompt = minimax_keyframe_prompt(
+    prompt = provider_keyframe_prompt(
         "\n".join(
             [
                 "Intent: a vertical founder keyframe.",
                 "Negative Constraints: Provider calls remain off; do not claim provider execution.",
                 "Lighting: low-key practical window light.",
-                "Agent Rationale: internal scoring should not reach MiniMax.",
+                "Agent Rationale: internal scoring should not reach provider prompts.",
                 "Continuity: stable wardrobe and room geography.",
             ]
         )
