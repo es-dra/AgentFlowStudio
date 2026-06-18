@@ -52,6 +52,7 @@ button:not(:disabled):active { transform: scale(0.96); }
   border-radius: var(--radius-chip);
   padding: 6px 8px;
   color: var(--text-secondary);
+  text-decoration: none;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .icon-btn:hover { background: var(--bg-chip); color: var(--text-primary); }

@@ -54,6 +54,7 @@ function pushEntry(el, options) {
   };
   function onOutside(event) {
     if (stack[stack.length - 1] !== entry) return;
+    if (options.closeOnOutside === false) return;
     const target = options.isModal ? options.content : el;
     if (!target.contains(event.target)) {
       if (options.isModal && event.target !== el) return;

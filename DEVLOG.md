@@ -1,5 +1,86 @@
 # Devlog
 
+## 2026-06-18 - Internal Auth And Invite-Gated Project Isolation
+
+- Added an opt-in Runtime auth slice for internal testing. When
+  `AFS_AUTH_ENABLED=true`, project APIs require a bearer session created by
+  `/auth/register` or `/auth/login`; static `/`, `/studio/`, `/health`,
+  `/capabilities`, and `/auth/*` remain reachable.
+- Added invite-code registration through `AFS_INVITE_CODES`. Invite codes are
+  stored hashed under the runtime root, consumed once, and mapped to the user
+  that used them; plaintext invite codes and passwords are not written to
+  project artifacts.
+- Added user-owned project isolation for the current Runtime surface:
+  `/projects` only lists the current user's projects, project routes reject
+  other users, and Studio creates an account-scoped default project after first
+  login instead of falling back to the shared `studio-local-001`.
+- Added Studio account session support, a registration/login gate, and a clear
+  topbar link back to the website homepage. The existing project menu remains
+  separate from the new homepage link.
+- Locked the auth gate against accidental backdrop dismissal when auth is
+  required, so internal-test users cannot silently close the login/register
+  surface and then hit protected Runtime APIs from an unauthenticated canvas.
+- Updated `.env.example` with auth switches only; no real invite code, password,
+  provider secret, or private deployment value was added.
+
+Verification:
+
+```text
+Auth-focused pytest: 3 passed / 1 warning
+Runtime/Auth/Studio/Site focused regression: 54 passed / 1 warning
+Auth gate/site focused regression after backdrop-lock fix: 7 passed / 1 warning
+Studio JS node --check: passed for all 70 apps/studio/src/**/*.js files
+CLI help/version: passed
+Full pytest: 474 passed / 527 deselected / 2 warnings
+maintenance audit: failed=0, warning=4
+git diff --check: passed with Windows CRLF notices only
+Runtime HTTP auth smoke on 127.0.0.1:8802: /, /studio/, /health, /auth/status,
+anonymous /projects rejection, invite registration, project creation, and owned
+project listing passed.
+```
+
+Boundary:
+
+- Internal-test account gate only. This is not a full SaaS auth system: no
+  email verification, admin console, password reset, project sharing, roles,
+  billing, abuse controls, or real-time collaborative editing is claimed.
+- No provider gate was opened, no live model/provider call was made, no local
+  secret provider config was edited, and no human acceptance or business
+  validation is claimed.
+
+## 2026-06-18 - Site and Studio UX Consolidation
+
+- Fixed the homepage product preview overlap by replacing absolutely positioned
+  node cards with a bounded flow grid and responsive single-column fallback.
+- Tightened the homepage visual shell: removed the decorative radial glow,
+  renamed the preview to a creation chain, and changed the right preview copy
+  from internal context jargon to user-facing "what the system referenced".
+- Reframed the Studio empty inspector from an algorithm/status console into a
+  creation decision surface: the header now says "next step", the primary copy
+  tells the user to continue generation, save assets, inspect references, or
+  revise, and the algorithm trace is kept as a folded system-reference audit.
+- Added static regressions that prevent the homepage preview from returning to
+  fixed-width absolute card placement and lock the Studio default inspector to
+  the creation-decision-first shape.
+
+Verification:
+
+```text
+tests/test_api_runtime_service.py + tests/test_site_homepage_static.py + tests/test_web_studio_static.py: 42 passed / 1 warning
+Full default pytest: 470 passed / 527 deselected / 2 warnings
+Studio JS node --check: passed for all apps/studio/src/**/*.js
+Runtime HTTP smoke on 127.0.0.1:8801: /, /studio/, /health all 200
+In-app Browser QA on 127.0.0.1:8801: homepage cardOverlaps=0, Studio nav CTA works, console warn/error empty
+maintenance audit: failed=0, warning=4
+git diff --check: passed
+```
+
+Boundary:
+
+- Frontend and static-route usability consolidation only. No provider gate was
+  opened, no provider call was made, no local secret config was edited, and no
+  human acceptance or business validation is claimed.
+
 ## 2026-06-18 - Model Route Surface Consolidation
 
 - Repointed the current Studio image/keyframe surface from the retired MiniMax

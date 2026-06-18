@@ -47,8 +47,8 @@
         <div class="product-preview" aria-label="AFS Studio 工作台预览">
           <div class="preview-topbar">
             <span></span>
-            <strong>Studio canvas</strong>
-            <em>saved</em>
+            <strong>创作链路</strong>
+            <em>ready</em>
           </div>
           <div class="preview-body">
             <div class="preview-sidebar">
@@ -60,30 +60,32 @@
             </div>
             <div class="preview-canvas">
               <div class="canvas-grid"></div>
-              <article class="node-card node-text">
-                <span>01</span>
-                <strong>创作意图</strong>
-                <small>brief / prompt / preference</small>
-              </article>
-              <article class="node-card node-image">
-                <span>02</span>
-                <strong>参考资产</strong>
-                <small>fixed / upstream / selected</small>
-              </article>
-              <article class="node-card node-video">
-                <span>03</span>
-                <strong>生成证据</strong>
-                <small>manifest / feedback / trace</small>
-              </article>
-              <svg class="node-link" viewBox="0 0 420 180" role="img" aria-label="节点上下文连接">
-                <path d="M92 96 C156 32 226 34 292 84" />
-                <path d="M174 132 C220 178 290 172 345 120" />
+              <div class="preview-flow" aria-label="一次创作调用的可视链路">
+                <article class="node-card node-text">
+                  <span>01</span>
+                  <strong>创作意图</strong>
+                  <small>故事 brief / 提示词倾向</small>
+                </article>
+                <article class="node-card node-image">
+                  <span>02</span>
+                  <strong>参考资产</strong>
+                  <small>固定人物 / 场景 / 上游图</small>
+                </article>
+                <article class="node-card node-video">
+                  <span>03</span>
+                  <strong>生成证据</strong>
+                  <small>结果 / 反馈 / 可追溯 trace</small>
+                </article>
+              </div>
+              <svg class="node-link" viewBox="0 0 520 300" role="img" aria-label="节点上下文连接">
+                <path d="M88 98 C168 40 258 56 346 118" />
+                <path d="M156 182 C252 256 368 242 448 176" />
               </svg>
             </div>
             <aside class="preview-inspector">
               <p>Context</p>
-              <strong>本次调用参考</strong>
-              <span>人物资产 / 场景图 / 用户偏好 / 上游输出</span>
+              <strong>本次系统参考</strong>
+              <span>人物资产、场景图、用户偏好和上游输出会先被整理成安全 brief。</span>
               <div class="trace-row"></div>
               <div class="trace-row wide"></div>
               <div class="trace-row"></div>

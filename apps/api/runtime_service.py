@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
 from agentflow.harness.json_io import write_json
@@ -35,6 +35,11 @@ from apps.api.runtime_video_revision_routes import register_runtime_video_revisi
 from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
+from apps.api.runtime_auth import (
+    RuntimeAuthStore,
+    configure_runtime_auth_middleware,
+    register_runtime_auth_routes,
+)
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import (
     DEFAULT_SITE_ROOT,
@@ -76,12 +81,15 @@ def create_runtime_app(
     site_root: Path = DEFAULT_SITE_ROOT,
 ) -> FastAPI:
     store = RuntimeStore(runtime_root)
+    auth = RuntimeAuthStore(store)
     app = FastAPI(
         title="AgentFlow Runtime Service",
         version="0.2.0",
         summary="Local AFS API adapter for AFS Studio canvas integration.",
     )
     configure_runtime_cors(app)
+    configure_runtime_auth_middleware(app, auth)
+    register_runtime_auth_routes(app, auth)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -92,19 +100,30 @@ def create_runtime_app(
         return runtime_capabilities_payload()
 
     @app.get("/projects")
-    def list_projects() -> dict[str, Any]:
-        return {"projects": [_project_summary_with_studio_meta(store, item) for item in store.list_project_summaries()]}
+    def list_projects(request: Request) -> dict[str, Any]:
+        summaries = [_project_summary_with_studio_meta(store, item) for item in store.list_project_summaries()]
+        if auth.enabled():
+            user = auth.require_user(request)
+            summaries = auth.filter_project_summaries(str(user["user_id"]), summaries)
+        return {"projects": summaries}
 
     @app.post("/projects")
-    def create_project(request: ProjectCreateRequest) -> dict[str, Any]:
+    def create_project(request: Request, body: ProjectCreateRequest) -> dict[str, Any]:
+        user = auth.require_user(request) if auth.enabled() else None
+        if user:
+            owner = auth.project_owner(body.project_id)
+            if owner and owner != str(user["user_id"]):
+                raise HTTPException(status_code=403, detail="project access denied")
         manifest = store.create_project_manifest(
-            project_id=request.project_id,
-            project_type=request.project_type,
-            goal=request.goal,
-            status=request.status,
+            project_id=body.project_id,
+            project_type=body.project_type,
+            goal=body.goal,
+            status=body.status,
         )
-        ref = store.register_artifact(store.project_manifest_path(request.project_id), role="project_manifest")
-        return {"project_id": request.project_id, "manifest": manifest, "artifact": ref, "flow": build_flow_summary(store, request.project_id)}
+        if user:
+            auth.register_project_owner(body.project_id, str(user["user_id"]))
+        ref = store.register_artifact(store.project_manifest_path(body.project_id), role="project_manifest")
+        return {"project_id": body.project_id, "manifest": manifest, "artifact": ref, "flow": build_flow_summary(store, body.project_id)}
 
     @app.get("/projects/{project_id}/manifest")
     def project_manifest(project_id: str) -> dict[str, Any]:
@@ -116,9 +135,11 @@ def create_runtime_app(
         return {"project_id": project_id, "manifest": manifest, "artifact": ref}
 
     @app.get("/artifacts/{artifact_id}")
-    def artifact(artifact_id: str) -> dict[str, Any]:
+    def artifact(artifact_id: str, request: Request) -> dict[str, Any]:
         try:
-            return store.read_artifact(artifact_id)
+            artifact_payload = store.read_artifact(artifact_id)
+            _enforce_payload_project_access(auth, request, artifact_payload)
+            return artifact_payload
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="artifact not found") from exc
         except ValueError as exc:
@@ -131,25 +152,28 @@ def create_runtime_app(
         raise HTTPException(status_code=404, detail="route not found")
 
     @app.get("/runs/{job_id}")
-    def run_job(job_id: str) -> dict[str, Any]:
+    def run_job(job_id: str, request: Request) -> dict[str, Any]:
         try:
-            return {"job": public_job_from_store(store, job_id)}
+            job = public_job_from_store(store, job_id)
+            _enforce_project_access(auth, request, str(job.get("project_id", "")))
+            return {"job": job}
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="job not found") from exc
 
     @app.post("/feedback")
-    def record_feedback(request: FeedbackRecordRequest) -> dict[str, Any]:
-        store.ensure_project_manifest(request.project_id)
-        job_id = store.new_job_id("record_feedback", request.project_id)
-        output_dir = store.feedback_dir / safe_job_id(request.project_id) / safe_job_id(job_id)
+    def record_feedback(request: Request, body: FeedbackRecordRequest) -> dict[str, Any]:
+        _enforce_project_access(auth, request, body.project_id)
+        store.ensure_project_manifest(body.project_id)
+        job_id = store.new_job_id("record_feedback", body.project_id)
+        output_dir = store.feedback_dir / safe_job_id(body.project_id) / safe_job_id(job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
-        event = runtime_feedback_event(request.project_id, sanitize_runtime_feedback(request.feedback), request.generated_at)
+        event = runtime_feedback_event(body.project_id, sanitize_runtime_feedback(body.feedback), body.generated_at)
         write_json(output_dir / "runtime_feedback_event.json", event)
         artifact_ref = store.register_artifact(output_dir / "runtime_feedback_event.json", role="runtime_feedback_event")
         artifacts = {"runtime_feedback_event": artifact_ref}
         trace_path = write_run_trace(
             output_dir,
-            project_id=request.project_id,
+            project_id=body.project_id,
             job_id=job_id,
             action="record_feedback",
             status="succeeded",
@@ -158,14 +182,14 @@ def create_runtime_app(
             tester_feedback={"status": "recorded_raw_evidence"},
         )
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
-        job = runtime_job(job_id, request.project_id, "record_feedback", "succeeded", artifacts=artifacts)
+        job = runtime_job(job_id, body.project_id, "record_feedback", "succeeded", artifacts=artifacts)
         public_job = store.write_job(job)
         store.update_project_manifest(
-            request.project_id,
+            body.project_id,
             {"feedback_refs": [feedback_ref(artifact_ref, event.get("feedback_id", job_id))]},
             status="in_progress",
         )
-        return {"job": public_job, "feedback_event": event, "artifact": artifact_ref, "flow": build_flow_summary(store, request.project_id)}
+        return {"job": public_job, "feedback_event": event, "artifact": artifact_ref, "flow": build_flow_summary(store, body.project_id)}
 
     if legacy_runtime_v02_enabled():
         register_runtime_v02_routes(app, store)
@@ -191,6 +215,21 @@ def legacy_runtime_v02_enabled() -> bool:
 
 def sanitize_runtime_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
     return sanitize_quality_feedback(feedback)
+
+
+def _enforce_project_access(auth: RuntimeAuthStore, request: Request, project_id: str) -> None:
+    if not auth.enabled():
+        return
+    user = auth.require_user(request)
+    if not project_id or not auth.user_can_access_project(str(user["user_id"]), project_id):
+        raise HTTPException(status_code=403, detail="project access denied")
+
+
+def _enforce_payload_project_access(auth: RuntimeAuthStore, request: Request, payload: dict[str, Any]) -> None:
+    body = payload.get("payload") if isinstance(payload.get("payload"), dict) else payload
+    project_id = str(body.get("project_id", "") if isinstance(body, dict) else "")
+    if project_id:
+        _enforce_project_access(auth, request, project_id)
 
 
 __all__ = (

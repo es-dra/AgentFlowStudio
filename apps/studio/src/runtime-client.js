@@ -5,6 +5,7 @@ const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
 const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
 const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"]);
+export const AUTH_TOKEN_STORAGE_KEY = "afs_auth_session_token";
 
 export function runtimeBaseUrl() {
   if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) {
@@ -61,9 +62,12 @@ function isLocalHost(hostname) {
 }
 
 async function requestJson(route, { method = "GET", payload = null } = {}) {
+  const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  const token = authToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(`${runtimeBaseUrl()}${route}`, {
     method,
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers,
     body: payload == null ? undefined : JSON.stringify(payload),
   });
   const body = await response.text();
@@ -97,12 +101,49 @@ function runtimeErrorMessage(response, body) {
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
 }
 
+export function authToken() {
+  try {
+    return String(window.localStorage?.getItem(AUTH_TOKEN_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function saveAuthToken(token) {
+  try {
+    if (token) window.localStorage?.setItem(AUTH_TOKEN_STORAGE_KEY, String(token));
+    else window.localStorage?.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    /* Browser storage can be blocked; authenticated API calls will fail safely. */
+  }
+}
+
+function persistSession(payload) {
+  if (payload?.session_token) saveAuthToken(payload.session_token);
+  return payload;
+}
+
 export function createRuntimeClient(projectId = "studio-local-001") {
   const encoded = encodeURIComponent(projectId);
   return {
     projectId,
     health() {
       return requestJson("/health");
+    },
+    authStatus() {
+      return requestJson("/auth/status");
+    },
+    me() {
+      return requestJson("/auth/me");
+    },
+    login(payload) {
+      return requestJson("/auth/login", { method: "POST", payload }).then(persistSession);
+    },
+    register(payload) {
+      return requestJson("/auth/register", { method: "POST", payload }).then(persistSession);
+    },
+    logout() {
+      return requestJson("/auth/logout", { method: "POST" }).finally(() => saveAuthToken(""));
     },
     listProjects() {
       return requestJson("/projects");

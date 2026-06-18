@@ -76,6 +76,28 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert "AFS_ALLOW_REMOTE_IMAGE" in env_example
 
 
+def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    auth_gate = (STUDIO_ROOT / "src" / "auth-gate.js").read_text(encoding="utf-8")
+    overlay = (STUDIO_ROOT / "src" / "overlay.js").read_text(encoding="utf-8")
+    topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+
+    assert "AUTH_TOKEN_STORAGE_KEY" in runtime_client
+    assert "Authorization" in runtime_client
+    assert "authStatus()" in runtime_client
+    assert "login(payload)" in runtime_client
+    assert "register(payload)" in runtime_client
+    assert "logout()" in runtime_client
+    assert "ensureAuthSession" in main
+    assert "ensureAccessibleStartupProject" in main
+    assert "closeOnOutside: false" in auth_gate
+    assert "options.closeOnOutside === false" in overlay
+    assert "site-home-btn" in topbar
+    assert 'href = "/"' in topbar
+    assert "首页" in topbar
+
+
 def test_studio_user_surface_does_not_reintroduce_old_workbench_terms() -> None:
     combined = "\n".join(
         path.read_text(encoding="utf-8")
@@ -557,6 +579,10 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
     assert "projectPipelineSection(state)" in inspector
     assert "algorithmConsoleSection(node)" in inspector
     assert "创作助手" in inspector
+    assert 'panelHead("panel", "创作助手", "下一步")' in inspector
+    assert "decisionGuide(state)" in inspector
+    assert "创作决策" in inspector
+    assert "算法过程会折叠记录在下方" in inspector
     assert "starterRailState(state)" in canvas_view
     assert 'starterRow.dataset.mode = rail.mode;' in canvas_view
     assert "shouldShowStarterRail" in starter_rail
@@ -572,6 +598,10 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
         "safeManifest",
     ):
         assert marker in source
+    algorithm_panel = (STUDIO_ROOT / "src" / "panels" / "algorithm-context-panel.js").read_text(encoding="utf-8")
+    assert 'title: "系统参考"' in algorithm_panel
+    assert 'tag: "折叠 trace"' in algorithm_panel
+    assert "生成时自动记录上下文、资产和证据" in algorithm_panel
     for marker in (
         ".algorithm-console",
         ".algorithm-disclosure",

@@ -22,13 +22,14 @@ export function renderInspectorPanel(state, store) {
 }
 
 function renderEmptyInspector(state, store, panel) {
-  panel.appendChild(panelHead("panel", "创作助手", "画布"));
+  panel.appendChild(panelHead("panel", "创作助手", "下一步"));
   panel.appendChild(emptyGuide(state));
   panel.appendChild(inspectorActions([
     ["素材库", "folder", () => openDrawerTab(store, "assets")],
     ["生成进度", "clock", () => openDrawerTab(store, "jobs")],
     ["作品库", "frames", () => openDrawerTab(store, "history")],
   ]));
+  panel.appendChild(decisionGuide(state));
   panel.appendChild(projectPipelineSection(state));
 }
 
@@ -55,14 +56,24 @@ function emptyGuide(state) {
   const hasNodes = state.order.length > 0;
   wrap.appendChild(el("h3", "", hasNodes ? "选择一个节点继续" : "从画布开始"));
   wrap.appendChild(el("p", "", hasNodes
-    ? "点击画布中的节点后，可以继续生成、保存素材或查看本次调用参考了什么。"
-    : "选择画布上的创作起点，系统会在生成前自动调度项目上下文和已确认素材。"));
+    ? "点击画布中的节点，优先决定是继续创作、保存素材，还是查看本次参考。"
+    : "选择一个创作起点，先写清本轮意图；系统会在生成前整理上下文和已确认素材。"));
   const line = el("div", "inspector-quiet-line");
   line.appendChild(metaPill("节点", state.order.length));
   line.appendChild(metaPill("素材", state.assets.length));
   line.appendChild(metaPill("连线", Object.keys(state.edges || {}).length));
   wrap.appendChild(line);
   return wrap;
+}
+
+function decisionGuide(state) {
+  const hasNodes = state.order.length > 0;
+  const assetCount = state.assets.length;
+  const message = hasNodes
+    ? "下一步从画布节点进入：继续生成、固定资产、查看参考或发起修订。算法过程会折叠记录在下方，不需要先理解系统内部。"
+    : "从底部工具栏新建文本、图片或视频节点；固定资产会在后续调用中自动参与调度。";
+  const suffix = assetCount ? `当前已有 ${assetCount} 个可用素材。` : "当前还没有确认素材。";
+  return section("创作决策", `${message}\n${suffix}`);
 }
 
 function nodeFocus(node) {

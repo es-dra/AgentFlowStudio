@@ -13,8 +13,8 @@ const CORE_ALGORITHMS = [
 
 export function projectPipelineSection(state) {
   return algorithmSection({
-    title: "系统过程",
-    tag: "项目链路",
+    title: "系统参考",
+    tag: "折叠 trace",
     summary: projectSummary(state),
     steps: CORE_ALGORITHMS.map((item) => [item, projectAlgorithmStatus(state, item.id)]),
     stats: [
@@ -143,7 +143,7 @@ function assetMemoryStatus(node, bundle) {
 
 function projectSummary(state) {
   const readyCount = CORE_ALGORITHMS.filter((item) => projectAlgorithmStatus(state, item.id).tone === "complete").length;
-  return readyCount ? `${readyCount} 个算法已有证据` : "生成前会自动调度上下文";
+  return readyCount ? `${readyCount} 项已有记录` : "生成时自动记录上下文、资产和证据";
 }
 
 function nodeSummary(node, bundle) {

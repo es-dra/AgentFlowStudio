@@ -14,6 +14,8 @@ export function renderTopbar(options) {
     onSwitchProject,
     onCreateProject,
     onOpenHome,
+    authUser,
+    onSignOut,
   } = options;
   const topbar = document.getElementById("topbar");
   const signature = [
@@ -24,6 +26,7 @@ export function renderTopbar(options) {
     state.ui.saveState,
     state.ui.saveMessage,
     showAllProjects ? "all-projects" : "studio-projects",
+    authUser?.user_id || "anonymous",
     projectSummaries.map((item) => item.project_id).join(","),
   ].join("|");
   if (topbar.dataset.signature === signature) return;
@@ -34,12 +37,14 @@ export function renderTopbar(options) {
   if (!state.ui.drawerOpen) {
     renderCompactTopbar(topbar, { state, store, runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject, onOpenHome });
   } else {
+    topbar.appendChild(siteHomeLink());
     topbar.appendChild(studioHomeButton(onOpenHome));
     appendProjectControls(topbar, { runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject });
   }
 
   topbar.appendChild(el("div", "topbar-spacer"));
   const right = el("div", "topbar-right");
+  if (authUser) right.appendChild(accountButton(authUser, onSignOut));
   const save = el("span", `save-pill ${saveClass(state.ui.saveState)}`, state.ui.saveState || "本地暂存");
   if (state.ui.saveMessage) save.title = state.ui.saveMessage;
   right.appendChild(save);
@@ -55,6 +60,7 @@ function renderCompactTopbar(topbar, options) {
   topbar.appendChild(openDrawer);
 
   topbar.appendChild(el("div", "topbar-logo", "AFS"));
+  topbar.appendChild(siteHomeLink());
   topbar.appendChild(studioHomeButton(onOpenHome));
 
   const title = el("div", "topbar-title compact-project");
@@ -66,12 +72,29 @@ function renderCompactTopbar(topbar, options) {
   appendProjectControls(topbar, { ...options, projectOptions });
 }
 
+function siteHomeLink() {
+  const home = el("a", "icon-btn site-home-btn");
+  home.href = "/";
+  home.innerHTML = `${icon("globe", 14)}<span>首页</span>`;
+  home.title = "返回网站首页";
+  return home;
+}
+
 function studioHomeButton(onOpenHome) {
   const home = el("button", "icon-btn studio-home-btn");
   home.innerHTML = `${icon("grid", 14)}<span>项目</span>`;
   home.title = "打开项目菜单";
   home.addEventListener("click", onOpenHome);
   return home;
+}
+
+function accountButton(user, onSignOut) {
+  const label = user.display_name || user.email || "账号";
+  const button = el("button", "icon-btn account-btn");
+  button.innerHTML = `${icon("user", 14)}<span>${label}</span>`;
+  button.title = "退出登录";
+  button.addEventListener("click", () => onSignOut?.());
+  return button;
 }
 
 function appendProjectControls(topbar, options) {

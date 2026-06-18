@@ -32,15 +32,16 @@
 }
 
 .preview-body {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) 210px;
   align-items: stretch;
   min-height: 522px;
 }
 
 .preview-sidebar,
 .preview-inspector {
-  width: 150px;
   border-right: 1px solid var(--line);
-  padding: 20px;
+  padding: 20px 16px;
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -75,7 +76,7 @@
 
 .preview-canvas {
   position: relative;
-  flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -89,13 +90,21 @@
   background-size: 52px 52px;
 }
 
-.node-card {
-  position: absolute;
+.preview-flow {
+  position: relative;
   z-index: 2;
-  width: 210px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 86px 24px 24px;
+}
+
+.node-card {
+  min-width: 0;
+  min-height: 128px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
-  padding: 18px;
+  padding: 18px 16px;
   background: rgba(22, 28, 34, 0.92);
 }
 
@@ -111,40 +120,36 @@
 
 .node-card strong {
   margin: 12px 0 8px;
-  font-size: 20px;
+  font-size: 19px;
 }
 
 .node-card small {
   color: var(--muted);
-}
-
-.node-text {
-  left: 46px;
-  top: 86px;
+  line-height: 1.45;
 }
 
 .node-image {
-  right: 42px;
-  top: 118px;
+  margin-top: 34px;
 }
 
 .node-video {
-  left: 36%;
-  bottom: 72px;
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(100%, 280px);
 }
 
 .node-link {
   position: absolute;
-  inset: 118px 30px auto;
-  width: calc(100% - 60px);
-  height: 220px;
+  inset: 74px 18px auto;
+  z-index: 1;
+  width: calc(100% - 36px);
+  height: 300px;
   fill: none;
   stroke: rgba(87, 213, 255, 0.42);
   stroke-width: 2;
 }
 
 .preview-inspector {
-  width: 230px;
   border-right: 0;
   border-left: 1px solid var(--line);
 }
@@ -157,7 +162,7 @@
 .preview-inspector strong {
   display: block;
   margin-bottom: 10px;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .preview-inspector span {

@@ -23,7 +23,6 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at 74% 20%, rgba(87, 213, 255, 0.14), transparent 30rem),
     linear-gradient(145deg, #0a0d10 0%, #12171b 44%, #080a0d 100%);
   color: var(--text);
   font-family:
@@ -139,7 +138,7 @@ p {
 
 h1 {
   margin-bottom: 18px;
-  font-size: clamp(58px, 8vw, 112px);
+  font-size: clamp(62px, 8vw, 116px);
   line-height: 0.95;
 }
 
@@ -157,7 +156,7 @@ h3 {
 .hero-lede {
   max-width: 620px;
   color: #c5ccd2;
-  font-size: clamp(20px, 2vw, 28px);
+  font-size: clamp(19px, 2vw, 27px);
   line-height: 1.45;
 }
 

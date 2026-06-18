@@ -18,6 +18,7 @@ import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality-feedback.js";
 import { renderTopbar } from "./studio-topbar.js";
+import { ensureAuthSession, signOut } from "./auth-gate.js";
 
 const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
 const RECENT_PROJECTS_KEY = "afs_studio_recent_project_ids";
@@ -28,21 +29,38 @@ const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
 let projectSummaries = [];
 let showAllProjects = false;
-rememberProject(runtime.projectId);
+let currentAuthUser = null;
 
-renderStarters();
-renderDock(store, runtimeRef);
-bindCanvasInput(store, runtimeRef);
-bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
-bindStudioKeyboard({ store, runtime: runtimeRef });
-bindQualityFeedback();
-bindVideoAssetCardDraft();
-bindStudioWorkflowEvents();
+bootstrap();
 
-store.subscribe(renderAll);
-renderAll(store.get());
-store.hydrateRuntime(runtime).then(() => syncRuntimeAssets(store, runtime));
-refreshProjectSummaries();
+async function bootstrap() {
+  rememberProject(runtime.projectId);
+  renderStarters();
+  renderDock(store, runtimeRef);
+  bindCanvasInput(store, runtimeRef);
+  bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
+  bindStudioKeyboard({ store, runtime: runtimeRef });
+  bindQualityFeedback();
+  bindVideoAssetCardDraft();
+  bindStudioWorkflowEvents();
+
+  store.subscribe(renderAll);
+  renderAll(store.get());
+
+  const authState = await ensureAuthSession(runtime, {
+    onAuthenticated: (user) => {
+      currentAuthUser = user || null;
+      renderAll(store.get());
+    },
+  });
+  currentAuthUser = authState?.user || null;
+  if (authState?.auth_required && !authState?.authenticated) return;
+
+  await ensureAccessibleStartupProject();
+  await store.hydrateRuntime(runtime);
+  await syncRuntimeAssets(store, runtime);
+  await refreshProjectSummaries();
+}
 
 function initialProjectId() {
   const params = new URLSearchParams(window.location.search || "");
@@ -66,6 +84,39 @@ async function refreshProjectSummaries() {
   } catch {
     projectSummaries = [];
   }
+}
+
+async function ensureAccessibleStartupProject() {
+  let payload;
+  try {
+    payload = await runtime.listProjects();
+  } catch {
+    projectSummaries = [];
+    return;
+  }
+  projectSummaries = Array.isArray(payload?.projects) ? payload.projects : [];
+  syncCurrentProjectMetaFromSummaries();
+  if (projectSummaries.some((item) => item.project_id === runtime.projectId)) return;
+  if (projectSummaries.length) {
+    await switchProject(projectSummaries[0].project_id);
+    return;
+  }
+  if (!currentAuthUser?.user_id) return;
+  const projectId = safeProjectId(`studio-${currentAuthUser.user_id}-home`);
+  const projectName = `${currentAuthUser.display_name || "AFS"} 的项目`;
+  runtime = createRuntimeClient(projectId);
+  await runtime.createProject({ project_id: projectId, goal: projectName });
+  localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+  rememberProject(projectId);
+  syncProjectUrl(projectId);
+  store.attachRuntime(runtime);
+  await store.switchProject(projectId, runtime);
+  store.set((s) => {
+    s.meta.projectName = projectName;
+    s.meta.canvasName = "画布 1";
+  }, { history: false });
+  await runtime.saveStudioState(store.get());
+  await refreshProjectSummaries();
 }
 
 function syncCurrentProjectMetaFromSummaries() {
@@ -380,6 +431,12 @@ function renderAll(state) {
     onSwitchProject: switchProject,
     onCreateProject: createNewProject,
     onOpenHome: () => openStudioHome(state),
+    authUser: currentAuthUser,
+    onSignOut: async () => {
+      await signOut(runtime);
+      currentAuthUser = null;
+      window.location.href = "/";
+    },
   });
   renderCanvas(state);
   renderDrawer(state, store, runtimeRef);

@@ -11,6 +11,10 @@
     display: none;
   }
 
+  .preview-body {
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+
   .workflow-line {
     grid-template-columns: 1fr;
   }
@@ -42,16 +46,24 @@
     display: none;
   }
 
-  .node-card {
-    width: 176px;
+  .preview-body {
+    grid-template-columns: 1fr;
   }
 
-  .node-image {
-    right: 20px;
+  .preview-flow {
+    grid-template-columns: 1fr;
+    padding: 40px 18px 20px;
   }
 
+  .node-image,
   .node-video {
-    left: 20px;
+    width: auto;
+    margin-top: 0;
+    justify-self: stretch;
+  }
+
+  .node-link {
+    display: none;
   }
 
   .site-footer {

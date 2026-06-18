@@ -8,6 +8,7 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def runtime_health_payload(studio_static: dict[str, Any] | None = None) -> dict[str, Any]:
+    auth_required = runtime_auth_required()
     return {
         "service": "agentflow_runtime_service",
         "status": "ready",
@@ -22,10 +23,11 @@ def runtime_health_payload(studio_static: dict[str, Any] | None = None) -> dict[
             "status": "missing",
         },
         "provider_gates": runtime_provider_gates(),
+        "auth_required": auth_required,
         "boundaries": {
             "local_only": True,
             "no_database": True,
-            "no_account_system": True,
+            "no_account_system": not auth_required,
             "no_browser_persistence": True,
             "no_provider_call_by_default": True,
             "no_durable_memory_write": True,
@@ -43,6 +45,11 @@ def runtime_provider_gates(env: dict[str, str] | None = None) -> dict[str, bool]
         "vision": _enabled(source.get("AFS_ALLOW_REMOTE_VISION")),
         "external_download": _enabled(source.get("AFS_ALLOW_EXTERNAL_DOWNLOAD")),
     }
+
+
+def runtime_auth_required(env: dict[str, str] | None = None) -> bool:
+    source = env if env is not None else os.environ
+    return _enabled(source.get("AFS_AUTH_ENABLED"))
 
 
 def _enabled(value: str | None) -> bool:
@@ -87,4 +94,4 @@ def runtime_capabilities_payload() -> dict[str, Any]:
     }
 
 
-__all__ = ("runtime_capabilities_payload", "runtime_health_payload", "runtime_provider_gates")
+__all__ = ("runtime_auth_required", "runtime_capabilities_payload", "runtime_health_payload", "runtime_provider_gates")
