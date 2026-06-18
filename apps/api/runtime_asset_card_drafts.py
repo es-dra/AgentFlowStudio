@@ -10,11 +10,14 @@ from fastapi import FastAPI, HTTPException
 from agentflow.algorithms.asset_card_drafting import draft_asset_card, draft_id_from_refs
 from agentflow.algorithms.fixed_asset_memory import build_video_asset_record, public_video_asset
 from agentflow.algorithms.provider_gate_manifest import blocked_manifest, provider_gate_status
+from agentflow.algorithms.request_projection import build_request_plan
+from agentflow.algorithms.visual_understanding import normalize_visual_observation
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_image_assets import image_asset_metadata
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_model_call_context import visual_inspect_model_call_context
 from apps.api.runtime_models import AssetCardDraftRequest, VideoAssetPromoteRequest
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload, safe_id
 from apps.api.runtime_tracing import artifact_refs, blocked_refs_from_blocks, write_run_trace
@@ -30,6 +33,16 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
         try:
             _validate_asset_card_draft_request(store, project_id, request)
             gate = provider_gate_status("vision")
+            model_call_context = visual_inspect_model_call_context(
+                project_id=project_id,
+                request=request,
+                provider_constraints=_vision_provider_constraints(request, gate.public()),
+            )
+            model_request_plan = build_request_plan(
+                model_call_context=model_call_context,
+                canonical_brief={"canonical_prompt": request.prompt_text},
+                provider_service_id=request.provider_service_id,
+            )
             if gate.status != "open":
                 safe_manifest = blocked_manifest(
                     action="asset_card_draft",
@@ -38,7 +51,17 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
                     failure_class="remote_vision_gate_closed",
                     provider_service_id=request.provider_service_id,
                 )
-                artifacts = _write_asset_card_artifacts(store, output_dir, safe_manifest=safe_manifest, draft=None)
+                safe_manifest["model_call_context_id"] = model_call_context["context_id"]
+                safe_manifest["model_request_plan_ref"] = "model_request_plan.json"
+                artifacts = _write_asset_card_artifacts(
+                    store,
+                    output_dir,
+                    safe_manifest=safe_manifest,
+                    draft=None,
+                    model_call_context=model_call_context,
+                    model_request_plan=model_request_plan,
+                    visual_observation=None,
+                )
                 trace_path = write_run_trace(
                     output_dir,
                     project_id=project_id,
@@ -61,12 +84,29 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
                     "safe_manifest": safe_manifest,
                     "draft": None,
                     "artifacts": artifacts,
+                    "model_call_context_id": model_call_context["context_id"],
                     "flow": build_flow_summary(store, project_id),
                 }
 
             refs_for_id = [*request.source_image_asset_refs, *request.sampled_image_asset_refs]
             if request.source_video_artifact_id:
                 refs_for_id.append(request.source_video_artifact_id)
+            visual_observation = normalize_visual_observation(
+                project_id=project_id,
+                observation_id=f"vu_{job_id}",
+                source_refs={
+                    "image_asset_refs": [*request.source_image_asset_refs, *request.sampled_image_asset_refs],
+                    "video_artifact_id": request.source_video_artifact_id,
+                },
+                provider_observation={
+                    "description": request.prompt_text,
+                    "labels": [request.asset_type],
+                },
+                project_need={
+                    "asset_types": [request.asset_type],
+                    "focus": "draft_asset_card",
+                },
+            )
             draft = draft_asset_card(
                 asset_type=request.asset_type,
                 project_id=project_id,
@@ -77,9 +117,21 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
                 prompt_text=request.prompt_text,
                 provider_service_id=request.provider_service_id,
             )
+            draft["visual_observation_ref"] = "visual_understanding_observation.json"
             reject_unsafe_payload(draft)
             safe_manifest = dict(draft["safe_manifest"])
-            artifacts = _write_asset_card_artifacts(store, output_dir, safe_manifest=safe_manifest, draft=draft)
+            safe_manifest["model_call_context_id"] = model_call_context["context_id"]
+            safe_manifest["model_request_plan_ref"] = "model_request_plan.json"
+            safe_manifest["visual_understanding_observation_ref"] = "visual_understanding_observation.json"
+            artifacts = _write_asset_card_artifacts(
+                store,
+                output_dir,
+                safe_manifest=safe_manifest,
+                draft=draft,
+                model_call_context=model_call_context,
+                model_request_plan=model_request_plan,
+                visual_observation=visual_observation,
+            )
             trace_path = write_run_trace(
                 output_dir,
                 project_id=project_id,
@@ -103,6 +155,7 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
             "safe_manifest": safe_manifest,
             "draft": draft,
             "artifacts": artifacts,
+            "model_call_context_id": model_call_context["context_id"],
             "flow": build_flow_summary(store, project_id),
         }
 
@@ -147,15 +200,31 @@ def _write_asset_card_artifacts(
     *,
     safe_manifest: dict[str, Any],
     draft: dict[str, Any] | None,
+    model_call_context: dict[str, Any],
+    model_request_plan: dict[str, Any],
+    visual_observation: dict[str, Any] | None,
 ) -> dict[str, dict[str, Any]]:
     reject_unsafe_payload(safe_manifest)
+    reject_unsafe_payload(model_call_context)
+    reject_unsafe_payload(model_request_plan)
     write_json(output_dir / "asset_card_draft_safe_manifest.json", safe_manifest)
+    write_json(output_dir / "model_call_context.json", model_call_context)
+    write_json(output_dir / "model_request_plan.json", model_request_plan)
     artifacts = {
         "asset_card_draft_safe_manifest": store.register_artifact(
             output_dir / "asset_card_draft_safe_manifest.json",
             role="asset_card_draft_safe_manifest",
-        )
+        ),
+        "model_call_context": store.register_artifact(output_dir / "model_call_context.json", role="model_call_context"),
+        "model_request_plan": store.register_artifact(output_dir / "model_request_plan.json", role="model_request_plan"),
     }
+    if visual_observation is not None:
+        reject_unsafe_payload(visual_observation)
+        write_json(output_dir / "visual_understanding_observation.json", visual_observation)
+        artifacts["visual_understanding_observation"] = store.register_artifact(
+            output_dir / "visual_understanding_observation.json",
+            role="visual_understanding_observation",
+        )
     if draft is not None:
         reject_unsafe_payload(draft)
         write_json(output_dir / "asset_card_draft.json", draft)
@@ -174,6 +243,17 @@ def _draft_input_refs(request: AssetCardDraftRequest) -> list[dict[str, str]]:
     if request.source_video_artifact_id:
         refs.append({"role": "source_video_artifact_id", "ref": request.source_video_artifact_id})
     return refs
+
+
+def _vision_provider_constraints(request: AssetCardDraftRequest, gate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "capability": "vision",
+        "provider_gate": gate.get("required_gate") or "AFS_ALLOW_REMOTE_VISION",
+        "provider_gate_status": gate.get("status") or "unknown",
+        "provider_service_id": request.provider_service_id,
+        "accepted_asset_types": ["character", "scene", "video"],
+        "mode": "visual_inspect",
+    }
 
 
 def _vision_gate_state(value: str) -> dict[str, str]:

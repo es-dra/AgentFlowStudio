@@ -7,6 +7,7 @@ from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_context_resolver import resolve_context_bundle
 from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
+from apps.api.runtime_model_call_context import prompt_optimization_model_call_context
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_assembly import (
     CONTEXT_PRIORITY,
@@ -62,11 +63,18 @@ def build_prompt_optimization(
         brief["context_bundle"] = context_bundle
     trace = _prompt_trace(request, project_id, assembly, background_refs, extracted, llm_enhancement, context_bundle)
     safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement, context_bundle)
-    for payload in (brief, trace, safe_manifest):
+    model_call_context = prompt_optimization_model_call_context(
+        project_id=project_id,
+        request=request,
+        assembly=assembly,
+        context_bundle=context_bundle,
+    )
+    for payload in (brief, trace, safe_manifest, model_call_context):
         reject_unsafe_payload(payload)
     state = append_extracted_context(state, extracted)
     write_creative_memory_state(store, project_id, state)
     output_dir.mkdir(parents=True, exist_ok=True)
+    write_json(output_dir / "model_call_context.json", model_call_context)
     write_json(output_dir / "creative_brief.json", brief)
     write_json(output_dir / "prompt_assembly_trace.json", trace)
     write_json(output_dir / "prompt_optimization_safe_manifest.json", safe_manifest)
@@ -83,6 +91,7 @@ def build_prompt_optimization(
         "user_prompt_plain": user_prompt_plain,
         "user_prompt_sections": user_prompt_sections,
         "context_bundle": context_bundle,
+        "model_call_context": model_call_context,
     }
 
 

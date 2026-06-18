@@ -25,6 +25,10 @@ def script_provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str
 
 def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
     return {
+        "model_call_context": store.register_artifact(
+            output_dir / "model_call_context.json",
+            role="model_call_context",
+        ),
         "creative_brief": store.register_artifact(
             output_dir / "creative_brief.json",
             role="creative_brief",
@@ -42,6 +46,14 @@ def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, 
 
 def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
     return {
+        "model_call_context": store.register_artifact(
+            output_dir / "model_call_context.json",
+            role="model_call_context",
+        ),
+        "model_request_plan": store.register_artifact(
+            output_dir / "model_request_plan.json",
+            role="model_request_plan",
+        ),
         "keyframe_request_plan": store.register_artifact(
             output_dir / "keyframe_request_plan.json",
             role="keyframe_request_plan",

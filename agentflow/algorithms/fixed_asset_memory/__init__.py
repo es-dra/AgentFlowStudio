@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.fixed_asset_memory.continuity import asset_continuity_context
+
 
 ALGORITHM_ID = "afs.fixed_asset_memory.v0.1"
 INPUT_CONTRACT = "human reviewed asset payloads, asset records, status filters, version links"
@@ -255,6 +257,7 @@ __all__ = (
     "OUTPUT_CONTRACT",
     "VISUAL_ASSET_SCHEMA_VERSION",
     "VIDEO_ASSET_SCHEMA_VERSION",
+    "asset_continuity_context",
     "build_video_asset_record",
     "build_visual_asset_record",
     "clean_feature_card",

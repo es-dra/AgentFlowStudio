@@ -33,6 +33,7 @@ archived.
 - `AFS-PROVIDER-CONNECTED-VALIDATION-READINESS-20260617.md`
 - `AFS-PROVIDER-FLOW-INTAKE-20260617.md`
 - `AFS-ALGORITHM-CORE-WAVE2-20260617.md`
+- `AFS-MODEL-CALL-CONTEXT-CONTRACT-20260618.md`
 - `COS-GFR-V1-PROJECTION-20260617.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
@@ -57,6 +58,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-PROVIDER-CONNECTED-VALIDATION-READINESS-20260617.md`
 - `AFS-PROVIDER-FLOW-INTAKE-20260617.md`
 - `AFS-ALGORITHM-CORE-WAVE2-20260617.md`
+- `AFS-MODEL-CALL-CONTEXT-CONTRACT-20260618.md`
 - `COS-GFR-V1-PROJECTION-20260617.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI

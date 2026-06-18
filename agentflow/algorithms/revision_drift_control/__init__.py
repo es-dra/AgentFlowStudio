@@ -12,7 +12,9 @@ EVIDENCE_BOUNDARY = "revision plan references safe artifacts only and never stor
 
 def revision_plan(*, intent: str, preserve: list[str], change: list[str], temporal_scope: dict[str, Any]) -> dict[str, Any]:
     return {
+        "artifact_type": "agentflow_revision_control_plan",
         "schema_version": "0.1.0",
+        "algorithm_id": ALGORITHM_ID,
         "revision_intent": str(intent or "").strip(),
         "preserve_boundaries": [str(item).strip() for item in preserve if str(item).strip()],
         "change_boundaries": [str(item).strip() for item in change if str(item).strip()],

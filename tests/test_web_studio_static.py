@@ -440,7 +440,8 @@ def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() 
 
     assert 'const FALLBACK_BASE_URL = "http://127.0.0.1:8790"' in runtime_client
     assert 'const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url"' in runtime_client
-    assert 'current.port !== "8790"' in runtime_client
+    assert 'const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"])' in runtime_client
+    assert "LOCAL_STATIC_FALLBACK_PORTS.has(current.port)" in runtime_client
     assert "return FALLBACK_BASE_URL;" in runtime_client
     assert "explicitRuntimeBaseUrl" in runtime_client
     assert "normalizeRuntimeBaseUrl" in runtime_client

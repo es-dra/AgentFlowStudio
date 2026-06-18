@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
+from agentflow.algorithms.request_projection import build_request_plan
 from agentflow.harness.json_io import write_json
 from agentflow.algorithms.provider_gate_manifest import (
     strip_image_edit_language as algorithm_strip_image_edit_language,
@@ -21,6 +22,7 @@ from apps.api.runtime_generation_preflight import preflight_token_matches, video
 from apps.api.runtime_image_assets import image_asset_file_path, image_asset_metadata
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_media_validation import reference_image_size_blocks
+from apps.api.runtime_model_call_context import video_generation_model_call_context
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload, safe_id
 
@@ -139,6 +141,27 @@ def _submit_video_generation(
         frame_metadata.append(image_asset_metadata(store, project_id, request.last_frame_image_asset_id))
     preflight = video_generation_preflight(store, project_id, request)
     context_bundle = preflight.get("context_bundle")
+    provider_prompt = _video_provider_prompt(request, context_bundle)
+    model_call_context = video_generation_model_call_context(
+        project_id=project_id,
+        request=request,
+        context_bundle=context_bundle,
+        provider_constraints={
+            "capability": "video",
+            "provider_service_id": request.provider_service_id,
+            "required_gate": REMOTE_VIDEO_ENV,
+            "duration_sec": request.duration_sec,
+            "resolution": request.resolution,
+            "aspect_ratio": request.aspect_ratio,
+            "reference_image_slots": 1 + int(bool(request.last_frame_image_asset_id)),
+        },
+    )
+    model_request_plan = build_request_plan(
+        model_call_context=model_call_context,
+        canonical_brief={"canonical_prompt": provider_prompt},
+        provider_service_id=request.provider_service_id,
+    )
+    artifacts = _write_model_call_artifacts(store, output_dir, model_call_context, model_request_plan)
     registry = None
     descriptor = None
     try:
@@ -151,9 +174,17 @@ def _submit_video_generation(
             provider_calls_started=False,
             blocks=[_provider_not_ready_block(str(exc))],
             context_bundle=context_bundle,
+            model_call_context_id=model_call_context["context_id"],
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
+        return _result_from_manifest(
+            status="blocked",
+            safe_manifest=manifest,
+            context_bundle=context_bundle,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
 
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_VIDEO_ENV) or REMOTE_VIDEO_ENV)
     gate = _video_gate(required_gate)
@@ -165,9 +196,17 @@ def _submit_video_generation(
             provider_gate=gate,
             blocks=[_gate_closed_block(required_gate)],
             context_bundle=context_bundle,
+            model_call_context_id=model_call_context["context_id"],
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
+        return _result_from_manifest(
+            status="blocked",
+            safe_manifest=manifest,
+            context_bundle=context_bundle,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
 
     min_reference_edge = int(getattr(descriptor, "min_reference_image_edge_px", 0) or 0)
     if size_blocks := reference_image_size_blocks(
@@ -183,15 +222,23 @@ def _submit_video_generation(
             provider_gate=gate,
             blocks=size_blocks,
             context_bundle=context_bundle,
+            model_call_context_id=model_call_context["context_id"],
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle)
+        return _result_from_manifest(
+            status="blocked",
+            safe_manifest=manifest,
+            context_bundle=context_bundle,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
 
     if _daily_submit_count(store, project_id) >= DAILY_VIDEO_SUBMIT_LIMIT and not request.quota_override_confirmed:
         raise ValueError("daily video submit quota requires quota_override_confirmed")
 
     dispatch_request = ProviderDispatchRequest(
-        prompt=_video_provider_prompt(request, context_bundle),
+        prompt=provider_prompt,
         output_dir=output_dir,
         aspect_ratio=request.aspect_ratio,
         candidate_count=1,
@@ -211,9 +258,17 @@ def _submit_video_generation(
             provider_gate=gate,
             blocks=[_provider_not_ready_block(str(exc))],
             context_bundle=context_bundle,
+            model_call_context_id=model_call_context["context_id"],
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle)
+        return _result_from_manifest(
+            status="poll_failed",
+            safe_manifest=manifest,
+            context_bundle=context_bundle,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
     except Exception as exc:
         manifest = _safe_manifest(
             project_id,
@@ -222,9 +277,17 @@ def _submit_video_generation(
             provider_gate=gate,
             blocks=[_provider_not_ready_block(str(exc))],
             context_bundle=context_bundle,
+            model_call_context_id=model_call_context["context_id"],
         )
         _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-        return _result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle)
+        return _result_from_manifest(
+            status="poll_failed",
+            safe_manifest=manifest,
+            context_bundle=context_bundle,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
 
     _increment_daily_submit_count(store, project_id)
     task_state = {
@@ -238,14 +301,40 @@ def _submit_video_generation(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "provider_raw_persisted": False,
         "context_bundle": context_bundle,
+        "model_call_context_id": model_call_context["context_id"],
+        "model_request_plan_ref": "model_request_plan.json",
     }
     _write_task_state(output_dir, task_state)
     if task_state["status"] == "already_complete":
         raw = provider_task.get("task", {}).get("raw") or {}
-        return _complete_video_result(output_dir, project_id, raw, task_state, gate)
-    manifest = _safe_manifest(project_id, status="submitted", provider_calls_started=True, provider_gate=gate, context_bundle=context_bundle)
+        return _complete_video_result(
+            output_dir,
+            project_id,
+            raw,
+            task_state,
+            gate,
+            artifacts=artifacts,
+            model_call_context=model_call_context,
+            model_request_plan=model_request_plan,
+        )
+    manifest = _safe_manifest(
+        project_id,
+        status="submitted",
+        provider_calls_started=True,
+        provider_gate=gate,
+        context_bundle=context_bundle,
+        model_call_context_id=model_call_context["context_id"],
+    )
     _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
-    return _result_from_manifest(status="submitted", safe_manifest=manifest, task_state=task_state, context_bundle=context_bundle)
+    return _result_from_manifest(
+        status="submitted",
+        safe_manifest=manifest,
+        task_state=task_state,
+        context_bundle=context_bundle,
+        artifacts=artifacts,
+        model_call_context=model_call_context,
+        model_request_plan=model_request_plan,
+    )
 
 
 def _poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path) -> dict[str, Any]:
@@ -308,6 +397,10 @@ def _complete_video_result(
     raw: dict[str, Any],
     task_state: dict[str, Any],
     provider_gate: dict[str, str],
+    *,
+    artifacts: dict[str, Any] | None = None,
+    model_call_context: dict[str, Any] | None = None,
+    model_request_plan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     outputs = _safe_outputs(output_dir, raw)
     context_bundle = task_state.get("context_bundle") if isinstance(task_state.get("context_bundle"), dict) else None
@@ -320,6 +413,7 @@ def _complete_video_result(
         provider_gate=provider_gate,
         outputs=outputs,
         context_bundle=context_bundle,
+        model_call_context_id=str(task_state.get("model_call_context_id") or ""),
     )
     _write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     return _result_from_manifest(
@@ -328,6 +422,9 @@ def _complete_video_result(
         task_state=task_state,
         outputs=outputs,
         context_bundle=context_bundle,
+        artifacts=artifacts,
+        model_call_context=model_call_context,
+        model_request_plan=model_request_plan,
     )
 
 
@@ -428,12 +525,16 @@ def _candidate_file(output_dir: Path, candidate_id: str) -> Path | None:
 def _video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     job_id = str(job["job_id"])
     outputs = result.get("outputs") or []
+    model_call_context = result.get("model_call_context") if isinstance(result.get("model_call_context"), dict) else {}
+    model_call_context_id = str(model_call_context.get("context_id") or (result.get("safe_manifest") or {}).get("model_call_context_id") or "")
     return {
         "job": job,
         "provider_gate": (result.get("safe_manifest") or {}).get("provider_gate") or _video_gate(REMOTE_VIDEO_ENV),
         "provider_calls_started": bool((result.get("safe_manifest") or {}).get("provider_calls_started")),
         "safe_manifest": result.get("safe_manifest"),
         "context_bundle": result.get("context_bundle"),
+        "model_call_context_id": model_call_context_id or None,
+        "artifacts": job.get("artifacts") or result.get("artifacts") or {},
         "candidate_previews": _candidate_previews(project_id, job_id, outputs),
         "flow": {"project_id": project_id},
         "non_claims": VIDEO_NON_CLAIMS,
@@ -441,7 +542,13 @@ def _video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], r
 
 
 def _write_video_job(store: RuntimeStore, project_id: str, job_id: str, result: dict[str, Any]) -> dict[str, Any]:
-    job = runtime_job(job_id, project_id, "video_generation", str(result["status"]), artifacts={})
+    artifacts = dict(result.get("artifacts") or {})
+    if not artifacts:
+        try:
+            artifacts = dict((store.load_job(job_id).get("artifacts") or {}))
+        except KeyError:
+            artifacts = {}
+    job = runtime_job(job_id, project_id, "video_generation", str(result["status"]), artifacts=artifacts)
     job["ui_summary"] = {
         "video_generation": {
             "status": result["status"],
@@ -458,6 +565,9 @@ def _result_from_manifest(
     task_state: dict[str, Any] | None = None,
     outputs: list[dict[str, Any]] | None = None,
     context_bundle: dict[str, Any] | None = None,
+    artifacts: dict[str, Any] | None = None,
+    model_call_context: dict[str, Any] | None = None,
+    model_request_plan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bundle = context_bundle
     if bundle is None and isinstance(task_state, dict) and isinstance(task_state.get("context_bundle"), dict):
@@ -468,6 +578,9 @@ def _result_from_manifest(
         "task_state": task_state,
         "outputs": outputs or safe_manifest.get("outputs") or [],
         "context_bundle": bundle,
+        "artifacts": artifacts or {},
+        "model_call_context": model_call_context,
+        "model_request_plan": model_request_plan,
     }
 
 
@@ -480,6 +593,7 @@ def _safe_manifest(
     blocks: list[dict[str, str]] | None = None,
     outputs: list[dict[str, Any]] | None = None,
     context_bundle: dict[str, Any] | None = None,
+    model_call_context_id: str | None = None,
 ) -> dict[str, Any]:
     manifest = {
         "schema_version": "afs_video_generation_safe_manifest.v0.1",
@@ -498,6 +612,9 @@ def _safe_manifest(
         "writes_company_kb": False,
         "non_claims": VIDEO_NON_CLAIMS,
     }
+    if model_call_context_id:
+        manifest["model_call_context_id"] = model_call_context_id
+        manifest["model_request_plan_ref"] = "model_request_plan.json"
     if context_bundle:
         manifest["context_bundle_mode"] = context_bundle.get("mode")
         manifest["context_included_asset_count"] = len(context_bundle.get("included_assets") or [])
@@ -511,6 +628,20 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
     write_json(path, payload)
 
 
+def _write_model_call_artifacts(
+    store: RuntimeStore,
+    output_dir: Path,
+    model_call_context: dict[str, Any],
+    model_request_plan: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    _write_json_checked(output_dir / "model_call_context.json", model_call_context)
+    _write_json_checked(output_dir / "model_request_plan.json", model_request_plan)
+    return {
+        "model_call_context": store.register_artifact(output_dir / "model_call_context.json", role="model_call_context"),
+        "model_request_plan": store.register_artifact(output_dir / "model_request_plan.json", role="model_request_plan"),
+    }
+
+
 def _write_task_state(output_dir: Path, state: dict[str, Any]) -> None:
     _write_json_checked(output_dir / "video_task_state.json", state)
 
@@ -521,6 +652,7 @@ def _provider_task_for_state(provider_task: dict[str, Any]) -> dict[str, Any]:
     if isinstance(inner, dict):
         safe_inner = dict(inner)
         safe_inner.pop("output_dir", None)
+        safe_inner.pop("raw", None)
         task["task"] = safe_inner
     task.pop("output_dir", None)
     return task

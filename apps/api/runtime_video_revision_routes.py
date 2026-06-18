@@ -7,11 +7,14 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
-from agentflow.harness.json_io import write_json
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_models import VideoRevisionRequest
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
+from apps.api.runtime_video_revision_context import (
+    build_video_revision_algorithm_bundle,
+    write_video_revision_algorithm_artifacts,
+)
 
 
 REMOTE_VIDEO_ENV = "AFS_ALLOW_REMOTE_VIDEO"
@@ -49,10 +52,26 @@ def register_runtime_video_revision_routes(app: FastAPI, store: RuntimeStore) ->
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
         try:
-            result = _blocked_revision_result(project_id, request)
+            feature_flag = _feature_flag()
+            video_gate = _video_gate()
+            algorithm_bundle = build_video_revision_algorithm_bundle(
+                project_id=project_id,
+                request=request,
+                feature_flag=feature_flag,
+                provider_gate=video_gate,
+            )
+            result = _blocked_revision_result(project_id, request, feature_flag=feature_flag, video_gate=video_gate)
+            result["safe_manifest"]["model_call_context_id"] = algorithm_bundle["model_call_context"]["context_id"]
+            result["safe_manifest"]["model_request_plan_ref"] = "model_request_plan.json"
+            result["safe_manifest"]["revision_plan_ref"] = "revision_plan.json"
+            result["artifacts"] = write_video_revision_algorithm_artifacts(
+                store,
+                output_dir,
+                safe_manifest=result["safe_manifest"],
+                bundle=algorithm_bundle,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_video_revision")) from exc
-        _write_json_checked(output_dir / "video_revision_safe_manifest.json", result["safe_manifest"])
         job = _write_video_revision_job(store, project_id, job_id, result)
         return _video_revision_response(project_id, job, result)
 
@@ -80,9 +99,15 @@ def video_revision_preflight(request: VideoRevisionRequest) -> dict[str, Any]:
     return payload
 
 
-def _blocked_revision_result(project_id: str, request: VideoRevisionRequest) -> dict[str, Any]:
-    feature_flag = _feature_flag()
-    video_gate = _video_gate()
+def _blocked_revision_result(
+    project_id: str,
+    request: VideoRevisionRequest,
+    *,
+    feature_flag: dict[str, str] | None = None,
+    video_gate: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    feature_flag = feature_flag or _feature_flag()
+    video_gate = video_gate or _video_gate()
     if feature_flag["status"] == "blocked":
         blocks = [_feature_disabled_block()]
     elif video_gate["status"] == "blocked":
@@ -152,6 +177,8 @@ def _video_revision_response(project_id: str, job: dict[str, Any], result: dict[
         "provider_gate": (result.get("safe_manifest") or {}).get("provider_gate") or _video_gate(),
         "provider_calls_started": bool((result.get("safe_manifest") or {}).get("provider_calls_started")),
         "safe_manifest": result.get("safe_manifest"),
+        "artifacts": result.get("artifacts") or {},
+        "model_call_context_id": (result.get("safe_manifest") or {}).get("model_call_context_id"),
         "candidate_previews": [],
         "flow": {"project_id": project_id},
         "non_claims": VIDEO_REVISION_NON_CLAIMS,
@@ -159,7 +186,7 @@ def _video_revision_response(project_id: str, job: dict[str, Any], result: dict[
 
 
 def _write_video_revision_job(store: RuntimeStore, project_id: str, job_id: str, result: dict[str, Any]) -> dict[str, Any]:
-    job = runtime_job(job_id, project_id, "video_revision", str(result["status"]), artifacts={})
+    job = runtime_job(job_id, project_id, "video_revision", str(result["status"]), artifacts=result.get("artifacts") or {})
     job["ui_summary"] = {
         "video_revision": {
             "status": result["status"],
@@ -261,11 +288,6 @@ def _provider_not_implemented_block() -> dict[str, str]:
         "reason": "Current provider path is I2V only; localized video revision is a best-effort experimental contract.",
         "required_gate": EXPERIMENTAL_VIDEO_REVISION_ENV,
     }
-
-
-def _write_json_checked(path, payload: dict[str, Any]) -> None:
-    reject_unsafe_payload(payload)
-    write_json(path, payload)
 
 
 __all__ = ("EXPERIMENTAL_VIDEO_REVISION_ENV", "register_runtime_video_revision_routes", "video_revision_preflight")

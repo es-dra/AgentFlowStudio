@@ -1,10 +1,12 @@
-# AFS 核心算法与操作链路图谱（讨论草案 v2）
+# AFS 核心算法与操作链路图谱（算法契约确认包 v3）
 
 本文用于对齐 AFS Studio 下一阶段的核心思想，不是最终 PRD，也不声明功能已经全部落地。
 
 文档类型：Explanation + Reference。
 目标读者：AFS 产品/工程协作者和后续接手 Agent。
 目标：把“真正值得作为核心技术架构迭代的智能体算法”和“用户核心操作链路”固定成两张可讨论、可迭代的项目内核心图。
+
+2026-06-18 更新：`ModelCallContext` 已作为第一阶段内部契约落地到 prompt optimization、keyframe/image generation、video generation、visual inspect / asset-card draft 和 video revision 路径；本文同步升级为算法确认包口径，用于进入用户操作链路固化前的人工确认。
 
 ## 这版修正的口径
 
@@ -33,7 +35,8 @@ flowchart TD
   GraphState["画布上下文<br/>上游节点、参考图、首帧、连接关系"] --> ContextScheduler
   Feedback["质量反馈与漂移证据<br/>人工评分、修改成功、连续性问题"] --> ContextScheduler
 
-  CallIntent --> ContextScheduler["上下文智能调度算法<br/>选择资产、参考图、上游摘要、预算、锁定项"]
+  CallIntent --> ModelCallContext["ModelCallContext<br/>统一模型调用前上下文入口<br/>context_id / safe refs / assets / feedback / constraints"]
+  ModelCallContext --> ContextScheduler["上下文智能调度算法<br/>选择资产、参考图、上游摘要、预算、锁定项"]
   ContextScheduler --> PromptOpt["提示词智能优化算法<br/>专家知识 + 资产 + 偏好 + provider 能力"]
 
   ContextScheduler --> RequestProjection["模型请求投影算法<br/>T2I/I2I/I2V/T2V 模式、参考槽、首帧、provider prompt 格式"]
@@ -78,6 +81,7 @@ AFS 的核心不是“用户点一次按钮就直接调模型”，而是每次�
 
 ```text
 用户本轮意图
+-> 构建 ModelCallContext
 -> 读取节点本地 prompt 和参数
 -> 读取画布上游节点、连线、参考图和首帧
 -> 读取 fixed asset memory 中可用的人物/场景/视频资产
@@ -98,7 +102,7 @@ flowchart LR
   Input --> Canvas["形成画布节点与连接<br/>脚本、图片、视频、资产节点"]
 
   Canvas --> Intent["选择本轮动作<br/>优化 / 生图 / 生视频 / 识别 / 修改"]
-  Intent --> HiddenLoop["隐性智能调度内循环<br/>上下文 + 资产 + 偏好 + 专家知识 + provider 能力"]
+  Intent --> HiddenLoop["ModelCallContext + 隐性智能调度内循环<br/>上下文 + 资产 + 偏好 + 专家知识 + provider 能力"]
 
   HiddenLoop --> PromptAction["提示词智能优化<br/>输出可编辑优化结果和 trace"]
   HiddenLoop --> ImageAction["图片/关键帧生成<br/>T2I/I2I + 参考图 + fixed assets"]
@@ -177,13 +181,15 @@ flowchart LR
 5. fixed asset 和 feedback 是下一轮模型调用的输入，不只是结果展示。
 6. provider gate、safe manifest、artifact lineage 是必要工程边界，但不应冒充核心智能算法。
 
-## 下一轮讨论建议
+## 进入用户链路固化前的确认点
 
-如果这版口径成立，下一步不急着扩功能，而应先把三件事定清楚：
+这版口径成立后，下一步才进入外层用户链路固化。确认点是：
 
-1. 核心算法命名和边界：尤其是“提示词智能优化”“上下文智能调度”“视觉理解资产化”的正式 contract。
-2. 每次模型调用的统一 request context：哪些字段必须存在，哪些字段是 optional，哪些字段绝不能进 provider。
-3. 用户链路中的确认边界：哪些可以自动草稿，哪些必须人工确认后才能进入 fixed asset 和下一轮上下文。
+1. 是否认可六大核心算法命名、边界和当前成熟度判断。
+2. 是否认可 `ModelCallContext` 是每次模型调用前的统一上下文入口。
+3. 是否认可 provider gate、safe manifest、artifact lineage、UI action routing 只作为工程护栏或证据设施，不提升为核心智能体算法。
+4. 是否先把 video generation、visual inspect、revision 三条 Runtime 路径接入同一 `ModelCallContext`，再重画用户主链路。
+5. 是否确认 draft asset 和 raw feedback 仍需要人工或规则确认后，才能进入 fixed asset / durable preference / 下一轮强约束。
 
 ## 非声明
 

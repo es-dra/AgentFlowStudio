@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from agentflow.algorithms.context_resolver import merged_reference_image_refs
+from agentflow.algorithms.request_projection import build_request_plan
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
@@ -14,6 +15,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
 )
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
+from apps.api.runtime_model_call_context import keyframe_model_call_context
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
 from apps.api.runtime_media_validation import reference_image_size_blocks
 from apps.api.runtime_provider_dispatch import dispatch_provider_with_retry
@@ -94,6 +96,23 @@ def build_keyframe_generation(
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
     provider_gate = image_provider_gate(required_gate)
     min_reference_edge = int(getattr(descriptor, "min_reference_image_edge_px", 0) or 0)
+    model_call_context = keyframe_model_call_context(
+        project_id=project_id,
+        request=request,
+        context_bundle=context_bundle,
+        provider_constraints={
+            "capability": "image",
+            "provider_service_id": request.provider_service_id,
+            "required_gate": required_gate,
+            "prompt_char_limit": int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
+            "reference_image_slots": int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+        },
+    )
+    model_request_plan = build_request_plan(
+        model_call_context=model_call_context,
+        canonical_brief={"canonical_prompt": provider_prompt},
+        provider_service_id=request.provider_service_id,
+    )
 
     provider_outputs: list[dict[str, Any]] = []
     status = "blocked"
@@ -169,6 +188,8 @@ def build_keyframe_generation(
         context_bundle,
         KEYFRAME_NON_CLAIMS,
     )
+    request_plan["model_call_context_id"] = model_call_context["context_id"]
+    request_plan["model_request_plan_ref"] = "model_request_plan.json"
     candidates = keyframe_candidate_summary(request, provider_prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
     safe_manifest = keyframe_safe_manifest(
         project_id,
@@ -183,8 +204,10 @@ def build_keyframe_generation(
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
     )
-    for payload in (request_plan, candidates, safe_manifest):
+    for payload in (model_call_context, model_request_plan, request_plan, candidates, safe_manifest):
         reject_unsafe_payload(payload)
+    write_json(output_dir / "model_call_context.json", model_call_context)
+    write_json(output_dir / "model_request_plan.json", model_request_plan)
     write_json(output_dir / "keyframe_request_plan.json", request_plan)
     write_json(output_dir / "keyframe_candidates_summary.json", candidates)
     write_json(output_dir / "keyframe_generation_safe_manifest.json", safe_manifest)
@@ -195,6 +218,8 @@ def build_keyframe_generation(
         "provider_outputs": provider_outputs,
         "safe_manifest": safe_manifest,
         "context_bundle": context_bundle,
+        "model_call_context": model_call_context,
+        "model_request_plan": model_request_plan,
         "tool_gate_state": {
             "remote_llm": "not_requested",
             "remote_asr": "blocked_by_default",

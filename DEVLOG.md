@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-18 - ModelCallContext Algorithm Contract
+
+- Added `ModelCallContext` as the pre-model-call internal contract for prompt
+  optimization and keyframe/image generation.
+- Added provider-neutral request projection and visual-understanding
+  normalization modules under `agentflow/algorithms/`.
+- Added fixed-asset continuity projection so only fixed assets are context
+  eligible; draft/rejected/retired assets remain evidence or history only.
+- Updated Runtime prompt optimization and keyframe generation to write
+  `model_call_context.json`; keyframe generation also writes
+  `model_request_plan.json` and links the legacy request plan to the same
+  `context_id`.
+- Extended the same contract to Runtime video generation, asset-card drafting,
+  and video revision. Video generation now emits a `video_generate`
+  `ModelCallContext` plus request plan; asset-card drafting emits
+  `visual_inspect` context, request plan, and normalized visual-understanding
+  observation; video revision emits a drift-control `revision_plan`, revision
+  `ModelCallContext`, and request plan while provider/feature gates remain
+  closed by default.
+- Fixed Studio Runtime base URL selection so Runtime-hosted `/studio/` on a
+  non-default local port uses same-origin instead of forcing the static/dev
+  fallback to `127.0.0.1:8790`.
+- Updated the algorithm-library docs to separate six core intelligent-agent
+  algorithms from auxiliary provider gate / manifest / action routing layers.
+- Updated the core algorithm and operation-chain map into a v3 confirmation
+  package with `ModelCallContext` in the diagrams and explicit user-link
+  confirmation points before the next UX hardening pass.
+
+Verification so far:
+
+```text
+tests/test_model_call_context_contract.py tests/test_model_call_context_runtime_routes.py: 11 passed
+tests/test_web_studio_static.py::test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port: 1 passed
+tests/test_algorithm_library_contracts.py: 7 passed
+tests/test_api_runtime_prompt_memory_loop.py: 18 passed
+tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_creative_agent_keyframes.py tests/test_api_runtime_asset_card_drafts.py tests/test_api_runtime_video_generations.py tests/test_api_runtime_video_revisions.py tests/test_model_call_context_contract.py tests/test_model_call_context_runtime_routes.py: 61 passed
+tests/test_api_runtime_context_resolver.py: 17 passed
+pytest -q: 464 passed, 527 deselected, 2 warnings
+tools/maintenance_audit.py: failed=0, warnings only
+gfr_audit.py: pass, checked_paths=41, checked_packets=3
+validate_ai_native_contracts.py: pass
+Runtime-hosted /studio/ browser smoke on 127.0.0.1:8797 with all provider gates false: 200, console errors 0, desktop/mobile screenshots captured, starter interaction created 3 nodes and saved state
+Final closeout HTTP smoke on 127.0.0.1:8797 with all provider gates false: /health ready, /studio/ 200, runtime client 200; no new rendered-browser evidence was added in this shell.
+```
+
+Boundary:
+
+- No live provider call, provider config change, secret, provider raw response,
+  credentialed URL, local private path, or media bytes were used.
+- This is structure/runtime verification, not provider smoke, human acceptance,
+  business validation, or durable Company OS memory promotion.
+
 ## 2026-06-18 - Studio Final Interaction And Progress Pass
 
 - Added a shared generation-state projection for Studio nodes: submit state,

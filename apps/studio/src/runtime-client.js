@@ -4,13 +4,14 @@
 const FALLBACK_BASE_URL = "http://127.0.0.1:8790";
 const RUNTIME_BASE_STORAGE_KEY = "afs_runtime_base_url";
 const RUNTIME_BASE_QUERY_KEYS = ["runtimeBaseUrl", "runtime_base_url", "runtime"];
+const LOCAL_STATIC_FALLBACK_PORTS = new Set(["8796"]);
 
 export function runtimeBaseUrl() {
   if (typeof window !== "undefined" && window.location?.protocol?.startsWith("http")) {
     const override = explicitRuntimeBaseUrl();
     if (override) return override;
     const current = new URL(window.location.href);
-    if (isLocalHost(current.hostname) && current.port && current.port !== "8790") {
+    if (isLocalHost(current.hostname) && LOCAL_STATIC_FALLBACK_PORTS.has(current.port)) {
       return FALLBACK_BASE_URL;
     }
     return current.origin;
