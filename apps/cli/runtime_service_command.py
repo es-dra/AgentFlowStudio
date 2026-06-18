@@ -11,7 +11,8 @@ def runtime_service_command(
     runtime_root: Path = typer.Option(
         Path("data/processed/runs/runtime_service"),
         "--runtime-root",
-        help="Ignored local runtime root for jobs and artifact refs.",
+        envvar="AFS_RUNTIME_ROOT",
+        help="Runtime root for jobs, artifacts, Studio state, and safe refs.",
         show_default=False,
     ),
 ) -> None:
@@ -35,7 +36,8 @@ def runtime_service_openapi_export_command(
     runtime_root: Path = typer.Option(
         Path("data/processed/runs/runtime_service_openapi_export"),
         "--runtime-root",
-        help="Ignored local runtime root used only while building the schema.",
+        envvar="AFS_RUNTIME_ROOT",
+        help="Runtime root used while building the schema.",
         show_default=False,
     ),
 ) -> None:

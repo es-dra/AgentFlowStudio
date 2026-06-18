@@ -25,11 +25,13 @@ is lighter/slower; port magnet vertical range is tighter; generating text
 shimmer is slower; `main.js` project lifecycle logic moved into
 `studio-project-controller.js`; `npm run check:studio-js` added. Verification:
 Studio/Site JS syntax check passed for 86 files; focused Runtime/Studio
-regression passed 69 / 1 warning; full pytest passed 507 / 527 deselected / 2
-warnings; CLI help/version passed with version 0.1.0; maintenance audit
-failed=0 with warnings only; `git diff --check` passed. Boundary: no video gate
-opened, no new provider introduced, no provider raw/signed URL/secret/media byte
-persistence, no human acceptance or business validation claimed. Maintenance ledger:
+regression passed 69 / 1 warning; Runtime CLI now maps `AFS_RUNTIME_ROOT` into
+`--runtime-root`; full pytest passed 508 / 527 deselected / 2 warnings; CLI
+help/version passed with version 0.1.0 and runtime-service help shows
+`AFS_RUNTIME_ROOT`; maintenance audit failed=0 with warnings only; `git diff
+--check` passed. Boundary: no video gate opened, no new provider introduced, no
+provider raw/signed URL/secret/media byte persistence, no human acceptance or
+business validation claimed. Maintenance ledger:
 `docs/maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`.
 
 Current frontend hardening addendum: 2026-06-19 pass continued Studio UX

@@ -25,6 +25,8 @@
 1. 内测安全
    - `GET /health` 的 `runtime_root_persisted` 改为根据当前 runtime root
      计算出的安全布尔值，不暴露也不暗示服务器绝对路径。
+   - Runtime CLI 的 `--runtime-root` 接入 `AFS_RUNTIME_ROOT`，确保服务器
+     systemd 环境里的 `/var/lib/afs-runtime` 能实际传入 Runtime app。
    - 跨用户访问测试覆盖到 Studio state、image assets、image preview、jobs
      和 artifact manifest，避免多内测用户互相污染项目数据。
 
@@ -75,11 +77,12 @@ Focused Runtime/Studio/Site regression:
 69 passed / 1 warning
 
 Full pytest:
-507 passed / 527 deselected / 2 warnings
+508 passed / 527 deselected / 2 warnings
 
 CLI:
 python -m apps.cli.main --help passed
 python -m apps.cli.main version -> 0.1.0
+python -m apps.cli.main runtime-service --help shows AFS_RUNTIME_ROOT envvar
 
 maintenance_audit:
 failed=0, warnings only

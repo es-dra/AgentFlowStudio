@@ -11,6 +11,7 @@ from apps.cli.main import app
 PRODUCT_REGISTRY = Path("apps/cli/command_registry.py")
 PRODUCTION_MEMORY_REGISTRY = Path("apps/cli/production_memory_command_registry.py")
 SUPPORT_REGISTRY = Path("apps/cli/support_command_registry.py")
+RUNTIME_SERVICE_COMMAND = Path("apps/cli/runtime_service_command.py")
 VISIBLE_PRODUCT_COMMANDS = (
     "version",
     "analyze-hooks",
@@ -100,6 +101,13 @@ def test_visible_product_command_help_avoids_terminal_truncation_glyphs() -> Non
         assert result.exit_code == 0, command
         assert "\u2026" not in result.output, command
         assert "\ufffd" not in result.output, command
+
+
+def test_runtime_service_command_uses_runtime_root_envvar() -> None:
+    source = RUNTIME_SERVICE_COMMAND.read_text(encoding="utf-8")
+
+    assert 'envvar="AFS_RUNTIME_ROOT"' in source
+    assert "Ignored local runtime root" not in source
 
 
 def test_runtime_service_openapi_export_command_writes_frontend_schema(tmp_path) -> None:

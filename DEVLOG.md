@@ -19,14 +19,17 @@
   `studio-project-controller.js`, keeping the entrypoint under the project
   maintainability target.
 - Added `npm run check:studio-js` to syntax-check Studio and site JavaScript.
+- Wired the Runtime CLI `--runtime-root` option to `AFS_RUNTIME_ROOT`, so the
+  server systemd environment is actually passed into `create_runtime_app()`.
 
 Verification:
 
 ```text
 npm run check:studio-js -> JS syntax check passed: 86 files
 Focused Runtime/Studio/site regression -> 69 passed / 1 warning
-Full pytest -> 507 passed / 527 deselected / 2 warnings
+Full pytest -> 508 passed / 527 deselected / 2 warnings
 CLI help/version -> passed, version 0.1.0
+runtime-service help -> shows env var: AFS_RUNTIME_ROOT
 maintenance_audit -> failed=0, warnings only
 git diff --check -> passed
 ```
