@@ -7,6 +7,14 @@
     min-height: 500px;
   }
 
+  .hero-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .project-lane {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .preview-inspector {
     display: none;
   }
@@ -53,6 +61,11 @@
   .preview-flow {
     grid-template-columns: 1fr;
     padding: 40px 18px 20px;
+  }
+
+  .project-lane,
+  .work-grid {
+    grid-template-columns: 1fr;
   }
 
   .node-image,

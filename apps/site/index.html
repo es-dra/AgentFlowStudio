@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AFS Studio | Agent-native AI 内容生产操作层</title>
+    <title>AFS Studio | 专业 AI 视频创作工作台</title>
     <meta
       name="description"
-      content="AFS Studio 将提示词、上下文、参考图、资产记忆和生成证据串成可复用的 AI 视频创作链路。"
+      content="AFS Studio 是面向 AI 视频创作的专业工作台，帮助创作者从故事、角色、场景、关键帧到视频片段持续迭代。"
     />
     <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/styles/site.css" />
@@ -20,100 +20,123 @@
         <span>AFS Studio</span>
       </a>
       <nav class="nav-links" aria-label="页面章节">
-        <a href="#workflow">方法</a>
-        <a href="#algorithms">算法</a>
-        <a href="#operation">链路</a>
+        <a href="#templates">模板</a>
+        <a href="#works">作品</a>
+        <a href="#workflow">工作流</a>
       </nav>
       <a class="nav-action" href="/studio/" data-auth-action>打开 Studio</a>
     </header>
 
     <main>
-      <section class="hero-section">
+      <section class="hero-section creation-hero">
         <div class="hero-copy">
-          <p class="eyebrow">Agent-native creative operations</p>
+          <p class="eyebrow">AI video creation workspace</p>
           <h1>AFS Studio</h1>
-          <p class="hero-lede">AI 内容生产的操作层，把创作意图、项目上下文、资产记忆和生成证据接成一条可复用链路。</p>
+          <p class="hero-lede">把故事、角色、场景、关键帧和视频片段放进同一个创作画布，生成、确认、复用和修订都从这里开始。</p>
           <div class="hero-actions">
-            <a class="primary-action" href="/studio/" data-auth-action>进入 Studio</a>
-            <a class="secondary-action" href="#workflow">查看工作流</a>
+            <a class="primary-action" href="/studio/" data-auth-action>新建视频项目</a>
+            <a class="secondary-action" href="#templates">选择创作模板</a>
           </div>
-          <div class="hero-proof" aria-label="当前产品能力">
-            <span>Prompt intelligence</span>
-            <span>Context dispatch</span>
-            <span>Evidence-bound assets</span>
+          <div class="hero-signal" aria-label="创作入口摘要">
+            <span><strong>01</strong> 写下创作意图</span>
+            <span><strong>02</strong> 固定角色与场景</span>
+            <span><strong>03</strong> 生成关键帧和视频</span>
           </div>
         </div>
 
-        <div class="product-preview" aria-label="AFS Studio 工作台预览">
-          <div class="preview-topbar">
-            <span></span>
-            <strong>创作链路</strong>
-            <em>ready</em>
-          </div>
-          <div class="preview-body">
-            <div class="preview-sidebar">
-              <span class="sidebar-pill active"></span>
-              <span class="sidebar-pill"></span>
-              <span class="sidebar-pill"></span>
-              <span class="sidebar-line"></span>
-              <span class="sidebar-line short"></span>
-            </div>
-            <div class="preview-canvas">
-              <div class="canvas-grid"></div>
-              <div class="preview-flow" aria-label="一次创作调用的可视链路">
-                <article class="node-card node-text">
-                  <span>01</span>
-                  <strong>创作意图</strong>
-                  <small>故事 brief / 提示词倾向</small>
-                </article>
-                <article class="node-card node-image">
-                  <span>02</span>
-                  <strong>参考资产</strong>
-                  <small>固定人物 / 场景 / 上游图</small>
-                </article>
-                <article class="node-card node-video">
-                  <span>03</span>
-                  <strong>生成证据</strong>
-                  <small>结果 / 反馈 / 可追溯 trace</small>
-                </article>
+        <div class="hero-stage" aria-label="AFS Studio 创作入口预览">
+          <article class="showcase-card featured-work">
+            <div class="work-frame">
+              <span class="frame-status">首帧预览</span>
+              <div class="frame-subject"></div>
+              <div class="frame-caption">
+                <strong>城市夜景追踪镜头</strong>
+                <span>角色一致性 / 运动意图 / 参考图已锁定</span>
               </div>
-              <svg class="node-link" viewBox="0 0 520 300" role="img" aria-label="节点上下文连接">
-                <path d="M88 98 C168 40 258 56 346 118" />
-                <path d="M156 182 C252 256 368 242 448 176" />
-              </svg>
             </div>
-            <aside class="preview-inspector">
-              <p>Context</p>
-              <strong>本次系统参考</strong>
-              <span>人物资产、场景图、用户偏好和上游输出会先被整理成安全 brief。</span>
-              <div class="trace-row"></div>
-              <div class="trace-row wide"></div>
-              <div class="trace-row"></div>
-            </aside>
+            <div class="work-meta">
+              <span>最近作品</span>
+              <strong>短剧开场片段</strong>
+            </div>
+          </article>
+
+          <div class="template-stack" id="templates" aria-label="常用创作模板">
+            <article class="template-card active">
+              <span>模板 01</span>
+              <strong>故事到关键帧</strong>
+              <small>脚本、导演台、关键帧三段式生产链。</small>
+            </article>
+            <article class="template-card">
+              <span>模板 02</span>
+              <strong>角色设定卡</strong>
+              <small>上传参考图，确认后保存为角色资产。</small>
+            </article>
+            <article class="template-card">
+              <span>模板 03</span>
+              <strong>图生视频迭代</strong>
+              <small>首帧、运动、预览和反馈连续处理。</small>
+            </article>
           </div>
+
+          <div class="project-lane" aria-label="项目入口">
+            <article>
+              <span>当前项目</span>
+              <strong>未命名项目</strong>
+              <small>进入画布继续整理节点和素材。</small>
+            </article>
+            <article>
+              <span>素材状态</span>
+              <strong>按需确认</strong>
+              <small>候选资产不会自动污染下一次生成。</small>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="works-section" id="works">
+        <div class="section-heading">
+          <p class="eyebrow">Recent work</p>
+          <h2>首页先让用户看到可以创作什么</h2>
+        </div>
+        <div class="work-grid" aria-label="作品与项目预览">
+          <article>
+            <span class="work-thumb tone-blue"></span>
+            <strong>角色首帧</strong>
+            <small>人物资产、场景参考和生成记录会在画布里持续保留。</small>
+          </article>
+          <article>
+            <span class="work-thumb tone-gold"></span>
+            <strong>视频片段</strong>
+            <small>关键帧、动作意图和反馈约束进入下一轮调用。</small>
+          </article>
+          <article>
+            <span class="work-thumb tone-green"></span>
+            <strong>修订版本</strong>
+            <small>保留与改变分开处理，避免反馈直接覆盖资产记忆。</small>
+          </article>
         </div>
       </section>
 
       <section class="workflow-section" id="workflow">
         <div class="section-heading">
           <p class="eyebrow">Workflow</p>
-          <h2>从一次生成，变成一条可复用生产链</h2>
+          <h2>进入 Studio 后，创作动作会被整理成可复用的生产链路</h2>
         </div>
         <div class="workflow-line">
           <article>
             <span>01</span>
             <h3>输入创作意图</h3>
-            <p>用户描述项目目标，系统同步读取上下游节点、固定资产、专家知识和偏好。</p>
+            <p>用户描述目标，系统读取上游节点、固定资产、偏好和项目上下文。</p>
           </article>
           <article>
             <span>02</span>
-            <h3>调度上下文</h3>
-            <p>模型调用前先形成标准 brief 与请求计划，明确纳入和排除的依据。</p>
+            <h3>生成和确认</h3>
+            <p>图片、视频和视觉理解结果先成为证据，再由用户确认是否沉淀为资产。</p>
           </article>
           <article>
             <span>03</span>
-            <h3>沉淀证据</h3>
-            <p>生成结果先进入 evidence，再由用户确认成资产，反馈进入下一次修订约束。</p>
+            <h3>继续迭代</h3>
+            <p>反馈进入下一次修订约束，固定资产进入后续上下文调度。</p>
           </article>
         </div>
       </section>
@@ -121,7 +144,7 @@
       <section class="algorithm-section" id="algorithms">
         <div class="section-heading">
           <p class="eyebrow">Core algorithms</p>
-          <h2>六个算法支撑 Studio 的创作连续性</h2>
+          <h2>底层算法负责稳定，首页不把它们当成主视觉</h2>
         </div>
         <div class="algorithm-rail" aria-label="AFS 六大核心算法">
           <span>提示词智能优化</span>
@@ -133,12 +156,12 @@
         </div>
       </section>
 
-      <section class="operation-section" id="operation">
+      <section class="operation-section">
         <div>
           <p class="eyebrow">Studio operation</p>
-          <h2>网站首页负责介绍产品，Studio 负责真正创作</h2>
+          <h2>网站负责进入创作，Studio 负责完成生产</h2>
           <p>
-            首页不承载复杂控制台。进入 Studio 后，用户在画布中创建节点、确认资产、发起生成和修订；系统在每次调用前完成上下文调度与请求投影。
+            进入工作台后，用户在画布中创建节点、确认资产、发起生成和修订。前端只展示安全摘要、项目状态和可操作入口，不暴露 provider secret、本地路径或原始响应。
           </p>
         </div>
         <a class="primary-action" href="/studio/" data-auth-action>打开 Studio 工作台</a>
@@ -147,7 +170,7 @@
 
     <footer class="site-footer">
       <span>AFS Studio</span>
-      <span>Runtime-backed local creative operations</span>
+      <span>Runtime-backed creative workspace</span>
     </footer>
     <script type="module" src="/site/site.js"></script>
   </body>

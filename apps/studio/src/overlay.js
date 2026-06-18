@@ -89,6 +89,7 @@ function positionPopover(anchorEl, el, options) {
   if (options.avoidSelector) {
     top = avoidOverlap(top, height, rect, options.avoidSelector, margin);
   }
+  top = Math.max(8, Math.min(top, Math.max(8, window.innerHeight - height - 8)));
   el.style.left = `${Math.round(left)}px`;
   el.style.top = `${Math.round(top)}px`;
   el.style.visibility = "";

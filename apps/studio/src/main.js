@@ -19,9 +19,15 @@ import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality-feedback.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
+import {
+  initialProjectId,
+  persistActiveProject,
+  recentProjectIds,
+  rememberProject,
+  safeProjectId,
+  syncProjectUrl,
+} from "./studio-project-session.js";
 
-const ACTIVE_PROJECT_KEY = "afs_studio_active_project_id";
-const RECENT_PROJECTS_KEY = "afs_studio_recent_project_ids";
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 let runtime = createRuntimeClient(initialProjectId());
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
@@ -62,19 +68,6 @@ async function bootstrap() {
   await refreshProjectSummaries();
 }
 
-function initialProjectId() {
-  const params = new URLSearchParams(window.location.search || "");
-  const fromQuery = safeProjectId(params.get("project"));
-  if (fromQuery) return fromQuery;
-  const stored = safeProjectId(localStorage.getItem(ACTIVE_PROJECT_KEY));
-  return stored || "studio-local-001";
-}
-
-function safeProjectId(value) {
-  const text = String(value || "").trim().replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
-  return text || "";
-}
-
 async function refreshProjectSummaries() {
   try {
     const payload = await runtime.listProjects();
@@ -106,7 +99,7 @@ async function ensureAccessibleStartupProject() {
   const projectName = `${currentAuthUser.display_name || "AFS"} 的项目`;
   runtime = createRuntimeClient(projectId);
   await runtime.createProject({ project_id: projectId, goal: projectName });
-  localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+  persistActiveProject(projectId);
   rememberProject(projectId);
   syncProjectUrl(projectId);
   store.attachRuntime(runtime);
@@ -134,7 +127,7 @@ function syncCurrentProjectMetaFromSummaries() {
 
 async function switchProject(projectId) {
   const safe = safeProjectId(projectId) || "studio-local-001";
-  localStorage.setItem(ACTIVE_PROJECT_KEY, safe);
+  persistActiveProject(safe);
   rememberProject(safe);
   syncProjectUrl(safe);
   runtime = createRuntimeClient(safe);
@@ -142,12 +135,6 @@ async function switchProject(projectId) {
   await store.switchProject(safe, runtime);
   await syncRuntimeAssets(store, runtime);
   await refreshProjectSummaries();
-}
-
-function syncProjectUrl(projectId) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("project", projectId);
-  window.history.replaceState({}, "", url);
 }
 
 async function createNewProject() {
@@ -159,7 +146,7 @@ async function createNewProject() {
   try {
     runtime = createRuntimeClient(projectId);
     await runtime.createProject({ project_id: projectId, goal: projectName });
-    localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+    persistActiveProject(projectId);
     rememberProject(projectId);
     syncProjectUrl(projectId);
     await store.switchProject(projectId, runtime);
@@ -393,26 +380,6 @@ function isTestProject(item) {
   const goal = String(item?.goal || "").toLowerCase();
   const name = String(item?.studio_state_meta?.projectName || "").toLowerCase();
   return /(smoke|qa|debug|test|browser|walkthrough|proj_|codex|frontend|review|loop|joint|gate|regression|probe|upload|optimize|empty)/.test(`${id} ${goal} ${name}`);
-}
-
-function rememberProject(projectId) {
-  const safe = safeProjectId(projectId);
-  if (!safe) return;
-  const ids = [safe, ...recentProjectIds().filter((item) => item !== safe)].slice(0, 8);
-  try {
-    localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(ids));
-  } catch {
-    /* local recent project cache is best-effort */
-  }
-}
-
-function recentProjectIds() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(RECENT_PROJECTS_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.map(safeProjectId).filter(Boolean).slice(0, 8) : [];
-  } catch {
-    return [];
-  }
 }
 
 function renderAll(state) {

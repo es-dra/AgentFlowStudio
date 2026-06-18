@@ -18,6 +18,7 @@ D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-REGISTRY-V0.json
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\EVIDENCE-LEDGER-V0.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\TASKRUN-LEDGER-V0.json
 D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
 ```
 
@@ -115,6 +116,22 @@ non_claim_boundary
 真实成本、合同原文、生成媒体字节或 provider 原始响应。它的证据等级最多是
 Runtime verification：证明 AFS 能读取一份安全的 COS/GFR 投影，不证明完整
 COS 执行器、Studio UI 展示、人类接受、商业验证或 durable memory promotion。
+
+## 2026-06-19 LoopSpec Addendum
+
+The source KB now has candidate LoopSpec and TaskRun Ledger objects:
+
+```text
+D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\schemas\loop_spec_v0.schema.json
+D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\schemas\taskrun_ledger_v0.schema.json
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\TASKRUN-LEDGER-V0.json
+```
+
+AFS should treat these as execution-planning metadata: signal sources,
+evaluators, trace requirements, failure capture, repair route, update
+candidates, promotion gate, and stop conditions. They do not authorize wider
+file reads, provider gates, automatic rule promotion, or any claim beyond the
+verified evidence state.
 
 ## 验证命令
 

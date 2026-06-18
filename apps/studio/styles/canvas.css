@@ -35,12 +35,12 @@
   fill: none;
   stroke: #4a6f86;
   stroke-width: 2;
+  stroke-linecap: round;
   pointer-events: stroke;
   transition: stroke 0.15s ease, opacity 0.15s ease;
 }
 #edge-layer path.edge-flow {
-  stroke-dasharray: 7 9;
-  animation: edge-flow 1.4s linear infinite;
+  filter: drop-shadow(0 0 2px rgba(90, 200, 250, 0.10));
 }
 #edge-layer path.director-edge {
   stroke: var(--energy);

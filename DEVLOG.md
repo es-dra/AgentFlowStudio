@@ -1,5 +1,246 @@
 # Devlog
 
+## 2026-06-19 - COS/GFR Display Package v0.1
+
+- Froze the current COS/GFR TaskRun flow map into versioned bilingual
+  distribution assets under the source-KB investor package: zh-CN and en SVG,
+  PNG, and PDF.
+- Rewrote the first HTML page into a restrained long-form narrative that leads
+  with the production-control problem before introducing COS/GFR names.
+- Rewrote the COS/GFR mechanism page around layer boundaries, the versioned
+  TaskRun map, startup packet fields, fractal dispatch, loop engineering, and
+  explicit non-claim boundaries.
+- Added a concrete TaskRun example in the source KB and registered it in
+  `TASKRUN-LEDGER-V0.json` as candidate loop-learning evidence.
+
+Verification:
+
+```text
+Source JSON parse: passed
+Versioned SVG XML parse: passed at 2600x2860
+HTML local href/src check: passed
+Playwright desktop/mobile render check: no horizontal overflow, no broken images, no console warn/error
+Company OS contract validator: passed
+GFR audit: passed with checked_paths=41, checked_packets=5, errors=0, warnings=0
+```
+
+Boundaries:
+
+- No Runtime API or Studio code was changed in this slice.
+- Provider gates remained closed; no provider call, generated media byte,
+  secret, signed URL, or provider raw response was touched.
+- This is structure/render verification plus candidate feedback routing, not
+  human acceptance, business validation, or durable memory promotion.
+
+## 2026-06-19 - Studio Edge Anchor Regression Follow-up
+
+- Fixed the final edge-anchor regression from browser review: persisted edges
+  now anchor to node frame boundaries with port-aligned vertical placement,
+  while pending drag edges still originate from the visible plus port.
+- Changed default stable edges from animated dash lines to solid round-capped
+  paths so endpoint dash gaps no longer read as detached from the node frame.
+- Kept incident edge SVG groups visible during node drag; dragging a connected
+  node now keeps the edge present, opaque, and recalculated against the moving
+  node.
+- Added regression coverage for frame-anchored persisted edges, plus-origin
+  pending geometry, visible incident edges, and solid default edge styling.
+
+Verification:
+
+```text
+Browser QA on http://127.0.0.1:8797/studio/?project=edge-anchor-regression-20260619:
+  persisted edge path starts at the left node frame right boundary and ends at
+  the right node frame left boundary; stable edge stroke-dasharray=none and
+  stroke-linecap=round; after dragging the left node, edgeCount=1,
+  edgeOpacity=1, and the path endpoint followed the moved node; console
+  warn/error count=0.
+Studio interaction tests: 10 passed.
+Focused Studio/Site/Runtime regression: 46 passed / 1 warning.
+Studio/Site JS node --check: 82 files passed.
+Full default pytest: 491 passed / 527 deselected / 2 warnings.
+CLI help/version: passed; version 0.1.0.
+maintenance_audit: failed=0, warnings only.
+git diff --check: exit 0 with Windows CRLF notice on overlay.js only.
+```
+
+Boundaries:
+
+- No Runtime API contract changed.
+- Provider gates remain closed; no model/provider call, generated media byte,
+  local provider config, secret, signed URL, or provider raw response was
+  touched.
+- This is runtime/browser/frontend verification, not human acceptance,
+  creative quality validation, business validation, or durable-memory
+  promotion.
+
+## 2026-06-19 - Studio Port Geometry And Homepage Entry
+
+- Reworked Studio connection geometry so pending drag edges originate from the
+  visible `.node-port` button center, while persisted edges anchor to the node
+  frame with port-aligned vertical placement. This keeps the "pull from plus"
+  feel without leaving a visual gap on stable connections.
+- Tightened port magnet behavior: left and right ports now have distinct
+  side-specific hit bands, and vertical follow is bounded to avoid oversized
+  up/down attraction.
+- Rebuilt the site root first viewport as a professional AI video creation
+  entry: direct Studio actions, template stack, current project entry, and
+  recent work previews. The algorithm explanation is now below the first
+  screen instead of the primary visual.
+- Decluttered the Studio right inspector around "next action" and "current
+  reference summary"; node drafts, output records, and algorithm trace stay
+  behind collapsed disclosures, with asset/progress/work library as drawer
+  entry points.
+- Split frontend structure in low-risk slices: store state serialization,
+  local persistence, project session helpers, node generation restore helpers,
+  and port geometry.
+
+Verification:
+
+```text
+Browser QA on http://127.0.0.1:8797/:
+  root homepage 200, creation hero visible, 8 template/project/work cards,
+  no horizontal overflow.
+Browser QA on http://127.0.0.1:8797/studio/:
+  inspector main sections are next action/current reference/more panels,
+  algorithm details are closed by default, persisted edge path starts/ends at
+  node frame boundaries, pending connection still starts from the visible plus
+  port, left/right magnet states work, vertical far-y magnet clears, console
+  error count=0.
+Focused frontend/runtime tests: 16 passed.
+Studio/Site JS node --check: passed.
+Full default pytest: 489 passed / 527 deselected / 2 warnings.
+CLI help/version: passed.
+maintenance_audit: failed=0, warnings only.
+git diff --check: passed with existing CRLF notice for overlay.js.
+```
+
+Boundaries:
+
+- Provider gates remain closed; no model/provider call, generated media byte,
+  local provider config, secret, signed URL, or provider raw response was
+  touched.
+- This is runtime/browser/frontend verification, not human creative acceptance,
+  business validation, or durable-memory promotion.
+
+## 2026-06-19 - Studio Interaction Motion Layer
+
+- Added a small `apps/studio/src/interaction/` layer for motion tokens,
+  pointer velocity, edge auto-pan, snap resolution, and DOM feedback overlays.
+  The goal is to improve canvas tactility without introducing a new canvas
+  framework or changing Runtime API contracts.
+- Updated node drag behavior to use world-coordinate pointer tracking, grid
+  snapping, alignment snapping, visible snap guides, a short snap chip, drag
+  lift styling, and landing feedback.
+- Added light canvas follow behavior: dragging near canvas edges nudges the
+  viewport, and space/middle-button panning releases with bounded inertial
+  motion.
+- Added connection-source feedback for node port dragging, with existing target
+  locking styles strengthened in a separate `interaction-motion.css` file.
+- Added focused interaction tests for stylesheet entry, module boundaries,
+  snap-engine alignment behavior, and reduced-motion/tactile CSS markers.
+
+Verification:
+
+```text
+New interaction tests: 4 passed
+Studio static + interaction regression: 34 passed
+Studio JS node --check: 75 files passed
+Browser QA on http://127.0.0.1:8797/studio/: node drag created the
+  interaction feedback layer, emitted align snap state, triggered landing
+  feedback, cleared guides/chip after animation, and console warn/error count=0
+Full default pytest: 484 passed / 527 deselected / 2 warnings
+CLI help/version: passed
+maintenance_audit: failed=0, warnings only
+```
+
+Boundaries:
+
+- Provider gates remain closed; no provider call, generated media byte, local
+  provider config, secret, signed URL, or provider raw response was touched.
+- This is runtime/browser verification of the Studio interaction layer, not
+  human acceptance, creative quality validation, business validation, or durable
+  memory promotion.
+
+## 2026-06-19 - Studio Interaction Edge, Port, And Menu Fixes
+
+- Kept incident edge SVG groups visible during active node drag and updated
+  stable connections to solid, round-capped paths. This prevents connected
+  lines from disappearing or looking detached while the node moves.
+- Added side-port magnetic hover behavior for canvas nodes. Hovering near the
+  left/right side now pulls the corresponding plus port into focus, and the
+  right-side magnetic zone can start a connection without requiring an exact
+  button hit.
+- Reduced the add-node menu to four common quick actions by default and moved
+  the full Action Registry into a collapsed, scroll-safe advanced list.
+- Hardened popover positioning so content that grows after opening is clamped
+  back into the viewport; the add-node menu now repositions after advanced-list
+  toggles.
+- Added bounded media preview sizing for generated image/video node results so
+  preview content fills the node body without unbounded growth.
+
+Verification:
+
+```text
+Studio interaction focused tests: 7 passed
+Studio static + interaction regression: 37 passed
+Studio JS node --check: 76 files passed
+Browser QA on http://127.0.0.1:8797/studio/?project=frontend-fix-overlap-browser:
+  right-side port magnet reached opacity=1 and scale=1.22;
+  add-node menu defaulted to 4 quick actions;
+  expanded advanced menu stayed inside the viewport and became scrollable;
+  node drag moved the node, preserved the single edge, and left 0 drag classes;
+  prompt bar and selected node had no geometric overlap;
+  console warn/error count=0
+Full default pytest: 487 passed / 527 deselected / 2 warnings
+CLI help/version: passed; version 0.1.0
+maintenance_audit: failed=0, warnings only
+git diff --check: exit 0 with Windows CRLF notice on overlay.js only
+```
+
+Boundaries:
+
+- No Runtime API contract changed.
+- No provider gate was opened and no live provider/model call was made.
+- This is browser/runtime verification, not human acceptance, creative quality
+  validation, business validation, or durable-memory promotion.
+
+## 2026-06-19 - COS / GFR LoopSpec And Distribution Diagram
+
+- Added source-KB LoopSpec and TaskRun Ledger candidate control objects so COS
+  and GFR can record loop-engineering signals, evaluators, repair routes,
+  feedback decisions, promotion gates, and stop conditions without promoting
+  lessons automatically.
+- Added bilingual SVG distribution assets for the learning Agent production
+  control system:
+  `assets/cos-learning-agent-production-loop.zh-CN.svg` and
+  `assets/cos-learning-agent-production-loop.en.svg` under the investor
+  material package.
+- Updated GFR startup templates so future substantial tasks include a LoopSpec
+  section and work-item LoopSpec column.
+- Updated the AFS projection note to acknowledge the new source-KB loop objects
+  while preserving the repo boundary: AFS stores only the safe execution
+  projection, not private strategy, provider secrets, customer material, or
+  automatic rule promotion.
+
+Verification:
+
+```text
+Company OS contract validator: passed; all valid/invalid fixtures behaved as expected, including loop_spec_v0 and taskrun_ledger_v0
+GFR audit: passed; checked_paths=41, checked_packets=5, errors=0, warnings=0
+Source JSON parse: COS-REGISTRY-V0, EVIDENCE-LEDGER-V0, TASKRUN-LEDGER-V0, and 2026-06-18/2026-06-19 task packets parsed
+Bilingual SVG parse: zh-CN and en SVG assets parsed as UTF-8 XML with width=2400 and height=1500
+Chrome render check: zh-CN and en SVG assets rendered at 2400x1500; final screenshots reviewed for obvious clipping/overlap
+Full default pytest: 484 passed / 527 deselected / 2 warnings
+maintenance audit: failed=0, warnings only
+git diff --check: passed
+```
+
+Boundary:
+
+- This is structure and distribution-asset work. It is not runtime COS
+  enforcement, provider smoke, human acceptance, business validation, or durable
+  memory promotion.
+
 ## 2026-06-18 - Internal Beta Entry And Studio State Conflict Guard
 
 - Added session TTL handling for the invite-gated internal auth slice. Runtime

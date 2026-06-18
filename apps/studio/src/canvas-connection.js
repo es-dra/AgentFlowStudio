@@ -1,4 +1,6 @@
 import { bezier, screenToWorld } from "./geometry.js";
+import { pulseConnectionSource } from "./interaction/feedback-layer.js";
+import { nodePortWorldPoint } from "./interaction/port-geometry.js";
 import { effectiveHeight, connect } from "./nodes.js";
 import { getPendingEdgeGroup } from "./canvas-view.js";
 import { openReferenceMenu } from "./panels/add-node-menu.js";
@@ -16,10 +18,13 @@ export function findOutputPortAtPoint(e) {
 
 export function startConnectSession(store, fromId, e) {
   const from = store.get().nodes[fromId];
+  const start = nodePortWorldPoint(from, "out", store.get().viewport)
+    || { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 };
   const group = getPendingEdgeGroup();
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.classList.add("pending");
   group.appendChild(path);
+  pulseConnectionSource(fromId, true);
   return {
     kind: "connect",
     fromId,
@@ -28,7 +33,7 @@ export function startConnectSession(store, fromId, e) {
     path,
     targetId: null,
     targetEl: null,
-    start: { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 },
+    start,
   };
 }
 
@@ -43,7 +48,10 @@ export function moveConnectSession(store, session, e) {
     session.targetEl = target.el;
     target.el.classList.add("drop-target");
     const node = state.nodes[target.id];
-    if (node) end = { x: node.x, y: node.y + effectiveHeight(node) / 2 };
+    if (node) {
+      end = nodePortWorldPoint(node, "in", state.viewport)
+        || { x: node.x, y: node.y + effectiveHeight(node) / 2 };
+    }
     session.path.classList.add("target-locked");
   } else {
     session.path.classList.remove("target-locked");
@@ -53,6 +61,7 @@ export function moveConnectSession(store, session, e) {
 
 export function finishConnectSession(store, runtime, session, e) {
   session.path.remove();
+  pulseConnectionSource(session.fromId, false);
   if (session.targetEl) session.targetEl.classList.remove("drop-target");
   const moved = Math.abs(e.clientX - session.startX) + Math.abs(e.clientY - session.startY) > CLICK_SLOP;
   if (!moved) {

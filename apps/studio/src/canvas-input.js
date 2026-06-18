@@ -1,7 +1,12 @@
 import { findOutputPortAtPoint, finishConnectSession, moveConnectSession, startConnectSession } from "./canvas-connection.js";
 import { handleCanvasNodeClick } from "./canvas-node-action-handler.js";
 import { dragSession, isEditable, selectInRect, updatePortHover } from "./canvas-selection.js";
-import { zoomAt, snap } from "./geometry.js";
+import { screenToWorld, zoomAt } from "./geometry.js";
+import { applyEdgeAutoPan } from "./interaction/auto-pan.js";
+import { beginDragFeedback, finishDragFeedback, updateDragFeedback } from "./interaction/feedback-layer.js";
+import { clearPortMagnet, outputPortFromMagnet, updatePortMagnet } from "./interaction/port-magnet.js";
+import { animateInertiaPan, createPointerKinematics } from "./interaction/pointer-kinematics.js";
+import { resolveDragSnap } from "./interaction/snap-engine.js";
 import { duplicateNode } from "./nodes.js";
 import { hasOpenOverlay } from "./overlay.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
@@ -12,22 +17,36 @@ export function bindCanvasInput(store, runtime) {
   const rootEl = document.getElementById("canvas-root");
   let spaceHeld = false;
   let session = null;
+  let cancelPanMomentum = null;
+  const stopPanMomentum = () => {
+    if (cancelPanMomentum) cancelPanMomentum();
+    cancelPanMomentum = null;
+  };
 
   bindSpacePan(viewportEl, (value) => { spaceHeld = value; });
-  bindViewportWheel(rootEl, store);
+  bindViewportWheel(rootEl, store, stopPanMomentum);
   bindQuickMenus(rootEl, store, runtime);
   rootEl.addEventListener("pointerover", updatePortHover);
   rootEl.addEventListener("pointerout", updatePortHover);
+  rootEl.addEventListener("pointerleave", clearPortMagnet);
   rootEl.addEventListener("pointerdown", (e) => {
+    stopPanMomentum();
+    clearPortMagnet();
     session = handlePointerDown(e, { store, runtime, rootEl, viewportEl, spaceHeld });
   });
   rootEl.addEventListener("pointermove", (e) => {
-    if (!session) return;
-    handlePointerMove(e, { store, session });
+    if (!session) {
+      updatePortMagnet(e);
+      return;
+    }
+    handlePointerMove(e, { store, session, rootEl });
+  });
+  rootEl.addEventListener("mousemove", (e) => {
+    if (!session) updatePortMagnet(e);
   });
   rootEl.addEventListener("pointerup", (e) => {
     if (!session) return;
-    handlePointerUp(e, { store, runtime, session, viewportEl });
+    cancelPanMomentum = handlePointerUp(e, { store, runtime, session, viewportEl, rootEl });
     session = null;
   });
   rootEl.addEventListener("click", (e) => handleCanvasNodeClick(store, runtime, e));
@@ -49,9 +68,10 @@ function bindSpacePan(viewportEl, setSpaceHeld) {
   });
 }
 
-function bindViewportWheel(rootEl, store) {
+function bindViewportWheel(rootEl, store, stopPanMomentum) {
   rootEl.addEventListener("wheel", (e) => {
     if (e.target.closest(".prompt-bar") || e.target.closest(".popover") || e.target.closest(".modal-backdrop")) return;
+    stopPanMomentum();
     e.preventDefault();
     store.set((s) => {
       if (e.ctrlKey || e.metaKey) {
@@ -81,7 +101,13 @@ function bindQuickMenus(rootEl, store, runtime) {
 function handlePointerDown(e, env) {
   const { rootEl, viewportEl, spaceHeld, store, runtime } = env;
   if (e.button === 1 || (spaceHeld && e.button === 0)) {
-    const session = { kind: "pan", startX: e.clientX, startY: e.clientY, vp: { ...store.get().viewport } };
+    const session = {
+      kind: "pan",
+      startX: e.clientX,
+      startY: e.clientY,
+      vp: { ...store.get().viewport },
+      kinematics: createPointerKinematics(e),
+    };
     viewportEl.classList.add("panning");
     rootEl.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -89,7 +115,7 @@ function handlePointerDown(e, env) {
   }
   if (e.button !== 0 || isChromeTarget(e)) return null;
 
-  const stackedOutputPort = findOutputPortAtPoint(e);
+  const stackedOutputPort = findOutputPortAtPoint(e) || outputPortFromMagnet(e);
   const portBtn = stackedOutputPort || e.target.closest(".node-port");
   const nodeEl = stackedOutputPort ? stackedOutputPort.closest(".node") : e.target.closest(".node");
   if (portBtn && nodeEl && portBtn.dataset.port === "out") {
@@ -123,7 +149,10 @@ function beginNodeDrag(e, { store, rootEl, nodeEl }) {
   }
   if (!selected.includes(nodeId)) return null;
   const session = e.altKey ? cloneDragSession(store, nodeId, e) : dragSession(store, selected, e, { primaryId: nodeId, additive });
-  if (session) rootEl.setPointerCapture(e.pointerId);
+  if (session) {
+    rootEl.setPointerCapture(e.pointerId);
+    beginDragFeedback(rootEl, session);
+  }
   return session;
 }
 
@@ -132,8 +161,9 @@ function cloneDragSession(store, nodeId, e) {
   return clone ? dragSession(store, [clone.id], e, { primaryId: clone.id }) : null;
 }
 
-function handlePointerMove(e, { store, session }) {
+function handlePointerMove(e, { store, session, rootEl }) {
   if (session.kind === "pan") {
+    session.kinematics?.sample(e);
     store.set((s) => {
       s.viewport.x = session.vp.x + (e.clientX - session.startX);
       s.viewport.y = session.vp.y + (e.clientY - session.startY);
@@ -141,24 +171,34 @@ function handlePointerMove(e, { store, session }) {
     return;
   }
   if (session.kind === "connect") return moveConnectSession(store, session, e);
-  if (session.kind === "drag-node") return moveNodeSession(store, session, e);
+  if (session.kind === "drag-node") return moveNodeSession(store, session, e, rootEl);
   if (session.kind === "marquee") return moveMarquee(session, e);
 }
 
-function moveNodeSession(store, session, e) {
-  const scale = store.get().viewport.scale;
-  const dx = (e.clientX - session.startX) / scale;
-  const dy = (e.clientY - session.startY) / scale;
+function moveNodeSession(store, session, e, rootEl) {
+  applyEdgeAutoPan(store, rootEl, e);
+  const state = store.get();
+  session.startWorld = session.startWorld || screenToWorld(state.viewport, session.startX, session.startY);
+  const currentWorld = screenToWorld(state.viewport, e.clientX, e.clientY);
+  const dx = currentWorld.x - session.startWorld.x;
+  const dy = currentWorld.y - session.startWorld.y;
   if (Math.abs(dx) + Math.abs(dy) > 2) session.moved = true;
+  const snapResult = resolveDragSnap(state, session, {
+    dx,
+    dy,
+    shiftKey: e.shiftKey,
+    ctrlKey: e.ctrlKey,
+    metaKey: e.metaKey,
+  });
   store.set((s) => {
-    for (const id of session.nodeIds) {
+    for (const [id, position] of Object.entries(snapResult.positions)) {
       const node = s.nodes[id];
-      const origin = session.origins[id];
-      if (!node || !origin) continue;
-      node.x = snap(origin.x + dx);
-      node.y = snap(origin.y + dy);
+      if (!node) continue;
+      node.x = position.x;
+      node.y = position.y;
     }
   }, { history: false });
+  updateDragFeedback(rootEl, store.get(), snapResult);
 }
 
 function moveMarquee(session, e) {
@@ -175,13 +215,18 @@ function moveMarquee(session, e) {
   session.rect = { x, y, w, h };
 }
 
-function handlePointerUp(e, { store, runtime, session, viewportEl }) {
-  if (session.kind === "pan") viewportEl.classList.remove("panning");
+function handlePointerUp(e, { store, runtime, session, viewportEl, rootEl }) {
+  if (session.kind === "pan") {
+    viewportEl.classList.remove("panning");
+    return animateInertiaPan(store, session.kinematics?.velocity?.() || { x: 0, y: 0 });
+  }
   if (session.kind === "connect") finishConnectSession(store, runtime, session, e);
+  if (session.kind === "drag-node") finishDragFeedback(rootEl, session, { land: session.moved });
   if (session.kind === "drag-node" && !session.moved && session.primaryId && !session.additive) {
     store.set((s) => { s.selection = { nodeIds: [session.primaryId], edgeId: null }; }, { history: false, persist: false });
   }
   if (session.kind === "marquee") finishMarquee(store, session);
+  return null;
 }
 
 function finishMarquee(store, session) {

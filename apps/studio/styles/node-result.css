@@ -17,12 +17,26 @@
   white-space: normal;
   background: rgba(13, 15, 18, 0.92);
 }
+.node.has-media-result .node-body {
+  justify-content: flex-start;
+  padding: 32px 14px 16px;
+  gap: 8px;
+}
+.node.has-media-result .node-status {
+  margin-bottom: 4px;
+}
 .node-preview-frame {
   position: relative;
+  width: 100%;
+  min-height: 168px;
+  max-height: 420px;
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 18px 100%,
     #0b0d10;
+}
+.node-preview-frame.video {
+  min-height: 180px;
 }
 .node-preview-img,
 .node-preview-video {

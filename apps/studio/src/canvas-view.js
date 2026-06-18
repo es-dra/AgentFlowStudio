@@ -3,6 +3,7 @@ import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { bezier } from "./geometry.js";
 import { icon } from "./icons.js";
+import { nodeFramePortWorldPoint } from "./interaction/port-geometry.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
 const EDGE_OFFSET = 20000;
@@ -242,10 +243,14 @@ function edgeElement(group, edgeId) {
 function syncEdgeElement(item, edge, from, to, state, relations) {
   const path = item.querySelector("path");
   const label = item.querySelector(".edge-label");
-  const x1 = from.x + from.w;
-  const y1 = from.y + effectiveHeight(from) / 2;
-  const x2 = to.x;
-  const y2 = to.y + effectiveHeight(to) / 2;
+  const start = nodeFramePortWorldPoint(from, "out", state.viewport)
+    || { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 };
+  const end = nodeFramePortWorldPoint(to, "in", state.viewport)
+    || { x: to.x, y: to.y + effectiveHeight(to) / 2 };
+  const x1 = start.x;
+  const y1 = start.y;
+  const x2 = end.x;
+  const y2 = end.y;
   const relation = edge.relation_type || edge.relationType || "generation";
   path.setAttribute("d", bezier(x1, y1, x2, y2));
   path.classList.toggle("director-edge", relation === "director");

@@ -1,0 +1,166 @@
+#interaction-feedback-layer {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-promptbar) - 1);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.if-guide {
+  position: absolute;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  will-change: transform, opacity;
+}
+
+.if-guide.visible {
+  opacity: 1;
+}
+
+.if-guide-x {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(90, 200, 250, 0.72), transparent);
+  box-shadow: 0 0 16px rgba(90, 200, 250, 0.24);
+}
+
+.if-guide-y {
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(90, 200, 250, 0.72), transparent);
+  box-shadow: 0 0 16px rgba(90, 200, 250, 0.24);
+}
+
+.if-snap-chip {
+  position: absolute;
+  opacity: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(90, 200, 250, 0.28);
+  border-radius: 999px;
+  background: rgba(18, 22, 26, 0.88);
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(14px);
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+}
+
+.if-snap-chip.visible {
+  opacity: 1;
+}
+
+.if-snap-chip[data-kind="align"] {
+  color: var(--accent);
+  border-color: rgba(90, 200, 250, 0.52);
+}
+
+.node {
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    filter 0.14s ease,
+    opacity 0.14s ease,
+    scale 0.14s ease;
+  will-change: transform, scale;
+}
+
+.node.drag-moving {
+  z-index: 12;
+  opacity: 1;
+  scale: 1.012;
+  filter: saturate(1.08);
+  border-color: rgba(90, 200, 250, 0.54);
+  box-shadow:
+    0 0 0 1px rgba(90, 200, 250, 0.24),
+    0 26px 70px rgba(0, 0, 0, 0.44),
+    0 0 34px rgba(90, 200, 250, 0.10);
+}
+
+.node.drag-primary {
+  border-color: rgba(90, 200, 250, 0.74);
+}
+
+.node.drag-landed {
+  animation: node-land 0.18s ease-out;
+}
+
+.node.connection-source {
+  border-color: rgba(245, 196, 81, 0.62);
+  box-shadow:
+    0 0 0 1px rgba(245, 196, 81, 0.28),
+    0 0 24px rgba(245, 196, 81, 0.14);
+}
+
+.node.drop-target {
+  scale: 1.01;
+}
+
+.node.drop-target .node-port.in {
+  opacity: 1;
+  transform: scale(1.24);
+  border-color: var(--port-out);
+  box-shadow:
+    0 0 0 7px rgba(56, 212, 192, 0.12),
+    0 0 22px rgba(56, 212, 192, 0.32);
+}
+
+#edge-layer [data-edge-id].drag-incident-edge {
+  opacity: 1;
+  transition: opacity 0.08s ease, filter 0.12s ease;
+  filter: drop-shadow(0 0 9px rgba(90, 200, 250, 0.18));
+}
+
+.node.port-magnet-left,
+.node.port-magnet-right {
+  box-shadow:
+    0 0 0 1px rgba(90, 200, 250, 0.30),
+    0 0 0 8px rgba(90, 200, 250, 0.08),
+    0 20px 58px rgba(0, 0, 0, 0.32);
+}
+
+.node.port-magnet-left .node-port.in,
+.node.port-magnet-right .node-port.out {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--text-primary);
+  transform: translateY(var(--port-magnet-y, 0px)) scale(1.22);
+  box-shadow:
+    0 0 0 8px rgba(90, 200, 250, 0.11),
+    0 0 24px rgba(90, 200, 250, 0.32);
+}
+
+.node.port-magnet-left .node-port.in {
+  left: -38px;
+}
+
+.node.port-magnet-right .node-port.out {
+  right: -38px;
+}
+
+#canvas-viewport.panning #world {
+  transition: none;
+}
+
+@keyframes node-land {
+  0% { scale: 1.018; }
+  55% { scale: 0.996; }
+  100% { scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node,
+  .if-guide,
+  .if-snap-chip {
+    transition: none;
+    animation: none;
+  }
+
+  .node.drag-moving,
+  .node.drop-target {
+    scale: 1;
+  }
+}

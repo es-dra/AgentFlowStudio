@@ -53,7 +53,7 @@ a {
 .brand,
 .nav-links,
 .hero-actions,
-.hero-proof,
+.hero-signal,
 .preview-topbar,
 .preview-body,
 .operation-section,
@@ -123,13 +123,13 @@ a {
 
 .hero-section {
   display: grid;
-  grid-template-columns: minmax(320px, 0.86fr) minmax(520px, 1.14fr);
-  gap: 56px;
+  grid-template-columns: minmax(320px, 0.78fr) minmax(560px, 1.22fr);
+  gap: 48px;
   align-items: center;
   width: min(1180px, calc(100% - 40px));
   min-height: calc(100vh - 80px);
   margin: 0 auto;
-  padding: 34px 0 72px;
+  padding: 26px 0 58px;
 }
 
 .eyebrow {
@@ -150,7 +150,7 @@ p {
 
 h1 {
   margin-bottom: 18px;
-  font-size: clamp(62px, 8vw, 116px);
+  font-size: clamp(60px, 8vw, 108px);
   line-height: 0.95;
 }
 
@@ -166,9 +166,9 @@ h3 {
 }
 
 .hero-lede {
-  max-width: 620px;
+  max-width: 600px;
   color: #c5ccd2;
-  font-size: clamp(19px, 2vw, 27px);
+  font-size: clamp(19px, 2vw, 25px);
   line-height: 1.45;
 }
 
@@ -178,13 +178,16 @@ h3 {
   margin-top: 30px;
 }
 
-.hero-proof {
+.hero-signal {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 34px;
 }
 
-.hero-proof span {
+.hero-signal span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
   padding: 8px 12px;
@@ -192,7 +195,12 @@ h3 {
   font-size: 13px;
 }
 
+.hero-signal strong {
+  color: var(--gold);
+}
+
 .workflow-section,
+.works-section,
 .algorithm-section,
 .operation-section {
   width: min(1180px, calc(100% - 40px));

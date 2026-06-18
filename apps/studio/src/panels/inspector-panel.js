@@ -24,12 +24,9 @@ export function renderInspectorPanel(state, store) {
 function renderEmptyInspector(state, store, panel) {
   panel.appendChild(panelHead("panel", "创作助手", "下一步"));
   panel.appendChild(emptyGuide(state));
-  panel.appendChild(inspectorActions([
-    ["素材库", "folder", () => openDrawerTab(store, "assets")],
-    ["生成进度", "clock", () => openDrawerTab(store, "jobs")],
-    ["作品库", "frames", () => openDrawerTab(store, "history")],
-  ]));
   panel.appendChild(decisionGuide(state));
+  panel.appendChild(projectReferenceSummary(state));
+  panel.appendChild(drawerLinks(store));
   panel.appendChild(projectPipelineSection(state));
 }
 
@@ -37,12 +34,13 @@ function renderNodeInspector(panel, node, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   panel.appendChild(panelHead(def.icon, node.title, def.label));
   panel.appendChild(nodeFocus(node));
+  panel.appendChild(section("下一步行动", nextStepText(node), "primary"));
   panel.appendChild(inspectorActions(nodeActions(node, store)));
-  panel.appendChild(section("下一步", nextStepText(node)));
-  panel.appendChild(section("参考与上下文", contextSummary(node)));
-  panel.appendChild(section("创作内容", node.prompt || node.content || "还没有填写创作内容。"));
+  panel.appendChild(section("本次参考摘要", contextSummary(node)));
+  panel.appendChild(drawerLinks(store));
+  panel.appendChild(detailsSection("节点草稿", node.prompt || node.content || "还没有填写创作内容。", "内容"));
   panel.appendChild(algorithmConsoleSection(node));
-  panel.appendChild(section("输出记录", recordSummary(node)));
+  panel.appendChild(detailsSection("输出记录", recordSummary(node), "记录"));
 }
 
 function panelHead(iconName, title, meta) {
@@ -70,10 +68,10 @@ function decisionGuide(state) {
   const hasNodes = state.order.length > 0;
   const assetCount = state.assets.length;
   const message = hasNodes
-    ? "下一步从画布节点进入：继续生成、固定资产、查看参考或发起修订。算法过程会折叠记录在下方，不需要先理解系统内部。"
+    ? "选择画布节点后，优先处理继续生成、固定资产、查看参考或发起修订。算法 trace 默认折叠在下方，不会抢占主任务。"
     : "从底部工具栏新建文本、图片或视频节点；固定资产会在后续调用中自动参与调度。";
   const suffix = assetCount ? `当前已有 ${assetCount} 个可用素材。` : "当前还没有确认素材。";
-  return section("创作决策", `${message}\n${suffix}`);
+  return section("下一步行动", `${message}\n${suffix}`, "primary");
 }
 
 function nodeFocus(node) {
@@ -114,7 +112,6 @@ function nodeActions(node, store) {
   if (node.type === "video") {
     base.push(["整理卡片", "frames", () => dispatchNodeEvent("afs:video-asset-card-draft", node)]);
   }
-  if (store) base.push(["素材库", "folder", () => openDrawerTab(store, "assets")]);
   return base;
 }
 
@@ -130,12 +127,43 @@ function openDrawerTab(store, tab) {
   }, { history: false, persist: false });
 }
 
-function section(title, text) {
-  const wrap = el("section", "inspector-section");
+function section(title, text, tone = "") {
+  const wrap = el("section", `inspector-section${tone ? ` ${tone}` : ""}`);
   wrap.appendChild(el("h3", "", title));
   const value = el("pre", "", String(text || "暂无内容"));
   wrap.appendChild(value);
   return wrap;
+}
+
+function detailsSection(title, text, tag = "详情") {
+  const details = el("details", "inspector-section inspector-disclosure");
+  const summary = el("summary", "inspector-disclosure-summary");
+  summary.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(tag)}</span>`;
+  details.appendChild(summary);
+  const value = el("pre", "", String(text || "暂无内容"));
+  details.appendChild(value);
+  return details;
+}
+
+function drawerLinks(store) {
+  const wrap = el("section", "inspector-drawer-links");
+  wrap.appendChild(el("h3", "", "更多面板"));
+  wrap.appendChild(inspectorActions([
+    ["素材库", "folder", () => openDrawerTab(store, "assets")],
+    ["生成进度", "clock", () => openDrawerTab(store, "jobs")],
+    ["作品库", "frames", () => openDrawerTab(store, "history")],
+  ]));
+  return wrap;
+}
+
+function projectReferenceSummary(state) {
+  const readyAssets = (state.assets || []).filter((asset) => String(asset.status || "").toLowerCase() !== "retired").length;
+  const edgeCount = Object.keys(state.edges || {}).length;
+  const nodeCount = state.order.length;
+  const text = nodeCount
+    ? `画布节点：${nodeCount}\n固定素材：${readyAssets}\n连线关系：${edgeCount}\n选择节点后会显示本次调用携带的参考。`
+    : "还没有项目参考。创建节点并确认素材后，系统会在生成前整理本次参考摘要。";
+  return section("本次参考摘要", text);
 }
 
 function nextStepText(node) {

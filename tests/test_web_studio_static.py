@@ -50,19 +50,21 @@ def test_studio_user_surface_has_no_common_mojibake_markers() -> None:
 def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -> None:
     source = _source()
     store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    persistence_source = (STUDIO_ROOT / "src" / "store-persistence.js").read_text(encoding="utf-8")
+    state_source = (STUDIO_ROOT / "src" / "store-state.js").read_text(encoding="utf-8")
     env_example = Path(".env.example").read_text(encoding="utf-8")
 
     for forbidden in ("window.prompt(", "window.confirm(", "window.alert("):
         assert forbidden not in source
-    assert '|| localStorage.getItem(STORAGE_KEY)' not in store_source
-    assert '|| localStorage.getItem(LEGACY_STORAGE_KEY)' not in store_source
+    assert '|| localStorage.getItem(STORAGE_KEY)' not in persistence_source
+    assert '|| localStorage.getItem(LEGACY_STORAGE_KEY)' not in persistence_source
     assert "migrateLegacyCanvasStorage" in store_source
-    assert "localStorage.removeItem(STORAGE_KEY)" in store_source
-    assert "localStorage.removeItem(LEGACY_STORAGE_KEY)" in store_source
+    assert "localStorage.removeItem(STORAGE_KEY)" in persistence_source
+    assert "localStorage.removeItem(LEGACY_STORAGE_KEY)" in persistence_source
     assert 'return { source: "stale", projectId: targetProjectId }' in store_source
     assert "hasStudioMeta(remoteState)" in store_source
-    assert 'next.type === "video" && next.params.lastVideoPreviewUrl' in store_source
-    assert '!String(next.previewUrl).includes("/video-generations/")' in store_source
+    assert 'next.type === "video" && next.params.lastVideoPreviewUrl' in state_source
+    assert '!String(next.previewUrl).includes("/video-generations/")' in state_source
     main_source = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     assert "syncCurrentProjectMetaFromSummaries" in main_source
     assert "const currentId = runtime.projectId || state.meta.projectId;" in main_source
@@ -542,10 +544,12 @@ def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions(
 
 def test_loop003_qal003_004_recent_or_current_projects_are_not_hidden_by_filter() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    session = (STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8")
 
-    assert "RECENT_PROJECTS_KEY" in main
-    assert "rememberProject" in main
-    assert "recentProjectIds" in main
+    assert "RECENT_PROJECTS_KEY" in session
+    assert "rememberProject" in session
+    assert "recentProjectIds" in session
+    assert "persistActiveProject" in main
     assert "item.project_id === currentId || recent.includes(item.project_id)" in main
     assert "hiddenProjectCount" in main
 
@@ -593,8 +597,11 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
     assert "创作助手" in inspector
     assert 'panelHead("panel", "创作助手", "下一步")' in inspector
     assert "decisionGuide(state)" in inspector
-    assert "创作决策" in inspector
-    assert "算法过程会折叠记录在下方" in inspector
+    assert "下一步行动" in inspector
+    assert "本次参考摘要" in inspector
+    assert "drawerLinks(store)" in inspector
+    assert "detailsSection(\"输出记录\"" in inspector
+    assert "算法 trace 默认折叠在下方" in inspector
     assert "starterRailState(state)" in canvas_view
     assert 'starterRow.dataset.mode = rail.mode;' in canvas_view
     assert "shouldShowStarterRail" in starter_rail
@@ -617,6 +624,8 @@ def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() ->
     for marker in (
         ".algorithm-console",
         ".algorithm-disclosure",
+        ".inspector-disclosure",
+        ".inspector-drawer-links",
         ".algorithm-step-track",
         ".algorithm-call-summary",
         '#starter-row[data-mode="quick-start"]',
@@ -641,6 +650,29 @@ def test_studio_mature_shell_prevents_scroll_and_overlap_regressions() -> None:
     assert "scrollbar-width: thin;" in workbench
     assert ".modal {" in styles
     assert "overflow: hidden;" in styles
+
+
+def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+
+    for path in (
+        "src/studio-project-session.js",
+        "src/store-state.js",
+        "src/store-persistence.js",
+        "src/node-generation-restore.js",
+        "src/interaction/port-geometry.js",
+    ):
+        assert (STUDIO_ROOT / path).is_file()
+
+    assert "from \"./studio-project-session.js\"" in main
+    assert "from \"./store-persistence.js\"" in store
+    assert "from \"./store-state.js\"" in store
+    assert "from \"./node-generation-restore.js\"" in node_actions
+    assert len(store.splitlines()) <= 220
+    assert len((STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8").splitlines()) <= 90
+    assert len((STUDIO_ROOT / "src" / "node-generation-restore.js").read_text(encoding="utf-8").splitlines()) <= 80
 
 
 def test_studio_layout_and_director_prompt_link_are_explicit() -> None:

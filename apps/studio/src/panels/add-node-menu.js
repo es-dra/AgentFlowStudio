@@ -4,7 +4,7 @@ import { showPopover, el } from "../overlay.js";
 import { icon } from "../icons.js";
 import { ACTION_GROUPS, createActionNode } from "../action-registry.js";
 
-const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_script", "node_director"];
+const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_director"];
 
 export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   let closeRef = () => {};
@@ -13,6 +13,7 @@ export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
     const position = openPositionNear(store, action, world.x - 140, world.y - 40);
     spawn(store, action, position.x, position.y);
   }, () => closeRef());
+  bindDynamicMenuPosition(pop, () => closeRef);
   if (anchorEl) {
     closeRef = showPopover(anchorEl, pop, { place: "top" });
     return closeRef;
@@ -60,22 +61,33 @@ export function openReferenceMenu(store, runtime, fromNode, anchorEl) {
 
 function buildMenu(onPick, onDone) {
   const pop = el("div");
-  pop.classList.add("action-registry-menu");
-  pop.style.minWidth = "420px";
+  pop.classList.add("action-registry-menu", "compact-create-menu");
   pop.appendChild(quickCreatePanel(onPick, onDone));
+  const advanced = el("details", "advanced-create-list");
+  advanced.appendChild(el("summary", "advanced-create-summary", "更多节点类型"));
+  const content = el("div", "advanced-create-content");
   pop.appendChild(el("div", "menu-title secondary", "全部类型"));
   for (const group of ACTION_GROUPS) {
-    pop.appendChild(el("div", "menu-title", group.label));
+    content.appendChild(el("div", "menu-title", group.label));
     for (const action of group.actions) {
       const item = menuItem(action.icon, action.label, action.tag, action.requires_gate);
       item.addEventListener("click", () => {
         onPick(action);
         onDone();
       });
-      pop.appendChild(item);
+      content.appendChild(item);
     }
   }
+  advanced.appendChild(content);
+  pop.appendChild(advanced);
   return pop;
+}
+
+function bindDynamicMenuPosition(pop, closeRef) {
+  pop.addEventListener("toggle", (event) => {
+    if (!event.target?.matches?.(".advanced-create-list")) return;
+    requestAnimationFrame(() => closeRef()?.reposition?.());
+  }, true);
 }
 
 function quickCreatePanel(onPick, onDone) {

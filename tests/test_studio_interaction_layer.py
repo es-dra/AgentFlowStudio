@@ -1,0 +1,265 @@
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+
+STUDIO_ROOT = Path("apps/studio")
+
+
+def test_studio_loads_interaction_motion_layer() -> None:
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    source = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    connection = (STUDIO_ROOT / "src" / "canvas-connection.js").read_text(encoding="utf-8")
+
+    assert './styles/interaction-motion.css' in index
+    for marker in (
+        "./interaction/snap-engine.js",
+        "./interaction/feedback-layer.js",
+        "./interaction/port-magnet.js",
+        "./interaction/pointer-kinematics.js",
+        "./interaction/auto-pan.js",
+        "resolveDragSnap",
+        "beginDragFeedback",
+        "updateDragFeedback",
+        "finishDragFeedback",
+        "updatePortMagnet",
+        "outputPortFromMagnet",
+        "animateInertiaPan",
+        "applyEdgeAutoPan",
+    ):
+        assert marker in source
+    assert "pulseConnectionSource" in connection
+    assert "./interaction/port-geometry.js" in connection
+    assert "nodePortWorldPoint" in connection
+
+
+def test_studio_interaction_modules_remain_small_and_single_purpose() -> None:
+    paths = [
+        STUDIO_ROOT / "src" / "interaction" / "motion-tokens.js",
+        STUDIO_ROOT / "src" / "interaction" / "pointer-kinematics.js",
+        STUDIO_ROOT / "src" / "interaction" / "auto-pan.js",
+        STUDIO_ROOT / "src" / "interaction" / "snap-engine.js",
+        STUDIO_ROOT / "src" / "interaction" / "feedback-layer.js",
+        STUDIO_ROOT / "src" / "interaction" / "port-magnet.js",
+        STUDIO_ROOT / "src" / "interaction" / "port-geometry.js",
+        STUDIO_ROOT / "styles" / "interaction-motion.css",
+    ]
+
+    for path in paths:
+        assert path.is_file()
+        assert len(path.read_text(encoding="utf-8").splitlines()) <= 180
+
+
+def test_snap_engine_aligns_primary_node_against_existing_geometry() -> None:
+    code = r"""
+import { resolveDragSnap } from './apps/studio/src/interaction/snap-engine.js';
+const state = {
+  nodes: {
+    a: { id: 'a', x: 98, y: 0, w: 100, h: 80 },
+    b: { id: 'b', x: 210, y: 0, w: 100, h: 80 },
+  },
+};
+const session = {
+  nodeIds: ['a'],
+  primaryId: 'a',
+  origins: { a: { x: 98, y: 0 } },
+};
+const result = resolveDragSnap(state, session, { dx: 10, dy: 0 });
+if (result.positions.a.x !== 110) throw new Error(`expected aligned x=110, got ${result.positions.a.x}`);
+if (!result.guides.some((guide) => guide.axis === 'x')) throw new Error('expected x guide');
+if (result.kind !== 'align') throw new Error(`expected align kind, got ${result.kind}`);
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> None:
+    styles = (STUDIO_ROOT / "styles" / "interaction-motion.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "#interaction-feedback-layer",
+        ".if-guide-x",
+        ".if-guide-y",
+        ".if-snap-chip",
+        ".node.drag-moving",
+        ".node.drag-landed",
+        ".node.connection-source",
+        ".node.drop-target .node-port.in",
+        ".drag-incident-edge",
+        ".node.port-magnet-right .node-port.out",
+        "@media (prefers-reduced-motion: reduce)",
+    ):
+        assert marker in styles
+    incident_rule = styles.split("#edge-layer [data-edge-id].drag-incident-edge", 1)[1].split("}", 1)[0]
+    assert "opacity: 0" not in incident_rule
+    assert "opacity: 1" in incident_rule
+
+
+def test_default_canvas_edges_use_solid_frame_connection() -> None:
+    styles = (STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8")
+    edge_rule = styles.split("#edge-layer path.edge-flow", 1)[1].split("}", 1)[0]
+
+    assert "stroke-linecap: round" in styles.split("#edge-layer path", 1)[1].split("}", 1)[0]
+    assert "stroke-dasharray" not in edge_rule
+    assert "animation:" not in edge_rule
+
+
+def test_port_magnet_module_finds_side_ports_without_exact_button_hit() -> None:
+    code = r"""
+import { outputPortFromMagnet, updatePortMagnet, clearPortMagnet } from './apps/studio/src/interaction/port-magnet.js';
+
+globalThis.document = {
+  nodes: [],
+  querySelectorAll(selector) {
+    return selector === '.node' ? this.nodes : [];
+  },
+};
+const outPort = { className: 'node-port out' };
+const classSet = new Set();
+const nodeEl = {
+  dataset: { nodeId: 'node_1' },
+  style: {
+    values: {},
+    setProperty(name, value) { this.values[name] = value; },
+    removeProperty(name) { delete this.values[name]; },
+  },
+  classList: {
+    add(...names) { names.forEach((name) => classSet.add(name)); },
+    remove(...names) { names.forEach((name) => classSet.delete(name)); },
+    toggle(name, value) { value ? classSet.add(name) : classSet.delete(name); },
+  },
+  getBoundingClientRect() {
+    return { left: 100, right: 380, top: 80, bottom: 320, height: 240 };
+  },
+  querySelector(selector) {
+    return selector === '.node-port.out' ? outPort : null;
+  },
+};
+document.nodes = [nodeEl];
+
+const hover = updatePortMagnet({ clientX: 408, clientY: 210 });
+if (hover.nodeId !== 'node_1' || hover.side !== 'right') throw new Error('expected right-side magnet');
+if (!classSet.has('port-magnet-right')) throw new Error('expected visual magnet state');
+if (outputPortFromMagnet({ clientX: 408, clientY: 210 }) !== outPort) throw new Error('expected output port');
+if (updatePortMagnet({ clientX: 408, clientY: 300 }) !== null) throw new Error('expected no far vertical magnet');
+updatePortMagnet({ clientX: 408, clientY: 232 });
+if (nodeEl.style.values['--port-magnet-y'] !== '16px') throw new Error('expected bounded vertical follow');
+clearPortMagnet();
+if (classSet.has('port-magnet-right')) throw new Error('expected cleared magnet state');
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_port_geometry_anchors_edges_to_visible_button_center() -> None:
+    code = r"""
+import { nodePortWorldPoint } from './apps/studio/src/interaction/port-geometry.js';
+
+const port = {
+  getBoundingClientRect() {
+    return { left: 390, top: 210, width: 22, height: 22 };
+  },
+};
+globalThis.document = {
+  querySelectorAll(selector) {
+    if (selector !== '.node') return [];
+    return [{
+      dataset: { nodeId: 'node_1' },
+      querySelector(inner) {
+        return inner === '.node-port.out' ? port : null;
+      },
+    }];
+  },
+};
+const point = nodePortWorldPoint(
+  { id: 'node_1', x: 100, y: 120, w: 280, h: 240 },
+  'out',
+  { x: 10, y: 20, scale: 2 },
+);
+if (point.x !== 195.5 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_port_geometry_anchors_persistent_edges_to_node_frame() -> None:
+    code = r"""
+import { nodeFramePortWorldPoint } from './apps/studio/src/interaction/port-geometry.js';
+
+const port = {
+  getBoundingClientRect() {
+    return { left: 390, top: 210, width: 22, height: 22 };
+  },
+};
+globalThis.document = {
+  querySelectorAll(selector) {
+    if (selector !== '.node') return [];
+    return [{
+      dataset: { nodeId: 'node_1' },
+      querySelector(inner) {
+        return inner === '.node-port.out' ? port : null;
+      },
+    }];
+  },
+};
+const point = nodeFramePortWorldPoint(
+  { id: 'node_1', x: 100, y: 120, w: 280, h: 240 },
+  'out',
+  { x: 10, y: 20, scale: 2 },
+);
+if (point.x !== 380 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
+    source = (STUDIO_ROOT / "src" / "panels" / "add-node-menu.js").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "studio-interactions.css").read_text(encoding="utf-8")
+    overlay = (STUDIO_ROOT / "src" / "overlay.js").read_text(encoding="utf-8")
+
+    assert 'const QUICK_ACTION_IDS = ["node_text", "node_image", "node_video", "node_director"]' in source
+    assert '"compact-create-menu"' in source
+    assert '"advanced-create-list"' in source
+    assert '"advanced-create-content"' in source
+    assert "bindDynamicMenuPosition" in source
+    assert ".compact-create-menu" in styles
+    assert "max-height: min(560px, calc(100vh - 32px))" in styles
+    assert "window.innerHeight - height - 8" in overlay
+
+
+def test_media_preview_has_bounded_fill_contract() -> None:
+    result_styles = (STUDIO_ROOT / "styles" / "node-result.css").read_text(encoding="utf-8")
+
+    for marker in (
+        ".node.has-media-result .node-body",
+        "min-height: 168px",
+        "max-height: 420px",
+        "object-fit: cover",
+    ):
+        assert marker in result_styles
