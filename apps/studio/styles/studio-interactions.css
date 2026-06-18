@@ -181,6 +181,7 @@
   border: 1px solid var(--starter-border);
   transform: rotate(18deg);
   opacity: 0.5;
+  pointer-events: none;
 }
 
 .quick-create-panel {

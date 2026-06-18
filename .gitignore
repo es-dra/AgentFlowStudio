@@ -21,6 +21,7 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+build/
 *.egg-info/
 
 # local data and generated artifacts

@@ -26,7 +26,8 @@ export function positionBar(bar, state, node) {
   const width = bar.offsetWidth || 540;
   const height = bar.offsetHeight || 150;
   const dockSafe = 84;
-  let y = bottom.y + 14;
+  const contextToolbarSafeGap = 54;
+  let y = bottom.y + contextToolbarSafeGap;
   if (y + height > window.innerHeight - dockSafe) {
     y = top.y - height - 40;
     bar.classList.add("above");
