@@ -1,0 +1,124 @@
+#edge-layer {
+  position: absolute;
+  left: -20000px;
+  top: -20000px;
+  width: 40000px;
+  height: 40000px;
+  overflow: visible;
+  z-index: var(--z-edges);
+  pointer-events: none;
+}
+
+#edge-layer path {
+  fill: none;
+  stroke: #4a6f86;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  pointer-events: stroke;
+  transition: stroke 0.15s ease, opacity 0.15s ease;
+}
+
+#edge-layer path.edge-flow {
+  filter: drop-shadow(0 0 2px rgba(90, 200, 250, 0.10));
+  opacity: 0.82;
+}
+
+#edge-layer path.edge-spark {
+  stroke: #5ac8fa;
+  stroke-width: 1.95;
+  stroke-dasharray: 0 26 16 220;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(90, 200, 250, 0.82));
+  animation: edge-spark-forward 2.6s linear infinite;
+  transition: opacity 0.15s ease;
+}
+
+#edge-layer path.edge-spark.active {
+  opacity: 0.95;
+}
+
+#edge-layer path.edge-spark.reverse {
+  animation-name: edge-spark-reverse;
+}
+
+#edge-layer path.director-edge {
+  stroke: var(--energy);
+  stroke-dasharray: 4 8;
+  filter: drop-shadow(0 0 4px rgba(245, 196, 81, 0.32));
+}
+
+#edge-layer path.reference-edge {
+  stroke: #8192a8;
+  stroke-dasharray: 3 7;
+}
+
+.edge-label {
+  display: none;
+  fill: var(--text-primary);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: rgba(17, 18, 20, 0.92);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+
+.edge-label.visible {
+  display: block;
+}
+
+@keyframes edge-flow {
+  to { stroke-dashoffset: -16; }
+}
+
+@keyframes edge-spark-forward {
+  to { stroke-dashoffset: -262; }
+}
+
+@keyframes edge-spark-reverse {
+  to { stroke-dashoffset: 262; }
+}
+
+#edge-layer path.pending {
+  stroke: var(--accent);
+  stroke-dasharray: 6 5;
+  animation: edge-flow 0.8s linear infinite;
+}
+
+#edge-layer path.pending.target-locked {
+  stroke: var(--port-out);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(56, 212, 192, 0.55));
+}
+
+#edge-layer path.selected-edge {
+  stroke: var(--accent);
+  stroke-width: 1.7;
+}
+
+#edge-layer path.just-connected {
+  stroke: var(--port-out);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 6px rgba(56, 212, 192, 0.7));
+  animation: edge-success 1s ease;
+}
+
+@keyframes edge-success {
+  0% { stroke-width: 3.5; }
+  100% { stroke-width: 2.2; }
+}
+
+#edge-layer path.rel-up-edge {
+  stroke: var(--port-in);
+  stroke-width: 1.75;
+}
+
+#edge-layer path.rel-down-edge {
+  stroke: var(--port-out);
+  stroke-width: 1.75;
+}
+
+#edge-layer path.rel-dim-edge {
+  opacity: 0.18;
+}

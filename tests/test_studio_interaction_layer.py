@@ -3,7 +3,6 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-
 STUDIO_ROOT = Path("apps/studio")
 
 
@@ -102,13 +101,49 @@ def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> N
     assert "opacity: 1" in incident_rule
 
 
-def test_default_canvas_edges_use_solid_frame_connection() -> None:
-    styles = (STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8")
-    edge_rule = styles.split("#edge-layer path.edge-flow", 1)[1].split("}", 1)[0]
+def test_generating_text_shimmer_is_loaded_and_motion_safe() -> None:
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "generation-feedback.css").read_text(encoding="utf-8")
 
-    assert "stroke-linecap: round" in styles.split("#edge-layer path", 1)[1].split("}", 1)[0]
+    assert './styles/generation-feedback.css' in index
+    assert len(styles.splitlines()) <= 90
+    for marker in (
+        ".node.is-generating .node-state-strip span:not(.dot)",
+        ".generation-progress-copy strong",
+        ".optimizer-pop .opt-state",
+        ".optimizer-pop .opt-loading span:not(.spinner)",
+        ".job-center-card.generating .job-state",
+        "@keyframes generating-text-shimmer",
+        "@media (prefers-reduced-motion: reduce)",
+    ):
+        assert marker in styles
+    shimmer_rule = styles.split(".node.is-generating .node-state-strip span:not(.dot)", 1)[1].split("}", 1)[0]
+    assert "generating-text-shimmer 3.2s" in shimmer_rule
+    reduced_rule = styles.split("@media (prefers-reduced-motion: reduce)", 1)[1].split("}", 1)[0]
+    assert "animation: none" in reduced_rule
+    assert "-webkit-text-fill-color: currentColor" in reduced_rule
+
+
+def test_default_canvas_edges_use_solid_frame_connection() -> None:
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8")
+    canvas_edges = (STUDIO_ROOT / "src" / "canvas-edges.js").read_text(encoding="utf-8")
+    edge_rule = styles.split("#edge-layer path.edge-flow", 1)[1].split("}", 1)[0]
+    base_rule = styles.split("#edge-layer path", 1)[1].split("}", 1)[0]
+
+    assert './styles/canvas-edges.css' in index
+    assert "stroke-linecap: round" in base_rule
+    assert "stroke-width: 1.35" in base_rule
     assert "stroke-dasharray" not in edge_rule
     assert "animation:" not in edge_rule
+    assert "edge-spark" in canvas_edges
+    assert "syncEdgeSpark" in canvas_edges
+    assert "selected.has(edge.from) || selected.has(edge.to)" in canvas_edges
+    assert "#edge-layer path.edge-spark" in styles
+    assert "animation: edge-spark-forward 2.6s linear infinite" in styles
+    assert "@keyframes edge-spark-forward" in styles
+    assert "@keyframes edge-spark-reverse" in styles
+    assert "animation-name: edge-spark-reverse" in styles
 
 
 def test_port_magnet_module_finds_side_ports_without_exact_button_hit() -> None:

@@ -8,6 +8,37 @@
 .asset-card:hover { border-color: var(--border-card); background: rgba(38, 41, 46, 0.9); }
 .asset-card.retired { opacity: 0.55; }
 .asset-card.retired .asset-kind { color: var(--text-faint); }
+.asset-card.lifecycle-fixed { border-color: rgba(56, 212, 192, 0.22); }
+.asset-card.lifecycle-draft { border-color: rgba(245, 196, 81, 0.18); }
+.asset-card.lifecycle-rejected,
+.asset-card.lifecycle-retired { border-color: rgba(255, 255, 255, 0.07); }
+
+.asset-lifecycle-filter {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 0 10px 6px;
+}
+.asset-lifecycle-filter button {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-height: 42px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-faint);
+  font-size: 10px;
+}
+.asset-lifecycle-filter button.active {
+  border-color: rgba(90, 200, 250, 0.32);
+  background: rgba(90, 200, 250, 0.09);
+  color: var(--text-primary);
+}
+.asset-lifecycle-filter strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
 
 .asset-thumb {
   width: 100%;
@@ -37,7 +68,32 @@
 }
 
 .asset-meta { padding: 8px 2px 2px; cursor: pointer; }
-.asset-title { color: var(--text-primary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.asset-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asset-lifecycle-badge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 650;
+}
+.asset-lifecycle-badge.fixed { color: var(--port-out); border-color: rgba(56, 212, 192, 0.2); }
+.asset-lifecycle-badge.draft { color: var(--energy); border-color: rgba(245, 196, 81, 0.2); }
+.asset-lifecycle-badge.rejected,
+.asset-lifecycle-badge.retired { color: var(--text-faint); }
 .asset-kind { color: var(--accent); font-size: 11px; margin-top: 2px; }
 .asset-summary {
   color: var(--text-faint);

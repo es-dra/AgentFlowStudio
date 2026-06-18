@@ -273,6 +273,20 @@ h3 {
   max-width: 770px;
 }
 
+.technical-details {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.technical-details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #dce3e7;
+  font-size: 14px;
+  font-weight: 800;
+}
+.technical-details .algorithm-rail { margin-top: 18px; }
+
 .site-footer {
   justify-content: space-between;
   width: min(1180px, calc(100% - 40px));

@@ -69,6 +69,7 @@ function drawerSignature(state) {
   return [
     state.meta.projectId, state.meta.projectName, state.meta.canvasName,
     state.ui.drawerOpen, state.ui.drawerTab,
+    state.ui.drawerSearch, state.ui.assetLifecycleFilter, state.ui.navigatorSearch,
     state.order.join(","),
     state.selection.nodeIds.join(","),
     Object.keys(state.groups).join(","),

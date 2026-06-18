@@ -3,6 +3,12 @@ import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 import { assetsFromNode } from "../asset-reference-summary.js";
 import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
+import {
+  nodeAssetDecisionText,
+  nodeContextSummaryText,
+  projectAssetDecisionText,
+  projectReferenceSummaryText,
+} from "./inspector-context-summary.js";
 
 export function renderInspectorPanel(state, store) {
   const panel = document.getElementById("inspector");
@@ -26,6 +32,7 @@ function renderEmptyInspector(state, store, panel) {
   panel.appendChild(emptyGuide(state));
   panel.appendChild(decisionGuide(state));
   panel.appendChild(projectReferenceSummary(state));
+  panel.appendChild(section("资产确认状态", projectAssetDecisionText(state)));
   panel.appendChild(drawerLinks(store));
   panel.appendChild(projectPipelineSection(state));
 }
@@ -36,7 +43,8 @@ function renderNodeInspector(panel, node, store) {
   panel.appendChild(nodeFocus(node));
   panel.appendChild(section("下一步行动", nextStepText(node), "primary"));
   panel.appendChild(inspectorActions(nodeActions(node, store)));
-  panel.appendChild(section("本次参考摘要", contextSummary(node)));
+  panel.appendChild(section("本次参考摘要", nodeContextSummaryText(node)));
+  panel.appendChild(section("资产确认状态", nodeAssetDecisionText(node)));
   panel.appendChild(drawerLinks(store));
   panel.appendChild(detailsSection("节点草稿", node.prompt || node.content || "还没有填写创作内容。", "内容"));
   panel.appendChild(algorithmConsoleSection(node));
@@ -157,13 +165,7 @@ function drawerLinks(store) {
 }
 
 function projectReferenceSummary(state) {
-  const readyAssets = (state.assets || []).filter((asset) => String(asset.status || "").toLowerCase() !== "retired").length;
-  const edgeCount = Object.keys(state.edges || {}).length;
-  const nodeCount = state.order.length;
-  const text = nodeCount
-    ? `画布节点：${nodeCount}\n固定素材：${readyAssets}\n连线关系：${edgeCount}\n选择节点后会显示本次调用携带的参考。`
-    : "还没有项目参考。创建节点并确认素材后，系统会在生成前整理本次参考摘要。";
-  return section("本次参考摘要", text);
+  return section("本次参考摘要", projectReferenceSummaryText(state));
 }
 
 function nextStepText(node) {
@@ -175,14 +177,6 @@ function nextStepText(node) {
   if (node.type === "image") return "填写画面描述或接入参考图，然后生成首帧。";
   if (node.type === "video") return "确认首帧和动作描述后生成视频；完成后再整理成视频素材卡。";
   return "补充内容后继续连接下游节点。";
-}
-
-function contextSummary(node) {
-  const bundle = node.params?.lastContextBundle || {};
-  const assets = Array.isArray(bundle.included_assets) ? bundle.included_assets.length : 0;
-  const nodes = Array.isArray(bundle.included_nodes) ? bundle.included_nodes.length : 0;
-  if (!assets && !nodes) return "还没有引用内容。优化或生成后会显示本次携带的节点与素材。";
-  return `引用节点：${nodes}\n引用素材：${assets}`;
 }
 
 function recordSummary(node) {

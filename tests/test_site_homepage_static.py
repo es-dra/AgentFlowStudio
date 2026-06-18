@@ -27,9 +27,11 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert "project-lane" in index
     assert "最近作品" in index
     assert "城市夜景追踪镜头" in index
+    assert "查看底层算法边界" in index
     assert "提示词智能优化" in index
     assert "上下文智能调度" in index
     assert "质量反馈与漂移控制" in index
+    assert 'class="algorithm-section"' not in index
     assert "Runtime Service" not in index
     assert "provider raw" not in index
 
@@ -74,6 +76,7 @@ def test_site_homepage_preview_uses_non_overlapping_flow_layout() -> None:
     assert "grid-template-columns: minmax(0, 1.1fr) minmax(230px, 0.7fr);" in preview
     assert ".template-stack" in preview
     assert ".project-lane" in preview
+    assert ".technical-details" in (SITE_ROOT / "styles" / "site.css").read_text(encoding="utf-8")
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in preview
     template_card_rule = preview.split(".template-card {", 1)[1].split(".template-card.active", 1)[0]
     assert "position: absolute;" not in template_card_rule

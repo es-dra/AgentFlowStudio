@@ -12,6 +12,37 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current frontend hardening addendum: 2026-06-19 pass continued Studio UX
+hardening after edge and homepage review. Root `/` now leads with the AI video
+creation entry and keeps the six core algorithms behind a folded technical
+boundary instead of a primary section. `/studio/` now separates asset lifecycle
+states in the asset drawer, redraws on asset search/filter state changes, and
+shows right-inspector summaries for included context, excluded context, and
+asset confirmation state; object-shaped context warnings are rendered through
+safe summary fields rather than raw objects. Canvas edges are thinner by default
+and selected-node related edges now render a directional spark overlay: upstream
+selection flows forward, downstream selection reverses; the selected-edge spark
+was slowed and generating/optimizing/running text now has a subtle shimmer with
+reduced-motion fallback. Verification so far:
+browser QA on
+`127.0.0.1:8797` confirmed homepage entry/no horizontal overflow/no console
+warn-error, selected edge forward/reverse spark, `1.35px` default edge width,
+`1.75px` associated edge width, lifecycle filter redraw, and inspector context
+copy. Current-scope maintainability risks from this pass were closed by
+splitting edge SVG styles into `canvas-edges.css` and splitting the broad Studio
+static regression file into focused asset/generation and mature-shell test
+files; focused Studio/Site static and interaction regression 46 passed;
+post-split focused Studio static and edge regression 33 passed; changed
+Studio/Site JS `node --check` passed; generating-feedback and mature-shell
+regression 20 passed; browser style verification confirmed
+`generation-feedback.css` loaded, selected-edge spark duration 2.6s,
+generating-text shimmer duration 3.2s, and console warn/error count=0; full
+default pytest passed 493 / 527 deselected / 2 warnings; maintenance audit
+failed=0 with warnings only; `git diff --check` passed with the existing CRLF
+notice on `apps/studio/styles/assets.css`. Boundary: no provider call, no
+generated media bytes, no human acceptance, no business validation, no
+durable-memory promotion.
+
 Current frontend closeout addendum: 2026-06-19 pass fixed Studio port geometry
 and homepage entry. Root `/` now serves the new professional AI video creation
 homepage; `/studio/` inspector is reduced to next action, current reference

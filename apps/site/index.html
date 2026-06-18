@@ -30,9 +30,8 @@
     <main>
       <section class="hero-section creation-hero">
         <div class="hero-copy">
-          <p class="eyebrow">AI video creation workspace</p>
           <h1>AFS Studio</h1>
-          <p class="hero-lede">把故事、角色、场景、关键帧和视频片段放进同一个创作画布，生成、确认、复用和修订都从这里开始。</p>
+          <p class="hero-lede">专业 AI 视频创作入口。把故事、角色、场景、关键帧和视频片段放进同一个画布，持续生成、确认、复用和修订。</p>
           <div class="hero-actions">
             <a class="primary-action" href="/studio/" data-auth-action>新建视频项目</a>
             <a class="secondary-action" href="#templates">选择创作模板</a>
@@ -95,7 +94,6 @@
 
       <section class="works-section" id="works">
         <div class="section-heading">
-          <p class="eyebrow">Recent work</p>
           <h2>首页先让用户看到可以创作什么</h2>
         </div>
         <div class="work-grid" aria-label="作品与项目预览">
@@ -119,7 +117,6 @@
 
       <section class="workflow-section" id="workflow">
         <div class="section-heading">
-          <p class="eyebrow">Workflow</p>
           <h2>进入 Studio 后，创作动作会被整理成可复用的生产链路</h2>
         </div>
         <div class="workflow-line">
@@ -141,28 +138,23 @@
         </div>
       </section>
 
-      <section class="algorithm-section" id="algorithms">
-        <div class="section-heading">
-          <p class="eyebrow">Core algorithms</p>
-          <h2>底层算法负责稳定，首页不把它们当成主视觉</h2>
-        </div>
-        <div class="algorithm-rail" aria-label="AFS 六大核心算法">
-          <span>提示词智能优化</span>
-          <span>上下文智能调度</span>
-          <span>图片/视频智能识别</span>
-          <span>资产记忆与连续性约束</span>
-          <span>模型请求投影</span>
-          <span>质量反馈与漂移控制</span>
-        </div>
-      </section>
-
       <section class="operation-section">
         <div>
-          <p class="eyebrow">Studio operation</p>
           <h2>网站负责进入创作，Studio 负责完成生产</h2>
           <p>
             进入工作台后，用户在画布中创建节点、确认资产、发起生成和修订。前端只展示安全摘要、项目状态和可操作入口，不暴露 provider secret、本地路径或原始响应。
           </p>
+          <details class="technical-details">
+            <summary>查看底层算法边界</summary>
+            <div class="algorithm-rail" aria-label="AFS 六大核心算法">
+              <span>提示词智能优化</span>
+              <span>上下文智能调度</span>
+              <span>图片/视频智能识别</span>
+              <span>资产记忆与连续性约束</span>
+              <span>模型请求投影</span>
+              <span>质量反馈与漂移控制</span>
+            </div>
+          </details>
         </div>
         <a class="primary-action" href="/studio/" data-auth-action>打开 Studio 工作台</a>
       </section>

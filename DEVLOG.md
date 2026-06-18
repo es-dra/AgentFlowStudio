@@ -1,5 +1,66 @@
 # Devlog
 
+## 2026-06-19 - Studio Context Transparency And Edge Flow Polish
+
+- Reworked the site root presentation so the first viewport is a direct
+  professional AI video creation entry. The six core algorithms remain
+  available as a folded technical boundary instead of occupying a homepage
+  section.
+- Added a small `asset-lifecycle` module and wired it into the Studio asset
+  drawer. Assets are now separated as all / fixed / candidate / retired, with
+  state-aware empty copy so draft evidence is not confused with confirmed
+  assets.
+- Split inspector context copy into `inspector-context-summary.js`. The right
+  inspector now states what was included, what was excluded, and which
+  candidate assets still need user confirmation before entering future calls.
+  Object-shaped context warnings are formatted through safe summary fields
+  instead of rendering raw objects.
+- Adjusted canvas edges after visual review: stable lines are thinner, and
+  edges connected to the selected node get a directional spark overlay that
+  flows downstream or reverses when the downstream node is selected. Slowed the
+  selected-edge spark so the flow reads as guidance instead of a fast warning.
+- Added a subtle generating-text shimmer for in-progress node state strips,
+  node generation progress, optimizer loading copy, and running job labels,
+  with reduced-motion fallback.
+- Fixed the drawer render signature so asset search and lifecycle filter
+  changes invalidate the drawer and actually redraw the list.
+- Resolved the current-scope maintainability warnings from this pass by moving
+  edge SVG styling into `canvas-edges.css` and splitting the broad Studio
+  static regression file into focused asset/generation and mature-shell files.
+
+Verification:
+
+```text
+Browser QA on http://127.0.0.1:8797/:
+  homepage first viewport is a Studio creation entry, no algorithm section in
+  the main page flow, folded technical boundary present, no horizontal
+  overflow, console warn/error count=0.
+Browser QA on http://127.0.0.1:8797/studio/?project=frontend-scroll-overlap-final-2:
+  selected upstream edge spark active with forward animation; selected
+  downstream edge spark active with reverse animation; default edge
+  stroke-width=1.35px; associated edge stroke-width=1.75px; asset lifecycle
+  filters render and redraw; inspector shows context and asset confirmation
+  summaries; console warn/error count=0.
+Browser style verification on http://127.0.0.1:8797/studio/?project=frontend-scroll-overlap-final-2:
+  `generation-feedback.css` loaded; selected edge spark duration=2.6s;
+  generating text shimmer duration=3.2s; console warn/error count=0.
+Focused Studio/Site static and interaction regression: 46 passed.
+Focused post-split Studio static and edge regression: 33 passed.
+Focused generating-feedback and mature-shell regression: 20 passed.
+Full default pytest: 493 passed / 527 deselected / 2 warnings.
+Studio/Site JS node --check: passed.
+git diff --check: passed with the existing CRLF notice on assets.css only.
+```
+
+Boundaries:
+
+- Provider gates remain closed; no model/provider call, generated media byte,
+  local provider config, secret, signed URL, or provider raw response was
+  touched.
+- This is frontend/runtime browser verification, not human creative
+  acceptance, provider smoke, business validation, or durable-memory
+  promotion.
+
 ## 2026-06-19 - COS/GFR Display Package v0.1
 
 - Froze the current COS/GFR TaskRun flow map into versioned bilingual

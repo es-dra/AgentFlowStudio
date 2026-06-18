@@ -20,6 +20,7 @@ export function initialState(projectId = "studio-local-001") {
       drawerOpen: true,
       drawerTab: "canvas",
       drawerSearch: "",
+      assetLifecycleFilter: "all",
       navigatorSearch: "",
       inspectorOpen: true,
       promptExpand: false,

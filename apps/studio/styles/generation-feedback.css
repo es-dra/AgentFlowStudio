@@ -1,0 +1,45 @@
+.node.is-generating .node-state-strip span:not(.dot),
+.node.is-generating .generation-progress-copy strong,
+.node.is-generating .generation-progress-copy small,
+.node.is-generating .generation-progress-percent,
+.node-mini-status.running,
+.job-center-card.generating .job-state,
+.optimizer-pop .opt-state,
+.optimizer-pop .opt-loading span:not(.spinner) {
+  background: linear-gradient(
+    100deg,
+    rgba(154, 166, 181, 0.82) 0%,
+    rgba(244, 248, 255, 0.96) 36%,
+    rgba(90, 200, 250, 0.96) 52%,
+    rgba(154, 166, 181, 0.82) 70%
+  );
+  background-size: 230% 100%;
+  color: var(--text-secondary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: generating-text-shimmer 3.2s ease-in-out infinite;
+  text-shadow: 0 0 14px rgba(90, 200, 250, 0.12);
+}
+
+@keyframes generating-text-shimmer {
+  0% { background-position: 135% 50%; }
+  100% { background-position: -85% 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node.is-generating .node-state-strip span:not(.dot),
+  .node.is-generating .generation-progress-copy strong,
+  .node.is-generating .generation-progress-copy small,
+  .node.is-generating .generation-progress-percent,
+  .node-mini-status.running,
+  .job-center-card.generating .job-state,
+  .optimizer-pop .opt-state,
+  .optimizer-pop .opt-loading span:not(.spinner) {
+    background: none;
+    animation: none;
+    color: var(--text-secondary);
+    -webkit-text-fill-color: currentColor;
+    text-shadow: none;
+  }
+}

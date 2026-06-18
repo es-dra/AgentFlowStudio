@@ -2,7 +2,7 @@ import { bezier, screenToWorld } from "./geometry.js";
 import { pulseConnectionSource } from "./interaction/feedback-layer.js";
 import { nodePortWorldPoint } from "./interaction/port-geometry.js";
 import { effectiveHeight, connect } from "./nodes.js";
-import { getPendingEdgeGroup } from "./canvas-view.js";
+import { getPendingEdgeGroup } from "./canvas-edges.js";
 import { openReferenceMenu } from "./panels/add-node-menu.js";
 
 const CLICK_SLOP = 5;
