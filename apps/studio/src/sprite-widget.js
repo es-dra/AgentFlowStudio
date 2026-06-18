@@ -11,6 +11,7 @@ let suppressSpriteClick = false;
 let spriteResizeBound = false;
 const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
 const SPRITE_MARGIN = 18;
+const SPRITE_SIZE = 92;
 const spriteMessages = [
   { role: "sprite", text: "我在这里陪你看画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -40,13 +41,19 @@ function spriteOrb() {
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
   button.title = spriteOpen ? "拖动移动，点击收起 AFS 小精灵" : "拖动移动，点击打开 AFS 小精灵";
   button.innerHTML = [
+    '<span class="sprite-backplate"></span>',
     '<span class="sprite-antenna"></span>',
     '<span class="sprite-wing left"></span>',
     '<span class="sprite-wing right"></span>',
     '<span class="sprite-body">',
-    '  <span class="sprite-visor"><i></i><i></i></span>',
+    '  <span class="sprite-face">',
+    '    <span class="sprite-visor"><i></i><i></i><b></b></span>',
+    "  </span>",
+    '  <span class="sprite-core"></span>',
     '  <span class="sprite-badge">AFS</span>',
     "</span>",
+    '<span class="sprite-foot left"></span>',
+    '<span class="sprite-foot right"></span>',
     '<span class="sprite-shadow"></span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
@@ -65,7 +72,16 @@ function spriteOrb() {
 function spritePanel(state, runtime) {
   const panel = el("div", "afs-sprite-panel");
   const head = el("div", "afs-sprite-head");
-  head.innerHTML = `${icon("sparkles", 14)}<strong>AFS 小精灵</strong><small>陪跑中</small>`;
+  head.title = "拖动移动 AFS 小精灵";
+  head.innerHTML = [
+    icon("sparkles", 14),
+    "<span>",
+    "<strong>AFS 小精灵</strong>",
+    "<small>陪跑中</small>",
+    "</span>",
+    '<span class="afs-sprite-grip" aria-hidden="true"><i></i><i></i><i></i></span>',
+  ].join("");
+  head.addEventListener("pointerdown", startSpriteDrag);
   panel.appendChild(head);
   const log = el("div", "afs-sprite-log");
   for (const message of spriteMessages.slice(-5)) {
@@ -196,8 +212,8 @@ function setSpritePosition(position, root = document.getElementById("sprite-root
   spritePosition = clampSpritePosition(position);
   root.style.setProperty("--sprite-x", `${spritePosition.x}px`);
   root.style.setProperty("--sprite-y", `${spritePosition.y}px`);
-  root.dataset.dock = spritePosition.x < 340 ? "left" : "right";
-  root.dataset.vertical = spritePosition.y < 300 ? "top" : "bottom";
+  root.dataset.dock = spritePosition.x < window.innerWidth / 2 ? "left" : "right";
+  root.dataset.vertical = spritePosition.y < window.innerHeight / 2 ? "top" : "bottom";
 }
 
 function readSpritePosition() {
@@ -221,14 +237,14 @@ function storeSpritePosition(position) {
 
 function defaultSpritePosition() {
   return {
-    x: Math.max(SPRITE_MARGIN, window.innerWidth - 96),
-    y: Math.max(76, window.innerHeight - 152),
+    x: Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 24),
+    y: Math.max(76, window.innerHeight - SPRITE_SIZE - 64),
   };
 }
 
 function clampSpritePosition(position) {
-  const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - 74);
-  const maxY = Math.max(76, window.innerHeight - 84);
+  const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 10);
+  const maxY = Math.max(76, window.innerHeight - SPRITE_SIZE - 12);
   const rawX = Number(position?.x);
   const rawY = Number(position?.y);
   const nextX = Number.isFinite(rawX) ? rawX : maxX;

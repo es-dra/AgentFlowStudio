@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-06-19 - Sprite Character Design Follow-up
+
+- Reworked `AFS 小精灵` from a generic floating control into a clearer
+  micro-assistant character with a fixed viewport layer, visible visor, glowing
+  core, side stabilizers, feet, antenna, shadow, and docking label.
+- Kept the sprite movable by dragging the avatar, and added panel-header
+  dragging so the assistant can still be repositioned when the chat panel is
+  open.
+- Moved the idle breathing motion from the clickable button shell to the inner
+  body layer. This preserves the visual float while keeping the hit target
+  stable for browser automation and user clicks.
+
+Verification:
+
+```text
+Sprite browser check on 127.0.0.1:8797/studio -> fixed layer, avatar drag,
+panel-header drag, character parts present, console warn/error count=0
+tests/test_web_studio_static.py -> 11 passed
+tests/test_api_runtime_sprite.py -> 5 passed / 1 warning
+npm run check:studio-js -> JS syntax check passed: 87 files
+git diff --check -> passed
+```
+
+Boundary: no Runtime provider gate changed, no provider call was made, and the
+sprite still only uses the existing safe Runtime chat endpoint.
+
 ## 2026-06-19 - Studio Panels And Sprite Assistant
 
 - Fixed persistent canvas edge anchoring so saved edges attach to the node frame

@@ -1,79 +1,113 @@
 .afs-sprite-avatar {
   position: absolute;
-  left: 3px;
-  top: 3px;
-  width: 68px;
-  height: 68px;
-  display: grid;
-  place-items: center;
+  left: 2px;
+  top: 1px;
+  width: 88px;
+  height: 88px;
   border: 0;
-  border-radius: 24px 24px 28px 28px;
-  background:
-    radial-gradient(circle at 34% 18%, rgba(255, 255, 255, 0.34), transparent 28%),
-    linear-gradient(145deg, rgba(72, 170, 220, 0.26), rgba(44, 48, 56, 0.96) 52%, rgba(17, 19, 23, 0.98));
-  box-shadow:
-    0 18px 46px rgba(0, 0, 0, 0.42),
-    0 0 0 1px rgba(105, 203, 255, 0.28),
-    0 0 32px rgba(78, 188, 242, 0.18);
+  border-radius: 32px;
+  background: transparent;
   color: var(--text-primary);
   cursor: grab;
-  transform-origin: 50% 92%;
-  animation: sprite-breathe 5.8s ease-in-out infinite;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  touch-action: none;
+  transform-origin: 50% 86%;
+  transition: filter 0.18s ease;
 }
 
+.afs-sprite-avatar:focus-visible { outline: 2px solid rgba(95, 226, 255, 0.82); outline-offset: 4px; }
+
 .afs-sprite-avatar:hover,
-.afs-sprite.open .afs-sprite-avatar {
-  filter: saturate(1.08);
-  transform: translateY(-2px) rotate(-1deg);
+.afs-sprite.open .afs-sprite-avatar { filter: saturate(1.08); }
+
+#sprite-root.is-dragging .afs-sprite-avatar { cursor: grabbing; filter: saturate(1.16); }
+
+.sprite-backplate {
+  position: absolute;
+  inset: 11px 7px 6px;
+  border-radius: 32px 32px 30px 30px;
+  background:
+    linear-gradient(158deg, rgba(111, 218, 255, 0.26), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(17, 20, 24, 0.38));
   box-shadow:
-    0 22px 54px rgba(0, 0, 0, 0.48),
-    0 0 0 1px rgba(105, 203, 255, 0.42),
-    0 0 44px rgba(68, 210, 241, 0.24);
+    0 19px 44px rgba(0, 0, 0, 0.48),
+    0 0 0 1px rgba(105, 203, 255, 0.2),
+    0 0 32px rgba(78, 188, 242, 0.14);
 }
 
 .sprite-body {
-  position: relative;
-  width: 42px;
-  height: 48px;
+  position: absolute;
+  z-index: 2;
+  left: 20px;
+  top: 14px;
+  width: 50px;
+  height: 58px;
   display: grid;
   justify-items: center;
   align-content: start;
-  gap: 6px;
-  padding-top: 12px;
-  border-radius: 20px 20px 22px 22px;
+  gap: 5px;
+  padding-top: 14px;
+  border-radius: 24px 24px 21px 21px;
   background:
-    linear-gradient(180deg, rgba(221, 247, 255, 0.9), rgba(91, 200, 250, 0.72) 48%, rgba(48, 63, 75, 0.96));
+    linear-gradient(180deg, rgba(241, 252, 255, 0.94), rgba(93, 206, 248, 0.82) 42%, rgba(51, 68, 78, 0.98) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.44),
-    inset 0 -12px 22px rgba(1, 11, 20, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -16px 24px rgba(1, 11, 20, 0.28),
+    0 0 0 1px rgba(160, 230, 255, 0.28),
+    0 14px 24px rgba(0, 0, 0, 0.24);
+  animation: sprite-breathe 6.4s ease-in-out infinite;
+  transition: transform 0.18s ease;
+}
+
+.afs-sprite-avatar:hover .sprite-body,
+.afs-sprite.open .sprite-body { transform: translateY(-3px); }
+
+#sprite-root.is-dragging .sprite-body { transform: translateY(-5px) scale(1.02); }
+
+.sprite-body::before {
+  content: "";
+  position: absolute;
+  inset: 6px 8px auto;
+  height: 13px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  opacity: 0.58;
 }
 
 .sprite-body::after {
   content: "";
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 7px;
+  left: 13px;
+  right: 13px;
+  bottom: 8px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(8, 17, 25, 0.28);
+  background: rgba(8, 17, 25, 0.27);
+}
+
+.sprite-face {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(7, 15, 22, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
 .sprite-visor {
   position: relative;
-  width: 28px;
-  height: 13px;
+  width: 31px;
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: space-evenly;
   border-radius: 999px;
-  background:
-    linear-gradient(90deg, rgba(4, 10, 16, 0.94), rgba(22, 37, 48, 0.92)),
-    rgba(6, 12, 18, 0.94);
+  background: linear-gradient(90deg, rgba(4, 10, 16, 0.96), rgba(24, 39, 48, 0.95));
   box-shadow:
-    inset 0 0 0 1px rgba(105, 203, 255, 0.16),
-    0 0 12px rgba(66, 223, 255, 0.18);
+    inset 0 0 0 1px rgba(105, 203, 255, 0.18),
+    0 0 13px rgba(66, 223, 255, 0.2);
   overflow: hidden;
 }
 
@@ -81,17 +115,41 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(105deg, transparent 15%, rgba(107, 231, 255, 0.34) 48%, transparent 72%);
+  background: linear-gradient(105deg, transparent 16%, rgba(107, 231, 255, 0.38) 48%, transparent 74%);
   transform: translateX(-120%);
-  animation: sprite-scan 4.8s ease-in-out infinite;
+  animation: sprite-scan 5.8s ease-in-out infinite;
 }
 
 .sprite-visor i {
+  position: relative;
+  z-index: 1;
   width: 4px;
-  height: 4px;
+  height: 5px;
   border-radius: 50%;
-  background: #5fe2ff;
-  box-shadow: 0 0 9px rgba(95, 226, 255, 0.82);
+  background: #72ecff;
+  box-shadow: 0 0 9px rgba(95, 226, 255, 0.86);
+}
+
+.sprite-visor b {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 3px;
+  width: 5px;
+  height: 1px;
+  border-radius: 999px;
+  background: rgba(185, 244, 255, 0.65);
+  transform: translateX(-50%);
+}
+
+.sprite-core {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0 15%, #7ef0ff 32%, #2389a9 68%, rgba(9, 28, 36, 0.72));
+  box-shadow: 0 0 15px rgba(95, 226, 255, 0.72);
 }
 
 .sprite-badge {
@@ -101,79 +159,96 @@
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   color: rgba(3, 14, 20, 0.82);
-  background: rgba(255, 255, 255, 0.28);
-  font-size: 9px;
+  background: rgba(255, 255, 255, 0.3);
+  font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .sprite-antenna {
   position: absolute;
-  top: -9px;
-  left: 32px;
-  width: 8px;
-  height: 18px;
+  z-index: 3;
+  top: -1px;
+  left: 43px;
+  width: 9px;
+  height: 21px;
   border: 1px solid rgba(96, 207, 255, 0.46);
   border-bottom: 0;
   border-radius: 999px 999px 0 0;
-  transform: rotate(-9deg);
+  transform: rotate(-7deg);
 }
 
 .sprite-antenna::after {
   content: "";
   position: absolute;
-  top: -4px;
+  top: -5px;
   left: 1px;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #5fe2ff;
+  background: #72ecff;
   box-shadow: 0 0 14px rgba(95, 226, 255, 0.9);
 }
 
 .sprite-wing {
   position: absolute;
-  top: 29px;
-  width: 15px;
-  height: 24px;
-  border: 1px solid rgba(106, 206, 255, 0.22);
-  background: linear-gradient(180deg, rgba(91, 200, 250, 0.2), rgba(255, 255, 255, 0.05));
-  opacity: 0.9;
+  z-index: 1;
+  top: 33px;
+  width: 19px;
+  height: 26px;
+  border: 1px solid rgba(106, 206, 255, 0.26);
+  background: linear-gradient(180deg, rgba(91, 200, 250, 0.22), rgba(255, 255, 255, 0.05));
+  opacity: 0.92;
 }
 
 .sprite-wing.left {
-  left: 6px;
-  border-radius: 12px 4px 10px 12px;
-  transform: rotate(-10deg);
+  left: 10px;
+  border-radius: 16px 5px 12px 16px;
+  transform: rotate(-13deg);
 }
 
 .sprite-wing.right {
-  right: 6px;
-  border-radius: 4px 12px 12px 10px;
-  transform: rotate(10deg);
+  right: 10px;
+  border-radius: 5px 16px 16px 12px;
+  transform: rotate(13deg);
 }
+
+.sprite-foot {
+  position: absolute;
+  z-index: 1;
+  bottom: 15px;
+  width: 14px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(122, 222, 255, 0.52), rgba(38, 52, 61, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+.sprite-foot.left { left: 29px; transform: rotate(9deg); }
+
+.sprite-foot.right { right: 29px; transform: rotate(-9deg); }
 
 .sprite-shadow {
   position: absolute;
-  left: 17px;
-  bottom: 4px;
-  width: 38px;
-  height: 8px;
+  left: 22px;
+  bottom: 3px;
+  width: 48px;
+  height: 10px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.34);
-  filter: blur(5px);
+  filter: blur(6px);
 }
 
 .sprite-label {
   position: absolute;
-  right: 76px;
-  top: 18px;
-  max-width: 96px;
+  right: 96px;
+  top: 25px;
+  max-width: 104px;
   padding: 6px 9px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 999px;
   color: var(--text-secondary);
-  background: rgba(17, 20, 24, 0.86);
+  background: rgba(17, 20, 24, 0.9);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
   font-size: 11px;
   line-height: 1;
@@ -185,7 +260,7 @@
 
 #sprite-root[data-dock="left"] .sprite-label {
   right: auto;
-  left: 76px;
+  left: 96px;
   transform: translateX(-8px);
 }
 
@@ -196,17 +271,17 @@
 }
 
 @keyframes sprite-breathe {
-  0%, 100% { transform: translateY(0) rotate(-1deg); }
-  50% { transform: translateY(-4px) rotate(1deg); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 @keyframes sprite-scan {
-  0%, 52%, 100% { transform: translateX(-120%); }
-  62%, 74% { transform: translateX(120%); }
+  0%, 56%, 100% { transform: translateX(-120%); }
+  66%, 78% { transform: translateX(120%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .afs-sprite-avatar,
+  .sprite-body,
   .sprite-visor::before {
     animation: none;
   }

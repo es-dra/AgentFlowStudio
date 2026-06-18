@@ -12,6 +12,20 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite character follow-up: 2026-06-19 pass reworked the decorative
+`AFS 小精灵` into a fixed-viewport micro-assistant character instead of a
+generic floating control. The avatar now has a recognizable visor, glowing
+core, side stabilizers, feet, antenna, shadow, and docking label; it can be
+moved by dragging the avatar or the open panel header. The idle breathing
+motion now runs on the inner body rather than the clickable shell, keeping the
+hit target stable for browser automation. Verification: browser check on
+`127.0.0.1:8797/studio` confirmed fixed layer, avatar drag, panel-header drag,
+character parts present, and console warn/error count=0; Studio static
+regression 11 passed; sprite Runtime regression 5 passed / 1 warning; Studio
+JS syntax check passed for 87 files; `git diff --check` passed. Boundary: no
+provider gate changed, no provider call, no generated media byte persistence,
+no human acceptance, no business validation, no durable-memory promotion.
+
 Current Studio panels and sprite assistant addendum: 2026-06-19 pass fixed the
 remaining persistent-edge gap by anchoring saved edges to the node frame
 boundary while keeping drag previews tied to the plus port. The Studio shell now

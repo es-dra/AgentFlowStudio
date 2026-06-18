@@ -127,7 +127,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "AFS 小精灵" in sprite
     assert "runtime.spriteChat" in sprite
     assert "SPRITE_POSITION_KEY" in sprite
+    assert "SPRITE_SIZE" in sprite
     assert "startSpriteDrag" in sprite
+    assert 'head.addEventListener("pointerdown", startSpriteDrag)' in sprite
     assert "storeSpritePosition" in sprite
     assert "clampSpritePosition" in sprite
     assert "data-dock" not in sprite
@@ -136,11 +138,17 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "__afsStudio" not in sprite
     assert "provider raw" not in sprite
     assert '@import url("./studio-sprite-avatar.css");' in styles
+    assert "position: fixed" in styles
     assert ".afs-sprite-orb" in styles
+    assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-avatar" in sprite_styles
+    assert ".sprite-backplate" in sprite_styles
     assert ".sprite-body" in sprite_styles
+    assert ".sprite-face" in sprite_styles
     assert ".sprite-visor" in sprite_styles
+    assert ".sprite-core" in sprite_styles
     assert ".sprite-wing.left" in sprite_styles
+    assert ".sprite-foot.left" in sprite_styles
     assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles
