@@ -12,10 +12,11 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
-Current deep hardening addendum: 2026-06-19 pass is running on
-`codex/afs-deep-ux-runtime-hardening-20260619` to strengthen internal beta
-usability, homepage product framing, Studio operation feel, and frontend
-structure while preserving provider gates. Implemented so far: `/health`
+Current deep hardening addendum: 2026-06-19 pass completed and was merged to
+`master` through `fda2dcafb3a5609deddc9e4ad664b6be060cb053`, then aligned
+across GitHub, server `/home`, and server `/opt`. The work strengthened
+internal beta usability, homepage product framing, Studio operation feel, and
+frontend structure while preserving provider gates. Implemented: `/health`
 runtime-root persistence is a safe boolean projection; cross-user auth tests now
 cover Studio state, image assets, image previews, jobs, and artifact manifests;
 homepage first viewport is more directly positioned as a professional AI video
@@ -32,7 +33,8 @@ help/version passed with version 0.1.0 and runtime-service help shows
 --check` passed. Boundary: no video gate opened, no new provider introduced, no
 provider raw/signed URL/secret/media byte persistence, no human acceptance or
 business validation claimed. Maintenance ledger:
-`docs/maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`.
+`docs/maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`. Closeout:
+`docs/handoff/AFS-DEEP-UX-RUNTIME-HARDENING-CLOSEOUT-20260619.md`.
 
 Current frontend hardening addendum: 2026-06-19 pass continued Studio UX
 hardening after edge and homepage review. Root `/` now leads with the AI video

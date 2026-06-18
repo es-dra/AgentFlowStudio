@@ -34,6 +34,7 @@ archived.
 - `AFS-PROVIDER-FLOW-INTAKE-20260617.md`
 - `AFS-ALGORITHM-CORE-WAVE2-20260617.md`
 - `AFS-MODEL-CALL-CONTEXT-CONTRACT-20260618.md`
+- `AFS-DEEP-UX-RUNTIME-HARDENING-CLOSEOUT-20260619.md`
 - `COS-GFR-V1-PROJECTION-20260617.md`
 
 `/studio/` is the only current user-facing frontend entry. Do not resume old
@@ -59,6 +60,7 @@ knowledgebase rules, and hidden background context policy.
 - `AFS-PROVIDER-FLOW-INTAKE-20260617.md`
 - `AFS-ALGORITHM-CORE-WAVE2-20260617.md`
 - `AFS-MODEL-CALL-CONTEXT-CONTRACT-20260618.md`
+- `AFS-DEEP-UX-RUNTIME-HARDENING-CLOSEOUT-20260619.md`
 - `COS-GFR-V1-PROJECTION-20260617.md`
 
 Runtime remains the frontend boundary. Browser UI must not consume CLI
@@ -73,6 +75,7 @@ responses, or media bytes.
 - `../maintenance/AFS-STUDIO-HARD-CLEANUP-001.zh-CN.md`
 - `../maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`
 - `../maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md`
+- `../maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`
 
 ## Routing Rule
 

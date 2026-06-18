@@ -21,6 +21,9 @@
 - Added `npm run check:studio-js` to syntax-check Studio and site JavaScript.
 - Wired the Runtime CLI `--runtime-root` option to `AFS_RUNTIME_ROOT`, so the
   server systemd environment is actually passed into `create_runtime_app()`.
+- Added a closeout handoff that records role-by-role review, local/GitHub/server
+  alignment, deployment evidence, explicit non-claims, and the next internal
+  beta acceptance slice.
 
 Verification:
 
@@ -36,7 +39,8 @@ git diff --check -> passed
 
 Boundary: no video gate was opened, no new provider was introduced, no provider
 raw response, signed URL, secret, or generated media byte was persisted, and no
-human creative acceptance or business validation is claimed.
+human creative acceptance or business validation is claimed. Closeout:
+`docs/handoff/AFS-DEEP-UX-RUNTIME-HARDENING-CLOSEOUT-20260619.md`.
 
 ## 2026-06-19 - Studio Context Transparency And Edge Flow Polish
 
