@@ -18,8 +18,10 @@ export function renderInspectorPanel(state, store) {
   const signature = inspectorSignature(state, node);
   if (panel.dataset.signature === signature) return;
   panel.dataset.signature = signature;
-  panel.className = `inspector-panel${node ? "" : " empty"}`;
+  panel.className = inspectorPanelClass(state, node);
   panel.replaceChildren();
+  panel.appendChild(inspectorCollapseToggle(state, store));
+  if (state.ui.inspectorOpen === false) return;
   if (!node) {
     renderEmptyInspector(state, store, panel);
     return;
@@ -53,6 +55,18 @@ function panelHead(iconName, title, meta) {
   const head = el("div", "inspector-head");
   head.innerHTML = `<span>${icon(iconName, 14)}</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(meta)}</small>`;
   return head;
+}
+
+function inspectorCollapseToggle(state, store) {
+  const button = el("button", "inspector-collapse-toggle");
+  button.type = "button";
+  const isOpen = state.ui.inspectorOpen !== false;
+  button.title = isOpen ? "收起右侧状态栏" : "展开右侧状态栏";
+  button.innerHTML = `${icon(isOpen ? "shrink" : "panel", 13)}<span>${isOpen ? "收起" : "状态"}</span>`;
+  button.addEventListener("click", () => store.set((s) => {
+    s.ui.inspectorOpen = s.ui.inspectorOpen === false;
+  }, { history: false, persist: false }));
+  return button;
 }
 
 function emptyGuide(state) {
@@ -224,6 +238,7 @@ function providerLabel(value) {
 
 function inspectorSignature(state, node) {
   return [
+    state.ui.inspectorOpen,
     state.selection.nodeIds.join(","),
     state.order.length,
     state.assets.length,
@@ -239,6 +254,14 @@ function inspectorSignature(state, node) {
     node?.params?.lastOptimizedPromptPlain || "",
     node?.params?.lastVideoAssetCardDraftStatus || "",
   ].join("|");
+}
+
+function inspectorPanelClass(state, node) {
+  return [
+    "inspector-panel",
+    node ? "" : "empty",
+    state.ui.inspectorOpen === false ? "is-collapsed" : "",
+  ].filter(Boolean).join(" ");
 }
 
 function escapeHtml(value) {

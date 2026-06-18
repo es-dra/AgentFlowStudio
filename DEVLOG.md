@@ -1,5 +1,54 @@
 # Devlog
 
+## 2026-06-19 - Studio Panels And Sprite Assistant
+
+- Fixed persistent canvas edge anchoring so saved edges attach to the node frame
+  boundary while drag-in-progress lines still originate from the visible plus
+  port.
+- Added a resizable left drawer with a narrow drag handle and local UI width
+  persistence. Added a collapsible right inspector so the canvas can reclaim
+  horizontal space during creation.
+- Disabled accidental text selection on the Studio chrome while preserving text
+  selection in inputs, textareas, selects, contenteditable fields, and explicit
+  selectable text surfaces.
+- Added an `AFS 小精灵` canvas companion as a decorative assistant. It can be
+  dragged around the Studio viewport, persists its position locally, adapts its
+  chat panel to left/right and top/bottom docking, and now has a recognizable
+  micro-assistant body, visor, side fins, antenna, shadow, and label instead of
+  a generic floating button. It calls the Runtime through
+  `/projects/{project_id}/sprite/chat`, falls back to local safe rules when the
+  LLM gate or provider is unavailable, and does not execute actions or write
+  durable memory.
+- Split the new drawer resize and inspector collapse styles into dedicated
+  small CSS files instead of growing the already-large shell and inspector
+  styles. Split the sprite docking/chat styles from the sprite avatar styles so
+  both new CSS files stay under the 300-line maintenance threshold.
+- Added a deterministic internal beta acceptance runner for auth scope, project
+  isolation, image assets, draft-vs-fixed asset lifecycle, context reuse,
+  feedback evidence, artifact scope, and video gate-closed behavior. The runner
+  is split into entrypoint, contract, scope steps, and generation steps so no
+  new tool file exceeds the maintenance threshold.
+
+Verification:
+
+```text
+Focused Studio/Runtime regression -> 26 passed / 1 warning
+Internal beta acceptance runner -> contract_verified_pending_human_acceptance
+Full pytest -> 517 passed / 527 deselected / 2 warnings
+npm run check:studio-js -> JS syntax check passed: 87 files
+CLI help/version -> passed, version 0.1.0
+maintenance_audit -> failed=0, warnings only
+git diff --check -> passed with Windows CRLF notice only
+Browser QA note:
+  in-app browser automation was blocked by Browser URL policy for the local
+  Studio URL in this pass, so movable-avatar visual acceptance is not claimed.
+```
+
+Boundary: the sprite assistant is decorative and safe-summary only; it does not
+open a new provider gate, bypass project-owner auth scope, persist provider raw
+response, expose local paths or signed URLs, execute actions, or promote chat
+feedback into durable memory.
+
 ## 2026-06-19 - Deep UX And Runtime Hardening
 
 - Hardened Runtime `/health` so `runtime_root_persisted` is computed as a safe

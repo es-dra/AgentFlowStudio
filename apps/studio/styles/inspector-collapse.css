@@ -1,0 +1,44 @@
+.inspector-collapse-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--text-faint);
+  background:
+    linear-gradient(180deg, rgba(30, 33, 37, 0.94), rgba(30, 33, 37, 0.74));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px);
+}
+
+.inspector-collapse-toggle:hover {
+  color: var(--text-primary);
+}
+
+#inspector.is-collapsed {
+  width: 46px;
+  min-height: 46px;
+  max-height: 46px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+#inspector.is-collapsed .inspector-collapse-toggle {
+  position: static;
+  width: 30px;
+  min-height: 30px;
+  justify-content: center;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+#inspector.is-collapsed .inspector-collapse-toggle span {
+  display: none;
+}

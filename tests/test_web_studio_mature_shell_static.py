@@ -121,6 +121,35 @@ def test_studio_mature_shell_prevents_scroll_and_overlap_regressions() -> None:
     assert "overflow: hidden;" in styles
 
 
+def test_studio_shell_supports_resizable_drawer_collapsible_inspector_and_no_select_chrome() -> None:
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    base = (STUDIO_ROOT / "styles" / "base.css").read_text(encoding="utf-8")
+    resize_css = (STUDIO_ROOT / "styles" / "drawer-resize.css").read_text(encoding="utf-8")
+    collapse_css = (STUDIO_ROOT / "styles" / "inspector-collapse.css").read_text(encoding="utf-8")
+    inspector_css = (STUDIO_ROOT / "styles" / "studio-inspector-declutter.css").read_text(encoding="utf-8")
+    drawer = (STUDIO_ROOT / "src" / "panels" / "drawer.js").read_text(encoding="utf-8")
+    inspector = (STUDIO_ROOT / "src" / "panels" / "inspector-panel.js").read_text(encoding="utf-8")
+    state = (STUDIO_ROOT / "src" / "store-state.js").read_text(encoding="utf-8")
+
+    assert './styles/drawer-resize.css' in index
+    assert './styles/inspector-collapse.css' in index
+    assert "drawerWidth" in state
+    assert "bindDrawerResize" in drawer
+    assert "drawer-resize-handle" in drawer
+    assert "setProperty(\"--drawer-w\"" in drawer
+    assert "stored || state.ui.drawerWidth || 196" in drawer
+    assert ".drawer-resize-handle" in resize_css
+    assert "cursor: ew-resize" in resize_css
+    assert "inspectorOpen" in state
+    assert "inspector-collapse-toggle" in inspector
+    assert "s.ui.inspectorOpen = s.ui.inspectorOpen === false" in inspector
+    assert "#inspector.is-collapsed" in collapse_css
+    assert "right: 16px;" in inspector_css
+    assert "user-select: none;" in base
+    assert "input, textarea, select, [contenteditable=\"true\"], .selectable-text" in base
+    assert "user-select: text;" in base
+
+
 def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")

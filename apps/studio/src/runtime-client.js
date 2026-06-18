@@ -219,5 +219,8 @@ export function createRuntimeClient(projectId = "studio-local-001") {
       if (expectedVersion) payload.expected_version = expectedVersion;
       return requestJson(`/projects/${encoded}/studio-state`, { method: "PUT", payload });
     },
+    spriteChat(payload) {
+      return requestJson(`/projects/${encoded}/sprite/chat`, { method: "POST", payload });
+    },
   };
 }

@@ -236,7 +236,7 @@ if (point.x !== 195.5 || point.y !== 100.5) throw new Error(`unexpected point ${
     assert completed.returncode == 0, completed.stderr
 
 
-def test_port_geometry_anchors_persistent_edges_to_visible_button_center() -> None:
+def test_port_geometry_anchors_persistent_edges_to_node_frame_boundary() -> None:
     code = r"""
 import { nodeFramePortWorldPoint } from './apps/studio/src/interaction/port-geometry.js';
 
@@ -261,7 +261,7 @@ const point = nodeFramePortWorldPoint(
   'out',
   { x: 10, y: 20, scale: 2 },
 );
-if (point.x !== 195.5 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
+if (point.x !== 380 || point.y !== 100.5) throw new Error(`unexpected point ${JSON.stringify(point)}`);
 """
     completed = subprocess.run(
         ["node", "--input-type=module", "-e", code],

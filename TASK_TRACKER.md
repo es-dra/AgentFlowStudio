@@ -12,6 +12,35 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio panels and sprite assistant addendum: 2026-06-19 pass fixed the
+remaining persistent-edge gap by anchoring saved edges to the node frame
+boundary while keeping drag previews tied to the plus port. The Studio shell now
+has a draggable left drawer width, collapsible right inspector, and
+non-selectable chrome with form fields still selectable. A decorative `AFS
+小精灵` was added through Runtime endpoint
+`/projects/{project_id}/sprite/chat`; it uses the unified LLM dispatch only
+when the LLM gate is ready, otherwise returns local safe rule replies. The
+sprite can be dragged around the viewport, persists its local position, adapts
+its panel to left/right and top/bottom docking, and now has a recognizable
+micro-assistant body/visor/side-fin/antenna silhouette instead of a generic
+floating button. It does not execute actions, expose local paths, return
+provider raw responses, bypass project-owner auth scope, or write durable
+memory. A deterministic internal beta acceptance runner now covers auth scope,
+project isolation, image assets, draft-vs-fixed asset lifecycle, context reuse,
+feedback evidence, artifact scope, and video gate-closed behavior without
+opening providers; it is split across small tool modules to avoid new oversized
+maintenance debt. Verification: focused Studio/Runtime regression 26 passed / 1
+warning; internal beta acceptance runner reports
+`contract_verified_pending_human_acceptance`; full pytest 517 passed / 527
+deselected / 2 warnings; `npm run
+check:studio-js` passed for 87 files; CLI help/version passed; maintenance
+audit failed=0 with warnings only; `git diff --check` passed with Windows CRLF
+notice only. In-app browser automation was blocked by Browser URL policy for
+the local Studio URL in this pass, so movable-avatar visual acceptance is not
+claimed. Remaining non-blocking warnings are existing maintenance-audit
+warnings for legacy frozen surfaces, Chinese-doc coverage, secret-like
+test/config fragments, and oversized files.
+
 Current deep hardening addendum: 2026-06-19 pass completed and was merged to
 `master` through `fda2dcafb3a5609deddc9e4ad664b6be060cb053`, then aligned
 across GitHub, server `/home`, and server `/opt`. The work strengthened

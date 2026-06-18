@@ -295,6 +295,14 @@ class FeedbackRecordRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class SpriteChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1200)
+    node_id: str | None = None
+    canvas_summary: dict[str, Any] = Field(default_factory=dict)
+    provider_service_id: str = "prompt_optimizer"
+    generated_at: str = Field(min_length=1)
+
+
 __all__ = (
     "AssetCardDraftRequest",
     "CanvasDraftRequest",
@@ -317,6 +325,7 @@ __all__ = (
     "ReviewDecisionRecordRequest",
     "SceneInspectorUpdateRequest",
     "SourceAssetRegisterRequest",
+    "SpriteChatRequest",
     "TemporaryLockOverride",
     "VisualAssetPromoteRequest",
     "VisualAssetRetireRequest",

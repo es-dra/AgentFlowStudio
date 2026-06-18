@@ -13,7 +13,11 @@ export function nodeFramePortWorldPoint(node, port, viewport) {
   const fallback = fallbackNodePortPoint(node, port);
   const center = nodePortScreenCenter(node.id, port);
   if (!center || !viewport) return fallback;
-  return screenToWorld(viewport, center.x, center.y);
+  const projected = screenToWorld(viewport, center.x, center.y);
+  return {
+    x: port === "in" ? node.x : node.x + node.w,
+    y: projected.y,
+  };
 }
 
 export function fallbackNodePortPoint(node, port) {

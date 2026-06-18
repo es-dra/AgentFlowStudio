@@ -21,6 +21,7 @@ import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { initialProjectId } from "./studio-project-session.js";
 import { createProjectController } from "./studio-project-controller.js";
+import { renderSpriteWidget } from "./sprite-widget.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -205,6 +206,7 @@ function renderAll(state) {
   renderDrawer(state, store, runtimeRef);
   renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);
+  renderSpriteWidget(state, runtimeRef);
 }
 
 function openStudioHome(state = store.get()) {

@@ -18,6 +18,8 @@ export function initialState(projectId = "studio-local-001") {
     assets: [],
     ui: {
       drawerOpen: true,
+      drawerWidth: 196,
+      inspectorOpen: true,
       drawerTab: "canvas",
       drawerSearch: "",
       assetLifecycleFilter: "all",
