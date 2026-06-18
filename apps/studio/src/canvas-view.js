@@ -1,4 +1,5 @@
 import { assetsFromNode } from "./asset-reference-summary.js";
+import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { bezier } from "./geometry.js";
 import { icon } from "./icons.js";
@@ -18,9 +19,11 @@ export function renderCanvas(state) {
 }
 
 function renderEmptyState(state) {
-  const empty = state.order.length === 0;
-  document.getElementById("canvas-empty-hint").hidden = !empty;
-  document.getElementById("starter-row").hidden = !empty;
+  const rail = starterRailState(state);
+  const starterRow = document.getElementById("starter-row");
+  document.getElementById("canvas-empty-hint").hidden = !rail.empty;
+  starterRow.hidden = !rail.show;
+  starterRow.dataset.mode = rail.mode;
 }
 
 function renderNodes(state, relations) {

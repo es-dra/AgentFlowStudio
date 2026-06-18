@@ -48,8 +48,8 @@ function nodeParameterSnapshot(node) {
   const p = node.params || {};
   const snapshot = {
     model: p.model || null,
-    llm_provider: "minimax_m3",
-    llm_model: "minimax-m3-enhance",
+    llm_provider: "prompt_optimizer",
+    llm_model: "prompt-optimizer",
     remote_optimizer_required: true,
   };
   if (node.type === "image" && p.spec) {

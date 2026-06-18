@@ -136,7 +136,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
         source_image_asset_refs: [imageAsset.asset_id],
         node_id: node.id,
         prompt_text: node.prompt || node.result || node.title || "",
-        provider_service_id: "fake_vision",
+        provider_service_id: "vision_image",
         generated_at: new Date().toISOString(),
       });
       const draft = response?.draft || {};

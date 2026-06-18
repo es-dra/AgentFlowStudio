@@ -40,7 +40,7 @@ def _draft_payload(asset_type: str, **overrides: object) -> dict[str, object]:
         "sampled_image_asset_refs": [],
         "node_id": "node-draft",
         "prompt_text": "Lin Wan in a rainy rooftop scene.",
-        "provider_service_id": "fake_vision",
+        "provider_service_id": "vision_image",
         "generated_at": "2026-06-17T09:05:00+08:00",
     }
     payload.update(overrides)
@@ -80,7 +80,7 @@ def test_asset_card_draft_gate_closed_blocks_before_provider_and_stays_safe(tmp_
     assert "d:\\" not in serialized
 
 
-def test_fake_vision_drafts_character_and_scene_cards_without_fixed_asset_pollution(tmp_path, monkeypatch) -> None:
+def test_vision_image_drafts_character_and_scene_cards_without_fixed_asset_pollution(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -151,7 +151,7 @@ def test_fake_vision_drafts_character_and_scene_cards_without_fixed_asset_pollut
     assert char_payload["draft"]["draft_id"] not in plan["provider_prompt"]
 
 
-def test_fake_vision_video_draft_and_video_asset_promote_use_segment_schema(tmp_path, monkeypatch) -> None:
+def test_vision_video_draft_and_video_asset_promote_use_segment_schema(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_video_asset_card"
@@ -164,6 +164,7 @@ def test_fake_vision_video_draft_and_video_asset_promote_use_segment_schema(tmp_
             source_video_artifact_id="art_video_123",
             sampled_image_asset_refs=[sampled_frame],
             prompt_text="A five second shot: camera pushes in as Lin Wan opens the rooftop door.",
+            provider_service_id="vision_video",
         ),
     )
     assert draft_response.status_code == 200

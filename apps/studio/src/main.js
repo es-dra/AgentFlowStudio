@@ -273,7 +273,7 @@ async function handleVideoAssetCardDraft(event) {
       sampled_image_asset_refs: [],
       node_id: nodeId,
       prompt_text: node.prompt || node.result || node.title || "",
-      provider_service_id: "fake_vision",
+      provider_service_id: "vision_video",
       generated_at: new Date().toISOString(),
     });
     store.set((s) => {

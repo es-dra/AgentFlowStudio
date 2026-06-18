@@ -1,5 +1,149 @@
 # Devlog
 
+## 2026-06-18 - Model Route Surface Consolidation
+
+- Repointed the current Studio image/keyframe surface from the retired MiniMax
+  image picker to the `Image2` product label backed by the server-side
+  `codex_image` handoff service.
+- Kept prompt optimization model identity server-configured: Studio now sends
+  `prompt_optimizer`, Runtime reports `provider_configured`, and safe traces do
+  not expose a concrete LLM model name.
+- Split visual-understanding service ids by media type: image asset-card drafts
+  use `vision_image`, while video asset-card drafts use `vision_video`.
+- Updated `configs/providers.example.json` to show the current execution
+  projection: `prompt_optimizer`, `codex_image`, `vision_image`,
+  `vision_video`, `fake_video`, and `kling_i2v`.
+- Preserved legacy prompt-optimizer fallback behavior for older requests so
+  explicit MiniMax-compatible test paths still route through the registry
+  without taking over the new Studio product path.
+
+Verification:
+
+```text
+Focused model route/runtime/static regression: 100 passed
+Full default pytest: 469 passed / 527 deselected / 2 warnings
+Studio JS node --check: passed for all apps/studio/src/**/*.js
+configs/providers.example.json parse: passed
+maintenance audit: failed=0, warning=4
+git diff --check: passed with CRLF normalization notices only
+```
+
+Boundary:
+
+- Repo example config and Runtime/Studio defaults only. No provider gate was
+  opened, no live model call was made, no local secret provider config was
+  edited, and no human acceptance is claimed.
+
+## 2026-06-18 - Site Homepage Root Entry
+
+- Added a distinct AFS Studio website homepage under `apps/site/` and mounted it
+  at Runtime root `/`, while keeping `/studio/` as the actual creative
+  workspace entry.
+- Kept the homepage as a mature product shell instead of another internal
+  control surface: brand/value proposition, product preview, workflow, six-core
+  algorithm rail, and a direct Studio CTA.
+- Split homepage CSS into base, product-preview, and responsive layers so each
+  new site file stays below the 300-line maintenance warning threshold.
+- Added Runtime and static regression tests for the root homepage, no-store
+  static assets, Studio link continuity, and secret/path/raw-provider safety.
+
+Verification:
+
+```text
+tests/test_api_runtime_service.py + tests/test_site_homepage_static.py + tests/test_web_studio_static.py: 41 passed
+```
+
+Boundary:
+
+- Runtime static routing and frontend-only homepage shell. No provider gate was
+  opened, no generation call was made, and no human acceptance is claimed.
+
+## 2026-06-18 - Studio Frontend Declutter Follow-up
+
+- Reframed the top-left Studio entry from a large "workbench" surface into a
+  compact project menu for continue/create/switch actions.
+- Moved the main creative entry emphasis back to the canvas starter rail and
+  removed the oversized project hub card wall.
+- Reduced the right inspector's default information density: the default view
+  now focuses on current node state, next action, context, content, and output
+  records, while six-core-algorithm details stay available behind a collapsed
+  "system process" disclosure.
+- Split right-inspector declutter CSS into `studio-inspector-declutter.css` so
+  the mature shell stylesheet stays below the maintenance warning threshold.
+
+Verification:
+
+```text
+tests/test_web_studio_static.py: 28 passed
+apps/studio changed JS node --check: passed
+git diff --check: passed
+Line-count check: touched/new Studio frontend files are all under 300 lines
+```
+
+Boundary:
+
+- Frontend-only UI and interaction polish. No Runtime API contract change, no
+  provider gate opened, no provider call, no human acceptance claimed.
+- In-app browser automation for the local URL was blocked by the Browser URL
+  policy during this pass, so final visual acceptance still needs a manual
+  refresh/review in the already-open `/studio/` page.
+
+## 2026-06-18 - Studio Inspector And Workbench Scroll Follow-up
+
+- Fixed the right inspector overlap regression by making the mature shell
+  inspector opt out of the older flex-column/shrink layout and keeping its
+  status/action/section blocks at natural height inside the scroll container.
+- Fixed the project workbench modal scroll regression by making `.project-hub`
+  own vertical scrolling instead of inheriting clipped modal overflow.
+- Added static regression coverage for the inspector no-shrink layout and
+  workbench vertical scroll contract.
+
+Verification:
+
+```text
+tests/test_web_studio_static.py: 28 passed
+apps/studio JS node --check: passed for all apps/studio/src/**/*.js
+git diff --check: passed
+In-app browser on 127.0.0.1:8797/studio/: starter-flow inspector sections had zero detected overlaps; workbench modal accepted real wheel scroll from top to bottom content; console warnings/errors 0
+```
+
+Boundary:
+
+- This is frontend layout/runtime verification only. No provider gate was
+  opened, no Runtime API contract changed, and no human acceptance is claimed.
+
+## 2026-06-18 - Studio Mature Shell And Algorithm Console
+
+- Added a Studio desktop shell polish layer for `/studio/`: stronger canvas
+  material, glass-like topbar/drawer/dock/inspector treatment, smoother hover
+  interactions, and a compact workflow starter rail for empty or pre-production
+  canvases.
+- Added `algorithm-context-panel.js` so the right inspector can show the six
+  core algorithm states from safe Studio node state: context scheduling, prompt
+  optimization, request projection, visual inspection, asset memory, and drift
+  control.
+- Updated the inspector from generic project overview to a production console;
+  selected nodes now show algorithm status, operation intent, generation
+  target, included/excluded context counts, and safe trace warnings.
+- Kept this pass frontend-only: no Runtime API contract change, no provider
+  call, no provider config change, and no sensitive local media/path exposure.
+
+Verification:
+
+```text
+apps/studio JS node --check: passed for all apps/studio/src/**/*.js
+tests/test_web_studio_static.py: 27 passed
+git diff --check: passed
+Runtime health on 127.0.0.1:8797: ready, Studio static ready
+Chrome headless desktop verification: /studio/ loaded, starter rail visible on empty canvas, workflow starter created 2 nodes, selected node showed 6 algorithm steps, console errors/warnings 0
+Screenshot: frontend-mature-shell-20260618/screenshots/studio-mature-shell-final-1440x900.png in the Codex backup area
+```
+
+Boundary:
+
+- This is frontend runtime verification, not human acceptance, provider smoke,
+  business validation, or durable Company OS memory promotion.
+
 ## 2026-06-18 - ModelCallContext Algorithm Contract
 
 - Added `ModelCallContext` as the pre-model-call internal contract for prompt

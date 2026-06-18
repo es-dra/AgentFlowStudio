@@ -17,6 +17,9 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     (tmp_path / "docs" / "handoff.md").write_text("# 交接\n", encoding="utf-8")
     (tmp_path / "apps" / "web_bridge").mkdir(parents=True)
     (tmp_path / "apps" / "web_bridge" / "server.py").write_text("", encoding="utf-8")
+    (tmp_path / "apps" / "site" / "styles").mkdir(parents=True)
+    (tmp_path / "apps" / "site" / "index.html").write_text("<!doctype html>\n", encoding="utf-8")
+    (tmp_path / "apps" / "site" / "styles" / "site.css").write_text(":root {}\n", encoding="utf-8")
     (tmp_path / ".github" / "workflows").mkdir(parents=True)
     (tmp_path / ".github" / "workflows" / "maintenance.yml").write_text("name: test\n", encoding="utf-8")
     (tmp_path / ".gitattributes").write_text("* text=auto eol=lf\n", encoding="utf-8")
@@ -35,6 +38,10 @@ def test_repository_retention_review_classifies_delete_candidate_and_known_paths
     assert files["agentflow/contracts.py"]["status"] == "current"
     assert files["apps/web_bridge/server.py"]["product_surface"] == "delete_candidate"
     assert files["apps/web_bridge/server.py"]["status"] == "legacy_runtime_surface"
+    assert files["apps/site/index.html"]["product_surface"] == "production_spine"
+    assert files["apps/site/index.html"]["status"] == "current"
+    assert files["apps/site/styles/site.css"]["product_surface"] == "production_spine"
+    assert files["apps/site/styles/site.css"]["status"] == "current"
     assert files[".github/workflows/maintenance.yml"]["product_surface"] == "operations_spine"
     assert files[".github/workflows/maintenance.yml"]["status"] == "current"
     assert files[".gitattributes"]["product_surface"] == "production_spine"

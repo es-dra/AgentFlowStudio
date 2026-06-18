@@ -273,14 +273,24 @@ def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_asse
 
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
 
     assert "提示词优化" in source
-    assert "MiniMax image-01" in source
+    assert "Image2" in source
     assert 'return Boolean(findModel("image", modelId).providerServiceId);' in source
     assert 'return Boolean(findModel("video", modelId).providerServiceId);' in source
     assert "local-creative-agent" not in source
     assert "remote_optimizer_required" in _source()
-    assert 'providerServiceId: "minimax_image"' in source
+    assert 'providerServiceId: "codex_image"' in source
+    assert 'llmProvider: "prompt_optimizer"' in source
+    assert 'llm_provider: "prompt_optimizer"' in optimizer_contract
+    assert 'provider_service_id: "vision_image"' in visual_asset_panel
+    assert 'provider_service_id: "vision_video"' in main
+    assert "MiniMax image-01" not in source
+    assert "minimax_m3" not in optimizer_contract
+    assert "fake_vision" not in main + visual_asset_panel
     for retired in ("Midjourney", "Seedream", "Seedance", "Qwen 3", "Lib Video", "Lib Image"):
         assert retired not in source
 
@@ -531,6 +541,64 @@ def test_studio_v02_flow_native_surface_is_visible() -> None:
         "asset-action",
     ):
         assert marker in source or marker in styles
+
+
+def test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail() -> None:
+    source = _source()
+    styles = _styles()
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    starter_rail = (STUDIO_ROOT / "src" / "canvas-starter-rail.js").read_text(encoding="utf-8")
+    inspector = (STUDIO_ROOT / "src" / "panels" / "inspector-panel.js").read_text(encoding="utf-8")
+
+    assert './styles/studio-mature-shell.css' in index
+    assert './styles/studio-inspector-declutter.css' in index
+    assert "algorithm-context-panel.js" in inspector
+    assert "projectPipelineSection(state)" in inspector
+    assert "algorithmConsoleSection(node)" in inspector
+    assert "创作助手" in inspector
+    assert "starterRailState(state)" in canvas_view
+    assert 'starterRow.dataset.mode = rail.mode;' in canvas_view
+    assert "shouldShowStarterRail" in starter_rail
+    assert 'mode: empty ? "empty" : "quick-start"' in starter_rail
+    for marker in (
+        "CORE_ALGORITHMS",
+        "上下文调度",
+        "提示词优化",
+        "请求投影",
+        "视觉识别",
+        "资产记忆",
+        "漂移控制",
+        "safeManifest",
+    ):
+        assert marker in source
+    for marker in (
+        ".algorithm-console",
+        ".algorithm-disclosure",
+        ".algorithm-step-track",
+        ".algorithm-call-summary",
+        '#starter-row[data-mode="quick-start"]',
+        "backdrop-filter: blur(18px)",
+    ):
+        assert marker in styles
+
+
+def test_studio_mature_shell_prevents_scroll_and_overlap_regressions() -> None:
+    styles = _styles()
+    inspector_shell = (STUDIO_ROOT / "styles" / "studio-inspector-declutter.css").read_text(encoding="utf-8")
+    workbench = (STUDIO_ROOT / "styles" / "studio-workbench.css").read_text(encoding="utf-8")
+
+    assert "#inspector" in inspector_shell
+    assert "display: block;" in inspector_shell
+    assert ".inspector-section" in inspector_shell
+    assert "flex: none;" in inspector_shell
+    assert ".project-hub" in workbench
+    assert ".project-menu" in workbench
+    assert "width: min(520px, calc(100vw - 56px));" in workbench
+    assert "overflow-y: auto;" in workbench
+    assert "scrollbar-width: thin;" in workbench
+    assert ".modal {" in styles
+    assert "overflow: hidden;" in styles
 
 
 def test_studio_layout_and_director_prompt_link_are_explicit() -> None:

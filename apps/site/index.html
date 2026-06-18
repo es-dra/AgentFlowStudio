@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AFS Studio | Agent-native AI 内容生产操作层</title>
+    <meta
+      name="description"
+      content="AFS Studio 将提示词、上下文、参考图、资产记忆和生成证据串成可复用的 AI 视频创作链路。"
+    />
+    <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/site/styles/site.css" />
+    <link rel="stylesheet" href="/site/styles/site-preview.css" />
+    <link rel="stylesheet" href="/site/styles/site-responsive.css" />
+  </head>
+  <body>
+    <header class="site-header" aria-label="AFS Studio 网站导航">
+      <a class="brand" href="/" aria-label="AFS Studio 首页">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>AFS Studio</span>
+      </a>
+      <nav class="nav-links" aria-label="页面章节">
+        <a href="#workflow">方法</a>
+        <a href="#algorithms">算法</a>
+        <a href="#operation">链路</a>
+      </nav>
+      <a class="nav-action" href="/studio/">打开 Studio</a>
+    </header>
+
+    <main>
+      <section class="hero-section">
+        <div class="hero-copy">
+          <p class="eyebrow">Agent-native creative operations</p>
+          <h1>AFS Studio</h1>
+          <p class="hero-lede">AI 内容生产的操作层，把创作意图、项目上下文、资产记忆和生成证据接成一条可复用链路。</p>
+          <div class="hero-actions">
+            <a class="primary-action" href="/studio/">进入 Studio</a>
+            <a class="secondary-action" href="#workflow">查看工作流</a>
+          </div>
+          <div class="hero-proof" aria-label="当前产品能力">
+            <span>Prompt intelligence</span>
+            <span>Context dispatch</span>
+            <span>Evidence-bound assets</span>
+          </div>
+        </div>
+
+        <div class="product-preview" aria-label="AFS Studio 工作台预览">
+          <div class="preview-topbar">
+            <span></span>
+            <strong>Studio canvas</strong>
+            <em>saved</em>
+          </div>
+          <div class="preview-body">
+            <div class="preview-sidebar">
+              <span class="sidebar-pill active"></span>
+              <span class="sidebar-pill"></span>
+              <span class="sidebar-pill"></span>
+              <span class="sidebar-line"></span>
+              <span class="sidebar-line short"></span>
+            </div>
+            <div class="preview-canvas">
+              <div class="canvas-grid"></div>
+              <article class="node-card node-text">
+                <span>01</span>
+                <strong>创作意图</strong>
+                <small>brief / prompt / preference</small>
+              </article>
+              <article class="node-card node-image">
+                <span>02</span>
+                <strong>参考资产</strong>
+                <small>fixed / upstream / selected</small>
+              </article>
+              <article class="node-card node-video">
+                <span>03</span>
+                <strong>生成证据</strong>
+                <small>manifest / feedback / trace</small>
+              </article>
+              <svg class="node-link" viewBox="0 0 420 180" role="img" aria-label="节点上下文连接">
+                <path d="M92 96 C156 32 226 34 292 84" />
+                <path d="M174 132 C220 178 290 172 345 120" />
+              </svg>
+            </div>
+            <aside class="preview-inspector">
+              <p>Context</p>
+              <strong>本次调用参考</strong>
+              <span>人物资产 / 场景图 / 用户偏好 / 上游输出</span>
+              <div class="trace-row"></div>
+              <div class="trace-row wide"></div>
+              <div class="trace-row"></div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow-section" id="workflow">
+        <div class="section-heading">
+          <p class="eyebrow">Workflow</p>
+          <h2>从一次生成，变成一条可复用生产链</h2>
+        </div>
+        <div class="workflow-line">
+          <article>
+            <span>01</span>
+            <h3>输入创作意图</h3>
+            <p>用户描述项目目标，系统同步读取上下游节点、固定资产、专家知识和偏好。</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>调度上下文</h3>
+            <p>模型调用前先形成标准 brief 与请求计划，明确纳入和排除的依据。</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>沉淀证据</h3>
+            <p>生成结果先进入 evidence，再由用户确认成资产，反馈进入下一次修订约束。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="algorithm-section" id="algorithms">
+        <div class="section-heading">
+          <p class="eyebrow">Core algorithms</p>
+          <h2>六个算法支撑 Studio 的创作连续性</h2>
+        </div>
+        <div class="algorithm-rail" aria-label="AFS 六大核心算法">
+          <span>提示词智能优化</span>
+          <span>上下文智能调度</span>
+          <span>图片/视频智能识别</span>
+          <span>资产记忆与连续性约束</span>
+          <span>模型请求投影</span>
+          <span>质量反馈与漂移控制</span>
+        </div>
+      </section>
+
+      <section class="operation-section" id="operation">
+        <div>
+          <p class="eyebrow">Studio operation</p>
+          <h2>网站首页负责介绍产品，Studio 负责真正创作</h2>
+          <p>
+            首页不承载复杂控制台。进入 Studio 后，用户在画布中创建节点、确认资产、发起生成和修订；系统在每次调用前完成上下文调度与请求投影。
+          </p>
+        </div>
+        <a class="primary-action" href="/studio/">打开 Studio 工作台</a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>AFS Studio</span>
+      <span>Runtime-backed local creative operations</span>
+    </footer>
+  </body>
+</html>

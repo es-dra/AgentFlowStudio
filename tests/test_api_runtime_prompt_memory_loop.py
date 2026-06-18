@@ -198,7 +198,7 @@ def test_prompt_optimizer_can_apply_gated_minimax_m3_enhancement(tmp_path, monke
     assert "Intent:" not in payload["optimized_prompt"]
     assert payload["user_prompt"] == payload["optimized_prompt"]
     assert trace["llm_enhancement"]["status"] == "applied"
-    assert trace["llm_enhancement"]["model"] == "MiniMax-M2.7-highspeed"
+    assert trace["llm_enhancement"]["model"] == "provider_configured"
     assert manifest["llm_enhancement"]["raw_response_stored"] is False
     assert brief["provider_calls_started"] is True
     assert "api_key" not in serialized
@@ -220,9 +220,9 @@ def test_studio_prompt_optimizer_uses_llm_fields_even_when_image_model_is_select
         target_platform="short_video",
         style="cinematic",
         node_parameters={
-            "model": "minimax_image",
-            "llm_provider": "minimax_m3",
-            "llm_model": "minimax-m3-enhance",
+            "model": "image2-keyframe",
+            "llm_provider": "prompt_optimizer",
+            "llm_model": "prompt-optimizer",
             "remote_optimizer_required": True,
         },
         generated_at="2026-06-14T05:20:00+08:00",
