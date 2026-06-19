@@ -12,6 +12,21 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current HTTP internal beta preflight addendum: 2026-06-19 pass added
+`--preflight-only` to `tools/afs_internal_beta_acceptance.py`. This mode checks
+deployed Runtime readiness through `/health` and `/auth/status` without
+requiring disposable invite codes and without executing the full acceptance
+contract. The safe report covers runtime health, auth surface, Studio static
+readiness, provider gate projection, and non-claims while excluding base URLs,
+invite codes, session tokens, signed URLs, provider raw responses, media bytes,
+and local paths. Verification: preflight tests 8 passed / 1 warning; local dev
+preflight against `127.0.0.1:8797` returned `needs_attention` because
+`auth_required=false`, with `provider_calls_started=false`; CLI help/version
+passed; full pytest passed 523 / 527 deselected / 2 warnings; maintenance audit
+failed=0 with warnings only; `git diff --check` passed. Boundary: readiness
+inspection only, not full HTTP beta acceptance, not provider smoke, not human
+acceptance, not business validation, not durable-memory promotion.
+
 Current HTTP internal beta acceptance addendum: 2026-06-19 pass extended
 `tools/afs_internal_beta_acceptance.py` from in-process deterministic contract
 verification to deployed Runtime HTTP contract verification. The tool now

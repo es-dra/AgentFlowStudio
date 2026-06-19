@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-06-19 - HTTP Internal Beta Preflight Mode
+
+- Added a `--preflight-only` mode to
+  `tools/afs_internal_beta_acceptance.py` for deployed Runtime checks that do
+  not require disposable invite codes and do not execute the full beta
+  acceptance contract.
+- The preflight report reads only safe public surfaces: `/health` and
+  `/auth/status`. It summarizes runtime readiness, auth surface readiness,
+  Studio static readiness, and provider gate projection without recording base
+  URLs, invite codes, session tokens, signed URLs, provider raw responses,
+  media bytes, or local paths.
+- Kept the existing full HTTP acceptance path unchanged for later disposable
+  invite-code tests.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance.py -> 8 passed / 1 warning
+local dev preflight on 127.0.0.1:8797 -> needs_attention because auth_required=false,
+  provider_calls_started=false, safe report written
+CLI help/version -> passed
+full pytest -> 523 passed / 527 deselected / 2 warnings
+maintenance_audit -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundary: preflight is readiness inspection only. It is not full HTTP beta
+acceptance, not provider smoke, not human acceptance, not business validation,
+and not durable-memory promotion.
+
 ## 2026-06-19 - Sprite Avatar Shape And Drag Stability Polish
 
 - Strengthened the `AFS 小精灵` visual silhouette so it reads as a small

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
 from tools import afs_internal_beta_acceptance_client as acceptance_client_module
-from tools.afs_internal_beta_acceptance import run_http_acceptance, run_inprocess_acceptance
+from tools.afs_internal_beta_acceptance import run_http_acceptance, run_http_preflight, run_inprocess_acceptance
 from tools.afs_internal_beta_acceptance_client import RuntimeTestClientAdapter
 
 
@@ -138,6 +138,80 @@ def test_http_acceptance_reuses_contract_with_safe_report(tmp_path: Path, monkey
     assert "https://afs.example.test" not in serialized
     assert "data_base64" not in serialized
     assert "iVBOR" not in serialized
+
+
+def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "alpha-http-invite,beta-http-invite")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "false")
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_ASR", "false")
+    monkeypatch.setenv("AFS_ALLOW_EXTERNAL_DOWNLOAD", "false")
+
+    app = create_runtime_app(runtime_root=tmp_path / "runtime")
+    client = RuntimeTestClientAdapter(TestClient(app))
+
+    def fake_http_client(base_url: str):
+        assert base_url == "https://afs.example.test"
+        return client
+
+    monkeypatch.setattr("tools.afs_internal_beta_acceptance.HttpAcceptanceClient", fake_http_client)
+
+    report = run_http_preflight(
+        base_url="https://afs.example.test",
+        report_path=tmp_path / "preflight-report.json",
+    )
+
+    checks = {item["check_id"]: item for item in report["checks"]}
+    assert report["artifact_type"] == "afs_internal_beta_acceptance_preflight_report"
+    assert report["schema_version"] == "0.1.0"
+    assert report["mode"] == "deployed_http_preflight"
+    assert report["status"] == "ready_for_http_acceptance"
+    assert report["requires_invite_codes"] is True
+    assert report["provider_calls_started"] is False
+    assert report["human_acceptance_claim"] == "not_claimed"
+    assert report["business_validation_claim"] == "not_claimed"
+    assert report["writes_company_kb"] is False
+    assert report["writes_long_term_memory"] is False
+    assert report["summary"]["failed_check_count"] == 0
+    assert report["summary"]["passed_check_count"] >= 4
+    assert checks["runtime_health"]["status"] == "passed"
+    assert checks["auth_surface"]["status"] == "passed"
+    assert checks["studio_static"]["status"] == "passed"
+    assert checks["provider_gate_projection"]["status"] == "passed"
+    assert report["safe_health"]["provider_gates"] == {
+        "llm": True,
+        "image": True,
+        "video": False,
+        "vision": True,
+        "asr": False,
+        "external_download": False,
+    }
+    assert (tmp_path / "preflight-report.json").is_file()
+
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert "https://afs.example.test" not in serialized
+    assert "alpha-http-invite" not in serialized
+    assert "beta-http-invite" not in serialized
+    assert "session_token" not in serialized
+    assert "signed_url" not in serialized
+    assert "provider_raw_response" not in serialized
+    assert "data_base64" not in serialized
+    assert str(tmp_path) not in serialized
+
+
+def test_http_preflight_rejects_missing_base_url_without_invite_code_requirement() -> None:
+    try:
+        run_http_preflight(base_url="")
+    except ValueError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("missing preflight base URL should fail before any request")
+
+    assert "base url" in message.lower()
+    assert "invite" not in message.lower()
 
 
 def test_http_acceptance_client_bypasses_system_proxy(monkeypatch) -> None:
