@@ -2961,3 +2961,29 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret exposure.
 - This is UI verification, not human acceptance or business validation.
+
+## 2026-06-19 - Internal Beta Human Review Record
+
+- Added `tools/afs_internal_beta_human_review_record.py` as a safe local record step after the internal beta human-review checklist.
+- The record step accepts an acceptance report plus operator scores/decision and writes an `afs_internal_beta_human_review_record` JSON artifact.
+- Acceptance for the next beta round is only recorded when every required section score meets the packet threshold and the decision is `accepted_for_next_beta_round`.
+- Inconsistent accepted decisions with low scores become `review_requires_followup` and keep `human_acceptance_claim=not_claimed`.
+- The CLI accepts UTF-8 with BOM input so Windows PowerShell-authored review JSON works.
+
+Verification:
+
+```text
+Red test: tests/test_afs_internal_beta_human_review_record.py failed before tools/afs_internal_beta_human_review_record.py existed.
+Red regression: BOM CLI test failed on JSONDecodeError before utf-8-sig read support.
+tests/test_afs_internal_beta_human_review_record.py: 4 passed / 1 existing Starlette/httpx warning
+CLI smoke: generated accepted_for_next_beta_round record; human=accepted_for_next_beta_round; business=not_claimed; durable=not_claimed; no local path, signed/token, or invite leak
+tests/test_afs_internal_beta_human_review_record.py + acceptance/three-end focused set: 22 passed / 1 existing warning
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No Company OS or long-term memory write was made.
+- This records human review for an internal beta round only; it does not claim business validation, provider quality approval, or durable memory promotion.
