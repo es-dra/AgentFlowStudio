@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi.testclient import TestClient
-
+from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
 from tools.afs_internal_beta_acceptance_generation_steps import (
     asset_confirmation_step,
     feedback_step,
@@ -22,32 +21,38 @@ from tools.afs_internal_beta_acceptance_scope_steps import (
 )
 
 
-def run_acceptance_contract(client: TestClient) -> dict[str, Any]:
+def run_acceptance_contract(
+    client,
+    *,
+    config: AcceptanceConfig | None = None,
+    mode: str = "inprocess_deterministic",
+) -> dict[str, Any]:
+    active_config = config or AcceptanceConfig.deterministic()
     steps: list[dict[str, Any]] = []
     health = health_step(client, steps)
-    alpha_headers, beta_headers = auth_registration_step(client, steps)
-    manifest_artifact_id = project_isolation_step(client, steps, alpha_headers, beta_headers)
-    studio_state_step(client, steps, alpha_headers, beta_headers)
-    image_asset_id, image_artifact_id = image_asset_step(client, steps, alpha_headers, beta_headers)
-    vision_gate_step(client, steps, alpha_headers, image_asset_id)
-    fixed_assets_not_polluted_step(client, steps, alpha_headers)
-    visual_asset_id = asset_confirmation_step(client, steps, alpha_headers, image_asset_id)
-    fixed_asset_context_reuse_step(client, steps, alpha_headers, visual_asset_id)
-    feedback_artifact_id = feedback_step(client, steps, alpha_headers)
+    alpha_headers, beta_headers = auth_registration_step(client, steps, active_config)
+    manifest_artifact_id = project_isolation_step(client, steps, alpha_headers, beta_headers, active_config)
+    studio_state_step(client, steps, alpha_headers, beta_headers, active_config)
+    image_asset_id, image_artifact_id = image_asset_step(client, steps, alpha_headers, beta_headers, active_config)
+    vision_gate_step(client, steps, alpha_headers, image_asset_id, active_config)
+    fixed_assets_not_polluted_step(client, steps, alpha_headers, active_config)
+    visual_asset_id = asset_confirmation_step(client, steps, alpha_headers, image_asset_id, active_config)
+    fixed_asset_context_reuse_step(client, steps, alpha_headers, visual_asset_id, active_config)
+    feedback_artifact_id = feedback_step(client, steps, alpha_headers, active_config)
     artifact_scope_step(client, steps, alpha_headers, beta_headers, [
         manifest_artifact_id,
         image_artifact_id,
         feedback_artifact_id,
     ])
-    video_gate_step(client, steps, alpha_headers, health, image_asset_id)
-    return _report(steps)
+    video_gate_step(client, steps, alpha_headers, health, image_asset_id, active_config)
+    return _report(steps, mode=mode)
 
 
-def _report(steps: list[dict[str, Any]]) -> dict[str, Any]:
+def _report(steps: list[dict[str, Any]], *, mode: str) -> dict[str, Any]:
     return {
         "artifact_type": "afs_internal_beta_acceptance_report",
         "schema_version": "0.1.0",
-        "mode": "inprocess_deterministic",
+        "mode": mode,
         "status": _report_status(steps),
         "summary": _summary(steps),
         "steps": steps,

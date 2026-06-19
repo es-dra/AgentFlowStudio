@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-19 - HTTP Internal Beta Acceptance Runner
+
+- Extended the deterministic internal beta acceptance runner with a deployed
+  Runtime HTTP mode. `tools/afs_internal_beta_acceptance.py` now accepts
+  `--base-url` plus two disposable invite codes from CLI flags or
+  `AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE` /
+  `AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA`.
+- Split the acceptance runtime client and config into small dedicated modules.
+  The HTTP client uses `trust_env=False` so local/server acceptance connects
+  directly to the target Runtime instead of inheriting workstation proxy
+  settings.
+- Parameterized the existing acceptance contract with generated project IDs,
+  emails, invite codes, and mode labels. The in-process deterministic mode
+  remains unchanged for default local verification.
+- Preserved the report boundary: reports include step evidence and non-claims,
+  but not invite codes, session tokens, passwords, base URLs, media bytes,
+  signed URLs, provider raw responses, or local runtime paths.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance.py -> 6 passed / 1 warning
+tools/afs_internal_beta_acceptance.py -> contract_verified_pending_human_acceptance
+HTTP missing alpha/beta invite modes -> safe configuration_error, no warning noise
+temporary local Runtime HTTP smoke -> deployed_http_runtime, 12 steps, 0 failed,
+  provider_calls_started=false
+full pytest -> 521 passed / 527 deselected / 2 warnings
+maintenance_audit -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundary: this is deployed Runtime contract verification only. It is not live
+provider smoke, not human acceptance, not business validation, and not durable
+memory promotion.
+
 ## 2026-06-19 - Sprite Character Design Follow-up
 
 - Reworked `AFS 小精灵` from a generic floating control into a clearer

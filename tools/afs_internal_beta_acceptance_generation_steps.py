@@ -2,21 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi.testclient import TestClient
+from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
+from tools.afs_internal_beta_acceptance_scope_steps import add_step
 
-from tools.afs_internal_beta_acceptance_scope_steps import GENERATED_AT, PROJECT_ID, add_step
 
-
-def vision_gate_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str], image_asset_id: str) -> None:
+def vision_gate_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], image_asset_id: str, config: AcceptanceConfig) -> None:
     response = client.post(
-        f"/projects/{PROJECT_ID}/asset-card-drafts",
+        f"/projects/{config.project_id}/asset-card-drafts",
         json={
             "asset_type": "character",
             "source_image_asset_refs": [image_asset_id],
             "node_id": "image_1",
             "prompt_text": "Summarize the character from this reference image for future continuity.",
             "provider_service_id": "vision_image",
-            "generated_at": GENERATED_AT,
+            "generated_at": config.generated_at,
         },
         headers=alpha_headers,
     )
@@ -31,8 +30,8 @@ def vision_gate_step(client: TestClient, steps: list[dict[str, Any]], alpha_head
     )
 
 
-def fixed_assets_not_polluted_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str]) -> None:
-    response = client.get(f"/projects/{PROJECT_ID}/visual-assets", headers=alpha_headers)
+def fixed_assets_not_polluted_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], config: AcceptanceConfig) -> None:
+    response = client.get(f"/projects/{config.project_id}/visual-assets", headers=alpha_headers)
     assets = response.json().get("assets") if response.status_code == 200 else []
     add_step(
         steps,
@@ -42,9 +41,9 @@ def fixed_assets_not_polluted_step(client: TestClient, steps: list[dict[str, Any
     )
 
 
-def asset_confirmation_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str], image_asset_id: str) -> str:
+def asset_confirmation_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], image_asset_id: str, config: AcceptanceConfig) -> str:
     response = client.post(
-        f"/projects/{PROJECT_ID}/visual-assets/promote",
+        f"/projects/{config.project_id}/visual-assets/promote",
         json={
             "source_image_asset_refs": [image_asset_id],
             "asset_type": "character",
@@ -54,7 +53,7 @@ def asset_confirmation_step(client: TestClient, steps: list[dict[str, Any]], alp
             "negative_locks": ["do not change identity"],
             "source_node_id": "image_1",
             "review_decision": "fixed",
-            "reviewed_at": GENERATED_AT,
+            "reviewed_at": config.generated_at,
         },
         headers=alpha_headers,
     )
@@ -70,9 +69,9 @@ def asset_confirmation_step(client: TestClient, steps: list[dict[str, Any]], alp
     return asset_id
 
 
-def fixed_asset_context_reuse_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str], visual_asset_id: str) -> None:
+def fixed_asset_context_reuse_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], visual_asset_id: str, config: AcceptanceConfig) -> None:
     response = client.post(
-        f"/projects/{PROJECT_ID}/keyframe-generations",
+        f"/projects/{config.project_id}/keyframe-generations",
         json={
             "node_id": "keyframe_1",
             "prompt_text": "Create a keyframe preserving the confirmed character identity.",
@@ -86,7 +85,7 @@ def fixed_asset_context_reuse_step(client: TestClient, steps: list[dict[str, Any
                 ],
                 "edges": [{"from": "asset_node", "to": "keyframe_1", "relation_type": "reference"}],
             },
-            "generated_at": GENERATED_AT,
+            "generated_at": config.generated_at,
         },
         headers=alpha_headers,
     )
@@ -100,10 +99,10 @@ def fixed_asset_context_reuse_step(client: TestClient, steps: list[dict[str, Any
     }, provider_calls_started=bool(payload.get("provider_calls_started")))
 
 
-def feedback_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str]) -> str:
+def feedback_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], config: AcceptanceConfig) -> str:
     response = client.post(
         "/feedback",
-        json={"project_id": PROJECT_ID, "feedback": {"rating": 4, "notes": "Use as raw evidence only for the next revision."}, "generated_at": GENERATED_AT},
+        json={"project_id": config.project_id, "feedback": {"rating": 4, "notes": "Use as raw evidence only for the next revision."}, "generated_at": config.generated_at},
         headers=alpha_headers,
     )
     payload = response.json()
@@ -117,9 +116,9 @@ def feedback_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers
     return artifact_id
 
 
-def video_gate_step(client: TestClient, steps: list[dict[str, Any]], alpha_headers: dict[str, str], health: dict[str, Any], image_asset_id: str) -> None:
+def video_gate_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str, str], health: dict[str, Any], image_asset_id: str, config: AcceptanceConfig) -> None:
     preflight = client.post(
-        f"/projects/{PROJECT_ID}/video-generations/preflight",
+        f"/projects/{config.project_id}/video-generations/preflight",
         json={
             "node_id": "video_1",
             "prompt_text": "Create a short motion test from the confirmed first frame.",
@@ -128,7 +127,7 @@ def video_gate_step(client: TestClient, steps: list[dict[str, Any]], alpha_heade
             "duration_sec": 5,
             "resolution": "720p",
             "aspect_ratio": "9:16",
-            "generated_at": GENERATED_AT,
+            "generated_at": config.generated_at,
         },
         headers=alpha_headers,
     )

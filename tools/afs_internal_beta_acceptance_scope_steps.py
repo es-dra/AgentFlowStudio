@@ -3,17 +3,15 @@ from __future__ import annotations
 import base64
 from typing import Any
 
-from fastapi.testclient import TestClient
+from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
 
 
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
-GENERATED_AT = "2026-06-19T12:00:00+08:00"
-PROJECT_ID = "afs-beta-accept-alpha"
 
 
-def health_step(client: TestClient, steps: list[dict[str, Any]]) -> dict[str, Any]:
+def health_step(client, steps: list[dict[str, Any]]) -> dict[str, Any]:
     response = client.get("/health")
     payload = response.json()
     add_step(
@@ -31,10 +29,10 @@ def health_step(client: TestClient, steps: list[dict[str, Any]]) -> dict[str, An
     return payload
 
 
-def auth_registration_step(client: TestClient, steps: list[dict[str, Any]]) -> tuple[dict[str, str], dict[str, str]]:
+def auth_registration_step(client, steps: list[dict[str, Any]], config: AcceptanceConfig) -> tuple[dict[str, str], dict[str, str]]:
     status = client.get("/auth/status").json()
-    alpha = _register(client, "alpha-invite", "alpha.beta.acceptance@example.test")
-    beta = _register(client, "beta-invite", "beta.beta.acceptance@example.test")
+    alpha = _register(client, config.alpha_invite_code, config.alpha_email, config.password)
+    beta = _register(client, config.beta_invite_code, config.beta_email, config.password)
     alpha_headers = auth_headers(alpha["session_token"])
     beta_headers = auth_headers(beta["session_token"])
     me = client.get("/auth/me", headers=alpha_headers)
@@ -53,20 +51,21 @@ def auth_registration_step(client: TestClient, steps: list[dict[str, Any]]) -> t
 
 
 def project_isolation_step(
-    client: TestClient,
+    client,
     steps: list[dict[str, Any]],
     alpha_headers: dict[str, str],
     beta_headers: dict[str, str],
+    config: AcceptanceConfig,
 ) -> str:
     created = client.post(
         "/projects",
-        json={"project_id": PROJECT_ID, "goal": "Internal beta acceptance deterministic project"},
+        json={"project_id": config.project_id, "goal": "Internal beta acceptance deterministic project"},
         headers=alpha_headers,
     )
     alpha_projects = client.get("/projects", headers=alpha_headers)
     beta_projects = client.get("/projects", headers=beta_headers)
-    alpha_manifest = client.get(f"/projects/{PROJECT_ID}/manifest", headers=alpha_headers)
-    beta_manifest = client.get(f"/projects/{PROJECT_ID}/manifest", headers=beta_headers)
+    alpha_manifest = client.get(f"/projects/{config.project_id}/manifest", headers=alpha_headers)
+    beta_manifest = client.get(f"/projects/{config.project_id}/manifest", headers=beta_headers)
     add_step(
         steps,
         "project_owner_isolation",
@@ -82,19 +81,20 @@ def project_isolation_step(
 
 
 def studio_state_step(
-    client: TestClient,
+    client,
     steps: list[dict[str, Any]],
     alpha_headers: dict[str, str],
     beta_headers: dict[str, str],
+    config: AcceptanceConfig,
 ) -> None:
     state = {
         "meta": {"projectName": "Beta Acceptance Project", "canvasName": "Acceptance Board"},
         "nodes": {"image_1": {"type": "image", "title": "First frame"}},
         "order": ["image_1"],
     }
-    write_response = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": state}, headers=alpha_headers)
-    alpha_state = client.get(f"/projects/{PROJECT_ID}/studio-state", headers=alpha_headers)
-    beta_state = client.get(f"/projects/{PROJECT_ID}/studio-state", headers=beta_headers)
+    write_response = client.put(f"/projects/{config.project_id}/studio-state", json={"state": state}, headers=alpha_headers)
+    alpha_state = client.get(f"/projects/{config.project_id}/studio-state", headers=alpha_headers)
+    beta_state = client.get(f"/projects/{config.project_id}/studio-state", headers=beta_headers)
     add_step(
         steps,
         "studio_state_isolation",
@@ -104,30 +104,31 @@ def studio_state_step(
 
 
 def image_asset_step(
-    client: TestClient,
+    client,
     steps: list[dict[str, Any]],
     alpha_headers: dict[str, str],
     beta_headers: dict[str, str],
+    config: AcceptanceConfig,
 ) -> tuple[str, str]:
     upload = client.post(
-        f"/projects/{PROJECT_ID}/image-assets",
+        f"/projects/{config.project_id}/image-assets",
         json={
             "node_id": "image_1",
             "filename": "first-frame.png",
             "mime_type": "image/png",
             "data_base64": base64.b64encode(PNG_BYTES).decode("ascii"),
             "role": "reference_image",
-            "generated_at": GENERATED_AT,
+            "generated_at": config.generated_at,
         },
         headers=alpha_headers,
     )
     payload = upload.json()
     asset_id = str(payload["asset"]["asset_id"])
     artifact_id = str(payload["artifact"]["artifact_id"])
-    alpha_list = client.get(f"/projects/{PROJECT_ID}/image-assets", headers=alpha_headers)
-    beta_list = client.get(f"/projects/{PROJECT_ID}/image-assets", headers=beta_headers)
-    alpha_preview = client.get(f"/projects/{PROJECT_ID}/image-assets/{asset_id}/preview", headers=alpha_headers)
-    beta_preview = client.get(f"/projects/{PROJECT_ID}/image-assets/{asset_id}/preview", headers=beta_headers)
+    alpha_list = client.get(f"/projects/{config.project_id}/image-assets", headers=alpha_headers)
+    beta_list = client.get(f"/projects/{config.project_id}/image-assets", headers=beta_headers)
+    alpha_preview = client.get(f"/projects/{config.project_id}/image-assets/{asset_id}/preview", headers=alpha_headers)
+    beta_preview = client.get(f"/projects/{config.project_id}/image-assets/{asset_id}/preview", headers=beta_headers)
     add_step(steps, "image_asset_isolation", "passed" if _image_asset_ok(upload, alpha_list, beta_list, alpha_preview, beta_preview, payload) else "failed", {
         "upload_http_status": upload.status_code,
         "alpha_asset_count": len(alpha_list.json().get("assets") or []),
@@ -139,7 +140,7 @@ def image_asset_step(
 
 
 def artifact_scope_step(
-    client: TestClient,
+    client,
     steps: list[dict[str, Any]],
     alpha_headers: dict[str, str],
     beta_headers: dict[str, str],
@@ -170,10 +171,10 @@ def add_step(
     steps.append({"step_id": step_id, "status": status, "provider_calls_started": provider_calls_started, "evidence": evidence})
 
 
-def _register(client: TestClient, invite_code: str, email: str) -> dict[str, Any]:
+def _register(client, invite_code: str, email: str, password: str) -> dict[str, Any]:
     response = client.post(
         "/auth/register",
-        json={"email": email, "password": "beta-acceptance-pass-123", "display_name": email.split("@", 1)[0], "invite_code": invite_code},
+        json={"email": email, "password": password, "display_name": email.split("@", 1)[0], "invite_code": invite_code},
     )
     if response.status_code != 200:
         raise RuntimeError("acceptance auth registration failed")

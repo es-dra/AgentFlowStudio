@@ -12,6 +12,26 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current HTTP internal beta acceptance addendum: 2026-06-19 pass extended
+`tools/afs_internal_beta_acceptance.py` from in-process deterministic contract
+verification to deployed Runtime HTTP contract verification. The tool now
+accepts `--base-url` and disposable invite codes via CLI flags or
+`AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE` /
+`AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA`, generates isolated project
+IDs and emails per run, and keeps reports free of invite codes, session tokens,
+passwords, base URLs, local paths, provider raw responses, signed URLs, and
+media bytes. HTTP mode requires two disposable invite codes so the alpha/beta
+project-isolation checks exercise separate users. The HTTP client disables system proxy inheritance with
+`trust_env=False` to connect directly to the target Runtime. Verification:
+acceptance tests 6 passed / 1 warning; default in-process runner returned
+`contract_verified_pending_human_acceptance`; HTTP missing-invite mode returned
+safe `configuration_error`; temporary local Runtime HTTP smoke returned
+`deployed_http_runtime`, 12 steps, 0 failed, provider_calls_started=false; full
+pytest passed 521 / 527 deselected / 2 warnings; maintenance audit failed=0
+with warnings only; `git diff --check` passed.
+Boundary: deployed Runtime contract verification only, not live provider smoke,
+not human acceptance, not business validation, not durable-memory promotion.
+
 Current sprite character follow-up: 2026-06-19 pass reworked the decorative
 `AFS 小精灵` into a fixed-viewport micro-assistant character instead of a
 generic floating control. The avatar now has a recognizable visor, glowing
