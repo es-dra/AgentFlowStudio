@@ -47,6 +47,13 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-face-window" in sprite
     assert "sprite-wand" in sprite
     assert "sprite-personality-tag" in sprite
+    assert "sprite-crest" in sprite
+    assert "sprite-orbit-dot" in sprite
+    assert "sprite-brow left" in sprite
+    assert "sprite-brow right" in sprite
+    assert "sprite-blush left" in sprite
+    assert "sprite-blush right" in sprite
+    assert "sprite-grab-ribbon" in sprite
     assert "sprite-hood" in sprite
     assert "sprite-eye left" in sprite
     assert "sprite-eye right" in sprite
@@ -124,7 +131,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-face-window" in sprite_styles
     assert ".sprite-wand" in sprite_styles
     assert ".sprite-personality-tag" in sprite_styles
-    assert "move micro companion" in sprite_styles
+    assert ".sprite-crest" in sprite_styles
+    assert ".sprite-orbit-dot.left" in sprite_styles
+    assert ".sprite-brow.left" in sprite_styles
+    assert ".sprite-blush.left" in sprite_styles
+    assert ".sprite-grab-ribbon" in sprite_styles
+    assert "studio navigator sprite" in sprite_styles
     assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite

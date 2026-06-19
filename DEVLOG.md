@@ -2935,3 +2935,29 @@ Boundaries:
 - No provider call was made.
 - No Company OS or long-term memory write was made.
 - This creates a safe human-review checklist; it still does not claim completed human acceptance or business validation.
+
+## 2026-06-19 - Studio Sprite Navigator Character Polish
+
+- Reworked the movable `AFS 小精灵` companion toward a clearer Studio navigator character rather than a generic floating control.
+- Added visible character details: crest, orbit dots, brows, blush marks, and a hover/drag grab ribbon.
+- Kept the existing Runtime `sprite/chat` boundary and local viewport-position behavior unchanged.
+- Extended the sprite static contract so future changes must preserve the character silhouette and drag affordance, not only the chat wiring.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py: red on missing sprite-crest contract, then passed after implementation
+tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 6 passed / 1 existing Starlette/httpx warning
+npm run check:studio-js: JS syntax check passed for 93 files
+Browser on http://127.0.0.1:8797/studio/: crest/orbit/brow/blush/grab-ribbon rendered; drag moved sprite from (522,270) to (440,222); opening the panel kept root at (440,222), panel followed, status light turned green, console warn/error count 0
+tools/maintenance_audit.py: failed=0; warnings only; sprite personality CSS remained below 300 lines
+git diff --check: passed
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret exposure.
+- This is UI verification, not human acceptance or business validation.

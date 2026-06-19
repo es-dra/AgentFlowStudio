@@ -1,10 +1,35 @@
-/* move micro companion: final silhouette and drag affordance layer */
+/* studio navigator sprite: final silhouette and drag affordance layer */
 .afs-sprite-avatar[data-sprite-character="navigator"] {
   filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.34));
 }
 
 .afs-sprite-avatar[data-sprite-character="navigator"]:hover {
   transform: translateY(-2px);
+}
+
+.sprite-orbit-dot {
+  position: absolute;
+  z-index: 9;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(229, 252, 255, 0.64);
+  border-radius: 50%;
+  background: radial-gradient(circle, #f7feff 0 22%, #66e7ff 56%, rgba(28, 134, 165, 0.2) 100%);
+  box-shadow: 0 0 18px rgba(100, 231, 255, 0.72);
+  pointer-events: none;
+}
+
+.sprite-orbit-dot.left {
+  left: 28px;
+  top: 79px;
+}
+
+.sprite-orbit-dot.right {
+  right: 29px;
+  top: 96px;
+  width: 7px;
+  height: 7px;
+  opacity: 0.78;
 }
 
 .sprite-halo-crown {
@@ -23,6 +48,37 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.38),
     0 0 24px rgba(95, 226, 255, 0.22);
   pointer-events: none;
+}
+
+.sprite-crest {
+  position: absolute;
+  z-index: 10;
+  left: 76px;
+  top: 13px;
+  width: 29px;
+  height: 21px;
+  border: 1px solid rgba(232, 254, 255, 0.56);
+  border-radius: 999px 999px 12px 12px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.78), transparent 36%),
+    linear-gradient(180deg, rgba(94, 235, 255, 0.72), rgba(18, 80, 98, 0.42));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.52),
+    0 0 16px rgba(95, 226, 255, 0.44);
+  pointer-events: none;
+}
+
+.sprite-crest::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffe08a;
+  box-shadow: 0 0 12px rgba(255, 222, 138, 0.82);
+  transform: translateX(-50%);
 }
 
 .sprite-halo-crown i {
@@ -74,6 +130,43 @@
   pointer-events: none;
 }
 
+.sprite-brow {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  width: 17px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(210, 247, 255, 0.84);
+  box-shadow: 0 0 8px rgba(96, 226, 255, 0.38);
+  pointer-events: none;
+}
+
+.sprite-brow.left {
+  left: 17px;
+  transform: rotate(-9deg);
+}
+
+.sprite-brow.right {
+  right: 17px;
+  transform: rotate(9deg);
+}
+
+.sprite-blush {
+  position: absolute;
+  z-index: 3;
+  bottom: 7px;
+  width: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 210, 133, 0.52);
+  box-shadow: 0 0 11px rgba(255, 202, 108, 0.44);
+  pointer-events: none;
+}
+
+.sprite-blush.left { left: 11px; }
+.sprite-blush.right { right: 11px; }
+
 .sprite-wand {
   position: absolute;
   z-index: 8;
@@ -118,6 +211,35 @@
   pointer-events: none;
 }
 
+.sprite-grab-ribbon {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 54px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 224, 135, 0.28);
+  border-radius: 999px;
+  color: rgba(10, 18, 22, 0.82);
+  background: linear-gradient(180deg, rgba(255, 239, 184, 0.92), rgba(255, 196, 88, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 8px 20px rgba(0, 0, 0, 0.24),
+    0 0 16px rgba(255, 214, 115, 0.22);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  opacity: 0;
+  transform: translate(-50%, -7px) scale(0.95);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+
+.afs-sprite-avatar:hover .sprite-grab-ribbon,
+#sprite-root.is-dragging .sprite-grab-ribbon {
+  opacity: 1;
+  transform: translate(-50%, -2px) scale(1);
+}
+
 .afs-sprite-avatar[data-sprite-character="navigator"] .sprite-move-handle {
   cursor: grab;
 }
@@ -132,6 +254,22 @@
 
 #sprite-root.is-dragging .sprite-personality-tag {
   transform: translateX(-50%) translateY(-3px);
+}
+
+#sprite-root.is-dragging .sprite-orbit-dot.left {
+  transform: translate(-7px, -3px) scale(1.12);
+}
+
+#sprite-root.is-dragging .sprite-orbit-dot.right {
+  transform: translate(6px, 2px) scale(1.08);
+}
+
+#sprite-root.is-dragging .sprite-brow.left {
+  transform: rotate(-17deg) translateY(-1px);
+}
+
+#sprite-root.is-dragging .sprite-brow.right {
+  transform: rotate(17deg) translateY(-1px);
 }
 
 #sprite-root.is-dragging .sprite-shadow {
