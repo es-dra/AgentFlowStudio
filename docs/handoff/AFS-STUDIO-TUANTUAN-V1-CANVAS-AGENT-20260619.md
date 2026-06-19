@@ -30,6 +30,9 @@ This slice treats the latest product intent as the source of truth:
   - Defines the base resting story-cat shape.
   - Keeps the low-profile dark-canvas compatible visual language.
 
+- `apps/studio/styles/studio-sprite-avatar-story-cat-details.css`
+  - Adds the reference-shape anchors that make TuanTuan read as a story cat rather than an abstract dark blob: inner ears, forehead tabby mark, cheek marks, whiskers, nose/mouth, story belly panel, and segmented tail.
+
 - `apps/studio/styles/studio-sprite-avatar-story-states.css`
   - Owns orbit speed, suggest/preview/execute/complete/sleep state behavior, drag affordance, sequence label, and reduced-motion fallback.
 
@@ -69,6 +72,16 @@ Chrome smoke after retiring the old PNG assets
 => assetImageCount=0
 => no failed requests
 => console warning/error count 0
+
+Chrome smoke after reference-shape correction
+=> inner ears=2
+=> face marks=3
+=> whiskers=2
+=> nose=1
+=> story panel=1
+=> tail panels=3
+=> console warning/error count 0
+=> screenshot: runs/tuantuan-shape-smoke-20260619.png
 ```
 
 ## Public Server Diagnosis

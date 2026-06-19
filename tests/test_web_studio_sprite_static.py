@@ -15,12 +15,14 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
     avatar_story_cat_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-story-cat.css").read_text(encoding="utf-8")
+    avatar_story_cat_details = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-story-cat-details.css").read_text(encoding="utf-8")
     avatar_story_state_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-story-states.css").read_text(encoding="utf-8")
     sprite_styles = (
         styles
         + avatar_styles
         + avatar_motion_styles
         + avatar_story_cat_styles
+        + avatar_story_cat_details
         + avatar_story_state_styles
     )
 
@@ -77,6 +79,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-cat-body" in character
     assert "sprite-cat-eye" in character
     assert "sprite-cat-tail" in character
+    assert "sprite-cat-inner-ear" in character
+    assert "sprite-cat-face-mark" in character
+    assert "sprite-cat-whiskers" in character
+    assert "sprite-cat-nose" in character
+    assert "sprite-cat-story-panel" in character
+    assert "sprite-tail-panel" in character
     assert "sprite-suggestion-bubble" in character
     assert "SPRITE_POSE_ASSETS" not in character
     assert "Object.entries(SPRITE_POSE_ASSETS)" not in character
@@ -117,6 +125,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar.css");' in styles
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
     assert '@import url("./studio-sprite-avatar-story-cat.css");' in styles
+    assert '@import url("./studio-sprite-avatar-story-cat-details.css");' in styles
     assert '@import url("./studio-sprite-avatar-story-states.css");' in styles
     assert "studio-sprite-avatar-tuantuan.css" not in styles
     assert "width: calc(190px * var(--sprite-scale, 1))" in styles
@@ -133,6 +142,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-tuantuan-cat" in sprite_styles
     assert ".sprite-cat-body" in sprite_styles
     assert ".sprite-cat-eye" in sprite_styles
+    assert ".sprite-cat-inner-ear" in sprite_styles
+    assert ".sprite-cat-face-mark" in sprite_styles
+    assert ".sprite-cat-whiskers" in sprite_styles
+    assert ".sprite-cat-nose" in sprite_styles
+    assert ".sprite-cat-story-panel" in sprite_styles
+    assert ".sprite-tail-panel" in sprite_styles
     assert ".sprite-suggestion-bubble" in sprite_styles
     assert ".sprite-move-handle" in sprite_styles
     assert ".sprite-move-handle::after" in sprite_styles
