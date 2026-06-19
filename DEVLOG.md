@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-19 - Sprite Character Design Pass
+
+- Reworked the decorative `AFS 小精灵` from a button-like floating helper into
+  a clearer movable micro-assistant character. The avatar now has a larger
+  fixed footprint, cockpit glass, scanner visor, status light, side arms,
+  hands, wings, feet, dock ring, and thruster so it reads as a character at
+  normal Studio scale.
+- Preserved the existing Runtime chat boundary and drag behavior. The avatar
+  and panel header remain draggable, position is clamped with separate width
+  and height values, and local storage persists only viewport coordinates.
+- Split limb/propulsion styling into
+  `apps/studio/styles/studio-sprite-avatar-parts.css` so each sprite stylesheet
+  stays under the project maintenance warning line.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -> 6 passed / 1 warning
+npm run check:studio-js -> JS syntax check passed: 87 files
+git diff --check -> passed
+Browser check on 127.0.0.1:8797/studio -> character parts=7, drag moved,
+  position stored, panel stayed in viewport, open status light turned green,
+  console warn/error count=0
+```
+
+Boundary: no Runtime provider gate changed, no provider call was made, no
+provider raw response, signed URL, local media byte, or secret was exposed.
+This is UI/runtime verification only, not human acceptance.
+
 ## 2026-06-19 - Three-End Status Report Tool
 
 - Added `tools/afs_three_end_status.py` as a safe local/GitHub/server status

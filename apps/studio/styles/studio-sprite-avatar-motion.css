@@ -1,7 +1,7 @@
 .sprite-label {
   position: absolute;
-  right: 112px;
-  top: 34px;
+  right: 132px;
+  top: 50px;
   max-width: 104px;
   padding: 6px 9px;
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -19,7 +19,7 @@
 
 #sprite-root[data-dock="left"] .sprite-label {
   right: auto;
-  left: 112px;
+  left: 132px;
   transform: translateX(-8px);
 }
 
@@ -31,16 +31,29 @@
 
 @keyframes sprite-breathe {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-5px); }
 }
 
 @keyframes sprite-scan {
-  0%, 56%, 100% { transform: translateX(-120%); }
-  66%, 78% { transform: translateX(120%); }
+  0%, 52%, 100% { transform: translateX(-118%); opacity: 0.62; }
+  64%, 80% { transform: translateX(118%); opacity: 1; }
+}
+
+@keyframes sprite-orbit {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) rotate(360deg); }
+}
+
+@keyframes sprite-core-pulse {
+  0%, 100% { transform: scale(1); filter: saturate(1); }
+  50% { transform: scale(1.1); filter: saturate(1.2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sprite-body, .sprite-drag-halo, .sprite-visor::before {
+  .sprite-body,
+  .sprite-dock-ring i,
+  .sprite-core,
+  .sprite-eye-glow {
     animation: none;
   }
 }

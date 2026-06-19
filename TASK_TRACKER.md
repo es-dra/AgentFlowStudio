@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite character design addendum: 2026-06-19 pass reworked the
+decorative `AFS 小精灵` from a button-like floating helper into a clearer
+movable micro-assistant character. It now has a larger fixed footprint, cockpit
+glass, scanner visor, status light, side arms, hands, wings, feet, dock ring,
+and thruster. Dragging remains available from the avatar and panel header, the
+position clamp now separates width and height, and only viewport coordinates
+are persisted in local storage. Limb and propulsion styles were split into
+`apps/studio/styles/studio-sprite-avatar-parts.css` so sprite files remain
+under the project maintenance warning line. Verification: sprite static plus
+Runtime sprite tests 6 passed / 1 warning; Studio JS syntax check passed for 87
+files; `git diff --check` passed; browser check on `127.0.0.1:8797/studio`
+confirmed character parts=7, drag movement, position storage, panel in
+viewport, green open status light, and console warn/error count=0. Boundary:
+no provider gate changed, no provider call, no provider raw response, signed
+URL, local media bytes, or secret exposure; not human acceptance or business
+validation.
+
 Current three-end status addendum: 2026-06-19 pass added
 `tools/afs_three_end_status.py` as a safe local/GitHub/server status reporter.
 It checks the local checkout, optional server `/home` checkout, optional server

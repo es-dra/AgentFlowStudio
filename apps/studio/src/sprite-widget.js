@@ -11,7 +11,8 @@ let suppressSpriteClick = false;
 let spriteResizeBound = false;
 const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
 const SPRITE_MARGIN = 18;
-const SPRITE_SIZE = 112;
+const SPRITE_SIZE = 132;
+const SPRITE_HEIGHT = 150;
 const spriteMessages = [
   { role: "sprite", text: "我在这里陪你看画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -43,17 +44,23 @@ function spriteOrb() {
   button.setAttribute("data-sprite-draggable", "true");
   button.title = spriteOpen ? "拖动移动，点击收起 AFS 小精灵" : "拖动移动，点击打开 AFS 小精灵";
   button.innerHTML = [
+    '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
-    '<span class="sprite-backplate"></span>',
+    '<span class="sprite-aura"></span>',
     '<span class="sprite-antenna"></span>',
     '<span class="sprite-wing left"></span>',
     '<span class="sprite-wing right"></span>',
+    '<span class="sprite-arm left"><span class="sprite-hand left"></span></span>',
+    '<span class="sprite-arm right"><span class="sprite-hand right"></span></span>',
+    '<span class="sprite-backplate"></span>',
     '<span class="sprite-body">',
+    '  <span class="sprite-cockpit"></span>',
     '  <span class="sprite-head-shell"></span>',
     '  <span class="sprite-face">',
-    '    <span class="sprite-visor"><i></i><i></i><b></b></span>',
+    '    <span class="sprite-visor"><span class="sprite-eye-glow"></span><i></i><i></i><b></b></span>',
     "  </span>",
     '  <span class="sprite-core"></span>',
+    '  <span class="sprite-status-light"></span>',
     '  <span class="sprite-badge">AFS</span>',
     "</span>",
     '<span class="sprite-foot left"></span>',
@@ -79,6 +86,7 @@ function spritePanel(state, runtime) {
   const panel = el("div", "afs-sprite-panel");
   const head = el("div", "afs-sprite-head");
   head.title = "拖动移动 AFS 小精灵";
+  head.setAttribute("data-sprite-drag-handle", "true");
   head.innerHTML = [
     icon("sparkles", 14),
     "<span>",
@@ -251,13 +259,13 @@ function storeSpritePosition(position) {
 function defaultSpritePosition() {
   return {
     x: Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 24),
-    y: Math.max(76, window.innerHeight - SPRITE_SIZE - 64),
+    y: Math.max(76, window.innerHeight - SPRITE_HEIGHT - 56),
   };
 }
 
 function clampSpritePosition(position) {
   const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 10);
-  const maxY = Math.max(76, window.innerHeight - SPRITE_SIZE - 12);
+  const maxY = Math.max(76, window.innerHeight - SPRITE_HEIGHT - 12);
   const rawX = Number(position?.x);
   const rawY = Number(position?.y);
   const nextX = Number.isFinite(rawX) ? rawX : maxX;
