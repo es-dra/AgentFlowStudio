@@ -14,20 +14,21 @@ not current task entrypoints.
 
 Current sprite character design addendum: 2026-06-19 pass reworked the
 decorative `AFS 小精灵` from a button-like floating helper into a clearer
-movable micro-assistant character. It now has a larger fixed footprint, cockpit
-glass, scanner visor, status light, side arms, hands, wings, feet, dock ring,
-and thruster. Dragging remains available from the avatar and panel header, the
-position clamp now separates width and height, and only viewport coordinates
-are persisted in local storage. Limb and propulsion styles were split into
+movable canvas companion. It now has a larger fixed footprint, visible drag
+chip, cockpit glass, canopy highlight, scanner visor, cheek/mouth detail,
+status light, shoulders, arms, mittens, wings, feet, tail fin, dock ring, glow
+trail, and thruster. Dragging remains available from the avatar and panel
+header, the position clamp separates width and height, and only viewport
+coordinates are persisted in local storage. Limb and propulsion styles live in
 `apps/studio/styles/studio-sprite-avatar-parts.css` so sprite files remain
 under the project maintenance warning line. Verification: sprite static plus
 Runtime sprite tests 6 passed / 1 warning; Studio JS syntax check passed for 87
-files; `git diff --check` passed; browser check on `127.0.0.1:8797/studio`
-confirmed character parts=7, drag movement, position storage, panel in
-viewport, green open status light, and console warn/error count=0. Boundary:
-no provider gate changed, no provider call, no provider raw response, signed
-URL, local media bytes, or secret exposure; not human acceptance or business
-validation.
+files; `git diff --check` passed; browser check on `127.0.0.1:8799/studio`
+confirmed character parts=8, avatar drag movement, panel-header drag movement,
+position storage, panel open state, viewport clamp, green open status light,
+and console warn/error count=0. Boundary: no provider gate changed, no provider
+call, no provider raw response, signed URL, local media bytes, or secret
+exposure; not human acceptance or business validation.
 
 Current three-end status addendum: 2026-06-19 pass added
 `tools/afs_three_end_status.py` as a safe local/GitHub/server status reporter.

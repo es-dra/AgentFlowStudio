@@ -4,10 +4,10 @@
 
 #sprite-root {
   position: fixed;
-  left: var(--sprite-x, calc(100vw - 158px));
-  top: var(--sprite-y, calc(100vh - 206px));
-  width: 132px;
-  height: 150px;
+  left: var(--sprite-x, calc(100vw - 184px));
+  top: var(--sprite-y, calc(100vh - 224px));
+  width: 156px;
+  height: 176px;
   z-index: calc(var(--z-modal) + 1);
   pointer-events: none;
   touch-action: none;
@@ -21,8 +21,8 @@
 
 .afs-sprite {
   position: relative;
-  width: 132px;
-  height: 150px;
+  width: 156px;
+  height: 176px;
   pointer-events: none;
 }
 
@@ -34,7 +34,7 @@
 .afs-sprite-panel {
   position: absolute;
   right: 0;
-  bottom: 154px;
+  bottom: 178px;
   width: min(318px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -55,7 +55,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-panel {
-  top: 154px;
+  top: 178px;
   bottom: auto;
   transform-origin: 92% 0;
 }
