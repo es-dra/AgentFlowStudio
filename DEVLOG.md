@@ -3051,3 +3051,35 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret exposure.
 - This is a lightweight lossless motion layer, not a full skeletal animation rig; full rigging still needs layered source art or a dedicated animation asset pipeline.
+
+## 2026-06-19 - TuanTuan V1 Canvas Agent Intent
+
+- Reframed TuanTuan from a mascot / desktop-pet style companion into the embodied projection of the AFS Agent system inside the Studio canvas.
+- Replaced pose-image swapping with a canvas-native story-cat DOM rig: resting cat silhouette, story orbit, eye/body/tail components, observe/suggest/preview/execute/complete/sleep state hooks.
+- Retired the previous `tuantuan-*.png` pose assets and the old reference-image sprite layer so the current canvas character is not a sticker swap implementation.
+- Preserved a quiet default `observe` state and mapped hover/open/send behavior to `think` / `suggest` semantics rather than attention-seeking chat behavior.
+- Renamed the main visual stylesheet from mascot language to story-cat language and split state/motion styles out of the base character file to keep files under the maintenance warning line.
+- Diagnosed the public-server login loop as Nginx Basic Auth in front of the already-authenticated Runtime app; the server also still runs `master`, so it cannot show this review-branch TuanTuan until the branch is merged and deployed.
+
+Verification:
+
+```text
+Red check: tests/test_web_studio_sprite_static.py failed before the V1 story-cat contract existed.
+npm run check:studio-js: JS syntax check passed for 96 files
+tests/test_web_studio_static.py + tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 16 passed / 1 existing Starlette/httpx warning
+full pytest: 543 passed / 527 deselected / 2 existing warnings
+npm run check:studio-js: JS syntax check passed for 96 files
+Browser smoke on Chrome at /studio/?project=tuantuan-v1-smoke: character=story-cat, role=embodied-agent, state observe -> hover think -> open suggest, story orbit/cat/body/eyes present, old image-asset sprite absent, console warn/error=0
+Browser smoke after old PNG retirement: assetImageCount=0, no failed requests, console warn/error=0
+tools/maintenance_audit.py: failed=0; warnings only
+git diff --check: passed
+Screenshot evidence: runs/tuantuan-v1-story-cat-smoke-20260619.png
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, or Company OS private source content was written.
+- This is frontend/runtime verification only, not human acceptance or business validation.

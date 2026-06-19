@@ -1,5 +1,0 @@
-/* TuanTuan reference asset layer. Keep this file small: the character form lives in PNG. */
-.sprite-tuantuan-stage,
-.sprite-tuantuan-asset {
-  contain: layout paint;
-}

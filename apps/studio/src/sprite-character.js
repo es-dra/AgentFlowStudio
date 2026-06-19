@@ -1,62 +1,93 @@
-export const SPRITE_POSE_ASSETS = {
-  idle: "./assets/tuantuan-idle.png",
-  happy: "./assets/tuantuan-happy.png",
-  curious: "./assets/tuantuan-curious.png",
-  thinking: "./assets/tuantuan-thinking.png",
-  surprised: "./assets/tuantuan-surprised.png",
-  sleepy: "./assets/tuantuan-sleepy.png",
-  working: "./assets/tuantuan-working.png",
-  celebrate: "./assets/tuantuan-celebrate.png",
+export const SPRITE_AGENT_STATES = {
+  observe: "观察",
+  think: "思考",
+  suggest: "提案",
+  preview: "预览",
+  execute: "执行",
+  complete: "完成",
+  sleep: "休息",
 };
 
-const IDLE_SPRITE_POSES = ["idle", "curious", "happy", "sleepy"];
-let spritePoseTickerBound = false;
-let spriteIdlePoseIndex = 0;
-let temporarySpritePose = "";
-let temporarySpritePoseTimer = 0;
+// TuanTuan visualizes the AFS Agent sequence: Observe → Suggest → Execute.
+const IDLE_AGENT_STATES = ["observe", "observe", "think", "observe", "sleep"];
+let spriteTickerBound = false;
+let idleStateIndex = 0;
+let temporaryState = "";
+let temporaryStateTimer = 0;
 
-export function spritePoseImages() {
-  return Object.entries(SPRITE_POSE_ASSETS).map(([pose, src]) => (
-    `  <img class="sprite-tuantuan-asset" data-pose="${pose}" src="${src}" alt="" draggable="false" />`
-  ));
+export function spriteStoryLayers() {
+  return [
+    '<span class="sprite-story-orbit" aria-hidden="true">',
+    '  <i data-orbit-node="observe"></i>',
+    '  <i data-orbit-node="suggest"></i>',
+    '  <i data-orbit-node="preview"></i>',
+    '  <i data-orbit-node="execute"></i>',
+    '  <i data-orbit-node="complete"></i>',
+    "</span>",
+    '<span class="sprite-preview-ghost" aria-hidden="true"></span>',
+    '<span class="sprite-suggestion-bubble" aria-hidden="true"><i></i><b></b><i></i></span>',
+    '<span class="sprite-complete-sparks" aria-hidden="true"><i></i><i></i><i></i></span>',
+    '<span class="sprite-sleep-mark" aria-hidden="true">zZ</span>',
+    '<span class="sprite-tuantuan-cat" aria-hidden="true">',
+    '  <span class="sprite-cat-tail"></span>',
+    '  <span class="sprite-cat-body"><i></i><i></i><i></i></span>',
+    '  <span class="sprite-cat-head">',
+    '    <span class="sprite-cat-ear left"></span>',
+    '    <span class="sprite-cat-ear right"></span>',
+    '    <span class="sprite-cat-sprout"><i></i><i></i></span>',
+    '    <span class="sprite-cat-eye left"></span>',
+    '    <span class="sprite-cat-eye right"></span>',
+    '    <span class="sprite-cat-muzzle"></span>',
+    "  </span>",
+    '  <span class="sprite-cat-paw left"></span>',
+    '  <span class="sprite-cat-paw right"></span>',
+    "</span>",
+    '<span class="sprite-tuantuan-shadow" aria-hidden="true"></span>',
+  ];
 }
 
 export function currentSpritePose(state = {}) {
-  if (temporarySpritePose) return temporarySpritePose;
-  if (state.sending) return "working";
-  if (state.settingsOpen) return "thinking";
-  if (state.open) return "curious";
-  return IDLE_SPRITE_POSES[spriteIdlePoseIndex] || "idle";
+  return currentSpriteState(state);
 }
 
-export function setSpritePose(button = document.querySelector(".afs-sprite-avatar"), pose = currentSpritePose()) {
+export function currentSpriteState(state = {}) {
+  if (temporaryState) return temporaryState;
+  if (state.sending) return "think";
+  if (state.settingsOpen) return "think";
+  if (state.open) return "suggest";
+  return IDLE_AGENT_STATES[idleStateIndex] || "observe";
+}
+
+export function setSpritePose(button = document.querySelector(".afs-sprite-avatar"), state = currentSpriteState()) {
   if (!button) return;
-  button.dataset.spritePose = SPRITE_POSE_ASSETS[pose] ? pose : "idle";
+  const nextState = SPRITE_AGENT_STATES[state] ? state : "observe";
+  button.dataset.spriteState = nextState;
+  button.dataset.spritePose = nextState;
 }
 
 export function applySpritePose(root = document.getElementById("sprite-root"), state = {}) {
-  setSpritePose(root?.querySelector(".afs-sprite-avatar"), currentSpritePose(state));
+  setSpritePose(root?.querySelector(".afs-sprite-avatar"), currentSpriteState(state));
 }
 
 export function bindSpritePoseTicker(getState, onTick) {
-  if (spritePoseTickerBound || typeof window === "undefined") return;
-  spritePoseTickerBound = true;
+  if (spriteTickerBound || typeof window === "undefined") return;
+  spriteTickerBound = true;
   window.setInterval(() => {
     const state = getState?.() || {};
-    if (state.open || state.settingsOpen || state.sending || temporarySpritePose) return;
+    if (state.open || state.settingsOpen || state.sending || temporaryState) return;
     const root = document.getElementById("sprite-root");
     if (root?.classList.contains("is-dragging")) return;
-    spriteIdlePoseIndex = (spriteIdlePoseIndex + 1) % IDLE_SPRITE_POSES.length;
+    idleStateIndex = (idleStateIndex + 1) % IDLE_AGENT_STATES.length;
     onTick?.();
-  }, 7200);
+  }, 9000);
 }
 
-export function setTemporarySpritePose(pose, duration = 1500, onExpire) {
-  if (!SPRITE_POSE_ASSETS[pose] || typeof window === "undefined") return;
-  temporarySpritePose = pose;
-  window.clearTimeout(temporarySpritePoseTimer);
-  temporarySpritePoseTimer = window.setTimeout(() => {
-    temporarySpritePose = "";
+export function setTemporarySpritePose(state, duration = 1500, onExpire) {
+  if (!SPRITE_AGENT_STATES[state] || typeof window === "undefined") return;
+  temporaryState = state;
+  window.clearTimeout(temporaryStateTimer);
+  temporaryStateTimer = window.setTimeout(() => {
+    temporaryState = "";
     onExpire?.();
   }, duration);
 }

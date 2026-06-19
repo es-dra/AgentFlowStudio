@@ -1,6 +1,6 @@
 let motionBound = false;
 let pointer = null;
-let mode = "idle";
+let mode = "observe";
 const motion = {
   lookX: 0,
   lookY: 0,
@@ -24,8 +24,8 @@ export function bindSpriteMotion(root = document.getElementById("sprite-root")) 
   window.requestAnimationFrame(tickSpriteMotion);
 }
 
-export function setSpriteMotionMode(nextMode = "idle", root = document.getElementById("sprite-root")) {
-  mode = nextMode || "idle";
+export function setSpriteMotionMode(nextMode = "observe", root = document.getElementById("sprite-root")) {
+  mode = nextMode || "observe";
   if (root) root.dataset.spriteMotion = mode;
 }
 
@@ -35,7 +35,7 @@ export function pulseSpriteMotion(kind = "success") {
   if (root) root.dataset.spriteMotion = mode;
   window.setTimeout(() => {
     const current = document.getElementById("sprite-root");
-    if (mode === "success" || mode === "error") setSpriteMotionMode("idle", current);
+    if (mode === "success" || mode === "error") setSpriteMotionMode("observe", current);
   }, 1300);
 }
 
@@ -82,15 +82,16 @@ function targetMotion(root, now) {
   const lookY = activePointer ? clamp(dy / 320, -1, 1) * (0.28 + attention * 0.5) : 0;
   const idleBob = Math.sin(now / 880) * 1.8;
   const drag = root.classList.contains("is-dragging") || mode === "drag";
-  const busy = mode === "working";
+  const thinking = mode === "think" || mode === "suggest";
+  const executing = mode === "execute";
   const success = mode === "success";
   const error = mode === "error";
   return {
     lookX,
     lookY,
-    lift: (attention * 4.5) + (drag ? 9 : 0) + (busy ? 4 : 0) + (success ? 7 : 0),
+    lift: (attention * 4.5) + (drag ? 9 : 0) + (thinking ? 3 : 0) + (executing ? 6 : 0) + (success ? 7 : 0),
     tilt: (lookX * (drag ? 9 : 4.5)) + (error ? Math.sin(now / 80) * 2.8 : 0),
-    bob: idleBob + (busy ? Math.sin(now / 170) * 2.4 : 0) + (success ? Math.sin(now / 110) * 4 : 0),
+    bob: idleBob + (thinking ? Math.sin(now / 230) * 1.5 : 0) + (executing ? Math.sin(now / 170) * 2.4 : 0) + (success ? Math.sin(now / 110) * 4 : 0),
     squashX: drag ? 1.035 : success ? 1.02 : 1,
     squashY: drag ? 0.975 : success ? 1.01 : 1,
   };

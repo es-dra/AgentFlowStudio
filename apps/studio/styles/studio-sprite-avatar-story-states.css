@@ -1,0 +1,133 @@
+.sprite-complete-sparks {
+  left: 38px;
+  top: 9px;
+}
+
+.sprite-complete-sparks i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7cff82;
+  box-shadow: 0 0 14px #7cff82;
+}
+
+.sprite-complete-sparks i:nth-child(2) { left: 26px; top: 13px; background: #00e5ff; }
+.sprite-complete-sparks i:nth-child(3) { left: 52px; top: 1px; background: #a8b6ff; }
+
+.sprite-sleep-mark {
+  right: 34px;
+  top: 3px;
+  color: #a8b6ff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.afs-sprite-avatar[data-sprite-state="observe"] .sprite-story-orbit { opacity: 0.36; animation-duration: 28s; }
+.afs-sprite-avatar[data-sprite-state="think"] .sprite-story-orbit { opacity: 0.54; animation-duration: 20s; }
+.afs-sprite-avatar[data-sprite-state="suggest"] .sprite-suggestion-bubble,
+.afs-sprite-avatar[data-sprite-state="preview"] .sprite-preview-ghost,
+.afs-sprite-avatar[data-sprite-state="complete"] .sprite-complete-sparks,
+.afs-sprite-avatar[data-sprite-state="sleep"] .sprite-sleep-mark { opacity: 1; }
+.afs-sprite-avatar[data-sprite-state="suggest"] [data-orbit-node="suggest"]::after,
+.afs-sprite-avatar[data-sprite-state="execute"] [data-orbit-node="execute"]::after,
+.afs-sprite-avatar[data-sprite-state="complete"] [data-orbit-node="complete"]::after { opacity: 1; }
+.afs-sprite-avatar[data-sprite-state="preview"] .sprite-story-orbit { border-style: dashed; opacity: 0.62; }
+.afs-sprite-avatar[data-sprite-state="execute"] .sprite-story-orbit,
+#sprite-root[data-sprite-motion="execute"] .sprite-story-orbit { animation-duration: 8s; opacity: 0.74; }
+.afs-sprite-avatar[data-sprite-state="complete"] .sprite-story-orbit,
+#sprite-root[data-sprite-motion="success"] .sprite-story-orbit { opacity: 0.82; }
+.afs-sprite-avatar[data-sprite-state="sleep"] .sprite-story-orbit { opacity: 0; }
+.afs-sprite-avatar[data-sprite-state="sleep"] .sprite-cat-eye { transform: scaleY(0.12); }
+
+.afs-sprite-avatar[data-sprite-character="story-cat"]:hover .sprite-story-orbit,
+.afs-sprite.open .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-story-orbit {
+  opacity: 0.62;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-drag-halo {
+  z-index: 1;
+  left: 7px;
+  right: -6px;
+  top: 70px;
+  bottom: 21px;
+  border-color: rgba(0, 229, 255, 0.22);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"]:hover .sprite-drag-halo,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-drag-halo {
+  opacity: 0.42;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-move-handle {
+  z-index: 8;
+  left: 75px;
+  top: 74px;
+  width: 38px;
+  height: 22px;
+  border-color: rgba(0, 229, 255, 0.18);
+  background: rgba(8, 18, 24, 0.6);
+  opacity: 0;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-move-handle::after {
+  content: "";
+  display: none;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"]:hover .sprite-move-handle,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-move-handle {
+  opacity: 1;
+}
+
+.sprite-agent-sequence {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 198px;
+  padding: 3px 9px;
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-radius: 999px;
+  color: rgba(213, 249, 255, 0.8);
+  background: rgba(5, 12, 17, 0.72);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"]:hover .sprite-agent-sequence,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-agent-sequence {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+
+.afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-label {
+  display: none;
+}
+
+@keyframes tuantuan-orbit {
+  0% { transform: rotate(-6deg); }
+  100% { transform: rotate(354deg); }
+}
+
+@keyframes tuantuan-tail {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-tuantuan-stage,
+  .sprite-story-orbit,
+  .sprite-cat-tail,
+  .sprite-agent-sequence {
+    animation: none;
+    transition: none;
+  }
+}

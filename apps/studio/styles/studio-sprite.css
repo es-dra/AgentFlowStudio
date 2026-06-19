@@ -4,8 +4,8 @@
 @import url("./studio-sprite-avatar-motion.css");
 @import url("./studio-sprite-avatar-redesign.css");
 @import url("./studio-sprite-avatar-personality.css");
-@import url("./studio-sprite-avatar-mascot.css");
-@import url("./studio-sprite-avatar-tuantuan.css");
+@import url("./studio-sprite-avatar-story-cat.css");
+@import url("./studio-sprite-avatar-story-states.css");
 
 #sprite-root {
   position: fixed;

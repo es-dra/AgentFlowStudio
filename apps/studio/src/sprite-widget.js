@@ -16,7 +16,7 @@ import {
   currentSpritePose,
   setSpritePose,
   setTemporarySpritePose,
-  spritePoseImages,
+  spriteStoryLayers,
 } from "./sprite-character.js";
 import {
   bindSpriteMotion,
@@ -32,7 +32,7 @@ let lastState = {};
 let lastRuntime = {};
 let suppressSpriteClick = false;
 const spriteMessages = [
-  { role: "sprite", text: "我在这里看着画布。可以问我下一步、素材确认或节点连线。" },
+  { role: "sprite", text: "我先观察画布。需要时，我会给出下一步建议。" },
 ];
 
 export function renderSpriteWidget(state, runtime) {
@@ -52,7 +52,7 @@ export function renderSpriteWidget(state, runtime) {
 
 function spriteShell(state, runtime) {
   const shell = el("section", `afs-sprite${spriteOpen ? " open" : ""}`);
-  shell.setAttribute("aria-label", "AFS 小精灵");
+  shell.setAttribute("aria-label", "团团画布 Agent");
   shell.appendChild(spriteOrb());
   if (spriteOpen) shell.appendChild(spritePanel(state, runtime));
   if (spriteSettingsOpen) shell.appendChild(spriteSettingsPanel());
@@ -62,28 +62,26 @@ function spriteShell(state, runtime) {
 function spriteOrb() {
   const button = el("button", "afs-sprite-orb afs-sprite-avatar");
   button.type = "button";
-  button.setAttribute("aria-label", "AFS 小精灵");
+  button.setAttribute("aria-label", "团团，AFS 画布 Agent");
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
   button.setAttribute("data-sprite-draggable", "true");
-  button.setAttribute("data-sprite-role", "movable-companion");
-  button.setAttribute("data-sprite-character", "mascot");
-  button.setAttribute("data-sprite-pose", currentSpritePose(spriteState()));
-  button.title = spriteOpen ? "拖动或方向键移动，右键设置，点击收起 AFS 小精灵" : "拖动或方向键移动，右键设置，点击打开 AFS 小精灵";
+  button.setAttribute("data-sprite-role", "embodied-agent");
+  button.setAttribute("data-sprite-character", "story-cat");
+  button.setAttribute("data-sprite-state", currentSpritePose(spriteState()));
+  button.title = spriteOpen ? "拖动或方向键移动，右键设置，点击收起团团" : "拖动或方向键移动，右键设置，点击查看团团的观察";
   button.innerHTML = [
     '<span class="sprite-tuantuan-stage" aria-hidden="true">',
-    ...spritePoseImages(),
+    ...spriteStoryLayers(),
     "</span>",
-    '<span class="sprite-mascot-shadow" aria-hidden="true"></span>',
     '<span class="sprite-drag-halo"></span>',
     '<span class="sprite-move-handle" data-sprite-drag-handle="true" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
-    '<span class="sprite-grab-ribbon" aria-hidden="true">按住移动</span>',
-    '<span class="sprite-mascot-tag" aria-hidden="true">团团</span>',
-    '<span class="sprite-label">AFS 小精灵</span>',
+    '<span class="sprite-agent-sequence" aria-hidden="true">观察 · 提案 · 执行</span>',
+    '<span class="sprite-label">团团</span>',
   ].join("");
   button.addEventListener("pointerdown", handleSpriteDrag);
   button.addEventListener("pointerenter", () => {
     if (!spriteOpen && !spriteSettingsOpen && !spriteSending) {
-      setSpritePose(button, "happy");
+      setSpritePose(button, "think");
       setSpriteMotionMode("hover");
     }
   });
@@ -115,7 +113,7 @@ function spriteOrb() {
 }
 
 function handleSpriteDrag(event) {
-  setSpritePose(event.currentTarget, "happy");
+  setSpritePose(event.currentTarget, "observe");
   setSpriteMotionMode("drag");
   startSpriteDrag(event, () => {
     suppressSpriteClick = true;
@@ -137,22 +135,22 @@ function spriteState() {
 }
 
 function spriteMotionMode() {
-  if (spriteSending) return "working";
-  if (spriteSettingsOpen) return "settings";
-  if (spriteOpen) return "panel";
-  return "idle";
+  if (spriteSending) return "think";
+  if (spriteSettingsOpen) return "think";
+  if (spriteOpen) return "suggest";
+  return "observe";
 }
 
 function spritePanel(state, runtime) {
   const panel = el("div", "afs-sprite-panel");
   const head = el("div", "afs-sprite-head");
-  head.title = "拖动移动 AFS 小精灵";
+  head.title = "拖动移动团团";
   head.setAttribute("data-sprite-drag-handle", "true");
   head.innerHTML = [
     icon("sparkles", 14),
     "<span>",
-    "<strong>AFS 小精灵</strong>",
-    "<small>陪跑中</small>",
+    "<strong>团团</strong>",
+    "<small>观察 · 提案 · 执行</small>",
     "</span>",
     '<span class="afs-sprite-grip" aria-hidden="true"><i></i><i></i><i></i></span>',
   ].join("");
@@ -171,7 +169,7 @@ function spritePanel(state, runtime) {
 function spriteSettingsPanel() {
   const panel = el("div", "afs-sprite-settings");
   panel.setAttribute("data-sprite-settings", "true");
-  panel.innerHTML = "<h3>小精灵设置</h3><p>调整陪跑角色大小。位置可以直接拖动保存。</p>";
+  panel.innerHTML = "<h3>团团设置</h3><p>调整画布 Agent 的尺寸。团团会保持低干扰，位置可以直接拖动保存。</p>";
   const grid = el("div", "afs-sprite-size-grid");
   const current = getSpriteScale().id;
   for (const option of SPRITE_SCALE_OPTIONS) {
@@ -192,7 +190,7 @@ function spriteForm(state, runtime) {
   const input = document.createElement("input");
   input.type = "text";
   input.value = draftMessage;
-  input.placeholder = "问问下一步怎么做...";
+  input.placeholder = "把想法放这里，团团先观察上下文...";
   input.maxLength = 180;
   input.addEventListener("input", () => {
     draftMessage = input.value;
@@ -225,11 +223,11 @@ async function submitSpriteMessage(state, runtime, rawText) {
     });
     spriteMessages.push({ role: "sprite", text: safeReply(response?.reply) });
     pulseSpriteMotion("success");
-    setTemporarySpritePose("celebrate", 1500, () => renderSpriteWidget(lastState, lastRuntime));
+    setTemporarySpritePose("suggest", 1500, () => renderSpriteWidget(lastState, lastRuntime));
   } catch {
-    spriteMessages.push({ role: "sprite", text: "我暂时连不上工作台服务。你仍可以先检查当前节点的参考图和已确认素材。" });
+    spriteMessages.push({ role: "sprite", text: "我暂时连不上工作台服务。可以先继续整理画布，我会保持观察。" });
     pulseSpriteMotion("error");
-    setTemporarySpritePose("surprised", 1800, () => renderSpriteWidget(lastState, lastRuntime));
+    setTemporarySpritePose("observe", 1800, () => renderSpriteWidget(lastState, lastRuntime));
   } finally {
     spriteSending = false;
     renderSpriteWidget(state, runtime);
@@ -254,5 +252,5 @@ function canvasSummary(state) {
 
 function safeReply(value) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
-  return text.slice(0, 220) || "我先在这里陪跑。可以从当前节点的下一步动作开始。";
+  return text.slice(0, 220) || "我先观察当前画布，再给出一个不打断创作的建议。";
 }

@@ -14,20 +14,15 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     styles = (STUDIO_ROOT / "styles" / "studio-sprite.css").read_text(encoding="utf-8")
     avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
-    avatar_mascot_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-mascot.css").read_text(encoding="utf-8")
-    avatar_tuantuan_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-tuantuan.css").read_text(encoding="utf-8")
-    sprite_styles = styles + avatar_styles + avatar_motion_styles + avatar_mascot_styles + avatar_tuantuan_styles
-    pose_assets = {
-        "idle": STUDIO_ROOT / "assets" / "tuantuan-idle.png",
-        "happy": STUDIO_ROOT / "assets" / "tuantuan-happy.png",
-        "curious": STUDIO_ROOT / "assets" / "tuantuan-curious.png",
-        "thinking": STUDIO_ROOT / "assets" / "tuantuan-thinking.png",
-        "surprised": STUDIO_ROOT / "assets" / "tuantuan-surprised.png",
-        "sleepy": STUDIO_ROOT / "assets" / "tuantuan-sleepy.png",
-        "working": STUDIO_ROOT / "assets" / "tuantuan-working.png",
-        "celebrate": STUDIO_ROOT / "assets" / "tuantuan-celebrate.png",
-    }
-    mascot_asset = STUDIO_ROOT / "assets" / "tuantuan-mascot.png"
+    avatar_story_cat_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-story-cat.css").read_text(encoding="utf-8")
+    avatar_story_state_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-story-states.css").read_text(encoding="utf-8")
+    sprite_styles = (
+        styles
+        + avatar_styles
+        + avatar_motion_styles
+        + avatar_story_cat_styles
+        + avatar_story_state_styles
+    )
 
     assert '<div id="sprite-root"></div>' in index
     assert './styles/studio-sprite.css' in index
@@ -35,41 +30,26 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "renderSpriteWidget" in main
     assert "spriteChat(payload)" in runtime_client
     assert "/sprite/chat" in runtime_client
-    for asset in pose_assets.values():
-        assert asset.exists(), asset
-        assert asset.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
-        assert asset.stat().st_size > 100_000
-    assert mascot_asset.exists()
-    assert mascot_asset.read_bytes() == pose_assets["idle"].read_bytes()
+
     assert "afs-sprite" in sprite
     assert 'from "./sprite-position.js"' in sprite
     assert 'from "./sprite-character.js"' in sprite
     assert 'from "./sprite-motion.js"' in sprite
-    assert "AFS 小精灵" in sprite
+    assert "团团" in sprite
+    assert "观察 · 提案 · 执行" in sprite
     assert "data-sprite-draggable" in sprite
-    assert 'data-sprite-role", "movable-companion"' in sprite
-    assert 'data-sprite-character", "mascot"' in sprite
+    assert 'data-sprite-role", "embodied-agent"' in sprite
+    assert 'data-sprite-character", "story-cat"' in sprite
     assert "bindSpriteMotion" in sprite
     assert "setSpriteMotionMode" in sprite
     assert "pulseSpriteMotion" in sprite
     assert "bindSpritePoseTicker" in sprite
     assert "currentSpritePose" in sprite
     assert "setTemporarySpritePose" in sprite
-    assert "data-sprite-pose" in sprite
-    assert "sprite-tuantuan-stage" in sprite
-    assert "sprite-tuantuan-asset" in character
-    assert "spritePoseImages()" in sprite
-    for pose in pose_assets:
-        assert f"./assets/tuantuan-{pose}.png" in character
-    assert 'data-pose="${pose}"' in character
-    assert "Object.entries(SPRITE_POSE_ASSETS)" in character
-    assert "IDLE_SPRITE_POSES" in character
-    assert "spriteIdlePoseIndex" in character
-    assert "draggable=\"false\"" in character
+    assert "data-sprite-state" in sprite
+    assert "spriteStoryLayers()" in sprite
     assert "sprite-move-handle" in sprite
-    assert "sprite-grab-ribbon" in sprite
-    assert "sprite-mascot-tag" in sprite
-    assert "团团" in sprite
+    assert "sprite-agent-sequence" in sprite
     assert "runtime.spriteChat" in sprite
     assert "data-sprite-drag-handle" in sprite
     assert 'data-sprite-drag-handle="true"' in sprite
@@ -85,8 +65,26 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "handleSpriteDrag" in sprite
     assert "__afsStudio" not in sprite
     assert "provider raw" not in sprite
+    assert "mascot" not in sprite
+    assert "desktop pet" not in sprite
     assert len(sprite.splitlines()) <= 300
+
+    assert "SPRITE_AGENT_STATES" in character
+    assert "Observe → Suggest → Execute" in character
+    assert "spriteStoryLayers" in character
+    assert "sprite-story-orbit" in character
+    assert "sprite-tuantuan-cat" in character
+    assert "sprite-cat-body" in character
+    assert "sprite-cat-eye" in character
+    assert "sprite-cat-tail" in character
+    assert "sprite-suggestion-bubble" in character
+    assert "SPRITE_POSE_ASSETS" not in character
+    assert "Object.entries(SPRITE_POSE_ASSETS)" not in character
+    assert "sprite-tuantuan-asset" not in character
+    for state in ["observe", "think", "suggest", "preview", "execute", "complete", "sleep"]:
+        assert state in character
     assert len(character.splitlines()) <= 300
+
     assert len(motion.splitlines()) <= 300
     assert "requestAnimationFrame" in motion
     assert "pointermove" in motion
@@ -118,8 +116,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
 
     assert '@import url("./studio-sprite-avatar.css");' in styles
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
-    assert '@import url("./studio-sprite-avatar-mascot.css");' in styles
-    assert '@import url("./studio-sprite-avatar-tuantuan.css");' in styles
+    assert '@import url("./studio-sprite-avatar-story-cat.css");' in styles
+    assert '@import url("./studio-sprite-avatar-story-states.css");' in styles
+    assert "studio-sprite-avatar-tuantuan.css" not in styles
     assert "width: calc(190px * var(--sprite-scale, 1))" in styles
     assert "height: calc(238px * var(--sprite-scale, 1))" in styles
     assert "position: fixed" in styles
@@ -130,26 +129,31 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".afs-sprite-size-button" in sprite_styles
     assert "--sprite-scale" in sprite_styles
     assert ".afs-sprite-avatar" in sprite_styles
-    assert ".sprite-tuantuan-stage" in sprite_styles
-    assert ".sprite-tuantuan-asset" in sprite_styles
+    assert ".sprite-story-orbit" in sprite_styles
+    assert ".sprite-tuantuan-cat" in sprite_styles
+    assert ".sprite-cat-body" in sprite_styles
+    assert ".sprite-cat-eye" in sprite_styles
+    assert ".sprite-suggestion-bubble" in sprite_styles
     assert ".sprite-move-handle" in sprite_styles
     assert ".sprite-move-handle::after" in sprite_styles
     assert ".sprite-drag-halo" in sprite_styles
-    assert ".sprite-grab-ribbon" in sprite_styles
-    assert ".sprite-mascot-tag" in sprite_styles
-    assert ".sprite-mascot-shadow" in sprite_styles
-    assert "Multi-pose raster TuanTuan mascot skin" in avatar_mascot_styles
-    assert "CSS reconstruction" in avatar_mascot_styles
-    assert "TuanTuan reference asset layer" in avatar_tuantuan_styles
-    assert '[data-sprite-pose="idle"]' in avatar_mascot_styles
-    assert '[data-sprite-pose="working"]' in avatar_mascot_styles
-    assert '[data-sprite-pose="celebrate"]' in avatar_mascot_styles
-    assert "--sprite-shift-x" in avatar_mascot_styles
-    assert "--sprite-shift-y" in avatar_mascot_styles
-    assert "--sprite-tilt-deg" in avatar_mascot_styles
-    assert "--sprite-shadow-scale" in avatar_mascot_styles
-    assert "translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)" in avatar_mascot_styles
-    assert '[data-sprite-motion="working"]' in avatar_mascot_styles
-    assert '[data-sprite-motion="success"]' in avatar_mascot_styles
-    assert 'content: ""' in avatar_mascot_styles
+    assert ".sprite-agent-sequence" in sprite_styles
+    assert ".sprite-tuantuan-shadow" in sprite_styles
+    assert "TuanTuan story-cat agent projection" in avatar_story_cat_styles
+    assert "Observe > Suggest > Execute" in avatar_story_cat_styles
+    assert '[data-sprite-state="observe"]' in sprite_styles
+    assert '[data-sprite-state="suggest"]' in sprite_styles
+    assert '[data-sprite-state="execute"]' in sprite_styles
+    assert '[data-sprite-state="complete"]' in sprite_styles
+    assert '[data-sprite-state="sleep"]' in sprite_styles
+    assert "--sprite-shift-x" in avatar_story_cat_styles
+    assert "--sprite-shift-y" in avatar_story_cat_styles
+    assert "--sprite-tilt-deg" in avatar_story_cat_styles
+    assert "--sprite-shadow-scale" in avatar_story_cat_styles
+    assert "translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)" in avatar_story_cat_styles
+    assert "@keyframes tuantuan-orbit" in sprite_styles
+    assert '[data-sprite-motion="execute"]' in sprite_styles
+    assert '[data-sprite-motion="success"]' in sprite_styles
+    assert "mascot skin" not in sprite_styles
+    assert 'content: ""' in sprite_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles
