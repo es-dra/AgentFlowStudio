@@ -14,7 +14,15 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     avatar_character_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-character.css").read_text(encoding="utf-8")
     avatar_parts_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-parts.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
-    sprite_styles = styles + avatar_styles + avatar_character_styles + avatar_parts_styles + avatar_motion_styles
+    avatar_redesign_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-redesign.css").read_text(encoding="utf-8")
+    sprite_styles = (
+        styles
+        + avatar_styles
+        + avatar_character_styles
+        + avatar_parts_styles
+        + avatar_motion_styles
+        + avatar_redesign_styles
+    )
 
     assert '<div id="sprite-root"></div>' in index
     assert './styles/studio-sprite.css' in index
@@ -61,6 +69,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-character.css");' in styles
     assert '@import url("./studio-sprite-avatar-parts.css");' in styles
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
+    assert '@import url("./studio-sprite-avatar-redesign.css");' in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles
@@ -104,4 +113,5 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite
     assert ".afs-sprite.open .sprite-status-light" in sprite_styles
+    assert 'content: "拖动我"' in sprite_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles

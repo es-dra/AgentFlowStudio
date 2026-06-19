@@ -1,0 +1,271 @@
+﻿.afs-sprite-avatar {
+  left: 0;
+  top: 0;
+  width: 180px;
+  height: 206px;
+  border-radius: 70px 70px 58px 58px;
+}
+.afs-sprite-avatar::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 31px;
+  top: 29px;
+  width: 118px;
+  height: 146px;
+  border-radius: 60px 60px 48px 48px;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(255, 255, 255, 0.48), transparent 31%),
+    linear-gradient(180deg, rgba(95, 222, 255, 0.3), rgba(12, 21, 28, 0.58) 56%, rgba(255, 197, 91, 0.2));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -24px 34px rgba(0, 8, 14, 0.38),
+    0 24px 54px rgba(0, 0, 0, 0.4);
+}
+.sprite-dock-ring {
+  inset: 15px 13px 12px;
+  border-radius: 70px 70px 58px 58px;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(128, 234, 255, 0.24), transparent 33%),
+    radial-gradient(circle at 50% 95%, rgba(255, 203, 105, 0.18), transparent 44%),
+    rgba(8, 13, 18, 0.22);
+}
+.sprite-drag-halo {
+  inset: 24px 24px 21px;
+  border-radius: 58px 58px 48px 48px;
+}
+.sprite-aura {
+  left: 30px;
+  top: 24px;
+  width: 120px;
+  height: 138px;
+  border-radius: 62px;
+  opacity: 0.72;
+}
+.sprite-character-shell {
+  left: 29px;
+  top: 25px;
+  width: 122px;
+  height: 152px;
+  border-radius: 58px 58px 43px 43px;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255, 255, 255, 0.42), transparent 32%),
+    linear-gradient(180deg, rgba(178, 245, 255, 0.36), rgba(24, 42, 53, 0.9) 61%, rgba(12, 18, 23, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -26px 36px rgba(0, 7, 12, 0.46),
+    0 0 0 1px rgba(126, 227, 255, 0.26),
+    0 30px 58px rgba(0, 0, 0, 0.42);
+}
+.sprite-hood {
+  left: 50px;
+  top: 30px;
+  width: 80px;
+  height: 58px;
+  border-radius: 40px 40px 21px 21px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(133, 232, 255, 0.16) 50%, rgba(12, 20, 27, 0.08)),
+    radial-gradient(circle at 50% 4px, rgba(255, 255, 255, 0.5), transparent 56%);
+}
+.sprite-ear {
+  top: 56px;
+  width: 35px;
+  height: 48px;
+  border-color: rgba(124, 226, 255, 0.4);
+  background:
+    linear-gradient(180deg, rgba(175, 240, 255, 0.25), rgba(31, 47, 57, 0.86)),
+    rgba(10, 16, 21, 0.86);
+}
+.sprite-ear.left {
+  left: 12px;
+  transform: rotate(-28deg);
+}
+.sprite-ear.right {
+  right: 12px;
+  transform: rotate(28deg);
+}
+.sprite-wing {
+  top: 78px;
+  width: 42px;
+  height: 52px;
+  border-color: rgba(110, 211, 255, 0.34);
+  background: linear-gradient(180deg, rgba(98, 211, 255, 0.24), rgba(13, 22, 30, 0.78));
+}
+.sprite-wing.left { left: 13px; }
+.sprite-wing.right { right: 13px; }
+.sprite-backplate {
+  left: 39px;
+  top: 44px;
+  width: 102px;
+  height: 123px;
+  border-radius: 48px 48px 36px 36px;
+}
+.sprite-body {
+  left: 44px;
+  top: 36px;
+  width: 92px;
+  height: 126px;
+  padding-top: 25px;
+  border-radius: 45px 45px 34px 34px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(153, 235, 255, 0.92) 36%, rgba(39, 56, 66, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.74),
+    inset 0 -20px 28px rgba(0, 9, 18, 0.36),
+    0 0 0 1px rgba(174, 238, 255, 0.36),
+    0 24px 38px rgba(0, 0, 0, 0.36);
+}
+.sprite-cockpit {
+  left: 11px;
+  top: 11px;
+  width: 70px;
+  height: 49px;
+}
+.sprite-head-shell {
+  left: 13px;
+  top: 22px;
+  width: 66px;
+  height: 41px;
+}
+.sprite-face {
+  width: 68px;
+  height: 40px;
+}
+.sprite-visor {
+  width: 58px;
+  height: 24px;
+  box-shadow:
+    inset 0 0 0 1px rgba(116, 225, 255, 0.32),
+    0 0 18px rgba(80, 220, 255, 0.26);
+}
+.sprite-visor i {
+  width: 7px;
+  height: 8px;
+}
+.sprite-cheek {
+  bottom: 1px;
+  width: 8px;
+  height: 5px;
+}
+.sprite-mouth {
+  bottom: 2px;
+  width: 14px;
+  height: 5px;
+}
+.sprite-core {
+  width: 21px;
+  height: 21px;
+}
+.sprite-torso-panel {
+  width: 44px;
+  height: 20px;
+}
+.sprite-badge {
+  padding: 2px 7px;
+  font-size: 8px;
+}
+.sprite-status-light {
+  width: 11px;
+  height: 11px;
+}
+.sprite-move-handle {
+  left: 66px;
+  top: 8px;
+  width: 48px;
+  height: 25px;
+  border-radius: 999px;
+  opacity: 1;
+}
+.sprite-move-handle::after {
+  content: "拖动我";
+  top: 30px;
+  opacity: 0.82;
+  transform: translateX(-50%);
+}
+.sprite-drag-chip {
+  left: 67px;
+  top: 36px;
+  width: 46px;
+  height: 14px;
+  opacity: 0.86;
+}
+.sprite-antenna {
+  top: 2px;
+  left: 84px;
+}
+.sprite-shoulder {
+  top: 103px;
+  width: 27px;
+  height: 20px;
+}
+.sprite-shoulder.left { left: 34px; }
+.sprite-shoulder.right { right: 34px; }
+.sprite-arm {
+  top: 113px;
+  width: 42px;
+  height: 13px;
+}
+.sprite-arm.left {
+  left: 19px;
+  transform: rotate(-23deg);
+}
+.sprite-arm.right {
+  right: 19px;
+  transform: rotate(23deg);
+}
+.sprite-hand,
+.sprite-mitten {
+  width: 18px;
+  height: 18px;
+}
+.sprite-mitten.left { left: -10px; }
+.sprite-mitten.right { right: -10px; }
+.sprite-scarf {
+  left: 54px;
+  top: 132px;
+  width: 72px;
+  height: 16px;
+}
+.sprite-nameplate {
+  left: 60px;
+  top: 152px;
+  width: 60px;
+  height: 15px;
+}
+.sprite-foot {
+  bottom: 33px;
+  width: 25px;
+  height: 13px;
+}
+.sprite-foot.left { left: 62px; }
+.sprite-foot.right { right: 62px; }
+.sprite-tail-fin {
+  left: 59px;
+  top: 132px;
+  width: 62px;
+  height: 40px;
+}
+.sprite-thruster {
+  left: 77px;
+  bottom: 22px;
+  width: 27px;
+  height: 29px;
+}
+.sprite-glow-trail {
+  left: 62px;
+  bottom: 11px;
+  width: 58px;
+}
+.sprite-shadow {
+  left: 42px;
+  bottom: 4px;
+  width: 96px;
+  height: 20px;
+}
+.sprite-label {
+  right: 181px;
+  top: 84px;
+}
+#sprite-root[data-dock="left"] .sprite-label {
+  left: 181px;
+}

@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite companion redesign addendum: 2026-06-19 pass reworked the
+movable `AFS 小精灵` visual layer from a subtle component cluster into a more
+recognizable Studio companion. The avatar footprint was expanded to 180 x 206,
+with a stronger silhouette, visible drag handle, clearer eyes/visor, arms,
+feet, scarf, status light, and docking label. Position clamping now uses the
+larger character bounds while preserving viewport-only local persistence and
+the existing Runtime `sprite/chat` boundary. Verification: sprite/Studio
+focused regression passed 16 / 1 existing warning; `npm run check:studio-js`
+passed for 88 files; browser QA on `127.0.0.1:8797/studio/` confirmed role
+parts rendered, cursor=grab, drag moved the sprite from `(628, 228)` to
+`(558, 191)`, opening the panel kept the same position, panel docked below in
+the top half of the viewport, and console warn/error count was 0; maintenance
+audit failed=0 with warnings only and the new CSS file stayed under the
+maintenance line threshold; `git diff --check` passed. Boundary: no provider
+gate changed, no provider call, no provider raw response, signed URL, local
+media bytes, or secret exposure; not human acceptance or business validation.
+
 Current Studio state module split addendum: 2026-06-19 pass split
 `apps/api/runtime_studio_state.py` from a route plus sanitizer file into a thin
 route module and focused safe-state helpers:

@@ -2,9 +2,9 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-export const SPRITE_SIZE = 156;
+export const SPRITE_SIZE = 180;
 const SPRITE_MARGIN = 18;
-const SPRITE_HEIGHT = 176;
+const SPRITE_HEIGHT = 206;
 
 export function startSpriteDrag(event, onMoved) {
   if (event.button !== undefined && event.button !== 0) return;

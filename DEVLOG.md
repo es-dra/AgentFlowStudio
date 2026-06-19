@@ -2561,6 +2561,30 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
 
+## 2026-06-19 - Sprite Companion Redesign Pass
+
+- Reworked the movable `AFS 小精灵` visual layer into a clearer Studio companion with a stronger full-body silhouette.
+- Expanded the avatar footprint to 180 x 206 and adjusted viewport clamping so drag/panel docking still uses the correct bounds.
+- Added a focused redesign CSS layer for the larger silhouette, visible drag handle, eyes/visor, arms, feet, scarf, status light, and docking label.
+- Kept the existing Runtime `sprite/chat` interface unchanged; this pass only changes the front-end companion appearance and movement affordance.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py + tests/test_web_studio_static.py + tests/test_api_runtime_sprite.py: 16 passed, 1 existing Starlette/httpx warning
+npm run check:studio-js: passed for 88 files
+Browser on http://127.0.0.1:8797/studio/: character parts rendered, cursor=grab, drag moved position, panel open kept position stable, console warn/error count 0
+tools/maintenance_audit.py: failed=0 with warnings only; new redesign CSS stayed under the maintenance threshold
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is runtime/browser verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Asset Card Draft Module Split
 
 - Split visual-inspection provider dispatch, provider observation projection, draft prompt summarization, and vision provider constraints out of `apps/api/runtime_asset_card_drafts.py`.
