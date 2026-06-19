@@ -2530,6 +2530,32 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
 
+## 2026-06-19 - Internal Beta Preflight Split
+
+- Split HTTP preflight readiness logic out of `tools/afs_internal_beta_acceptance.py` into `tools/afs_internal_beta_acceptance_preflight.py`.
+- Moved `AcceptanceConfigurationError` into `tools/afs_internal_beta_acceptance_errors.py` so the CLI runner and preflight module share the same safe configuration error type without circular imports.
+- Kept `tools.afs_internal_beta_acceptance.run_http_preflight` as a thin compatibility wrapper, preserving existing imports and HTTP client monkeypatch behavior.
+- Added a structural regression test to keep preflight report construction and safe health projection out of the runner.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance.py: 9 passed / 1 existing Starlette/httpx warning
+tests/test_afs_internal_beta_acceptance.py + tests/test_afs_internal_beta_preflight_three_end.py + tests/test_afs_three_end_status.py: 16 passed / 1 existing warning
+tools/afs_internal_beta_acceptance.py --help: passed and still exposes preflight/three-end flags
+tools/afs_internal_beta_acceptance.py --preflight-only: safe configuration_error when base URL is missing
+pytest -q: 531 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count dropped from 40 to 39
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No invite code, session token, base URL, local path, signed URL, provider raw response, or media byte was added to reports.
+- This is runtime/readiness verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Sprite Companion Character Pass
 
 - Strengthened the decorative `AFS 小精灵` into a clearer movable Studio companion rather than a button-like helper.

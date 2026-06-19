@@ -1,0 +1,176 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from tools.afs_internal_beta_acceptance_client import HttpAcceptanceClient
+from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
+from tools.afs_internal_beta_preflight_three_end import collect_three_end_status, safe_three_end_status
+
+
+def run_http_preflight(
+    *,
+    base_url: str,
+    report_path: Path | None = None,
+    include_three_end_status: bool = False,
+    three_end_repo_root: Path | None = None,
+    three_end_server: str = "",
+    http_client_factory: Callable[[str], Any] | None = None,
+) -> dict[str, Any]:
+    if not base_url.strip():
+        raise AcceptanceConfigurationError("HTTP preflight requires a Runtime base URL.")
+    factory = http_client_factory or HttpAcceptanceClient
+    client = factory(base_url.strip())
+    try:
+        three_end_status = None
+        if include_three_end_status:
+            three_end_status = collect_three_end_status(
+                repo_root=three_end_repo_root or Path("."),
+                server=three_end_server,
+            )
+        report = _build_http_preflight_report(client, three_end_status=three_end_status)
+    finally:
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return report
+
+
+def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | None = None) -> dict[str, Any]:
+    checks: list[dict[str, Any]] = []
+    health_status = 0
+    health: dict[str, Any] = {}
+    auth_status = 0
+    auth_payload: dict[str, Any] = {}
+    try:
+        health_response = client.get("/health")
+        health_status = int(getattr(health_response, "status_code", 0))
+        health = _safe_json_object(health_response)
+    except Exception as exc:  # pragma: no cover - exercised by deployed smoke more than unit tests.
+        _add_preflight_check(checks, "runtime_health", "failed", {"http_status": 0, "error_class": exc.__class__.__name__})
+    else:
+        _add_preflight_check(
+            checks,
+            "runtime_health",
+            "passed" if health_status == 200 and health.get("status") == "ready" else "failed",
+            {
+                "http_status": health_status,
+                "runtime_status": health.get("status"),
+                "runtime_root_persisted": bool(health.get("runtime_root_persisted")),
+            },
+        )
+    try:
+        auth_response = client.get("/auth/status")
+        auth_status = int(getattr(auth_response, "status_code", 0))
+        auth_payload = _safe_json_object(auth_response)
+    except Exception as exc:  # pragma: no cover - exercised by deployed smoke more than unit tests.
+        _add_preflight_check(checks, "auth_surface", "failed", {"http_status": 0, "error_class": exc.__class__.__name__})
+    else:
+        _add_preflight_check(
+            checks,
+            "auth_surface",
+            "passed" if auth_status == 200 and auth_payload.get("auth_required") is True else "failed",
+            {
+                "http_status": auth_status,
+                "auth_required": auth_payload.get("auth_required"),
+                "invite_registration_available": auth_payload.get("invite_registration_available"),
+            },
+        )
+    studio_static = health.get("studio_static") if isinstance(health, dict) else {}
+    _add_preflight_check(
+        checks,
+        "studio_static",
+        "passed" if isinstance(studio_static, dict) and studio_static.get("status") == "ready" else "failed",
+        _safe_studio_static(studio_static),
+    )
+    provider_gates = _safe_provider_gates(health.get("provider_gates") if isinstance(health, dict) else {})
+    _add_preflight_check(
+        checks,
+        "provider_gate_projection",
+        "passed" if "video" in provider_gates else "failed",
+        {"provider_gates": provider_gates, "provider_calls_started": False},
+    )
+    safe_three_end = safe_three_end_status(three_end_status) if three_end_status is not None else None
+    if safe_three_end is not None:
+        summary = safe_three_end.get("summary", {})
+        _add_preflight_check(
+            checks,
+            "three_end_status",
+            "passed" if safe_three_end.get("status") == "aligned" else "failed",
+            {
+                "status": str(safe_three_end.get("status") or ""),
+                "checked_end_count": int(summary.get("checked_end_count") or 0),
+                "aligned_end_count": int(summary.get("aligned_end_count") or 0),
+                "dirty_end_count": int(summary.get("dirty_end_count") or 0),
+                "runtime_status": str(summary.get("runtime_status") or ""),
+            },
+        )
+    failed_count = sum(1 for item in checks if item["status"] == "failed")
+    passed_count = sum(1 for item in checks if item["status"] == "passed")
+    report = {
+        "artifact_type": "afs_internal_beta_acceptance_preflight_report",
+        "schema_version": "0.1.0",
+        "mode": "deployed_http_preflight",
+        "status": "ready_for_http_acceptance" if failed_count == 0 else "needs_attention",
+        "provider_calls_started": False,
+        "requires_invite_codes": bool(auth_payload.get("invite_registration_available") or health.get("auth_required")),
+        "human_acceptance_claim": "not_claimed",
+        "business_validation_claim": "not_claimed",
+        "writes_company_kb": False,
+        "writes_long_term_memory": False,
+        "summary": {"passed_check_count": passed_count, "failed_check_count": failed_count},
+        "safe_health": _safe_health(health),
+        "checks": checks,
+    }
+    if safe_three_end is not None:
+        report["three_end_status"] = safe_three_end
+    return report
+
+
+def _add_preflight_check(checks: list[dict[str, Any]], check_id: str, status: str, evidence: dict[str, Any]) -> None:
+    checks.append({"check_id": check_id, "status": status, "provider_calls_started": False, "evidence": evidence})
+
+
+def _safe_json_object(response) -> dict[str, Any]:
+    try:
+        value = response.json()
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _safe_health(health: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "service": str(health.get("service") or ""),
+        "status": str(health.get("status") or ""),
+        "service_version": str(health.get("service_version") or ""),
+        "schema_version": str(health.get("schema_version") or ""),
+        "runtime_root_persisted": bool(health.get("runtime_root_persisted")),
+        "auth_required": bool(health.get("auth_required")),
+        "studio_static": _safe_studio_static(health.get("studio_static")),
+        "provider_gates": _safe_provider_gates(health.get("provider_gates")),
+    }
+
+
+def _safe_studio_static(value: Any) -> dict[str, bool | str]:
+    if not isinstance(value, dict):
+        value = {}
+    return {
+        "mounted": bool(value.get("mounted")),
+        "root_exists": bool(value.get("root_exists")),
+        "index_exists": bool(value.get("index_exists")),
+        "entry_js_exists": bool(value.get("entry_js_exists")),
+        "status": str(value.get("status") or "missing"),
+    }
+
+
+def _safe_provider_gates(value: Any) -> dict[str, bool]:
+    if not isinstance(value, dict):
+        return {}
+    allowed = {"llm", "image", "video", "vision", "asr", "external_download"}
+    return {str(key): bool(val) for key, val in value.items() if str(key) in allowed}

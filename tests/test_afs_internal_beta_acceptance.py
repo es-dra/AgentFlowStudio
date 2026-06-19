@@ -231,3 +231,21 @@ def test_http_acceptance_client_bypasses_system_proxy(monkeypatch) -> None:
 
     assert captured["trust_env"] is False
     assert captured["follow_redirects"] is True
+
+
+def test_acceptance_runner_keeps_preflight_logic_split() -> None:
+    runner = Path("tools/afs_internal_beta_acceptance.py").read_text(encoding="utf-8")
+    preflight = Path("tools/afs_internal_beta_acceptance_preflight.py").read_text(encoding="utf-8")
+    errors = Path("tools/afs_internal_beta_acceptance_errors.py").read_text(encoding="utf-8")
+
+    assert "from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError" in runner
+    assert "from tools.afs_internal_beta_acceptance_preflight import run_http_preflight as _run_http_preflight" in runner
+    assert "def _build_http_preflight_report" not in runner
+    assert "def _safe_health" not in runner
+    assert "def run_http_preflight" in runner
+    assert "def _build_http_preflight_report" in preflight
+    assert "safe_three_end_status" in preflight
+    assert "class AcceptanceConfigurationError" in errors
+    assert len(runner.splitlines()) <= 220
+    assert len(preflight.splitlines()) <= 220
+    assert len(errors.splitlines()) <= 80

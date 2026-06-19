@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current internal beta acceptance split addendum: 2026-06-19 pass split HTTP
+preflight readiness logic out of `tools/afs_internal_beta_acceptance.py` into
+`tools/afs_internal_beta_acceptance_preflight.py`, and moved the shared
+configuration error into `tools/afs_internal_beta_acceptance_errors.py`. The
+runner now remains a thin CLI/in-process/HTTP acceptance wrapper while
+continuing to export `run_http_preflight` for existing callers. The preflight
+contract still reports Runtime `/health`, `/auth/status`, Studio static
+readiness, provider gate projection, and optional safe three-end status without
+requiring invite codes or starting provider calls. Verification: red/green
+split test added; internal beta plus three-end focused regression passed 16 /
+1 existing warning; full pytest passed 531 / 527 deselected / 2 existing
+warnings; maintenance audit failed=0 with warnings only and oversized warning
+count dropped from 40 to 39; `git diff --check` passed. Boundary: no provider
+gate changed, no provider call, no invite code/session token/base URL/local
+path/signed URL/provider raw/media byte added to reports; not human acceptance
+or business validation.
+
 Current sprite companion design addendum: 2026-06-19 pass strengthened the
 decorative `AFS 小精灵` from a floating helper into a clearer movable companion.
 The avatar now declares `data-sprite-role="movable-companion"` and adds a hood,
