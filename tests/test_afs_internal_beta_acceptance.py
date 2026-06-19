@@ -59,37 +59,6 @@ def test_internal_beta_acceptance_contract_keeps_report_safe(tmp_path: Path, mon
     assert "signed_url" not in serialized
 
 
-def test_internal_beta_acceptance_report_has_review_packet_without_acceptance_claim(tmp_path: Path) -> None:
-    report = run_inprocess_acceptance(runtime_root=tmp_path)
-
-    packet = report["human_review_packet"]
-    sections = {item["section_id"]: item for item in packet["required_sections"]}
-
-    assert packet["schema_version"] == "0.1.0"
-    assert packet["status"] == "pending_human_review"
-    assert packet["reviewer_role"] == "internal_beta_operator"
-    assert packet["score_scale"] == {"min": 1, "max": 5, "pass_threshold": 4}
-    assert packet["acceptance_claim"] == "not_claimed"
-    assert packet["forbidden_claims"] == [
-        "human acceptance",
-        "business validation",
-        "durable memory promotion",
-        "live provider quality approval",
-    ]
-    assert sections["generated_media_quality"]["requires_human_score"] is True
-    assert sections["generated_media_quality"]["evidence_step_ids"] == ["video_gate_closed"]
-    assert sections["asset_context_continuity"]["evidence_step_ids"] == [
-        "asset_confirmation",
-        "fixed_asset_context_reuse",
-    ]
-    assert packet["manual_artifacts_required"][0]["artifact_id"] == "browser_session_notes"
-    serialized = json.dumps(packet, ensure_ascii=False)
-    assert str(tmp_path) not in serialized
-    assert "session_token" not in serialized
-    assert "invite" not in serialized.lower()
-    assert "signed_url" not in serialized
-
-
 def test_internal_beta_acceptance_writes_optional_report_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
@@ -289,7 +258,9 @@ def test_acceptance_runner_keeps_preflight_logic_split() -> None:
     assert "safe_three_end_status" in preflight
     assert "class AcceptanceConfigurationError" in errors
     assert "def build_human_review_packet" in review
+    assert "def render_human_review_markdown" in review
+    assert "human_review_path" in runner
     assert len(runner.splitlines()) <= 220
     assert len(preflight.splitlines()) <= 220
     assert len(errors.splitlines()) <= 80
-    assert len(review.splitlines()) <= 180
+    assert len(review.splitlines()) <= 220

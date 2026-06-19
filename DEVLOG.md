@@ -2909,3 +2909,29 @@ Boundaries:
 - No provider call was made.
 - No Company OS or long-term memory write was made.
 - This is deterministic runtime/readiness verification plus a human review handoff packet, not completed human acceptance or business validation.
+
+## 2026-06-19 - Internal Beta Human Review Markdown
+
+- Added optional `--human-review-md` output to `tools/afs_internal_beta_acceptance.py`.
+- Added `render_human_review_markdown()` so the safe `human_review_packet` can become an operator-facing Markdown checklist.
+- The checklist includes the report status, review status, non-claim warning, five scoreable review sections, decision options, operator notes, and boundary reminders.
+- Split the review-specific tests into `tests/test_afs_internal_beta_acceptance_review.py` so the main acceptance test file stays below the 300-line warning threshold.
+
+Verification:
+
+```text
+Red test: tests/test_afs_internal_beta_acceptance.py failed before human_review_path and render_human_review_markdown existed.
+tests/test_afs_internal_beta_acceptance.py: 11 passed, 1 existing Starlette/httpx warning
+Acceptance CLI smoke with --human-review-md: title present, decision present, 5 score lines, no temp path or credential wording
+tests/test_afs_internal_beta_acceptance.py + tests/test_afs_internal_beta_acceptance_review.py + tests/test_afs_internal_beta_preflight_three_end.py + tests/test_afs_three_end_status.py: 18 passed, 1 existing warning
+pytest -q: 538 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count stayed at 31 after test split
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No Company OS or long-term memory write was made.
+- This creates a safe human-review checklist; it still does not claim completed human acceptance or business validation.

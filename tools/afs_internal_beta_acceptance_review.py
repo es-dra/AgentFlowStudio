@@ -36,6 +36,46 @@ def build_human_review_packet(steps: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def render_human_review_markdown(report: dict[str, Any]) -> str:
+    packet = report.get("human_review_packet") or {}
+    lines = [
+        "# AFS Internal Beta Human Review",
+        "",
+        f"Report status: `{_safe_inline(report.get('status'))}`",
+        f"Review status: `{_safe_inline(packet.get('status'))}`",
+        f"Human acceptance claim: `{_safe_inline(report.get('human_acceptance_claim'))}`",
+        "",
+        "Human acceptance is not claimed until this checklist is completed by an operator.",
+        "",
+        "## Required Review Sections",
+        "",
+    ]
+    for section in packet.get("required_sections") or []:
+        lines.extend(_section_markdown(section))
+    lines.extend([
+        "## Decision",
+        "",
+        f"Decision: `{_decision_options(packet)}`",
+        "",
+        "Operator notes:",
+        "",
+        "```text",
+        "",
+        "```",
+        "",
+        "## Boundaries",
+        "",
+    ])
+    for claim in packet.get("forbidden_claims") or []:
+        lines.append(f"- Do not claim {_safe_text(claim)} from this report alone.")
+    lines.extend([
+        "- Do not paste credentials, local paths, signed URLs, provider raw responses, or media bytes into this checklist.",
+        "- Keep provider smoke, human acceptance, business validation, and durable-memory promotion as separate evidence states.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 def _required_sections(step_ids: set[str]) -> list[dict[str, Any]]:
     sections = [
         _section(
@@ -84,3 +124,40 @@ def _section(section_id: str, title: str, evidence_step_ids: list[str], pass_con
         "pass_condition": pass_condition,
         "reviewer_notes": "",
     }
+
+
+def _section_markdown(section: dict[str, Any]) -> list[str]:
+    title = _safe_text(section.get("title"))
+    condition = _safe_text(section.get("pass_condition"))
+    step_ids = ", ".join(f"`{_safe_inline(step_id)}`" for step_id in section.get("evidence_step_ids") or [])
+    evidence = "yes" if section.get("evidence_available") else "no"
+    return [
+        f"- [ ] {title}",
+        f"  - Evidence steps: {step_ids}",
+        f"  - Evidence available: `{evidence}`",
+        f"  - Pass condition: {condition}",
+        "  - Score (1-5): ____",
+        "  - Notes: ____",
+        "",
+    ]
+
+
+def _decision_options(packet: dict[str, Any]) -> str:
+    return "` / `".join(_safe_inline(item) for item in packet.get("decision_options") or [])
+
+
+def _safe_inline(value: Any) -> str:
+    return _safe_text(value).replace("`", "'")
+
+
+def _safe_text(value: Any) -> str:
+    text = str(value or "")
+    replacements = {
+        "session_token": "session credential",
+        "signed_url": "signed link",
+        "provider_raw_response": "provider raw payload",
+        "invite": "credential",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new).replace(old.upper(), new).replace(old.title(), new)
+    return text

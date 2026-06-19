@@ -21,11 +21,13 @@ from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
 from tools.afs_internal_beta_acceptance_contract import run_acceptance_contract
 from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
 from tools.afs_internal_beta_acceptance_preflight import run_http_preflight as _run_http_preflight
+from tools.afs_internal_beta_acceptance_review import render_human_review_markdown
 
 
 def main() -> int:
     args = _parse_args()
     report_path = Path(args.report).resolve() if args.report else None
+    human_review_path = Path(args.human_review_md).resolve() if args.human_review_md else None
     try:
         if args.preflight_only:
             report = run_http_preflight(
@@ -41,12 +43,13 @@ def main() -> int:
                 invite_code=args.invite_code or os.environ.get(args.invite_code_env, ""),
                 beta_invite_code=args.beta_invite_code or os.environ.get(args.beta_invite_code_env, ""),
                 report_path=report_path,
+                human_review_path=human_review_path,
             )
         elif args.runtime_root:
-            report = run_inprocess_acceptance(runtime_root=Path(args.runtime_root).resolve(), report_path=report_path)
+            report = run_inprocess_acceptance(runtime_root=Path(args.runtime_root).resolve(), report_path=report_path, human_review_path=human_review_path)
         else:
             with tempfile.TemporaryDirectory(prefix="afs-beta-acceptance-") as temp_dir:
-                report = run_inprocess_acceptance(runtime_root=Path(temp_dir), report_path=report_path)
+                report = run_inprocess_acceptance(runtime_root=Path(temp_dir), report_path=report_path, human_review_path=human_review_path)
     except AcceptanceConfigurationError as exc:
         print(json.dumps({"status": "configuration_error", "error": str(exc), "report": str(report_path) if report_path else ""}, ensure_ascii=False))
         return 2
@@ -68,10 +71,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--three-end-repo-root", default=".", help="Local repository root for optional three-end preflight status.")
     parser.add_argument("--three-end-server", default="", help="Optional SSH alias for server-side three-end status.")
     parser.add_argument("--report", default="", help="Optional JSON report output path.")
+    parser.add_argument("--human-review-md", default="", help="Optional safe Markdown checklist for the human beta reviewer.")
     return parser.parse_args()
 
 
-def run_inprocess_acceptance(*, runtime_root: Path, report_path: Path | None = None) -> dict[str, Any]:
+def run_inprocess_acceptance(*, runtime_root: Path, report_path: Path | None = None, human_review_path: Path | None = None) -> dict[str, Any]:
     from fastapi.testclient import TestClient
 
     runtime_root = runtime_root.resolve()
@@ -82,6 +86,7 @@ def run_inprocess_acceptance(*, runtime_root: Path, report_path: Path | None = N
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_human_review_markdown(report, human_review_path)
     return report
 
 
@@ -91,6 +96,7 @@ def run_http_acceptance(
     invite_code: str,
     beta_invite_code: str = "",
     report_path: Path | None = None,
+    human_review_path: Path | None = None,
     run_id: str | None = None,
 ) -> dict[str, Any]:
     if not base_url.strip():
@@ -118,6 +124,7 @@ def run_http_acceptance(
     if report_path is not None:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_human_review_markdown(report, human_review_path)
     return report
 
 
@@ -142,6 +149,13 @@ def run_http_preflight(
 def _safe_run_id(value: str) -> str:
     safe = "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
     return safe[:40] or uuid.uuid4().hex[:10]
+
+
+def _write_human_review_markdown(report: dict[str, Any], human_review_path: Path | None) -> None:
+    if human_review_path is None:
+        return
+    human_review_path.parent.mkdir(parents=True, exist_ok=True)
+    human_review_path.write_text(render_human_review_markdown(report), encoding="utf-8")
 
 
 @contextmanager
