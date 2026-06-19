@@ -12,6 +12,22 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current three-end status addendum: 2026-06-19 pass added
+`tools/afs_three_end_status.py` as a safe local/GitHub/server status reporter.
+It checks the local checkout, optional server `/home` checkout, optional server
+`/opt` checkout, and Runtime `/health` using safe fields only. The report
+captures commit alignment, dirty state, Studio static readiness, auth
+readiness, and provider gate booleans without recording provider config,
+server-local runtime paths, signed URLs, session tokens, provider raw
+responses, media bytes, or secrets. Empty or failed checked health is now
+treated as `needs_attention` rather than silent success. Verification:
+three-end status tests 5 passed; three-end plus beta acceptance focused tests
+13 passed / 1 warning; full pytest passed 528 / 527 deselected / 2 warnings;
+maintenance audit failed=0 with warnings only; `git diff --check` passed.
+Boundary: ops/readiness report only, not git pull/deploy/restart automation,
+not provider smoke, not human acceptance, not business validation, not
+durable-memory promotion.
+
 Current HTTP internal beta preflight addendum: 2026-06-19 pass added
 `--preflight-only` to `tools/afs_internal_beta_acceptance.py`. This mode checks
 deployed Runtime readiness through `/health` and `/auth/status` without

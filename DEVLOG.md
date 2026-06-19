@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-19 - Three-End Status Report Tool
+
+- Added `tools/afs_three_end_status.py` as a safe local/GitHub/server status
+  reporter. It checks the local checkout, optional server `/home` checkout,
+  optional server `/opt` checkout, and Runtime `/health` through safe fields
+  only.
+- The report keeps provider calls closed and records only commit alignment,
+  dirty state, safe Runtime health booleans, Studio static readiness, auth
+  readiness, and provider gate booleans. It does not record provider config,
+  local/server absolute runtime paths, signed URLs, session tokens, provider
+  raw responses, media bytes, or secrets.
+- Empty or unparsable checked health is treated as `needs_attention`, while
+  missing health is only allowed when the caller intentionally runs local-only
+  mode.
+
+Verification:
+
+```text
+tests/test_afs_three_end_status.py -> 5 passed
+tests/test_afs_three_end_status.py tests/test_afs_internal_beta_acceptance.py -> 13 passed / 1 warning
+full pytest -> 528 passed / 527 deselected / 2 warnings
+maintenance_audit -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundary: this is an ops/readiness report only. It does not pull, restart,
+open provider gates, call providers, claim human acceptance, or write durable
+memory.
+
 ## 2026-06-19 - HTTP Internal Beta Preflight Mode
 
 - Added a `--preflight-only` mode to
