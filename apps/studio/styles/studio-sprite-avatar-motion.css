@@ -1,0 +1,46 @@
+.sprite-label {
+  position: absolute;
+  right: 112px;
+  top: 34px;
+  max-width: 104px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: rgba(17, 20, 24, 0.9);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(8px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+#sprite-root[data-dock="left"] .sprite-label {
+  right: auto;
+  left: 112px;
+  transform: translateX(-8px);
+}
+
+.afs-sprite-avatar:hover .sprite-label,
+.afs-sprite.open .sprite-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@keyframes sprite-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes sprite-scan {
+  0%, 56%, 100% { transform: translateX(-120%); }
+  66%, 78% { transform: translateX(120%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite-body, .sprite-drag-halo, .sprite-visor::before {
+    animation: none;
+  }
+}

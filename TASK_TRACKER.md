@@ -32,6 +32,22 @@ with warnings only; `git diff --check` passed.
 Boundary: deployed Runtime contract verification only, not live provider smoke,
 not human acceptance, not business validation, not durable-memory promotion.
 
+Current sprite avatar polish addendum: 2026-06-19 pass strengthened the
+decorative `AFS 小精灵` into a more recognizable movable canvas companion. The
+avatar now has an explicit drag halo, larger body shell, head shell, visor, core
+light, side wings, feet, and bottom thruster; the fixed layer sits above modal
+level so the sprite remains reachable while Studio panels are open. The drag
+state now remembers the current DOM position before re-rendering, preventing a
+post-drag panel-open click from jumping the sprite back to an older stored
+position. Verification: focused sprite static test passed; Studio static plus
+Runtime sprite regression 16 passed / 1 warning; Studio JS syntax check passed
+for 87 files; `git diff --check` passed; browser check on
+`127.0.0.1:8797/studio` confirmed avatar parts, z-index=81, avatar drag,
+open-panel position delta=0, panel-header drag, and console warn/error count=0.
+Boundary: no provider gate changed, no provider call, no generated media byte
+persistence, no human acceptance, no business validation, no durable-memory
+promotion.
+
 Current sprite character follow-up: 2026-06-19 pass reworked the decorative
 `AFS 小精灵` into a fixed-viewport micro-assistant character instead of a
 generic floating control. The avatar now has a recognizable visor, glowing

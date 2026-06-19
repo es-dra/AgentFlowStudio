@@ -11,7 +11,7 @@ let suppressSpriteClick = false;
 let spriteResizeBound = false;
 const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
 const SPRITE_MARGIN = 18;
-const SPRITE_SIZE = 92;
+const SPRITE_SIZE = 112;
 const spriteMessages = [
   { role: "sprite", text: "我在这里陪你看画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -22,6 +22,7 @@ export function renderSpriteWidget(state, runtime) {
   lastState = state || {};
   lastRuntime = runtime || {};
   bindSpriteViewportClamp();
+  rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.replaceChildren(spriteShell(state, runtime));
 }
@@ -39,13 +40,16 @@ function spriteOrb() {
   button.type = "button";
   button.setAttribute("aria-label", "AFS 小精灵");
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
+  button.setAttribute("data-sprite-draggable", "true");
   button.title = spriteOpen ? "拖动移动，点击收起 AFS 小精灵" : "拖动移动，点击打开 AFS 小精灵";
   button.innerHTML = [
+    '<span class="sprite-drag-halo"></span>',
     '<span class="sprite-backplate"></span>',
     '<span class="sprite-antenna"></span>',
     '<span class="sprite-wing left"></span>',
     '<span class="sprite-wing right"></span>',
     '<span class="sprite-body">',
+    '  <span class="sprite-head-shell"></span>',
     '  <span class="sprite-face">',
     '    <span class="sprite-visor"><i></i><i></i><b></b></span>',
     "  </span>",
@@ -54,6 +58,7 @@ function spriteOrb() {
     "</span>",
     '<span class="sprite-foot left"></span>',
     '<span class="sprite-foot right"></span>',
+    '<span class="sprite-thruster"></span>',
     '<span class="sprite-shadow"></span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
@@ -63,6 +68,7 @@ function spriteOrb() {
       suppressSpriteClick = false;
       return;
     }
+    rememberSpritePositionFromRoot();
     spriteOpen = !spriteOpen;
     renderSpriteWidget(lastState, lastRuntime);
   });
@@ -205,6 +211,13 @@ function bindSpriteViewportClamp() {
 
 function applySpritePosition(root) {
   setSpritePosition(spritePosition || readSpritePosition() || defaultSpritePosition(), root);
+}
+
+function rememberSpritePositionFromRoot(root = document.getElementById("sprite-root")) {
+  if (!root?.firstElementChild) return;
+  const rect = root.getBoundingClientRect();
+  if (!Number.isFinite(rect?.left) || !Number.isFinite(rect?.top)) return;
+  spritePosition = clampSpritePosition({ x: rect.left, y: rect.top });
 }
 
 function setSpritePosition(position, root = document.getElementById("sprite-root")) {

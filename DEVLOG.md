@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-19 - Sprite Avatar Shape And Drag Stability Polish
+
+- Strengthened the `AFS 小精灵` visual silhouette so it reads as a small
+  movable canvas companion instead of a plain floating control. The avatar now
+  has an explicit drag halo, larger body shell, head shell, visor, core light,
+  side wings, feet, and bottom thruster.
+- Raised the sprite fixed layer above modal level so it remains reachable while
+  Studio panels are open, without changing Runtime or provider behavior.
+- Fixed a drag/re-render edge case by remembering the current DOM position
+  before the sprite re-renders. This prevents the avatar from jumping back to an
+  older stored position when the user drags it and then opens the chat panel.
+- Split sprite label/motion styles into `studio-sprite-avatar-motion.css` so
+  the avatar structure stylesheet stays below the project maintenance line.
+- Moved the sprite static contract into `tests/test_web_studio_sprite_static.py`
+  instead of growing the already-large general Studio static test file.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py::test_studio_sprite_widget_is_wired_to_runtime_chat -> passed
+tests/test_web_studio_static.py tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -> 16 passed / 1 warning
+npm run check:studio-js -> JS syntax check passed: 87 files
+git diff --check -> passed
+Browser check on 127.0.0.1:8797/studio -> avatar parts present, fixed layer z-index=81,
+  avatar drag stable, open-panel click keeps position delta=0, panel-header drag moves sprite,
+  console warn/error count=0
+```
+
+Boundary: no provider gate changed, no provider call was made, no generated
+media bytes or provider raw response were persisted, and this is UI/runtime
+verification only, not human acceptance or business validation.
+
 ## 2026-06-19 - HTTP Internal Beta Acceptance Runner
 
 - Extended the deterministic internal beta acceptance runner with a deployed

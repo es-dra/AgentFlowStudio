@@ -1,12 +1,13 @@
 @import url("./studio-sprite-avatar.css");
+@import url("./studio-sprite-avatar-motion.css");
 
 #sprite-root {
   position: fixed;
-  left: var(--sprite-x, calc(100vw - 116px));
-  top: var(--sprite-y, calc(100vh - 156px));
-  width: 92px;
-  height: 92px;
-  z-index: var(--z-popover);
+  left: var(--sprite-x, calc(100vw - 136px));
+  top: var(--sprite-y, calc(100vh - 176px));
+  width: 112px;
+  height: 118px;
+  z-index: calc(var(--z-modal) + 1);
   pointer-events: none;
   touch-action: none;
 }
@@ -19,8 +20,8 @@
 
 .afs-sprite {
   position: relative;
-  width: 92px;
-  height: 92px;
+  width: 112px;
+  height: 118px;
   pointer-events: none;
 }
 
@@ -32,7 +33,7 @@
 .afs-sprite-panel {
   position: absolute;
   right: 0;
-  bottom: 104px;
+  bottom: 126px;
   width: min(318px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -53,7 +54,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-panel {
-  top: 104px;
+  top: 126px;
   bottom: auto;
   transform-origin: 92% 0;
 }

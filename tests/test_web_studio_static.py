@@ -108,52 +108,6 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "首页" in topbar
 
 
-def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
-    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
-    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
-    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
-    sprite = (STUDIO_ROOT / "src" / "sprite-widget.js").read_text(encoding="utf-8")
-    styles = (STUDIO_ROOT / "styles" / "studio-sprite.css").read_text(encoding="utf-8")
-    avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
-    sprite_styles = styles + avatar_styles
-
-    assert '<div id="sprite-root"></div>' in index
-    assert './styles/studio-sprite.css' in index
-    assert 'from "./sprite-widget.js"' in main
-    assert "renderSpriteWidget" in main
-    assert "spriteChat(payload)" in runtime_client
-    assert "/sprite/chat" in runtime_client
-    assert "afs-sprite" in sprite
-    assert "AFS 小精灵" in sprite
-    assert "runtime.spriteChat" in sprite
-    assert "SPRITE_POSITION_KEY" in sprite
-    assert "SPRITE_SIZE" in sprite
-    assert "startSpriteDrag" in sprite
-    assert 'head.addEventListener("pointerdown", startSpriteDrag)' in sprite
-    assert "storeSpritePosition" in sprite
-    assert "clampSpritePosition" in sprite
-    assert "data-dock" not in sprite
-    assert "root.dataset.dock" in sprite
-    assert "root.dataset.vertical" in sprite
-    assert "__afsStudio" not in sprite
-    assert "provider raw" not in sprite
-    assert '@import url("./studio-sprite-avatar.css");' in styles
-    assert "position: fixed" in styles
-    assert ".afs-sprite-orb" in styles
-    assert ".afs-sprite-grip" in styles
-    assert ".afs-sprite-avatar" in sprite_styles
-    assert ".sprite-backplate" in sprite_styles
-    assert ".sprite-body" in sprite_styles
-    assert ".sprite-face" in sprite_styles
-    assert ".sprite-visor" in sprite_styles
-    assert ".sprite-core" in sprite_styles
-    assert ".sprite-wing.left" in sprite_styles
-    assert ".sprite-foot.left" in sprite_styles
-    assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
-    assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
-    assert "@media (prefers-reduced-motion: reduce)" in sprite_styles
-
-
 def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
     store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
 
