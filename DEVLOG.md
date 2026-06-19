@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-19 - Studio Generation Action Module Split
+
+- Split `apps/studio/src/node-actions.js` from a mixed 446-line node action
+  and generation file into a thin 80-line router.
+- Added `apps/studio/src/node-keyframe-actions.js` for keyframe submit, poll,
+  response application, reusable image asset recording, and context badge
+  reconciliation.
+- Added `apps/studio/src/node-video-actions.js` for video first-frame setup,
+  video submit, polling, local cancel, response application, and experimental
+  video revision draft/submit state.
+- Kept the public call surface through `node-actions.js`, so prompt bar, node
+  menu, and canvas action handlers continue importing the same top-level
+  actions.
+
+Verification:
+
+```text
+TDD red: structure tests failed on missing node-keyframe-actions.js, then on missing node-video-actions.js
+Studio static regression -> 43 passed
+Studio/runtime focused regression -> 60 passed / 1 warning
+npm run check:studio-js -> passed for 90 files
+pytest -q -> 536 passed / 527 deselected / 2 warnings
+tools/maintenance_audit.py -> failed=0; oversized warning count 33; node-actions.js removed from oversized findings
+local HTTP static checks -> /studio/, /studio/src/node-keyframe-actions.js, /studio/src/node-video-actions.js returned 200
+git diff --check -> passed
+```
+
+Boundaries:
+
+- No Runtime API shape was changed.
+- No provider gate or provider config was changed.
+- No provider call was made.
+- No Studio behavior was intentionally changed; this was a module-boundary
+  refactor.
+- No provider raw response, signed URL, local media byte, local path, invite
+  code, or secret was exposed.
+- This is local structural/runtime verification, not human acceptance or
+  business validation.
+
 ## 2026-06-19 - LLM Enhancement Module Split
 
 - Split `apps/api/runtime_llm_enhancement.py` into a thin orchestration module

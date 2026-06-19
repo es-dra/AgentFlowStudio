@@ -227,8 +227,11 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     assert 'dataset.action = "video-poll"' in canvas_view
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     assert "pollNodeVideoGeneration" in canvas_action_handler
-    assert node_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 3
-    assert node_actions.count("await store.flushRuntimeSave?.();\n      return;") >= 2
+    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
+    generation_actions = node_actions + keyframe_actions + video_actions
+    assert generation_actions.count("restoreCancelledGeneration(store, node.id, previousNodeState);") == 3
+    assert generation_actions.count("await store.flushRuntimeSave?.();\n      return;") >= 2
     drawer_source = "".join(
         path.read_text(encoding="utf-8")
         for path in (

@@ -12,6 +12,28 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio generation action module split addendum: 2026-06-19 pass split
+`apps/studio/src/node-actions.js` from a 446-line mixed action/generation module
+into an 80-line top-level node action router plus focused generation helpers:
+`node-keyframe-actions.js` for keyframe submit/poll/result persistence and
+`node-video-actions.js` for video first-frame setup, video submit/poll/cancel,
+and experimental video revision state. Existing public imports remain available
+through `node-actions.js`, so prompt bar, node menu, and canvas action handlers
+do not change their call surface. Verification: structure tests first failed on
+missing `node-keyframe-actions.js` and then on missing `node-video-actions.js`;
+after implementation Studio static regression passed 43; wider Studio/runtime
+focused regression passed 60 / 1 existing warning; `npm run check:studio-js`
+passed for 90 files; full pytest passed 536 / 527 deselected / 2 existing
+warnings; maintenance audit failed=0 with warnings only and oversized warning
+count dropped from 34 to 33, with `node-actions.js` removed from oversized
+findings; local HTTP static checks returned 200 for `/studio/`,
+`/studio/src/node-keyframe-actions.js`, and `/studio/src/node-video-actions.js`;
+`git diff --check` passed. Boundary: no Runtime API shape changed, no provider
+gate changed, no provider config changed, no provider call was made, no Studio
+UI behavior was intentionally changed, and no provider raw response, signed
+URL, local media byte, local path, invite code, or secret was exposed; not human
+acceptance or business validation.
+
 Current LLM enhancement module split addendum: 2026-06-19 pass split
 `apps/api/runtime_llm_enhancement.py` from a 600+ line prompt optimization
 runtime module into a 181-line orchestration surface plus focused helpers:

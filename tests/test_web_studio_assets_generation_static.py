@@ -83,14 +83,16 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
 
 def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers() -> None:
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
     generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
-    generation_submit = node_actions + "\n" + generation_guards
+    generation_submit = "\n".join((node_actions, keyframe_actions, video_actions, generation_guards))
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 
     assert "preflightKeyframe" in runtime_client
     assert "preflightVideo" in runtime_client
-    assert "prepareGenerationRequest" in node_actions
+    assert "prepareGenerationRequest" in keyframe_actions + video_actions
     assert "showCarryConfirmModal" in generation_guards
     assert "preflight_token" in generation_submit
     assert "temporary_asset_exclusions" in generation_submit
@@ -106,21 +108,24 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
 def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
 
     assert "pollKeyframe(jobId)" in runtime_client
     assert "/keyframe-generations/${encodeURIComponent(jobId)}/poll" in runtime_client
     assert "pollNodeKeyframeGeneration" in node_actions
-    assert "pollKeyframeUntilTerminal" in node_actions
-    assert "lastKeyframeJobId" in node_actions
+    assert "pollKeyframeUntilTerminal" not in node_actions
+    assert "pollKeyframeUntilTerminal" in keyframe_actions
+    assert "lastKeyframeJobId" in keyframe_actions
     assert "MiniMax keyframe request failed" not in node_actions
     for forbidden in ("Codex", "codex", "handoff", "request.json", "codex_image_job"):
-        assert forbidden not in node_actions
+        assert forbidden not in node_actions + keyframe_actions
 
 
 def test_video_revision_and_fail_closed_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
     generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js").read_text(encoding="utf-8")
@@ -136,8 +141,8 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     assert "label_matched" in inspector
     assert "named_asset_not_connected_fail_closed" in generation_guards
     assert "startRemoteVideoRevision" in node_actions
-    assert "videoRevision" in node_actions
-    assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in node_actions
+    assert "videoRevision" in video_actions
+    assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in video_actions
     assert "enableVideoRevisionDraft" in source
     assert "video-revision-draft" in node_menu
 
@@ -177,6 +182,7 @@ def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> N
 def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     feedback = STUDIO_ROOT / "src" / "quality-feedback.js"
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
     video_node_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
@@ -213,11 +219,11 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
     assert "cancelNodeVideoGeneration" in node_actions
-    assert "cancelVideo(jobId)" in node_actions
-    assert "cancelled_local_only" in node_actions
-    assert "厂商侧任务" in node_actions
-    assert "停止计费" in node_actions
-    assert "ensureVideoFirstFrameAsset" in node_actions
+    assert "cancelVideo(jobId)" in video_actions
+    assert "cancelled_local_only" in video_actions
+    assert "厂商侧任务" in video_actions
+    assert "停止计费" in video_actions
+    assert "ensureVideoFirstFrameAsset" in video_actions
     assert "ensureVideoFirstFrameAsset" in video_node_flow
     assert "inferConnectedFirstFrameAsset" in video_node_flow
     assert "已自动使用上游关键帧作为首帧" in video_node_flow

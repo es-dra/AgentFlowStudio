@@ -190,17 +190,31 @@ def test_generation_projection_is_split_from_node_actions() -> None:
         "src/node-generation-results.js",
         "src/node-generation-guards.js",
         "src/node-generation-context.js",
+        "src/node-keyframe-actions.js",
+        "src/node-video-actions.js",
     ):
         assert (STUDIO_ROOT / path).is_file()
 
     node_actions = _read("src/node-actions.js")
+    keyframe_actions = _read("src/node-keyframe-actions.js")
+    video_actions = _read("src/node-video-actions.js")
     progress = _read("src/node-generation-progress.js")
     results = _read("src/node-generation-results.js")
     guards = _read("src/node-generation-guards.js")
 
-    assert len(node_actions.splitlines()) < 500
-    assert "setSubmittingGenerationState" in node_actions
-    assert "updateNodeGenerationState" in node_actions
+    assert len(node_actions.splitlines()) <= 260
+    assert len(keyframe_actions.splitlines()) <= 180
+    assert len(video_actions.splitlines()) <= 300
+    assert "setSubmittingGenerationState" in keyframe_actions + video_actions
+    assert "updateNodeGenerationState" in keyframe_actions + video_actions
+    assert "function startRemoteKeyframeGeneration" not in node_actions
+    assert "function applyKeyframeResponse" not in node_actions
+    assert "startRemoteKeyframeGeneration" in keyframe_actions
+    assert "applyKeyframeResponse" in keyframe_actions
+    assert "function startRemoteVideoGeneration" not in node_actions
+    assert "function applyVideoResponse" not in node_actions
+    assert "startRemoteVideoGeneration" in video_actions
+    assert "applyVideoResponse" in video_actions
     assert "STATUS_PROGRESS" in progress
     assert "candidate_previews" in progress
     assert "candidatePreviewUrls" in progress

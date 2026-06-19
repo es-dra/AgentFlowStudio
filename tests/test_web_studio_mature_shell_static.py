@@ -155,6 +155,8 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
 
     for path in (
         "src/studio-project-session.js",
@@ -162,6 +164,8 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
         "src/store-state.js",
         "src/store-persistence.js",
         "src/node-generation-restore.js",
+        "src/node-keyframe-actions.js",
+        "src/node-video-actions.js",
         "src/canvas-edges.js",
         "src/interaction/port-geometry.js",
         "styles/canvas-edges.css",
@@ -173,7 +177,9 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     assert "from \"./studio-project-controller.js\"" in main
     assert "from \"./store-persistence.js\"" in store
     assert "from \"./store-state.js\"" in store
-    assert "from \"./node-generation-restore.js\"" in node_actions
+    assert "from \"./node-generation-restore.js\"" not in node_actions
+    assert "from \"./node-generation-restore.js\"" in keyframe_actions
+    assert "from \"./node-generation-restore.js\"" in video_actions
     assert 'from "./canvas-edges.js"' in (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     assert 'from "./canvas-edges.js"' in (STUDIO_ROOT / "src" / "canvas-connection.js").read_text(encoding="utf-8")
     assert len(store.splitlines()) <= 220
@@ -183,6 +189,9 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     assert len((STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8").splitlines()) <= 140
     assert len((STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8").splitlines()) <= 90
     assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 300
+    assert len(keyframe_actions.splitlines()) <= 180
+    assert len(video_actions.splitlines()) <= 300
+    assert len(node_actions.splitlines()) <= 120
     assert len(main.splitlines()) <= 300
     assert len((STUDIO_ROOT / "src" / "node-generation-restore.js").read_text(encoding="utf-8").splitlines()) <= 80
 
