@@ -1,0 +1,47 @@
+#edge-layer .edge-disconnect-button {
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 0.14s ease, filter 0.14s ease;
+}
+
+#edge-layer .edge-disconnect-button circle {
+  fill: rgba(17, 22, 27, 0.92);
+  stroke: rgba(171, 235, 255, 0.42);
+  stroke-width: 1;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.32));
+}
+
+#edge-layer .edge-disconnect-button path {
+  stroke: rgba(230, 248, 255, 0.9);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+#edge-layer [data-edge-id]:hover .edge-disconnect-button,
+#edge-layer [data-edge-selected="true"] .edge-disconnect-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#edge-layer .edge-disconnect-button:hover circle {
+  fill: rgba(43, 26, 29, 0.96);
+  stroke: rgba(255, 130, 130, 0.66);
+}
+
+#edge-layer .edge-disconnect-button:hover path {
+  stroke: rgba(255, 210, 210, 0.96);
+}
+
+#edge-layer [data-edge-selected="true"] path.edge-flow {
+  stroke: var(--accent);
+  stroke-width: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #edge-layer .edge-disconnect-button {
+    transition: none;
+  }
+}

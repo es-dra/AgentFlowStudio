@@ -16,6 +16,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
     avatar_redesign_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-redesign.css").read_text(encoding="utf-8")
     avatar_personality_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-personality.css").read_text(encoding="utf-8")
+    avatar_mascot_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-mascot.css").read_text(encoding="utf-8")
     sprite_styles = (
         styles
         + avatar_styles
@@ -24,6 +25,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
         + avatar_motion_styles
         + avatar_redesign_styles
         + avatar_personality_styles
+        + avatar_mascot_styles
     )
 
     assert '<div id="sprite-root"></div>' in index
@@ -47,6 +49,16 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-face-window" in sprite
     assert "sprite-wand" in sprite
     assert "sprite-personality-tag" in sprite
+    assert "sprite-mascot-shell" in sprite
+    assert "sprite-mascot-face" in sprite
+    assert "sprite-mascot-eye left" in sprite
+    assert "sprite-mascot-eye right" in sprite
+    assert "sprite-mascot-smile" in sprite
+    assert "sprite-mascot-hand left" in sprite
+    assert "sprite-mascot-hand right" in sprite
+    assert "sprite-mascot-star" in sprite
+    assert "sprite-mascot-tag" in sprite
+    assert "sprite-mascot-shadow" in sprite
     assert "sprite-crest" in sprite
     assert "sprite-orbit-dot" in sprite
     assert "sprite-brow left" in sprite
@@ -64,6 +76,10 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_POSITION_VERSION" in position
     assert "SPRITE_SIZE" in position
+    assert "SPRITE_SCALE_KEY" in position
+    assert "SPRITE_SCALE_OPTIONS" in position
+    assert "getSpriteScale" in position
+    assert "setSpriteScale" in position
     assert "safeDefaultSpritePosition" in position
     assert "startSpriteDrag" in sprite
     assert "nudgeSpritePosition" in sprite
@@ -87,6 +103,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
     assert '@import url("./studio-sprite-avatar-redesign.css");' in styles
     assert '@import url("./studio-sprite-avatar-personality.css");' in styles
+    assert '@import url("./studio-sprite-avatar-mascot.css");' in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles
@@ -131,6 +148,15 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-face-window" in sprite_styles
     assert ".sprite-wand" in sprite_styles
     assert ".sprite-personality-tag" in sprite_styles
+    assert ".sprite-mascot-shell" in sprite_styles
+    assert ".sprite-mascot-face" in sprite_styles
+    assert ".sprite-mascot-eye.left" in sprite_styles
+    assert ".sprite-mascot-smile" in sprite_styles
+    assert ".sprite-mascot-hand.left" in sprite_styles
+    assert ".sprite-mascot-star" in sprite_styles
+    assert ".sprite-mascot-tag" in sprite_styles
+    assert ".sprite-mascot-shadow" in sprite_styles
+    assert "Cartoon mascot skin" in avatar_mascot_styles
     assert ".sprite-crest" in sprite_styles
     assert ".sprite-orbit-dot.left" in sprite_styles
     assert ".sprite-brow.left" in sprite_styles
@@ -141,10 +167,19 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite
     assert 'data-sprite-drag-handle="true"' in sprite
+    assert "spriteSettingsPanel" in sprite
+    assert "contextmenu" in sprite
+    assert "setSpriteScale" in sprite
+    assert "getSpriteScale" in sprite
+    assert "data-sprite-settings" in sprite
+    assert ".afs-sprite-settings" in sprite_styles
+    assert ".afs-sprite-size-button" in sprite_styles
+    assert "--sprite-scale" in sprite_styles
     assert ".afs-sprite.open .sprite-status-light" in sprite_styles
     assert 'content: "拖动我"' in sprite_styles
     assert "version: SPRITE_POSITION_VERSION" in position
     assert "value?.version === SPRITE_POSITION_VERSION" in position
     assert "sprite-arm left" in sprite
     assert "#sprite-root.is-dragging .sprite-arm.left" in sprite_styles
+    assert "#sprite-root.is-dragging .sprite-mascot-hand.right" in sprite_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles

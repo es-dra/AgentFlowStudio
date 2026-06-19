@@ -193,6 +193,19 @@ export function connect(store, fromId, toId) {
   return created;
 }
 
+export function removeEdge(store, edgeId) {
+  if (!edgeId) return false;
+  let removed = false;
+  store.set((s) => {
+    if (!s.edges[edgeId]) return;
+    delete s.edges[edgeId];
+    if (s.selection.edgeId === edgeId) s.selection = { nodeIds: [], edgeId: null };
+    if (s.ui.lastConnectedEdgeId === edgeId) s.ui.lastConnectedEdgeId = null;
+    removed = true;
+  });
+  return removed;
+}
+
 function relationTypeFor(state, fromId, toId) {
   const from = state.nodes[fromId];
   const to = state.nodes[toId];

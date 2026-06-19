@@ -4,13 +4,14 @@
 @import url("./studio-sprite-avatar-motion.css");
 @import url("./studio-sprite-avatar-redesign.css");
 @import url("./studio-sprite-avatar-personality.css");
+@import url("./studio-sprite-avatar-mascot.css");
 
 #sprite-root {
   position: fixed;
   left: var(--sprite-x, calc(100vw - 210px));
   top: var(--sprite-y, calc(100vh - 252px));
-  width: 180px;
-  height: 206px;
+  width: calc(180px * var(--sprite-scale, 1));
+  height: calc(206px * var(--sprite-scale, 1));
   z-index: calc(var(--z-modal) + 1);
   pointer-events: none;
   touch-action: none;
@@ -37,7 +38,7 @@
 .afs-sprite-panel {
   position: absolute;
   right: 0;
-  bottom: 208px;
+  bottom: calc((206px * var(--sprite-scale, 1)) + 8px);
   width: min(318px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -58,9 +59,66 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-panel {
-  top: 208px;
+  top: calc((206px * var(--sprite-scale, 1)) + 8px);
   bottom: auto;
   transform-origin: 92% 0;
+}
+
+.afs-sprite-settings {
+  position: absolute;
+  right: 0;
+  bottom: calc((206px * var(--sprite-scale, 1)) + 8px);
+  width: 246px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 15px;
+  background: rgba(19, 22, 26, 0.96);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(20px);
+  pointer-events: auto;
+}
+
+#sprite-root[data-dock="left"] .afs-sprite-settings {
+  left: 0;
+  right: auto;
+}
+
+#sprite-root[data-vertical="top"] .afs-sprite-settings {
+  top: calc((206px * var(--sprite-scale, 1)) + 8px);
+  bottom: auto;
+}
+
+.afs-sprite-settings h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.afs-sprite-settings p {
+  margin: 0 0 10px;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.afs-sprite-size-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.afs-sprite-size-button {
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.afs-sprite-size-button.active {
+  border-color: rgba(90, 200, 250, 0.5);
+  background: rgba(90, 200, 250, 0.14);
+  color: var(--text-primary);
 }
 
 #sprite-root[data-dock="left"][data-vertical="top"] .afs-sprite-panel {

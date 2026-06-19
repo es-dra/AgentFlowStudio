@@ -3,12 +3,16 @@ import { el } from "./overlay.js";
 import {
   applySpritePosition,
   bindSpriteViewportClamp,
+  getSpriteScale,
   nudgeSpritePosition,
   rememberSpritePositionFromRoot,
+  setSpriteScale,
   startSpriteDrag,
+  SPRITE_SCALE_OPTIONS,
 } from "./sprite-position.js";
 
 let spriteOpen = false;
+let spriteSettingsOpen = false;
 let spriteSending = false;
 let draftMessage = "";
 let lastState = {};
@@ -34,6 +38,7 @@ function spriteShell(state, runtime) {
   shell.setAttribute("aria-label", "AFS 小精灵");
   shell.appendChild(spriteOrb());
   if (spriteOpen) shell.appendChild(spritePanel(state, runtime));
+  if (spriteSettingsOpen) shell.appendChild(spriteSettingsPanel());
   return shell;
 }
 
@@ -44,18 +49,33 @@ function spriteOrb() {
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
   button.setAttribute("data-sprite-draggable", "true");
   button.setAttribute("data-sprite-role", "movable-companion");
-  button.setAttribute("data-sprite-character", "navigator");
-  button.title = spriteOpen ? "拖动或方向键移动，点击收起 AFS 小精灵" : "拖动或方向键移动，点击打开 AFS 小精灵";
+  button.setAttribute("data-sprite-character", "mascot");
+  button.title = spriteOpen ? "拖动或方向键移动，右键设置，点击收起 AFS 小精灵" : "拖动或方向键移动，右键设置，点击打开 AFS 小精灵";
   button.innerHTML = [
+    '<span class="sprite-mascot-shell" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-ear left" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-ear right" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-face" aria-hidden="true">',
+    '  <span class="sprite-mascot-eye left"></span>',
+    '  <span class="sprite-mascot-eye right"></span>',
+    '  <span class="sprite-mascot-smile"></span>',
+    "</span>",
+    '<span class="sprite-mascot-hand left" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-hand right" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-star" aria-hidden="true"></span>',
+    '<span class="sprite-mascot-tag" aria-hidden="true">AFS</span>',
+    '<span class="sprite-mascot-shadow" aria-hidden="true"></span>',
     '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
     '<span class="sprite-orbit-dot left" aria-hidden="true"></span>',
     '<span class="sprite-orbit-dot right" aria-hidden="true"></span>',
+    '<span class="sprite-navigator-shell" aria-hidden="true"></span>',
     '<span class="sprite-halo-crown" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-crest" aria-hidden="true"></span>',
     '<span class="sprite-character-shell"></span>',
     '<span class="sprite-hood"></span>',
     '<span class="sprite-helmet-glass"></span>',
+    '<span class="sprite-helmet-reflection" aria-hidden="true"></span>',
     '<span class="sprite-move-handle" data-sprite-drag-handle="true" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
     '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-aura"></span>',
@@ -69,6 +89,8 @@ function spriteOrb() {
     '<span class="sprite-shoulder right"></span>',
     '<span class="sprite-arm left"><span class="sprite-hand left"></span><span class="sprite-mitten left"></span></span>',
     '<span class="sprite-arm right"><span class="sprite-hand right"></span><span class="sprite-mitten right"></span></span>',
+    '<span class="sprite-hand-wave" aria-hidden="true"></span>',
+    '<span class="sprite-jet-pack" aria-hidden="true"></span>',
     '<span class="sprite-backplate"></span>',
     '<span class="sprite-body">',
     '  <span class="sprite-cockpit"></span>',
@@ -84,6 +106,7 @@ function spriteOrb() {
     '    <span class="sprite-blush left"></span>',
     '    <span class="sprite-blush right"></span>',
     '    <span class="sprite-mouth"></span>',
+    '    <span class="sprite-face-smile"></span>',
     "  </span>",
     '  <span class="sprite-core"></span>',
     '  <span class="sprite-torso-panel"><i></i><i></i></span>',
@@ -99,17 +122,26 @@ function spriteOrb() {
     '<span class="sprite-foot right"></span>',
     '<span class="sprite-thruster"></span>',
     '<span class="sprite-glow-trail"></span>',
+    '<span class="sprite-hover-pad" aria-hidden="true"></span>',
     '<span class="sprite-shadow"></span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
   button.addEventListener("pointerdown", handleSpriteDrag);
   button.addEventListener("keydown", nudgeSpritePosition);
+  button.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    rememberSpritePositionFromRoot();
+    spriteSettingsOpen = true;
+    spriteOpen = false;
+    renderSpriteWidget(lastState, lastRuntime);
+  });
   button.addEventListener("click", () => {
     if (suppressSpriteClick) {
       suppressSpriteClick = false;
       return;
     }
     rememberSpritePositionFromRoot();
+    spriteSettingsOpen = false;
     spriteOpen = !spriteOpen;
     renderSpriteWidget(lastState, lastRuntime);
   });
@@ -147,6 +179,25 @@ function spritePanel(state, runtime) {
   }
   panel.appendChild(log);
   panel.appendChild(spriteForm(state, runtime));
+  return panel;
+}
+
+function spriteSettingsPanel() {
+  const panel = el("div", "afs-sprite-settings");
+  panel.setAttribute("data-sprite-settings", "true");
+  panel.innerHTML = "<h3>小精灵设置</h3><p>调整陪跑角色大小。位置可以直接拖动保存。</p>";
+  const grid = el("div", "afs-sprite-size-grid");
+  const current = getSpriteScale().id;
+  for (const option of SPRITE_SCALE_OPTIONS) {
+    const button = el("button", `afs-sprite-size-button${option.id === current ? " active" : ""}`, option.label);
+    button.type = "button";
+    button.addEventListener("click", () => {
+      setSpriteScale(option.id);
+      renderSpriteWidget(lastState, lastRuntime);
+    });
+    grid.appendChild(button);
+  }
+  panel.appendChild(grid);
   return panel;
 }
 

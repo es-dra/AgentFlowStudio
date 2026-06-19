@@ -12,6 +12,27 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio mascot and edge disconnect addendum: 2026-06-19 pass made two
+front-end interaction improvements requested during Studio polish. The movable
+`AFS 小精灵` now uses a cartoon mascot skin through
+`apps/studio/styles/studio-sprite-avatar-mascot.css`, opens a small settings
+panel on right-click, and persists local size choices through
+`afs_studio_sprite_scale`. Canvas connections now support natural removal:
+clicking an edge selects it, a compact inline disconnect control appears on the
+line, and Delete / Backspace removes the selected connection through the same
+store mutation path. Verification: sprite and edge tests first failed on the
+missing mascot skin and missing edge-action module, then passed after
+implementation; focused Studio/sprite regression passed 28 / 1 existing warning;
+`npm run check:studio-js` passed for 94 files; browser smoke confirmed the
+mascot rendered, size persisted, old mechanical body stayed hidden, and the
+real render-chain edge disconnect removed edge `e1`; maintenance audit
+failed=0 with warnings only; `git diff --check` passed with one CRLF
+normalization warning for `apps/studio/src/nodes.js`. Boundary: no Runtime API
+shape changed, no provider gate changed, no provider config changed, no
+provider call was made, and no provider raw response, signed URL, local media
+byte, local path, invite code, or secret was exposed; not human acceptance or
+business validation.
+
 Current Studio generation action module split addendum: 2026-06-19 pass split
 `apps/studio/src/node-actions.js` from a 446-line mixed action/generation module
 into an 80-line top-level node action router plus focused generation helpers:

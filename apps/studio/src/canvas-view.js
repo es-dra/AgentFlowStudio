@@ -5,12 +5,12 @@ import { renderEdges } from "./canvas-edges.js";
 import { icon } from "./icons.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
-export function renderCanvas(state) {
+export function renderCanvas(state, store) {
   const world = document.getElementById("world");
   world.style.transform = `translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${state.viewport.scale})`;
   const relations = relationSets(state);
   renderNodes(state, relations);
-  renderEdges(state, relations);
+  renderEdges(state, relations, store);
   renderEmptyState(state);
   const zoomLabel = document.querySelector("#corner-controls .zoom-label");
   if (zoomLabel) zoomLabel.textContent = `${Math.round(state.viewport.scale * 100)}%`;

@@ -1,10 +1,11 @@
+import { bindEdgeActionButton } from "./canvas-edge-actions.js";
 import { bezier } from "./geometry.js";
 import { nodeFramePortWorldPoint } from "./interaction/port-geometry.js";
 import { effectiveHeight } from "./nodes.js";
 
 const EDGE_OFFSET = 20000;
 
-export function renderEdges(state, relations) {
+export function renderEdges(state, relations, store) {
   const group = edgeGroup("edges");
   const seen = new Set();
   for (const edge of Object.values(state.edges)) {
@@ -13,7 +14,7 @@ export function renderEdges(state, relations) {
     if (!from || !to) continue;
     seen.add(edge.id);
     const item = edgeElement(group, edge.id);
-    syncEdgeElement(item, edge, from, to, state, relations);
+    syncEdgeElement(item, edge, from, to, state, relations, store);
   }
   for (const item of [...group.children]) {
     if (!seen.has(item.dataset.edgeId)) item.remove();
@@ -31,15 +32,21 @@ function edgeElement(group, edgeId) {
   path.classList.add("edge-flow");
   const spark = document.createElementNS("http://www.w3.org/2000/svg", "path");
   spark.classList.add("edge-spark");
-  item.append(path, spark, label);
+  const action = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  action.classList.add("edge-disconnect-button");
+  action.setAttribute("role", "button");
+  action.setAttribute("aria-label", "断开连线");
+  action.innerHTML = '<circle r="12"></circle><path d="M-4 -4l8 8M4 -4l-8 8"></path>';
+  item.append(path, spark, label, action);
   group.appendChild(item);
   return item;
 }
 
-function syncEdgeElement(item, edge, from, to, state, relations) {
+function syncEdgeElement(item, edge, from, to, state, relations, store) {
   const path = item.querySelector("path.edge-flow");
   const spark = item.querySelector("path.edge-spark");
   const label = item.querySelector(".edge-label");
+  const action = item.querySelector(".edge-disconnect-button");
   const start = nodeFramePortWorldPoint(from, "out", state.viewport)
     || { x: from.x + from.w, y: from.y + effectiveHeight(from) / 2 };
   const end = nodeFramePortWorldPoint(to, "in", state.viewport)
@@ -56,13 +63,22 @@ function syncEdgeElement(item, edge, from, to, state, relations) {
   path.classList.toggle("reference-edge", relation === "reference");
   path.classList.toggle("selected-edge", state.selection.edgeId === edge.id);
   path.classList.toggle("just-connected", state.ui.lastConnectedEdgeId === edge.id);
+  item.dataset.edgeSelected = state.selection.edgeId === edge.id ? "true" : "false";
   path.classList.remove("rel-up-edge", "rel-down-edge", "rel-dim-edge");
   label.textContent = relation === "director" ? "导演台" : relation === "reference" ? "参考" : "";
   label.setAttribute("x", String((x1 + x2) / 2));
   label.setAttribute("y", String((y1 + y2) / 2 - 8));
   label.classList.toggle("visible", Boolean(label.textContent));
+  syncEdgeActionButton(action, item, edge, store, (x1 + x2) / 2, (y1 + y2) / 2, state.selection.edgeId === edge.id);
   syncEdgeRelationClass(path, edge, relations);
   syncEdgeSpark(spark, edge, state);
+}
+
+function syncEdgeActionButton(action, item, edge, store, x, y, selected) {
+  action.setAttribute("transform", `translate(${x}, ${y})`);
+  action.style.opacity = selected ? "1" : "";
+  action.style.pointerEvents = selected ? "auto" : "";
+  bindEdgeActionButton(item, edge, store);
 }
 
 function syncEdgeSpark(spark, edge, state) {

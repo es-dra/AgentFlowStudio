@@ -2,7 +2,13 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-export const SPRITE_POSITION_VERSION = "2026-06-navigator-companion-v2";
+export const SPRITE_POSITION_VERSION = "2026-06-mascot-companion-v1";
+export const SPRITE_SCALE_KEY = "afs_studio_sprite_scale";
+export const SPRITE_SCALE_OPTIONS = [
+  { id: "small", label: "小", value: 0.82 },
+  { id: "normal", label: "中", value: 1 },
+  { id: "large", label: "大", value: 1.18 },
+];
 export const SPRITE_SIZE = 180;
 const SPRITE_MARGIN = 18;
 const SPRITE_HEIGHT = 206;
@@ -76,7 +82,35 @@ export function bindSpriteViewportClamp() {
 }
 
 export function applySpritePosition(root) {
+  applySpriteScale(root);
   setSpritePosition(spritePosition || readSpritePosition() || defaultSpritePosition(), root);
+}
+
+export function getSpriteScale() {
+  try {
+    const value = window.localStorage?.getItem(SPRITE_SCALE_KEY);
+    return SPRITE_SCALE_OPTIONS.find((item) => item.id === value) || SPRITE_SCALE_OPTIONS[1];
+  } catch {
+    return SPRITE_SCALE_OPTIONS[1];
+  }
+}
+
+export function setSpriteScale(scaleId, root = document.getElementById("sprite-root")) {
+  const option = SPRITE_SCALE_OPTIONS.find((item) => item.id === scaleId) || SPRITE_SCALE_OPTIONS[1];
+  try {
+    window.localStorage?.setItem(SPRITE_SCALE_KEY, option.id);
+  } catch {
+    // Local UI preference only; blocked storage should not break the companion.
+  }
+  applySpriteScale(root);
+  setSpritePosition(spritePosition || readSpritePosition() || defaultSpritePosition(), root);
+  storeSpritePosition(spritePosition);
+  return option;
+}
+
+function applySpriteScale(root = document.getElementById("sprite-root")) {
+  if (!root) return;
+  root.style.setProperty("--sprite-scale", String(getSpriteScale().value));
 }
 
 export function rememberSpritePositionFromRoot(root = document.getElementById("sprite-root")) {
@@ -125,11 +159,11 @@ export function safeDefaultSpritePosition() {
   const inspectorRect = visibleOverlayRect("inspector");
   const dockRect = visibleOverlayRect("dock");
   const rightSafeX = inspectorRect
-    ? inspectorRect.left - SPRITE_SIZE - 24
-    : window.innerWidth - SPRITE_SIZE - 24;
+    ? inspectorRect.left - scaledSpriteWidth() - 24
+    : window.innerWidth - scaledSpriteWidth() - 24;
   const bottomSafeY = dockRect
-    ? dockRect.top - SPRITE_HEIGHT - 22
-    : window.innerHeight - SPRITE_HEIGHT - 48;
+    ? dockRect.top - scaledSpriteHeight() - 22
+    : window.innerHeight - scaledSpriteHeight() - 48;
   return {
     x: Math.max(SPRITE_MARGIN, Math.round(rightSafeX)),
     y: Math.max(76, Math.round(bottomSafeY)),
@@ -149,8 +183,8 @@ function visibleOverlayRect(id) {
 }
 
 export function clampSpritePosition(position) {
-  const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 10);
-  const maxY = Math.max(76, window.innerHeight - SPRITE_HEIGHT - 10);
+  const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - scaledSpriteWidth() - 10);
+  const maxY = Math.max(76, window.innerHeight - scaledSpriteHeight() - 10);
   const rawX = Number(position?.x);
   const rawY = Number(position?.y);
   const nextX = Number.isFinite(rawX) ? rawX : maxX;
@@ -159,4 +193,12 @@ export function clampSpritePosition(position) {
     x: Math.max(SPRITE_MARGIN, Math.min(maxX, Math.round(nextX))),
     y: Math.max(76, Math.min(maxY, Math.round(nextY))),
   };
+}
+
+function scaledSpriteWidth() {
+  return SPRITE_SIZE * getSpriteScale().value;
+}
+
+function scaledSpriteHeight() {
+  return SPRITE_HEIGHT * getSpriteScale().value;
 }

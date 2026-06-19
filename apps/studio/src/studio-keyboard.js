@@ -1,6 +1,6 @@
 import { zoomAt } from "./geometry.js";
 import { fitVisibleCanvasViewport, visibleCanvasCenter, visibleCanvasFrame } from "./canvas-safe-area.js";
-import { deleteNodes, duplicateNode } from "./nodes.js";
+import { deleteNodes, duplicateNode, removeEdge } from "./nodes.js";
 import { startNodeGeneration } from "./node-actions.js";
 import { closeTop, hasOpenOverlay } from "./overlay.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
@@ -43,7 +43,7 @@ function handleEscape(e, store) {
     closeTop();
     return true;
   }
-  if (store.get().selection.nodeIds.length) {
+  if (store.get().selection.nodeIds.length || store.get().selection.edgeId) {
     store.set((s) => { s.selection = { nodeIds: [], edgeId: null }; }, { history: false, persist: false });
     return true;
   }
@@ -52,6 +52,7 @@ function handleEscape(e, store) {
 }
 
 function handleNodeCommands(e, store, runtime) {
+  if (handleSelectedEdgeDelete(e, store)) return true;
   if ((e.key === "Delete" || e.key === "Backspace") && store.get().selection.nodeIds.length) {
     deleteNodes(store, store.get().selection.nodeIds);
     return true;
@@ -67,6 +68,15 @@ function handleNodeCommands(e, store, runtime) {
     return true;
   }
   return false;
+}
+
+function handleSelectedEdgeDelete(e, store) {
+  if (e.key !== "Delete" && e.key !== "Backspace") return false;
+  const edgeId = store.get().selection.edgeId;
+  if (!edgeId) return false;
+  e.preventDefault();
+  removeEdge(store, edgeId);
+  return true;
 }
 
 function handleCanvasCommands(e, store, runtime) {

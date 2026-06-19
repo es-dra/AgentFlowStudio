@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-19 - Studio Mascot Companion And Edge Disconnect
+
+- Reworked the movable `AFS 小精灵` into a cartoon mascot skin for the first
+  company-IP direction, while keeping the existing Runtime sprite chat
+  boundary.
+- Added right-click settings for the sprite with small / medium / large size
+  options, persisted as a local UI preference.
+- Added a low-burden edge disconnect affordance: selecting a connection shows
+  a compact inline disconnect control, and Delete / Backspace removes the
+  selected edge.
+- Kept edge selection and edge deletion inside the Studio store path so node
+  rendering, graph relations, and persistence continue using the existing
+  canvas state model.
+
+Verification:
+
+```text
+TDD red: sprite static test failed on missing mascot skin, then passed after implementation
+TDD red: Studio interaction test failed on missing canvas-edge-actions.js, then passed after implementation
+tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py tests/test_studio_interaction_layer.py tests/test_web_studio_mature_shell_static.py -q -> 28 passed / 1 existing warning
+npm run check:studio-js -> passed for 94 files
+tools/maintenance_audit.py -> failed=0; warnings only
+git diff --check -> passed with one CRLF normalization warning in apps/studio/src/nodes.js
+browser smoke -> mascot rendered as data-sprite-character="mascot"; size large persisted; old mechanical body hidden; edge render chain selected e1 and disconnect removed it; console warn/error count 0
+```
+
+Boundaries:
+
+- No Runtime API shape was changed.
+- No provider gate or provider config was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, local path, invite
+  code, or secret was exposed.
+- This is local static/browser verification, not human acceptance or business
+  validation.
+
 ## 2026-06-19 - Studio Generation Action Module Split
 
 - Split `apps/studio/src/node-actions.js` from a mixed 446-line node action

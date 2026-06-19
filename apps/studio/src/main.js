@@ -202,7 +202,7 @@ function renderAll(state) {
       window.location.href = "/";
     },
   });
-  renderCanvas(state);
+  renderCanvas(state, store);
   renderDrawer(state, store, runtimeRef);
   renderInspectorPanel(state, store, runtimeRef);
   renderPromptBar(state, store, runtime);

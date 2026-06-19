@@ -146,6 +146,38 @@ def test_default_canvas_edges_use_solid_frame_connection() -> None:
     assert "animation-name: edge-spark-reverse" in styles
 
 
+def test_canvas_edges_support_lightweight_disconnect_affordance() -> None:
+    index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    canvas_edges = (STUDIO_ROOT / "src" / "canvas-edges.js").read_text(encoding="utf-8")
+    edge_actions = (STUDIO_ROOT / "src" / "canvas-edge-actions.js").read_text(encoding="utf-8")
+    keyboard = (STUDIO_ROOT / "src" / "studio-keyboard.js").read_text(encoding="utf-8")
+    nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "canvas-edge-actions.css").read_text(encoding="utf-8")
+
+    assert './styles/canvas-edge-actions.css' in index
+    assert "renderEdges(state, relations, store)" in canvas_view
+    assert "syncEdgeActionButton" in canvas_edges
+    assert "edge-disconnect-button" in canvas_edges
+    assert "bindEdgeActionButton" in edge_actions
+    assert "selectEdge(store, edgeId)" in edge_actions
+    assert "disconnectEdge(store, edgeId)" in edge_actions
+    assert "removeEdge(store, edgeId)" in nodes
+    assert "handleSelectedEdgeDelete(e, store)" in keyboard
+    assert "store.get().selection.edgeId" in keyboard
+    for marker in (
+        ".edge-disconnect-button",
+        "#edge-layer [data-edge-id]:hover .edge-disconnect-button",
+        "#edge-layer [data-edge-selected=\"true\"] .edge-disconnect-button",
+        "opacity: 0",
+        "pointer-events: none",
+        "pointer-events: auto",
+    ):
+        assert marker in styles
+    assert len(edge_actions.splitlines()) <= 120
+    assert len(styles.splitlines()) <= 120
+
+
 def test_port_magnet_module_finds_side_ports_without_exact_button_hit() -> None:
     code = r"""
 import { outputPortFromMagnet, updatePortMagnet, clearPortMagnet } from './apps/studio/src/interaction/port-magnet.js';
