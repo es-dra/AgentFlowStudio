@@ -122,6 +122,23 @@
   cursor: grab;
 }
 
+#sprite-root.is-dragging .sprite-arm.left {
+  transform: rotate(-32deg) translate(-3px, -2px);
+}
+
+#sprite-root.is-dragging .sprite-arm.right {
+  transform: rotate(32deg) translate(3px, -2px);
+}
+
+#sprite-root.is-dragging .sprite-personality-tag {
+  transform: translateX(-50%) translateY(-3px);
+}
+
+#sprite-root.is-dragging .sprite-shadow {
+  opacity: 0.78;
+  transform: scaleX(0.82);
+}
+
 #sprite-root.is-dragging .sprite-halo-crown,
 #sprite-root.is-dragging .sprite-wand::after {
   filter: brightness(1.2) saturate(1.18);

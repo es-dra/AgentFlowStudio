@@ -55,7 +55,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert 'data-sprite-role", "movable-companion"' in sprite
     assert "runtime.spriteChat" in sprite
     assert "SPRITE_POSITION_KEY" in position
+    assert "SPRITE_POSITION_VERSION" in position
     assert "SPRITE_SIZE" in position
+    assert "safeDefaultSpritePosition" in position
     assert "startSpriteDrag" in sprite
     assert "nudgeSpritePosition" in sprite
     assert "rememberSpritePositionFromRoot" in sprite
@@ -126,6 +128,11 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite
+    assert 'data-sprite-drag-handle="true"' in sprite
     assert ".afs-sprite.open .sprite-status-light" in sprite_styles
     assert 'content: "拖动我"' in sprite_styles
+    assert "version: SPRITE_POSITION_VERSION" in position
+    assert "value?.version === SPRITE_POSITION_VERSION" in position
+    assert "sprite-arm left" in sprite
+    assert "#sprite-root.is-dragging .sprite-arm.left" in sprite_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles

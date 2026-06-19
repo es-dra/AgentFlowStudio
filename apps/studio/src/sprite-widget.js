@@ -53,7 +53,7 @@ function spriteOrb() {
     '<span class="sprite-character-shell"></span>',
     '<span class="sprite-hood"></span>',
     '<span class="sprite-helmet-glass"></span>',
-    '<span class="sprite-move-handle" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
+    '<span class="sprite-move-handle" data-sprite-drag-handle="true" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
     '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-aura"></span>',
     '<span class="sprite-antenna"></span>',

@@ -2805,3 +2805,29 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
+
+## 2026-06-19 - Sprite Companion Movable Polish
+
+- Versioned the Studio sprite position storage so old local positions do not strand the redesigned companion in the middle of the canvas.
+- Changed the default sprite landing point to avoid the right inspector and bottom dock while still keeping it available on the canvas.
+- Marked the visible move handle as a first-class drag affordance and added drag-state response for arms, nameplate, shadow, and thruster.
+- Verified the sprite keeps a clear character silhouette after moving and stays wired to the existing Runtime `sprite/chat` LLM boundary.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py: 1 passed
+tests/test_web_studio_static.py + tests/test_web_studio_sprite_static.py: 11 passed
+npm run check:studio-js: passed for 90 files
+Browser check on http://127.0.0.1:8797/studio/: default sprite placement avoided inspector/dock; drag moved position from (768,414) to (598,315)
+pytest -q: 536 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0 with existing warnings only
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is local browser/runtime verification, not human acceptance or business validation.

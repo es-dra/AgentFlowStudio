@@ -2,6 +2,7 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
+export const SPRITE_POSITION_VERSION = "2026-06-navigator-companion-v2";
 export const SPRITE_SIZE = 180;
 const SPRITE_MARGIN = 18;
 const SPRITE_HEIGHT = 206;
@@ -97,7 +98,7 @@ function setSpritePosition(position, root = document.getElementById("sprite-root
 function readSpritePosition() {
   try {
     const value = JSON.parse(window.localStorage?.getItem(SPRITE_POSITION_KEY) || "null");
-    if (Number.isFinite(value?.x) && Number.isFinite(value?.y)) return value;
+    if (value?.version === SPRITE_POSITION_VERSION && Number.isFinite(value?.x) && Number.isFinite(value?.y)) return value;
   } catch {
     return null;
   }
@@ -107,17 +108,44 @@ function readSpritePosition() {
 export function storeSpritePosition(position) {
   if (!position) return;
   try {
-    window.localStorage?.setItem(SPRITE_POSITION_KEY, JSON.stringify(clampSpritePosition(position)));
+    window.localStorage?.setItem(SPRITE_POSITION_KEY, JSON.stringify({
+      version: SPRITE_POSITION_VERSION,
+      ...clampSpritePosition(position),
+    }));
   } catch {
     // Storage can be blocked; the current session position still remains live.
   }
 }
 
 function defaultSpritePosition() {
+  return safeDefaultSpritePosition();
+}
+
+export function safeDefaultSpritePosition() {
+  const inspectorRect = visibleOverlayRect("inspector");
+  const dockRect = visibleOverlayRect("dock");
+  const rightSafeX = inspectorRect
+    ? inspectorRect.left - SPRITE_SIZE - 24
+    : window.innerWidth - SPRITE_SIZE - 24;
+  const bottomSafeY = dockRect
+    ? dockRect.top - SPRITE_HEIGHT - 22
+    : window.innerHeight - SPRITE_HEIGHT - 48;
   return {
-    x: Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 24),
-    y: Math.max(76, window.innerHeight - SPRITE_HEIGHT - 48),
+    x: Math.max(SPRITE_MARGIN, Math.round(rightSafeX)),
+    y: Math.max(76, Math.round(bottomSafeY)),
   };
+}
+
+function visibleOverlayRect(id) {
+  const element = document.getElementById(id);
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  if (rect.width < 80 || rect.height < 32) return null;
+  const isVisible = rect.right > 0
+    && rect.bottom > 0
+    && rect.left < window.innerWidth
+    && rect.top < window.innerHeight;
+  return isVisible ? rect : null;
 }
 
 export function clampSpritePosition(position) {
