@@ -1,7 +1,7 @@
 .sprite-label {
   position: absolute;
-  right: 132px;
-  top: 50px;
+  right: 156px;
+  top: 66px;
   max-width: 104px;
   padding: 6px 9px;
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -19,7 +19,7 @@
 
 #sprite-root[data-dock="left"] .sprite-label {
   right: auto;
-  left: 132px;
+  left: 156px;
   transform: translateX(-8px);
 }
 
@@ -51,6 +51,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sprite-body,
+  .sprite-drag-chip,
   .sprite-dock-ring i,
   .sprite-core,
   .sprite-eye-glow {

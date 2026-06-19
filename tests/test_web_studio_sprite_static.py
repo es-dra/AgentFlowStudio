@@ -23,6 +23,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "afs-sprite" in sprite
     assert "AFS 小精灵" in sprite
     assert "data-sprite-draggable" in sprite
+    assert "sprite-drag-chip" in sprite
     assert "runtime.spriteChat" in sprite
     assert "SPRITE_POSITION_KEY" in sprite
     assert "SPRITE_SIZE" in sprite
@@ -45,19 +46,27 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-avatar" in sprite_styles
     assert ".sprite-drag-halo" in sprite_styles
+    assert ".sprite-drag-chip" in sprite_styles
     assert ".sprite-dock-ring" in sprite_styles
     assert ".sprite-backplate" in sprite_styles
+    assert ".sprite-tail-fin" in sprite_styles
     assert ".sprite-cockpit" in sprite_styles
+    assert ".sprite-canopy" in sprite_styles
     assert ".sprite-head-shell" in sprite_styles
     assert ".sprite-body" in sprite_styles
+    assert ".sprite-shoulder.left" in sprite_styles
     assert ".sprite-arm.left" in sprite_styles
     assert ".sprite-hand.left" in sprite_styles
+    assert ".sprite-mitten.left" in sprite_styles
     assert ".sprite-face" in sprite_styles
     assert ".sprite-visor" in sprite_styles
+    assert ".sprite-cheek.left" in sprite_styles
+    assert ".sprite-mouth" in sprite_styles
     assert ".sprite-eye-glow" in sprite_styles
     assert ".sprite-status-light" in sprite_styles
     assert ".sprite-core" in sprite_styles
     assert ".sprite-thruster" in sprite_styles
+    assert ".sprite-glow-trail" in sprite_styles
     assert "#sprite-root.is-dragging .sprite-thruster" in sprite_styles
     assert ".sprite-wing.left" in sprite_styles
     assert ".sprite-foot.left" in sprite_styles

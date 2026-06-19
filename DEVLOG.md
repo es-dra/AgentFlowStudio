@@ -31,10 +31,11 @@ not human acceptance or business validation.
 ## 2026-06-19 - Sprite Character Design Pass
 
 - Reworked the decorative `AFS 小精灵` from a button-like floating helper into
-  a clearer movable micro-assistant character. The avatar now has a larger
-  fixed footprint, cockpit glass, scanner visor, status light, side arms,
-  hands, wings, feet, dock ring, and thruster so it reads as a character at
-  normal Studio scale.
+  a clearer movable canvas companion. The avatar now has a larger fixed
+  footprint, visible drag chip, cockpit glass, canopy highlight, scanner visor,
+  cheek/mouth detail, status light, shoulders, arms, mittens, wings, feet,
+  tail fin, dock ring, glow trail, and thruster so it reads as a character at
+  normal Studio scale rather than a generic floating control.
 - Preserved the existing Runtime chat boundary and drag behavior. The avatar
   and panel header remain draggable, position is clamped with separate width
   and height values, and local storage persists only viewport coordinates.
@@ -48,8 +49,9 @@ Verification:
 tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -> 6 passed / 1 warning
 npm run check:studio-js -> JS syntax check passed: 87 files
 git diff --check -> passed
-Browser check on 127.0.0.1:8797/studio -> character parts=7, drag moved,
-  position stored, panel stayed in viewport, open status light turned green,
+Browser check on 127.0.0.1:8799/studio -> character parts=8, avatar drag moved
+  -180/-120 and persisted position, panel-header drag moved and persisted
+  within viewport clamp, panel opened, open status light turned green,
   console warn/error count=0
 ```
 

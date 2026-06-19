@@ -11,10 +11,10 @@ let suppressSpriteClick = false;
 let spriteResizeBound = false;
 const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
 const SPRITE_MARGIN = 18;
-const SPRITE_SIZE = 132;
-const SPRITE_HEIGHT = 150;
+const SPRITE_SIZE = 156;
+const SPRITE_HEIGHT = 176;
 const spriteMessages = [
-  { role: "sprite", text: "我在这里陪你看画布。可以问我下一步、素材确认或节点连线。" },
+  { role: "sprite", text: "我在这里看着画布。可以问我下一步、素材确认或节点连线。" },
 ];
 
 export function renderSpriteWidget(state, runtime) {
@@ -46,18 +46,26 @@ function spriteOrb() {
   button.innerHTML = [
     '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
+    '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-aura"></span>',
     '<span class="sprite-antenna"></span>',
     '<span class="sprite-wing left"></span>',
     '<span class="sprite-wing right"></span>',
-    '<span class="sprite-arm left"><span class="sprite-hand left"></span></span>',
-    '<span class="sprite-arm right"><span class="sprite-hand right"></span></span>',
+    '<span class="sprite-tail-fin"></span>',
+    '<span class="sprite-shoulder left"></span>',
+    '<span class="sprite-shoulder right"></span>',
+    '<span class="sprite-arm left"><span class="sprite-hand left"></span><span class="sprite-mitten left"></span></span>',
+    '<span class="sprite-arm right"><span class="sprite-hand right"></span><span class="sprite-mitten right"></span></span>',
     '<span class="sprite-backplate"></span>',
     '<span class="sprite-body">',
     '  <span class="sprite-cockpit"></span>',
+    '  <span class="sprite-canopy"></span>',
     '  <span class="sprite-head-shell"></span>',
     '  <span class="sprite-face">',
+    '    <span class="sprite-cheek left"></span>',
     '    <span class="sprite-visor"><span class="sprite-eye-glow"></span><i></i><i></i><b></b></span>',
+    '    <span class="sprite-cheek right"></span>',
+    '    <span class="sprite-mouth"></span>',
     "  </span>",
     '  <span class="sprite-core"></span>',
     '  <span class="sprite-status-light"></span>',
@@ -66,6 +74,7 @@ function spriteOrb() {
     '<span class="sprite-foot left"></span>',
     '<span class="sprite-foot right"></span>',
     '<span class="sprite-thruster"></span>',
+    '<span class="sprite-glow-trail"></span>',
     '<span class="sprite-shadow"></span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
@@ -259,13 +268,13 @@ function storeSpritePosition(position) {
 function defaultSpritePosition() {
   return {
     x: Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 24),
-    y: Math.max(76, window.innerHeight - SPRITE_HEIGHT - 56),
+    y: Math.max(76, window.innerHeight - SPRITE_HEIGHT - 48),
   };
 }
 
 function clampSpritePosition(position) {
   const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 10);
-  const maxY = Math.max(76, window.innerHeight - SPRITE_HEIGHT - 12);
+  const maxY = Math.max(76, window.innerHeight - SPRITE_HEIGHT - 10);
   const rawX = Number(position?.x);
   const rawY = Number(position?.y);
   const nextX = Number.isFinite(rawX) ? rawX : maxX;
