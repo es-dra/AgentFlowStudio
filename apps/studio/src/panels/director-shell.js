@@ -1,8 +1,6 @@
 import { showModal, el } from "../overlay.js";
 import { icon } from "../icons.js";
 import {
-  DIRECTOR_OBJECTS,
-  allDirectorObjects,
   createDefaultDirectorSetup,
   directorPromptSummary,
   directorSummary,
@@ -21,39 +19,32 @@ import {
   subjectFields,
   textField,
 } from "./director-fields.js";
+import {
+  createDirectorShellFrame,
+  renderDirectorBoard,
+  renderDirectorIntentPreview,
+  renderDirectorObjectList,
+} from "./director-shell-render.js";
+import { addDirectorObject } from "./director-object-factory.js";
 
 export function openDirectorShell(store, node) {
   let setup = normalizeDirectorSetup(node.params.directorSetup);
   let drag = null;
   let activeView = "layout";
 
-  const modal = el("div", "modal director-modal director-2d-modal");
-  const top = el("div", "d-top");
-  top.appendChild(el("span", "d-title", "二维导演台"));
-  const views = el("div", "d-views");
-  const layoutTab = el("button", "modal-tab active", "顶视布置");
-  const intentTab = el("button", "modal-tab", "镜头意图");
-  views.append(layoutTab, intentTab);
-  top.appendChild(views);
-  const closeBtn = el("button", "modal-close");
-  closeBtn.innerHTML = icon("x", 15);
-  top.appendChild(closeBtn);
-  modal.appendChild(top);
-
-  const main = el("div", "d-main");
-  const scene = el("div", "d-scene director-objects");
-  const board = el("div", "d-viewport director-board");
-  const props = el("div", "d-props director-props");
-  main.append(scene, board, props);
-  modal.appendChild(main);
-
-  const bottom = el("div", "d-bottom director-actions");
-  const saveBtn = el("button", "cam-use-btn", "保存布置");
-  const applyBtn = el("button", "cam-use-btn", "应用到相连节点");
-  const promptBtn = el("button", "cam-use-btn", "生成提示词片段");
-  const resetBtn = el("button", "cam-use-btn muted", "重置布局");
-  bottom.append(saveBtn, applyBtn, promptBtn, resetBtn);
-  modal.appendChild(bottom);
+  const {
+    modal,
+    layoutTab,
+    intentTab,
+    closeBtn,
+    scene,
+    board,
+    props,
+    saveBtn,
+    applyBtn,
+    promptBtn,
+    resetBtn,
+  } = createDirectorShellFrame();
 
   renderAll();
 
@@ -109,70 +100,23 @@ export function openDirectorShell(store, node) {
   }
 
   function renderIntentPreview() {
-    scene.replaceChildren();
-    scene.appendChild(el("div", "d-scene-label", "编译预览"));
-    scene.appendChild(el("div", "p-readonly", directorSummary(setup)));
-    board.replaceChildren();
-    const preview = el("div", "director-intent-preview");
-    preview.textContent = directorPromptSummary(setup);
-    board.appendChild(preview);
-    props.replaceChildren();
-    props.appendChild(el("div", "d-scene-label", "检查"));
-    for (const warning of localDirectorWarnings(setup)) {
-      props.appendChild(el("div", "bundle-warning", warning));
-    }
+    renderDirectorIntentPreview({ scene, board, props, setup, warnings: localDirectorWarnings(setup) });
   }
 
   function renderObjectList() {
-    scene.replaceChildren();
-    scene.appendChild(el("div", "d-scene-label", "对象"));
-    const search = el("div", "drawer-search");
-    search.innerHTML = icon("search", 13);
-    const input = document.createElement("input");
-    input.placeholder = "搜索对象";
-    search.appendChild(input);
-    scene.appendChild(search);
-
-    for (const def of DIRECTOR_OBJECTS) {
-      const entry = objectByKind(setup, def.kind);
-      const item = el("button", `tree-item${entry?.object.id === setup.selectedId ? " selected" : ""}`);
-      item.innerHTML = `<span class="tree-icon">${icon(iconForKind(def.kind), 12)}</span><span class="tree-label">${entry ? def.label : `+ ${def.label}`}</span>`;
-      item.addEventListener("click", () => {
+    renderDirectorObjectList({
+      scene,
+      setup,
+      onObjectSelect: (def, entry) => {
         const current = entry || addDirectorObject(setup, def);
         setup.selectedId = current.object.id;
         renderAll();
-      });
-      scene.appendChild(item);
-    }
+      },
+    });
   }
 
   function renderBoard() {
-    board.replaceChildren();
-    const guide = el("div", "director-board-hint", "拖动相机、人物、灯光和道具来布置镜头");
-    board.appendChild(guide);
-    for (const entry of allDirectorObjects(setup)) {
-      board.appendChild(renderBoardObject(entry));
-    }
-  }
-
-  function renderBoardObject(entry) {
-    const obj = entry.object;
-    const item = el("button", `director-object ${entry.group} kind-${obj.kind || entry.group}${obj.id === setup.selectedId ? " selected" : ""}`);
-    item.dataset.objectId = obj.id;
-    item.style.left = `${obj.x}%`;
-    item.style.top = `${obj.y}%`;
-    item.style.setProperty("--angle", `${obj.angle || 0}deg`);
-    if (entry.group === "prop") {
-      item.style.width = `${obj.width || 12}%`;
-      item.style.height = `${obj.height || 8}%`;
-    }
-    if (entry.group === "camera") item.innerHTML = `<span class="camera-cone"></span>${icon("filmcam", 15)}<span>${obj.name}</span>`;
-    else if (entry.group === "light") item.innerHTML = `<span class="light-cone"></span>${icon("sparkles", 14)}<span>${obj.name}</span>`;
-    else if (entry.group === "subject") item.innerHTML = `${icon("user", 15)}<span>${obj.name}</span><span class="facing-arrow">↑</span>`;
-    else if (entry.group === "modifier") item.innerHTML = `${icon(iconForKind(obj.kind), 14)}<span>${obj.name}</span>`;
-    else item.innerHTML = `<span>${obj.name}</span>`;
-    item.addEventListener("pointerdown", (event) => startDrag(event, item, obj));
-    return item;
+    renderDirectorBoard({ board, setup, onObjectPointerDown: startDrag });
   }
 
   function startDrag(event, item, obj) {
@@ -341,48 +285,4 @@ function localDirectorWarnings(setup) {
   if (!setup.cameras.length) warnings.push("当前没有机位。");
   if (!setup.subjects.length) warnings.push("当前没有主体。");
   return warnings.length ? warnings : ["后端会在优化/生成时使用 Director Compiler v1 编译摄影语言。"];
-}
-
-function objectByKind(setup, kind) {
-  return allDirectorObjects(setup).find((entry) => entry.object.kind === kind || entry.group === kind);
-}
-
-function addDirectorObject(setup, def) {
-  const kind = def.kind;
-  const id = `${kind}_${Date.now().toString(36)}`;
-  let object;
-  let group;
-  if (kind === "camera") {
-    group = "camera";
-    object = { id, kind: "camera", name: "机位", x: 22, y: 78, angle: -35, fov: 50, focalLength: 35, height: "平视", shot: "中景", composition: "", lookAt: "" };
-    setup.cameras.push(object);
-    setup.activeCameraId = setup.activeCameraId || id;
-  } else if (kind === "subject") {
-    group = "subject";
-    object = { id, kind: "subject", name: "主体", x: 53, y: 55, angle: 210, action: "", emotion: "", visual_asset_id: "" };
-    setup.subjects.push(object);
-    setup.activeSubjectIds = [...new Set([...(setup.activeSubjectIds || []), id])];
-  } else if (kind.includes("light")) {
-    group = "light";
-    object = { id, kind, name: def.label, x: 36, y: 30, angle: 45, intensity: 60, colorTemp: 4300, softness: 60, distance: 3, motivated: false };
-    setup.lights.push(object);
-  } else if (["reflector", "diffusion", "flag", "window_light"].includes(kind)) {
-    group = "modifier";
-    object = { id, kind, name: def.label, x: 45, y: 45, angle: 90, width: 16, influence: "" };
-    setup.modifiers.push(object);
-  } else {
-    group = "prop";
-    object = { id, kind, name: def.label, x: 58, y: 58, width: 14, height: 10, visible: true, narrative: "" };
-    setup.props.push(object);
-  }
-  return { group, object };
-}
-
-function iconForKind(kind) {
-  if (kind === "camera") return "filmcam";
-  if (kind === "subject") return "user";
-  if (kind.includes("light")) return "sparkles";
-  if (kind === "reflector" || kind === "diffusion" || kind === "flag") return "layers";
-  if (kind === "poster") return "image";
-  return "layers";
 }

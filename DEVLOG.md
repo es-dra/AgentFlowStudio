@@ -2856,3 +2856,30 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is frontend structure/runtime-boundary verification, not human acceptance or business validation.
+
+## 2026-06-19 - Director Shell Render Split
+
+- Split the Director Shell modal frame, object list, board rendering, and intent preview into `apps/studio/src/panels/director-shell-render.js`.
+- Split default director object construction into `apps/studio/src/panels/director-object-factory.js`.
+- Kept `apps/studio/src/panels/director-shell.js` focused on interaction orchestration: tab switching, drag state, save/apply actions, prompt append confirmation, and director asset projection.
+- Added static regression coverage so Director Shell stays under 300 lines while the render module owns visible layout rendering.
+
+Verification:
+
+```text
+Red test: tests/test_web_studio_mature_shell_static.py::test_director_shell_uses_active_ids_and_confirmed_append_only failed before the render module existed.
+tests/test_web_studio_mature_shell_static.py targeted director tests: 2 passed
+tests/test_web_studio_mature_shell_static.py + tests/test_web_studio_static.py + tests/test_web_studio_sprite_static.py + tests/test_studio_interaction_layer.py: 32 passed
+npm run check:studio-js: passed for 93 files
+Browser check on http://127.0.0.1:8797/studio/: Studio loaded with title "AFS Studio 创作图谱"; console warn/error count=0
+pytest -q: 536 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count dropped from 32 to 31
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is frontend structure/runtime-boundary verification, not human acceptance or business validation.
