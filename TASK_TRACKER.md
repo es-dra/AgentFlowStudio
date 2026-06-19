@@ -408,3 +408,9 @@ failed=0 with warnings only; `git diff --check` exit 0.
 | ID | Owner role | Scope | Status | Evidence |
 |---|---|---|---|---|
 | AFS-ASSET-CARD-DRAFT-MODULE-SPLIT-20260619 | Runtime/API Integrator + Maintainability Steward | Split asset-card draft route helpers for visual inspection dispatch/provider observation and safe artifact writing into focused modules. | Local verification passed; provider gates unchanged; no live provider call. Oversized warning count dropped from 39 to 38. | `apps/api/runtime_asset_card_drafts.py`, `apps/api/runtime_asset_card_observation.py`, `apps/api/runtime_asset_card_artifacts.py`, `tests/test_api_runtime_asset_card_modules.py`; pytest 532 passed / 527 deselected / 2 existing warnings; maintenance audit failed=0; `git diff --check` passed. |
+
+## Current Addendum - Auth Module Split
+
+| ID | Owner role | Scope | Status | Evidence |
+|---|---|---|---|---|
+| AFS-AUTH-MODULE-SPLIT-20260619 | Runtime/API Integrator + Internal Beta Steward | Split auth route/middleware assembly and password/session/token helpers out of `runtime_auth.py` while preserving invite registration, session auth, and project-owner isolation. | Local verification passed; auth policy unchanged; provider gates unchanged. Oversized warning count dropped from 38 to 37. | `apps/api/runtime_auth.py`, `apps/api/runtime_auth_routes.py`, `apps/api/runtime_auth_security.py`, `apps/api/runtime_service.py`, `tests/test_api_runtime_auth_modules.py`; auth/internal-beta focused tests 17 passed; pytest 533 passed / 527 deselected / 2 existing warnings; maintenance audit failed=0; `git diff --check` passed. |

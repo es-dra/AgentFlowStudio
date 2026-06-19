@@ -38,11 +38,8 @@ from apps.api.runtime_video_routes import register_runtime_video_routes
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_threadpool_compat import configure_runtime_threadpool_compat
-from apps.api.runtime_auth import (
-    RuntimeAuthStore,
-    configure_runtime_auth_middleware,
-    register_runtime_auth_routes,
-)
+from apps.api.runtime_auth import RuntimeAuthStore
+from apps.api.runtime_auth_routes import configure_runtime_auth_middleware, register_runtime_auth_routes
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import (
     DEFAULT_SITE_ROOT,

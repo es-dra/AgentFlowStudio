@@ -2553,6 +2553,30 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/module verification, not human acceptance or business validation.
 
+## 2026-06-19 - Auth Module Split
+
+- Split FastAPI auth route and middleware assembly into `apps/api/runtime_auth_routes.py`.
+- Split password hashing, session-token hashing, invite-code normalization, bearer parsing, TTL expiry, and timestamp helpers into `apps/api/runtime_auth_security.py`.
+- Kept `apps/api/runtime_auth.py` focused on request models, `RuntimeAuthStore`, user projection, and persisted auth-store reads.
+- Added a structural regression test to keep auth store, route assembly, and security helpers separated under the 300-line threshold.
+
+Verification:
+
+```text
+tests/test_api_runtime_auth.py + tests/test_api_runtime_auth_modules.py + tests/test_afs_internal_beta_acceptance.py + tests/test_afs_internal_beta_preflight_three_end.py: 17 passed / 1 existing Starlette/httpx warning
+pytest -q: 533 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count dropped from 38 to 37
+git diff --check: passed
+```
+
+Boundaries:
+
+- No auth policy was changed.
+- No provider gate was changed.
+- No provider call was made.
+- No invite code, session token, local path, signed URL, provider raw response, or media byte was added to reports.
+- This is runtime/internal-beta structure verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Internal Beta Preflight Split
 
 - Split HTTP preflight readiness logic out of `tools/afs_internal_beta_acceptance.py` into `tools/afs_internal_beta_acceptance_preflight.py`.
