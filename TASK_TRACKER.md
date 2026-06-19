@@ -12,6 +12,21 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current internal beta acceptance operating index addendum: 2026-06-19 pass
+added `docs/handoff/AFS-INTERNAL-BETA-ACCEPTANCE-OPERATING-INDEX-20260619.md`
+and linked it from the handoff index. The new entry consolidates the current
+operator routes for three-end readiness, deployed Runtime preflight,
+deterministic local contract, deployed HTTP acceptance, human review packet
+completion, claim ladder, and safety boundary. Verification: the new static
+test first failed on the missing operating index, then passed after the index
+was added; focused acceptance/preflight/review/three-end regression passed 23 /
+1 existing warning; maintenance audit failed=0 with warnings only and no new
+Chinese coverage warning; `git diff --check` passed. Boundary: no Runtime API,
+provider gate, provider config, provider call, server state, secret, invite code
+value, provider raw response, signed URL, local path, or media bytes changed;
+not human acceptance, provider smoke, business validation, or durable-memory
+promotion.
+
 Current Studio generation action module split addendum: 2026-06-19 pass split
 `apps/studio/src/node-actions.js` from a 446-line mixed action/generation module
 into an 80-line top-level node action router plus focused generation helpers:

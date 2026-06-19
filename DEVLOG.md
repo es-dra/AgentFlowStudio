@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-19 - Internal Beta Acceptance Operating Index
+
+- Added `docs/handoff/AFS-INTERNAL-BETA-ACCEPTANCE-OPERATING-INDEX-20260619.md`
+  as the current operator entry for internal beta readiness and acceptance.
+- Linked the new index from `docs/handoff/INDEX.md` so future handoffs start
+  from the current acceptance routes instead of older browser-QA notes.
+- Added a static regression test that requires the index to preserve the
+  three-end status command, deployed preflight command, HTTP acceptance invite
+  variables, claim ladder, and safety boundary.
+
+Verification:
+
+```text
+TDD red: tests/test_afs_internal_beta_acceptance_operating_index.py failed on missing operating index
+tests/test_afs_internal_beta_acceptance_operating_index.py -> 1 passed
+tests/test_afs_internal_beta_acceptance.py tests/test_afs_internal_beta_preflight_three_end.py tests/test_afs_internal_beta_acceptance_review.py tests/test_afs_internal_beta_human_review_record.py tests/test_afs_three_end_status.py tests/test_afs_internal_beta_acceptance_operating_index.py -> 23 passed / 1 warning
+tools/maintenance_audit.py -> failed=0; warnings only; no new Chinese coverage warning
+git diff --check -> passed
+```
+
+Boundary:
+
+- No Runtime API shape changed.
+- No provider gate or provider config changed.
+- No provider call was made.
+- No server state was changed.
+- No secret, invite code value, provider raw response, signed URL, local path,
+  or media bytes were added.
+- This is an operating index and static/runtime-contract verification, not
+  human acceptance, provider smoke, business validation, or durable-memory
+  promotion.
+
 ## 2026-06-19 - Studio Generation Action Module Split
 
 - Split `apps/studio/src/node-actions.js` from a mixed 446-line node action
