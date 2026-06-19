@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-06-19 - Sprite Companion Personality Polish
+
+- Refined the movable `AFS 小精灵` into a clearer Studio navigator character instead of a parts-heavy helper.
+- Added `data-sprite-character="navigator"` plus visible halo crown, glass helmet, face window, wand, and personality tag.
+- Isolated the final silhouette layer in `apps/studio/styles/studio-sprite-avatar-personality.css` so existing sprite CSS files stay within the maintenance threshold.
+- Extended the sprite static regression test so future changes must preserve the character-shape contract as well as the Runtime `sprite/chat` boundary.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py: red on missing character-shape contract, then 1 passed
+npm run check:studio-js: passed for 88 files
+Browser QA on http://127.0.0.1:8797/studio/: new character parts rendered, cursor=grab, drag moved from (558, 191) to (478, 151), panel opened without position jump, console warn/error count 0
+```
+
+Boundaries:
+
+- No Runtime API shape was changed.
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is frontend runtime/browser verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Studio State Module Split
 
 - Split `apps/api/runtime_studio_state.py` into a thin route module plus

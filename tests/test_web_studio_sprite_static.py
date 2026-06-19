@@ -15,6 +15,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     avatar_parts_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-parts.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
     avatar_redesign_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-redesign.css").read_text(encoding="utf-8")
+    avatar_personality_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-personality.css").read_text(encoding="utf-8")
     sprite_styles = (
         styles
         + avatar_styles
@@ -22,6 +23,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
         + avatar_parts_styles
         + avatar_motion_styles
         + avatar_redesign_styles
+        + avatar_personality_styles
     )
 
     assert '<div id="sprite-root"></div>' in index
@@ -40,6 +42,11 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-ear right" in sprite
     assert "sprite-scarf" in sprite
     assert "sprite-drag-chip" in sprite
+    assert "sprite-halo-crown" in sprite
+    assert "sprite-helmet-glass" in sprite
+    assert "sprite-face-window" in sprite
+    assert "sprite-wand" in sprite
+    assert "sprite-personality-tag" in sprite
     assert "sprite-hood" in sprite
     assert "sprite-eye left" in sprite
     assert "sprite-eye right" in sprite
@@ -70,6 +77,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-parts.css");' in styles
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
     assert '@import url("./studio-sprite-avatar-redesign.css");' in styles
+    assert '@import url("./studio-sprite-avatar-personality.css");' in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles
@@ -109,6 +117,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "#sprite-root.is-dragging .sprite-thruster" in sprite_styles
     assert ".sprite-wing.left" in sprite_styles
     assert ".sprite-foot.left" in sprite_styles
+    assert ".sprite-halo-crown" in sprite_styles
+    assert ".sprite-helmet-glass" in sprite_styles
+    assert ".sprite-face-window" in sprite_styles
+    assert ".sprite-wand" in sprite_styles
+    assert ".sprite-personality-tag" in sprite_styles
+    assert "move micro companion" in sprite_styles
     assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
     assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite

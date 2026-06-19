@@ -12,6 +12,22 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite companion personality polish addendum: 2026-06-19 pass refined
+the movable `AFS 小精灵` from a parts-heavy helper into a clearer Studio
+navigator character. The widget now declares `data-sprite-character="navigator"`
+and adds a halo crown, glass helmet, face window, small wand, and personality
+tag, with the final silhouette isolated in
+`apps/studio/styles/studio-sprite-avatar-personality.css` so existing sprite
+CSS files stay below the maintenance threshold. Verification: sprite static
+test first failed on the missing character-shape contract, then passed after
+the implementation; `npm run check:studio-js` passed for 88 files; browser QA
+on `127.0.0.1:8797/studio/` confirmed the new parts rendered, cursor was
+`grab`, drag moved the sprite from `(558, 191)` to `(478, 151)`, opening the
+panel kept the moved position, and console warn/error count was 0. Boundary:
+no Runtime API shape changed, no provider gate changed, no provider call, no
+provider raw response, signed URL, local media byte, or secret exposure; not
+human acceptance or business validation.
+
 Current video routes module split addendum: 2026-06-19 pass split
 `apps/api/runtime_video_routes.py` from a 739-line route/orchestration module
 into a 105-line route assembly surface plus focused helpers:
