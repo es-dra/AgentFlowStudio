@@ -2883,3 +2883,29 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is frontend structure/runtime-boundary verification, not human acceptance or business validation.
+
+## 2026-06-19 - Internal Beta Human Review Packet
+
+- Added `tools/afs_internal_beta_acceptance_review.py` to build a safe `human_review_packet` for every deterministic internal beta acceptance report.
+- The packet turns machine verification into an operator-facing review checklist with scoring sections for account/project isolation, asset-context continuity, generated media quality, feedback/revision loop, and privacy/provider boundaries.
+- Kept the report explicit that human acceptance, business validation, durable memory promotion, and live provider quality approval are still not claimed.
+- Avoided writing invite values, session tokens, local paths, signed URLs, provider raw responses, or media bytes into the review packet.
+
+Verification:
+
+```text
+Red test: tests/test_afs_internal_beta_acceptance.py failed before human_review_packet and tools/afs_internal_beta_acceptance_review.py existed.
+tests/test_afs_internal_beta_acceptance.py: 10 passed, 1 existing Starlette/httpx warning
+Acceptance CLI smoke: status=contract_verified_pending_human_acceptance; packet_status=pending_human_review; provider_calls=false; human_claim=not_claimed
+tests/test_afs_internal_beta_acceptance.py + tests/test_afs_internal_beta_preflight_three_end.py + tests/test_afs_three_end_status.py: 17 passed, 1 existing warning
+pytest -q: 537 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0 with existing warnings only
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No Company OS or long-term memory write was made.
+- This is deterministic runtime/readiness verification plus a human review handoff packet, not completed human acceptance or business validation.

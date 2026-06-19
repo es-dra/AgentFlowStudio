@@ -26,6 +26,15 @@ def test_internal_beta_acceptance_contract_keeps_report_safe(tmp_path: Path, mon
     assert report["provider_calls_started"] is False
     assert report["human_acceptance_claim"] == "not_claimed"
     assert report["business_validation_claim"] == "not_claimed"
+    assert report["human_review_packet"]["status"] == "pending_human_review"
+    assert report["human_review_packet"]["score_scale"]["pass_threshold"] == 4
+    section_ids = {item["section_id"] for item in report["human_review_packet"]["required_sections"]}
+    assert "account_project_isolation" in section_ids
+    assert "asset_context_continuity" in section_ids
+    assert "generated_media_quality" in section_ids
+    assert "feedback_revision_loop" in section_ids
+    assert "privacy_boundary" in section_ids
+    assert "accepted_for_next_beta_round" in report["human_review_packet"]["decision_options"]
     assert report["writes_company_kb"] is False
     assert report["writes_long_term_memory"] is False
 
@@ -47,6 +56,37 @@ def test_internal_beta_acceptance_contract_keeps_report_safe(tmp_path: Path, mon
     assert "data_base64" not in serialized
     assert "iVBOR" not in serialized
     assert "provider_raw_response" not in serialized
+    assert "signed_url" not in serialized
+
+
+def test_internal_beta_acceptance_report_has_review_packet_without_acceptance_claim(tmp_path: Path) -> None:
+    report = run_inprocess_acceptance(runtime_root=tmp_path)
+
+    packet = report["human_review_packet"]
+    sections = {item["section_id"]: item for item in packet["required_sections"]}
+
+    assert packet["schema_version"] == "0.1.0"
+    assert packet["status"] == "pending_human_review"
+    assert packet["reviewer_role"] == "internal_beta_operator"
+    assert packet["score_scale"] == {"min": 1, "max": 5, "pass_threshold": 4}
+    assert packet["acceptance_claim"] == "not_claimed"
+    assert packet["forbidden_claims"] == [
+        "human acceptance",
+        "business validation",
+        "durable memory promotion",
+        "live provider quality approval",
+    ]
+    assert sections["generated_media_quality"]["requires_human_score"] is True
+    assert sections["generated_media_quality"]["evidence_step_ids"] == ["video_gate_closed"]
+    assert sections["asset_context_continuity"]["evidence_step_ids"] == [
+        "asset_confirmation",
+        "fixed_asset_context_reuse",
+    ]
+    assert packet["manual_artifacts_required"][0]["artifact_id"] == "browser_session_notes"
+    serialized = json.dumps(packet, ensure_ascii=False)
+    assert str(tmp_path) not in serialized
+    assert "session_token" not in serialized
+    assert "invite" not in serialized.lower()
     assert "signed_url" not in serialized
 
 
@@ -237,15 +277,19 @@ def test_acceptance_runner_keeps_preflight_logic_split() -> None:
     runner = Path("tools/afs_internal_beta_acceptance.py").read_text(encoding="utf-8")
     preflight = Path("tools/afs_internal_beta_acceptance_preflight.py").read_text(encoding="utf-8")
     errors = Path("tools/afs_internal_beta_acceptance_errors.py").read_text(encoding="utf-8")
+    review = Path("tools/afs_internal_beta_acceptance_review.py").read_text(encoding="utf-8")
 
     assert "from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError" in runner
     assert "from tools.afs_internal_beta_acceptance_preflight import run_http_preflight as _run_http_preflight" in runner
+    assert "from tools.afs_internal_beta_acceptance_review import build_human_review_packet" in Path("tools/afs_internal_beta_acceptance_contract.py").read_text(encoding="utf-8")
     assert "def _build_http_preflight_report" not in runner
     assert "def _safe_health" not in runner
     assert "def run_http_preflight" in runner
     assert "def _build_http_preflight_report" in preflight
     assert "safe_three_end_status" in preflight
     assert "class AcceptanceConfigurationError" in errors
+    assert "def build_human_review_packet" in review
     assert len(runner.splitlines()) <= 220
     assert len(preflight.splitlines()) <= 220
     assert len(errors.splitlines()) <= 80
+    assert len(review.splitlines()) <= 180

@@ -19,6 +19,7 @@ from tools.afs_internal_beta_acceptance_scope_steps import (
     project_isolation_step,
     studio_state_step,
 )
+from tools.afs_internal_beta_acceptance_review import build_human_review_packet
 
 
 def run_acceptance_contract(
@@ -56,6 +57,7 @@ def _report(steps: list[dict[str, Any]], *, mode: str) -> dict[str, Any]:
         "status": _report_status(steps),
         "summary": _summary(steps),
         "steps": steps,
+        "human_review_packet": build_human_review_packet(steps),
         "provider_calls_started": any(bool(step.get("provider_calls_started")) for step in steps),
         "human_acceptance_claim": "not_claimed",
         "business_validation_claim": "not_claimed",
