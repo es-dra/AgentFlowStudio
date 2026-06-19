@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-06-19 - HTTP Preflight Three-End Status Addendum
+
+- Extended `tools/afs_internal_beta_acceptance.py --preflight-only` with an
+  optional `--three-end-status` check. Preflight can now produce one safe
+  readiness report that covers deployed Runtime `/health`, `/auth/status`,
+  Studio static readiness, provider gate projection, and local/GitHub/server
+  drift state.
+- Added `tools/afs_internal_beta_preflight_three_end.py` so three-end collection
+  and report sanitization stay out of the main acceptance runner. The embedded
+  report keeps only safe commit/status summaries, safe Runtime health fields,
+  and provider gate booleans.
+- If three-end status is not `aligned`, the preflight report now becomes
+  `needs_attention` even if Runtime health checks pass. Default preflight
+  behavior remains unchanged unless `--three-end-status` is explicitly used.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance.py -> 10 passed / 1 warning
+tests/test_afs_three_end_status.py tests/test_afs_internal_beta_acceptance.py -> 15 passed / 1 warning
+CLI help shows --three-end-status, --three-end-repo-root, --three-end-server
+```
+
+Boundary: no provider gate changed, no provider call was made, no invite code,
+session token, base URL, local path, signed URL, provider raw response, or
+media byte is written into the preflight report. This is readiness inspection,
+not human acceptance or business validation.
+
 ## 2026-06-19 - Sprite Character Design Pass
 
 - Reworked the decorative `AFS 小精灵` from a button-like floating helper into

@@ -19,6 +19,7 @@ from apps.api.runtime_service import create_runtime_app
 from tools.afs_internal_beta_acceptance_client import HttpAcceptanceClient
 from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
 from tools.afs_internal_beta_acceptance_contract import run_acceptance_contract
+from tools.afs_internal_beta_preflight_three_end import collect_three_end_status, safe_three_end_status
 
 
 class AcceptanceConfigurationError(ValueError):
@@ -30,7 +31,13 @@ def main() -> int:
     report_path = Path(args.report).resolve() if args.report else None
     try:
         if args.preflight_only:
-            report = run_http_preflight(base_url=args.base_url, report_path=report_path)
+            report = run_http_preflight(
+                base_url=args.base_url,
+                report_path=report_path,
+                include_three_end_status=args.three_end_status,
+                three_end_repo_root=Path(args.three_end_repo_root).resolve(),
+                three_end_server=args.three_end_server,
+            )
         elif args.base_url:
             report = run_http_acceptance(
                 base_url=args.base_url,
@@ -60,6 +67,9 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--beta-invite-code", default="", help="Disposable beta invite code for HTTP mode.")
     parser.add_argument("--beta-invite-code-env", default="AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA", help="Environment variable holding the beta invite code.")
     parser.add_argument("--preflight-only", action="store_true", help="Only inspect deployed Runtime readiness; no invite codes or provider calls.")
+    parser.add_argument("--three-end-status", action="store_true", help="Include safe local/GitHub/server drift status in preflight mode.")
+    parser.add_argument("--three-end-repo-root", default=".", help="Local repository root for optional three-end preflight status.")
+    parser.add_argument("--three-end-server", default="", help="Optional SSH alias for server-side three-end status.")
     parser.add_argument("--report", default="", help="Optional JSON report output path.")
     return parser.parse_args()
 
@@ -118,12 +128,21 @@ def run_http_preflight(
     *,
     base_url: str,
     report_path: Path | None = None,
+    include_three_end_status: bool = False,
+    three_end_repo_root: Path | None = None,
+    three_end_server: str = "",
 ) -> dict[str, Any]:
     if not base_url.strip():
         raise AcceptanceConfigurationError("HTTP preflight requires a Runtime base URL.")
     client = HttpAcceptanceClient(base_url.strip())
     try:
-        report = _build_http_preflight_report(client)
+        three_end_status = None
+        if include_three_end_status:
+            three_end_status = collect_three_end_status(
+                repo_root=three_end_repo_root or Path("."),
+                server=three_end_server,
+            )
+        report = _build_http_preflight_report(client, three_end_status=three_end_status)
     finally:
         close = getattr(client, "close", None)
         if callable(close):
@@ -139,7 +158,7 @@ def _safe_run_id(value: str) -> str:
     return safe[:40] or uuid.uuid4().hex[:10]
 
 
-def _build_http_preflight_report(client) -> dict[str, Any]:
+def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     health_status = 0
     health: dict[str, Any] = {}
@@ -193,9 +212,24 @@ def _build_http_preflight_report(client) -> dict[str, Any]:
         "passed" if "video" in provider_gates else "failed",
         {"provider_gates": provider_gates, "provider_calls_started": False},
     )
+    safe_three_end = safe_three_end_status(three_end_status) if three_end_status is not None else None
+    if safe_three_end is not None:
+        summary = safe_three_end.get("summary", {})
+        _add_preflight_check(
+            checks,
+            "three_end_status",
+            "passed" if safe_three_end.get("status") == "aligned" else "failed",
+            {
+                "status": str(safe_three_end.get("status") or ""),
+                "checked_end_count": int(summary.get("checked_end_count") or 0),
+                "aligned_end_count": int(summary.get("aligned_end_count") or 0),
+                "dirty_end_count": int(summary.get("dirty_end_count") or 0),
+                "runtime_status": str(summary.get("runtime_status") or ""),
+            },
+        )
     failed_count = sum(1 for item in checks if item["status"] == "failed")
     passed_count = sum(1 for item in checks if item["status"] == "passed")
-    return {
+    report = {
         "artifact_type": "afs_internal_beta_acceptance_preflight_report",
         "schema_version": "0.1.0",
         "mode": "deployed_http_preflight",
@@ -210,6 +244,9 @@ def _build_http_preflight_report(client) -> dict[str, Any]:
         "safe_health": _safe_health(health),
         "checks": checks,
     }
+    if safe_three_end is not None:
+        report["three_end_status"] = safe_three_end
+    return report
 
 
 def _add_preflight_check(checks: list[dict[str, Any]], check_id: str, status: str, evidence: dict[str, Any]) -> None:

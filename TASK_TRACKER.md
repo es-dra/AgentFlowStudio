@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current HTTP preflight three-end addendum: 2026-06-19 pass connected the safe
+three-end status reporter into `tools/afs_internal_beta_acceptance.py
+--preflight-only` through explicit `--three-end-status`,
+`--three-end-repo-root`, and `--three-end-server` parameters. The resulting
+preflight report can now include local/GitHub/server drift state alongside
+Runtime `/health`, `/auth/status`, Studio static readiness, and provider gate
+projection. If three-end status is not `aligned`, the report becomes
+`needs_attention` even when Runtime health passes. The collection and
+whitelist projection live in `tools/afs_internal_beta_preflight_three_end.py`
+so the new safety projection stays isolated from the acceptance runner; the
+runner itself remains an existing maintenance split candidate. Verification:
+preflight tests 10 passed / 1 warning; three-end plus preflight focused tests
+15 passed / 1 warning; CLI help exposes the new flags. Boundary: no provider
+gate changed, no provider call, no invite code/session token/base URL/local
+path/signed URL/provider raw/media byte in the report; not human acceptance or
+business validation.
+
 Current sprite character design addendum: 2026-06-19 pass reworked the
 decorative `AFS 小精灵` from a button-like floating helper into a clearer
 movable micro-assistant character. It now has a larger fixed footprint, cockpit
