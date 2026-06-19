@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite companion design addendum: 2026-06-19 pass strengthened the
+decorative `AFS 小精灵` from a floating helper into a clearer movable companion.
+The avatar now declares `data-sprite-role="movable-companion"` and adds a hood,
+explicit left/right eyes, torso panel, nameplate, and visible drag hint while
+preserving the existing Runtime `sprite/chat` boundary. Pointer capture is now
+defensive so browser automation or synthetic pointer events cannot break drag
+startup. Verification: sprite static test passed; Runtime sprite regression
+passed 6 / 1 existing warning; Studio JS syntax check passed for 88 files;
+full pytest passed 530 / 527 deselected / 2 existing warnings; maintenance
+audit failed=0 with warnings only; `git diff --check` passed; Chrome
+automation on `127.0.0.1:8797/studio/` confirmed character parts rendered,
+drag moved and persisted viewport position, panel open kept position stable,
+green open status light, and zero console warn/error. Boundary: no provider
+gate changed, no provider call, no provider raw response, no signed URL, no
+local media bytes, no secret exposure; not human acceptance or business
+validation.
+
 Current sprite draggable character addendum: 2026-06-19 pass made the
 decorative `AFS 小精灵` more clearly movable and character-shaped. The avatar
 now includes a dedicated character silhouette layer, visible move handle,

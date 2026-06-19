@@ -2529,3 +2529,29 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
+
+## 2026-06-19 - Sprite Companion Character Pass
+
+- Strengthened the decorative `AFS 小精灵` into a clearer movable Studio companion rather than a button-like helper.
+- Added a hood, explicit left/right eyes, torso panel, nameplate, and visible drag hint while preserving the existing Runtime `sprite/chat` boundary.
+- Added defensive pointer capture handling so synthetic pointer events and browser automation cannot break drag startup.
+- Extended the sprite static regression test to cover the new character parts and draggable companion role.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py: 1 passed
+tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 6 passed, 1 existing Starlette/httpx warning
+npm run check:studio-js: passed for 88 files
+Chrome automation on http://127.0.0.1:8797/studio/: character parts rendered, drag moved/persisted position, panel-open position delta 0, zero console warn/error
+pytest -q: 530 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0 with warnings only
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is runtime/browser verification, not human acceptance or business validation.

@@ -14,7 +14,7 @@ export function startSpriteDrag(event, onMoved) {
   const startPosition = spritePosition || readSpritePosition() || defaultSpritePosition();
   let moved = false;
   event.preventDefault();
-  event.currentTarget.setPointerCapture?.(event.pointerId);
+  captureSpritePointer(event);
   root.classList.add("is-dragging");
   const onMove = (moveEvent) => {
     const dx = moveEvent.clientX - startPoint.x;
@@ -35,6 +35,14 @@ export function startSpriteDrag(event, onMoved) {
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onEnd, { once: true });
   window.addEventListener("pointercancel", onEnd, { once: true });
+}
+
+function captureSpritePointer(event) {
+  try {
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Synthetic pointer events in browser automation may not own the pointer.
+  }
 }
 
 export function nudgeSpritePosition(event) {

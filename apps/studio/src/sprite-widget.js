@@ -43,11 +43,13 @@ function spriteOrb() {
   button.setAttribute("aria-label", "AFS 小精灵");
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
   button.setAttribute("data-sprite-draggable", "true");
+  button.setAttribute("data-sprite-role", "movable-companion");
   button.title = spriteOpen ? "拖动或方向键移动，点击收起 AFS 小精灵" : "拖动或方向键移动，点击打开 AFS 小精灵";
   button.innerHTML = [
     '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
     '<span class="sprite-character-shell"></span>',
+    '<span class="sprite-hood"></span>',
     '<span class="sprite-move-handle" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
     '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-aura"></span>',
@@ -68,14 +70,16 @@ function spriteOrb() {
     '  <span class="sprite-head-shell"></span>',
     '  <span class="sprite-face">',
     '    <span class="sprite-cheek left"></span>',
-    '    <span class="sprite-visor"><span class="sprite-eye-glow"></span><i></i><i></i><b></b></span>',
+    '    <span class="sprite-visor"><span class="sprite-eye-glow"></span><i class="sprite-eye left"></i><i class="sprite-eye right"></i><b></b></span>',
     '    <span class="sprite-cheek right"></span>',
     '    <span class="sprite-mouth"></span>',
     "  </span>",
     '  <span class="sprite-core"></span>',
+    '  <span class="sprite-torso-panel"><i></i><i></i></span>',
     '  <span class="sprite-status-light"></span>',
     '  <span class="sprite-badge">AFS</span>',
     "</span>",
+    '<span class="sprite-nameplate" aria-hidden="true"><i></i><i></i><b></b></span>',
     '<span class="sprite-scarf"></span>',
     '<span class="sprite-foot left"></span>',
     '<span class="sprite-foot right"></span>',

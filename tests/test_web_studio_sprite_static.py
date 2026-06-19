@@ -32,6 +32,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-ear right" in sprite
     assert "sprite-scarf" in sprite
     assert "sprite-drag-chip" in sprite
+    assert "sprite-hood" in sprite
+    assert "sprite-eye left" in sprite
+    assert "sprite-eye right" in sprite
+    assert "sprite-torso-panel" in sprite
+    assert "sprite-nameplate" in sprite
+    assert 'data-sprite-role", "movable-companion"' in sprite
     assert "runtime.spriteChat" in sprite
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_SIZE" in position
@@ -40,6 +46,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "rememberSpritePositionFromRoot" in sprite
     assert 'button.addEventListener("keydown", nudgeSpritePosition)' in sprite
     assert "handleSpriteDrag" in sprite
+    assert "captureSpritePointer" in position
+    assert "setPointerCapture" in position
     assert "storeSpritePosition" in position
     assert "clampSpritePosition" in position
     assert len(sprite.splitlines()) <= 300
@@ -80,6 +88,11 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-cheek.left" in sprite_styles
     assert ".sprite-mouth" in sprite_styles
     assert ".sprite-eye-glow" in sprite_styles
+    assert ".sprite-hood" in sprite_styles
+    assert ".sprite-eye.left" in sprite_styles
+    assert ".sprite-torso-panel" in sprite_styles
+    assert ".sprite-nameplate" in sprite_styles
+    assert ".sprite-move-handle::after" in sprite_styles
     assert ".sprite-status-light" in sprite_styles
     assert ".sprite-core" in sprite_styles
     assert ".sprite-thruster" in sprite_styles
