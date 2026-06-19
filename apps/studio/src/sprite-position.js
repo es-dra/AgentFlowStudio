@@ -2,18 +2,18 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-export const SPRITE_POSITION_VERSION = "2026-06-mascot-companion-v1";
+export const SPRITE_POSITION_VERSION = "2026-06-tuantuan-raster-v1";
 export const SPRITE_SCALE_KEY = "afs_studio_sprite_scale";
 export const SPRITE_SCALE_OPTIONS = [
   { id: "small", label: "小", value: 0.82 },
   { id: "normal", label: "中", value: 1 },
   { id: "large", label: "大", value: 1.18 },
 ];
-export const SPRITE_SIZE = 180;
+export const SPRITE_SIZE = 190;
 const SPRITE_MARGIN = 18;
-const SPRITE_HEIGHT = 206;
+const SPRITE_HEIGHT = 238;
 
-export function startSpriteDrag(event, onMoved) {
+export function startSpriteDrag(event, onMoved, onEnded) {
   if (event.button !== undefined && event.button !== 0) return;
   const root = document.getElementById("sprite-root");
   if (!root) return;
@@ -38,6 +38,7 @@ export function startSpriteDrag(event, onMoved) {
       onMoved?.();
       storeSpritePosition(spritePosition);
     }
+    onEnded?.();
   };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onEnd, { once: true });

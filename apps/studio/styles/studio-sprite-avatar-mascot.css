@@ -1,246 +1,216 @@
-/* Cartoon mascot skin for the long-term AFS companion IP. */
+/* Multi-pose raster TuanTuan mascot skin. The character form lives in PNG poses, not CSS reconstruction. */
 .afs-sprite-avatar[data-sprite-character="mascot"] {
+  left: 0;
+  top: 0;
+  width: 190px;
+  height: 238px;
+  overflow: visible;
+  border: 0;
+  border-radius: 76px 76px 64px 64px;
+  background: transparent;
+  box-shadow: none;
   scale: var(--sprite-scale, 1);
   transform-origin: left top;
-  filter: drop-shadow(0 20px 42px rgba(0, 0, 0, 0.35));
+  filter:
+    drop-shadow(0 18px 30px rgba(0, 0, 0, 0.38))
+    drop-shadow(0 3px 0 rgba(255, 220, 162, 0.1));
 }
 
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-dock-ring,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-orbit-dot,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-halo-crown,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-crest,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-character-shell,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-hood,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-helmet-glass,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-helmet-reflection,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-drag-chip,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-aura,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-antenna,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-ear,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-wing,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tail-fin,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-shoulder,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-arm,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-hand-wave,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-jet-pack,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-backplate,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-body,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-wand,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-nameplate,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-personality-tag,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-scarf,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-foot,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-thruster,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-glow-trail,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-hover-pad,
-.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-shadow {
+.afs-sprite-avatar[data-sprite-character="mascot"]::before {
   display: none;
 }
 
-.sprite-mascot-shell {
+.sprite-tuantuan-stage {
   position: absolute;
-  z-index: 2;
-  left: 36px;
-  top: 25px;
-  width: 108px;
-  height: 132px;
-  border: 2px solid rgba(226, 252, 255, 0.78);
-  border-radius: 58px 58px 48px 48px;
-  background:
-    radial-gradient(circle at 50% 15%, rgba(255, 255, 255, 0.98), transparent 21%),
-    linear-gradient(180deg, #f8feff 0%, #8deaff 43%, #42b8d9 68%, #1f6073 100%);
-  box-shadow:
-    inset 0 7px 12px rgba(255, 255, 255, 0.7),
-    inset 0 -18px 22px rgba(0, 46, 62, 0.22),
-    0 18px 38px rgba(0, 0, 0, 0.32),
-    0 0 0 1px rgba(95, 226, 255, 0.18);
+  z-index: 3;
+  inset: -3px -2px 5px -3px;
+  display: block;
+  isolation: isolate;
   pointer-events: none;
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
 
-.sprite-mascot-shell::before {
-  content: "";
+.sprite-tuantuan-asset {
   position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 18px;
-  height: 26px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
-}
-
-.sprite-mascot-ear {
-  position: absolute;
-  z-index: 1;
-  top: 42px;
-  width: 40px;
-  height: 58px;
-  border: 2px solid rgba(226, 252, 255, 0.72);
-  background: linear-gradient(180deg, #dffaff, #58d5ee 62%, #1e6c7d);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  opacity: 0;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform: translateY(5px) scale(0.985);
+  transition: opacity 0.2s ease, transform 0.2s ease, filter 0.2s ease;
 }
 
-.sprite-mascot-ear.left {
-  left: 20px;
-  border-radius: 28px 12px 27px 32px;
-  transform: rotate(-21deg);
-}
-
-.sprite-mascot-ear.right {
-  right: 20px;
-  border-radius: 12px 28px 32px 27px;
-  transform: rotate(21deg);
-}
-
-.sprite-mascot-face {
-  position: absolute;
-  z-index: 4;
-  left: 52px;
-  top: 58px;
-  width: 76px;
-  height: 55px;
-  border: 2px solid rgba(18, 57, 70, 0.2);
-  border-radius: 35px 35px 30px 30px;
-  background:
-    radial-gradient(circle at 27% 54%, rgba(255, 210, 143, 0.45), transparent 16%),
-    radial-gradient(circle at 73% 54%, rgba(255, 210, 143, 0.45), transparent 16%),
-    linear-gradient(180deg, #ffffff, #e4fbff);
-  box-shadow: inset 0 -5px 10px rgba(63, 174, 205, 0.12);
-  pointer-events: none;
-}
-
-.sprite-mascot-eye {
-  position: absolute;
-  top: 18px;
-  width: 10px;
-  height: 14px;
-  border-radius: 999px;
-  background: #102734;
-  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.9);
-}
-
-.sprite-mascot-eye.left { left: 22px; }
-.sprite-mascot-eye.right { right: 22px; }
-
-.sprite-mascot-smile {
-  position: absolute;
-  left: 50%;
-  bottom: 13px;
-  width: 25px;
-  height: 11px;
-  border-bottom: 3px solid rgba(16, 45, 56, 0.72);
-  border-radius: 0 0 999px 999px;
-  transform: translateX(-50%);
-}
-
-.sprite-mascot-hand {
-  position: absolute;
-  z-index: 5;
-  width: 30px;
-  height: 30px;
-  border: 2px solid rgba(255, 249, 226, 0.84);
-  border-radius: 50%;
-  background: linear-gradient(180deg, #ffe9a6, #ffc66b);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
-  pointer-events: none;
-}
-
-.sprite-mascot-hand.left {
-  left: 25px;
-  top: 111px;
-  transform: rotate(-16deg);
-}
-
-.sprite-mascot-hand.right {
-  right: 22px;
-  top: 88px;
-  transform: rotate(18deg);
-}
-
-.sprite-mascot-hand.right::after {
-  content: "";
-  position: absolute;
-  right: -13px;
-  top: 3px;
-  width: 18px;
-  height: 10px;
-  border-top: 2px solid rgba(255, 222, 143, 0.62);
-  border-radius: 50%;
-  transform: rotate(24deg);
-}
-
-.sprite-mascot-star {
-  position: absolute;
-  z-index: 6;
-  left: 78px;
-  top: 128px;
-  width: 24px;
-  height: 24px;
-  clip-path: polygon(50% 0, 61% 34%, 97% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 3% 35%, 39% 34%);
-  background: #ffe08a;
-  box-shadow: 0 0 18px rgba(255, 224, 138, 0.72);
-  pointer-events: none;
-}
-
-.sprite-mascot-tag {
-  position: absolute;
-  z-index: 7;
-  left: 50%;
-  top: 157px;
-  padding: 3px 9px;
-  border: 1px solid rgba(226, 252, 255, 0.34);
-  border-radius: 999px;
-  background: rgba(13, 31, 38, 0.78);
-  color: rgba(236, 253, 255, 0.96);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0;
-  transform: translateX(-50%);
-  pointer-events: none;
+.afs-sprite-avatar[data-sprite-pose="idle"] .sprite-tuantuan-asset[data-pose="idle"],
+.afs-sprite-avatar[data-sprite-pose="happy"] .sprite-tuantuan-asset[data-pose="happy"],
+.afs-sprite-avatar[data-sprite-pose="curious"] .sprite-tuantuan-asset[data-pose="curious"],
+.afs-sprite-avatar[data-sprite-pose="thinking"] .sprite-tuantuan-asset[data-pose="thinking"],
+.afs-sprite-avatar[data-sprite-pose="surprised"] .sprite-tuantuan-asset[data-pose="surprised"],
+.afs-sprite-avatar[data-sprite-pose="sleepy"] .sprite-tuantuan-asset[data-pose="sleepy"],
+.afs-sprite-avatar[data-sprite-pose="working"] .sprite-tuantuan-asset[data-pose="working"],
+.afs-sprite-avatar[data-sprite-pose="celebrate"] .sprite-tuantuan-asset[data-pose="celebrate"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .sprite-mascot-shadow {
   position: absolute;
   z-index: 0;
-  left: 46px;
-  bottom: 18px;
-  width: 90px;
-  height: 20px;
+  left: 29px;
+  right: 29px;
+  bottom: 16px;
+  height: 23px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(95, 226, 255, 0.32), rgba(95, 226, 255, 0.08) 52%, transparent 74%);
+  background: radial-gradient(ellipse, rgba(48, 30, 16, 0.42), transparent 71%);
+  filter: blur(1px);
+  opacity: 0.72;
   pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-drag-halo {
+  z-index: 1;
+  inset: 8px 14px 20px 13px;
+  border-color: rgba(255, 203, 104, 0.28);
+  border-radius: 72px 72px 60px 60px;
+  opacity: 0;
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-drag-halo,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-drag-halo {
+  opacity: 0.58;
 }
 
 .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-move-handle {
-  left: 71px;
-  top: 8px;
-  width: 38px;
-  height: 24px;
-  border-radius: 999px;
+  z-index: 6;
+  left: 74px;
+  top: 9px;
+  width: 43px;
+  height: 25px;
+  border-color: rgba(255, 214, 137, 0.28);
+  background: rgba(45, 31, 20, 0.42);
+  box-shadow: 0 8px 20px rgba(44, 29, 17, 0.2);
+  opacity: 0;
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-move-handle::after {
+  content: "";
+  display: none;
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-move-handle,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-move-handle {
+  opacity: 1;
 }
 
 .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-grab-ribbon {
-  top: 38px;
+  z-index: 7;
+  left: 50%;
+  top: 190px;
+  width: auto;
+  padding: 3px 10px;
+  border: 1px solid rgba(128, 83, 52, 0.16);
+  color: rgba(77, 45, 26, 0.88);
+  background: linear-gradient(180deg, rgba(255, 245, 214, 0.94), rgba(255, 205, 116, 0.82));
+  box-shadow: 0 8px 16px rgba(46, 29, 17, 0.16);
+  font-size: 10px;
+  opacity: 0;
+  transform: translateX(-50%) translateY(4px);
 }
 
-#sprite-root.is-dragging .sprite-mascot-hand.right {
-  transform: rotate(-10deg) translateY(-8px);
+.afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-grab-ribbon,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-grab-ribbon {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
-#sprite-root.is-dragging .sprite-mascot-shell {
-  transform: translateY(-4px);
+.sprite-mascot-tag {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 202px;
+  padding: 3px 10px;
+  border: 1px solid rgba(128, 83, 52, 0.16);
+  border-radius: 999px;
+  color: rgba(77, 45, 26, 0.88);
+  background: rgba(255, 239, 204, 0.9);
+  box-shadow: 0 8px 16px rgba(46, 29, 17, 0.16);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
 }
 
-#sprite-root.is-dragging .sprite-mascot-shadow {
-  transform: scaleX(0.76);
-  opacity: 0.76;
+.afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-mascot-tag,
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-mascot-tag {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"] .sprite-label {
+  display: none;
+}
+
+.afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-tuantuan-stage,
+.afs-sprite.open .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
+  filter: saturate(1.05) brightness(1.02);
+  transform: translateY(-2px);
+}
+
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
+  transform: translateY(-8px) rotate(-1deg);
+}
+
+.afs-sprite-avatar[data-sprite-pose="working"] .sprite-tuantuan-stage {
+  animation: sprite-tuantuan-work 1.8s ease-in-out infinite;
+}
+
+.afs-sprite-avatar[data-sprite-pose="celebrate"] .sprite-tuantuan-stage {
+  animation: sprite-tuantuan-celebrate 1.2s ease-in-out infinite;
+}
+
+@keyframes sprite-tuantuan-work {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-1.5deg); }
+}
+
+@keyframes sprite-tuantuan-celebrate {
+  0%, 100% { transform: translateY(-2px) rotate(0deg) scale(1); }
+  45% { transform: translateY(-9px) rotate(2deg) scale(1.035); }
+}
+
+#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-mascot-shadow {
+  opacity: 0.54;
+  transform: scaleX(0.78);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #sprite-root.is-dragging .sprite-mascot-hand.right,
-  #sprite-root.is-dragging .sprite-mascot-shell,
-  #sprite-root.is-dragging .sprite-mascot-shadow {
+  .sprite-tuantuan-stage,
+  .sprite-mascot-shadow,
+  .sprite-drag-halo,
+  .sprite-grab-ribbon,
+  .sprite-tuantuan-asset,
+  .sprite-mascot-tag {
+    transition: none;
+  }
+
+  .afs-sprite-avatar[data-sprite-pose="working"] .sprite-tuantuan-stage,
+  .afs-sprite-avatar[data-sprite-pose="celebrate"] .sprite-tuantuan-stage {
+    animation: none;
+  }
+
+  .afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-tuantuan-stage,
+  .afs-sprite.open .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage,
+  #sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage,
+  #sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-mascot-shadow {
     transform: none;
   }
 }

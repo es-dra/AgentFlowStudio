@@ -11,22 +11,21 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     position = (STUDIO_ROOT / "src" / "sprite-position.js").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "studio-sprite.css").read_text(encoding="utf-8")
     avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
-    avatar_character_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-character.css").read_text(encoding="utf-8")
-    avatar_parts_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-parts.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
-    avatar_redesign_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-redesign.css").read_text(encoding="utf-8")
-    avatar_personality_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-personality.css").read_text(encoding="utf-8")
     avatar_mascot_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-mascot.css").read_text(encoding="utf-8")
-    sprite_styles = (
-        styles
-        + avatar_styles
-        + avatar_character_styles
-        + avatar_parts_styles
-        + avatar_motion_styles
-        + avatar_redesign_styles
-        + avatar_personality_styles
-        + avatar_mascot_styles
-    )
+    avatar_tuantuan_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-tuantuan.css").read_text(encoding="utf-8")
+    sprite_styles = styles + avatar_styles + avatar_motion_styles + avatar_mascot_styles + avatar_tuantuan_styles
+    pose_assets = {
+        "idle": STUDIO_ROOT / "assets" / "tuantuan-idle.png",
+        "happy": STUDIO_ROOT / "assets" / "tuantuan-happy.png",
+        "curious": STUDIO_ROOT / "assets" / "tuantuan-curious.png",
+        "thinking": STUDIO_ROOT / "assets" / "tuantuan-thinking.png",
+        "surprised": STUDIO_ROOT / "assets" / "tuantuan-surprised.png",
+        "sleepy": STUDIO_ROOT / "assets" / "tuantuan-sleepy.png",
+        "working": STUDIO_ROOT / "assets" / "tuantuan-working.png",
+        "celebrate": STUDIO_ROOT / "assets" / "tuantuan-celebrate.png",
+    }
+    mascot_asset = STUDIO_ROOT / "assets" / "tuantuan-mascot.png"
 
     assert '<div id="sprite-root"></div>' in index
     assert './styles/studio-sprite.css' in index
@@ -34,137 +33,37 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "renderSpriteWidget" in main
     assert "spriteChat(payload)" in runtime_client
     assert "/sprite/chat" in runtime_client
+    for asset in pose_assets.values():
+        assert asset.exists(), asset
+        assert asset.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+        assert asset.stat().st_size > 100_000
+    assert mascot_asset.exists()
+    assert mascot_asset.read_bytes() == pose_assets["idle"].read_bytes()
     assert "afs-sprite" in sprite
     assert 'from "./sprite-position.js"' in sprite
     assert "AFS 小精灵" in sprite
     assert "data-sprite-draggable" in sprite
-    assert "sprite-character-shell" in sprite
-    assert "sprite-move-handle" in sprite
-    assert "sprite-ear left" in sprite
-    assert "sprite-ear right" in sprite
-    assert "sprite-scarf" in sprite
-    assert "sprite-drag-chip" in sprite
-    assert "sprite-halo-crown" in sprite
-    assert "sprite-helmet-glass" in sprite
-    assert "sprite-face-window" in sprite
-    assert "sprite-wand" in sprite
-    assert "sprite-personality-tag" in sprite
-    assert "sprite-mascot-shell" in sprite
-    assert "sprite-mascot-face" in sprite
-    assert "sprite-mascot-eye left" in sprite
-    assert "sprite-mascot-eye right" in sprite
-    assert "sprite-mascot-smile" in sprite
-    assert "sprite-mascot-hand left" in sprite
-    assert "sprite-mascot-hand right" in sprite
-    assert "sprite-mascot-star" in sprite
-    assert "sprite-mascot-tag" in sprite
-    assert "sprite-mascot-shadow" in sprite
-    assert "sprite-crest" in sprite
-    assert "sprite-orbit-dot" in sprite
-    assert "sprite-brow left" in sprite
-    assert "sprite-brow right" in sprite
-    assert "sprite-blush left" in sprite
-    assert "sprite-blush right" in sprite
-    assert "sprite-grab-ribbon" in sprite
-    assert "sprite-hood" in sprite
-    assert "sprite-eye left" in sprite
-    assert "sprite-eye right" in sprite
-    assert "sprite-torso-panel" in sprite
-    assert "sprite-nameplate" in sprite
     assert 'data-sprite-role", "movable-companion"' in sprite
+    assert 'data-sprite-character", "mascot"' in sprite
+    assert "SPRITE_POSE_ASSETS" in sprite
+    assert "IDLE_SPRITE_POSES" in sprite
+    assert "spriteIdlePoseIndex" in sprite
+    assert "bindSpritePoseTicker" in sprite
+    assert "currentSpritePose" in sprite
+    assert "setTemporarySpritePose" in sprite
+    assert "data-sprite-pose" in sprite
+    assert "sprite-tuantuan-stage" in sprite
+    assert "sprite-tuantuan-asset" in sprite
+    for pose in pose_assets:
+        assert f"./assets/tuantuan-{pose}.png" in sprite
+    assert 'data-pose="${pose}"' in sprite
+    assert "Object.entries(SPRITE_POSE_ASSETS)" in sprite
+    assert "draggable=\"false\"" in sprite
+    assert "sprite-move-handle" in sprite
+    assert "sprite-grab-ribbon" in sprite
+    assert "sprite-mascot-tag" in sprite
+    assert "团团" in sprite
     assert "runtime.spriteChat" in sprite
-    assert "SPRITE_POSITION_KEY" in position
-    assert "SPRITE_POSITION_VERSION" in position
-    assert "SPRITE_SIZE" in position
-    assert "SPRITE_SCALE_KEY" in position
-    assert "SPRITE_SCALE_OPTIONS" in position
-    assert "getSpriteScale" in position
-    assert "setSpriteScale" in position
-    assert "safeDefaultSpritePosition" in position
-    assert "startSpriteDrag" in sprite
-    assert "nudgeSpritePosition" in sprite
-    assert "rememberSpritePositionFromRoot" in sprite
-    assert 'button.addEventListener("keydown", nudgeSpritePosition)' in sprite
-    assert "handleSpriteDrag" in sprite
-    assert "captureSpritePointer" in position
-    assert "setPointerCapture" in position
-    assert "storeSpritePosition" in position
-    assert "clampSpritePosition" in position
-    assert len(sprite.splitlines()) <= 300
-    assert len(position.splitlines()) <= 300
-    assert "data-dock" not in sprite
-    assert "root.dataset.dock" in position
-    assert "root.dataset.vertical" in position
-    assert "__afsStudio" not in sprite
-    assert "provider raw" not in sprite
-    assert '@import url("./studio-sprite-avatar.css");' in styles
-    assert '@import url("./studio-sprite-avatar-character.css");' in styles
-    assert '@import url("./studio-sprite-avatar-parts.css");' in styles
-    assert '@import url("./studio-sprite-avatar-motion.css");' in styles
-    assert '@import url("./studio-sprite-avatar-redesign.css");' in styles
-    assert '@import url("./studio-sprite-avatar-personality.css");' in styles
-    assert '@import url("./studio-sprite-avatar-mascot.css");' in styles
-    assert "position: fixed" in styles
-    assert "calc(var(--z-modal) + 1)" in styles
-    assert ".afs-sprite-orb" in styles
-    assert ".afs-sprite-grip" in styles
-    assert ".afs-sprite-avatar" in sprite_styles
-    assert ".sprite-character-shell" in sprite_styles
-    assert ".sprite-move-handle" in sprite_styles
-    assert ".sprite-ear.left" in sprite_styles
-    assert ".sprite-scarf" in sprite_styles
-    assert ".sprite-drag-halo" in sprite_styles
-    assert ".sprite-drag-chip" in sprite_styles
-    assert ".sprite-dock-ring" in sprite_styles
-    assert ".sprite-backplate" in sprite_styles
-    assert ".sprite-tail-fin" in sprite_styles
-    assert ".sprite-cockpit" in sprite_styles
-    assert ".sprite-canopy" in sprite_styles
-    assert ".sprite-head-shell" in sprite_styles
-    assert ".sprite-body" in sprite_styles
-    assert ".sprite-shoulder.left" in sprite_styles
-    assert ".sprite-arm.left" in sprite_styles
-    assert ".sprite-hand.left" in sprite_styles
-    assert ".sprite-mitten.left" in sprite_styles
-    assert ".sprite-face" in sprite_styles
-    assert ".sprite-visor" in sprite_styles
-    assert ".sprite-cheek.left" in sprite_styles
-    assert ".sprite-mouth" in sprite_styles
-    assert ".sprite-eye-glow" in sprite_styles
-    assert ".sprite-hood" in sprite_styles
-    assert ".sprite-eye.left" in sprite_styles
-    assert ".sprite-torso-panel" in sprite_styles
-    assert ".sprite-nameplate" in sprite_styles
-    assert ".sprite-move-handle::after" in sprite_styles
-    assert ".sprite-status-light" in sprite_styles
-    assert ".sprite-core" in sprite_styles
-    assert ".sprite-thruster" in sprite_styles
-    assert ".sprite-glow-trail" in sprite_styles
-    assert "#sprite-root.is-dragging .sprite-thruster" in sprite_styles
-    assert ".sprite-wing.left" in sprite_styles
-    assert ".sprite-foot.left" in sprite_styles
-    assert ".sprite-halo-crown" in sprite_styles
-    assert ".sprite-helmet-glass" in sprite_styles
-    assert ".sprite-face-window" in sprite_styles
-    assert ".sprite-wand" in sprite_styles
-    assert ".sprite-personality-tag" in sprite_styles
-    assert ".sprite-mascot-shell" in sprite_styles
-    assert ".sprite-mascot-face" in sprite_styles
-    assert ".sprite-mascot-eye.left" in sprite_styles
-    assert ".sprite-mascot-smile" in sprite_styles
-    assert ".sprite-mascot-hand.left" in sprite_styles
-    assert ".sprite-mascot-star" in sprite_styles
-    assert ".sprite-mascot-tag" in sprite_styles
-    assert ".sprite-mascot-shadow" in sprite_styles
-    assert "Cartoon mascot skin" in avatar_mascot_styles
-    assert ".sprite-crest" in sprite_styles
-    assert ".sprite-orbit-dot.left" in sprite_styles
-    assert ".sprite-brow.left" in sprite_styles
-    assert ".sprite-blush.left" in sprite_styles
-    assert ".sprite-grab-ribbon" in sprite_styles
-    assert "studio navigator sprite" in sprite_styles
-    assert "#sprite-root[data-dock=\"left\"] .afs-sprite-panel" in styles
-    assert "#sprite-root[data-vertical=\"top\"] .afs-sprite-panel" in styles
     assert "data-sprite-drag-handle" in sprite
     assert 'data-sprite-drag-handle="true"' in sprite
     assert "spriteSettingsPanel" in sprite
@@ -172,14 +71,60 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "setSpriteScale" in sprite
     assert "getSpriteScale" in sprite
     assert "data-sprite-settings" in sprite
+    assert "startSpriteDrag" in sprite
+    assert "nudgeSpritePosition" in sprite
+    assert "rememberSpritePositionFromRoot" in sprite
+    assert 'button.addEventListener("keydown", nudgeSpritePosition)' in sprite
+    assert "handleSpriteDrag" in sprite
+    assert "__afsStudio" not in sprite
+    assert "provider raw" not in sprite
+    assert len(sprite.splitlines()) <= 300
+
+    assert "SPRITE_POSITION_KEY" in position
+    assert "SPRITE_POSITION_VERSION" in position
+    assert "2026-06-tuantuan-raster-v1" in position
+    assert "SPRITE_SIZE = 190" in position
+    assert "const SPRITE_HEIGHT = 238" in position
+    assert "SPRITE_SCALE_KEY" in position
+    assert "SPRITE_SCALE_OPTIONS" in position
+    assert "getSpriteScale" in position
+    assert "setSpriteScale" in position
+    assert "safeDefaultSpritePosition" in position
+    assert "captureSpritePointer" in position
+    assert "setPointerCapture" in position
+    assert "storeSpritePosition" in position
+    assert "clampSpritePosition" in position
+    assert len(position.splitlines()) <= 300
+
+    assert '@import url("./studio-sprite-avatar.css");' in styles
+    assert '@import url("./studio-sprite-avatar-motion.css");' in styles
+    assert '@import url("./studio-sprite-avatar-mascot.css");' in styles
+    assert '@import url("./studio-sprite-avatar-tuantuan.css");' in styles
+    assert "width: calc(190px * var(--sprite-scale, 1))" in styles
+    assert "height: calc(238px * var(--sprite-scale, 1))" in styles
+    assert "position: fixed" in styles
+    assert "calc(var(--z-modal) + 1)" in styles
+    assert ".afs-sprite-orb" in styles
+    assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-settings" in sprite_styles
     assert ".afs-sprite-size-button" in sprite_styles
     assert "--sprite-scale" in sprite_styles
-    assert ".afs-sprite.open .sprite-status-light" in sprite_styles
-    assert 'content: "拖动我"' in sprite_styles
-    assert "version: SPRITE_POSITION_VERSION" in position
-    assert "value?.version === SPRITE_POSITION_VERSION" in position
-    assert "sprite-arm left" in sprite
-    assert "#sprite-root.is-dragging .sprite-arm.left" in sprite_styles
-    assert "#sprite-root.is-dragging .sprite-mascot-hand.right" in sprite_styles
+    assert ".afs-sprite-avatar" in sprite_styles
+    assert ".sprite-tuantuan-stage" in sprite_styles
+    assert ".sprite-tuantuan-asset" in sprite_styles
+    assert ".sprite-move-handle" in sprite_styles
+    assert ".sprite-move-handle::after" in sprite_styles
+    assert ".sprite-drag-halo" in sprite_styles
+    assert ".sprite-grab-ribbon" in sprite_styles
+    assert ".sprite-mascot-tag" in sprite_styles
+    assert ".sprite-mascot-shadow" in sprite_styles
+    assert "Multi-pose raster TuanTuan mascot skin" in avatar_mascot_styles
+    assert "CSS reconstruction" in avatar_mascot_styles
+    assert "TuanTuan reference asset layer" in avatar_tuantuan_styles
+    assert '[data-sprite-pose="idle"]' in avatar_mascot_styles
+    assert '[data-sprite-pose="working"]' in avatar_mascot_styles
+    assert '[data-sprite-pose="celebrate"]' in avatar_mascot_styles
+    assert "sprite-tuantuan-work" in avatar_mascot_styles
+    assert "sprite-tuantuan-celebrate" in avatar_mascot_styles
+    assert 'content: ""' in avatar_mascot_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles

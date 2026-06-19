@@ -18,6 +18,21 @@ let draftMessage = "";
 let lastState = {};
 let lastRuntime = {};
 let suppressSpriteClick = false;
+let spritePoseTickerBound = false;
+let spriteIdlePoseIndex = 0;
+let temporarySpritePose = "";
+let temporarySpritePoseTimer = 0;
+const SPRITE_POSE_ASSETS = {
+  idle: "./assets/tuantuan-idle.png",
+  happy: "./assets/tuantuan-happy.png",
+  curious: "./assets/tuantuan-curious.png",
+  thinking: "./assets/tuantuan-thinking.png",
+  surprised: "./assets/tuantuan-surprised.png",
+  sleepy: "./assets/tuantuan-sleepy.png",
+  working: "./assets/tuantuan-working.png",
+  celebrate: "./assets/tuantuan-celebrate.png",
+};
+const IDLE_SPRITE_POSES = ["idle", "curious", "happy", "sleepy"];
 const spriteMessages = [
   { role: "sprite", text: "我在这里看着画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -27,10 +42,12 @@ export function renderSpriteWidget(state, runtime) {
   if (!root) return;
   lastState = state || {};
   lastRuntime = runtime || {};
+  bindSpritePoseTicker();
   bindSpriteViewportClamp();
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.replaceChildren(spriteShell(state, runtime));
+  applySpritePose(root);
 }
 
 function spriteShell(state, runtime) {
@@ -50,83 +67,26 @@ function spriteOrb() {
   button.setAttribute("data-sprite-draggable", "true");
   button.setAttribute("data-sprite-role", "movable-companion");
   button.setAttribute("data-sprite-character", "mascot");
+  button.setAttribute("data-sprite-pose", currentSpritePose());
   button.title = spriteOpen ? "拖动或方向键移动，右键设置，点击收起 AFS 小精灵" : "拖动或方向键移动，右键设置，点击打开 AFS 小精灵";
   button.innerHTML = [
-    '<span class="sprite-mascot-shell" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-ear left" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-ear right" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-face" aria-hidden="true">',
-    '  <span class="sprite-mascot-eye left"></span>',
-    '  <span class="sprite-mascot-eye right"></span>',
-    '  <span class="sprite-mascot-smile"></span>',
+    '<span class="sprite-tuantuan-stage" aria-hidden="true">',
+    ...spritePoseImages(),
     "</span>",
-    '<span class="sprite-mascot-hand left" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-hand right" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-star" aria-hidden="true"></span>',
-    '<span class="sprite-mascot-tag" aria-hidden="true">AFS</span>',
     '<span class="sprite-mascot-shadow" aria-hidden="true"></span>',
-    '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
-    '<span class="sprite-orbit-dot left" aria-hidden="true"></span>',
-    '<span class="sprite-orbit-dot right" aria-hidden="true"></span>',
-    '<span class="sprite-navigator-shell" aria-hidden="true"></span>',
-    '<span class="sprite-halo-crown" aria-hidden="true"><i></i><i></i><i></i></span>',
-    '<span class="sprite-crest" aria-hidden="true"></span>',
-    '<span class="sprite-character-shell"></span>',
-    '<span class="sprite-hood"></span>',
-    '<span class="sprite-helmet-glass"></span>',
-    '<span class="sprite-helmet-reflection" aria-hidden="true"></span>',
     '<span class="sprite-move-handle" data-sprite-drag-handle="true" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
-    '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
-    '<span class="sprite-aura"></span>',
-    '<span class="sprite-antenna"></span>',
-    '<span class="sprite-ear left"></span>',
-    '<span class="sprite-ear right"></span>',
-    '<span class="sprite-wing left"></span>',
-    '<span class="sprite-wing right"></span>',
-    '<span class="sprite-tail-fin"></span>',
-    '<span class="sprite-shoulder left"></span>',
-    '<span class="sprite-shoulder right"></span>',
-    '<span class="sprite-arm left"><span class="sprite-hand left"></span><span class="sprite-mitten left"></span></span>',
-    '<span class="sprite-arm right"><span class="sprite-hand right"></span><span class="sprite-mitten right"></span></span>',
-    '<span class="sprite-hand-wave" aria-hidden="true"></span>',
-    '<span class="sprite-jet-pack" aria-hidden="true"></span>',
-    '<span class="sprite-backplate"></span>',
-    '<span class="sprite-body">',
-    '  <span class="sprite-cockpit"></span>',
-    '  <span class="sprite-canopy"></span>',
-    '  <span class="sprite-head-shell"></span>',
-    '  <span class="sprite-face-window"></span>',
-    '  <span class="sprite-face">',
-    '    <span class="sprite-brow left"></span>',
-    '    <span class="sprite-brow right"></span>',
-    '    <span class="sprite-cheek left"></span>',
-    '    <span class="sprite-visor"><span class="sprite-eye-glow"></span><i class="sprite-eye left"></i><i class="sprite-eye right"></i><b></b></span>',
-    '    <span class="sprite-cheek right"></span>',
-    '    <span class="sprite-blush left"></span>',
-    '    <span class="sprite-blush right"></span>',
-    '    <span class="sprite-mouth"></span>',
-    '    <span class="sprite-face-smile"></span>',
-    "  </span>",
-    '  <span class="sprite-core"></span>',
-    '  <span class="sprite-torso-panel"><i></i><i></i></span>',
-    '  <span class="sprite-status-light"></span>',
-    '  <span class="sprite-badge">AFS</span>',
-    "</span>",
-    '<span class="sprite-wand" aria-hidden="true"></span>',
-    '<span class="sprite-nameplate" aria-hidden="true"><i></i><i></i><b></b></span>',
-    '<span class="sprite-personality-tag" aria-hidden="true">星导</span>',
     '<span class="sprite-grab-ribbon" aria-hidden="true">按住移动</span>',
-    '<span class="sprite-scarf"></span>',
-    '<span class="sprite-foot left"></span>',
-    '<span class="sprite-foot right"></span>',
-    '<span class="sprite-thruster"></span>',
-    '<span class="sprite-glow-trail"></span>',
-    '<span class="sprite-hover-pad" aria-hidden="true"></span>',
-    '<span class="sprite-shadow"></span>',
+    '<span class="sprite-mascot-tag" aria-hidden="true">团团</span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
   button.addEventListener("pointerdown", handleSpriteDrag);
+  button.addEventListener("pointerenter", () => {
+    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) setSpritePose(button, "happy");
+  });
+  button.addEventListener("pointerleave", () => {
+    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) setSpritePose(button);
+  });
   button.addEventListener("keydown", nudgeSpritePosition);
   button.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -148,13 +108,61 @@ function spriteOrb() {
   return button;
 }
 
+function spritePoseImages() {
+  return Object.entries(SPRITE_POSE_ASSETS).map(([pose, src]) => (
+    `  <img class="sprite-tuantuan-asset" data-pose="${pose}" src="${src}" alt="" draggable="false" />`
+  ));
+}
+
 function handleSpriteDrag(event) {
+  setSpritePose(event.currentTarget, "happy");
   startSpriteDrag(event, () => {
     suppressSpriteClick = true;
     window.setTimeout(() => {
       suppressSpriteClick = false;
     }, 260);
+  }, () => {
+    applySpritePose();
   });
+}
+
+function currentSpritePose() {
+  if (temporarySpritePose) return temporarySpritePose;
+  if (spriteSending) return "working";
+  if (spriteSettingsOpen) return "thinking";
+  if (spriteOpen) return "curious";
+  return IDLE_SPRITE_POSES[spriteIdlePoseIndex] || "idle";
+}
+
+function setSpritePose(button = document.querySelector(".afs-sprite-avatar"), pose = currentSpritePose()) {
+  if (!button) return;
+  button.dataset.spritePose = SPRITE_POSE_ASSETS[pose] ? pose : "idle";
+}
+
+function applySpritePose(root = document.getElementById("sprite-root")) {
+  setSpritePose(root?.querySelector(".afs-sprite-avatar"));
+}
+
+function bindSpritePoseTicker() {
+  if (spritePoseTickerBound || typeof window === "undefined") return;
+  spritePoseTickerBound = true;
+  window.setInterval(() => {
+    if (spriteOpen || spriteSettingsOpen || spriteSending || temporarySpritePose) return;
+    const root = document.getElementById("sprite-root");
+    if (root?.classList.contains("is-dragging")) return;
+    spriteIdlePoseIndex = (spriteIdlePoseIndex + 1) % IDLE_SPRITE_POSES.length;
+    applySpritePose(root);
+  }, 7200);
+}
+
+function setTemporarySpritePose(pose, duration = 1500) {
+  if (!SPRITE_POSE_ASSETS[pose] || typeof window === "undefined") return;
+  temporarySpritePose = pose;
+  window.clearTimeout(temporarySpritePoseTimer);
+  temporarySpritePoseTimer = window.setTimeout(() => {
+    temporarySpritePose = "";
+    renderSpriteWidget(lastState, lastRuntime);
+  }, duration);
 }
 
 function spritePanel(state, runtime) {
@@ -238,8 +246,10 @@ async function submitSpriteMessage(state, runtime, rawText) {
       generated_at: new Date().toISOString(),
     });
     spriteMessages.push({ role: "sprite", text: safeReply(response?.reply) });
+    setTemporarySpritePose("celebrate");
   } catch {
     spriteMessages.push({ role: "sprite", text: "我暂时连不上工作台服务。你仍可以先检查当前节点的参考图和已确认素材。" });
+    setTemporarySpritePose("surprised", 1800);
   } finally {
     spriteSending = false;
     renderSpriteWidget(state, runtime);

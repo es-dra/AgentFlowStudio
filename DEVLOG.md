@@ -1,29 +1,31 @@
 # Devlog
 
-## 2026-06-19 - Studio Mascot Companion And Edge Disconnect
+## 2026-06-19 - Studio TuanTuan Multi-Pose Mascot Follow-up
 
-- Reworked the movable `AFS 小精灵` into a cartoon mascot skin for the first
-  company-IP direction, while keeping the existing Runtime sprite chat
-  boundary.
+- Reworked the movable `AFS 小精灵` from a single raster sticker into a
+  multi-pose `团团` mascot based on the latest provided IP reference.
+- Added idle / happy / curious / thinking / surprised / sleepy / working /
+  celebrate PNG poses and a lightweight pose state machine for hover, drag,
+  settings, chat-open, sending, success, and idle cycling.
+- Replaced the earlier CSS reconstruction with reference-derived PNG poses on
+  one canvas companion stage.
+- Kept the asset reference relative to Studio (`./assets/tuantuan-mascot.png`);
+  the full local reference board and local absolute source path are not exposed
+  in frontend code.
+- Kept the existing Runtime sprite chat boundary, draggable shell, keyboard
+  nudging, right-click settings, and local size persistence.
 - Added right-click settings for the sprite with small / medium / large size
   options, persisted as a local UI preference.
-- Added a low-burden edge disconnect affordance: selecting a connection shows
-  a compact inline disconnect control, and Delete / Backspace removes the
-  selected edge.
-- Kept edge selection and edge deletion inside the Studio store path so node
-  rendering, graph relations, and persistence continue using the existing
-  canvas state model.
-
 Verification:
 
 ```text
-TDD red: sprite static test failed on missing mascot skin, then passed after implementation
-TDD red: Studio interaction test failed on missing canvas-edge-actions.js, then passed after implementation
-tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py tests/test_studio_interaction_layer.py tests/test_web_studio_mature_shell_static.py -q -> 28 passed / 1 existing warning
+TDD red: sprite static test failed while it still expected the old single-pose/static markers, then passed after the multi-pose contract update.
+tests/test_web_studio_static.py tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q -> 16 passed / 1 existing warning
 npm run check:studio-js -> passed for 94 files
 tools/maintenance_audit.py -> failed=0; warnings only
-git diff --check -> passed with one CRLF normalization warning in apps/studio/src/nodes.js
-browser smoke -> mascot rendered as data-sprite-character="mascot"; size large persisted; old mechanical body hidden; edge render chain selected e1 and disconnect removed it; console warn/error count 0
+git diff --check -> passed
+browser smoke -> initial=idle; hover/drag=happy; right-click settings=thinking; open chat=curious; 8 pose assets loaded at 410x515; console warn/error count 0
+browser screenshot -> runs/tuantuan-sprite-multipose-smoke-20260619.png
 ```
 
 Boundaries:
@@ -31,8 +33,9 @@ Boundaries:
 - No Runtime API shape was changed.
 - No provider gate or provider config was changed.
 - No provider call was made.
-- No provider raw response, signed URL, local media byte, local path, invite
-  code, or secret was exposed.
+- Added only Studio UI mascot pose assets derived from the provided reference;
+  the full local reference board and local absolute source path are not exposed.
+- No provider raw response, signed URL, invite code, or secret was exposed.
 - This is local static/browser verification, not human acceptance or business
   validation.
 
