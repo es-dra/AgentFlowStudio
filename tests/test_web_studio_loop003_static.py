@@ -15,6 +15,7 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    visual_asset_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
 
     assert 'data-action="fix-visual-asset"' in canvas_view
     assert "fixNodeVisualAsset" in node_actions
@@ -22,11 +23,11 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
     assert "reusable_image_assets" in keyframe_actions
     assert 'initialAssetType: assetType' in drawer
     assert 'initialAssetType = "character"' in visual_asset_panel
-    assert 'data-action="draft-card"' in visual_asset_panel
+    assert 'data-action="draft-card"' in visual_asset_render
     assert "runtime.draftAssetCard" in visual_asset_panel
     assert "candidate_locks" in visual_asset_panel
     assert "missing_fields" in visual_asset_panel
-    assert "draft-status" in visual_asset_panel
+    assert "draft-status" in visual_asset_render
 
 
 def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions() -> None:

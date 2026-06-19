@@ -8,6 +8,7 @@ def test_studio_hardening_static_contract_markers() -> None:
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
     optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    visual_asset_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
     shortcuts = (STUDIO_ROOT / "src" / "panels" / "shortcuts-panel.js").read_text(encoding="utf-8")
 
     assert "lastOptimizedPromptPlain" in source
@@ -16,7 +17,7 @@ def test_studio_hardening_static_contract_markers() -> None:
     assert "costHop" in optimizer_contract
     assert "degraded_to_signature_over_limit" in source
     assert "superseded_by_newer_label_version" in source
-    assert "不采用" in visual_asset_panel
+    assert "不采用" in visual_asset_render
     assert "asset_fix" not in visual_asset_panel
     assert "fix visual asset" not in source
     assert "未引用 · 可连线" in optimizer
@@ -28,6 +29,7 @@ def test_studio_hardening_static_contract_markers() -> None:
 
 def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
     panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
     defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
     assert "sectionText" in defaults
     assert "inferIdentity" in defaults
@@ -35,7 +37,12 @@ def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
     assert "uniqueTextParts" in defaults
 
     assert "visualAssetDefaults" in panel
-    assert "data-card" in panel
+    assert 'from "./visual-asset-panel-render.js"' in panel
+    assert "renderVisualAssetPanel" in render
+    assert "lockChipsForAssetType" in render
+    assert "data-card" in render
+    assert len(panel.splitlines()) <= 300
+    assert len(render.splitlines()) <= 220
     assert "短发" in defaults
     assert "保持参考图人物身份和脸部辨识度" in defaults
 

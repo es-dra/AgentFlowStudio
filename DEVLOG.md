@@ -2831,3 +2831,28 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is local browser/runtime verification, not human acceptance or business validation.
+
+## 2026-06-19 - Visual Asset Panel Render Split
+
+- Split the visual asset confirmation modal rendering into `apps/studio/src/panels/visual-asset-panel-render.js`.
+- Kept `apps/studio/src/panels/visual-asset-panel.js` focused on Runtime calls, draft-card handling, submit validation, and store updates.
+- Preserved the existing `vision_image` draft-card route, fixed/rejected asset review flow, and safe local store projection.
+- Added static regression coverage so the main panel stays under 300 lines and the render module owns the visible fields/actions.
+
+Verification:
+
+```text
+tests/test_web_studio_assets_generation_static.py + tests/test_web_studio_loop003_static.py + tests/test_web_studio_static.py: 24 passed
+npm run check:studio-js: passed for 91 files
+Browser check on http://127.0.0.1:8797/studio/: Studio root and sprite root rendered; console warn/error count=0
+pytest -q: 536 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count dropped from 33 to 32
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is frontend structure/runtime-boundary verification, not human acceptance or business validation.
