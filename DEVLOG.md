@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-19 - Studio State Module Split
+
+- Split `apps/api/runtime_studio_state.py` into a thin route module plus
+  focused safe-state helpers. The route now owns HTTP persistence and version
+  metadata; `runtime_studio_state_sanitizer.py` owns top-level state
+  projection; `runtime_studio_state_context.py` owns context bundle
+  projection; `runtime_studio_state_assets.py` owns asset-list sanitization;
+  `runtime_studio_state_preview.py` owns safe Runtime preview URL allow-listing.
+- Preserved the existing Runtime API shape and the public
+  `sanitize_studio_state` import compatibility from the route module.
+- Added a structural regression test so future changes cannot fold nodes,
+  params, context bundles, assets, or preview URL safety back into the route
+  file. All new Studio state modules remain under the 300-line maintenance
+  threshold.
+
+Verification:
+
+```text
+tests/test_api_runtime_studio_state_modules.py tests/test_api_runtime_studio_state.py -> 10 passed / 1 warning
+Runtime/internal-beta focused set -> 32 passed / 1 warning
+pytest -q -> 534 passed / 527 deselected / 2 warnings
+tools/maintenance_audit.py -> failed=0; oversized warning count 36
+git diff --check -> passed
+```
+
+Boundary: no Runtime API shape changed, no auth policy changed, no provider
+gate changed, no provider call was made, and no local path, signed URL,
+provider raw response, media byte, invite code, or session token was added to
+persisted Studio state. This is Runtime/module verification, not human
+acceptance or business validation.
+
 ## 2026-06-19 - HTTP Preflight Three-End Status Addendum
 
 - Extended `tools/afs_internal_beta_acceptance.py --preflight-only` with an

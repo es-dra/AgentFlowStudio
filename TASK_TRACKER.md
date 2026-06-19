@@ -12,6 +12,24 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio state module split addendum: 2026-06-19 pass split
+`apps/api/runtime_studio_state.py` from a route plus sanitizer file into a thin
+route module and focused safe-state helpers:
+`runtime_studio_state_sanitizer.py`, `runtime_studio_state_context.py`,
+`runtime_studio_state_assets.py`, and `runtime_studio_state_preview.py`.
+The public `sanitize_studio_state` compatibility export remains available
+from the route module, while preview URL allow-listing, context bundle
+projection, and asset-list sanitization now have separate regression coverage.
+Verification: Studio state focused regression passed 10 / 1 existing warning;
+Runtime/internal-beta focused set passed 32 / 1 existing warning; full pytest
+passed 534 / 527 deselected / 2 existing warnings; maintenance audit failed=0
+with warnings only and oversized warning count dropped from 37 to 36;
+`git diff --check` passed. Boundary: no Runtime API shape changed, no auth
+policy changed, no provider gate changed, no provider call, no local path,
+signed URL, provider raw response, media byte, invite code, or session token
+was added to persisted Studio state; not human acceptance or business
+validation.
+
 Current internal beta acceptance split addendum: 2026-06-19 pass split HTTP
 preflight readiness logic out of `tools/afs_internal_beta_acceptance.py` into
 `tools/afs_internal_beta_acceptance_preflight.py`, and moved the shared

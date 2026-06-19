@@ -1,0 +1,265 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS, sanitize_generation_param
+from apps.api.runtime_studio_state_assets import sanitize_assets
+from apps.api.runtime_studio_state_context import sanitize_context_bundle
+from apps.api.runtime_studio_state_preview import LOCAL_PATH_PATTERN, safe_node_preview_url, safe_preview_url
+from apps.api.runtime_store import safe_id
+
+
+FORBIDDEN_STUDIO_KEYS = {
+    "api_key",
+    "secret",
+    "token",
+    "cookie",
+    "authorization",
+    "provider_config",
+    "signed_url",
+    "provider_raw",
+    "provider_response",
+    "raw_response",
+    "media_bytes",
+    "trace",
+    "knowledge_weights",
+    "hidden_memory",
+}
+SAFE_NODE_PARAM_KEYS = (
+    "model",
+    "spec",
+    "camera",
+    "motion",
+    "styleRef",
+    "attachments",
+    "directorSetup",
+    "isReference",
+    "intent",
+    "uploads",
+    "previewAspectRatio",
+    "visualAssets",
+    "visual_asset_ids",
+    "firstFrameImageAssetId",
+    "lastFrameImageAssetId",
+    "lastVideoJobId",
+    "lastVideoPreviewUrl",
+    *SAFE_GENERATION_PARAM_KEYS,
+    "quotaOverrideConfirmed",
+    "lastContextBundle",
+)
+PRUNED_RUNTIME_PARAM_KEYS = {
+    "lastContextBundle",
+    "temporaryLockOverrides",
+}
+
+
+def sanitize_studio_state(value: dict[str, Any], *, project_id: str | None = None) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("studio state must be an object")
+    _reject_forbidden_known_surfaces(value)
+    sanitized = {
+        "meta": _meta(value.get("meta")),
+        "viewport": _viewport(value.get("viewport")),
+        "nodes": _nodes(value.get("nodes"), project_id=project_id),
+        "edges": _edges(value.get("edges")),
+        "order": _order(value.get("order"), value.get("nodes")),
+        "assets": sanitize_assets(
+            value.get("assets"),
+            project_id=project_id,
+            text=_text,
+            preview_url=safe_preview_url,
+        ),
+    }
+    _reject_forbidden(sanitized)
+    return sanitized
+
+
+def _meta(value: Any) -> dict[str, Any]:
+    data = value if isinstance(value, dict) else {}
+    return {
+        "projectName": _text(data.get("projectName"), "未命名项目", 80),
+        "canvasName": _text(data.get("canvasName"), "画布 1", 80),
+        "seq": _number(data.get("seq"), 1),
+        "updated_at": _text(data.get("updated_at"), "", 80),
+    }
+
+
+def _viewport(value: Any) -> dict[str, float]:
+    data = value if isinstance(value, dict) else {}
+    return {
+        "x": _number(data.get("x"), 0),
+        "y": _number(data.get("y"), 0),
+        "scale": max(0.18, min(2.6, _number(data.get("scale"), 1))),
+    }
+
+
+def _nodes(value: Any, *, project_id: str | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    source = value if isinstance(value, dict) else {}
+    for raw_id, node in source.items():
+        if not isinstance(node, dict):
+            continue
+        node_id = safe_id(str(raw_id))
+        node_type = _text(node.get("type"), "text", 40)
+        params = node.get("params") if isinstance(node.get("params"), dict) else {}
+        safe_params = _node_params(params, project_id=project_id)
+        preview_url = safe_node_preview_url(node.get("previewUrl"), node_type=node_type, project_id=project_id)
+        safe_node = {
+            "id": node_id,
+            "type": node_type,
+            "title": _text(node.get("title"), "未命名节点", 120),
+            "x": _number(node.get("x"), 0),
+            "y": _number(node.get("y"), 0),
+            "w": _number(node.get("w"), 280),
+            "h": _number(node.get("h"), 280),
+            "prompt": _text(node.get("prompt"), "", 4000),
+            "content": _text(node.get("content"), "", 8000),
+            "params": _jsonable(safe_params),
+            "status": _text(node.get("status"), "idle", 40),
+            "result": _text(node.get("result"), "", 4000),
+            "collapsed": bool(node.get("collapsed")),
+        }
+        if preview_url:
+            safe_node["previewUrl"] = preview_url
+        result[node_id] = safe_node
+    return result
+
+
+def _edges(value: Any) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    source = value if isinstance(value, dict) else {}
+    for raw_id, edge in source.items():
+        if not isinstance(edge, dict):
+            continue
+        edge_id = safe_id(str(raw_id))
+        relation = _text(edge.get("relation_type") or edge.get("relationType"), "generation", 40)
+        if relation not in {"generation", "director", "reference"}:
+            relation = "generation"
+        result[edge_id] = {
+            "id": edge_id,
+            "from": safe_id(str(edge.get("from", ""))),
+            "to": safe_id(str(edge.get("to", ""))),
+            "relation_type": relation,
+        }
+    return result
+
+
+def _node_params(value: dict[str, Any], *, project_id: str | None = None) -> dict[str, Any]:
+    safe_params: dict[str, Any] = {}
+    for key in SAFE_NODE_PARAM_KEYS:
+        if key not in value:
+            continue
+        if key == "uploads":
+            safe_params[key] = _uploads(value[key], project_id=project_id)
+        elif key in {"firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId"}:
+            safe_params[key] = safe_id(str(value[key]))
+        elif key == "lastVideoPreviewUrl":
+            safe_params[key] = safe_preview_url(value[key], project_id=project_id)
+        elif key in SAFE_GENERATION_PARAM_KEYS:
+            generation_param = sanitize_generation_param(
+                key,
+                value[key],
+                project_id=project_id,
+                preview_url=safe_preview_url,
+                text=_text,
+                number=_number,
+            )
+            if generation_param not in (None, "", [], {}):
+                safe_params[key] = generation_param
+        elif key == "quotaOverrideConfirmed":
+            safe_params[key] = bool(value[key])
+        elif key == "lastContextBundle":
+            bundle = sanitize_context_bundle(value[key])
+            if bundle:
+                safe_params[key] = bundle
+        else:
+            safe_params[key] = value[key]
+    return safe_params
+
+
+def _order(value: Any, nodes: Any) -> list[str]:
+    if isinstance(value, list):
+        return [safe_id(str(item)) for item in value]
+    if isinstance(nodes, dict):
+        return [safe_id(str(item)) for item in nodes]
+    return []
+
+
+def _reject_forbidden(value: Any) -> None:
+    serialized = json.dumps(value, ensure_ascii=False)
+    lowered = serialized.lower()
+    for key in FORBIDDEN_STUDIO_KEYS:
+        if key in lowered:
+            raise ValueError(f"studio state contains forbidden field: {key}")
+    if LOCAL_PATH_PATTERN.search(serialized):
+        raise ValueError("studio state contains local path or runtime artifact path")
+
+
+def _reject_forbidden_known_surfaces(value: dict[str, Any]) -> None:
+    nodes = value.get("nodes")
+    if isinstance(nodes, dict):
+        for node in nodes.values():
+            if not isinstance(node, dict):
+                continue
+            safe_preview_url(node.get("previewUrl"))
+            node_shallow = {key: item for key, item in node.items() if key not in {"params", "previewUrl"}}
+            _reject_forbidden(node_shallow)
+            _reject_node_params(node.get("params"))
+    assets = value.get("assets")
+    if isinstance(assets, list):
+        for item in assets:
+            if isinstance(item, dict):
+                _reject_forbidden(item)
+
+
+def _reject_node_params(params: Any) -> None:
+    if not isinstance(params, dict):
+        return
+    for key, item in params.items():
+        if key in PRUNED_RUNTIME_PARAM_KEYS:
+            continue
+        lowered = str(key).lower()
+        if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
+            raise ValueError(f"studio state contains forbidden field: {key}")
+        if key in SAFE_NODE_PARAM_KEYS:
+            if key == "uploads":
+                _uploads(item)
+            _reject_forbidden(item)
+
+
+def _text(value: Any, fallback: str, max_length: int) -> str:
+    text = str(value if value is not None else fallback)
+    if LOCAL_PATH_PATTERN.search(text):
+        raise ValueError("studio state contains local path or runtime artifact path")
+    return text[:max_length]
+
+
+def _number(value: Any, fallback: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _jsonable(value: Any) -> Any:
+    dumped = json.dumps(value, ensure_ascii=False)
+    _reject_forbidden(value)
+    return json.loads(dumped)
+
+
+def _uploads(value: Any, *, project_id: str | None = None) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    result: list[Any] = []
+    for item in value[:24]:
+        if not isinstance(item, dict):
+            continue
+        upload = dict(item)
+        if "preview_url" in upload:
+            upload["preview_url"] = safe_preview_url(upload.get("preview_url"), project_id=project_id)
+        result.append(upload)
+    return result
+
+
+__all__ = ("sanitize_studio_state",)
