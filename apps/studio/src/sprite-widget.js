@@ -10,6 +10,19 @@ import {
   startSpriteDrag,
   SPRITE_SCALE_OPTIONS,
 } from "./sprite-position.js";
+import {
+  applySpritePose,
+  bindSpritePoseTicker,
+  currentSpritePose,
+  setSpritePose,
+  setTemporarySpritePose,
+  spritePoseImages,
+} from "./sprite-character.js";
+import {
+  bindSpriteMotion,
+  pulseSpriteMotion,
+  setSpriteMotionMode,
+} from "./sprite-motion.js";
 
 let spriteOpen = false;
 let spriteSettingsOpen = false;
@@ -18,21 +31,6 @@ let draftMessage = "";
 let lastState = {};
 let lastRuntime = {};
 let suppressSpriteClick = false;
-let spritePoseTickerBound = false;
-let spriteIdlePoseIndex = 0;
-let temporarySpritePose = "";
-let temporarySpritePoseTimer = 0;
-const SPRITE_POSE_ASSETS = {
-  idle: "./assets/tuantuan-idle.png",
-  happy: "./assets/tuantuan-happy.png",
-  curious: "./assets/tuantuan-curious.png",
-  thinking: "./assets/tuantuan-thinking.png",
-  surprised: "./assets/tuantuan-surprised.png",
-  sleepy: "./assets/tuantuan-sleepy.png",
-  working: "./assets/tuantuan-working.png",
-  celebrate: "./assets/tuantuan-celebrate.png",
-};
-const IDLE_SPRITE_POSES = ["idle", "curious", "happy", "sleepy"];
 const spriteMessages = [
   { role: "sprite", text: "我在这里看着画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -42,12 +40,14 @@ export function renderSpriteWidget(state, runtime) {
   if (!root) return;
   lastState = state || {};
   lastRuntime = runtime || {};
-  bindSpritePoseTicker();
+  bindSpritePoseTicker(spriteState, () => applySpritePose(document.getElementById("sprite-root"), spriteState()));
+  bindSpriteMotion(root);
   bindSpriteViewportClamp();
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.replaceChildren(spriteShell(state, runtime));
-  applySpritePose(root);
+  applySpritePose(root, spriteState());
+  setSpriteMotionMode(spriteMotionMode(), root);
 }
 
 function spriteShell(state, runtime) {
@@ -67,7 +67,7 @@ function spriteOrb() {
   button.setAttribute("data-sprite-draggable", "true");
   button.setAttribute("data-sprite-role", "movable-companion");
   button.setAttribute("data-sprite-character", "mascot");
-  button.setAttribute("data-sprite-pose", currentSpritePose());
+  button.setAttribute("data-sprite-pose", currentSpritePose(spriteState()));
   button.title = spriteOpen ? "拖动或方向键移动，右键设置，点击收起 AFS 小精灵" : "拖动或方向键移动，右键设置，点击打开 AFS 小精灵";
   button.innerHTML = [
     '<span class="sprite-tuantuan-stage" aria-hidden="true">',
@@ -82,10 +82,16 @@ function spriteOrb() {
   ].join("");
   button.addEventListener("pointerdown", handleSpriteDrag);
   button.addEventListener("pointerenter", () => {
-    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) setSpritePose(button, "happy");
+    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) {
+      setSpritePose(button, "happy");
+      setSpriteMotionMode("hover");
+    }
   });
   button.addEventListener("pointerleave", () => {
-    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) setSpritePose(button);
+    if (!spriteOpen && !spriteSettingsOpen && !spriteSending) {
+      setSpritePose(button, currentSpritePose(spriteState()));
+      setSpriteMotionMode(spriteMotionMode());
+    }
   });
   button.addEventListener("keydown", nudgeSpritePosition);
   button.addEventListener("contextmenu", (event) => {
@@ -108,61 +114,33 @@ function spriteOrb() {
   return button;
 }
 
-function spritePoseImages() {
-  return Object.entries(SPRITE_POSE_ASSETS).map(([pose, src]) => (
-    `  <img class="sprite-tuantuan-asset" data-pose="${pose}" src="${src}" alt="" draggable="false" />`
-  ));
-}
-
 function handleSpriteDrag(event) {
   setSpritePose(event.currentTarget, "happy");
+  setSpriteMotionMode("drag");
   startSpriteDrag(event, () => {
     suppressSpriteClick = true;
     window.setTimeout(() => {
       suppressSpriteClick = false;
     }, 260);
   }, () => {
-    applySpritePose();
+    applySpritePose(document.getElementById("sprite-root"), spriteState());
+    setSpriteMotionMode(spriteMotionMode());
   });
 }
 
-function currentSpritePose() {
-  if (temporarySpritePose) return temporarySpritePose;
+function spriteState() {
+  return {
+    open: spriteOpen,
+    settingsOpen: spriteSettingsOpen,
+    sending: spriteSending,
+  };
+}
+
+function spriteMotionMode() {
   if (spriteSending) return "working";
-  if (spriteSettingsOpen) return "thinking";
-  if (spriteOpen) return "curious";
-  return IDLE_SPRITE_POSES[spriteIdlePoseIndex] || "idle";
-}
-
-function setSpritePose(button = document.querySelector(".afs-sprite-avatar"), pose = currentSpritePose()) {
-  if (!button) return;
-  button.dataset.spritePose = SPRITE_POSE_ASSETS[pose] ? pose : "idle";
-}
-
-function applySpritePose(root = document.getElementById("sprite-root")) {
-  setSpritePose(root?.querySelector(".afs-sprite-avatar"));
-}
-
-function bindSpritePoseTicker() {
-  if (spritePoseTickerBound || typeof window === "undefined") return;
-  spritePoseTickerBound = true;
-  window.setInterval(() => {
-    if (spriteOpen || spriteSettingsOpen || spriteSending || temporarySpritePose) return;
-    const root = document.getElementById("sprite-root");
-    if (root?.classList.contains("is-dragging")) return;
-    spriteIdlePoseIndex = (spriteIdlePoseIndex + 1) % IDLE_SPRITE_POSES.length;
-    applySpritePose(root);
-  }, 7200);
-}
-
-function setTemporarySpritePose(pose, duration = 1500) {
-  if (!SPRITE_POSE_ASSETS[pose] || typeof window === "undefined") return;
-  temporarySpritePose = pose;
-  window.clearTimeout(temporarySpritePoseTimer);
-  temporarySpritePoseTimer = window.setTimeout(() => {
-    temporarySpritePose = "";
-    renderSpriteWidget(lastState, lastRuntime);
-  }, duration);
+  if (spriteSettingsOpen) return "settings";
+  if (spriteOpen) return "panel";
+  return "idle";
 }
 
 function spritePanel(state, runtime) {
@@ -246,10 +224,12 @@ async function submitSpriteMessage(state, runtime, rawText) {
       generated_at: new Date().toISOString(),
     });
     spriteMessages.push({ role: "sprite", text: safeReply(response?.reply) });
-    setTemporarySpritePose("celebrate");
+    pulseSpriteMotion("success");
+    setTemporarySpritePose("celebrate", 1500, () => renderSpriteWidget(lastState, lastRuntime));
   } catch {
     spriteMessages.push({ role: "sprite", text: "我暂时连不上工作台服务。你仍可以先检查当前节点的参考图和已确认素材。" });
-    setTemporarySpritePose("surprised", 1800);
+    pulseSpriteMotion("error");
+    setTemporarySpritePose("surprised", 1800, () => renderSpriteWidget(lastState, lastRuntime));
   } finally {
     spriteSending = false;
     renderSpriteWidget(state, runtime);

@@ -1,5 +1,18 @@
 /* Multi-pose raster TuanTuan mascot skin. The character form lives in PNG poses, not CSS reconstruction. */
 .afs-sprite-avatar[data-sprite-character="mascot"] {
+  --sprite-look-x: 0;
+  --sprite-look-y: 0;
+  --sprite-lift: 0;
+  --sprite-tilt: 0;
+  --sprite-bob: 0;
+  --sprite-squash-x: 1;
+  --sprite-squash-y: 1;
+  --sprite-shift-x: 0px;
+  --sprite-shift-y: 0px;
+  --sprite-tilt-deg: 0deg;
+  --sprite-shadow-x: 0px;
+  --sprite-shadow-scale: 1;
+  --sprite-shadow-opacity: 0.72;
   left: 0;
   top: 0;
   width: 190px;
@@ -27,7 +40,13 @@
   display: block;
   isolation: isolate;
   pointer-events: none;
-  transition: transform 0.2s ease, filter 0.2s ease;
+  transform:
+    translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)
+    rotate(var(--sprite-tilt-deg))
+    scaleX(var(--sprite-squash-x))
+    scaleY(var(--sprite-squash-y));
+  transform-origin: 50% 86%;
+  transition: filter 0.18s ease;
 }
 
 .sprite-tuantuan-asset {
@@ -67,9 +86,12 @@
   border-radius: 50%;
   background: radial-gradient(ellipse, rgba(48, 30, 16, 0.42), transparent 71%);
   filter: blur(1px);
-  opacity: 0.72;
+  opacity: var(--sprite-shadow-opacity);
   pointer-events: none;
   transition: opacity 0.2s ease, transform 0.2s ease;
+  transform:
+    translateX(var(--sprite-shadow-x))
+    scaleX(var(--sprite-shadow-scale));
 }
 
 .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-drag-halo {
@@ -162,34 +184,18 @@
 .afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-tuantuan-stage,
 .afs-sprite.open .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
   filter: saturate(1.05) brightness(1.02);
-  transform: translateY(-2px);
 }
 
-#sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
-  transform: translateY(-8px) rotate(-1deg);
+#sprite-root[data-sprite-motion="working"] .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
+  filter: saturate(1.08) brightness(1.03);
 }
 
-.afs-sprite-avatar[data-sprite-pose="working"] .sprite-tuantuan-stage {
-  animation: sprite-tuantuan-work 1.8s ease-in-out infinite;
-}
-
-.afs-sprite-avatar[data-sprite-pose="celebrate"] .sprite-tuantuan-stage {
-  animation: sprite-tuantuan-celebrate 1.2s ease-in-out infinite;
-}
-
-@keyframes sprite-tuantuan-work {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-4px) rotate(-1.5deg); }
-}
-
-@keyframes sprite-tuantuan-celebrate {
-  0%, 100% { transform: translateY(-2px) rotate(0deg) scale(1); }
-  45% { transform: translateY(-9px) rotate(2deg) scale(1.035); }
+#sprite-root[data-sprite-motion="success"] .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-tuantuan-stage {
+  filter: saturate(1.14) brightness(1.06);
 }
 
 #sprite-root.is-dragging .afs-sprite-avatar[data-sprite-character="mascot"] .sprite-mascot-shadow {
   opacity: 0.54;
-  transform: scaleX(0.78);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -200,11 +206,6 @@
   .sprite-tuantuan-asset,
   .sprite-mascot-tag {
     transition: none;
-  }
-
-  .afs-sprite-avatar[data-sprite-pose="working"] .sprite-tuantuan-stage,
-  .afs-sprite-avatar[data-sprite-pose="celebrate"] .sprite-tuantuan-stage {
-    animation: none;
   }
 
   .afs-sprite-avatar[data-sprite-character="mascot"]:hover .sprite-tuantuan-stage,

@@ -8,6 +8,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     sprite = (STUDIO_ROOT / "src" / "sprite-widget.js").read_text(encoding="utf-8")
+    character = (STUDIO_ROOT / "src" / "sprite-character.js").read_text(encoding="utf-8")
+    motion = (STUDIO_ROOT / "src" / "sprite-motion.js").read_text(encoding="utf-8")
     position = (STUDIO_ROOT / "src" / "sprite-position.js").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "studio-sprite.css").read_text(encoding="utf-8")
     avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
@@ -41,24 +43,29 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert mascot_asset.read_bytes() == pose_assets["idle"].read_bytes()
     assert "afs-sprite" in sprite
     assert 'from "./sprite-position.js"' in sprite
+    assert 'from "./sprite-character.js"' in sprite
+    assert 'from "./sprite-motion.js"' in sprite
     assert "AFS 小精灵" in sprite
     assert "data-sprite-draggable" in sprite
     assert 'data-sprite-role", "movable-companion"' in sprite
     assert 'data-sprite-character", "mascot"' in sprite
-    assert "SPRITE_POSE_ASSETS" in sprite
-    assert "IDLE_SPRITE_POSES" in sprite
-    assert "spriteIdlePoseIndex" in sprite
+    assert "bindSpriteMotion" in sprite
+    assert "setSpriteMotionMode" in sprite
+    assert "pulseSpriteMotion" in sprite
     assert "bindSpritePoseTicker" in sprite
     assert "currentSpritePose" in sprite
     assert "setTemporarySpritePose" in sprite
     assert "data-sprite-pose" in sprite
     assert "sprite-tuantuan-stage" in sprite
-    assert "sprite-tuantuan-asset" in sprite
+    assert "sprite-tuantuan-asset" in character
+    assert "spritePoseImages()" in sprite
     for pose in pose_assets:
-        assert f"./assets/tuantuan-{pose}.png" in sprite
-    assert 'data-pose="${pose}"' in sprite
-    assert "Object.entries(SPRITE_POSE_ASSETS)" in sprite
-    assert "draggable=\"false\"" in sprite
+        assert f"./assets/tuantuan-{pose}.png" in character
+    assert 'data-pose="${pose}"' in character
+    assert "Object.entries(SPRITE_POSE_ASSETS)" in character
+    assert "IDLE_SPRITE_POSES" in character
+    assert "spriteIdlePoseIndex" in character
+    assert "draggable=\"false\"" in character
     assert "sprite-move-handle" in sprite
     assert "sprite-grab-ribbon" in sprite
     assert "sprite-mascot-tag" in sprite
@@ -79,6 +86,19 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "__afsStudio" not in sprite
     assert "provider raw" not in sprite
     assert len(sprite.splitlines()) <= 300
+    assert len(character.splitlines()) <= 300
+    assert len(motion.splitlines()) <= 300
+    assert "requestAnimationFrame" in motion
+    assert "pointermove" in motion
+    assert "targetMotion" in motion
+    assert "motionTarget" in motion
+    assert "prefersReducedMotion" in motion
+    assert "--sprite-shift-x" in motion
+    assert "--sprite-shift-y" in motion
+    assert "--sprite-tilt-deg" in motion
+    assert "--sprite-shadow-scale" in motion
+    assert "--sprite-shadow-opacity" in motion
+    assert "dataset.spriteMotion" in motion
 
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_POSITION_VERSION" in position
@@ -124,7 +144,12 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '[data-sprite-pose="idle"]' in avatar_mascot_styles
     assert '[data-sprite-pose="working"]' in avatar_mascot_styles
     assert '[data-sprite-pose="celebrate"]' in avatar_mascot_styles
-    assert "sprite-tuantuan-work" in avatar_mascot_styles
-    assert "sprite-tuantuan-celebrate" in avatar_mascot_styles
+    assert "--sprite-shift-x" in avatar_mascot_styles
+    assert "--sprite-shift-y" in avatar_mascot_styles
+    assert "--sprite-tilt-deg" in avatar_mascot_styles
+    assert "--sprite-shadow-scale" in avatar_mascot_styles
+    assert "translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)" in avatar_mascot_styles
+    assert '[data-sprite-motion="working"]' in avatar_mascot_styles
+    assert '[data-sprite-motion="success"]' in avatar_mascot_styles
     assert 'content: ""' in avatar_mascot_styles
     assert "@media (prefers-reduced-motion: reduce)" in sprite_styles

@@ -3026,3 +3026,28 @@ Boundaries:
 - No provider call was made.
 - No Company OS or long-term memory write was made.
 - This records human review for an internal beta round only; it does not claim business validation, provider quality approval, or durable memory promotion.
+
+## 2026-06-19 - TuanTuan Lossless Motion Layer
+
+- Split the Studio companion into separate widget, character-asset, and motion modules so `sprite-widget.js` no longer owns pose assets or continuous motion math.
+- Added `sprite-motion.js` to drive continuous pointer attention, hover, drag lift, squash, tilt, bob, and shadow response through CSS variables on the actual mascot button.
+- Kept the reference-derived high-resolution TuanTuan PNG poses intact; the motion layer transforms the rendered character and shadow without generating or storing new media bytes.
+- Added reduced-motion handling so users who prefer less motion get a calmer version of the companion.
+
+Verification:
+
+```text
+npm run check:studio-js: JS syntax check passed for 96 files
+tests/test_web_studio_static.py + tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 16 passed / 1 existing Starlette/httpx warning
+git diff --check: passed
+Browser smoke on Chrome at /studio/?project=tuantuan-motion-smoke: 8 TuanTuan assets loaded at 410x515; pointer/hover/drag changed shift, tilt, squash, and shadow CSS variables; console warn/error count 0
+Screenshot evidence: runs/tuantuan-sprite-motion-smoke-20260619.png
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret exposure.
+- This is a lightweight lossless motion layer, not a full skeletal animation rig; full rigging still needs layered source art or a dedicated animation asset pipeline.
