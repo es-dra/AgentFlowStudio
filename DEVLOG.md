@@ -2561,6 +2561,31 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
 
+## 2026-06-19 - Video Routes Module Split
+
+- Split `apps/api/runtime_video_routes.py` from a 739-line route/orchestration module into a thin 105-line route assembly surface.
+- Added focused helper modules for video constants, gate blocks, prompt projection, candidate previews, safe manifest/job responses, task state/quota handling, and submit/poll dispatch.
+- Preserved the existing Runtime API shape and compatibility exports used by tests: `VideoGenerationRequest`, `load_provider_registry`, and `_video_provider_prompt`.
+- Kept provider registry loading injectable from the route module so existing monkeypatch coverage still proves provider gate and safe-manifest behavior.
+
+Verification:
+
+```text
+tests/test_api_runtime_video_routes_modules.py: first failed on missing helper modules, then passed after split
+tests/test_api_runtime_video_routes_modules.py + tests/test_api_runtime_video_generations.py + tests/test_api_runtime_generation_manifest_safety.py + tests/test_model_call_context_runtime_routes.py: 17 passed, 1 existing Starlette/httpx warning
+video/manifest/ModelCallContext/internal-beta/three-end focused set: 34 passed, 1 existing Starlette/httpx warning
+tools/maintenance_audit.py: failed=0 with warnings only; oversized warning count dropped from 36 to 35
+git diff --check: passed
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate was changed.
+- No provider call was made.
+- No provider config, local media byte, local path, signed URL, provider raw response, invite code, or session token was added to API payloads or reports.
+- This is runtime/module verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Sprite Companion Redesign Pass
 
 - Reworked the movable `AFS 小精灵` visual layer into a clearer Studio companion with a stronger full-body silhouette.

@@ -12,6 +12,27 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current video routes module split addendum: 2026-06-19 pass split
+`apps/api/runtime_video_routes.py` from a 739-line route/orchestration module
+into a 105-line route assembly surface plus focused helpers:
+`runtime_video_constants.py`, `runtime_video_gate.py`,
+`runtime_video_prompt.py`, `runtime_video_candidates.py`,
+`runtime_video_manifest.py`, `runtime_video_task_state.py`, and
+`runtime_video_dispatch.py`. The route module keeps the compatibility exports
+used by existing tests, including `VideoGenerationRequest`,
+`load_provider_registry`, and `_video_provider_prompt`, while dispatch receives
+the registry loader by dependency injection so existing monkeypatch tests keep
+covering provider-gate behavior. Verification: structural split test first
+failed on missing helper modules, then passed after the split; video/runtime
+focused regression passed 17 / 1 existing warning; wider video, manifest,
+ModelCallContext, internal-beta, and three-end focused set passed 34 / 1
+existing warning; maintenance audit failed=0 with warnings only and oversized
+warning count dropped from 36 to 35; `git diff --check` passed. Boundary: no
+Runtime API shape changed, no provider gate changed, no provider call, no
+provider config, local media byte, local path, signed URL, provider raw
+response, invite code, or session token was added to API payloads or reports;
+not human acceptance or business validation.
+
 Current sprite companion redesign addendum: 2026-06-19 pass reworked the
 movable `AFS 小精灵` visual layer from a subtle component cluster into a more
 recognizable Studio companion. The avatar footprint was expanded to 180 x 206,
