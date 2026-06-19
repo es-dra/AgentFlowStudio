@@ -12,6 +12,21 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current sprite draggable character addendum: 2026-06-19 pass made the
+decorative `AFS 小精灵` more clearly movable and character-shaped. The avatar
+now includes a dedicated character silhouette layer, visible move handle,
+left/right ear fins, scarf accent, and keyboard arrow-key nudging in addition
+to pointer dragging. The visual shell was split into
+`apps/studio/styles/studio-sprite-avatar-character.css` to keep existing
+sprite files under the project maintenance warning line. Verification:
+sprite static test passed; Studio JS syntax check passed for 87 files; focused
+Runtime sprite tests passed; in-app browser on `127.0.0.1:8797/studio/`
+confirmed role parts rendered, pointer drag movement, arrow-key movement,
+panel-open position stability, green open status light, and zero console
+warn/error. Boundary: no provider gate changed, no provider call, no provider
+raw response, no signed URL, no local media bytes, no secret exposure; not
+human acceptance or business validation.
+
 Current HTTP preflight three-end addendum: 2026-06-19 pass connected the safe
 three-end status reporter into `tools/afs_internal_beta_acceptance.py
 --preflight-only` through explicit `--three-end-status`,

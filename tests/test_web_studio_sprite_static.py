@@ -8,11 +8,13 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     sprite = (STUDIO_ROOT / "src" / "sprite-widget.js").read_text(encoding="utf-8")
+    position = (STUDIO_ROOT / "src" / "sprite-position.js").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "studio-sprite.css").read_text(encoding="utf-8")
     avatar_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar.css").read_text(encoding="utf-8")
+    avatar_character_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-character.css").read_text(encoding="utf-8")
     avatar_parts_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-parts.css").read_text(encoding="utf-8")
     avatar_motion_styles = (STUDIO_ROOT / "styles" / "studio-sprite-avatar-motion.css").read_text(encoding="utf-8")
-    sprite_styles = styles + avatar_styles + avatar_parts_styles + avatar_motion_styles
+    sprite_styles = styles + avatar_styles + avatar_character_styles + avatar_parts_styles + avatar_motion_styles
 
     assert '<div id="sprite-root"></div>' in index
     assert './styles/studio-sprite.css' in index
@@ -21,23 +23,34 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "spriteChat(payload)" in runtime_client
     assert "/sprite/chat" in runtime_client
     assert "afs-sprite" in sprite
+    assert 'from "./sprite-position.js"' in sprite
     assert "AFS 小精灵" in sprite
     assert "data-sprite-draggable" in sprite
+    assert "sprite-character-shell" in sprite
+    assert "sprite-move-handle" in sprite
+    assert "sprite-ear left" in sprite
+    assert "sprite-ear right" in sprite
+    assert "sprite-scarf" in sprite
     assert "sprite-drag-chip" in sprite
     assert "runtime.spriteChat" in sprite
-    assert "SPRITE_POSITION_KEY" in sprite
-    assert "SPRITE_SIZE" in sprite
+    assert "SPRITE_POSITION_KEY" in position
+    assert "SPRITE_SIZE" in position
     assert "startSpriteDrag" in sprite
+    assert "nudgeSpritePosition" in sprite
     assert "rememberSpritePositionFromRoot" in sprite
-    assert 'head.addEventListener("pointerdown", startSpriteDrag)' in sprite
-    assert "storeSpritePosition" in sprite
-    assert "clampSpritePosition" in sprite
+    assert 'button.addEventListener("keydown", nudgeSpritePosition)' in sprite
+    assert "handleSpriteDrag" in sprite
+    assert "storeSpritePosition" in position
+    assert "clampSpritePosition" in position
+    assert len(sprite.splitlines()) <= 300
+    assert len(position.splitlines()) <= 300
     assert "data-dock" not in sprite
-    assert "root.dataset.dock" in sprite
-    assert "root.dataset.vertical" in sprite
+    assert "root.dataset.dock" in position
+    assert "root.dataset.vertical" in position
     assert "__afsStudio" not in sprite
     assert "provider raw" not in sprite
     assert '@import url("./studio-sprite-avatar.css");' in styles
+    assert '@import url("./studio-sprite-avatar-character.css");' in styles
     assert '@import url("./studio-sprite-avatar-parts.css");' in styles
     assert '@import url("./studio-sprite-avatar-motion.css");' in styles
     assert "position: fixed" in styles
@@ -45,6 +58,10 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".afs-sprite-orb" in styles
     assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-avatar" in sprite_styles
+    assert ".sprite-character-shell" in sprite_styles
+    assert ".sprite-move-handle" in sprite_styles
+    assert ".sprite-ear.left" in sprite_styles
+    assert ".sprite-scarf" in sprite_styles
     assert ".sprite-drag-halo" in sprite_styles
     assert ".sprite-drag-chip" in sprite_styles
     assert ".sprite-dock-ring" in sprite_styles

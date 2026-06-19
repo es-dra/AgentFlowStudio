@@ -2507,3 +2507,25 @@ Boundaries:
 - Deleted old UI source, old UI-specific tests, old Workbench browser QA tools, and old frontend integration docs.
 - Prompt optimizer contract moved to `docs/architecture/AFS_NODE_PROMPT_OPTIMIZER_CONTRACT.zh-CN.md`.
 - Verified earlier in this branch: full pytest, maintenance audit, `git diff --check`, Runtime-hosted `/studio/` browser QA, and `/workbench/` 404.
+## 2026-06-19 - Studio Sprite Draggable Character Polish
+
+- Reworked the `AFS 小精灵` avatar into a more recognizable movable canvas companion.
+- Added a character silhouette layer, visible move handle, ear fins, scarf accent, and keyboard arrow-key nudging.
+- Kept the LLM chat boundary unchanged: the sprite still uses the existing Runtime `sprite/chat` path and remains gate-aware.
+- Split the new visual shell into `apps/studio/styles/studio-sprite-avatar-character.css` so the existing sprite files stay below the 300-line maintenance warning threshold.
+
+Verification so far:
+
+```text
+tests/test_web_studio_sprite_static.py: 1 passed
+tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 6 passed, 1 existing Starlette/httpx warning
+npm run check:studio-js: passed for 87 files
+Browser on http://127.0.0.1:8797/studio/: sprite parts rendered, pointer drag moved position, arrow keys nudged by 18px, panel open kept position stable, console warn/error count 0
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is runtime/browser verification, not human acceptance or business validation.

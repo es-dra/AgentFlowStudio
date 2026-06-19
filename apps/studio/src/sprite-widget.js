@@ -1,18 +1,19 @@
 import { icon } from "./icons.js";
 import { el } from "./overlay.js";
+import {
+  applySpritePosition,
+  bindSpriteViewportClamp,
+  nudgeSpritePosition,
+  rememberSpritePositionFromRoot,
+  startSpriteDrag,
+} from "./sprite-position.js";
 
 let spriteOpen = false;
 let spriteSending = false;
 let draftMessage = "";
 let lastState = {};
 let lastRuntime = {};
-let spritePosition = null;
 let suppressSpriteClick = false;
-let spriteResizeBound = false;
-const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-const SPRITE_MARGIN = 18;
-const SPRITE_SIZE = 156;
-const SPRITE_HEIGHT = 176;
 const spriteMessages = [
   { role: "sprite", text: "我在这里看着画布。可以问我下一步、素材确认或节点连线。" },
 ];
@@ -42,13 +43,17 @@ function spriteOrb() {
   button.setAttribute("aria-label", "AFS 小精灵");
   button.setAttribute("aria-pressed", spriteOpen ? "true" : "false");
   button.setAttribute("data-sprite-draggable", "true");
-  button.title = spriteOpen ? "拖动移动，点击收起 AFS 小精灵" : "拖动移动，点击打开 AFS 小精灵";
+  button.title = spriteOpen ? "拖动或方向键移动，点击收起 AFS 小精灵" : "拖动或方向键移动，点击打开 AFS 小精灵";
   button.innerHTML = [
     '<span class="sprite-dock-ring"><i></i></span>',
     '<span class="sprite-drag-halo"></span>',
+    '<span class="sprite-character-shell"></span>',
+    '<span class="sprite-move-handle" aria-hidden="true"><i></i><i></i><i></i><b></b></span>',
     '<span class="sprite-drag-chip" aria-hidden="true"><i></i><i></i><i></i></span>',
     '<span class="sprite-aura"></span>',
     '<span class="sprite-antenna"></span>',
+    '<span class="sprite-ear left"></span>',
+    '<span class="sprite-ear right"></span>',
     '<span class="sprite-wing left"></span>',
     '<span class="sprite-wing right"></span>',
     '<span class="sprite-tail-fin"></span>',
@@ -71,6 +76,7 @@ function spriteOrb() {
     '  <span class="sprite-status-light"></span>',
     '  <span class="sprite-badge">AFS</span>',
     "</span>",
+    '<span class="sprite-scarf"></span>',
     '<span class="sprite-foot left"></span>',
     '<span class="sprite-foot right"></span>',
     '<span class="sprite-thruster"></span>',
@@ -78,7 +84,8 @@ function spriteOrb() {
     '<span class="sprite-shadow"></span>',
     '<span class="sprite-label">AFS 小精灵</span>',
   ].join("");
-  button.addEventListener("pointerdown", startSpriteDrag);
+  button.addEventListener("pointerdown", handleSpriteDrag);
+  button.addEventListener("keydown", nudgeSpritePosition);
   button.addEventListener("click", () => {
     if (suppressSpriteClick) {
       suppressSpriteClick = false;
@@ -89,6 +96,15 @@ function spriteOrb() {
     renderSpriteWidget(lastState, lastRuntime);
   });
   return button;
+}
+
+function handleSpriteDrag(event) {
+  startSpriteDrag(event, () => {
+    suppressSpriteClick = true;
+    window.setTimeout(() => {
+      suppressSpriteClick = false;
+    }, 260);
+  });
 }
 
 function spritePanel(state, runtime) {
@@ -104,7 +120,7 @@ function spritePanel(state, runtime) {
     "</span>",
     '<span class="afs-sprite-grip" aria-hidden="true"><i></i><i></i><i></i></span>',
   ].join("");
-  head.addEventListener("pointerdown", startSpriteDrag);
+  head.addEventListener("pointerdown", handleSpriteDrag);
   panel.appendChild(head);
   const log = el("div", "afs-sprite-log");
   for (const message of spriteMessages.slice(-5)) {
@@ -180,107 +196,4 @@ function canvasSummary(state) {
 function safeReply(value) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   return text.slice(0, 220) || "我先在这里陪跑。可以从当前节点的下一步动作开始。";
-}
-
-function startSpriteDrag(event) {
-  if (event.button !== undefined && event.button !== 0) return;
-  const root = document.getElementById("sprite-root");
-  if (!root) return;
-  const startPoint = { x: event.clientX, y: event.clientY };
-  const startPosition = spritePosition || readSpritePosition() || defaultSpritePosition();
-  let moved = false;
-  event.preventDefault();
-  event.currentTarget.setPointerCapture?.(event.pointerId);
-  root.classList.add("is-dragging");
-  const onMove = (moveEvent) => {
-    const dx = moveEvent.clientX - startPoint.x;
-    const dy = moveEvent.clientY - startPoint.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
-    setSpritePosition({ x: startPosition.x + dx, y: startPosition.y + dy });
-  };
-  const onEnd = () => {
-    root.classList.remove("is-dragging");
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onEnd);
-    window.removeEventListener("pointercancel", onEnd);
-    if (moved) {
-      suppressSpriteClick = true;
-      window.setTimeout(() => {
-        suppressSpriteClick = false;
-      }, 260);
-      storeSpritePosition(spritePosition);
-    }
-  };
-  window.addEventListener("pointermove", onMove);
-  window.addEventListener("pointerup", onEnd, { once: true });
-  window.addEventListener("pointercancel", onEnd, { once: true });
-}
-
-function bindSpriteViewportClamp() {
-  if (spriteResizeBound) return;
-  spriteResizeBound = true;
-  window.addEventListener("resize", () => {
-    if (!spritePosition) return;
-    setSpritePosition(spritePosition);
-    storeSpritePosition(spritePosition);
-  });
-}
-
-function applySpritePosition(root) {
-  setSpritePosition(spritePosition || readSpritePosition() || defaultSpritePosition(), root);
-}
-
-function rememberSpritePositionFromRoot(root = document.getElementById("sprite-root")) {
-  if (!root?.firstElementChild) return;
-  const rect = root.getBoundingClientRect();
-  if (!Number.isFinite(rect?.left) || !Number.isFinite(rect?.top)) return;
-  spritePosition = clampSpritePosition({ x: rect.left, y: rect.top });
-}
-
-function setSpritePosition(position, root = document.getElementById("sprite-root")) {
-  if (!root) return;
-  spritePosition = clampSpritePosition(position);
-  root.style.setProperty("--sprite-x", `${spritePosition.x}px`);
-  root.style.setProperty("--sprite-y", `${spritePosition.y}px`);
-  root.dataset.dock = spritePosition.x < window.innerWidth / 2 ? "left" : "right";
-  root.dataset.vertical = spritePosition.y < window.innerHeight / 2 ? "top" : "bottom";
-}
-
-function readSpritePosition() {
-  try {
-    const value = JSON.parse(window.localStorage?.getItem(SPRITE_POSITION_KEY) || "null");
-    if (Number.isFinite(value?.x) && Number.isFinite(value?.y)) return value;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function storeSpritePosition(position) {
-  if (!position) return;
-  try {
-    window.localStorage?.setItem(SPRITE_POSITION_KEY, JSON.stringify(clampSpritePosition(position)));
-  } catch {
-    // Storage can be blocked; the current session position still remains live.
-  }
-}
-
-function defaultSpritePosition() {
-  return {
-    x: Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 24),
-    y: Math.max(76, window.innerHeight - SPRITE_HEIGHT - 48),
-  };
-}
-
-function clampSpritePosition(position) {
-  const maxX = Math.max(SPRITE_MARGIN, window.innerWidth - SPRITE_SIZE - 10);
-  const maxY = Math.max(76, window.innerHeight - SPRITE_HEIGHT - 10);
-  const rawX = Number(position?.x);
-  const rawY = Number(position?.y);
-  const nextX = Number.isFinite(rawX) ? rawX : maxX;
-  const nextY = Number.isFinite(rawY) ? rawY : maxY;
-  return {
-    x: Math.max(SPRITE_MARGIN, Math.min(maxX, Math.round(nextX))),
-    y: Math.max(76, Math.min(maxY, Math.round(nextY))),
-  };
 }
