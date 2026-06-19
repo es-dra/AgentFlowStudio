@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-19 - LLM Enhancement Module Split
+
+- Split `apps/api/runtime_llm_enhancement.py` into a thin orchestration module
+  plus focused helpers for constants, provider gate/candidates, safety parsing,
+  instruction assembly, deterministic fallback prompts, and dispatch fallback.
+- Preserved the Runtime prompt optimization API shape and existing monkeypatch
+  seams, including `load_provider_registry`, `llm_provider_gate`,
+  `provider_text_requested`, `sanitize_enhanced_prompt`, and
+  `deterministic_chinese_fallback_prompt`.
+- Added a structural regression test for the helper split, line-count
+  thresholds, and UTF-8 Chinese prompt labels so future refactors cannot damage
+  the prompt contract silently.
+
+Verification:
+
+```text
+tests/test_api_runtime_llm_enhancement_modules.py: red on missing helper modules, then 1 passed
+tests/test_api_runtime_llm_enhancement_modules.py tests/test_api_runtime_prompt_memory_loop.py tests/test_model_call_context_runtime_routes.py tests/test_api_runtime_sprite.py tests/test_provider_adapter_registry.py -> 59 passed / 1 warning
+pytest -q -> 536 passed / 527 deselected / 2 warnings
+apps.cli.main --help -> passed
+apps.cli.main version -> 0.1.0
+tools/maintenance_audit.py -> failed=0; warnings only
+git diff --check -> passed
+```
+
+Boundaries:
+
+- No Runtime API shape was changed.
+- No provider gate or provider config was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, local path, or secret
+  was exposed.
+- This is module/runtime verification, not human acceptance or business
+  validation.
+
 ## 2026-06-19 - Sprite Companion Personality Polish
 
 - Refined the movable `AFS 小精灵` into a clearer Studio navigator character instead of a parts-heavy helper.

@@ -12,6 +12,29 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current LLM enhancement module split addendum: 2026-06-19 pass split
+`apps/api/runtime_llm_enhancement.py` from a 600+ line prompt optimization
+runtime module into a 181-line orchestration surface plus focused helpers:
+`runtime_llm_enhancement_constants.py`, `runtime_llm_enhancement_gate.py`,
+`runtime_llm_enhancement_safety.py`, `runtime_llm_enhancement_instructions.py`,
+`runtime_llm_enhancement_fallback.py`, and
+`runtime_llm_enhancement_dispatch.py`. The route-facing module keeps existing
+compatibility exports and monkeypatch seams, including `load_provider_registry`,
+`llm_provider_gate`, `provider_text_requested`, `sanitize_enhanced_prompt`, and
+`deterministic_chinese_fallback_prompt`, while the helper modules keep provider
+selection, safety parsing, fallback prompt construction, instruction assembly,
+and dispatch fallback under separate maintenance thresholds. Verification:
+structural split test first failed on missing helper modules, then passed after
+implementation; UTF-8 label guard was added to prevent Chinese prompt contract
+drift; LLM prompt-memory regression passed 18 / 1 existing warning; wider
+focused Runtime set passed 59 / 1 existing warning; full pytest passed 536 /
+527 deselected / 2 existing warnings; CLI help and version passed; maintenance
+audit failed=0 with warnings only; `git diff --check` passed. Boundary: no
+Runtime API shape changed, no provider gate changed, no provider config changed,
+no provider call was made, and no provider raw response, signed URL, local media
+byte, local path, or secret was added to API payloads or reports; not human
+acceptance or business validation.
+
 Current sprite companion personality polish addendum: 2026-06-19 pass refined
 the movable `AFS 小精灵` from a parts-heavy helper into a clearer Studio
 navigator character. The widget now declares `data-sprite-character="navigator"`
