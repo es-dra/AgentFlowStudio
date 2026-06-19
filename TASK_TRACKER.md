@@ -402,3 +402,9 @@ failed=0 with warnings only; `git diff --check` exit 0.
 | ID | Owner role | Scope | Status | Evidence |
 |---|---|---|---|---|
 | AFS-MVP-FOLLOWUP-LIVE-COMPARISONS-20260612 | Runtime/API Integrator + Provider Gate Steward + QA Gatekeeper | Run the pre-internal-test Group 2 character+scene asset comparison and Group 3 lock-conflict locked/unlocked live MiniMax image checks. | Implemented follow-up runner and focused tests. Group 2 first run succeeded for A/B/C; Group 3 retry succeeded for locked and temporary-unlocked runs. One later Group 2 rerun hit provider/CLI readiness block and is preserved as intermittency evidence. | `tools/studio_asset_context_followup_comparisons.py`, `tests/test_studio_asset_context_followup_comparisons.py`, `docs/handoff/AFS-MVP-FOLLOWUP-LIVE-COMPARISONS-20260612.md`, `runs/studio_asset_context_followup_20260612_group2_success/`, `runs/studio_asset_context_followup_20260612_group3_retry/` |
+
+## Current Addendum - Asset Card Draft Module Split
+
+| ID | Owner role | Scope | Status | Evidence |
+|---|---|---|---|---|
+| AFS-ASSET-CARD-DRAFT-MODULE-SPLIT-20260619 | Runtime/API Integrator + Maintainability Steward | Split asset-card draft route helpers for visual inspection dispatch/provider observation and safe artifact writing into focused modules. | Local verification passed; provider gates unchanged; no live provider call. Oversized warning count dropped from 39 to 38. | `apps/api/runtime_asset_card_drafts.py`, `apps/api/runtime_asset_card_observation.py`, `apps/api/runtime_asset_card_artifacts.py`, `tests/test_api_runtime_asset_card_modules.py`; pytest 532 passed / 527 deselected / 2 existing warnings; maintenance audit failed=0; `git diff --check` passed. |

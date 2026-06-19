@@ -2530,6 +2530,29 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, or secret was exposed.
 - This is runtime/browser verification, not human acceptance or business validation.
 
+## 2026-06-19 - Asset Card Draft Module Split
+
+- Split visual-inspection provider dispatch, provider observation projection, draft prompt summarization, and vision provider constraints out of `apps/api/runtime_asset_card_drafts.py`.
+- Added `apps/api/runtime_asset_card_observation.py` for visual observation/provider-facing helper logic.
+- Added `apps/api/runtime_asset_card_artifacts.py` for safe manifest/model-context/model-request-plan/draft artifact writing and trace input refs.
+- Added a structural regression test so the asset-card draft route stays below the 300-line maintenance threshold and does not absorb the helper responsibilities again.
+
+Verification:
+
+```text
+tests/test_api_runtime_asset_card_drafts.py + tests/test_api_runtime_asset_card_modules.py + tests/test_model_call_context_runtime_routes.py: 8 passed / 1 existing Starlette/httpx warning
+pytest -q: 532 passed / 527 deselected / 2 existing warnings
+tools/maintenance_audit.py: failed=0; oversized warning count dropped from 39 to 38
+git diff --check: passed
+```
+
+Boundaries:
+
+- No provider gate was changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, or secret was exposed.
+- This is runtime/module verification, not human acceptance or business validation.
+
 ## 2026-06-19 - Internal Beta Preflight Split
 
 - Split HTTP preflight readiness logic out of `tools/afs_internal_beta_acceptance.py` into `tools/afs_internal_beta_acceptance_preflight.py`.
