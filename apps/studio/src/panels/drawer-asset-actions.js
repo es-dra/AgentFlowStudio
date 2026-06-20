@@ -67,6 +67,49 @@ export function promoteImageAssetFromDrawer(state, store, runtime, asset, assetT
   });
 }
 
+export function deleteImageAssetFromDrawer(state, store, runtime, asset) {
+  const assetId = String(asset?.asset_id || "").trim();
+  if (!assetId || isFixedVisualAsset(asset)) return;
+  const applyDelete = () => {
+    removeImageAssetFromStore(store, assetId);
+    store.flushRuntimeSave?.();
+  };
+  if (!runtime?.deleteImageAsset) {
+    applyDelete();
+    return;
+  }
+  runtime.deleteImageAsset(assetId)
+    .then(applyDelete)
+    .catch((error) => {
+      store.set((s) => {
+        s.ui.saveState = "本地暂存";
+        s.ui.saveMessage = `图片素材删除失败：${safeError(error)}`;
+      }, { history: false, persist: false });
+    });
+}
+
+export function removeImageAssetFromStore(store, assetId) {
+  const normalized = String(assetId || "").trim();
+  if (!normalized) return;
+  store.set((s) => {
+    s.assets = (s.assets || []).filter((item) => String(item.asset_id || "") !== normalized);
+    for (const node of Object.values(s.nodes || {})) {
+      if (!node?.params) continue;
+      if (Array.isArray(node.params.uploads)) {
+        node.params.uploads = node.params.uploads.filter((item) => String(item?.asset_id || item?.assetId || "") !== normalized);
+      }
+      if (Array.isArray(node.params.attachments)) {
+        node.params.attachments = node.params.attachments.filter((item) => String(item?.asset_id || item?.assetId || item?.id || "") !== normalized);
+      }
+      if (String(node.params.firstFrameImageAssetId || "") === normalized) delete node.params.firstFrameImageAssetId;
+      if (String(node.params.lastFrameImageAssetId || "") === normalized) delete node.params.lastFrameImageAssetId;
+      if (String(node.previewUrl || "").includes(`/image-assets/${normalized}/preview`)) {
+        delete node.previewUrl;
+      }
+    }
+  });
+}
+
 export function openRetireAssetModal(store, runtime, asset) {
   const assetId = String(asset.visual_asset_id || asset.asset_id || "").trim();
   if (!assetId || !runtime?.retireVisualAsset) return;

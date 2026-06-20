@@ -8,6 +8,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     sprite = (STUDIO_ROOT / "src" / "sprite-widget.js").read_text(encoding="utf-8")
+    pending = (STUDIO_ROOT / "src" / "sprite-pending-state.js").read_text(encoding="utf-8")
+    chat_context = (STUDIO_ROOT / "src" / "sprite-chat-context.js").read_text(encoding="utf-8")
     character = (STUDIO_ROOT / "src" / "sprite-character.js").read_text(encoding="utf-8")
     motion = (STUDIO_ROOT / "src" / "sprite-motion.js").read_text(encoding="utf-8")
     position = (STUDIO_ROOT / "src" / "sprite-position.js").read_text(encoding="utf-8")
@@ -54,9 +56,15 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-agent-sequence" in sprite
     assert "runtime.spriteChat" in sprite
     assert 'role: "pending"' in sprite
-    assert "团团正在整理画布上下文" in sprite
-    assert "正在请求服务器" not in sprite
-    assert "Codex" not in sprite
+    sprite_runtime = sprite + pending + chat_context
+    assert "团团正在整理画布上下文" in sprite_runtime
+    assert "SPRITE_PENDING_LINES" in sprite_runtime
+    assert "startSpritePendingTicker" in sprite_runtime
+    assert "stopSpritePendingTicker" in sprite_runtime
+    assert "restoreSpriteInputFocus" in sprite_runtime
+    assert "spriteInputFocused" in sprite_runtime
+    assert "正在请求服务器" not in sprite_runtime
+    assert "Codex" not in sprite_runtime
     assert "data-sprite-drag-handle" in sprite
     assert 'data-sprite-drag-handle="true"' in sprite
     assert "spriteSettingsPanel" in sprite
@@ -173,6 +181,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-settings" in sprite_styles
     assert ".afs-sprite-size-button" in sprite_styles
+    assert ".afs-sprite-msg.pending" in sprite_styles
+    assert "generating-text-shimmer" in sprite_styles
     assert "--sprite-scale" in sprite_styles
     assert ".afs-sprite-avatar" in sprite_styles
     assert ".sprite-story-orbit" in sprite_styles

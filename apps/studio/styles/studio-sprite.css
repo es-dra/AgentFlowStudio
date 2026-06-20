@@ -233,6 +233,23 @@
   background: rgba(90, 200, 250, 0.12);
 }
 
+.afs-sprite-msg.pending {
+  border: 1px solid rgba(90, 200, 250, 0.14);
+  background: linear-gradient(
+    100deg,
+    rgba(154, 166, 181, 0.82) 0%,
+    rgba(244, 248, 255, 0.96) 36%,
+    rgba(90, 200, 250, 0.96) 52%,
+    rgba(154, 166, 181, 0.82) 70%
+  );
+  background-size: 230% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: generating-text-shimmer 4.4s ease-in-out infinite;
+  text-shadow: 0 0 14px rgba(90, 200, 250, 0.14);
+}
+
 .afs-sprite-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
@@ -261,4 +278,14 @@
   border-radius: 10px;
   background: rgba(90, 200, 250, 0.12);
   color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .afs-sprite-msg.pending {
+    background: rgba(255, 255, 255, 0.045);
+    animation: none;
+    color: var(--text-secondary);
+    -webkit-text-fill-color: currentColor;
+    text-shadow: none;
+  }
 }

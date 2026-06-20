@@ -1,5 +1,6 @@
 import { icon } from "../icons.js";
-import { el } from "../overlay.js";
+import { el, showPopover } from "../overlay.js";
+import { runtimeMediaUrl } from "../runtime-client.js";
 import {
   ASSET_LIFECYCLE_FILTERS,
   assetLifecycleLabel,
@@ -10,6 +11,7 @@ import {
 import { openAssetDetailPopover } from "./asset-detail-popover.js";
 import {
   attachAssetToSelection,
+  deleteImageAssetFromDrawer,
   focusAssetSource,
   iconForAsset,
   isFixedVisualAsset,
@@ -87,6 +89,7 @@ function assetCard(state, store, runtime, asset) {
   const meta = assetMeta(store, runtime, asset, retired);
   const actions = assetActions(state, store, runtime, asset, retired);
   card.append(thumb, meta, actions);
+  card.addEventListener("contextmenu", (event) => openAssetContextMenu(event, state, store, runtime, asset, retired));
   return card;
 }
 
@@ -94,7 +97,7 @@ function assetThumb(store, runtime, asset) {
   const thumb = el("button", `asset-thumb asset-thumb-${asset.thumbnail_ref || asset.kind || "reference"}`);
   if (asset.preview_url) {
     const img = document.createElement("img");
-    img.src = asset.preview_url;
+    img.src = runtimeMediaUrl(asset.preview_url);
     img.alt = asset.title || asset.asset_id || "asset preview";
     img.loading = "lazy";
     thumb.appendChild(img);
@@ -147,8 +150,77 @@ function assetActions(state, store, runtime, asset, retired) {
   return actions;
 }
 
+function openAssetContextMenu(event, state, store, runtime, asset, retired) {
+  event.preventDefault();
+  event.stopPropagation();
+  const menu = el("div", "canvas-context-menu asset-context-menu");
+  menu.appendChild(el("div", "canvas-menu-title", asset.title || asset.asset_id || "素材"));
+  const anchor = {
+    getBoundingClientRect() {
+      const size = 1;
+      return {
+        left: event.clientX,
+        right: event.clientX + size,
+        top: event.clientY,
+        bottom: event.clientY + size,
+        width: size,
+        height: size,
+      };
+    },
+  };
+  const close = showPopover(anchor, menu, { place: "bottom" });
+  const appendItem = (label, iconName, description, onClick, disabled = false) => {
+    const button = contextMenuItem(label, iconName, description, () => {
+      close();
+      onClick();
+    });
+    button.disabled = disabled;
+    menu.appendChild(button);
+  };
+  appendItem("查看详情", "image", "打开素材记录和来源", () => openAssetDetailPopover(store, runtime, asset, menu));
+  appendItem("用作参考", "bookmark", "标记为当前生成参考", () => markAssetReference(store, asset));
+  appendContextAttachAction(appendItem, state, store, asset);
+  appendItem("定位来源", "layers", "回到产生该素材的节点", () => focusAssetSource(store, asset), !asset.source_node_id);
+  if (isFixedVisualAsset(asset)) {
+    appendItem("停用素材", "x", "不再默认带入后续生成", () => openRetireAssetModal(store, runtime, asset), retired);
+  } else if (isImageAsset(asset)) {
+    appendItem("删除图片素材", "x", "从当前项目素材库移除", () => deleteImageAssetFromDrawer(state, store, runtime, asset));
+  }
+}
+
+function appendContextAttachAction(appendItem, state, store, asset) {
+  const selectedNode = state.nodes[state.selection.nodeIds[0]];
+  if (selectedNode?.type === "video" && isImageAsset(asset)) {
+    appendItem("设为首帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "first"));
+    appendItem("设为尾帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "last"));
+    return;
+  }
+  appendItem("加入当前节点", "plus", "把素材挂到选中节点", () => attachAssetToSelection(state, store, asset), !state.selection.nodeIds[0]);
+}
+
+function contextMenuItem(label, iconName, description, onClick) {
+  const item = el("button", "canvas-menu-item");
+  item.type = "button";
+  item.innerHTML = [
+    `<span class="canvas-menu-icon">${icon(iconName, 14)}</span>`,
+    `<span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>`,
+  ].join("");
+  item.addEventListener("click", onClick);
+  return item;
+}
+
 function assetAction(label, onClick) {
   const btn = el("button", "asset-action", label);
   btn.addEventListener("click", onClick);
   return btn;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[ch]));
 }

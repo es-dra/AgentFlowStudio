@@ -60,7 +60,7 @@ function imageAssetProjection(asset) {
     source_node_id: asset.source_node_id || null,
     status: "ready",
     asset_id: asset.asset_id,
-    preview_url: asset.preview_url,
+    preview_url: asset.preview_url || "",
   };
 }
 

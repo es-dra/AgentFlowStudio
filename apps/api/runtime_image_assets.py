@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import shutil
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -76,6 +77,25 @@ def register_runtime_image_asset_routes(app: FastAPI, store: RuntimeStore) -> No
             media_type=IMAGE_SUFFIX_TYPES[path.suffix.lower()],
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.delete("/projects/{project_id}/image-assets/{asset_id}", include_in_schema=False)
+    def delete_image_asset(project_id: str, asset_id: str) -> dict[str, Any]:
+        store.ensure_project_manifest(project_id)
+        try:
+            metadata = image_asset_metadata(store, project_id, asset_id)
+            asset_dir = _asset_dir(store, project_id, asset_id).resolve()
+            root = store.root.resolve()
+            asset_dir.relative_to(root)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=404, detail="image asset not found") from exc
+        shutil.rmtree(asset_dir)
+        return {
+            "project_id": project_id,
+            "asset_id": metadata["asset_id"],
+            "deleted": True,
+            "media_bytes_returned": False,
+            "provider_raw_response_stored": False,
+        }
 
 
 def image_asset_file_path(store: RuntimeStore, project_id: str, asset_id: str) -> Path:

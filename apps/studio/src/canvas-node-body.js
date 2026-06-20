@@ -33,10 +33,20 @@ export function candidatePreviews(node) {
 
 export function generationProgress(node) {
   const value = node.params?.progressPercent ?? node.params?.jobProgress?.percent ?? node.params?.terminalProgress?.percent;
+  const mode = String(node.params?.jobProgress?.mode || "");
+  if (mode === "indeterminate") {
+    return {
+      percent: null,
+      mode,
+      label: node.params?.jobProgress?.label || "正在生成",
+      hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
+    };
+  }
   const percent = Number(value);
   if (!Number.isFinite(percent)) return null;
   return {
     percent: Math.max(0, Math.min(100, Math.round(percent))),
+    mode,
     label: node.params?.jobProgress?.label || "正在生成",
     hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
   };
@@ -155,13 +165,14 @@ function emptyBody(node, def) {
 function generationProgressView(node) {
   const progress = generationProgress(node);
   const status = document.createElement("div");
-  status.className = `node-status generation-progress-layer${progress ? "" : " indeterminate"}`;
-  const percentLabel = progress ? `${progress.percent}%` : "生成中";
+  const isIndeterminate = !progress || progress?.mode === "indeterminate" || progress?.percent == null;
+  status.className = `node-status generation-progress-layer${isIndeterminate ? " indeterminate" : ""}`;
+  const percentLabel = isIndeterminate ? "生成中" : `${progress.percent}%`;
   status.innerHTML = [
     '<span class="spinner"></span>',
     `<span class="generation-progress-copy"><strong>${escapeHtml(progress?.label || "正在生成")}</strong><small>${escapeHtml(progress?.hint || "结果完成后会自动回到节点中")}</small></span>`,
     `<span class="generation-progress-percent">${escapeHtml(percentLabel)}</span>`,
-    `<span class="generation-progress-track"><span style="width:${progress ? progress.percent : 46}%"></span></span>`,
+    `<span class="generation-progress-track"><span style="width:${isIndeterminate ? 46 : progress.percent}%"></span></span>`,
   ].join("");
   return status;
 }

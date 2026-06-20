@@ -3453,3 +3453,32 @@ Boundaries:
 - No provider gate changed.
 - No provider call was made.
 - No secret, invite code, local media byte, provider raw response, or Company OS private source content was written.
+
+## 2026-06-21 - Studio Runtime UI Fixes Before Internal Test
+
+- Reworked Runtime job progress so active image/keyframe jobs no longer report fake `50%`; running and pending jobs now expose an indeterminate mode, while terminal progress keeps the existing complete contract.
+- Extended keyframe polling so long image jobs stay visibly in progress instead of being marked failed by the frontend while the worker is still producing a candidate.
+- Added stale running-job recovery to the Codex image handoff worker so an old stuck running job does not block later pending image jobs.
+- Kept Studio state safe by storing Runtime preview routes as project-relative URLs and resolving them to absolute media URLs only at render boundaries.
+- Added image asset deletion through the Runtime API and an app-level asset drawer context menu, avoiding the browser's native image context menu for project actions.
+- Split TuanTuan pending/input helper logic out of `sprite-widget.js`; added rotating pending copy, shimmer text styling, and input focus restoration across render/save-state updates.
+- Tightened the Works library drawer layout so completed work cards stay within the sidebar width.
+
+Verification:
+
+```text
+npm run check:studio-js: JS syntax check passed for 98 files
+Focused Runtime/worker/API tests: 19 passed / 1 existing warning
+Focused Studio frontend tests: 45 passed
+Full pytest: 569 passed / 527 deselected / 2 existing warnings
+git diff --check: passed with CRLF normalization warning only
+Browser/runtime smoke: passed; reference image rendered, image asset context-menu delete worked, TuanTuan focus retained, pending text rotated with generating-text-shimmer, Works library had no horizontal overflow
+Browser smoke report: runs/studio_runtime_ui_fixes_browser_smoke.json
+```
+
+Boundaries:
+
+- No video gate was opened.
+- No live provider call was made during this verification pass.
+- No provider raw response, signed URL, local media byte, secret, invite code, or Company OS private source content was written.
+- This is automated/runtime/browser verification only, not human acceptance, business validation, or durable memory promotion.

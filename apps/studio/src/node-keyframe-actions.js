@@ -8,6 +8,8 @@ import { clearOneRunOverrides, prepareGenerationRequest } from "./node-generatio
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
 
+const MAX_KEYFRAME_POLL_ATTEMPTS = 540;
+
 export async function pollNodeKeyframeGeneration(store, runtime, node) {
   const jobId = node.params?.lastKeyframeJobId;
   if (!jobId || !runtime?.pollKeyframe) {
@@ -58,7 +60,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
 
 async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
   let lastResponse = null;
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_KEYFRAME_POLL_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await sleep(2000);
     const response = await runtime.pollKeyframe(jobId);
     lastResponse = response;
@@ -66,7 +68,9 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
     await store.flushRuntimeSave?.();
     if (!isKeyframeInProgress(response)) return response;
   }
-  throw new Error(`图像生成仍在处理中，请稍后重试刷新。任务编号：${lastResponse?.job?.job_id || jobId}`);
+  markKeyframeStillProcessing(store, nodeId, lastResponse?.job?.job_id || jobId);
+  await store.flushRuntimeSave?.();
+  return lastResponse;
 }
 
 function applyKeyframeResponse(store, nodeId, response, request) {
@@ -107,4 +111,19 @@ function applyKeyframeResponse(store, nodeId, response, request) {
       });
     }
   });
+}
+
+function markKeyframeStillProcessing(store, nodeId, jobId) {
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    n.status = "generating";
+    updateNodeGenerationState(n, { job: { job_id: jobId, status: "running", progress: { mode: "indeterminate" } } }, {
+      kind: "keyframe",
+      label: "图片仍在生成",
+      hint: `任务 ${jobId} 还在处理，稍后可继续刷新节点。`,
+    });
+    n.result = `图像生成仍在进行中。\n任务编号：${jobId}`;
+    n.params.lastKeyframeJobId = jobId;
+  }, { history: false });
 }

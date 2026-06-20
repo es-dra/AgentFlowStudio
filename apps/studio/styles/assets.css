@@ -121,3 +121,12 @@
 }
 .asset-action:hover { color: var(--text-primary); background: var(--bg-chip); }
 .asset-action:last-child { grid-column: 1 / -1; }
+
+.asset-context-menu {
+  width: min(252px, calc(100vw - 18px));
+}
+
+.asset-context-menu .canvas-menu-item:last-child .canvas-menu-icon {
+  color: var(--danger);
+  background: rgba(255, 99, 99, 0.1);
+}

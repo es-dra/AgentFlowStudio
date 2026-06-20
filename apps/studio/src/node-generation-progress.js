@@ -7,7 +7,6 @@ const KIND_LABELS = {
 const STATUS_PROGRESS = {
   pending: 16,
   submitted: 24,
-  running: 62,
   succeeded: 100,
   failed: 100,
   blocked: 100,
@@ -15,16 +14,18 @@ const STATUS_PROGRESS = {
   cancelled: 100,
   cancelled_local_only: 100,
 };
+const INDETERMINATE_ACTIVE_STATUSES = new Set(["pending", "running"]);
 
 export function setSubmittingGenerationState(node, kind, options = {}) {
   const params = ensureParams(node);
   const label = options.label || `${kindLabel(kind)}已提交`;
   const hint = options.hint || "正在等待创作服务返回进度，页面会自动刷新节点。";
   params.jobProgress = {
-    percent: clampPercent(options.percent ?? 8),
+    percent: options.percent === null ? null : clampPercent(options.percent ?? 8),
     label,
     hint,
     status: "submitted",
+    mode: "queued",
     terminal: false,
   };
   params.progressPercent = params.jobProgress.percent;
@@ -42,6 +43,7 @@ export function updateNodeGenerationState(node, response, options = {}) {
     label: options.label || progressLabel(kind, status),
     hint: options.hint || progressHint(kind, status, response),
     status,
+    mode: progressMode(response, status),
     terminal: isTerminalStatus(status),
   };
   params.jobProgress = progress;
@@ -79,14 +81,25 @@ function normalizeCandidatePreview(item) {
 }
 
 function progressPercent(response, status, override) {
+  if (override === null || INDETERMINATE_ACTIVE_STATUSES.has(status)) return null;
   const explicit = override
     ?? response?.job?.progress?.percent
     ?? response?.job?.progress_percent
     ?? response?.progress?.percent
     ?? response?.progress_percent;
+  if (explicit == null || explicit === "") return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
   const explicitPercent = Number(explicit);
   if (Number.isFinite(explicitPercent)) return clampPercent(explicitPercent);
-  return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : 45);
+  return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
+}
+
+function progressMode(response, status) {
+  const mode = response?.job?.progress?.mode || response?.progress?.mode;
+  if (mode) return String(mode);
+  if (INDETERMINATE_ACTIVE_STATUSES.has(status)) return "indeterminate";
+  if (status === "submitted") return "queued";
+  if (isTerminalStatus(status)) return "complete";
+  return "idle";
 }
 
 function progressLabel(kind, status) {

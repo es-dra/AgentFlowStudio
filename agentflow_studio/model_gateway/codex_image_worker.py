@@ -6,8 +6,6 @@ import json
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -21,6 +19,9 @@ from agentflow_studio.model_gateway.codex_image_handoff import (
     failed_result_payload,
 )
 from agentflow_studio.model_gateway.codex_runtime_env import codex_subprocess_env, prune_codex_home
+from agentflow_studio.model_gateway.codex_image_worker_io import append_worker_event, trim_finished_job_dir
+from agentflow_studio.model_gateway.codex_image_worker_recovery import recover_stale_running_jobs
+from agentflow_studio.model_gateway.codex_image_worker_result import ProcessResult
 
 
 class CodexImageExecutor(Protocol):
@@ -83,24 +84,27 @@ class CodexExecImageExecutor:
         raise RuntimeError("Codex image worker did not create candidate_001.png")
 
 
-@dataclass(frozen=True)
-class ProcessResult:
-    job_id: str
-    status: str
-    job_dir: Path
-
-
-def process_one(root: str | Path, *, executor: CodexImageExecutor | None = None) -> ProcessResult | None:
+def process_one(
+    root: str | Path,
+    *,
+    executor: CodexImageExecutor | None = None,
+    stale_running_sec: float = 3600.0,
+) -> ProcessResult | None:
     executor = executor or CodexExecImageExecutor()
+    recover_stale_running_jobs(root, stale_running_sec=stale_running_sec)
     pending = _next_pending_job(Path(root))
     if pending is None:
         return None
+    return _process_pending(pending, executor)
+
+
+def _process_pending(pending: Path, executor: CodexImageExecutor) -> ProcessResult:
     job_id = pending.name
     job_root = pending.parents[1]
     running = job_root / "running" / job_id
     running.parent.mkdir(parents=True, exist_ok=True)
     pending.rename(running)
-    _append_event(job_root, job_id=job_id, status="running")
+    append_worker_event(job_root, job_id=job_id, status="running")
     output_dir = running.parents[2]
     try:
         request = _read_request(running)
@@ -113,8 +117,8 @@ def process_one(root: str | Path, *, executor: CodexImageExecutor | None = None)
         completed = job_root / "completed" / job_id
         completed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(completed)
-        _trim_finished_job_dir(completed)
-        _append_event(job_root, job_id=job_id, status="succeeded", image_path="image_candidates/candidate_001.png")
+        trim_finished_job_dir(completed)
+        append_worker_event(job_root, job_id=job_id, status="succeeded", image_path="image_candidates/candidate_001.png")
         return ProcessResult(job_id=job_id, status="succeeded", job_dir=completed)
     except Exception as exc:  # noqa: BLE001 - worker boundary converts all failures to safe job results.
         result = failed_result_payload(job_id=job_id, reason=str(exc))
@@ -122,8 +126,8 @@ def process_one(root: str | Path, *, executor: CodexImageExecutor | None = None)
         failed = job_root / "failed" / job_id
         failed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(failed)
-        _trim_finished_job_dir(failed)
-        _append_event(job_root, job_id=job_id, status="failed", error_summary=result["blocks"][0]["reason"])
+        trim_finished_job_dir(failed)
+        append_worker_event(job_root, job_id=job_id, status="failed", error_summary=result["blocks"][0]["reason"])
         return ProcessResult(job_id=job_id, status="failed", job_dir=failed)
 
 
@@ -180,31 +184,6 @@ def _read_request(job_dir: Path) -> dict[str, Any]:
     return payload
 
 
-def _append_event(job_root: Path, *, job_id: str, status: str, image_path: str | None = None, error_summary: str | None = None) -> None:
-    event = {
-        "time": datetime.now(timezone.utc).isoformat(),
-        "job_id": job_id,
-        "status": status,
-        "image_path": image_path,
-        "error_summary": error_summary,
-        "provider_raw_response_stored": False,
-    }
-    path = job_root / "_logs" / "events.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
-
-
-def _trim_finished_job_dir(job_dir: Path) -> None:
-    for item in Path(job_dir).iterdir():
-        if item.name == RESULT_FILENAME:
-            continue
-        if item.is_dir():
-            shutil.rmtree(item)
-        else:
-            item.unlink(missing_ok=True)
-
-
 def _worker_prompt(request: dict[str, Any]) -> str:
     reference_lines = "\n".join(f"- {item.get('path')}" for item in request.get("reference_images") or [])
     return (
@@ -249,4 +228,5 @@ __all__ = (
     "main",
     "process_all",
     "process_one",
+    "recover_stale_running_jobs",
 )

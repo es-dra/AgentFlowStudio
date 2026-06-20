@@ -25,6 +25,8 @@ import {
   pulseSpriteMotion,
   setSpriteMotionMode,
 } from "./sprite-motion.js";
+import { canvasSummary, safeReply, selectedNodeId } from "./sprite-chat-context.js";
+import { captureSpriteInputFocus, pendingSpriteText, rememberSpriteInputSelection, resetSpritePendingLine, restoreSpriteInputFocus, spriteInputFocused, startSpritePendingTicker, stopSpritePendingTicker, SPRITE_PENDING_LINES } from "./sprite-pending-state.js";
 
 let spriteOpen = false;
 let spriteSettingsOpen = false;
@@ -48,6 +50,7 @@ export function renderSpriteWidget(state, runtime) {
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.dataset.spriteHidden = isSpriteHidden() ? "true" : "false";
+  const focusSnapshot = captureSpriteInputFocus(root);
   if (isSpriteHidden()) {
     root.replaceChildren(spriteRestoreButton());
     return;
@@ -55,6 +58,11 @@ export function renderSpriteWidget(state, runtime) {
   root.replaceChildren(spriteShell(state, runtime));
   applySpritePose(root, spriteState());
   setSpriteMotionMode(spriteMotionMode(), root);
+  restoreSpriteInputFocus(root, focusSnapshot, {
+    open: spriteOpen,
+    settingsOpen: spriteSettingsOpen,
+    sending: spriteSending,
+  });
 }
 
 function spriteShell(state, runtime) {
@@ -166,6 +174,7 @@ function spritePanel(state, runtime) {
   const log = el("div", "afs-sprite-log");
   for (const message of spriteMessages.slice(-5)) {
     const item = el("p", `afs-sprite-msg ${message.role}`, message.text);
+    if (message.role === "pending") item.dataset.pendingText = message.text;
     log.appendChild(item);
   }
   panel.appendChild(log);
@@ -221,7 +230,17 @@ function spriteForm(state, runtime) {
   input.maxLength = 180;
   input.addEventListener("input", () => {
     draftMessage = input.value;
+    rememberSpriteInputSelection(input);
   });
+  input.addEventListener("focus", () => {
+    spriteInputFocused(true, input);
+  });
+  input.addEventListener("blur", () => {
+    spriteInputFocused(false, input);
+  });
+  input.addEventListener("click", () => rememberSpriteInputSelection(input));
+  input.addEventListener("keyup", () => rememberSpriteInputSelection(input));
+  input.addEventListener("select", () => rememberSpriteInputSelection(input));
   const send = el("button", "afs-sprite-send");
   send.type = "submit";
   send.disabled = spriteSending;
@@ -239,9 +258,15 @@ async function submitSpriteMessage(state, runtime, rawText) {
   if (!message || spriteSending) return;
   draftMessage = "";
   spriteMessages.push({ role: "user", text: message });
-  spriteMessages.push({ role: "pending", text: "团团正在整理画布上下文..." });
   spriteSending = true;
+  resetSpritePendingLine();
+  spriteMessages.push({ role: "pending", text: pendingSpriteText() });
   renderSpriteWidget(state, runtime);
+  startSpritePendingTicker({
+    messages: spriteMessages,
+    isSending: () => spriteSending,
+    render: () => renderSpriteWidget(lastState, lastRuntime),
+  });
   try {
     const response = await runtime.spriteChat({
       message,
@@ -259,6 +284,7 @@ async function submitSpriteMessage(state, runtime, rawText) {
     pulseSpriteMotion("error");
     setTemporarySpritePose("observe", 1800, () => renderSpriteWidget(lastState, lastRuntime));
   } finally {
+    stopSpritePendingTicker();
     spriteSending = false;
     renderSpriteWidget(state, runtime);
   }
@@ -268,25 +294,4 @@ function clearPendingSpriteMessages() {
   for (let i = spriteMessages.length - 1; i >= 0; i -= 1) {
     if (spriteMessages[i]?.role === "pending") spriteMessages.splice(i, 1);
   }
-}
-
-function selectedNodeId(state) {
-  return String(state?.selection?.nodeIds?.[0] || "");
-}
-
-function canvasSummary(state) {
-  const nodeId = selectedNodeId(state);
-  const node = nodeId ? state.nodes?.[nodeId] : null;
-  return {
-    nodes: Array.isArray(state?.order) ? state.order.length : 0,
-    assets: Array.isArray(state?.assets) ? state.assets.length : 0,
-    edges: Object.keys(state?.edges || {}).length,
-    selected_node_type: node?.type || "",
-    selected_node_status: node?.status || "",
-  };
-}
-
-function safeReply(value) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  return text.slice(0, 220) || "我先观察当前画布，再给出一个不打断创作的建议。";
 }

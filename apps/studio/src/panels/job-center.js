@@ -1,5 +1,6 @@
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
+import { runtimeMediaUrl } from "../runtime-client.js";
 import { openCreationProcessPanel } from "./creation-process-panel.js";
 
 export function renderJobCenter(state, store, body, mode = "jobs") {
@@ -128,7 +129,7 @@ function jobThumb(node) {
   const thumb = el("span", `job-thumb ${node.type || "text"}`);
   if (node.previewUrl && node.type === "image") {
     const img = document.createElement("img");
-    img.src = node.previewUrl;
+    img.src = runtimeMediaUrl(node.previewUrl);
     img.alt = "";
     img.loading = "lazy";
     thumb.appendChild(img);

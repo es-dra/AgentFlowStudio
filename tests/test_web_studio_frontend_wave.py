@@ -227,6 +227,59 @@ def test_generation_projection_is_split_from_node_actions() -> None:
     assert "function showCarryConfirmModal" not in node_actions
 
 
+def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failure() -> None:
+    progress = _read("src/node-generation-progress.js")
+    keyframe_actions = _read("src/node-keyframe-actions.js")
+    body = _read("src/canvas-node-body.js")
+
+    assert "INDETERMINATE_ACTIVE_STATUSES" in progress
+    assert "mode: progressMode(response, status)" in progress
+    assert "MAX_KEYFRAME_POLL_ATTEMPTS" in keyframe_actions
+    assert "markKeyframeStillProcessing" in keyframe_actions
+    assert "throw new Error(`图片生成仍在处理中" not in keyframe_actions
+    assert "progress?.mode === \"indeterminate\"" in body
+    assert "生成中" in body
+
+
+def test_runtime_media_urls_are_normalized_only_at_render_boundaries() -> None:
+    runtime_client = _read("src/runtime-client.js")
+    keyframe_actions = _read("src/node-keyframe-actions.js")
+    upload_actions = _read("src/node-upload-actions.js")
+    result_view = _read("src/node-result-view.js")
+    job_center = _read("src/panels/job-center.js")
+    drawer_assets = _read("src/panels/drawer-assets.js")
+    runtime_asset_sync = _read("src/runtime-asset-sync.js")
+
+    assert "runtimeMediaUrl" in runtime_client
+    assert "toMediaUrl(value)" in runtime_client
+    assert "runtimeMediaUrl" in result_view
+    assert "runtimeMediaUrl" in job_center
+    assert "runtimeMediaUrl" in drawer_assets
+    assert "runtimeMediaUrl" not in keyframe_actions
+    assert "runtimeMediaUrl" not in upload_actions
+    assert "runtimeMediaUrl" not in runtime_asset_sync
+
+
+def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
+    drawer_assets = _read("src/panels/drawer-assets.js")
+    drawer_actions = _read("src/panels/drawer-asset-actions.js")
+    runtime_client = _read("src/runtime-client.js")
+    styles = _read("styles/assets.css")
+
+    for marker in (
+        "asset-context-menu",
+        "contextmenu",
+        "openAssetContextMenu",
+        "删除图片素材",
+        "preventDefault",
+    ):
+        assert marker in drawer_assets
+    assert "deleteImageAsset(assetId)" in runtime_client
+    assert "deleteImageAssetFromDrawer" in drawer_actions
+    assert "removeImageAssetFromStore" in drawer_actions
+    assert ".asset-context-menu" in styles
+
+
 def test_canvas_fit_uses_visible_safe_area_not_full_root_bounds() -> None:
     assert (STUDIO_ROOT / "src" / "canvas-safe-area.js").is_file()
     safe_area = _read("src/canvas-safe-area.js")

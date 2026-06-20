@@ -20,6 +20,24 @@ export function runtimeBaseUrl() {
   return FALLBACK_BASE_URL;
 }
 
+export function runtimeMediaUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (["http:", "https:", "blob:", "data:"].includes(url.protocol)) return raw;
+    return "";
+  } catch {
+    const base = runtimeBaseUrl();
+    if (raw.startsWith("/")) return `${base}${raw}`;
+    try {
+      return new URL(raw, `${base}/`).toString();
+    } catch {
+      return "";
+    }
+  }
+}
+
 function explicitRuntimeBaseUrl() {
   const values = [];
   try {
@@ -157,8 +175,14 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     uploadImageAsset(payload) {
       return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
     },
+    deleteImageAsset(assetId) {
+      return requestJson(`/projects/${encoded}/image-assets/${encodeURIComponent(assetId)}`, { method: "DELETE" });
+    },
     listImageAssets() {
       return requestJson(`/projects/${encoded}/image-assets`);
+    },
+    toMediaUrl(value) {
+      return runtimeMediaUrl(value);
     },
     draftAssetCard(payload) {
       return requestJson(`/projects/${encoded}/asset-card-drafts`, { method: "POST", payload });

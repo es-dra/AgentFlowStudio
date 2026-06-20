@@ -244,6 +244,35 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     assert reusable_preview.content == PNG_BYTES
 
 
+def test_uploaded_image_asset_can_be_deleted_from_project_runtime(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    upload = client.post(
+        "/projects/proj_image_delete/image-assets",
+        json={
+            "node_id": "image-node-upload-001",
+            "filename": "reference.png",
+            "mime_type": "image/png",
+            "data_base64": base64.b64encode(PNG_BYTES).decode("ascii"),
+            "role": "reference_image",
+            "generated_at": "2026-06-21T03:40:00+08:00",
+        },
+    )
+    assert upload.status_code == 200
+    asset = upload.json()["asset"]
+
+    preview_before = client.get(asset["preview_url"])
+    assert preview_before.status_code == 200
+
+    deleted = client.delete(f"/projects/proj_image_delete/image-assets/{asset['asset_id']}")
+
+    assert deleted.status_code == 200
+    assert deleted.json()["asset_id"] == asset["asset_id"]
+    assert deleted.json()["deleted"] is True
+    assert client.get(asset["preview_url"]).status_code == 404
+    assets = client.get("/projects/proj_image_delete/image-assets").json()["assets"]
+    assert assets == []
+
+
 def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setattr("apps.api.runtime_provider_dispatch.time.sleep", lambda _seconds: None)

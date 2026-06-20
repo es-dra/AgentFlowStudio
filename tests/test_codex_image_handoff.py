@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from agentflow_studio.model_gateway.codex_image_worker import CodexExecImageExecutor, FakeCodexImageExecutor, process_one
+from agentflow_studio.model_gateway.codex_image_worker import (
+    CodexExecImageExecutor,
+    FakeCodexImageExecutor,
+    process_one,
+    recover_stale_running_jobs,
+)
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from apps.api.runtime_service import create_runtime_app
@@ -239,6 +246,41 @@ def test_codex_image_worker_reports_missing_cli_as_safe_runtime_error(tmp_path, 
     with pytest.raises(RuntimeError, match="Codex image worker command is not available"):
         CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
 
+
+def test_codex_image_worker_recovers_stale_running_jobs_without_blocking_queue(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    store = _store(tmp_path, _codex_provider_config())
+    registry = ProviderRegistry.from_store(store)
+    output_dir = tmp_path / "run"
+
+    first = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="First job.", output_dir=output_dir, candidate_count=1),
+    )
+    second = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="Second job.", output_dir=output_dir, candidate_count=1),
+    )
+    pending_dir = output_dir / "codex_image_job" / "pending" / first["task"]["job_id"]
+    running_dir = output_dir / "codex_image_job" / "running" / first["task"]["job_id"]
+    running_dir.parent.mkdir(parents=True, exist_ok=True)
+    pending_dir.rename(running_dir)
+    assert running_dir.is_dir()
+    old_time = time.time() - 7200
+    for path in [running_dir, *running_dir.iterdir()]:
+        os.utime(path, (old_time, old_time))
+
+    recovered = recover_stale_running_jobs(output_dir, stale_running_sec=3600)
+    processed = process_one(output_dir, executor=FakeCodexImageExecutor(), stale_running_sec=3600)
+
+    assert [item.status for item in recovered] == ["failed"]
+    assert processed is not None
+    assert processed.job_id == second["task"]["job_id"]
+    assert processed.status == "succeeded"
+    assert registry.poll("image", "codex_image", first)["status"] == "failed"
+    assert registry.poll("image", "codex_image", second)["status"] == "succeeded"
 
 def _store(tmp_path: Path, payload: dict):
     path = tmp_path / "providers.local.json"
