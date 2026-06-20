@@ -12,22 +12,25 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
-Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed the
-Studio `story-cat` visual baseline around the user-provided TuanTuan reference.
-The default canvas companion is now a low-profile dark tabby story cat with
-large triangular ears, large cyan eyes, a quieter sprout, forepaws, curled
-tail, tabby marks, and a story orbit. The implementation remains DOM/SVG/CSS
-instead of raster pose swaps, preserving a path toward continuous interaction
-without treating TuanTuan as a sticker or robot helper. Verification:
-`tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q`
-passed 6 / 1 existing warning; `npm run check:studio-js` passed for 96 files;
-Chrome render smoke confirmed `story-cat`, observe state, resting silhouette,
-and 5 orbit nodes; screenshot evidence:
-`runs/tuantuan-reference-lock-20260620/tuantuan-crop-v2.png`; maintenance audit
-failed=0 with warnings only; `git diff --check` passed. Boundary: no Runtime API
-shape changed, no provider gate/config/call, no local reference image, provider
-raw response, signed URL, media byte, invite code, or secret was exposed; not
-human acceptance or business validation.
+Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed and then
+calibrated the Studio `story-cat` visual baseline around the user-approved
+TuanTuan reference. The default canvas companion is now a low-profile dark tabby
+story cat with a wider resting body, large triangular ears, ear rims, black
+pupils with blue-white highlights, a quieter sprout, forepaws, rear paw, curled
+tail, tabby marks, whiskers, and a cyan story orbit. The story belly panel is
+kept as a very low-opacity internal symbol so TuanTuan reads as a canvas-native
+story cat rather than a robot or sticker. The implementation remains DOM/SVG/CSS
+instead of raster pose swaps, preserving a path toward continuous interaction.
+Verification: the red check failed on the old 320x190 shape; focused sprite/API
+tests passed 6 / 1 existing warning; `npm run check:studio-js` passed for 96
+files; Chrome render smoke confirmed viewBox `0 0 360 210`, ears=2, pupils=2,
+eyeShine=4, tabbyMarks=9, storyPanelOpacity=0.18, orbitNodes=5, and no console
+warn/error; screenshot evidence:
+`runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-expanded-v4.png`.
+Boundary: no Runtime API shape changed, no provider gate/config/call, no local
+reference image, provider raw response, signed URL, media byte, invite code, or
+secret was exposed; not final IP acceptance, human acceptance, business
+validation, or durable memory promotion.
 
 Current Studio mascot and edge disconnect addendum: 2026-06-19 pass made two
 front-end interaction improvements requested during Studio polish. The movable

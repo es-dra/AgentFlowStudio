@@ -3271,6 +3271,31 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, secret, or Company OS private source content was written.
 - This sets a more faithful V1 visual baseline; it is still not final IP illustration acceptance or full animation rigging.
 
+## 2026-06-20 - TuanTuan Reference Shape Calibration
+
+- Calibrated the V1 `story-cat` rig against the user-approved TuanTuan reference: expanded the SVG to a wider low-resting cat silhouette, rebuilt the ears, tail, body, rear paw, forepaws, tabby markings, whiskers, and sprout around a dark canvas-native black cat direction.
+- Changed the eyes from pure cyan glow blobs into black pupils with blue-white highlights, closer to the reference's calm observing expression.
+- Reduced the story belly panel to a very low-opacity internal symbol so the sprite no longer reads as a robot or sticker while keeping the AFS story-orbit/product symbol available for future animation states.
+- Added regression anchors for the new viewBox, rear paw, ear rim, face ridge, pupils, eye highlights, and tabby details.
+
+Verification:
+
+```text
+Red check: tests/test_web_studio_sprite_static.py failed on the old 320x190 shape before implementation.
+tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 6 passed / 1 existing Starlette/httpx warning
+npm run check:studio-js: JS syntax check passed for 96 files
+Chrome render smoke on 127.0.0.1:8797/studio/?project=tuantuan-reference-shape-local: viewBox=0 0 360 210, ears=2, pupils=2, eyeShine=4, tabbyMarks=9, storyPanelOpacity=0.18, orbitNodes=5, console warn/error=0
+Screenshot evidence: runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-expanded-v4.png
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, invite code, or Company OS private source content was written.
+- This is frontend/runtime verification only, not final IP illustration acceptance, human acceptance, business validation, or durable memory promotion.
+
 ## 2026-06-20 - Public Edge Auth Preflight
 
 - Added a safe public-edge preflight that distinguishes Nginx Basic Auth blocking from Runtime app auth.

@@ -75,7 +75,7 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "Observe → Suggest → Execute" in character
     assert "spriteStoryLayers" in character
     assert '<svg class="sprite-tuantuan-cat"' in character
-    assert 'viewBox="0 0 320 190"' in character
+    assert 'viewBox="0 0 360 210"' in character
     assert "tuantuanBody" in character
     assert "tuantuanEar" in character
     assert "tuantuanSoftGlow" in character
@@ -86,12 +86,17 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-cat-face" in character
     assert "sprite-cat-eye" in character
     assert "sprite-cat-tail" in character
+    assert "sprite-cat-rear-paw" in character
+    assert "sprite-cat-pupil" in character
     assert "sprite-cat-outline" in character
+    assert "sprite-cat-ear-rim" in character
     assert "sprite-cat-tabby-mark" in character
+    assert "sprite-cat-face-ridge" in character
     assert "sprite-cat-ground-glow" in character
     assert "sprite-cat-inner-ear" in character
     assert "sprite-cat-face-mark" in character
     assert "sprite-cat-whiskers" in character
+    assert "sprite-cat-eye-shine" in character
     assert "sprite-cat-nose" in character
     assert "sprite-cat-story-panel" in character
     assert "sprite-cat-sprout" in character
@@ -156,8 +161,13 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-cat-body" in sprite_styles
     assert ".sprite-cat-face" in sprite_styles
     assert ".sprite-cat-resting-silhouette" in sprite_styles
+    assert ".sprite-cat-rear-paw" in sprite_styles
     assert ".sprite-cat-back-glow" in sprite_styles
     assert ".sprite-cat-eye" in sprite_styles
+    assert ".sprite-cat-pupil" in sprite_styles
+    assert ".sprite-cat-ear-rim" in sprite_styles
+    assert ".sprite-cat-face-ridge" in sprite_styles
+    assert ".sprite-cat-eye-shine" in sprite_styles
     assert ".sprite-cat-outline" in sprite_styles
     assert ".sprite-cat-tabby-mark" in sprite_styles
     assert ".sprite-cat-ground-glow" in sprite_styles

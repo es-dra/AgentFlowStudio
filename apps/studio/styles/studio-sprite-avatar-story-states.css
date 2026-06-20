@@ -24,6 +24,49 @@
   letter-spacing: 0;
 }
 
+.sprite-suggestion-bubble,
+.sprite-preview-ghost,
+.sprite-complete-sparks,
+.sprite-sleep-mark {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sprite-suggestion-bubble {
+  right: 24px;
+  top: 18px;
+  width: 38px;
+  height: 28px;
+  border: 1px solid rgba(0, 229, 255, 0.46);
+  border-radius: 12px;
+  background: rgba(7, 18, 24, 0.74);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.2);
+}
+
+.sprite-suggestion-bubble i,
+.sprite-suggestion-bubble b {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(168, 182, 255, 0.78);
+}
+
+.sprite-suggestion-bubble i:first-child { top: 7px; }
+.sprite-suggestion-bubble b { top: 13px; }
+.sprite-suggestion-bubble i:last-child { top: 19px; width: 12px; }
+
+.sprite-preview-ghost {
+  right: 42px;
+  top: 48px;
+  width: 44px;
+  height: 34px;
+  border: 1px dashed rgba(168, 182, 255, 0.58);
+  border-radius: 12px;
+}
+
 .afs-sprite-avatar[data-sprite-state="observe"] .sprite-story-orbit { opacity: 0.36; animation-duration: 28s; }
 .afs-sprite-avatar[data-sprite-state="think"] .sprite-story-orbit { opacity: 0.54; animation-duration: 20s; }
 .afs-sprite-avatar[data-sprite-state="suggest"] .sprite-suggestion-bubble,
