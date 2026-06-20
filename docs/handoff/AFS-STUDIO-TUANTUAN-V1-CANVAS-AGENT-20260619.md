@@ -84,6 +84,68 @@ Chrome smoke after reference-shape correction
 => screenshot: runs/tuantuan-shape-smoke-20260619.png
 ```
 
+## 2026-06-20 Reference Shape Reset
+
+The 2026-06-19 DOM rig was directionally correct as an embodied canvas agent, but it still read too far from the approved TuanTuan reference. The current V1 visual baseline is now:
+
+- dark low-profile resting tabby cat, not a round mascot, robot, or generic pet
+- large observant eyes and ears
+- top sprout as the growth / companion symbol
+- cyan story orbit as the visible thinking layer
+- body tabby marks, paws, whiskers, nose/mouth, and story belly panel
+- animatable SVG/DOM rig rather than static PNG sticker swapping
+
+Changed files:
+
+- `apps/studio/src/sprite-character.js`
+  - Replaced the previous span-built cat body with an inline SVG story-cat rig.
+  - Preserves the same state hooks and class anchors for observe / suggest / execute behavior.
+
+- `apps/studio/src/sprite-position.js`
+  - Bumped the persisted position version to avoid reusing bad coordinates from the rejected shape.
+  - Updated sprite dimensions to match the wider resting cat.
+
+- `apps/studio/styles/studio-sprite.css`
+  - Updated root sizing and settings-panel offsets for the new 236 x 220 sprite frame.
+
+- `apps/studio/styles/studio-sprite-avatar-story-cat.css`
+  - Rebuilt the base visual style around the reference shape: dark body, cyan outline, orbit cards, tail, head tracking, eyes, and sprout.
+
+- `apps/studio/styles/studio-sprite-avatar-story-cat-details.css`
+  - Rebuilt detail styles for inner ears, tabby marks, whiskers, story panel, blink, and glow.
+
+- `tests/test_web_studio_sprite_static.py`
+  - Added shape anchors so future changes cannot silently regress to sticker, robot, or abstract blob.
+
+Verification:
+
+```text
+npm run check:studio-js
+=> JS syntax check passed: 96 files
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_sprite_static.py tests\test_api_runtime_sprite.py -q
+=> 6 passed, 1 existing Starlette/httpx warning
+
+git diff --check
+=> passed
+
+Chrome smoke at /studio/?project=tuantuan-reference-shape-v2
+=> catTag=svg
+=> eyes=2
+=> ears=2
+=> tabbyMarks=3
+=> orbitNodes=5
+=> state=observe
+=> screenshot: runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-avatar-v2.png
+```
+
+Remaining boundary:
+
+- This is now the frontend V1 shape baseline.
+- This is not final IP illustration acceptance.
+- This is not full skeletal animation, Lottie, Canvas, or WebGL rigging.
+- The next visual iteration should refine expression/pose fidelity on top of this SVG rig, not reintroduce static pose stickers.
+
 ## Public Server Diagnosis
 
 The public login loop at `https://afstudio.art/studio/` is caused by Nginx Basic Auth in front of the Runtime app:

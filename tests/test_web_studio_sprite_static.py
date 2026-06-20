@@ -74,16 +74,24 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "SPRITE_AGENT_STATES" in character
     assert "Observe → Suggest → Execute" in character
     assert "spriteStoryLayers" in character
+    assert '<svg class="sprite-tuantuan-cat"' in character
+    assert 'viewBox="0 0 286 166"' in character
+    assert "tuantuanBody" in character
     assert "sprite-story-orbit" in character
     assert "sprite-tuantuan-cat" in character
     assert "sprite-cat-body" in character
+    assert "sprite-cat-face" in character
     assert "sprite-cat-eye" in character
     assert "sprite-cat-tail" in character
+    assert "sprite-cat-outline" in character
+    assert "sprite-cat-tabby-mark" in character
+    assert "sprite-cat-ground-glow" in character
     assert "sprite-cat-inner-ear" in character
     assert "sprite-cat-face-mark" in character
     assert "sprite-cat-whiskers" in character
     assert "sprite-cat-nose" in character
     assert "sprite-cat-story-panel" in character
+    assert "sprite-cat-sprout" in character
     assert "sprite-tail-panel" in character
     assert "sprite-suggestion-bubble" in character
     assert "SPRITE_POSE_ASSETS" not in character
@@ -108,9 +116,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
 
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_POSITION_VERSION" in position
-    assert "2026-06-tuantuan-raster-v1" in position
-    assert "SPRITE_SIZE = 190" in position
-    assert "const SPRITE_HEIGHT = 238" in position
+    assert "2026-06-tuantuan-story-cat-v1" in position
+    assert "SPRITE_SIZE = 236" in position
+    assert "const SPRITE_HEIGHT = 220" in position
     assert "SPRITE_SCALE_KEY" in position
     assert "SPRITE_SCALE_OPTIONS" in position
     assert "getSpriteScale" in position
@@ -128,8 +136,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-story-cat-details.css");' in styles
     assert '@import url("./studio-sprite-avatar-story-states.css");' in styles
     assert "studio-sprite-avatar-tuantuan.css" not in styles
-    assert "width: calc(190px * var(--sprite-scale, 1))" in styles
-    assert "height: calc(238px * var(--sprite-scale, 1))" in styles
+    assert "width: calc(236px * var(--sprite-scale, 1))" in styles
+    assert "height: calc(220px * var(--sprite-scale, 1))" in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles
@@ -141,12 +149,17 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-story-orbit" in sprite_styles
     assert ".sprite-tuantuan-cat" in sprite_styles
     assert ".sprite-cat-body" in sprite_styles
+    assert ".sprite-cat-face" in sprite_styles
     assert ".sprite-cat-eye" in sprite_styles
+    assert ".sprite-cat-outline" in sprite_styles
+    assert ".sprite-cat-tabby-mark" in sprite_styles
+    assert ".sprite-cat-ground-glow" in sprite_styles
     assert ".sprite-cat-inner-ear" in sprite_styles
     assert ".sprite-cat-face-mark" in sprite_styles
     assert ".sprite-cat-whiskers" in sprite_styles
     assert ".sprite-cat-nose" in sprite_styles
     assert ".sprite-cat-story-panel" in sprite_styles
+    assert ".sprite-cat-sprout" in sprite_styles
     assert ".sprite-tail-panel" in sprite_styles
     assert ".sprite-suggestion-bubble" in sprite_styles
     assert ".sprite-move-handle" in sprite_styles

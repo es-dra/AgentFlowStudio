@@ -3086,3 +3086,29 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, secret, or Company OS private source content was written.
 - This is frontend/runtime verification only, not human acceptance or business validation.
+
+## 2026-06-20 - TuanTuan Reference Shape Reset
+
+- Reworked TuanTuan's canvas character from the previous abstract dark DOM rig into a closer reference-shape vector rig: low resting tabby-cat posture, larger head and ears, glowing eyes, sprout, dark curled body, paws, whiskers, body tabby marks, story belly panel, and cyan story orbit.
+- Switched the character layer to inline SVG inside the existing sprite DOM so the sprite remains animatable and state-driven instead of becoming another static sticker image.
+- Updated sprite dimensions and persisted-position version so old local positions from the rejected shape do not lock the new wider resting cat into a bad location.
+- Added static shape anchors to tests for SVG, reference body outline, tabby marks, sprout, story panel, and orbit nodes.
+- Kept the interaction scope intentionally small: observe/think/suggest/preview/execute/complete/sleep state styling, drag, size settings, and simple LLM-backed chat remain the only V1 behaviors.
+
+Verification:
+
+```text
+npm run check:studio-js: JS syntax check passed for 96 files
+tests/test_web_studio_sprite_static.py + tests/test_api_runtime_sprite.py: 6 passed / 1 existing Starlette/httpx warning
+git diff --check: passed
+Browser smoke on Chrome at /studio/?project=tuantuan-reference-shape-v2: catTag=svg, eyes=2, ears=2, tabbyMarks=3, orbitNodes=5, state=observe
+Screenshot evidence: runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-avatar-v2.png
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, or Company OS private source content was written.
+- This sets a more faithful V1 visual baseline; it is still not final IP illustration acceptance or full animation rigging.
