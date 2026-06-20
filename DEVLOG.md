@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-06-20 - Public Edge Gate For HTTP Acceptance
+
+- Added a public-edge gate to deployed HTTP internal-beta acceptance. When
+  `--base-url` and `--public-edge-status` are used together, the runner checks
+  the public Studio edge before requiring invite codes or starting auth/project
+  writes.
+- If the edge is still blocked by Nginx Basic Auth, the runner now returns a
+  safe `afs_internal_beta_acceptance_edge_gate_report` with
+  `status=public_edge_not_ready`.
+- If the edge is ready, deployed HTTP acceptance continues and stores the safe
+  `public_edge_status` in the acceptance report.
+- Split CLI arg parsing and the public-edge gate into focused modules so
+  `tools/afs_internal_beta_acceptance.py` stays under the local line-count
+  guard.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance.py tests/test_afs_internal_beta_acceptance_cli.py tests/test_afs_internal_beta_preflight_public_edge.py tests/test_afs_public_edge_preflight.py tests/test_afs_public_edge_nginx_fix.py -q -> 23 passed / 1 existing warning
+live HTTP acceptance edge gate without invite codes -> public_edge_not_ready, exit_code=2, edge_basic_auth=true, runtime_status=ready
+```
+
+Boundaries:
+
+- No Nginx config was changed in this local session.
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No invite code, session token, provider raw response, signed URL, local media
+  byte, secret, or Company OS private source content was written.
+- This is an acceptance safety gate, not completed public-login acceptance,
+  human acceptance, or business validation.
+
 ## 2026-06-20 - Public Edge Nginx Basic Auth Fix Tool
 
 - Rechecked the public Studio edge: `https://afstudio.art/studio/` still

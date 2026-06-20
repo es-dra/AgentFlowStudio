@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import sys
@@ -16,9 +15,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from apps.api.runtime_service import create_runtime_app
+from tools.afs_internal_beta_acceptance_args import parse_acceptance_args
 from tools.afs_internal_beta_acceptance_client import HttpAcceptanceClient
 from tools.afs_internal_beta_acceptance_config import AcceptanceConfig
 from tools.afs_internal_beta_acceptance_contract import run_acceptance_contract
+from tools.afs_internal_beta_acceptance_edge_gate import collect_public_edge_acceptance_gate
 from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
 from tools.afs_internal_beta_acceptance_preflight import run_http_preflight as _run_http_preflight
 from tools.afs_internal_beta_acceptance_review import render_human_review_markdown
@@ -26,7 +27,7 @@ from tools.afs_three_end_status import run_three_end_status
 
 
 def main() -> int:
-    args = _parse_args()
+    args = parse_acceptance_args()
     report_path = Path(args.report).resolve() if args.report else None
     human_review_path = Path(args.human_review_md).resolve() if args.human_review_md else None
     try:
@@ -52,6 +53,10 @@ def main() -> int:
                 beta_invite_code=args.beta_invite_code or os.environ.get(args.beta_invite_code_env, ""),
                 report_path=report_path,
                 human_review_path=human_review_path,
+                include_public_edge_status=args.public_edge_status,
+                public_edge_url=args.public_edge_url,
+                public_edge_server=args.public_edge_server or args.three_end_server,
+                public_edge_check_runtime_health=args.public_edge_check_runtime_health,
             )
         elif args.runtime_root:
             report = run_inprocess_acceptance(runtime_root=Path(args.runtime_root).resolve(), report_path=report_path, human_review_path=human_review_path)
@@ -64,28 +69,6 @@ def main() -> int:
     print(json.dumps({"status": report["status"], "report": str(report_path) if report_path else ""}, ensure_ascii=False))
     ok_statuses = {"contract_verified_pending_human_acceptance", "ready_for_http_acceptance", "aligned"}
     return 0 if report["status"] in ok_statuses else 2
-
-
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a safe deterministic AFS internal beta acceptance contract.")
-    parser.add_argument("--runtime-root", default="", help="Optional local runtime root for deterministic in-process mode.")
-    parser.add_argument("--base-url", default="", help="Optional deployed Runtime base URL for HTTP acceptance mode.")
-    parser.add_argument("--invite-code", default="", help="Disposable alpha invite code for HTTP mode. Prefer the env form.")
-    parser.add_argument("--invite-code-env", default="AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE", help="Environment variable holding the alpha invite code.")
-    parser.add_argument("--beta-invite-code", default="", help="Disposable beta invite code for HTTP mode.")
-    parser.add_argument("--beta-invite-code-env", default="AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA", help="Environment variable holding the beta invite code.")
-    parser.add_argument("--preflight-only", action="store_true", help="Only inspect deployed Runtime readiness; no invite codes or provider calls.")
-    parser.add_argument("--three-end-status", action="store_true", help="Run or include safe local/GitHub/server drift status.")
-    parser.add_argument("--three-end-repo-root", default=".", help="Local repository root for optional three-end preflight status.")
-    parser.add_argument("--three-end-server", default="", help="Optional SSH alias for server-side three-end status.")
-    parser.add_argument("--public-edge-status", action="store_true", help="Include public Studio edge-auth status in preflight mode.")
-    parser.add_argument("--public-edge-url", default="", help="Optional public Studio URL for edge-auth preflight.")
-    parser.add_argument("--public-edge-server", default="", help="Optional SSH alias for Runtime health inside public-edge preflight.")
-    parser.add_argument("--public-edge-check-runtime-health", action="store_true", help="Check Runtime health directly from this machine for public-edge preflight.")
-    parser.add_argument("--report", default="", help="Optional JSON report output path.")
-    parser.add_argument("--human-review-md", default="", help="Optional safe Markdown checklist for the human beta reviewer.")
-    return parser.parse_args()
-
 
 def run_inprocess_acceptance(*, runtime_root: Path, report_path: Path | None = None, human_review_path: Path | None = None) -> dict[str, Any]:
     from fastapi.testclient import TestClient
@@ -108,9 +91,23 @@ def run_http_acceptance(
     report_path: Path | None = None,
     human_review_path: Path | None = None,
     run_id: str | None = None,
+    include_public_edge_status: bool = False,
+    public_edge_url: str = "",
+    public_edge_server: str = "",
+    public_edge_check_runtime_health: bool = False,
 ) -> dict[str, Any]:
     if not base_url.strip():
         raise AcceptanceConfigurationError("HTTP acceptance requires a Runtime base URL.")
+    public_edge, edge_gate_report = collect_public_edge_acceptance_gate(
+        enabled=include_public_edge_status,
+        base_url=base_url,
+        public_url=public_edge_url,
+        server=public_edge_server,
+        check_runtime_health=public_edge_check_runtime_health,
+    )
+    if edge_gate_report is not None:
+        _write_json_report(edge_gate_report, report_path)
+        return edge_gate_report
     if not invite_code.strip():
         raise AcceptanceConfigurationError("HTTP acceptance requires an invite code via --invite-code or AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE.")
     if not beta_invite_code.strip():
@@ -131,6 +128,8 @@ def run_http_acceptance(
         close = getattr(client, "close", None)
         if callable(close):
             close()
+    if public_edge is not None:
+        report["public_edge_status"] = public_edge
     _write_json_report(report, report_path)
     _write_human_review_markdown(report, human_review_path)
     return report

@@ -127,6 +127,40 @@ WWW-Authenticate: Basic
 ready_for_public_auth
 ```
 
+## 修复后的 HTTP acceptance gate
+
+公网 edge 解除后，再运行完整 HTTP 内测契约。建议保留
+`--public-edge-status`，这样如果 Nginx Basic Auth 又被加回去，验收会先返回
+`public_edge_not_ready`，不会消耗邀请码，也不会进入注册/项目写入链路。
+
+```powershell
+$env:AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE = "<alpha disposable invite>"
+$env:AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA = "<beta disposable invite>"
+
+.\.venv\Scripts\python.exe tools\afs_internal_beta_acceptance.py `
+  --base-url https://afstudio.art `
+  --public-edge-status `
+  --public-edge-url https://afstudio.art/studio/ `
+  --public-edge-server afs-bwg-ops `
+  --report runs\internal_beta_http_acceptance_public_edge.json `
+  --human-review-md runs\internal_beta_human_review_public_edge.md
+```
+
+服务器内等价命令：
+
+```bash
+cd /opt/afs/AgentFlowStudio
+AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE="<alpha disposable invite>" \
+AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA="<beta disposable invite>" \
+./.venv/bin/python tools/afs_internal_beta_acceptance.py \
+  --base-url https://afstudio.art \
+  --public-edge-status \
+  --public-edge-url https://afstudio.art/studio/ \
+  --public-edge-check-runtime-health \
+  --report runs/internal_beta_http_acceptance_public_edge.json \
+  --human-review-md runs/internal_beta_human_review_public_edge.md
+```
+
 ## 该检查能证明什么
 
 能证明：
