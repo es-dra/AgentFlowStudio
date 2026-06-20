@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -44,7 +45,7 @@ def main() -> int:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     screenshot_path.parent.mkdir(parents=True, exist_ok=True)
 
-    server = start_runtime(repo, runtime_root, port, allow_live_llm=args.allow_live_llm)
+    server = start_runtime(repo, runtime_root, port, allow_live_llm=args.allow_live_llm or args.stub_llm)
     try:
         wait_for_http(f"{base_url}/studio/")
         prepare_clean_project(runtime_root)
@@ -56,6 +57,7 @@ def main() -> int:
             headed=args.headed,
             timeout_ms=args.timeout_ms,
             allow_live_llm=args.allow_live_llm,
+            stub_llm=args.stub_llm,
         )
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"status": "passed", "report": str(report_path)}, ensure_ascii=False))
@@ -75,6 +77,11 @@ def parse_args() -> argparse.Namespace:
         "--allow-live-llm",
         action="store_true",
         help="Keep AFS_ALLOW_REMOTE_LLM for prompt optimization while image/video/ASR gates stay closed.",
+    )
+    parser.add_argument(
+        "--stub-llm",
+        action="store_true",
+        help="Use a deterministic QA LLM stub for browser interaction coverage while media gates stay closed.",
     )
     parser.add_argument(
         "--timeout-ms",
@@ -153,6 +160,7 @@ def run_browser_qa(
     headed: bool,
     timeout_ms: int,
     allow_live_llm: bool,
+    stub_llm: bool,
 ) -> dict[str, Any]:
     upload_file = runtime_root / "qa-lin-wan.png"
     upload_file.write_bytes(PNG_BYTES)
@@ -167,6 +175,10 @@ def run_browser_qa(
         expect.set_options(timeout=timeout_ms)
         page.route("**/studio/src/**", make_studio_static_route(repo))
         page.route("**/studio/styles/**", make_studio_static_route(repo))
+        previous_stub = os.environ.get("AFS_BROWSER_QA_STUB_LLM")
+        if stub_llm:
+            os.environ["AFS_BROWSER_QA_STUB_LLM"] = "true"
+            allow_live_llm = True
         page.route("**/projects/**", make_mutating_runtime_proxy(runtime_root, allow_live_llm=allow_live_llm))
         try:
             page.goto(f"{base_url}/studio/?project={PROJECT_ID}&qa={int(time.time())}", wait_until="commit")
@@ -218,6 +230,7 @@ def run_browser_qa(
                 "screenshot": str(screenshot_path),
                 **llm_summary,
                 "live_llm_gate_allowed": allow_live_llm,
+                "llm_stubbed": stub_llm,
                 "provider_gate": keyframe["provider_gate"],
                 "provider_calls_started": keyframe["provider_calls_started"],
                 "included_asset_count": len(keyframe["context_bundle"]["included_assets"]),
@@ -234,6 +247,10 @@ def run_browser_qa(
                 ],
             }
         finally:
+            if previous_stub is None:
+                os.environ.pop("AFS_BROWSER_QA_STUB_LLM", None)
+            else:
+                os.environ["AFS_BROWSER_QA_STUB_LLM"] = previous_stub
             browser.close()
 
 
@@ -252,7 +269,7 @@ def create_character_asset(page: Page, upload_file: Path) -> None:
         arg=STUDIO_STORAGE_KEY,
     )
 
-    node.locator('[data-action="fix-visual-asset"]').click()
+    node.locator('.na-btn[data-action="fix-visual-asset"]').click()
     panel = page.locator(".visual-asset-panel")
     expect(panel).to_be_visible()
     panel.locator('[data-field="label"]').fill("Lin Wan")
@@ -274,13 +291,13 @@ def create_character_asset(page: Page, upload_file: Path) -> None:
 def create_image_node(page: Page, position: dict[str, int]) -> None:
     page.locator("#canvas-root").click(position=position)
     page.locator("#dock .dock-btn.primary").click()
-    page.locator(".popover .menu-item").nth(1).click()
+    page.locator(".popover .quick-create-grid .quick-create-card[data-tone='scene']").click()
 
 
 def create_target_node(page: Page) -> None:
     page.locator("#canvas-root").click(position={"x": 900, "y": 440})
     page.locator("#dock .dock-btn.primary").click()
-    page.locator(".popover .menu-item").nth(1).click()
+    page.locator(".popover .quick-create-grid .quick-create-card[data-tone='scene']").click()
     page.wait_for_function(
         "(key) => JSON.parse(window.localStorage.getItem(key)).order.length >= 2",
         arg=STUDIO_STORAGE_KEY,

@@ -14,7 +14,7 @@
   top: var(--sprite-y, calc(100vh - 242px));
   width: calc(232px * var(--sprite-scale, 1));
   height: calc(212px * var(--sprite-scale, 1));
-  z-index: calc(var(--z-modal) + 1);
+  z-index: calc(var(--z-promptbar) - 1);
   pointer-events: none;
   touch-action: none;
 }

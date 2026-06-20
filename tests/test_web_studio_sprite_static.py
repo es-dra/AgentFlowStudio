@@ -176,7 +176,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "height: calc(212px * var(--sprite-scale, 1))" in styles
     assert '#sprite-root[data-sprite-hidden="true"]' in styles
     assert "position: fixed" in styles
-    assert "calc(var(--z-modal) + 1)" in styles
+    assert "calc(var(--z-promptbar) - 1)" in styles
+    assert "calc(var(--z-modal) + 1)" not in styles
     assert ".afs-sprite-orb" in styles
     assert ".afs-sprite-grip" in styles
     assert ".afs-sprite-settings" in sprite_styles

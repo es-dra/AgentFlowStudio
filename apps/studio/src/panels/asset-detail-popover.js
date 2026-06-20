@@ -2,23 +2,24 @@ import { showPopover, el } from "../overlay.js";
 
 export function openAssetDetailPopover(store, runtime, assetRef, anchor) {
   const assetId = assetIdFromRef(assetRef);
-  const localAsset = resolveAsset(store.get(), assetRef);
+  const localAsset = resolveAsset(store.get(), assetRef) || (typeof assetRef === "object" ? assetRef : null);
+  const visualAssetId = visualAssetIdFromRef(assetRef) || visualAssetIdFromRef(localAsset);
   const pop = el("div", "asset-detail-popover");
-  renderAssetDetail(pop, store, localAsset, assetId);
+  renderAssetDetail(pop, store, localAsset, assetId, visualAssetId);
   showPopover(anchor, pop, { place: "bottom" });
-  if (!assetId || !runtime?.getVisualAsset) return;
-  runtime.getVisualAsset(assetId)
+  if (!visualAssetId || !runtime?.getVisualAsset) return;
+  runtime.getVisualAsset(visualAssetId)
     .then((payload) => {
       const detail = payload?.asset || null;
       if (!detail) return;
-      renderAssetDetail(pop, store, { ...localAsset, ...detail }, assetId);
+      renderAssetDetail(pop, store, { ...localAsset, ...detail }, assetId, visualAssetId);
     })
     .catch(() => {
-      if (!localAsset) renderAssetDetail(pop, store, null, assetId);
+      if (!localAsset) renderAssetDetail(pop, store, null, assetId, visualAssetId);
     });
 }
 
-function renderAssetDetail(pop, store, asset, assetId) {
+function renderAssetDetail(pop, store, asset, assetId, visualAssetId = "") {
   pop.replaceChildren();
   if (!asset) {
     pop.appendChild(el("div", "asset-detail-empty", "未找到资产详情"));
@@ -26,7 +27,7 @@ function renderAssetDetail(pop, store, asset, assetId) {
   }
   pop.appendChild(el("div", "asset-detail-title", asset.label || asset.title || asset.asset_id || assetId || "未命名资产"));
   pop.appendChild(detailRow("状态", statusLabel(asset)));
-  pop.appendChild(detailRow("类型", asset.asset_type === "scene" ? "场景资产" : asset.asset_type === "character" ? "人物资产" : "显性资产"));
+  pop.appendChild(detailRow("类型", assetTypeLabel(asset)));
   pop.appendChild(detailRow("签名", asset.signature || asset.safe_summary || "未记录"));
   pop.appendChild(detailList("特征卡", featureCardRows(asset.feature_card)));
   pop.appendChild(detailList("锁定项", Array.isArray(asset.negative_locks) ? asset.negative_locks : []));
@@ -34,9 +35,9 @@ function renderAssetDetail(pop, store, asset, assetId) {
   if (asset.disabled_reason) pop.appendChild(detailRow("本次携带", asset.disabled_reason));
   const actions = el("div", "asset-detail-actions");
   const selectedId = store.get().selection.nodeIds[0];
-  if (selectedId && assetId) {
-    actions.appendChild(actionButton("从当前节点移除", () => removeAssetFromSelectedNode(store, assetId)));
-    actions.appendChild(actionButton("本次不携带", () => excludeAssetForNextRun(store, assetId)));
+  if (selectedId && visualAssetId) {
+    actions.appendChild(actionButton("从当前节点移除", () => removeAssetFromSelectedNode(store, visualAssetId)));
+    actions.appendChild(actionButton("本次不携带", () => excludeAssetForNextRun(store, visualAssetId)));
   }
   if (actions.childNodes.length) pop.appendChild(actions);
 }
@@ -54,6 +55,15 @@ function resolveAsset(state, ref) {
 
 function assetIdFromRef(ref) {
   return String(ref?.asset_id || ref?.visual_asset_id || ref?.assetId || ref || "").trim();
+}
+
+function visualAssetIdFromRef(ref) {
+  if (!ref || typeof ref !== "object") return "";
+  if (ref.visual_asset_id) return String(ref.visual_asset_id).trim();
+  const kind = String(ref.kind || "").trim();
+  if (["character_asset", "scene_asset", "visual_asset"].includes(kind) && ref.asset_id) return String(ref.asset_id).trim();
+  if (ref.asset_type && ref.asset_id) return String(ref.asset_id).trim();
+  return "";
 }
 
 function actionButton(label, onClick) {
@@ -131,8 +141,16 @@ function statusLabel(asset) {
   const status = asset.runtime_status === "excluded" ? "excluded" : asset.status || asset.asset_status || "fixed";
   return {
     fixed: "已固定",
+    ready: "可用",
     rejected: "未采用",
     retired: "已退役",
     excluded: "已失效，本次未携带",
   }[status] || status;
+}
+
+function assetTypeLabel(asset) {
+  if (asset.asset_type === "scene") return "场景资产";
+  if (asset.asset_type === "character") return "人物资产";
+  if (asset.kind === "image_reference" || asset.role === "reference_image") return "参考图片";
+  return "显性资产";
 }

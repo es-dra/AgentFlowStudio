@@ -264,6 +264,7 @@ def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
     drawer_assets = _read("src/panels/drawer-assets.js")
     drawer_actions = _read("src/panels/drawer-asset-actions.js")
     runtime_client = _read("src/runtime-client.js")
+    asset_detail = _read("src/panels/asset-detail-popover.js")
     styles = _read("styles/assets.css")
 
     for marker in (
@@ -277,6 +278,10 @@ def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
     assert "deleteImageAsset(assetId)" in runtime_client
     assert "deleteImageAssetFromDrawer" in drawer_actions
     assert "removeImageAssetFromStore" in drawer_actions
+    assert "visualAssetIdFromRef" in asset_detail
+    assert 'typeof assetRef === "object"' in asset_detail
+    assert "runtime.getVisualAsset(visualAssetId)" in asset_detail
+    assert 'asset.kind === "image_reference"' in asset_detail
     assert ".asset-context-menu" in styles
 
 

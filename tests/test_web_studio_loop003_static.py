@@ -44,7 +44,9 @@ def test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions(
     )
 
     assert "getVisualAsset(assetId)" in runtime_client
-    assert "runtime.getVisualAsset(assetId)" in asset_detail
+    assert "visualAssetIdFromRef" in asset_detail
+    assert "if (!visualAssetId || !runtime?.getVisualAsset) return" in asset_detail
+    assert "runtime.getVisualAsset(visualAssetId)" in asset_detail
     assert "removeAssetFromSelectedNode" in asset_detail
     assert "excludeAssetForNextRun" in asset_detail
     assert "temporaryAssetExclusions" in asset_detail

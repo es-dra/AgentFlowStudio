@@ -3482,3 +3482,51 @@ Boundaries:
 - No live provider call was made during this verification pass.
 - No provider raw response, signed URL, local media byte, secret, invite code, or Company OS private source content was written.
 - This is automated/runtime/browser verification only, not human acceptance, business validation, or durable memory promotion.
+
+## 2026-06-21 - Full-Coverage Studio Internal Test Replacement Pass
+
+- Created a multi-role QA plan and run ledger for the internal-test replacement pass, covering creator, returning creator, creative director, asset librarian, QA gatekeeper, release operator, privacy/security, waiting user, small viewport, and failure-recovery perspectives.
+- Fixed local browser QA startup under proxy-enabled developer machines: health checks now bypass `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY` for local Runtime probes, Runtime subprocesses receive `NO_PROXY`, and the QA helper passes the correct `AFS_RUNTIME_ROOT`.
+- Updated stale browser QA selectors for the current quick-create menu and duplicate save-asset actions, then added a deterministic `--stub-llm` mode so UI/Runtime browser coverage can run without depending on local provider readiness.
+- Fixed a real Studio interaction bug where TuanTuan sat above modal panels and intercepted the visual-asset “确认固定” button; TuanTuan is now a canvas companion layer below prompt bar, dock, drawer, popover, and modal surfaces.
+- Fixed a real asset drawer bug where opening ordinary uploaded image details requested `/visual-assets/{image_asset_id}`, producing a 404 and console noise. Image references now render local safe detail only; visual asset detail is requested only when a visual asset id exists.
+- Added a broader browser QA script that validates uploaded image preview and app-level right-click delete, TuanTuan pending shimmer and rotating copy, refresh restore, and small-viewport horizontal overflow.
+- Verified server-side public edge is now ready for Runtime app auth and no longer blocked by old Basic Auth.
+- Ran server non-video provider checks: LLM smoke passed, image handoff smoke succeeded with one candidate and no raw/signed URL persistence, and vision smoke dispatched successfully. Video remained closed.
+
+Verification:
+
+```text
+Initial baseline:
+npm run check:studio-js: passed for 98 files
+python -m apps.cli.main --help: passed
+python -m apps.cli.main version: 0.1.0
+python tools/maintenance_audit.py: failed=0, warnings only
+python -m pytest -q: 572 passed / 527 deselected / 2 existing warnings
+git diff --check: passed
+
+Focused fix checks:
+tests/test_studio_asset_context_browser_qa_support.py: 3 passed / 1 existing warning
+tests/test_web_studio_sprite_static.py: 1 passed
+tests/test_web_studio_frontend_wave.py::test_asset_drawer_has_app_context_menu_and_image_delete_action: 1 passed
+tests/test_afs_public_edge_preflight.py: 4 passed
+tests/test_web_studio_loop003_static.py::test_loop003_qal003_003_asset_detail_reads_runtime_and_exposes_node_actions: 1 passed
+
+Browser QA:
+tools/studio_asset_context_browser_qa.py --stub-llm: passed, report runs/final_existing_browser_qa_stub_20260621.json
+tools/studio_full_coverage_browser_qa.py: passed, report runs/final_full_coverage_browser_qa_20260621.json, console/network errors 0
+
+Live server safe checks:
+three-end status before commit/deploy: server_home and server_opt aligned at 6a5bf30, Runtime ready, local dirty as expected
+public edge preflight: ready_for_public_auth
+server LLM smoke: passed, provider_calls_started=true
+server image handoff smoke: succeeded, output_count=1, provider_raw_response_stored=false, signed_urls_persisted=false
+server vision smoke: passed
+```
+
+Boundaries:
+
+- Video generation was not triggered and `AFS_ALLOW_REMOTE_VIDEO` remained false.
+- No ASR or external download gate was opened.
+- No provider raw response, signed URL, local private media byte, secret, invite code, session token, or Company OS private source content was written to repo records.
+- Browser/runtime verification and provider smoke remain separate from human acceptance, creative quality scoring, business validation, and durable memory promotion.
