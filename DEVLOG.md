@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-20 - Public Edge Nginx Basic Auth Fix Tool
+
+- Rechecked the public Studio edge: `https://afstudio.art/studio/` still
+  returns `401` with `WWW-Authenticate: Basic`, while Runtime `/health` is
+  `ready` and three-end status is `aligned`.
+- Confirmed the current SSH user can read the Nginx site config and belongs to
+  `sudo`, but does not have passwordless sudo, so this local session cannot
+  non-interactively edit `/etc/nginx/sites-available/afs-runtime`.
+- Added `tools.afs_public_edge_nginx_fix`, a safe server-side repair command
+  that backs up the Nginx site file and removes only the two known old Basic
+  Auth lines for `AFS Studio Internal Test`.
+- Updated public-edge preflight recommendations and the maintenance runbook to
+  use the tested repair command instead of a raw `sed` edit.
+
+Verification:
+
+```text
+live public-edge preflight before fix -> blocked_by_edge_basic_auth
+three-end status before fix -> aligned
+server runtime health -> ready
+tests/test_afs_public_edge_nginx_fix.py tests/test_afs_public_edge_preflight.py tests/test_afs_internal_beta_preflight_public_edge.py -q -> 11 passed / 1 existing warning
+```
+
+Boundaries:
+
+- No Nginx config was changed in this local session because sudo requires an
+  interactive password.
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, or Company OS
+  private source content was written.
+- This is server repair tooling and diagnosis, not public-login acceptance,
+  human acceptance, or business validation.
+
 ## 2026-06-20 - Three-End Status Acceptance CLI Guard
 
 - Fixed standalone `tools/afs_internal_beta_acceptance.py --three-end-status`

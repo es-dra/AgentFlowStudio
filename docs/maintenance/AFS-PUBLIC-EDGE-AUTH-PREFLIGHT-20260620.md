@@ -82,13 +82,14 @@ blocked_by_edge_basic_auth
 只有在确认“产品登录应该交给 Runtime app auth / invite auth 处理”后，才执行下面的服务器命令。
 
 ```bash
-sudo cp /etc/nginx/sites-available/afs-runtime /etc/nginx/sites-available/afs-runtime.bak-$(date +%Y%m%d%H%M%S)
-sudo sed -i '/auth_basic "AFS Studio Internal Test";/d; /auth_basic_user_file \/etc\/nginx\/.htpasswd_afs;/d' /etc/nginx/sites-available/afs-runtime
+cd /opt/afs/AgentFlowStudio
+sudo ./.venv/bin/python -m tools.afs_public_edge_nginx_fix --apply --config /etc/nginx/sites-available/afs-runtime
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-注意：不要关闭 Runtime app 自身的账号、会话、邀请码认证。
+`tools.afs_public_edge_nginx_fix` 会先备份配置，只移除旧公网 Basic Auth
+的两行目标配置，不会关闭 Runtime app 自身的账号、会话、邀请码认证。
 
 ## 修复后验证
 

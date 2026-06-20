@@ -137,8 +137,7 @@ def fetch_json_url(url: str) -> dict[str, Any]:
 
 def nginx_basic_auth_disable_commands() -> list[str]:
     return [
-        "sudo cp /etc/nginx/sites-available/afs-runtime /etc/nginx/sites-available/afs-runtime.bak-$(date +%Y%m%d%H%M%S)",
-        "sudo sed -i '/auth_basic \"AFS Studio Internal Test\";/d; /auth_basic_user_file \\/etc\\/nginx\\/.htpasswd_afs;/d' /etc/nginx/sites-available/afs-runtime",
+        "sudo ./.venv/bin/python -m tools.afs_public_edge_nginx_fix --apply --config /etc/nginx/sites-available/afs-runtime",
         "sudo nginx -t",
         "sudo systemctl reload nginx",
     ]

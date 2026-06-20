@@ -30,7 +30,7 @@ def test_public_edge_preflight_detects_nginx_basic_auth_block() -> None:
     assert report["checks"][0]["evidence"]["www_authenticate"] == "Basic"
     assert report["checks"][1]["status"] == "passed"
     assert report["recommended_action"]["action"] == "remove_nginx_basic_auth_or_intentionally_keep_it"
-    assert "auth_basic" in " ".join(report["recommended_action"]["commands"]).lower()
+    assert "afs_public_edge_nginx_fix" in " ".join(report["recommended_action"]["commands"])
 
 
 def test_public_edge_preflight_reports_ready_when_edge_and_runtime_are_ready() -> None:
@@ -74,6 +74,7 @@ def test_public_edge_preflight_can_check_runtime_health_locally() -> None:
 def test_nginx_basic_auth_disable_commands_are_sudo_scoped() -> None:
     commands = nginx_basic_auth_disable_commands()
 
-    assert commands[0].startswith("sudo cp /etc/nginx/sites-available/afs-runtime")
+    assert commands[0].startswith("sudo ./.venv/bin/python -m tools.afs_public_edge_nginx_fix --apply")
     assert commands[-2:] == ["sudo nginx -t", "sudo systemctl reload nginx"]
     assert all("provider" not in command.lower() for command in commands)
+    assert all("sed" not in command.lower() for command in commands)
