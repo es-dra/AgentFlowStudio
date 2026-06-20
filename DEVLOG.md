@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-06-20 - Three-End Status Acceptance CLI Guard
+
+- Fixed standalone `tools/afs_internal_beta_acceptance.py --three-end-status`
+  so it runs the safe local/GitHub/server status report instead of falling
+  through to deterministic in-process acceptance.
+- Added a focused CLI regression test that fails if standalone three-end status
+  invokes `run_inprocess_acceptance`.
+- Reused the JSON report writer across acceptance paths to keep report output
+  consistent without changing Runtime behavior.
+
+Verification:
+
+```text
+tests/test_afs_internal_beta_acceptance_cli.py::test_three_end_status_flag_runs_standalone_report_not_acceptance -q -> passed
+tests/test_afs_internal_beta_acceptance.py tests/test_afs_internal_beta_acceptance_cli.py tests/test_afs_internal_beta_preflight_three_end.py tests/test_afs_three_end_status.py -q -> 17 passed / 1 existing warning
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, or Company OS
+  private source content was written.
+- This is release/QA tooling repair, not human acceptance or business
+  validation.
+
 ## 2026-06-20 - TuanTuan Reference Shape Calibration
 
 - Rebalanced the V1 `story-cat` vector rig against the latest user reference:

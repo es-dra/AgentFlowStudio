@@ -22,6 +22,7 @@ from tools.afs_internal_beta_acceptance_contract import run_acceptance_contract
 from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
 from tools.afs_internal_beta_acceptance_preflight import run_http_preflight as _run_http_preflight
 from tools.afs_internal_beta_acceptance_review import render_human_review_markdown
+from tools.afs_three_end_status import run_three_end_status
 
 
 def main() -> int:
@@ -41,6 +42,9 @@ def main() -> int:
                 public_edge_server=args.public_edge_server or args.three_end_server,
                 public_edge_check_runtime_health=args.public_edge_check_runtime_health,
             )
+        elif args.three_end_status:
+            report = run_three_end_status(repo_root=Path(args.three_end_repo_root).resolve(), server=args.three_end_server)
+            _write_json_report(report, report_path)
         elif args.base_url:
             report = run_http_acceptance(
                 base_url=args.base_url,
@@ -58,7 +62,7 @@ def main() -> int:
         print(json.dumps({"status": "configuration_error", "error": str(exc), "report": str(report_path) if report_path else ""}, ensure_ascii=False))
         return 2
     print(json.dumps({"status": report["status"], "report": str(report_path) if report_path else ""}, ensure_ascii=False))
-    ok_statuses = {"contract_verified_pending_human_acceptance", "ready_for_http_acceptance"}
+    ok_statuses = {"contract_verified_pending_human_acceptance", "ready_for_http_acceptance", "aligned"}
     return 0 if report["status"] in ok_statuses else 2
 
 
@@ -71,7 +75,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--beta-invite-code", default="", help="Disposable beta invite code for HTTP mode.")
     parser.add_argument("--beta-invite-code-env", default="AFS_INTERNAL_BETA_ACCEPTANCE_INVITE_CODE_BETA", help="Environment variable holding the beta invite code.")
     parser.add_argument("--preflight-only", action="store_true", help="Only inspect deployed Runtime readiness; no invite codes or provider calls.")
-    parser.add_argument("--three-end-status", action="store_true", help="Include safe local/GitHub/server drift status in preflight mode.")
+    parser.add_argument("--three-end-status", action="store_true", help="Run or include safe local/GitHub/server drift status.")
     parser.add_argument("--three-end-repo-root", default=".", help="Local repository root for optional three-end preflight status.")
     parser.add_argument("--three-end-server", default="", help="Optional SSH alias for server-side three-end status.")
     parser.add_argument("--public-edge-status", action="store_true", help="Include public Studio edge-auth status in preflight mode.")
@@ -91,9 +95,7 @@ def run_inprocess_acceptance(*, runtime_root: Path, report_path: Path | None = N
     with _deterministic_runtime_env():
         client = TestClient(create_runtime_app(runtime_root=runtime_root))
         report = run_acceptance_contract(client)
-    if report_path is not None:
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_json_report(report, report_path)
     _write_human_review_markdown(report, human_review_path)
     return report
 
@@ -129,9 +131,7 @@ def run_http_acceptance(
         close = getattr(client, "close", None)
         if callable(close):
             close()
-    if report_path is not None:
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_json_report(report, report_path)
     _write_human_review_markdown(report, human_review_path)
     return report
 
@@ -172,6 +172,13 @@ def _write_human_review_markdown(report: dict[str, Any], human_review_path: Path
         return
     human_review_path.parent.mkdir(parents=True, exist_ok=True)
     human_review_path.write_text(render_human_review_markdown(report), encoding="utf-8")
+
+
+def _write_json_report(report: dict[str, Any], report_path: Path | None) -> None:
+    if report_path is None:
+        return
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @contextmanager
