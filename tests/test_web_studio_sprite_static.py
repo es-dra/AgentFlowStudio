@@ -75,10 +75,13 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "Observe → Suggest → Execute" in character
     assert "spriteStoryLayers" in character
     assert '<svg class="sprite-tuantuan-cat"' in character
-    assert 'viewBox="0 0 286 166"' in character
+    assert 'viewBox="0 0 320 190"' in character
     assert "tuantuanBody" in character
+    assert "tuantuanEar" in character
+    assert "tuantuanSoftGlow" in character
     assert "sprite-story-orbit" in character
     assert "sprite-tuantuan-cat" in character
+    assert "sprite-cat-resting-silhouette" in character
     assert "sprite-cat-body" in character
     assert "sprite-cat-face" in character
     assert "sprite-cat-eye" in character
@@ -93,6 +96,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-cat-story-panel" in character
     assert "sprite-cat-sprout" in character
     assert "sprite-tail-panel" in character
+    assert "sprite-cat-forepaws" in character
+    assert "sprite-cat-back-glow" in character
     assert "sprite-suggestion-bubble" in character
     assert "SPRITE_POSE_ASSETS" not in character
     assert "Object.entries(SPRITE_POSE_ASSETS)" not in character
@@ -150,6 +155,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert ".sprite-tuantuan-cat" in sprite_styles
     assert ".sprite-cat-body" in sprite_styles
     assert ".sprite-cat-face" in sprite_styles
+    assert ".sprite-cat-resting-silhouette" in sprite_styles
+    assert ".sprite-cat-back-glow" in sprite_styles
     assert ".sprite-cat-eye" in sprite_styles
     assert ".sprite-cat-outline" in sprite_styles
     assert ".sprite-cat-tabby-mark" in sprite_styles

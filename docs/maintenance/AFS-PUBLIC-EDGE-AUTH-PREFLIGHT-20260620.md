@@ -36,6 +36,21 @@ https://afstudio.art/studio/
 
 ## 新增预检命令
 
+内测验收 preflight 可以直接带上公网边缘检查：
+
+```powershell
+.\.venv\Scripts\python.exe -m tools.afs_internal_beta_acceptance `
+  --preflight-only `
+  --base-url https://afstudio.art `
+  --three-end-status `
+  --three-end-server afs-bwg-ops `
+  --public-edge-status `
+  --public-edge-url https://afstudio.art/studio/ `
+  --report runs\internal_beta_preflight_public_edge.json
+```
+
+如果没有单独传 `--public-edge-server`，它会复用 `--three-end-server` 读取 Runtime health。
+
 在本地 Codex 仓库根目录运行：
 
 ```powershell

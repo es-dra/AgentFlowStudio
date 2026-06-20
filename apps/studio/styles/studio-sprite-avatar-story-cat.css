@@ -36,27 +36,27 @@
 .sprite-tuantuan-stage {
   position: absolute;
   z-index: 3;
-  left: -56px;
-  bottom: 12px;
-  width: 344px;
-  height: 190px;
+  left: -67px;
+  bottom: 4px;
+  width: 372px;
+  height: 214px;
   pointer-events: none;
   transform:
     translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)
     rotate(var(--sprite-tilt-deg))
     scaleX(var(--sprite-squash-x))
     scaleY(var(--sprite-squash-y));
-  transform-origin: 49% 82%;
+  transform-origin: 48% 82%;
   transition: filter 0.2s ease;
 }
 
 .sprite-story-orbit {
   position: absolute;
-  left: 18px;
-  top: 20px;
+  left: 23px;
+  top: 35px;
   z-index: 2;
-  width: 300px;
-  height: 134px;
+  width: 318px;
+  height: 128px;
   border: 1px dashed rgba(0, 229, 255, 0.38);
   border-radius: 50%;
   opacity: 0.42;
@@ -86,11 +86,11 @@
 }
 
 .sprite-story-orbit [data-orbit-node="observe"] { left: 6px; top: 62px; }
-.sprite-story-orbit [data-orbit-node="suggest"] { left: 94px; top: -1px; }
-.sprite-story-orbit [data-orbit-node="preview"] { right: 43px; top: 12px; }
-.sprite-story-orbit [data-orbit-node="execute"] { right: 3px; bottom: 39px; }
+.sprite-story-orbit [data-orbit-node="suggest"] { left: 110px; top: -1px; }
+.sprite-story-orbit [data-orbit-node="preview"] { right: 42px; top: 10px; }
+.sprite-story-orbit [data-orbit-node="execute"] { right: 3px; bottom: 37px; }
 .sprite-story-orbit [data-orbit-node="complete"] {
-  left: 128px;
+  left: 146px;
   bottom: -4px;
   background: #7cff82;
   box-shadow: 0 0 17px rgba(124, 255, 130, 0.6);
@@ -98,35 +98,52 @@
 
 .sprite-tuantuan-cat {
   position: absolute;
-  left: 32px;
-  bottom: 11px;
+  left: 26px;
+  bottom: 0;
   z-index: 4;
-  width: 286px;
-  height: 166px;
+  width: 320px;
+  height: 190px;
   overflow: visible;
 }
 
 .sprite-cat-outline {
-  stroke: rgba(168, 212, 255, 0.58);
-  stroke-width: 1.35;
+  stroke: rgba(170, 214, 255, 0.74);
+  stroke-width: 1.55;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 7px rgba(0, 229, 255, 0.18));
+  filter: drop-shadow(0 0 9px rgba(0, 229, 255, 0.22));
 }
 
 .sprite-cat-body,
 .sprite-cat-face,
-.sprite-cat-ear,
 .sprite-cat-paw {
   fill: url(#tuantuanBody);
 }
 
+.sprite-cat-ear {
+  fill: url(#tuantuanEar);
+}
+
 .sprite-cat-body-shade {
-  fill: rgba(0, 3, 6, 0.2);
+  fill: rgba(0, 3, 6, 0.26);
+}
+
+.sprite-cat-back-glow {
+  fill: none;
+  stroke: rgba(0, 229, 255, 0.12);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: blur(1px);
 }
 
 .sprite-cat-ground-glow {
-  fill: rgba(0, 229, 255, 0.08);
+  fill: url(#tuantuanSoftGlow);
+  opacity: 0.82;
   filter: blur(3px);
+}
+
+.sprite-cat-resting-silhouette {
+  transform-box: fill-box;
+  transform-origin: 48% 84%;
 }
 
 .sprite-cat-tail {
@@ -137,11 +154,13 @@
 
 .sprite-cat-tail-shape {
   fill: none;
-  stroke: rgba(21, 34, 44, 0.98);
-  stroke-width: 22;
+  stroke: rgba(10, 19, 27, 0.99);
+  stroke-width: 24;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.14));
+  filter:
+    drop-shadow(0 0 7px rgba(0, 229, 255, 0.18))
+    drop-shadow(0 10px 14px rgba(0, 0, 0, 0.24));
 }
 
 .sprite-cat-head {
@@ -156,32 +175,34 @@
 
 .sprite-cat-cheek-glow,
 .sprite-cat-muzzle {
-  fill: rgba(222, 242, 246, 0.06);
+  fill: rgba(208, 241, 255, 0.075);
 }
 
 .sprite-cat-sprout {
   transform-box: fill-box;
   transform-origin: 50% 95%;
-  filter: drop-shadow(0 0 8px rgba(124, 255, 130, 0.5));
+  filter: drop-shadow(0 0 6px rgba(124, 255, 130, 0.38));
 }
 
 .sprite-cat-sprout path {
   fill: none;
   stroke: url(#tuantuanSprout);
-  stroke-width: 4;
+  stroke-width: 4.6;
   stroke-linecap: round;
 }
 
 .sprite-cat-sprout ellipse {
   fill: url(#tuantuanSprout);
-  stroke: rgba(215, 255, 145, 0.4);
+  stroke: rgba(215, 255, 145, 0.32);
   stroke-width: 0.8;
 }
 
 .sprite-cat-eye {
   transform-box: fill-box;
   transform-origin: center;
-  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.44));
+  filter:
+    drop-shadow(0 0 9px rgba(0, 229, 255, 0.48))
+    drop-shadow(0 0 18px rgba(168, 182, 255, 0.16));
 }
 
 .sprite-cat-eye ellipse {
@@ -193,8 +214,8 @@
 }
 
 .sprite-cat-nose {
-  fill: #ffd36e;
-  filter: drop-shadow(0 0 5px rgba(255, 211, 110, 0.45));
+  fill: #ffc86f;
+  filter: drop-shadow(0 0 6px rgba(255, 211, 110, 0.5));
 }
 
 .sprite-cat-mouth,
@@ -207,14 +228,14 @@
 }
 
 .sprite-cat-face-mark {
-  stroke: rgba(0, 7, 12, 0.54);
-  stroke-width: 4;
+  stroke: rgba(2, 8, 13, 0.58);
+  stroke-width: 4.2;
 }
 
 .sprite-cat-tabby-mark {
   fill: none;
-  stroke: rgba(0, 6, 11, 0.38);
-  stroke-width: 8;
+  stroke: rgba(0, 5, 9, 0.44);
+  stroke-width: 8.5;
   stroke-linecap: round;
 }
 
@@ -225,8 +246,8 @@
 
 .sprite-tuantuan-shadow {
   position: absolute;
-  left: 42px;
-  right: 18px;
+  left: 45px;
+  right: 10px;
   bottom: 2px;
   height: 24px;
   border-radius: 50%;

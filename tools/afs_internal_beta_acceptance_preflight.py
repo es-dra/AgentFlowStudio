@@ -7,6 +7,7 @@ from typing import Any
 
 from tools.afs_internal_beta_acceptance_client import HttpAcceptanceClient
 from tools.afs_internal_beta_acceptance_errors import AcceptanceConfigurationError
+from tools.afs_internal_beta_preflight_public_edge import collect_public_edge_status, safe_public_edge_status
 from tools.afs_internal_beta_preflight_three_end import collect_three_end_status, safe_three_end_status
 
 
@@ -17,6 +18,10 @@ def run_http_preflight(
     include_three_end_status: bool = False,
     three_end_repo_root: Path | None = None,
     three_end_server: str = "",
+    include_public_edge_status: bool = False,
+    public_edge_url: str = "",
+    public_edge_server: str = "",
+    public_edge_check_runtime_health: bool = False,
     http_client_factory: Callable[[str], Any] | None = None,
 ) -> dict[str, Any]:
     if not base_url.strip():
@@ -30,7 +35,15 @@ def run_http_preflight(
                 repo_root=three_end_repo_root or Path("."),
                 server=three_end_server,
             )
-        report = _build_http_preflight_report(client, three_end_status=three_end_status)
+        public_edge_status = None
+        if include_public_edge_status:
+            public_edge_status = collect_public_edge_status(
+                base_url=base_url,
+                public_url=public_edge_url,
+                server=public_edge_server,
+                check_runtime_health=public_edge_check_runtime_health,
+            )
+        report = _build_http_preflight_report(client, three_end_status=three_end_status, public_edge_status=public_edge_status)
     finally:
         close = getattr(client, "close", None)
         if callable(close):
@@ -41,7 +54,7 @@ def run_http_preflight(
     return report
 
 
-def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | None = None) -> dict[str, Any]:
+def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | None = None, public_edge_status: dict[str, Any] | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     health_status = 0
     health: dict[str, Any] = {}
@@ -110,6 +123,20 @@ def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | N
                 "runtime_status": str(summary.get("runtime_status") or ""),
             },
         )
+    safe_public_edge = safe_public_edge_status(public_edge_status) if public_edge_status is not None else None
+    if safe_public_edge is not None:
+        summary = safe_public_edge.get("summary", {})
+        _add_preflight_check(
+            checks,
+            "public_edge_auth",
+            "passed" if safe_public_edge.get("status") == "ready_for_public_auth" else "failed",
+            {
+                "status": str(safe_public_edge.get("status") or ""),
+                "public_edge_http_status": int(summary.get("public_edge_http_status") or 0),
+                "edge_basic_auth": bool(summary.get("edge_basic_auth")),
+                "runtime_status": str(summary.get("runtime_status") or ""),
+            },
+        )
     failed_count = sum(1 for item in checks if item["status"] == "failed")
     passed_count = sum(1 for item in checks if item["status"] == "passed")
     report = {
@@ -129,6 +156,8 @@ def _build_http_preflight_report(client, *, three_end_status: dict[str, Any] | N
     }
     if safe_three_end is not None:
         report["three_end_status"] = safe_three_end
+    if safe_public_edge is not None:
+        report["public_edge_status"] = safe_public_edge
     return report
 
 

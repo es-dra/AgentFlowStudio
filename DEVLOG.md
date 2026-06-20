@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-20 - TuanTuan Reference Shape Lock
+
+- Reworked the Studio `story-cat` sprite from an abstract dark blob toward the
+  provided TuanTuan reference: a low-profile dark tabby story cat with large
+  triangular ears, large cyan eyes, sprout, forepaws, curled tail, tabby marks,
+  and a quiet story orbit.
+- Kept the implementation as DOM/SVG/CSS layers rather than raster pose
+  switching, so future interaction can remain continuous without introducing a
+  sticker-like asset swap.
+- Added static shape anchors for the larger viewBox, ear gradient, soft glow,
+  resting silhouette, forepaws, and back glow to reduce the chance of drifting
+  back to the old abstract/robot look.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q -> 6 passed / 1 existing warning
+npm run check:studio-js -> passed for 96 files
+tools/maintenance_audit.py -> failed=0; warnings only
+git diff --check -> passed
+Chrome render smoke -> story-cat, observe state, resting silhouette=true, orbit nodes=5
+browser screenshot -> runs/tuantuan-reference-lock-20260620/tuantuan-crop-v2.png
+```
+
+Boundaries:
+
+- No Runtime API shape was changed.
+- No provider gate or provider config was changed.
+- No provider call was made.
+- No local source reference image, provider raw response, signed URL, local
+  media byte, invite code, or secret was exposed.
+- This is local static/browser verification, not human acceptance or business
+  validation.
+
 ## 2026-06-19 - Studio TuanTuan Multi-Pose Mascot Follow-up
 
 - Reworked the movable `AFS 小精灵` from a single raster sticker into a
@@ -3118,6 +3152,7 @@ Boundaries:
 - Added a safe public-edge preflight that distinguishes Nginx Basic Auth blocking from Runtime app auth.
 - The preflight checks the public `/studio/` entry without credentials and, when an SSH server alias is provided, also reads server-side Runtime `/health`.
 - Added `--check-runtime-health` for server-side self-checks where SSH-ing back to the same host is not appropriate.
+- Wired public edge status into the internal beta HTTP preflight so deployed acceptance reports can fail on `public_edge_auth` explicitly instead of only surfacing generic `/health` 401 failures.
 - Current live result is `blocked_by_edge_basic_auth`: public edge returns `401` with `WWW-Authenticate: Basic`, while Runtime health remains `ready`.
 - Added a maintenance runbook with the sudo-side Nginx fix and post-fix verification commands.
 
@@ -3127,6 +3162,8 @@ Verification:
 tests/test_afs_public_edge_preflight.py: 3 passed
 Live preflight: status=blocked_by_edge_basic_auth, public_edge_http_status=401, edge_basic_auth=true, runtime_status=ready
 Report evidence: runs/public_edge_preflight_20260620.json
+tests/test_afs_internal_beta_acceptance.py + tests/test_afs_public_edge_preflight.py: 16 passed / 1 existing warning
+Internal beta HTTP preflight with `--public-edge-status`: status=needs_attention; public_edge_auth failed with blocked_by_edge_basic_auth; provider_calls_started=false
 ```
 
 Boundaries:

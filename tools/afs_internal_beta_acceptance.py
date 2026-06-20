@@ -36,6 +36,10 @@ def main() -> int:
                 include_three_end_status=args.three_end_status,
                 three_end_repo_root=Path(args.three_end_repo_root).resolve(),
                 three_end_server=args.three_end_server,
+                include_public_edge_status=args.public_edge_status,
+                public_edge_url=args.public_edge_url,
+                public_edge_server=args.public_edge_server or args.three_end_server,
+                public_edge_check_runtime_health=args.public_edge_check_runtime_health,
             )
         elif args.base_url:
             report = run_http_acceptance(
@@ -70,6 +74,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--three-end-status", action="store_true", help="Include safe local/GitHub/server drift status in preflight mode.")
     parser.add_argument("--three-end-repo-root", default=".", help="Local repository root for optional three-end preflight status.")
     parser.add_argument("--three-end-server", default="", help="Optional SSH alias for server-side three-end status.")
+    parser.add_argument("--public-edge-status", action="store_true", help="Include public Studio edge-auth status in preflight mode.")
+    parser.add_argument("--public-edge-url", default="", help="Optional public Studio URL for edge-auth preflight.")
+    parser.add_argument("--public-edge-server", default="", help="Optional SSH alias for Runtime health inside public-edge preflight.")
+    parser.add_argument("--public-edge-check-runtime-health", action="store_true", help="Check Runtime health directly from this machine for public-edge preflight.")
     parser.add_argument("--report", default="", help="Optional JSON report output path.")
     parser.add_argument("--human-review-md", default="", help="Optional safe Markdown checklist for the human beta reviewer.")
     return parser.parse_args()
@@ -135,6 +143,10 @@ def run_http_preflight(
     include_three_end_status: bool = False,
     three_end_repo_root: Path | None = None,
     three_end_server: str = "",
+    include_public_edge_status: bool = False,
+    public_edge_url: str = "",
+    public_edge_server: str = "",
+    public_edge_check_runtime_health: bool = False,
 ) -> dict[str, Any]:
     return _run_http_preflight(
         base_url=base_url,
@@ -142,6 +154,10 @@ def run_http_preflight(
         include_three_end_status=include_three_end_status,
         three_end_repo_root=three_end_repo_root,
         three_end_server=three_end_server,
+        include_public_edge_status=include_public_edge_status,
+        public_edge_url=public_edge_url,
+        public_edge_server=public_edge_server,
+        public_edge_check_runtime_health=public_edge_check_runtime_health,
         http_client_factory=HttpAcceptanceClient,
     )
 

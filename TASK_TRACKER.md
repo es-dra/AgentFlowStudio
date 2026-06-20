@@ -6,11 +6,28 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-19 by Codex
+Last updated: 2026-06-20 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed the
+Studio `story-cat` visual baseline around the user-provided TuanTuan reference.
+The default canvas companion is now a low-profile dark tabby story cat with
+large triangular ears, large cyan eyes, a quieter sprout, forepaws, curled
+tail, tabby marks, and a story orbit. The implementation remains DOM/SVG/CSS
+instead of raster pose swaps, preserving a path toward continuous interaction
+without treating TuanTuan as a sticker or robot helper. Verification:
+`tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q`
+passed 6 / 1 existing warning; `npm run check:studio-js` passed for 96 files;
+Chrome render smoke confirmed `story-cat`, observe state, resting silhouette,
+and 5 orbit nodes; screenshot evidence:
+`runs/tuantuan-reference-lock-20260620/tuantuan-crop-v2.png`; maintenance audit
+failed=0 with warnings only; `git diff --check` passed. Boundary: no Runtime API
+shape changed, no provider gate/config/call, no local reference image, provider
+raw response, signed URL, media byte, invite code, or secret was exposed; not
+human acceptance or business validation.
 
 Current Studio mascot and edge disconnect addendum: 2026-06-19 pass made two
 front-end interaction improvements requested during Studio polish. The movable
@@ -563,4 +580,5 @@ failed=0 with warnings only; `git diff --check` exit 0.
 | AFS-STUDIO-SPRITE-TUANTUAN-V1-CANVAS-AGENT-20260619 | Studio Interaction Designer + Frontend QA Gatekeeper + Product Intent Steward | Reframe TuanTuan as the embodied AFS Agent projection inside the canvas, not a mascot, desktop pet, or chatbot avatar. Implement a resting story-cat DOM rig with story orbit and Observe / Suggest / Execute state semantics. | Local focused verification passed; Runtime sprite boundary unchanged; provider gates unchanged; no live provider call. Public server still needs the review branch merged/deployed; the current login loop is caused by Nginx Basic Auth in front of Runtime app auth and requires sudo-side Nginx adjustment. | `apps/studio/src/sprite-character.js`, `apps/studio/src/sprite-motion.js`, `apps/studio/src/sprite-widget.js`, `apps/studio/styles/studio-sprite-avatar-story-cat.css`, `apps/studio/styles/studio-sprite-avatar-story-cat-details.css`, `apps/studio/styles/studio-sprite-avatar-story-states.css`, `tests/test_web_studio_sprite_static.py`, `docs/handoff/AFS-STUDIO-TUANTUAN-V1-CANVAS-AGENT-20260619.md`; retired old `apps/studio/assets/tuantuan-*.png` sticker poses; added reference-shape anchors: inner ears, tabby face marks, whiskers, nose/mouth, story belly panel, front paws, segmented tail; JS check 96 files passed; sprite/API focused tests 16 passed / 1 existing warning; browser smoke confirmed role=embodied-agent, character=story-cat, observe->think->suggest state path, no old image-asset sprite, console warn/error=0. |
 | AFS-STUDIO-SPRITE-TUANTUAN-REFERENCE-SHAPE-20260620 | Studio Interaction Designer + Frontend QA Gatekeeper + Product Intent Steward | Reset TuanTuan's V1 visual baseline to the user-approved reference direction: dark low resting tabby story cat, large ears/eyes, sprout, cyan story orbit, body tabby marks, paws, whiskers, and story belly panel. Keep the implementation as animatable SVG/DOM, not a sticker. | Local focused verification passed; Runtime sprite boundary unchanged; provider gates unchanged; no live provider call. This is a more faithful V1 visual baseline, not final IP illustration acceptance or full animation rig. | `apps/studio/src/sprite-character.js`, `apps/studio/src/sprite-position.js`, `apps/studio/styles/studio-sprite.css`, `apps/studio/styles/studio-sprite-avatar-story-cat.css`, `apps/studio/styles/studio-sprite-avatar-story-cat-details.css`, `tests/test_web_studio_sprite_static.py`; JS check 96 files passed; sprite/API focused tests 6 passed / 1 existing warning; browser smoke confirmed `catTag=svg`, eyes=2, ears=2, tabbyMarks=3, orbitNodes=5, state=observe; screenshot `runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-avatar-v2.png`. |
 | AFS-PUBLIC-EDGE-AUTH-PREFLIGHT-20260620 | Internal Beta Steward + QA Gatekeeper + Release Gatekeeper | Add a safe public-edge preflight and runbook to distinguish Nginx Basic Auth blocking from Runtime app auth, so deployed `/studio/` login loops are diagnosed consistently. | Local tests passed; live preflight currently reports `blocked_by_edge_basic_auth` because the public edge returns 401 Basic Auth while Runtime health is ready. Sudo-side Nginx change is still required. | `tools/afs_public_edge_preflight.py`, `tests/test_afs_public_edge_preflight.py`, `docs/maintenance/AFS-PUBLIC-EDGE-AUTH-PREFLIGHT-20260620.md`; focused tests 3 passed; live report `runs/public_edge_preflight_20260620.json`; provider calls not started. |
+| AFS-INTERNAL-BETA-PREFLIGHT-PUBLIC-EDGE-GATE-20260620 | Internal Beta Steward + QA Gatekeeper | Wire public edge auth status into deployed HTTP internal-beta preflight, so acceptance reports fail explicitly on `public_edge_auth` when Nginx Basic Auth blocks Runtime auth. | Local focused tests passed; live deployed preflight currently reports `needs_attention` with `public_edge_auth=failed` and `blocked_by_edge_basic_auth`; provider calls not started. | `tools/afs_internal_beta_acceptance.py`, `tools/afs_internal_beta_acceptance_preflight.py`, `tools/afs_internal_beta_preflight_public_edge.py`, `tests/test_afs_internal_beta_acceptance.py`; focused tests 16 passed / 1 existing warning; live report `runs/internal_beta_preflight_public_edge_latest_20260620.json`. |
 | AFS-INTERNAL-BETA-HUMAN-REVIEW-RECORD-20260619 | QA Gatekeeper + Internal Beta Steward | Add a safe human-review record step so completed operator scores and decisions can become a bounded internal-beta evidence artifact after the Markdown checklist. | Local verification passed; provider gates unchanged; no live provider call; no Company OS or long-term memory write. | `tools/afs_internal_beta_human_review_record.py`, `tests/test_afs_internal_beta_human_review_record.py`; red/green record tests; PowerShell UTF-8 BOM regression; CLI smoke generated `accepted_for_next_beta_round` while keeping business/durable claims not claimed; acceptance focused tests 22 passed; `git diff --check` passed. |
