@@ -3112,3 +3112,25 @@ Boundaries:
 - No provider call was made.
 - No provider raw response, signed URL, local media byte, secret, or Company OS private source content was written.
 - This sets a more faithful V1 visual baseline; it is still not final IP illustration acceptance or full animation rigging.
+
+## 2026-06-20 - Public Edge Auth Preflight
+
+- Added a safe public-edge preflight that distinguishes Nginx Basic Auth blocking from Runtime app auth.
+- The preflight checks the public `/studio/` entry without credentials and, when an SSH server alias is provided, also reads server-side Runtime `/health`.
+- Current live result is `blocked_by_edge_basic_auth`: public edge returns `401` with `WWW-Authenticate: Basic`, while Runtime health remains `ready`.
+- Added a maintenance runbook with the sudo-side Nginx fix and post-fix verification commands.
+
+Verification:
+
+```text
+tests/test_afs_public_edge_preflight.py: 3 passed
+Live preflight: status=blocked_by_edge_basic_auth, public_edge_http_status=401, edge_basic_auth=true, runtime_status=ready
+Report evidence: runs/public_edge_preflight_20260620.json
+```
+
+Boundaries:
+
+- No Nginx config was changed because current SSH user has no passwordless sudo.
+- No provider gate changed.
+- No provider call was made.
+- No secret, invite code, local media byte, provider raw response, or Company OS private source content was written.
