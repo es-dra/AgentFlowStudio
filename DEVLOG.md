@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-20 - TuanTuan Reference Shape Calibration
+
+- Rebalanced the V1 `story-cat` vector rig against the latest user reference:
+  lower resting body, clearer dark tabby silhouette, larger triangular ears,
+  calmer cyan eyes, smaller sprout, and quieter story orbit.
+- Reduced the visual weight of the story panel so TuanTuan reads as a calm
+  canvas-native story cat first, not a robot assistant or sticker.
+- Kept all behavior on the existing sprite boundary: draggable position,
+  right-click settings, size scaling, state poses, and Runtime sprite chat.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q -> 6 passed / 1 existing warning
+npm run check:studio-js -> passed for 96 files
+git diff --check -> passed
+Chrome render smoke on http://127.0.0.1:8797/studio/?project=tuantuan-local-preview-2 -> local screenshot inspected
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, or Company OS
+  private source content was written.
+- This is a frontend visual calibration, not final IP illustration acceptance
+  or full animation rigging.
+
 ## 2026-06-20 - TuanTuan Reference Shape Lock
 
 - Reworked the Studio `story-cat` sprite from an abstract dark blob toward the

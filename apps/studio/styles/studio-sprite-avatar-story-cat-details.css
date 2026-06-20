@@ -70,20 +70,20 @@
 }
 
 .sprite-cat-story-panel rect {
-  fill: rgba(0, 229, 255, 0.08);
-  stroke: rgba(0, 229, 255, 0.28);
+  fill: rgba(0, 229, 255, 0.045);
+  stroke: rgba(0, 229, 255, 0.18);
   stroke-width: 1;
-  filter: drop-shadow(0 0 9px rgba(0, 229, 255, 0.16));
+  filter: drop-shadow(0 0 7px rgba(0, 229, 255, 0.1));
 }
 
 .sprite-cat-story-panel circle {
-  fill: rgba(107, 225, 255, 0.86);
-  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.42));
+  fill: rgba(107, 225, 255, 0.58);
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.24));
 }
 
 .sprite-cat-story-panel path {
   fill: none;
-  stroke: rgba(107, 225, 255, 0.76);
+  stroke: rgba(107, 225, 255, 0.54);
   stroke-width: 1.4;
   stroke-linecap: round;
 }
