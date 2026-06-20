@@ -2,16 +2,17 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-export const SPRITE_POSITION_VERSION = "2026-06-tuantuan-reference-cat-v2";
+export const SPRITE_POSITION_VERSION = "2026-06-tuantuan-reference-cat-v3";
 export const SPRITE_SCALE_KEY = "afs_studio_sprite_scale";
+export const SPRITE_HIDDEN_KEY = "afs_studio_sprite_hidden";
 export const SPRITE_SCALE_OPTIONS = [
-  { id: "small", label: "小", value: 0.82 },
-  { id: "normal", label: "中", value: 1 },
-  { id: "large", label: "大", value: 1.18 },
+  { id: "small", label: "小", value: 0.76 },
+  { id: "normal", label: "中", value: 0.9 },
+  { id: "large", label: "大", value: 1.08 },
 ];
-export const SPRITE_SIZE = 260;
+export const SPRITE_SIZE = 232;
 const SPRITE_MARGIN = 18;
-const SPRITE_HEIGHT = 238;
+const SPRITE_HEIGHT = 212;
 
 export function startSpriteDrag(event, onMoved, onEnded) {
   if (event.button !== undefined && event.button !== 0) return;
@@ -93,6 +94,23 @@ export function getSpriteScale() {
     return SPRITE_SCALE_OPTIONS.find((item) => item.id === value) || SPRITE_SCALE_OPTIONS[1];
   } catch {
     return SPRITE_SCALE_OPTIONS[1];
+  }
+}
+
+export function isSpriteHidden() {
+  try {
+    return window.localStorage?.getItem(SPRITE_HIDDEN_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setSpriteHidden(hidden) {
+  try {
+    if (hidden) window.localStorage?.setItem(SPRITE_HIDDEN_KEY, "true");
+    else window.localStorage?.removeItem(SPRITE_HIDDEN_KEY);
+  } catch {
+    // Local UI preference only; blocked storage should not break the companion.
   }
 }
 

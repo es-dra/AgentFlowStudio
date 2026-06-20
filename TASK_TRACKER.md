@@ -6,11 +6,27 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-20 by Codex
+Last updated: 2026-06-21 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current public edge and TuanTuan usability addendum: 2026-06-21 pass reduced
+the default TuanTuan canvas footprint from 260 x 238 to 232 x 212 and lowered
+the default scale to 0.9. The sprite settings panel now supports `关闭团团`,
+persisted through `afs_studio_sprite_hidden`, and a small `显示团团` restore
+chip keeps the feature reversible without clearing browser storage.
+Verification: focused sprite/runtime tests passed 6 / 1 existing warning;
+`npm run check:studio-js` passed for 96 files. Public edge status remains
+`blocked_by_edge_basic_auth`; server dry-run for
+`tools.afs_public_edge_nginx_fix --config /etc/nginx/sites-available/afs-runtime`
+returned `ready_to_apply` and `target_line_count=2`, but the file is root-owned
+and the current SSH user lacks passwordless sudo, so the Nginx removal still
+needs one interactive sudo application. Boundary: no Runtime API shape changed,
+no provider gate/config/call, no invite code/session token/provider raw
+response/signed URL/local media byte/secret was written; not invite-login
+acceptance, human acceptance, business validation, or durable memory promotion.
 
 Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed,
 calibrated, and then reset the Studio `story-cat` visual baseline around the

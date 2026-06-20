@@ -10,13 +10,22 @@
 
 #sprite-root {
   position: fixed;
-  left: var(--sprite-x, calc(100vw - 270px));
-  top: var(--sprite-y, calc(100vh - 268px));
-  width: calc(260px * var(--sprite-scale, 1));
-  height: calc(238px * var(--sprite-scale, 1));
+  left: var(--sprite-x, calc(100vw - 242px));
+  top: var(--sprite-y, calc(100vh - 242px));
+  width: calc(232px * var(--sprite-scale, 1));
+  height: calc(212px * var(--sprite-scale, 1));
   z-index: calc(var(--z-modal) + 1);
   pointer-events: none;
   touch-action: none;
+}
+
+#sprite-root[data-sprite-hidden="true"] {
+  left: auto !important;
+  top: auto !important;
+  right: 18px;
+  bottom: 18px;
+  width: auto;
+  height: auto;
 }
 
 #sprite-root.is-dragging,
@@ -27,8 +36,8 @@
 
 .afs-sprite {
   position: relative;
-  width: 260px;
-  height: 238px;
+  width: 232px;
+  height: 212px;
   pointer-events: none;
 }
 
@@ -40,7 +49,7 @@
 .afs-sprite-panel {
   position: absolute;
   right: 0;
-  bottom: calc((238px * var(--sprite-scale, 1)) + 8px);
+  bottom: calc((212px * var(--sprite-scale, 1)) + 8px);
   width: min(318px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -61,7 +70,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-panel {
-  top: calc((238px * var(--sprite-scale, 1)) + 8px);
+  top: calc((212px * var(--sprite-scale, 1)) + 8px);
   bottom: auto;
   transform-origin: 92% 0;
 }
@@ -69,7 +78,7 @@
 .afs-sprite-settings {
   position: absolute;
   right: 0;
-  bottom: calc((238px * var(--sprite-scale, 1)) + 8px);
+  bottom: calc((212px * var(--sprite-scale, 1)) + 8px);
   width: 246px;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -86,7 +95,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-settings {
-  top: calc((238px * var(--sprite-scale, 1)) + 8px);
+  top: calc((212px * var(--sprite-scale, 1)) + 8px);
   bottom: auto;
 }
 
@@ -120,6 +129,41 @@
 .afs-sprite-size-button.active {
   border-color: rgba(90, 200, 250, 0.5);
   background: rgba(90, 200, 250, 0.14);
+  color: var(--text-primary);
+}
+
+.afs-sprite-close {
+  width: 100%;
+  height: 34px;
+  margin-top: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.afs-sprite-close:hover {
+  border-color: rgba(90, 200, 250, 0.32);
+  color: var(--text-primary);
+}
+
+.afs-sprite-restore {
+  min-width: 78px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(90, 200, 250, 0.28);
+  border-radius: 999px;
+  background: rgba(12, 18, 22, 0.76);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36), 0 0 18px rgba(90, 200, 250, 0.1);
+  color: var(--text-secondary);
+  font-size: 12px;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.afs-sprite-restore:hover {
+  background: rgba(90, 200, 250, 0.12);
   color: var(--text-primary);
 }
 

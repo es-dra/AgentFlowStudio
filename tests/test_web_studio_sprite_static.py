@@ -59,6 +59,13 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "contextmenu" in sprite
     assert "setSpriteScale" in sprite
     assert "getSpriteScale" in sprite
+    assert "isSpriteHidden" in sprite
+    assert "setSpriteHidden" in sprite
+    assert "spriteRestoreButton" in sprite
+    assert "关闭团团" in sprite
+    assert "显示团团" in sprite
+    assert "afs-sprite-close" in sprite
+    assert "afs-sprite-restore" in sprite
     assert "data-sprite-settings" in sprite
     assert "startSpriteDrag" in sprite
     assert "nudgeSpritePosition" in sprite
@@ -129,13 +136,17 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
 
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_POSITION_VERSION" in position
-    assert "2026-06-tuantuan-reference-cat-v2" in position
-    assert "SPRITE_SIZE = 260" in position
-    assert "const SPRITE_HEIGHT = 238" in position
+    assert "2026-06-tuantuan-reference-cat-v3" in position
+    assert "SPRITE_SIZE = 232" in position
+    assert "const SPRITE_HEIGHT = 212" in position
     assert "SPRITE_SCALE_KEY" in position
+    assert "SPRITE_HIDDEN_KEY" in position
+    assert '{ id: "normal", label: "中", value: 0.9 }' in position
     assert "SPRITE_SCALE_OPTIONS" in position
     assert "getSpriteScale" in position
     assert "setSpriteScale" in position
+    assert "isSpriteHidden" in position
+    assert "setSpriteHidden" in position
     assert "safeDefaultSpritePosition" in position
     assert "captureSpritePointer" in position
     assert "setPointerCapture" in position
@@ -149,8 +160,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-story-cat-details.css");' in styles
     assert '@import url("./studio-sprite-avatar-story-states.css");' in styles
     assert "studio-sprite-avatar-tuantuan.css" not in styles
-    assert "width: calc(260px * var(--sprite-scale, 1))" in styles
-    assert "height: calc(238px * var(--sprite-scale, 1))" in styles
+    assert "width: calc(232px * var(--sprite-scale, 1))" in styles
+    assert "height: calc(212px * var(--sprite-scale, 1))" in styles
+    assert '#sprite-root[data-sprite-hidden="true"]' in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles

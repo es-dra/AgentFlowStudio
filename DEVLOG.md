@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-21 - TuanTuan Size And Public Edge Auth Follow-Up
+
+- Reduced the default TuanTuan canvas footprint from a 260 x 238 base to a
+  232 x 212 base, with the default scale lowered to `0.9`. Small / normal /
+  large now map to `0.76`, `0.9`, and `1.08`, so TuanTuan stays present but is
+  less likely to block Studio work.
+- Added a local `afs_studio_sprite_hidden` preference. The settings panel can
+  close TuanTuan, and the closed state leaves only a small `显示团团` restore
+  chip so users can bring it back without clearing browser storage.
+- Rechecked the public edge. `https://afstudio.art/studio/` still returns
+  `blocked_by_edge_basic_auth`; the safe Nginx fix dry run on `/opt` reports
+  `ready_to_apply` with exactly two target Basic Auth lines.
+- Confirmed the current SSH user can read the Nginx site config but cannot
+  apply the fix non-interactively because `/etc/nginx/sites-available/afs-runtime`
+  is `root:root` and sudo requires a password.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py tests/test_api_runtime_sprite.py -q -> 6 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 96 files
+tools.afs_public_edge_preflight --public-url https://afstudio.art/studio/ --server afs-bwg-ops -> blocked_by_edge_basic_auth
+server dry-run: tools.afs_public_edge_nginx_fix --config /etc/nginx/sites-available/afs-runtime -> ready_to_apply, target_line_count=2
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No invite code, session token, provider raw response, signed URL, local media
+  byte, secret, or Company OS private source content was written.
+- The public edge is diagnosed and ready for the existing sudo-scoped fix, but
+  Nginx has not been changed in this session because sudo requires an
+  interactive password.
+
 ## 2026-06-20 - Public Edge Gate For HTTP Acceptance
 
 - Added a public-edge gate to deployed HTTP internal-beta acceptance. When

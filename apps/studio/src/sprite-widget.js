@@ -4,8 +4,10 @@ import {
   applySpritePosition,
   bindSpriteViewportClamp,
   getSpriteScale,
+  isSpriteHidden,
   nudgeSpritePosition,
   rememberSpritePositionFromRoot,
+  setSpriteHidden,
   setSpriteScale,
   startSpriteDrag,
   SPRITE_SCALE_OPTIONS,
@@ -45,6 +47,11 @@ export function renderSpriteWidget(state, runtime) {
   bindSpriteViewportClamp();
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
+  root.dataset.spriteHidden = isSpriteHidden() ? "true" : "false";
+  if (isSpriteHidden()) {
+    root.replaceChildren(spriteRestoreButton());
+    return;
+  }
   root.replaceChildren(spriteShell(state, runtime));
   applySpritePose(root, spriteState());
   setSpriteMotionMode(spriteMotionMode(), root);
@@ -182,7 +189,27 @@ function spriteSettingsPanel() {
     grid.appendChild(button);
   }
   panel.appendChild(grid);
+  const closeButton = el("button", "afs-sprite-close", "关闭团团");
+  closeButton.type = "button";
+  closeButton.addEventListener("click", () => {
+    setSpriteHidden(true);
+    spriteOpen = false;
+    spriteSettingsOpen = false;
+    renderSpriteWidget(lastState, lastRuntime);
+  });
+  panel.appendChild(closeButton);
   return panel;
+}
+
+function spriteRestoreButton() {
+  const button = el("button", "afs-sprite-restore", "显示团团");
+  button.type = "button";
+  button.setAttribute("aria-label", "显示团团");
+  button.addEventListener("click", () => {
+    setSpriteHidden(false);
+    renderSpriteWidget(lastState, lastRuntime);
+  });
+  return button;
 }
 
 function spriteForm(state, runtime) {
