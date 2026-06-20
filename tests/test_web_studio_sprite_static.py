@@ -53,6 +53,10 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-move-handle" in sprite
     assert "sprite-agent-sequence" in sprite
     assert "runtime.spriteChat" in sprite
+    assert 'role: "pending"' in sprite
+    assert "团团正在整理画布上下文" in sprite
+    assert "正在请求服务器" not in sprite
+    assert "Codex" not in sprite
     assert "data-sprite-drag-handle" in sprite
     assert 'data-sprite-drag-handle="true"' in sprite
     assert "spriteSettingsPanel" in sprite

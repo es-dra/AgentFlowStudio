@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current non-video Codex flow and Studio feedback repair addendum: 2026-06-21
+pass fixed the image handoff worker's Codex CLI resolution for service
+environments, restored readable prompt optimizer retry instructions, tightened
+TuanTuan's first-person persona prompt, hard-limited TuanTuan LLM replies to
+two sentences / 220 characters, added a visible TuanTuan pending state, moved
+media quality feedback to the node right-click menu, made completed image nodes
+fill their node body, and adjusted prompt bar placement to avoid the selected
+node. Verification: full pytest passed 562 / 527 deselected / 2
+existing warnings; `npm run check:studio-js` passed for 96 files; CLI help and
+version passed; local Playwright smoke on 8797 passed image fill, right-click
+feedback, prompt-bar avoidance, TuanTuan pending state, and no internal
+Codex/server wording; `git diff --check` passed. Boundary: video remains out
+of scope; no provider raw response, signed URL, local media byte, secret,
+invite code, session token, or Company OS private source content was written;
+browser smoke used intercepted Studio state and sprite response, not human
+acceptance or business validation.
+
 Current public edge and TuanTuan usability addendum: 2026-06-21 pass reduced
 the default TuanTuan canvas footprint from 260 x 238 to 232 x 212 and lowered
 the default scale to 0.9. The sprite settings panel now supports `关闭团团`,

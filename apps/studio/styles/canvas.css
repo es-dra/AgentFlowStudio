@@ -129,6 +129,24 @@
   justify-content: flex-start;
   padding: 34px 18px 18px;
 }
+.node.type-image.has-media-result .node-body {
+  justify-content: stretch;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.node.type-image.has-media-result .node-status.success {
+  position: absolute;
+  top: 66px;
+  left: 18px;
+  z-index: 2;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(56, 212, 192, 0.28);
+  border-radius: var(--radius-chip);
+  background: rgba(12, 14, 16, 0.68);
+  backdrop-filter: blur(10px);
+}
 .carry-chain-strip {
   display: flex;
   flex-wrap: wrap;

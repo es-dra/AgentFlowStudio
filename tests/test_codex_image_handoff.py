@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
-from agentflow_studio.model_gateway.codex_image_worker import FakeCodexImageExecutor, process_one
+from agentflow_studio.model_gateway.codex_image_worker import CodexExecImageExecutor, FakeCodexImageExecutor, process_one
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from apps.api.runtime_service import create_runtime_app
@@ -199,10 +201,59 @@ def test_codex_image_handoff_worker_trims_failed_job_payload_after_result(tmp_pa
     assert "references/" not in serialized
 
 
+def test_codex_image_worker_resolves_user_local_codex_when_path_is_missing(tmp_path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    codex = home / ".local" / "bin" / "codex"
+    codex.parent.mkdir(parents=True)
+    codex.write_text("#!/bin/sh\n", encoding="utf-8")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    captured: dict[str, list[str]] = {}
+
+    def fake_run(command, *, cwd, **kwargs):  # noqa: ANN001, ANN202
+        captured["command"] = list(command)
+        (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: home)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", fake_run)
+
+    produced = CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
+
+    assert produced == work_dir / "candidate_001.png"
+    assert captured["command"][0] == str(codex)
+
+
+def test_codex_image_worker_reports_missing_cli_as_safe_runtime_error(tmp_path, monkeypatch) -> None:
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+
+    def missing_codex(*args, **kwargs):  # noqa: ANN001, ANN202
+        raise FileNotFoundError("codex")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: tmp_path / "missing-home")
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", missing_codex)
+
+    with pytest.raises(RuntimeError, match="Codex image worker command is not available"):
+        CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
+
+
 def _store(tmp_path: Path, payload: dict):
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return load_company_provider_secrets(path)
+
+
+def _image_worker_request() -> dict:
+    return {
+        "job_id": "codex_img_test",
+        "service_id": "codex_image",
+        "prompt": "Generate a clean cinematic keyframe.",
+        "aspect_ratio": "9:16",
+        "reference_images": [],
+    }
 
 
 def _codex_provider_config() -> dict:

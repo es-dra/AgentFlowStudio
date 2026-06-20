@@ -322,11 +322,17 @@ def test_add_node_menu_defaults_to_compact_collapsed_registry() -> None:
 
 def test_media_preview_has_bounded_fill_contract() -> None:
     result_styles = (STUDIO_ROOT / "styles" / "node-result.css").read_text(encoding="utf-8")
+    canvas_styles = (STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8")
+    prompt_position = (STUDIO_ROOT / "src" / "prompt-bar-position.js").read_text(encoding="utf-8")
 
     for marker in (
         ".node.has-media-result .node-body",
         "min-height: 168px",
-        "max-height: 420px",
         "object-fit: cover",
     ):
         assert marker in result_styles
+    assert ".node.type-image.has-media-result .node-body" in canvas_styles
+    assert "padding: 0" in canvas_styles
+    assert ".node.type-image.has-media-result .node-status.success" in canvas_styles
+    assert "overlapWithNode" in prompt_position
+    assert "chooseNonOverlappingY" in prompt_position

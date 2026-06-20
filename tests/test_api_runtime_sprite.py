@@ -100,6 +100,41 @@ def test_sprite_chat_uses_unified_llm_dispatch_when_gate_is_open(tmp_path, monke
     assert calls[0][1] == "prompt_optimizer"
     assert "我现在怎么继续?" in calls[0][2]
     assert "Do not include local paths" in calls[0][2]
+    assert "你是团团" in calls[0][2]
+    assert "不要把用户称为 AFS Studio" in calls[0][2]
+
+
+def test_sprite_chat_constrains_long_llm_reply_to_two_sentences(tmp_path, monkeypatch) -> None:
+    class VerboseRegistry:
+        def dispatch(self, capability, service_id, request):
+            return {
+                "text": (
+                    "我先看当前画布，建议你确认关键帧节点。"
+                    "然后检查素材是否已经固定。"
+                    "第三步再进入生成队列，避免上下文漂移。"
+                )
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_sprite.load_provider_registry", lambda: VerboseRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_sprite_concise"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/sprite/chat",
+        json={
+            "message": "你看到了什么?",
+            "node_id": "image_1",
+            "canvas_summary": {"nodes": 1, "assets": 0, "selected_node_type": "image"},
+            "generated_at": "2026-06-21T00:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    reply = response.json()["reply"]
+    assert reply == "我先看当前画布，建议你确认关键帧节点。然后检查素材是否已经固定。"
+    assert "第三步" not in reply
 
 
 def test_sprite_chat_falls_back_when_llm_reply_is_unsafe(tmp_path, monkeypatch) -> None:

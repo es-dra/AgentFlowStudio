@@ -239,6 +239,7 @@ async function submitSpriteMessage(state, runtime, rawText) {
   if (!message || spriteSending) return;
   draftMessage = "";
   spriteMessages.push({ role: "user", text: message });
+  spriteMessages.push({ role: "pending", text: "团团正在整理画布上下文..." });
   spriteSending = true;
   renderSpriteWidget(state, runtime);
   try {
@@ -248,16 +249,24 @@ async function submitSpriteMessage(state, runtime, rawText) {
       canvas_summary: canvasSummary(state),
       generated_at: new Date().toISOString(),
     });
+    clearPendingSpriteMessages();
     spriteMessages.push({ role: "sprite", text: safeReply(response?.reply) });
     pulseSpriteMotion("success");
     setTemporarySpritePose("suggest", 1500, () => renderSpriteWidget(lastState, lastRuntime));
   } catch {
+    clearPendingSpriteMessages();
     spriteMessages.push({ role: "sprite", text: "我暂时连不上工作台服务。可以先继续整理画布，我会保持观察。" });
     pulseSpriteMotion("error");
     setTemporarySpritePose("observe", 1800, () => renderSpriteWidget(lastState, lastRuntime));
   } finally {
     spriteSending = false;
     renderSpriteWidget(state, runtime);
+  }
+}
+
+function clearPendingSpriteMessages() {
+  for (let i = spriteMessages.length - 1; i >= 0; i -= 1) {
+    if (spriteMessages[i]?.role === "pending") spriteMessages.splice(i, 1);
   }
 }
 

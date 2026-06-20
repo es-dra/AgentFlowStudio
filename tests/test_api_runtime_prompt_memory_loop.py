@@ -580,6 +580,28 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
     assert trace["llm_enhancement"]["format_retry_count"] == 1
 
 
+def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
+    from apps.api.runtime_llm_enhancement_instructions import strict_format_retry_instruction
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-retry-instruction",
+        node_type="image",
+        prompt_text="根据参考图生成电影感关键帧",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={"model": "image2-keyframe"},
+        generated_at="2026-06-21T00:00:00+08:00",
+    )
+
+    instruction = strict_format_retry_instruction(request)
+
+    assert "只输出九行" in instruction
+    assert "人物/主体" in instruction
+    assert "负面约束" in instruction
+    assert "????" not in instruction
+
+
 def test_studio_prompt_optimizer_salvages_repeated_chatty_llm_article(tmp_path, monkeypatch) -> None:
     chatty = "\n".join(
         [

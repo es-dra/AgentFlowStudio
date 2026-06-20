@@ -25,6 +25,25 @@
 .node.has-media-result .node-status {
   margin-bottom: 4px;
 }
+.node.type-image .node-result.has-preview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+.node.type-image .node-preview-frame.image {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto !important;
+}
+.node.type-image .node-preview-img {
+  height: 100%;
+}
 .node-preview-frame {
   position: relative;
   width: 100%;
@@ -177,6 +196,14 @@
 .quality-feedback-submit:disabled {
   opacity: 0.55;
   cursor: wait;
+}
+.quality-feedback-popover {
+  width: min(360px, calc(100vw - 32px));
+  padding: 0;
+}
+.quality-feedback-popover .quality-feedback {
+  border-top: 0;
+  border-radius: var(--radius-card);
 }
 
 .context-bundle-summary {

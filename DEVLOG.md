@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-21 - Non-Video Codex Flow And Studio Feedback Repair
+
+- Repaired the Codex image handoff worker so systemd-style environments that
+  do not include the user local bin directory can still resolve
+  `~/.local/bin/codex`, and a missing CLI now becomes a safe worker error.
+- Replaced the prompt optimizer strict-format retry mojibake with readable
+  Chinese instructions, preserving the nine-section output contract.
+- Tightened TuanTuan's LLM persona prompt so replies use `我` as TuanTuan and
+  do not explain internal service/model routing; Runtime now also hard-limits
+  LLM replies to two sentences / 220 characters.
+- Added a visible TuanTuan pending message, moved image/video quality feedback
+  into the node right-click menu, made completed image nodes fill the node body,
+  and adjusted the prompt bar to choose a non-overlapping placement.
+
+Verification:
+
+```text
+pytest -q -> 562 passed / 527 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 96 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+Playwright browser smoke on local 8797 -> passed image fill, right-click feedback, prompt-bar avoidance, TuanTuan pending state, and no internal Codex/server wording
+git diff --check -> passed
+```
+
+Boundaries:
+
+- Video remains out of scope and was not enabled.
+- No provider raw response, signed URL, local media byte, secret, invite code,
+  session token, or Company OS private source content was written.
+- Browser smoke used intercepted Studio state and sprite response for UI
+  behavior; live server provider smoke is tracked separately from human
+  acceptance and business validation.
+
 ## 2026-06-21 - Server Codex LLM Path Repair
 
 - Rechecked local `master`, `origin/master`, server `/home/afs-ops/AgentFlowStudio`,

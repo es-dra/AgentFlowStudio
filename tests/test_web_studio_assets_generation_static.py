@@ -222,7 +222,10 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node-preview-download" in result_view
     assert "下载视频" in result_view
     assert "下载图片" in result_view
-    assert "qualityFeedbackView" in result_view
+    assert "qualityFeedbackView" not in result_view
+    assert "openQualityFeedbackMenu" in node_menu
+    assert "反馈图片质量" in node_menu
+    assert "反馈视频质量" in node_menu
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
     assert "cancelNodeVideoGeneration" in node_actions
@@ -241,6 +244,7 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     assert "node-status cancelled" in node_actions or "node-status cancelled" in canvas_body
     assert "quality-feedback" in styles
+    assert "quality-feedback-popover" in styles
     assert "node-status.cancelled" in styles
 
 

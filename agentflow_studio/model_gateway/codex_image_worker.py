@@ -51,7 +51,7 @@ class CodexExecImageExecutor:
         try:
             completed = subprocess.run(
                 [
-                    self.cli_command,
+                    _resolve_codex_cli_command(self.cli_command),
                     "exec",
                     "-c",
                     'approval_policy="never"',
@@ -71,6 +71,8 @@ class CodexExecImageExecutor:
                 timeout=self.timeout_sec,
                 check=False,
             )
+        except OSError as exc:
+            raise RuntimeError("Codex image worker command is not available") from exc
         finally:
             prune_codex_home(codex_env)
         if completed.returncode != 0:
@@ -213,6 +215,20 @@ def _worker_prompt(request: dict[str, Any]) -> str:
         f"Prompt: {request.get('prompt')}\n"
         f"Reference image files:\n{reference_lines or '- none'}\n"
     )
+
+
+def _resolve_codex_cli_command(cli_command: str) -> str:
+    command = str(cli_command or "codex").strip() or "codex"
+    path = Path(command)
+    if path.anchor or "/" in command or "\\" in command:
+        return command
+    found = shutil.which(command)
+    if found:
+        return found
+    local_bin_command = Path.home() / ".local" / "bin" / command
+    if local_bin_command.is_file():
+        return str(local_bin_command)
+    return command
 
 
 def _safe_process_error(value: str) -> str:

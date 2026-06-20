@@ -1,5 +1,4 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
-import { qualityFeedbackView } from "./quality-feedback.js";
 import { icon } from "./icons.js";
 
 export function resultView(node) {
@@ -35,14 +34,12 @@ export function resultView(node) {
     frame.appendChild(previewOverlay(node));
     result.appendChild(frame);
     if (candidates.length > 1) result.appendChild(candidateGrid(candidates));
-    result.appendChild(resultActions(node, result));
+    if (node.type === "video") result.appendChild(resultActions(node, result));
   }
   const text = document.createElement("div");
   text.className = "node-result-text";
   text.textContent = node.result;
   result.appendChild(text);
-  const feedback = qualityFeedbackView(node);
-  if (feedback) result.appendChild(feedback);
   return result;
 }
 

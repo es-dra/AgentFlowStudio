@@ -1,6 +1,7 @@
 import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
+import { qualityFeedbackView } from "../quality-feedback.js";
 import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
@@ -18,8 +19,9 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   if (!node) return;
   const pop = el("div");
   pop.style.minWidth = "188px";
+  const anchor = resolveAnchor(anchorOrPoint);
 
-  addItem("pencil", "重命名", () => renameNode(store, nodeId, anchor));
+  addItem("pencil", "重命名", () => renameNode(store, nodeId, anchor.point || anchor.el));
   addItem("copy", "复制节点", () => duplicateNode(store, nodeId));
   addItem(node.collapsed ? "chevronDown" : "chevronUp", node.collapsed ? "展开" : "折叠", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
@@ -36,6 +38,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
     });
+    if (node.status === "complete" && (node.previewUrl || node.result)) {
+      addItem("sparkles", "反馈图片质量", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) openQualityFeedbackMenu(fresh, anchor.point || anchor.el);
+      });
+    }
   }
   if (node.type === "video") {
     addItem("upload", "上传首帧/尾帧图片", () => {
@@ -67,12 +75,17 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
         });
       }
     }
+    if (node.status === "complete" && (node.previewUrl || node.result)) {
+      addItem("sparkles", "反馈视频质量", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) openQualityFeedbackMenu(fresh, anchor.point || anchor.el);
+      });
+    }
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.params.isReference = !n.params.isReference; }));
   addItem("trash", "删除节点", () => deleteNodes(store, [nodeId]), true);
 
-  const anchor = resolveAnchor(anchorOrPoint);
   const close = showPopover(anchor.el, pop, { place: "bottom", onClose: anchor.cleanup });
 
   function addItem(iconName, label, onClick, danger = false) {
@@ -81,6 +94,15 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     item.addEventListener("click", () => { close(); onClick(); });
     pop.appendChild(item);
   }
+}
+
+export function openQualityFeedbackMenu(node, anchorOrPoint) {
+  const feedback = qualityFeedbackView(node);
+  if (!feedback) return;
+  const pop = el("div", "quality-feedback-popover");
+  pop.appendChild(feedback);
+  const anchor = resolveAnchor(anchorOrPoint);
+  showPopover(anchor.el, pop, { place: "bottom", onClose: anchor.cleanup });
 }
 
 export function renameNode(store, nodeId, anchorOrPoint) {
@@ -107,9 +129,9 @@ export function renameNode(store, nodeId, anchorOrPoint) {
 }
 
 function resolveAnchor(anchorOrPoint) {
-  if (anchorOrPoint instanceof Element) return { el: anchorOrPoint, cleanup: undefined };
+  if (anchorOrPoint instanceof Element) return { el: anchorOrPoint, cleanup: undefined, point: null };
   const ghost = el("div");
   ghost.style.cssText = `position:fixed;left:${anchorOrPoint.x}px;top:${anchorOrPoint.y}px;width:1px;height:1px;pointer-events:none;`;
   document.body.appendChild(ghost);
-  return { el: ghost, cleanup: () => ghost.remove() };
+  return { el: ghost, cleanup: () => ghost.remove(), point: { x: anchorOrPoint.x, y: anchorOrPoint.y } };
 }
