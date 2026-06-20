@@ -36,7 +36,7 @@ https://afstudio.art/studio/
 
 ## 新增预检命令
 
-在仓库根目录运行：
+在本地 Codex 仓库根目录运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m tools.afs_public_edge_preflight `
@@ -52,6 +52,15 @@ blocked_by_edge_basic_auth
 ```
 
 该命令在公网入口未就绪时会返回非零退出码，这是预期行为。
+
+如果在服务器 `/opt/afs/AgentFlowStudio` 内直接运行，不需要再 SSH 回服务器，使用：
+
+```bash
+./.venv/bin/python -m tools.afs_public_edge_preflight \
+  --public-url https://afstudio.art/studio/ \
+  --check-runtime-health \
+  --report runs/public_edge_preflight_server.json
+```
 
 ## 服务器 sudo 修复步骤
 
@@ -86,6 +95,14 @@ WWW-Authenticate: Basic
 .\.venv\Scripts\python.exe -m tools.afs_public_edge_preflight `
   --public-url https://afstudio.art/studio/ `
   --server afs-bwg-ops
+```
+
+或在服务器内运行：
+
+```bash
+./.venv/bin/python -m tools.afs_public_edge_preflight \
+  --public-url https://afstudio.art/studio/ \
+  --check-runtime-health
 ```
 
 预期状态：

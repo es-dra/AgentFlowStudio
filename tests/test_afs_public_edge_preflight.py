@@ -53,6 +53,24 @@ def test_public_edge_preflight_reports_ready_when_edge_and_runtime_are_ready() -
     assert report["recommended_action"] == {"action": "none", "commands": []}
 
 
+def test_public_edge_preflight_can_check_runtime_health_locally() -> None:
+    report = run_public_edge_preflight(
+        public_url="https://afstudio.art/studio/",
+        check_runtime_health=True,
+        head_fetcher=lambda _url: EdgeResponse(status_code=401, headers={"www-authenticate": "Basic realm=x"}),
+        local_runtime_health_fetcher=lambda _url: {
+            "status": "ready",
+            "auth_required": True,
+            "studio_static": {"status": "ready"},
+        },
+    )
+
+    assert report["status"] == "blocked_by_edge_basic_auth"
+    assert report["checks"][1]["evidence"]["runtime_checked"] is True
+    assert report["checks"][1]["evidence"]["runtime_status"] == "ready"
+    assert report["checks"][1]["status"] == "passed"
+
+
 def test_nginx_basic_auth_disable_commands_are_sudo_scoped() -> None:
     commands = nginx_basic_auth_disable_commands()
 

@@ -3117,6 +3117,7 @@ Boundaries:
 
 - Added a safe public-edge preflight that distinguishes Nginx Basic Auth blocking from Runtime app auth.
 - The preflight checks the public `/studio/` entry without credentials and, when an SSH server alias is provided, also reads server-side Runtime `/health`.
+- Added `--check-runtime-health` for server-side self-checks where SSH-ing back to the same host is not appropriate.
 - Current live result is `blocked_by_edge_basic_auth`: public edge returns `401` with `WWW-Authenticate: Basic`, while Runtime health remains `ready`.
 - Added a maintenance runbook with the sudo-side Nginx fix and post-fix verification commands.
 

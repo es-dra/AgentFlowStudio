@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
         public_url=args.public_url,
         server=args.server,
         runtime_health_url=args.runtime_health_url,
+        check_runtime_health=args.check_runtime_health,
     )
     if args.report:
         path = Path(args.report).resolve()
@@ -43,11 +44,14 @@ def run_public_edge_preflight(
     public_url: str = DEFAULT_PUBLIC_URL,
     server: str = "",
     runtime_health_url: str = DEFAULT_RUNTIME_HEALTH_URL,
+    check_runtime_health: bool = False,
     head_fetcher: Callable[[str], EdgeResponse] | None = None,
     runtime_health_fetcher: Callable[[str, str], dict[str, Any]] | None = None,
+    local_runtime_health_fetcher: Callable[[str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     fetch_head = head_fetcher or fetch_public_head
     fetch_runtime_health = runtime_health_fetcher or collect_remote_runtime_health
+    fetch_local_runtime_health = local_runtime_health_fetcher or fetch_json_url
     edge = fetch_head(public_url)
     runtime_health = {}
     if server.strip():
@@ -55,6 +59,8 @@ def run_public_edge_preflight(
             runtime_health = fetch_runtime_health(server, runtime_health_url)
         except RuntimeError:
             runtime_health = {}
+    elif check_runtime_health:
+        runtime_health = fetch_local_runtime_health(runtime_health_url)
     checks: list[dict[str, Any]] = []
     edge_blocked = _is_basic_auth_block(edge)
     edge_ready = 200 <= edge.status_code < 400 and not edge_blocked
@@ -71,13 +77,14 @@ def run_public_edge_preflight(
         },
     )
     safe_health = _safe_runtime_health(runtime_health)
-    runtime_ready = not server.strip() or safe_health.get("status") == "ready"
+    runtime_checked = bool(server.strip() or check_runtime_health)
+    runtime_ready = not runtime_checked or safe_health.get("status") == "ready"
     _add_check(
         checks,
         "runtime_health",
         "passed" if runtime_ready else "failed",
         {
-            "runtime_checked": bool(server.strip()),
+            "runtime_checked": runtime_checked,
             "runtime_status": safe_health.get("status", ""),
             "studio_static_status": safe_health.get("studio_static", {}).get("status", ""),
             "auth_required": safe_health.get("auth_required", False),
@@ -116,6 +123,16 @@ def fetch_public_head(public_url: str) -> EdgeResponse:
         return EdgeResponse(status_code=exc.code, headers=_lower_headers(exc.headers), error_class=exc.__class__.__name__)
     except urllib.error.URLError as exc:
         return EdgeResponse(status_code=0, headers={}, error_class=exc.__class__.__name__)
+
+
+def fetch_json_url(url: str) -> dict[str, Any]:
+    request = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            value = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def nginx_basic_auth_disable_commands() -> list[str]:
@@ -200,6 +217,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--public-url", default=DEFAULT_PUBLIC_URL, help="Public Studio URL to check without credentials.")
     parser.add_argument("--server", default="", help="Optional SSH alias for server-side Runtime health.")
     parser.add_argument("--runtime-health-url", default=DEFAULT_RUNTIME_HEALTH_URL, help="Runtime health URL checked from the server.")
+    parser.add_argument("--check-runtime-health", action="store_true", help="Check runtime-health-url directly from this machine instead of through SSH.")
     parser.add_argument("--report", default="", help="Optional JSON report output path.")
     return parser.parse_args(argv)
 
