@@ -2,16 +2,16 @@ let spritePosition = null;
 let spriteResizeBound = false;
 
 export const SPRITE_POSITION_KEY = "afs_studio_sprite_position";
-export const SPRITE_POSITION_VERSION = "2026-06-tuantuan-story-cat-v1";
+export const SPRITE_POSITION_VERSION = "2026-06-tuantuan-reference-cat-v2";
 export const SPRITE_SCALE_KEY = "afs_studio_sprite_scale";
 export const SPRITE_SCALE_OPTIONS = [
   { id: "small", label: "小", value: 0.82 },
   { id: "normal", label: "中", value: 1 },
   { id: "large", label: "大", value: 1.18 },
 ];
-export const SPRITE_SIZE = 236;
+export const SPRITE_SIZE = 260;
 const SPRITE_MARGIN = 18;
-const SPRITE_HEIGHT = 220;
+const SPRITE_HEIGHT = 238;
 
 export function startSpriteDrag(event, onMoved, onEnded) {
   if (event.button !== undefined && event.button !== 0) return;

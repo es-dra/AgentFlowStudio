@@ -75,9 +75,10 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "Observe → Suggest → Execute" in character
     assert "spriteStoryLayers" in character
     assert '<svg class="sprite-tuantuan-cat"' in character
-    assert 'viewBox="0 0 360 210"' in character
+    assert 'viewBox="0 0 390 230"' in character
     assert "tuantuanBody" in character
     assert "tuantuanEar" in character
+    assert "tuantuanStripe" in character
     assert "tuantuanSoftGlow" in character
     assert "sprite-story-orbit" in character
     assert "sprite-tuantuan-cat" in character
@@ -91,6 +92,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "sprite-cat-outline" in character
     assert "sprite-cat-ear-rim" in character
     assert "sprite-cat-tabby-mark" in character
+    assert "sprite-cat-tabby-mark body four" in character
+    assert "sprite-cat-face-mark brow" in character
     assert "sprite-cat-face-ridge" in character
     assert "sprite-cat-ground-glow" in character
     assert "sprite-cat-inner-ear" in character
@@ -126,9 +129,9 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
 
     assert "SPRITE_POSITION_KEY" in position
     assert "SPRITE_POSITION_VERSION" in position
-    assert "2026-06-tuantuan-story-cat-v1" in position
-    assert "SPRITE_SIZE = 236" in position
-    assert "const SPRITE_HEIGHT = 220" in position
+    assert "2026-06-tuantuan-reference-cat-v2" in position
+    assert "SPRITE_SIZE = 260" in position
+    assert "const SPRITE_HEIGHT = 238" in position
     assert "SPRITE_SCALE_KEY" in position
     assert "SPRITE_SCALE_OPTIONS" in position
     assert "getSpriteScale" in position
@@ -146,8 +149,8 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert '@import url("./studio-sprite-avatar-story-cat-details.css");' in styles
     assert '@import url("./studio-sprite-avatar-story-states.css");' in styles
     assert "studio-sprite-avatar-tuantuan.css" not in styles
-    assert "width: calc(236px * var(--sprite-scale, 1))" in styles
-    assert "height: calc(220px * var(--sprite-scale, 1))" in styles
+    assert "width: calc(260px * var(--sprite-scale, 1))" in styles
+    assert "height: calc(238px * var(--sprite-scale, 1))" in styles
     assert "position: fixed" in styles
     assert "calc(var(--z-modal) + 1)" in styles
     assert ".afs-sprite-orb" in styles

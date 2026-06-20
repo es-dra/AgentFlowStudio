@@ -146,6 +146,53 @@ Remaining boundary:
 - This is not full skeletal animation, Lottie, Canvas, or WebGL rigging.
 - The next visual iteration should refine expression/pose fidelity on top of this SVG rig, not reintroduce static pose stickers.
 
+## 2026-06-20 Latest Reference Shape Lock
+
+The latest user-approved reference is the dark resting TuanTuan story cat with
+large ears, blue-white eyes, a small sprout, a low body, a curled tail, cyan
+story orbit, and quiet canvas-native presence. The implementation has been
+recalibrated again around that reference rather than the earlier abstract cat.
+
+Current locked frontend facts:
+
+- Sprite frame: `260 x 238`.
+- SVG viewBox: `0 0 390 230`.
+- Position version: `2026-06-tuantuan-reference-cat-v2`.
+- Shape anchors: `ears=2`, `innerEars=2`, `eyes=2`, `pupils=2`, `tailShapes=1`,
+  `tabbyMarks=4`, `orbitNodes=5`.
+- Tail is a closed filled shape, not a thin outline path.
+- Implementation remains inline SVG/CSS and state-driven; do not reintroduce
+  static PNG pose swapping as the primary sprite surface.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests/test_web_studio_sprite_static.py -q
+=> 1 passed
+
+npm run check:studio-js
+=> JS syntax check passed: 96 files
+
+In-app browser smoke at /studio/?project=tuantuan-reference-check
+=> viewBox=0 0 390 230
+=> ears=2
+=> innerEars=2
+=> eyes=2
+=> pupils=2
+=> tailShapes=1
+=> tabbyMarks=4
+=> orbitNodes=5
+=> state=observe
+```
+
+Remaining boundary:
+
+- This is the closest current V1 canvas shape baseline.
+- This is not final IP illustration acceptance.
+- This is not full skeletal animation, Lottie, Canvas, or WebGL rigging.
+- The next iteration should refine expression, stripe density, and continuous
+  ear/tail/eye motion on this SVG rig.
+
 ## Public Server Diagnosis
 
 The public login loop at `https://afstudio.art/studio/` is caused by Nginx Basic Auth in front of the Runtime app:

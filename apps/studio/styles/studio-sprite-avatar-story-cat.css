@@ -15,11 +15,11 @@
   --sprite-shadow-opacity: 0.58;
   left: 0;
   top: 0;
-  width: 236px;
-  height: 220px;
+  width: 260px;
+  height: 238px;
   overflow: visible;
   border: 0;
-  border-radius: 72px;
+  border-radius: 84px;
   background: transparent;
   box-shadow: none;
   scale: var(--sprite-scale, 1);
@@ -36,10 +36,10 @@
 .sprite-tuantuan-stage {
   position: absolute;
   z-index: 3;
-  left: -82px;
-  bottom: 2px;
-  width: 410px;
-  height: 226px;
+  left: -94px;
+  bottom: -4px;
+  width: 444px;
+  height: 252px;
   pointer-events: none;
   transform:
     translate3d(var(--sprite-shift-x), var(--sprite-shift-y), 0)
@@ -52,16 +52,16 @@
 
 .sprite-story-orbit {
   position: absolute;
-  left: 20px;
-  top: 46px;
+  left: 28px;
+  top: 54px;
   z-index: 2;
-  width: 354px;
-  height: 132px;
-  border: 1px dashed rgba(0, 229, 255, 0.38);
+  width: 382px;
+  height: 146px;
+  border: 1px dashed rgba(0, 229, 255, 0.34);
   border-radius: 50%;
-  opacity: 0.4;
-  transform: rotate(-6deg);
-  animation: tuantuan-orbit 34s linear infinite;
+  opacity: 0.38;
+  transform: rotate(-8deg);
+  animation: tuantuan-orbit 38s linear infinite;
   box-shadow:
     0 0 18px rgba(0, 229, 255, 0.08),
     inset 0 0 22px rgba(0, 229, 255, 0.05);
@@ -85,12 +85,12 @@
   opacity: 0;
 }
 
-.sprite-story-orbit [data-orbit-node="observe"] { left: 10px; top: 62px; }
-.sprite-story-orbit [data-orbit-node="suggest"] { left: 128px; top: -2px; }
-.sprite-story-orbit [data-orbit-node="preview"] { right: 48px; top: 8px; }
-.sprite-story-orbit [data-orbit-node="execute"] { right: 5px; bottom: 35px; }
+.sprite-story-orbit [data-orbit-node="observe"] { left: 13px; top: 70px; }
+.sprite-story-orbit [data-orbit-node="suggest"] { left: 140px; top: -2px; }
+.sprite-story-orbit [data-orbit-node="preview"] { right: 48px; top: 9px; }
+.sprite-story-orbit [data-orbit-node="execute"] { right: 8px; bottom: 38px; }
 .sprite-story-orbit [data-orbit-node="complete"] {
-  left: 164px;
+  left: 178px;
   bottom: -4px;
   background: #7cff82;
   box-shadow: 0 0 17px rgba(124, 255, 130, 0.6);
@@ -99,16 +99,16 @@
 .sprite-tuantuan-cat {
   position: absolute;
   left: 10px;
-  bottom: 0;
+  bottom: -2px;
   z-index: 4;
-  width: 360px;
-  height: 210px;
+  width: 390px;
+  height: 230px;
   overflow: visible;
 }
 
 .sprite-cat-outline {
-  stroke: rgba(179, 224, 255, 0.74);
-  stroke-width: 1.85;
+  stroke: rgba(188, 229, 255, 0.82);
+  stroke-width: 1.65;
   stroke-linejoin: round;
   filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.23));
 }
@@ -116,15 +116,19 @@
 .sprite-cat-body,
 .sprite-cat-face,
 .sprite-cat-paw,
-.sprite-cat-rear-paw {
+.sprite-cat-rear-paw,
+.sprite-cat-tail-shape {
   fill: url(#tuantuanBody);
 }
 
 .sprite-cat-ear {
   fill: url(#tuantuanEar);
+  filter:
+    drop-shadow(0 0 10px rgba(0, 229, 255, 0.18))
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.22));
 }
 
-.sprite-cat-body-shade { fill: rgba(0, 3, 6, 0.42); }
+.sprite-cat-body-shade { fill: rgba(0, 3, 6, 0.36); }
 
 .sprite-cat-back-glow {
   fill: none;
@@ -152,13 +156,8 @@
 }
 
 .sprite-cat-tail-shape {
-  fill: none;
-  stroke: rgba(5, 11, 17, 0.99);
-  stroke-width: 25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   filter:
-    drop-shadow(0 0 9px rgba(0, 229, 255, 0.2))
+    drop-shadow(0 0 9px rgba(0, 229, 255, 0.18))
     drop-shadow(0 10px 14px rgba(0, 0, 0, 0.24));
 }
 
@@ -244,8 +243,8 @@
 
 .sprite-cat-tabby-mark {
   fill: none;
-  stroke: rgba(0, 5, 9, 0.58);
-  stroke-width: 9.2;
+  stroke: url(#tuantuanStripe);
+  stroke-width: 10.4;
   stroke-linecap: round;
 }
 
@@ -257,9 +256,9 @@
 
 .sprite-tuantuan-shadow {
   position: absolute;
-  left: 45px;
-  right: 10px;
-  bottom: 2px;
+  left: 56px;
+  right: 2px;
+  bottom: 5px;
   height: 24px;
   border-radius: 50%;
   background: radial-gradient(ellipse, rgba(0, 0, 0, 0.58), transparent 70%);

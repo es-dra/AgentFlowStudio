@@ -12,8 +12,8 @@
   position: fixed;
   left: var(--sprite-x, calc(100vw - 270px));
   top: var(--sprite-y, calc(100vh - 268px));
-  width: calc(236px * var(--sprite-scale, 1));
-  height: calc(220px * var(--sprite-scale, 1));
+  width: calc(260px * var(--sprite-scale, 1));
+  height: calc(238px * var(--sprite-scale, 1));
   z-index: calc(var(--z-modal) + 1);
   pointer-events: none;
   touch-action: none;
@@ -27,8 +27,8 @@
 
 .afs-sprite {
   position: relative;
-  width: 236px;
-  height: 220px;
+  width: 260px;
+  height: 238px;
   pointer-events: none;
 }
 
@@ -40,7 +40,7 @@
 .afs-sprite-panel {
   position: absolute;
   right: 0;
-  bottom: calc((220px * var(--sprite-scale, 1)) + 8px);
+  bottom: calc((238px * var(--sprite-scale, 1)) + 8px);
   width: min(318px, calc(100vw - 32px));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -61,7 +61,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-panel {
-  top: calc((220px * var(--sprite-scale, 1)) + 8px);
+  top: calc((238px * var(--sprite-scale, 1)) + 8px);
   bottom: auto;
   transform-origin: 92% 0;
 }
@@ -69,7 +69,7 @@
 .afs-sprite-settings {
   position: absolute;
   right: 0;
-  bottom: calc((220px * var(--sprite-scale, 1)) + 8px);
+  bottom: calc((238px * var(--sprite-scale, 1)) + 8px);
   width: 246px;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -86,7 +86,7 @@
 }
 
 #sprite-root[data-vertical="top"] .afs-sprite-settings {
-  top: calc((220px * var(--sprite-scale, 1)) + 8px);
+  top: calc((238px * var(--sprite-scale, 1)) + 8px);
   bottom: auto;
 }
 

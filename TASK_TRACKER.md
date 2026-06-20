@@ -12,21 +12,20 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
-Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed and then
-calibrated the Studio `story-cat` visual baseline around the user-approved
-TuanTuan reference. The default canvas companion is now a low-profile dark tabby
-story cat with a wider resting body, large triangular ears, ear rims, black
-pupils with blue-white highlights, a quieter sprout, forepaws, rear paw, curled
-tail, tabby marks, whiskers, and a cyan story orbit. The story belly panel is
-kept as a very low-opacity internal symbol so TuanTuan reads as a canvas-native
-story cat rather than a robot or sticker. The implementation remains DOM/SVG/CSS
-instead of raster pose swaps, preserving a path toward continuous interaction.
-Verification: the red check failed on the old 320x190 shape; focused sprite/API
-tests passed 6 / 1 existing warning; `npm run check:studio-js` passed for 96
-files; Chrome render smoke confirmed viewBox `0 0 360 210`, ears=2, pupils=2,
-eyeShine=4, tabbyMarks=9, storyPanelOpacity=0.18, orbitNodes=5, and no console
-warn/error; screenshot evidence:
-`runs/tuantuan-reference-shape-20260620/tuantuan-reference-shape-expanded-v4.png`.
+Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed,
+calibrated, and then reset the Studio `story-cat` visual baseline around the
+latest user-approved dark TuanTuan reference. The default canvas companion is
+now a low-profile dark tabby story cat with a wider resting body, larger
+triangular ears, brighter inner ear rims, black pupils with blue-white
+highlights, a quiet sprout, forepaws, rear paw, closed curled tail, body tabby
+marks, whiskers, and a cyan story orbit. The story belly panel remains a
+low-opacity internal symbol so TuanTuan reads as a canvas-native story cat
+rather than a robot or sticker. The implementation remains DOM/SVG/CSS instead
+of raster pose swaps, preserving a path toward continuous interaction.
+Verification: focused sprite static test passed; `npm run check:studio-js`
+passed for 96 files; in-app browser render smoke confirmed viewBox `0 0 390
+230`, ears=2, innerEars=2, eyes=2, pupils=2, tailShapes=1, tabbyMarks=4,
+orbitNodes=5, state=observe, and no old PNG/sticker sprite path.
 Boundary: no Runtime API shape changed, no provider gate/config/call, no local
 reference image, provider raw response, signed URL, media byte, invite code, or
 secret was exposed; not final IP acceptance, human acceptance, business

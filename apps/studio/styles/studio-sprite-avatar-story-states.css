@@ -34,8 +34,8 @@
 }
 
 .sprite-suggestion-bubble {
-  right: 24px;
-  top: 18px;
+  right: 18px;
+  top: 22px;
   width: 38px;
   height: 28px;
   border: 1px solid rgba(0, 229, 255, 0.46);
@@ -59,8 +59,8 @@
 .sprite-suggestion-bubble i:last-child { top: 19px; width: 12px; }
 
 .sprite-preview-ghost {
-  right: 42px;
-  top: 48px;
+  right: 38px;
+  top: 58px;
   width: 44px;
   height: 34px;
   border: 1px dashed rgba(168, 182, 255, 0.58);
@@ -91,10 +91,10 @@
 
 .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-drag-halo {
   z-index: 1;
-  left: 7px;
-  right: -6px;
-  top: 70px;
-  bottom: 21px;
+  left: 8px;
+  right: -12px;
+  top: 78px;
+  bottom: 18px;
   border-color: rgba(0, 229, 255, 0.22);
   border-radius: 50%;
   opacity: 0;
@@ -107,8 +107,8 @@
 
 .afs-sprite-avatar[data-sprite-character="story-cat"] .sprite-move-handle {
   z-index: 8;
-  left: 75px;
-  top: 74px;
+  left: 84px;
+  top: 86px;
   width: 38px;
   height: 22px;
   border-color: rgba(0, 229, 255, 0.18);
@@ -130,7 +130,7 @@
   position: absolute;
   z-index: 8;
   left: 50%;
-  top: 198px;
+  top: 218px;
   padding: 3px 9px;
   border: 1px solid rgba(0, 229, 255, 0.18);
   border-radius: 999px;
@@ -156,8 +156,8 @@
 }
 
 @keyframes tuantuan-orbit {
-  0% { transform: rotate(-6deg); }
-  100% { transform: rotate(354deg); }
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(352deg); }
 }
 
 @keyframes tuantuan-tail {

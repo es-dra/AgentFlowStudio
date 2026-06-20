@@ -3296,6 +3296,38 @@ Boundaries:
 - No provider raw response, signed URL, local media byte, secret, invite code, or Company OS private source content was written.
 - This is frontend/runtime verification only, not final IP illustration acceptance, human acceptance, business validation, or durable memory promotion.
 
+## 2026-06-20 - TuanTuan Latest Reference Shape Lock
+
+- Responded to the latest reference correction that the current canvas TuanTuan still looked too far from the approved dark story-cat image.
+- Rebuilt the SVG rig around the reference's most important visible anchors: larger triangular ears, a wider low resting body, a closed curled tail instead of a thin line, blue-white highlighted eyes with black pupils, brighter inner ear rims, visible forepaws/rear paw, dark body tabby stripes, whiskers, and the cyan story orbit around the body.
+- Bumped the local sprite position version and frame from `236 x 220` to `260 x 238`, so old coordinates from rejected shapes do not pin the wider cat into a bad place.
+- Kept the implementation as animatable inline SVG/CSS rather than returning to static PNG pose swapping; this preserves the later path toward eye tracking, tail/ear motion, state transitions, and Observe -> Suggest -> Execute behavior.
+
+Verification:
+
+```text
+tests/test_web_studio_sprite_static.py: 1 passed
+npm run check:studio-js: JS syntax check passed for 96 files
+In-app browser smoke at /studio/?project=tuantuan-reference-check:
+  viewBox=0 0 390 230
+  ears=2
+  innerEars=2
+  eyes=2
+  pupils=2
+  tailShapes=1
+  tabbyMarks=4
+  orbitNodes=5
+  state=observe
+```
+
+Boundaries:
+
+- No Runtime API shape changed.
+- No provider gate changed.
+- No provider call was made.
+- No provider raw response, signed URL, local media byte, secret, invite code, or Company OS private source content was written.
+- This locks a closer V1 visual direction only; it is not final IP illustration acceptance, human acceptance, business validation, or full animation rigging.
+
 ## 2026-06-20 - Public Edge Auth Preflight
 
 - Added a safe public-edge preflight that distinguishes Nginx Basic Auth blocking from Runtime app auth.

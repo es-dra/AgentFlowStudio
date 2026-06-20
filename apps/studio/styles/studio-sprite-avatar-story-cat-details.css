@@ -36,16 +36,16 @@
 }
 
 .sprite-cat-inner-ear {
-  fill: rgba(255, 205, 130, 0.12);
-  stroke: rgba(255, 205, 130, 0.46);
-  stroke-width: 1.2;
-  filter: drop-shadow(0 0 5px rgba(255, 205, 130, 0.16));
+  fill: rgba(255, 214, 142, 0.16);
+  stroke: rgba(255, 218, 150, 0.6);
+  stroke-width: 1.35;
+  filter: drop-shadow(0 0 7px rgba(255, 205, 130, 0.22));
 }
 
 .sprite-cat-ear-rim {
   fill: none;
-  stroke: rgba(228, 240, 255, 0.42);
-  stroke-width: 1.3;
+  stroke: rgba(227, 246, 255, 0.58);
+  stroke-width: 1.45;
   stroke-linecap: round;
 }
 
@@ -56,13 +56,15 @@
 }
 
 .sprite-cat-face-mark.forehead-side,
+.sprite-cat-face-mark.brow,
 .sprite-cat-face-mark.cheek {
   fill: none;
   stroke: rgba(0, 7, 12, 0.48);
   stroke-linecap: round;
 }
 
-.sprite-cat-face-mark.forehead-side {
+.sprite-cat-face-mark.forehead-side,
+.sprite-cat-face-mark.brow {
   stroke-width: 5.4;
 }
 
@@ -72,8 +74,8 @@
 
 .sprite-tail-panel {
   fill: none;
-  stroke: rgba(1, 7, 12, 0.56);
-  stroke-width: 8.4;
+  stroke: rgba(1, 7, 12, 0.62);
+  stroke-width: 8.8;
   stroke-linecap: round;
 }
 
