@@ -28,6 +28,21 @@ no provider gate/config/call, no invite code/session token/provider raw
 response/signed URL/local media byte/secret was written; not invite-login
 acceptance, human acceptance, business validation, or durable memory promotion.
 
+Current server Codex LLM path addendum: 2026-06-21 pass verified local
+`master`, `origin/master`, server `/home`, and server `/opt` were aligned at
+`0205148`. The deployed TuanTuan fallback was traced to the Runtime systemd
+environment not resolving the local `codex` executable, even though the sprite
+route already used the unified LLM dispatch. Server-local `codex_local`
+provider services were pointed at `/home/afs-ops/.local/bin/codex`, then
+provider-level and Runtime route smoke checks for `sprite_chat` passed with
+`provider_calls_started=true` and `mode=llm`. Local code now wraps a missing
+Codex CLI as `ModelGatewayError` with a regression test. Verification:
+provider/sprite/registry focused tests passed 37 / 1 existing warning.
+Boundary: video remains disabled; no ASR or external-download gate was opened;
+no provider raw response, invite code, session token, signed URL, local media
+byte, secret, or Company OS private source content was written; public
+authenticated browser UI chat remains a separate human-session check.
+
 Current TuanTuan reference-shape lock addendum: 2026-06-20 pass fixed,
 calibrated, and then reset the Studio `story-cat` visual baseline around the
 latest user-approved dark TuanTuan reference. The default canvas companion is

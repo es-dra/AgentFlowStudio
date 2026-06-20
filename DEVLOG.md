@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-06-21 - Server Codex LLM Path Repair
+
+- Rechecked local `master`, `origin/master`, server `/home/afs-ops/AgentFlowStudio`,
+  and server `/opt/afs/AgentFlowStudio`: all were aligned at commit `0205148`.
+- Diagnosed the TuanTuan chat fallback shown in Studio. The Runtime sprite route
+  was already wired through the unified LLM dispatch boundary, but the deployed
+  systemd process could not resolve the local `codex` executable.
+- Repaired the server-local provider config by setting the `codex_local` service
+  command to `/home/afs-ops/.local/bin/codex` for the non-video Codex-backed
+  services. This change is intentionally server-local and not committed.
+- Added a local regression guard so a missing Codex CLI is reported as
+  `ModelGatewayError` instead of escaping as a raw `FileNotFoundError`.
+
+Verification:
+
+```text
+Server provider smoke: llm/prompt_optimizer task_type=sprite_chat -> status=ok, provider_calls_started=true
+Server Runtime route smoke: POST /projects/{project_id}/sprite/chat -> 200, mode=llm, provider_calls_started=true
+tests/test_codex_local_provider_errors.py tests/test_api_runtime_sprite.py tests/test_provider_adapter_registry.py -q -> 37 passed / 1 existing warning
+```
+
+Boundaries:
+
+- Video remains disabled.
+- No ASR or external download gate was opened.
+- No provider raw response, invite code, session token, signed URL, local media
+  byte, secret, or Company OS private source content was written.
+- Public browser UI chat was not exercised with a real authenticated session in
+  this pass; the verified live path is provider-level plus Runtime route smoke.
+
 ## 2026-06-21 - TuanTuan Size And Public Edge Auth Follow-Up
 
 - Reduced the default TuanTuan canvas footprint from a 260 x 238 base to a

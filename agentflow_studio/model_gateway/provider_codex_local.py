@@ -115,6 +115,10 @@ def _run_codex(plan: dict[str, Any]) -> dict[str, Any]:
                 timeout=float(plan.get("timeout_sec") or 120.0),
                 check=False,
             )
+        except OSError as exc:
+            # Keep missing local CLI setup inside the provider contract
+            # instead of leaking raw OS errors.
+            raise ModelGatewayError("Codex local provider command is not available") from exc
         finally:
             prune_codex_home(codex_env)
         if completed.returncode != 0:
