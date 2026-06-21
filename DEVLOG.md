@@ -17,6 +17,10 @@
 - Let Codex image handoff polling recover a stable generated candidate from a
   still-marked running job directory, so a completed image file is not held
   hostage by a stale worker state.
+- Added a one-shot Studio startup and project-switch refresh for image nodes
+  still marked `generating`, so an already completed or failed Runtime image
+  job can be reconciled without requiring the user to manually restart the
+  whole generation chain.
 - Split the new media DOM logic out of `runtime-client.js`; the client is back
   under the 300-line target while the media helper stays single-purpose.
 

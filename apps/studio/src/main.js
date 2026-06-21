@@ -11,6 +11,7 @@ import { openCreationProcessPanel } from "./panels/creation-process-panel.js";
 import { renderDock } from "./panels/dock.js";
 import { el } from "./overlay.js";
 import { fixNodeVisualAsset, startNodeGeneration } from "./node-actions.js";
+import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { WORKFLOW_STARTERS, createWorkflowStarter } from "./workflow-starters.js";
 import { openProjectHub } from "./project-hub.js";
 import { syncRuntimeAssets } from "./runtime-asset-sync.js";
@@ -37,6 +38,7 @@ const projectController = createProjectController({
     runtime = nextRuntime;
     store.attachRuntime(runtime);
   },
+  onProjectReady: (runtimeClient) => refreshPendingKeyframeGenerations(store, runtimeClient),
   render: () => renderAll(store.get()),
 });
 
@@ -71,6 +73,7 @@ async function bootstrap() {
   await projectController.ensureAccessibleStartupProject();
   await store.hydrateRuntime(runtime);
   await syncRuntimeAssets(store, runtime);
+  await refreshPendingKeyframeGenerations(store, runtime);
   await projectController.refreshProjectSummaries();
 }
 

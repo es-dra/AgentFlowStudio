@@ -10,7 +10,7 @@ import {
 import { el, showModal } from "./overlay.js";
 import { icon } from "./icons.js";
 
-export function createProjectController({ store, getRuntime, setRuntime, render }) {
+export function createProjectController({ store, getRuntime, setRuntime, render, onProjectReady }) {
   let projectSummaries = [];
   let showAllProjects = false;
   let currentAuthUser = null;
@@ -32,6 +32,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render 
     if (syncAssets) {
       await syncRuntimeAssets(store, runtimeClient);
     }
+    await onProjectReady?.(runtimeClient);
     await refreshProjectSummaries();
   }
 

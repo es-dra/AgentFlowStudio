@@ -21,7 +21,9 @@ downloads, and asset thumbnails. TuanTuan now rejects LLM prompt/persona echo,
 falls back to safe first-person replies, preserves chat scroll across rerenders,
 and avoids full redraw during IME composition so Chinese input does not lose
 focus. Codex image handoff polling can recover a stable generated candidate
-from a job still marked running, reducing stale progress failures. Verification:
+from a job still marked running, and Studio startup/project switch now performs
+a one-shot refresh for image nodes still marked `generating`, reducing stale
+progress failures after a page refresh or interrupted session. Verification:
 focused regression passed 33 / 1 existing warning; full pytest passed 574 / 527
 deselected / 2 existing warnings; `npm run check:studio-js` passed for 99
 files; CLI help and version passed; maintenance audit failed=0 with warnings

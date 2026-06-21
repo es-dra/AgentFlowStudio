@@ -9,6 +9,7 @@ import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
 
 const MAX_KEYFRAME_POLL_ATTEMPTS = 540;
+const MAX_BOOTSTRAP_KEYFRAME_REFRESH = 4;
 
 export async function pollNodeKeyframeGeneration(store, runtime, node) {
   const jobId = node.params?.lastKeyframeJobId;
@@ -55,6 +56,24 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     setNodeError(store, node.id, `图像生成请求失败: ${safeError(error)}`);
     if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
+  }
+}
+
+export async function refreshPendingKeyframeGenerations(store, runtime, options = {}) {
+  if (!runtime?.pollKeyframe) return;
+  const limit = Number(options.limit || MAX_BOOTSTRAP_KEYFRAME_REFRESH);
+  const nodes = Object.values(store.get().nodes || {})
+    .filter((node) => node?.type === "image" && node.status === "generating" && node.params?.lastKeyframeJobId)
+    .slice(0, Math.max(0, limit));
+  for (const node of nodes) {
+    const jobId = node.params.lastKeyframeJobId;
+    try {
+      const response = await runtime.pollKeyframe(jobId);
+      applyKeyframeResponse(store, node.id, response, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
+      await store.flushRuntimeSave?.();
+    } catch {
+      // Keep the saved generating state; the user can still retry from the node menu.
+    }
   }
 }
 
