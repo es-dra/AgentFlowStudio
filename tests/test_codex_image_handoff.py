@@ -282,6 +282,34 @@ def test_codex_image_worker_recovers_stale_running_jobs_without_blocking_queue(t
     assert registry.poll("image", "codex_image", first)["status"] == "failed"
     assert registry.poll("image", "codex_image", second)["status"] == "succeeded"
 
+
+def test_codex_image_handoff_poll_recovers_stable_running_candidate(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _codex_provider_config()))
+    output_dir = tmp_path / "run"
+    task = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="Recover stable candidate.", output_dir=output_dir, candidate_count=1),
+    )
+    job_id = task["task"]["job_id"]
+    pending_dir = output_dir / "codex_image_job" / "pending" / job_id
+    running_dir = output_dir / "codex_image_job" / "running" / job_id
+    running_dir.parent.mkdir(parents=True, exist_ok=True)
+    pending_dir.rename(running_dir)
+    candidate = running_dir / "candidate_001.png"
+    candidate.write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+    old_time = time.time() - 10
+    os.utime(candidate, (old_time, old_time))
+
+    result = registry.poll("image", "codex_image", task)
+
+    assert result["status"] == "succeeded"
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert (output_dir / "image_candidates" / "candidate_001.png").read_bytes() == FakeCodexImageExecutor.PNG_BYTES
+    assert (running_dir / "result.json").is_file()
+
+
 def _store(tmp_path: Path, payload: dict):
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")

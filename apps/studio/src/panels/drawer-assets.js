@@ -1,6 +1,6 @@
 import { icon } from "../icons.js";
 import { el, showPopover } from "../overlay.js";
-import { runtimeMediaUrl } from "../runtime-client.js";
+import { setRuntimeMediaSource } from "../runtime-media-source.js";
 import {
   ASSET_LIFECYCLE_FILTERS,
   assetLifecycleLabel,
@@ -97,7 +97,7 @@ function assetThumb(store, runtime, asset) {
   const thumb = el("button", `asset-thumb asset-thumb-${asset.thumbnail_ref || asset.kind || "reference"}`);
   if (asset.preview_url) {
     const img = document.createElement("img");
-    img.src = runtimeMediaUrl(asset.preview_url);
+    setRuntimeMediaSource(img, asset.preview_url);
     img.alt = asset.title || asset.asset_id || "asset preview";
     img.loading = "lazy";
     thumb.appendChild(img);

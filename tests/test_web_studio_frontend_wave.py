@@ -243,6 +243,7 @@ def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failu
 
 def test_runtime_media_urls_are_normalized_only_at_render_boundaries() -> None:
     runtime_client = _read("src/runtime-client.js")
+    runtime_media_source = _read("src/runtime-media-source.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")
     upload_actions = _read("src/node-upload-actions.js")
     result_view = _read("src/node-result-view.js")
@@ -251,10 +252,13 @@ def test_runtime_media_urls_are_normalized_only_at_render_boundaries() -> None:
     runtime_asset_sync = _read("src/runtime-asset-sync.js")
 
     assert "runtimeMediaUrl" in runtime_client
+    assert "runtimeMediaUrl(value)" in runtime_media_source
+    assert "Authorization: `Bearer ${token}`" in runtime_media_source
+    assert 'url.pathname.startsWith("/projects/")' in runtime_media_source
     assert "toMediaUrl(value)" in runtime_client
-    assert "runtimeMediaUrl" in result_view
-    assert "runtimeMediaUrl" in job_center
-    assert "runtimeMediaUrl" in drawer_assets
+    assert "setRuntimeMediaSource" in result_view
+    assert "setRuntimeMediaSource" in job_center
+    assert "setRuntimeMediaSource" in drawer_assets
     assert "runtimeMediaUrl" not in keyframe_actions
     assert "runtimeMediaUrl" not in upload_actions
     assert "runtimeMediaUrl" not in runtime_asset_sync

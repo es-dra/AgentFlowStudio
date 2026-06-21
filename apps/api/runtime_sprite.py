@@ -19,6 +19,18 @@ from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
 
 SPRITE_REMOTE_PROMPT_FORBIDDEN_FRAGMENTS = ("signed url", "provider raw", "api key")
+SPRITE_PROMPT_LEAK_FRAGMENTS = (
+    "你是团团",
+    "观察型 agent",
+    "第一人称",
+    "不要复述系统设定",
+    "系统设定",
+    "project id:",
+    "selected node id:",
+    "canvas summary:",
+    "user message:",
+    "do not include local paths",
+)
 
 
 def register_runtime_sprite_routes(app: FastAPI, store: RuntimeStore) -> None:
@@ -126,11 +138,11 @@ def _local_sprite_reply(
     asset_count = _safe_int(summary.get("assets"))
     lowered = message.lower()
     if "下一步" in message or "继续" in message or "next" in lowered:
-        reply = f"下一步建议先选中当前关键节点，确认它需要的参考图和已确认资产；当前画布约有 {node_count} 个节点、{asset_count} 个素材。"
+        reply = f"我建议下一步先选中当前关键节点，确认它需要的参考图和已确认资产；当前画布约有 {node_count} 个节点、{asset_count} 个素材。"
     elif "素材" in message or "资产" in message:
-        reply = "可以先把候选素材整理成已确认资产，再进入下一次生成。只有确认后的角色或场景资产会默认参与上下文调度。"
+        reply = "我建议先把候选素材整理成已确认资产，再进入下一次生成；只有确认后的角色或场景资产会默认参与上下文调度。"
     elif "连线" in message or "节点" in message:
-        reply = "可以从节点右侧加号拖到下游节点，形成生成链路；连线只表达上下文引用，不会自动触发远程生成。"
+        reply = "我建议从节点右侧加号拖到下游节点，形成生成链路；连线只表达上下文引用，不会自动触发远程生成。"
     else:
         reply = "我现在先作为画布小助手陪跑：可以回答下一步、素材确认、节点连线和生成前检查这类问题。"
     return {
@@ -225,6 +237,8 @@ def _safe_reply_text(value: str) -> str:
         return ""
     if _contains_unsafe_private_fragment(text):
         raise ValueError("unsafe sprite reply")
+    if _contains_prompt_leak_fragment(text):
+        raise ValueError("prompt leak in sprite reply")
     return _concise_sprite_reply(text)
 
 
@@ -248,6 +262,11 @@ def _contains_unsafe_private_fragment(value: str) -> bool:
     lowered = str(value or "").lower()
     fragments = AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS + SPRITE_REMOTE_PROMPT_FORBIDDEN_FRAGMENTS
     return any(fragment.lower() in lowered for fragment in fragments)
+
+
+def _contains_prompt_leak_fragment(value: str) -> bool:
+    lowered = str(value or "").lower()
+    return any(fragment in lowered for fragment in SPRITE_PROMPT_LEAK_FRAGMENTS)
 
 
 def _safe_int(value: Any) -> int:

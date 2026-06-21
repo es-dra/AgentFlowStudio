@@ -62,6 +62,11 @@ def test_studio_sprite_widget_is_wired_to_runtime_chat() -> None:
     assert "startSpritePendingTicker" in sprite_runtime
     assert "stopSpritePendingTicker" in sprite_runtime
     assert "restoreSpriteInputFocus" in sprite_runtime
+    assert "captureSpriteLogScroll" in sprite_runtime
+    assert "restoreSpriteLogScroll" in sprite_runtime
+    assert "compositionstart" in sprite_runtime
+    assert "compositionend" in sprite_runtime
+    assert "isSpriteInputComposing" in sprite_runtime
     assert "spriteInputFocused" in sprite_runtime
     assert "正在请求服务器" not in sprite_runtime
     assert "Codex" not in sprite_runtime

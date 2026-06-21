@@ -26,7 +26,7 @@ import {
   setSpriteMotionMode,
 } from "./sprite-motion.js";
 import { canvasSummary, safeReply, selectedNodeId } from "./sprite-chat-context.js";
-import { captureSpriteInputFocus, pendingSpriteText, rememberSpriteInputSelection, resetSpritePendingLine, restoreSpriteInputFocus, spriteInputFocused, startSpritePendingTicker, stopSpritePendingTicker, SPRITE_PENDING_LINES } from "./sprite-pending-state.js";
+import { captureSpriteInputFocus, captureSpriteLogScroll, isSpriteInputComposing, pendingSpriteText, rememberSpriteInputSelection, resetSpritePendingLine, restoreSpriteInputFocus, restoreSpriteLogScroll, spriteInputComposing, spriteInputFocused, startSpritePendingTicker, stopSpritePendingTicker } from "./sprite-pending-state.js";
 
 let spriteOpen = false;
 let spriteSettingsOpen = false;
@@ -50,7 +50,13 @@ export function renderSpriteWidget(state, runtime) {
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.dataset.spriteHidden = isSpriteHidden() ? "true" : "false";
+  if (isSpriteInputComposing() && spriteOpen && !spriteSettingsOpen && !spriteSending && root.querySelector(".afs-sprite-form input")) {
+    applySpritePose(root, spriteState());
+    setSpriteMotionMode(spriteMotionMode(), root);
+    return;
+  }
   const focusSnapshot = captureSpriteInputFocus(root);
+  const logSnapshot = captureSpriteLogScroll(root);
   if (isSpriteHidden()) {
     root.replaceChildren(spriteRestoreButton());
     return;
@@ -63,6 +69,7 @@ export function renderSpriteWidget(state, runtime) {
     settingsOpen: spriteSettingsOpen,
     sending: spriteSending,
   });
+  restoreSpriteLogScroll(root, logSnapshot);
 }
 
 function spriteShell(state, runtime) {
@@ -181,7 +188,6 @@ function spritePanel(state, runtime) {
   panel.appendChild(spriteForm(state, runtime));
   return panel;
 }
-
 function spriteSettingsPanel() {
   const panel = el("div", "afs-sprite-settings");
   panel.setAttribute("data-sprite-settings", "true");
@@ -209,7 +215,6 @@ function spriteSettingsPanel() {
   panel.appendChild(closeButton);
   return panel;
 }
-
 function spriteRestoreButton() {
   const button = el("button", "afs-sprite-restore", "显示团团");
   button.type = "button";
@@ -232,12 +237,10 @@ function spriteForm(state, runtime) {
     draftMessage = input.value;
     rememberSpriteInputSelection(input);
   });
-  input.addEventListener("focus", () => {
-    spriteInputFocused(true, input);
-  });
-  input.addEventListener("blur", () => {
-    spriteInputFocused(false, input);
-  });
+  input.addEventListener("compositionstart", () => spriteInputComposing(true, input));
+  input.addEventListener("compositionend", () => { draftMessage = input.value; spriteInputComposing(false, input); rememberSpriteInputSelection(input); });
+  input.addEventListener("focus", () => spriteInputFocused(true, input));
+  input.addEventListener("blur", () => spriteInputFocused(false, input));
   input.addEventListener("click", () => rememberSpriteInputSelection(input));
   input.addEventListener("keyup", () => rememberSpriteInputSelection(input));
   input.addEventListener("select", () => rememberSpriteInputSelection(input));

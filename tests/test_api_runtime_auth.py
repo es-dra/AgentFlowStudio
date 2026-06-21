@@ -176,6 +176,7 @@ def test_auth_scope_covers_studio_state_assets_jobs_and_artifacts(tmp_path, monk
     asset_artifact_id = upload.json()["artifact"]["artifact_id"]
     assert client.get("/projects/alpha-project/image-assets", headers=alpha_headers).status_code == 200
     assert client.get("/projects/alpha-project/image-assets", headers=beta_headers).status_code == 403
+    assert client.get(f"/projects/alpha-project/image-assets/{asset_id}/preview").status_code == 401
     assert client.get(f"/projects/alpha-project/image-assets/{asset_id}/preview", headers=alpha_headers).status_code == 200
     assert client.get(f"/projects/alpha-project/image-assets/{asset_id}/preview", headers=beta_headers).status_code == 403
 

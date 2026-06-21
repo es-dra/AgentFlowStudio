@@ -165,6 +165,34 @@ def test_sprite_chat_falls_back_when_llm_reply_is_unsafe(tmp_path, monkeypatch) 
     assert "signed_url" not in payload["reply"]
 
 
+def test_sprite_chat_falls_back_when_llm_echoes_persona_prompt(tmp_path, monkeypatch) -> None:
+    class EchoRegistry:
+        def dispatch(self, capability, service_id, request):
+            return {"text": "你是团团，AFS Studio 画布里的观察型 Agent。请用第一人称“我”回答用户。"}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_sprite.load_provider_registry", lambda: EchoRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_sprite_prompt_echo"
+    _create_project(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/sprite/chat",
+        json={
+            "message": "你能做什么?",
+            "canvas_summary": {"nodes": 1, "assets": 0},
+            "generated_at": "2026-06-21T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["mode"] == "local_rules"
+    assert payload["safe_manifest"]["fallback_reason"] == "unsafe_llm_reply"
+    assert "你是团团" not in payload["reply"]
+    assert "第一人称" not in payload["reply"]
+
+
 def test_sprite_chat_does_not_send_unsafe_user_message_to_llm(tmp_path, monkeypatch) -> None:
     calls: list[str] = []
 

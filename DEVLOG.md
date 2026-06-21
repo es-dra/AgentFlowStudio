@@ -1,5 +1,47 @@
 # Devlog
 
+## 2026-06-21 - Authenticated Media And TuanTuan Stability Repair
+
+- Diagnosed broken uploaded/reference images in image nodes and the asset drawer:
+  project media routes correctly require authenticated Runtime access, while
+  plain browser image tags cannot attach the stored bearer session token.
+- Added a small `runtime-media-source.js` render helper that fetches protected
+  `/projects/...` media with the current Studio session token and assigns a
+  blob URL to image, video, and download elements. Node previews, candidate
+  grids, job thumbnails, and asset drawer thumbnails now share that path.
+- Added a Runtime guard against TuanTuan LLM prompt echo, so persona/system
+  instruction leakage falls back to safe local first-person replies.
+- Preserved TuanTuan chat scroll position across widget rerenders and skipped
+  full widget redraws during IME composition, avoiding lost Chinese input
+  focus while typing.
+- Let Codex image handoff polling recover a stable generated candidate from a
+  still-marked running job directory, so a completed image file is not held
+  hostage by a stale worker state.
+- Split the new media DOM logic out of `runtime-client.js`; the client is back
+  under the 300-line target while the media helper stays single-purpose.
+
+Verification:
+
+```text
+tests/test_api_runtime_sprite.py tests/test_api_runtime_auth.py tests/test_codex_image_handoff.py tests/test_web_studio_sprite_static.py tests/test_web_studio_frontend_wave.py -> 33 passed / 1 existing warning
+pytest -q -> 574 passed / 527 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 99 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, warnings only; oversized warning count reduced from 37 to 36 after split
+git diff --check -> passed
+```
+
+Boundaries:
+
+- Video remains out of scope and was not enabled.
+- Backend media auth was not weakened; protected media is loaded through the
+  existing logged-in Studio session.
+- No provider raw response, signed URL, local media byte, secret, invite code,
+  session token, or Company OS private source content was written.
+- Verification is runtime/code evidence, not human acceptance, business
+  validation, or durable memory promotion.
+
 ## 2026-06-21 - Non-Video Codex Flow And Studio Feedback Repair
 
 - Repaired the Codex image handoff worker so systemd-style environments that

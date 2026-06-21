@@ -1,6 +1,6 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
 import { icon } from "./icons.js";
-import { runtimeMediaUrl } from "./runtime-client.js";
+import { setRuntimeMediaSource } from "./runtime-media-source.js";
 
 export function resultView(node) {
   const result = document.createElement("div");
@@ -18,7 +18,7 @@ export function resultView(node) {
     if (node.type === "video") {
       const video = document.createElement("video");
       video.className = "node-preview-video";
-      video.src = runtimeMediaUrl(node.previewUrl);
+      setRuntimeMediaSource(video, node.previewUrl);
       video.controls = true;
       video.playsInline = true;
       video.preload = "metadata";
@@ -27,7 +27,7 @@ export function resultView(node) {
     } else {
       const img = document.createElement("img");
       img.className = "node-preview-img";
-      img.src = runtimeMediaUrl(node.previewUrl);
+      setRuntimeMediaSource(img, node.previewUrl);
       img.alt = "生成的关键帧";
       img.loading = "lazy";
       frame.appendChild(img);
@@ -97,7 +97,7 @@ function candidateGrid(candidates) {
     item.type = "button";
     item.title = `候选 ${index + 1}`;
     const img = document.createElement("img");
-    img.src = runtimeMediaUrl(candidate.url || candidate.preview_url);
+    setRuntimeMediaSource(img, candidate.url || candidate.preview_url);
     img.alt = `候选 ${index + 1}`;
     img.loading = "lazy";
     item.appendChild(img);
@@ -244,7 +244,7 @@ function previewAspectRatio(node) {
 function downloadPreviewLink(node) {
   const link = document.createElement("a");
   link.className = "mini-btn node-preview-download";
-  link.href = runtimeMediaUrl(node.previewUrl);
+  setRuntimeMediaSource(link, node.previewUrl);
   link.download = previewDownloadName(node);
   link.textContent = node.type === "video" ? "下载视频" : "下载图片";
   return link;

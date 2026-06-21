@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -67,6 +68,9 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         raise ModelGatewayError("Codex image handoff job not found")
     state, job_dir = located
     if state in {"pending", "running"}:
+        recovered = _completed_running_candidate(output_dir, job_dir, job_id)
+        if recovered:
+            return recovered
         return {
             "status": "running",
             "job_id": job_id,
@@ -94,6 +98,32 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         "provider_raw_response_stored": False,
         "outputs": outputs,
     }
+
+
+def _completed_running_candidate(output_dir: Path, job_dir: Path, job_id: str) -> dict[str, Any] | None:
+    candidate = _running_candidate_path(job_dir)
+    if not candidate or time.time() - candidate.stat().st_mtime < 5:
+        return None
+    target = candidate_output_path(output_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if candidate.resolve() != target.resolve():
+        shutil.copyfile(candidate, target)
+    result = completed_result_payload(job_id=job_id, output_dir=output_dir, candidate_path=target)
+    write_json(job_dir / RESULT_FILENAME, result)
+    return {
+        "status": "succeeded",
+        "job_id": job_id,
+        "provider_calls_started": True,
+        "provider_raw_response_stored": False,
+        "outputs": _safe_outputs(output_dir, result),
+    }
+
+
+def _running_candidate_path(job_dir: Path) -> Path | None:
+    for candidate in (job_dir / "candidate_001.png", job_dir / "image_candidates" / "candidate_001.png"):
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return candidate
+    return None
 
 
 def completed_result_payload(*, job_id: str, output_dir: Path, candidate_path: Path) -> dict[str, Any]:

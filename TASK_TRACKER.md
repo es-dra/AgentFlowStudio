@@ -12,6 +12,26 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current authenticated media and TuanTuan stability addendum: 2026-06-21 pass
+fixed broken uploaded/reference image rendering in image nodes and the asset
+drawer without weakening Runtime media auth. Studio now fetches protected
+`/projects/...` media with the current logged-in session and assigns blob URLs
+at render boundaries for node previews, candidate grids, job thumbnails,
+downloads, and asset thumbnails. TuanTuan now rejects LLM prompt/persona echo,
+falls back to safe first-person replies, preserves chat scroll across rerenders,
+and avoids full redraw during IME composition so Chinese input does not lose
+focus. Codex image handoff polling can recover a stable generated candidate
+from a job still marked running, reducing stale progress failures. Verification:
+focused regression passed 33 / 1 existing warning; full pytest passed 574 / 527
+deselected / 2 existing warnings; `npm run check:studio-js` passed for 99
+files; CLI help and version passed; maintenance audit failed=0 with warnings
+only and oversized warning count reduced from 37 to 36 after moving protected
+media DOM logic into a single-purpose helper; `git diff --check` passed.
+Boundary: video remains out of scope; backend media auth was not opened; no
+provider raw response, signed URL, local media byte, secret, invite code,
+session token, or Company OS private source content was written; not human
+acceptance, business validation, or durable memory promotion.
+
 Current non-video Codex flow and Studio feedback repair addendum: 2026-06-21
 pass fixed the image handoff worker's Codex CLI resolution for service
 environments, restored readable prompt optimizer retry instructions, tightened

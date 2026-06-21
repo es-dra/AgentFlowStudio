@@ -1,6 +1,7 @@
 let spritePendingTimer = null;
 let spritePendingIndex = 0;
 let inputFocused = false;
+let inputComposing = false;
 let inputSelection = { start: 0, end: 0 };
 
 export const SPRITE_PENDING_LINES = [
@@ -49,7 +50,7 @@ export function captureSpriteInputFocus(root) {
 }
 
 export function restoreSpriteInputFocus(root, snapshot, { open, settingsOpen, sending }) {
-  if (!snapshot?.active || !open || settingsOpen || sending) return;
+  if (!snapshot?.active || !open || settingsOpen || sending || inputComposing) return;
   window.requestAnimationFrame(() => {
     const input = root.querySelector?.(".afs-sprite-form input");
     if (!input) return;
@@ -59,6 +60,32 @@ export function restoreSpriteInputFocus(root, snapshot, { open, settingsOpen, se
     const end = Math.max(start, Math.min(Number(snapshot.end ?? start), length));
     input.setSelectionRange?.(start, end);
   });
+}
+
+export function captureSpriteLogScroll(root) {
+  const log = root.querySelector?.(".afs-sprite-log");
+  if (!log) return null;
+  return {
+    top: Number(log.scrollTop || 0),
+    nearBottom: log.scrollHeight - log.clientHeight - log.scrollTop < 8,
+  };
+}
+
+export function restoreSpriteLogScroll(root, snapshot) {
+  window.requestAnimationFrame(() => {
+    const log = root.querySelector?.(".afs-sprite-log");
+    if (!log) return;
+    log.scrollTop = snapshot?.nearBottom ? log.scrollHeight : Number(snapshot?.top || 0);
+  });
+}
+
+export function isSpriteInputComposing() {
+  return inputComposing;
+}
+
+export function spriteInputComposing(value, input) {
+  inputComposing = Boolean(value);
+  if (input) rememberSpriteInputSelection(input);
 }
 
 export function spriteInputFocused(value, input) {
