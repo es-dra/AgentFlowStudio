@@ -1,5 +1,43 @@
 # Devlog
 
+## 2026-06-22 - Storyboard Asset Cards And Keyframe Layer
+
+- Added editable candidate asset cards for storyboard-derived assets. Script
+  nodes can now run `识别资产` to create downstream image nodes for roles,
+  scenes, and props; these nodes store `params.assetCardDraft` and do not write
+  fixed `visualAssets` before user confirmation.
+- Added the `生成关键帧层` action for storyboard nodes. The generated keyframe
+  image node connects back to the storyboard and asset-card nodes, but copies
+  only already fixed visual assets into its generation context; unconfirmed
+  candidate cards remain excluded and are reported as missing.
+- Promoted prop assets to first-class support across Studio and Runtime
+  contracts, including visual asset panels, asset summaries, drawer actions,
+  Runtime draft/promotion models, context asset limits, and asset-card drafting.
+- Split newly expanded helper logic to keep active files under the project
+  maintenance threshold: `visual-asset-defaults.js` is 287 lines and
+  `asset_card_drafting/__init__.py` is 294 lines after extraction.
+
+Verification:
+
+```text
+pytest -q -> 587 passed / 520 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 107 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/studio_full_coverage_browser_qa.py --timeout-ms 30000 -> passed
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed with CRLF/LF warnings only
+```
+
+Boundaries:
+
+- Provider gates were not opened; no remote LLM, image, or video provider call
+  was made.
+- Candidate asset cards are editable drafts, not fixed assets, human
+  acceptance, business validation, provider smoke, or durable memory promotion.
+- No provider raw response, signed URL, local media byte, secret, invite code,
+  session token, server state, or Company OS private source content was written.
+
 ## 2026-06-21 - Prompt Template, Reference Image, And Provider Cleanup Pass
 
 - Reworked image prompt optimization around a clearer priority order: current

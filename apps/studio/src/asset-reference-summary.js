@@ -12,6 +12,7 @@ export function assetTypeLabel(ref) {
   const type = String(ref?.asset_type || ref?.type || "").toLowerCase();
   if (type === "scene") return "场景";
   if (type === "character") return "角色";
+  if (type === "prop") return "道具";
   return "资产";
 }
 

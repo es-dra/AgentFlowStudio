@@ -6,7 +6,9 @@ import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
   fixNodeVisualAsset,
+  createStoryboardKeyframeLayer,
   pollNodeVideoGeneration,
+  identifyScriptAssets,
   setNodeVideoFrame,
   startNodeGeneration,
   uploadNodeImage,
@@ -16,6 +18,7 @@ import {
   importScriptFileIntoTextNode,
   splitTextNodeToStoryboardNodes,
 } from "../script-breakdown.js";
+import { openAssetCardPanel } from "./asset-card-panel.js";
 
 const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
 
@@ -49,11 +52,18 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     });
   }
   if (node.type === "image") {
+    if (node.params?.assetCardDraft) {
+      addItem("pencil", "编辑资产卡", () => openAssetCardPanel(store, nodeId));
+      addItem("bolt", "生成资产图", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) startNodeGeneration(store, runtime, fresh);
+      });
+    }
     addItem("upload", "上传/替换参考图", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);
     });
-    addItem("bookmark", "标记为角色/场景资产", () => {
+    addItem("bookmark", "标记为角色/场景/道具资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
     });
@@ -100,6 +110,16 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
         if (fresh) openQualityFeedbackMenu(fresh, anchor.point || anchor.el);
       });
     }
+  }
+  if (node.type === "script") {
+    addItem("sparkles", "识别资产", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) identifyScriptAssets(store, fresh);
+    });
+    addItem("image", "生成关键帧层", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) createStoryboardKeyframeLayer(store, fresh);
+    });
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.params.isReference = !n.params.isReference; }));

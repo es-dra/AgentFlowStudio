@@ -67,6 +67,14 @@ Runtime remains the frontend boundary. Browser UI must not consume CLI
 internals, provider secrets, local private paths, signed URLs, raw provider
 responses, or media bytes.
 
+## Internal Beta Acceptance
+
+- `AFS-INTERNAL-BETA-ACCEPTANCE-OPERATING-INDEX-20260619.md`
+
+This index routes three-end readiness, deployed preflight, deterministic
+contract checks, and human review packet boundaries. It is an execution index,
+not a claim that human acceptance or business validation has happened.
+
 ## Current Maintenance Evidence
 
 - `../maintenance/AFS-LEGACY-FREEZE-20260613.md`
@@ -76,6 +84,7 @@ responses, or media bytes.
 - `../maintenance/AFS-ACTUAL-CLEANUP-002.zh-CN.md`
 - `../maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md`
 - `../maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`
+- `../maintenance/AFS-BRANCH-MERGE-CLEANUP-20260622.md`
 
 ## Routing Rule
 

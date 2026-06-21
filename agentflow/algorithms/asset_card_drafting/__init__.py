@@ -4,6 +4,15 @@ import hashlib
 import re
 from typing import Any
 
+from agentflow.algorithms.asset_card_drafting._helpers import (
+    animal_label_from_prompt,
+    camera_motion,
+    clean_text,
+    is_animal_subject_text,
+    missing_fields,
+    prop_category,
+    sentence_or_default,
+)
 from agentflow.algorithms.provider_gate_manifest import succeeded_manifest
 
 
@@ -13,7 +22,7 @@ OUTPUT_CONTRACT = "editable asset card draft with confidence, missing fields, ca
 FAILURE_MODES = ("vision_gate_closed", "unsupported_asset_type", "missing_media_ref", "unsafe_draft_rejected")
 EVIDENCE_BOUNDARY = "draft safe summary only; no fixed asset writes before human confirmation"
 
-ASSET_TYPES = {"character", "scene", "video"}
+ASSET_TYPES = {"character", "scene", "prop", "video"}
 
 
 def draft_asset_card(
@@ -28,12 +37,14 @@ def draft_asset_card(
     provider_service_id: str,
 ) -> dict[str, Any]:
     if asset_type not in ASSET_TYPES:
-        raise ValueError("asset_type must be character, scene, or video")
-    text = _clean_text(prompt_text)
+        raise ValueError("asset_type must be character, scene, prop, or video")
+    text = clean_text(prompt_text)
     if asset_type == "character":
         draft = _character_draft(draft_id, project_id, source_image_asset_refs, text)
     elif asset_type == "scene":
         draft = _scene_draft(draft_id, project_id, source_image_asset_refs, text)
+    elif asset_type == "prop":
+        draft = _prop_draft(draft_id, project_id, source_image_asset_refs, text)
     else:
         draft = _video_draft(draft_id, project_id, source_video_artifact_id, sampled_image_asset_refs, text)
     draft["safe_manifest"] = succeeded_manifest(
@@ -51,11 +62,11 @@ def draft_id_from_refs(project_id: str, generated_at: str, refs: list[str]) -> s
 
 
 def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
-    if _is_animal_subject_text(prompt_text):
+    if is_animal_subject_text(prompt_text):
         return _animal_subject_draft(draft_id, project_id, refs, prompt_text)
     label = _label_from_prompt(prompt_text, fallback="角色资产草稿")
     card = {
-        "identity": _sentence_or_default(prompt_text, "参考图中的主要角色，身份待人工确认"),
+        "identity": sentence_or_default(prompt_text, "参考图中的主要角色，身份待人工确认"),
         "hair": "发型、发色待人工确认",
         "face": "面部辨识点待人工确认",
         "build": "体态比例待人工确认",
@@ -72,7 +83,7 @@ def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_tex
         feature_card=card,
         candidate_locks=["keep role identity", "keep face recognizability", "keep signature wardrobe"],
         confidence=0.62,
-        missing_fields=_missing_fields(card),
+        missing_fields=missing_fields(card),
         source_image_asset_refs=refs,
         sampled_image_asset_refs=[],
         source_video_artifact_id=None,
@@ -81,9 +92,9 @@ def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_tex
 
 
 def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
-    label = _animal_label_from_prompt(prompt_text)
+    label = animal_label_from_prompt(prompt_text)
     card = {
-        "identity": _sentence_or_default(prompt_text, f"参考图中的同一只{label}，身份待人工确认"),
+        "identity": sentence_or_default(prompt_text, f"参考图中的同一只{label}，身份待人工确认"),
         "hair": "毛色、毛发纹理和斑纹待人工确认",
         "face": "脸部斑纹、眼睛、耳朵和胡须辨识点待人工确认",
         "build": "体型比例、四肢和尾巴形态待人工确认",
@@ -105,7 +116,7 @@ def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], promp
             "only add human hair clothing or anthropomorphic traits when explicitly requested",
         ],
         confidence=0.62,
-        missing_fields=_missing_fields(card),
+        missing_fields=missing_fields(card),
         source_image_asset_refs=refs,
         sampled_image_asset_refs=[],
         source_video_artifact_id=None,
@@ -116,7 +127,7 @@ def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], promp
 def _scene_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
     label = _label_from_prompt(prompt_text, fallback="场景资产草稿")
     card = {
-        "location": _sentence_or_default(prompt_text, "场景地点待人工确认"),
+        "location": sentence_or_default(prompt_text, "场景地点待人工确认"),
         "layout": "空间结构待人工确认",
         "props": "关键道具待人工确认",
         "lighting_mood": "光线和氛围待人工确认",
@@ -132,7 +143,34 @@ def _scene_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: s
         feature_card=card,
         candidate_locks=["keep spatial layout", "keep key props", "keep lighting mood"],
         confidence=0.6,
-        missing_fields=_missing_fields(card),
+        missing_fields=missing_fields(card),
+        source_image_asset_refs=refs,
+        sampled_image_asset_refs=[],
+        source_video_artifact_id=None,
+        prompt_text=prompt_text,
+    )
+
+
+def _prop_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
+    label = _label_from_prompt(prompt_text, fallback="道具资产草稿")
+    card = {
+        "category": prop_category(prompt_text),
+        "appearance": sentence_or_default(prompt_text, "参考图中的道具外观待人工确认"),
+        "material": "材质工艺待人工确认",
+        "scale": "与角色或场景的比例关系待人工确认",
+        "usage": "使用方式待人工确认",
+        "continuity": "后续镜头连续性待人工确认",
+    }
+    return _base_draft(
+        draft_id=draft_id,
+        project_id=project_id,
+        asset_type="prop",
+        label=label,
+        signature=f"{label}: reusable prop, pending human confirmation",
+        feature_card=card,
+        candidate_locks=["keep prop appearance", "keep material and scale", "keep usage continuity"],
+        confidence=0.58,
+        missing_fields=missing_fields(card),
         source_image_asset_refs=refs,
         sampled_image_asset_refs=[],
         source_video_artifact_id=None,
@@ -153,15 +191,15 @@ def _video_draft(
         "start_time_sec": 0.0,
         "end_time_sec": 5.0,
         "visible_subjects": ["primary subject pending confirmation"],
-        "actions": [_sentence_or_default(prompt_text, "main action pending confirmation")],
+        "actions": [sentence_or_default(prompt_text, "main action pending confirmation")],
         "scene_state": "scene continuity pending confirmation",
-        "camera_motion": _camera_motion(prompt_text),
+        "camera_motion": camera_motion(prompt_text),
         "props": [],
         "continuity_anchors": ["first usable frame", "last usable frame"],
         "drift_risks": ["identity drift", "motion drift"],
         "usable_reference_frames": [*sampled_refs[:4]],
     }
-    summary = _sentence_or_default(prompt_text, "视频内容摘要待人工确认")
+    summary = sentence_or_default(prompt_text, "视频内容摘要待人工确认")
     card = {
         "summary": summary,
         "temporal_scope": "single generated shot",
@@ -178,7 +216,7 @@ def _video_draft(
         feature_card=card,
         candidate_locks=["preserve temporal action", "preserve camera motion", "preserve continuity anchors"],
         confidence=0.58,
-        missing_fields=_missing_fields(card),
+        missing_fields=missing_fields(card),
         source_image_asset_refs=[],
         sampled_image_asset_refs=sampled_refs,
         source_video_artifact_id=source_video_artifact_id,
@@ -237,56 +275,11 @@ def _base_draft(
 
 
 def _label_from_prompt(prompt_text: str, *, fallback: str) -> str:
-    text = _clean_text(prompt_text)
+    text = clean_text(prompt_text)
     if not text:
         return fallback
     words = re.split(r"\s+", text)
     return " ".join(words[:6]).strip(" ,.;:，。；：")[:80] or fallback
-
-
-def _animal_label_from_prompt(prompt_text: str) -> str:
-    text = _clean_text(prompt_text).casefold()
-    if "黑色" in prompt_text and "狸花猫" in prompt_text:
-        return "黑色狸花猫"
-    if "狸花猫" in prompt_text or "tabby" in text:
-        return "狸花猫"
-    if "猫" in prompt_text or "cat" in text or "kitten" in text or "feline" in text:
-        return "猫主体资产"
-    if "狗" in prompt_text or "犬" in prompt_text or "dog" in text or "puppy" in text:
-        return "狗主体资产"
-    return "动物主体资产"
-
-
-def _is_animal_subject_text(prompt_text: str) -> bool:
-    text = _clean_text(prompt_text).casefold()
-    animal_terms = ("猫", "狸花猫", "黑猫", "白猫", "橘猫", "宠物", "动物", "狗", "犬", "cat", "tabby", "kitten", "feline", "dog", "puppy", "animal", "pet")
-    human_terms = ("人物", "人像", "真人", "人类", "女孩", "男孩", "女人", "男人", "女性", "男性", "头发", "发型", "校服", "服装", "person", "human", "girl", "boy", "woman", "man", "hair", "wardrobe", "uniform")
-    return any(term.casefold() in text for term in animal_terms) and not any(term.casefold() in text for term in human_terms)
-
-
-def _sentence_or_default(prompt_text: str, fallback: str) -> str:
-    text = _clean_text(prompt_text)
-    if not text:
-        return fallback
-    first = re.split(r"[。.!?！？]\s*", text)[0]
-    return first[:160] or fallback
-
-
-def _camera_motion(prompt_text: str) -> str:
-    lowered = prompt_text.lower()
-    if "push" in lowered or "推进" in lowered:
-        return "slow push in"
-    if "pan" in lowered or "摇" in lowered:
-        return "pan"
-    return "camera motion pending confirmation"
-
-
-def _missing_fields(card: dict[str, Any]) -> list[str]:
-    return [key for key, value in card.items() if "待人工确认" in str(value) or "pending confirmation" in str(value)]
-
-
-def _clean_text(value: str) -> str:
-    return re.sub(r"\s+", " ", str(value or "").strip())[:2000]
 
 
 __all__ = (

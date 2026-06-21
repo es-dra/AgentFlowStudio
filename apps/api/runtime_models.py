@@ -219,7 +219,7 @@ class GenerationComparisonRequest(BaseModel):
 
 
 class AssetCardDraftRequest(BaseModel):
-    asset_type: Literal["character", "scene", "video"]
+    asset_type: Literal["character", "scene", "prop", "video"]
     source_image_asset_refs: list[str] = Field(default_factory=list)
     source_video_artifact_id: str | None = None
     sampled_image_asset_refs: list[str] = Field(default_factory=list)
@@ -231,7 +231,7 @@ class AssetCardDraftRequest(BaseModel):
 
 class VisualAssetPromoteRequest(BaseModel):
     source_image_asset_refs: list[str] = Field(min_length=1)
-    asset_type: Literal["character", "scene"]
+    asset_type: Literal["character", "scene", "prop"]
     label: str = Field(min_length=1)
     signature: str = Field(min_length=1)
     feature_card: dict[str, Any] = Field(default_factory=dict)
@@ -243,7 +243,7 @@ class VisualAssetPromoteRequest(BaseModel):
 
 
 class AssetCardDraftRequest(BaseModel):
-    asset_type: Literal["character", "scene", "video"]
+    asset_type: Literal["character", "scene", "prop", "video"]
     source_image_asset_refs: list[str] = Field(default_factory=list)
     source_video_artifact_id: str | None = None
     sampled_image_asset_refs: list[str] = Field(default_factory=list)

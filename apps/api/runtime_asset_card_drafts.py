@@ -179,7 +179,7 @@ def register_runtime_asset_card_routes(app: FastAPI, store: RuntimeStore) -> Non
 
 def _validate_asset_card_draft_request(store: RuntimeStore, project_id: str, request: AssetCardDraftRequest) -> None:
     image_refs = [*request.source_image_asset_refs, *request.sampled_image_asset_refs]
-    if request.asset_type in {"character", "scene"} and not request.source_image_asset_refs:
+    if request.asset_type in {"character", "scene", "prop"} and not request.source_image_asset_refs:
         raise ValueError("source_image_asset_refs is required")
     if request.asset_type == "video" and not request.source_video_artifact_id:
         raise ValueError("source_video_artifact_id is required")

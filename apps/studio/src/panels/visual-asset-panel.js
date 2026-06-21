@@ -12,7 +12,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     return;
   }
 
-  let assetType = (existingAsset?.asset_type || initialAssetType) === "scene" ? "scene" : "character";
+  let assetType = normalizeAssetType(existingAsset?.asset_type || initialAssetType);
   const modal = el("div", "modal-card visual-asset-panel");
   const close = showModal(modal);
   render();
@@ -276,6 +276,8 @@ function mergeFieldValues(seed, current) {
     card: { ...(seed.card || {}), ...(current.card || {}) },
   };
 }
+
+const normalizeAssetType = (value) => (["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character");
 
 function assetIdFromRef(ref) {
   return String(ref?.asset_id || ref?.visual_asset_id || ref?.assetId || "").trim();

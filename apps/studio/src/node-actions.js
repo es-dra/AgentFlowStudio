@@ -6,20 +6,14 @@ import { imageAssetFromVisualAsset, lastImageAsset } from "./node-image-assets.j
 import { setNodeError } from "./node-action-utils.js";
 import { startRemoteKeyframeGeneration } from "./node-keyframe-actions.js";
 import { startRemoteVideoGeneration, startRemoteVideoRevision } from "./node-video-actions.js";
-import {
-  importScriptFileIntoTextNode,
-  splitTextNodeToStoryboardNodes,
-} from "./script-breakdown.js";
+import { importScriptFileIntoTextNode, splitTextNodeToStoryboardNodes } from "./script-breakdown.js";
+import { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
 
 export { uploadNodeImage } from "./node-upload-actions.js";
 export { visibleAssetForNode } from "./node-visible-assets.js";
+export { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
 export { pollNodeKeyframeGeneration } from "./node-keyframe-actions.js";
-export {
-  cancelNodeVideoGeneration,
-  enableVideoRevisionDraft,
-  pollNodeVideoGeneration,
-  setNodeVideoFrame,
-} from "./node-video-actions.js";
+export { cancelNodeVideoGeneration, enableVideoRevisionDraft, pollNodeVideoGeneration, setNodeVideoFrame } from "./node-video-actions.js";
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
@@ -38,6 +32,14 @@ export function handleNodeIntent(store, node, intent) {
   }
   if (node.type === "script" && intent === "剧本生成分镜脚本") {
     spawnSampleScriptFlow(store, node);
+    return;
+  }
+  if (node.type === "script" && intent === "识别资产") {
+    identifyScriptAssets(store, node);
+    return;
+  }
+  if (node.type === "script" && intent === "生成关键帧层") {
+    createStoryboardKeyframeLayer(store, node);
     return;
   }
   store.set((s) => {
@@ -73,11 +75,13 @@ export function spawnSampleScriptFlow(store, scriptNode) {
 export function fixNodeVisualAsset(store, runtime, node) {
   const existingAsset = lastFixedVisualAsset(node);
   const imageAsset = lastImageAsset(node) || imageAssetFromVisualAsset(existingAsset);
+  const initialAssetType = existingAsset?.asset_type || node.params?.assetCardDraft?.asset_type || "character";
   openVisualAssetPanel({
     store,
     runtime,
     node,
     imageAsset,
+    initialAssetType,
     existingAsset,
   });
 }

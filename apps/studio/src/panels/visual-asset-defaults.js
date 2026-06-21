@@ -1,4 +1,6 @@
-﻿export function visualAssetDefaults(node, imageAsset, assetType) {
+import { propDefaults } from "./visual-asset-prop-defaults.js";
+
+export function visualAssetDefaults(node, imageAsset, assetType) {
   const text = [
     node?.title,
     node?.prompt,
@@ -6,7 +8,9 @@
     imageAsset?.filename,
     imageAsset?.label,
   ].filter(Boolean).join(" ");
-  return assetType === "scene" ? sceneDefaults(node, text) : characterDefaults(node, text);
+  if (assetType === "scene") return sceneDefaults(node, text);
+  if (assetType === "prop") return propDefaults(node, text);
+  return characterDefaults(node, text);
 }
 
 function characterDefaults(node, text) {
@@ -157,24 +161,10 @@ function inferTimeWeather(text) {
 }
 
 const SECTION_LABELS = [
-  "意图",
-  "角色/主体",
-  "人物/主体",
-  "人物",
-  "主体",
-  "场景/美术",
-  "场景",
-  "美术",
-  "动作/情节",
-  "动作",
-  "镜头/构图",
-  "镜头",
-  "构图",
-  "灯光",
-  "运动/时间推进",
-  "运动",
-  "连续性",
-  "负面约束",
+  "意图", "角色/主体", "人物/主体", "人物", "主体",
+  "场景/美术", "场景", "美术", "道具", "关键道具", "物件", "资产",
+  "动作/情节", "动作", "镜头/构图", "镜头", "构图", "灯光",
+  "运动/时间推进", "运动", "连续性", "负面约束",
 ];
 
 function sectionText(text, labels) {

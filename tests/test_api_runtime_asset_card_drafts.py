@@ -225,6 +225,40 @@ def test_vision_image_drafts_character_and_scene_cards_without_fixed_asset_pollu
     assert char_payload["draft"]["draft_id"] not in plan["provider_prompt"]
 
 
+def test_vision_image_drafts_prop_card_without_fixed_asset_pollution(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    _configure_fake_vision_provider(tmp_path, monkeypatch)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_prop_asset_card_fake"
+    prop_image = _upload_image(client, project_id, "prop-node")
+
+    response = client.post(
+        f"/projects/{project_id}/asset-card-drafts",
+        json=_draft_payload(
+            "prop",
+            source_image_asset_refs=[prop_image],
+            node_id="prop-node",
+            prompt_text="A brass compass prop with scratches, used by Lin Wan in the observatory.",
+        ),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert payload["job"]["status"] == "succeeded"
+    assert payload["provider_calls_started"] is True
+    assert payload["draft"]["status"] == "draft"
+    assert payload["draft"]["asset_type"] == "prop"
+    assert payload["draft"]["feature_card"]["category"]
+    assert payload["draft"]["feature_card"]["appearance"]
+    assert payload["draft"]["asset_memory_policy"]["writes_fixed_asset"] is False
+    assert client.get(f"/projects/{project_id}/visual-assets").json()["assets"] == []
+    assert "data_base64" not in serialized
+    assert "signed_url" not in serialized
+
+
 def test_vision_video_draft_and_video_asset_promote_use_segment_schema(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_VISION", "true")
     _configure_fake_vision_provider(tmp_path, monkeypatch)

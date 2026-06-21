@@ -12,6 +12,7 @@ from apps.api.runtime_visual_assets import public_visual_asset
 MAX_OPTIMIZE_SIGNATURES = 4
 MAX_GENERATE_FULL_CHARACTER_ASSETS = 3
 MAX_GENERATE_FULL_SCENE_ASSETS = 1
+MAX_GENERATE_FULL_PROP_ASSETS = 4
 
 
 def optimize_asset_ids(assets: dict[str, dict[str, Any]], connected_ids: list[str], prompt: str) -> list[str]:
@@ -77,8 +78,12 @@ def apply_label_arbitration(
 def asset_detail_levels(assets: dict[str, dict[str, Any]], included_ids: list[str], mode: str) -> dict[str, str]:
     if mode != "generate":
         return {asset_id: "signature_only" for asset_id in included_ids}
-    counts = {"character": 0, "scene": 0}
-    limits = {"character": MAX_GENERATE_FULL_CHARACTER_ASSETS, "scene": MAX_GENERATE_FULL_SCENE_ASSETS}
+    counts = {"character": 0, "scene": 0, "prop": 0}
+    limits = {
+        "character": MAX_GENERATE_FULL_CHARACTER_ASSETS,
+        "scene": MAX_GENERATE_FULL_SCENE_ASSETS,
+        "prop": MAX_GENERATE_FULL_PROP_ASSETS,
+    }
     detail: dict[str, str] = {}
     for asset_id in included_ids:
         asset_type = str(assets.get(asset_id, {}).get("asset_type") or "character")
@@ -270,6 +275,7 @@ def _asset_recorded_at(asset: dict[str, Any]) -> str:
 
 __all__ = (
     "MAX_GENERATE_FULL_CHARACTER_ASSETS",
+    "MAX_GENERATE_FULL_PROP_ASSETS",
     "MAX_GENERATE_FULL_SCENE_ASSETS",
     "MAX_OPTIMIZE_SIGNATURES",
     "apply_label_arbitration",

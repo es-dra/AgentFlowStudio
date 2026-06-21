@@ -109,7 +109,7 @@ function showCarryConfirmModal(preflight, node, kind) {
       input.value = asset.asset_id;
       checks.set(asset.asset_id, input);
       const text = el("span", "carry-asset-text");
-      text.textContent = `${asset.asset_type === "scene" ? "场景" : "角色"} · ${asset.label || asset.asset_id}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
+      text.textContent = `${assetTypeLabel(asset)} · ${asset.label || asset.asset_id}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
       const sig = el("small", "", asset.signature || asset.detail_level || "");
       row.append(input, text, sig);
       list.appendChild(row);
@@ -152,6 +152,12 @@ function showCarryConfirmModal(preflight, node, kind) {
     submit.addEventListener("click", () => finish({ action: "continue" }));
     exclude.addEventListener("click", () => finish({ action: "exclude", assetIds: selectedIds() }));
   });
+}
+
+function assetTypeLabel(asset) {
+  if (asset.asset_type === "scene") return "场景";
+  if (asset.asset_type === "prop") return "道具";
+  return "角色";
 }
 
 function normalizeAssetExclusions(values) {

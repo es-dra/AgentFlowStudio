@@ -13,7 +13,7 @@ def normalize_asset_card_provider_service(request: AssetCardDraftRequest) -> Non
     service_id = str(request.provider_service_id or "").strip()
     if request.asset_type == "video" and service_id in {"", "fake_vision", "vision_image"}:
         request.provider_service_id = "vision_video"
-    elif request.asset_type in {"character", "scene"} and service_id in {"", "fake_vision"}:
+    elif request.asset_type in {"character", "scene", "prop"} and service_id in {"", "fake_vision"}:
         request.provider_service_id = "vision_image"
 
 
@@ -75,7 +75,7 @@ def vision_provider_constraints(request: AssetCardDraftRequest, gate: dict[str, 
         "provider_gate": gate.get("required_gate") or "AFS_ALLOW_REMOTE_VISION",
         "provider_gate_status": gate.get("status") or "unknown",
         "provider_service_id": request.provider_service_id,
-        "accepted_asset_types": ["character", "scene", "video"],
+        "accepted_asset_types": ["character", "scene", "prop", "video"],
         "mode": "visual_inspect",
     }
 

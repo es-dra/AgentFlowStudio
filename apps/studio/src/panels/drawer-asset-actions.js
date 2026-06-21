@@ -62,7 +62,7 @@ export function promoteImageAssetFromDrawer(state, store, runtime, asset, assetT
     store,
     runtime,
     node,
-    imageAsset: imageAssetUploadRef(asset, assetType === "scene" ? "scene_reference" : "character_reference"),
+    imageAsset: imageAssetUploadRef(asset, assetType === "scene" ? "scene_reference" : assetType === "prop" ? "prop_reference" : "character_reference"),
     initialAssetType: assetType,
   });
 }
@@ -151,14 +151,16 @@ export function isImageAsset(asset) {
 }
 
 export function isFixedVisualAsset(asset) {
-  return ["visual_asset", "character_asset", "scene_asset"].includes(String(asset?.kind || "")) || Boolean(asset?.visual_asset_id);
+  return ["visual_asset", "character_asset", "scene_asset", "prop_asset"].includes(String(asset?.kind || "")) || Boolean(asset?.visual_asset_id);
 }
 
 export function iconForAsset(asset) {
   if (asset.kind === "visual_asset" && asset.asset_type === "character") return "user";
   if (asset.kind === "visual_asset" && asset.asset_type === "scene") return "image";
+  if (asset.kind === "visual_asset" && asset.asset_type === "prop") return "bookmark";
   if (asset.kind === "character_asset") return "user";
   if (asset.kind === "scene_asset") return "image";
+  if (asset.kind === "prop_asset") return "bookmark";
   if (asset.kind === "director_setup") return "layers";
   if (asset.kind === "character_turnaround") return "user";
   if (asset.kind === "video_clip" || asset.kind === "video_comp") return "video";
@@ -171,9 +173,11 @@ export function kindLabel(assetOrKind) {
   const asset = typeof assetOrKind === "object" && assetOrKind ? assetOrKind : { kind: assetOrKind };
   if (asset.kind === "visual_asset" && asset.asset_type === "character") return "角色资产";
   if (asset.kind === "visual_asset" && asset.asset_type === "scene") return "场景资产";
+  if (asset.kind === "visual_asset" && asset.asset_type === "prop") return "道具资产";
   return {
     character_asset: "角色资产",
     scene_asset: "场景资产",
+    prop_asset: "道具资产",
     character_turnaround: "角色三视图",
     scene_board: "场景",
     keyframe: "关键帧",
@@ -245,7 +249,7 @@ function visualAssetRef(asset) {
   return {
     asset_id: assetId,
     label: asset.label || asset.title || assetId,
-    asset_type: asset.asset_type || (asset.kind === "scene_asset" ? "scene" : "character"),
+    asset_type: asset.asset_type || (asset.kind === "scene_asset" ? "scene" : asset.kind === "prop_asset" ? "prop" : "character"),
     status: asset.status || "fixed",
     signature: asset.signature || asset.safe_summary || "",
     feature_card: asset.feature_card || {},

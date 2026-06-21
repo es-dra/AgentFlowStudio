@@ -17,6 +17,15 @@ const SCENE_FIELDS = [
   ["time_weather", "时间天气", "深夜，雨后"],
 ];
 
+const PROP_FIELDS = [
+  ["category", "道具类别", "手持罗盘 / 旧照片 / 发光钥匙"],
+  ["appearance", "外观细节", "磨损黄铜外壳，玻璃表面有细划痕"],
+  ["material", "材质工艺", "黄铜、玻璃、红色棉线"],
+  ["scale", "尺寸比例", "可单手握持，与角色手部比例一致"],
+  ["usage", "使用方式", "角色查看方向时拿在右手"],
+  ["continuity", "连续性约束", "后续镜头保持同一磨损状态和挂绳位置"],
+];
+
 const CHARACTER_LOCK_CHIPS = [
   ["保持发型/毛发", "hair"],
   ["保持服装/外观", "wardrobe"],
@@ -30,18 +39,27 @@ const SCENE_LOCK_CHIPS = [
   ["保持光线基调", "lighting_mood"],
 ];
 
+const PROP_LOCK_CHIPS = [
+  ["保持外观细节", "appearance"],
+  ["保持材质工艺", "material"],
+  ["保持尺寸比例", "scale"],
+  ["保持使用状态", "continuity"],
+];
+
 export function lockChipsForAssetType(assetType) {
-  return assetType === "character" ? CHARACTER_LOCK_CHIPS : SCENE_LOCK_CHIPS;
+  if (assetType === "character") return CHARACTER_LOCK_CHIPS;
+  if (assetType === "prop") return PROP_LOCK_CHIPS;
+  return SCENE_LOCK_CHIPS;
 }
 
 export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, previous, defaults, drafting = false }) {
-  const fields = assetType === "character" ? CHARACTER_FIELDS : SCENE_FIELDS;
+  const fields = assetType === "character" ? CHARACTER_FIELDS : assetType === "prop" ? PROP_FIELDS : SCENE_FIELDS;
   const lockChips = lockChipsForAssetType(assetType);
   modal.innerHTML = `
     <div class="modal-head">
       <div>
         <div class="eyebrow">人工确认</div>
-        <h3>固定为${assetType === "character" ? "角色" : "场景"}资产</h3>
+        <h3>固定为${assetTypeLabel(assetType)}资产</h3>
       </div>
       <button class="icon-btn" data-action="close" title="关闭">×</button>
     </div>
@@ -56,6 +74,7 @@ export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, pre
     <div class="va-type-row">
       <button class="va-type${assetType === "character" ? " active" : ""}" data-type="character">角色资产</button>
       <button class="va-type${assetType === "scene" ? " active" : ""}" data-type="scene">场景资产</button>
+      <button class="va-type${assetType === "prop" ? " active" : ""}" data-type="prop">道具资产</button>
     </div>
     <label class="va-row">名称<input data-field="label" data-drafting="${drafting ? "true" : "false"}" value="${escapeAttr(previous.label || defaults.label || node.title || "")}" placeholder="如：林晚 / 观测站"></label>
     <label class="va-row">一句话签名<input data-field="signature" data-drafting="${drafting ? "true" : "false"}" value="${escapeAttr(previous.signature || defaults.signature || "")}" placeholder="只写最具辨识度的 2-4 个特征，将进入优化提示词"></label>
@@ -75,7 +94,13 @@ export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, pre
       <button class="ghost-btn" data-action="reject">不采用</button>
       <button class="primary-btn" data-action="fix">确认固定</button>
     </div>
-  `;
+`;
+}
+
+function assetTypeLabel(assetType) {
+  if (assetType === "character") return "角色";
+  if (assetType === "prop") return "道具";
+  return "场景";
 }
 
 function escapeHtml(value) {

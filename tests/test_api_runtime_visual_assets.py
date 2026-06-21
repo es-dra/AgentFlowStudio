@@ -152,3 +152,33 @@ def test_visual_asset_detail_returns_safe_card_and_locks(tmp_path) -> None:
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
     assert missing.status_code == 404
+
+
+def test_visual_asset_promote_accepts_prop_assets(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_visual_prop_asset"
+    image_id = _upload_image(client, project_id, "node-prop")
+
+    promoted = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(
+            image_id,
+            asset_type="prop",
+            label="Brass Compass",
+            signature="aged brass compass with scratched glass and red thread",
+            feature_card={
+                "category": "hand prop",
+                "appearance": "aged brass compass with scratched glass",
+                "usage": "held by Lin Wan when reading direction",
+            },
+            negative_locks=["keep scratched glass", "keep brass body"],
+        ),
+    )
+
+    assert promoted.status_code == 200
+    payload = promoted.json()["asset"]
+
+    assert payload["status"] == "fixed"
+    assert payload["asset_type"] == "prop"
+    assert payload["label"] == "Brass Compass"
+    assert payload["image_asset_refs"] == [image_id]

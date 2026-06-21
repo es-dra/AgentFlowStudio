@@ -20,13 +20,19 @@ export function imageAssetFromVisualAsset(asset) {
   if (!assetId) return null;
   return {
     asset_id: assetId,
-    role: asset?.asset_type === "scene" ? "scene_reference" : "character_reference",
+    role: assetRole(asset?.asset_type),
     filename: asset?.title || asset?.label || `${assetId}.png`,
     preview_url: asset?.preview_url || "",
     width: asset?.width || null,
     height: asset?.height || null,
     aspect_ratio: asset?.aspect_ratio || null,
   };
+}
+
+function assetRole(assetType) {
+  if (assetType === "scene") return "scene_reference";
+  if (assetType === "prop") return "prop_reference";
+  return "character_reference";
 }
 
 export function resizeNodeForImagePreview(node, preview, fallbackAspectRatio) {

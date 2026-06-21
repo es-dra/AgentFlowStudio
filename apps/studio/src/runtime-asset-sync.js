@@ -36,10 +36,10 @@ export async function syncRuntimeAssets(store, runtime) {
 function visualAssetProjection(asset, runtime, imagePreviewById) {
   return {
     id: `visual_${asset.asset_id}`,
-    kind: asset.asset_type === "scene" ? "scene_asset" : "character_asset",
+    kind: asset.asset_type === "scene" ? "scene_asset" : asset.asset_type === "prop" ? "prop_asset" : "character_asset",
     title: asset.label || asset.asset_id,
     safe_summary: asset.signature || "",
-    thumbnail_ref: asset.asset_type === "scene" ? "scene-board" : "character-sheet",
+    thumbnail_ref: asset.asset_type === "scene" ? "scene-board" : asset.asset_type === "prop" ? "prop-sheet" : "character-sheet",
     source_node_id: asset.source_node_id || null,
     status: asset.status || "fixed",
     asset_id: asset.asset_id,

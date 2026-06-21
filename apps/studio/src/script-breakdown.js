@@ -84,7 +84,7 @@ export function splitTextNodeToStoryboardNodes(store, node) {
       const target = s.nodes[shotNode.id];
       if (!target) return;
       target.params.assetPrepState = {
-        status: shotAssetNodeIds.length ? "needs_generation" : "no_assets_detected",
+        status: shotAssetNodeIds.length ? "card_ready" : "no_assets_detected",
         downstream_node_ids: shotAssetNodeIds,
         updated_at: new Date().toISOString(),
       };

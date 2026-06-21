@@ -75,6 +75,8 @@ export const NODE_TYPES = {
       { icon: "text", label: "剧本生成分镜脚本" },
       { icon: "video", label: "视频参考生成分镜脚本" },
       { icon: "user", label: "角色生成分镜脚本" },
+      { icon: "sparkles", label: "识别资产" },
+      { icon: "image", label: "生成关键帧层" },
     ],
     downstream: ["text", "image", "video", "director", "ref"],
     size: { w: 280, h: 280 },

@@ -86,7 +86,7 @@ function openExistingAssetPanel(store, runtime, asset, visualAssetId) {
     runtime,
     node,
     imageAsset: imageAssetFromVisualAsset(asset) || lastImageAsset(node),
-    initialAssetType: asset?.asset_type === "scene" ? "scene" : "character",
+    initialAssetType: ["character", "scene", "prop"].includes(String(asset?.asset_type || "")) ? asset.asset_type : "character",
     existingAsset: { ...asset, asset_id: visualAssetId || asset?.asset_id },
   });
 }
@@ -181,6 +181,7 @@ function statusLabel(asset) {
 function assetTypeLabel(asset) {
   if (asset.asset_type === "scene") return "场景资产";
   if (asset.asset_type === "character") return "角色资产";
+  if (asset.asset_type === "prop") return "道具资产";
   if (asset.kind === "image_reference" || asset.role === "reference_image") return "参考图片";
   return "显性资产";
 }

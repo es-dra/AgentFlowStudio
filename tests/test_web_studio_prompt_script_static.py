@@ -70,6 +70,58 @@ def test_storyboard_breakdown_creates_structured_shots_and_asset_prep_nodes() ->
     assert "connect(store, scriptNodeId, assetNode.id)" in asset_nodes
 
 
+def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -> None:
+    asset_drafts = (STUDIO_ROOT / "src" / "asset-card-drafts.js").read_text(encoding="utf-8")
+    asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
+    asset_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "assetCardDraftFromRef" in asset_drafts
+    assert "assetCardText" in asset_drafts
+    assert "assetImagePrompt" in asset_drafts
+    assert "included_in_context_before_confirmation: false" in asset_drafts
+    assert "node.params.assetCardDraft" in asset_nodes
+    assert 'node.params.nodeRole = "asset_card_draft"' in asset_nodes
+    assert "node.params.visualAssets" not in asset_nodes
+    assert "openAssetCardPanel" in asset_panel
+    assert "编辑资产卡" in node_menu
+
+
+def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidate_pollution() -> None:
+    nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    keyframes = (STUDIO_ROOT / "src" / "storyboard-keyframes.js").read_text(encoding="utf-8")
+
+    assert "识别资产" in nodes
+    assert "生成关键帧层" in nodes
+    assert "identifyScriptAssets" in node_actions
+    assert "createStoryboardKeyframeLayer" in node_actions
+    assert "识别资产" in node_menu
+    assert "生成关键帧层" in node_menu
+    assert "createKeyframeNodesForStoryboard" in keyframes
+    assert "fixed_visual_asset_ids" in keyframes
+    assert "missing_asset_card_node_ids" in keyframes
+    assert "asset.params?.visualAssets" in keyframes
+    assert "connect(store, scriptNode.id, keyframeNode.id)" in keyframes
+
+
+def test_visual_asset_cards_support_prop_assets_across_frontend_and_runtime_contract() -> None:
+    visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
+    visual_defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
+    asset_summary = (STUDIO_ROOT / "src" / "asset-reference-summary.js").read_text(encoding="utf-8")
+    runtime_models = (STUDIO_ROOT.parent / "api" / "runtime_models.py").read_text(encoding="utf-8")
+    algorithm = (STUDIO_ROOT.parent.parent / "agentflow" / "algorithms" / "asset_card_drafting" / "__init__.py").read_text(encoding="utf-8")
+
+    assert "PROP_FIELDS" in visual_render
+    assert "道具资产" in visual_render
+    assert "propDefaults" in visual_defaults
+    assert 'if (type === "prop") return "道具";' in asset_summary
+    assert 'Literal["character", "scene", "prop", "video"]' in runtime_models
+    assert 'Literal["character", "scene", "prop"]' in runtime_models
+    assert '"prop"' in algorithm
+
+
 def test_visual_asset_draft_and_existing_asset_edit_show_inline_loading() -> None:
     visual_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
     visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")

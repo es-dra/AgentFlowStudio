@@ -6,11 +6,30 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-21 by Codex
+Last updated: 2026-06-22 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current storyboard asset-card and keyframe-layer addendum: 2026-06-22 pass
+connected structured storyboard nodes to editable candidate asset cards and a
+fixed-asset-only keyframe layer. Script nodes now expose `识别资产` and
+`生成关键帧层`; identified角色/场景/道具 become downstream image nodes with
+`params.assetCardDraft`, while `params.visualAssets` remains reserved for
+human-confirmed fixed assets. Keyframe nodes connect to the storyboard and
+asset-card nodes, but inject only fixed visual assets into their prompt/context
+and record unconfirmed candidate nodes as missing. Prop assets are now supported
+across Studio panels, summaries, drawer actions, Runtime draft/promotion
+contracts, context asset limits, and asset-card drafting. Verification: full
+pytest passed 587 / 520 deselected / 2 existing warnings; `npm run
+check:studio-js` passed for 107 files; CLI help and version passed; full
+coverage browser QA passed; maintenance audit failed=0 with warnings only; `git
+diff --check` passed with CRLF/LF warnings only. Boundary: provider gates were
+not opened; no merge, push, deployment, server sync, raw provider response,
+signed URL, local media byte, secret, invite code, session token, or Company OS
+private source content was written; this is code/runtime evidence, not human
+acceptance, provider smoke, business validation, or durable memory promotion.
 
 Current prompt/template and provider cleanup addendum: 2026-06-21 pass repaired
 the reference-image prompt contract that was leaking old human-edit wording into

@@ -25,6 +25,7 @@ export const ACTION_GROUPS = [
     actions: [
       { id: "asset_character", type: "image", label: "角色设定卡", icon: "user", tag: "草稿" },
       { id: "asset_scene", type: "image", label: "场景设定卡", icon: "image", tag: "草稿" },
+      { id: "asset_prop", type: "image", label: "道具设定卡", icon: "bookmark", tag: "草稿" },
       { id: "asset_video", type: "video", label: "视频片段卡", icon: "frames", tag: "草稿" },
     ],
   },
@@ -79,6 +80,11 @@ function applyActionDefaults(node, action) {
   if (action.id === "asset_scene") {
     node.title = "场景设定卡草稿";
     node.prompt = "上传或生成场景参考图，然后整理空间结构、光线、道具、连续细节和待补充信息。";
+    return;
+  }
+  if (action.id === "asset_prop") {
+    node.title = "道具设定卡草稿";
+    node.prompt = "上传或生成道具参考图，然后整理外观、材质、比例、使用方式和连续性约束。";
     return;
   }
   if (action.id === "asset_video") {

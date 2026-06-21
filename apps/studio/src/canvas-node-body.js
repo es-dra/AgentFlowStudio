@@ -198,10 +198,16 @@ function carryChainView(node) {
     chip.dataset.action = "asset-detail";
     chip.dataset.assetId = item.asset_id || item.assetId || "";
     chip.title = `${assetTypeLabel(item)} · ${assetLabel(item)} · ${assetCarryLabel(item)}`;
-    chip.innerHTML = `<span class="carry-chain-icon">${icon(item.asset_type === "scene" ? "image" : "bookmark", 11)}</span><span>${escapeHtml(assetLabel(item))}</span>`;
+    chip.innerHTML = `<span class="carry-chain-icon">${icon(carryAssetIcon(item), 11)}</span><span>${escapeHtml(assetLabel(item))}</span>`;
     strip.appendChild(chip);
   }
   return strip;
+}
+
+function carryAssetIcon(item) {
+  if (item.asset_type === "scene") return "image";
+  if (item.asset_type === "character") return "user";
+  return "bookmark";
 }
 
 function iconBlock(iconName) {
