@@ -52,7 +52,7 @@ def build_asset_profile_test_package(
     character_reference_image_path: Path | None = None,
     provider_config_path: Path | None = None,
     run_provider_validation: bool = False,
-    image_service: str = "minimax_image",
+    image_service: str = "codex_image",
     video_service: str = "kling_i2v",
     provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:

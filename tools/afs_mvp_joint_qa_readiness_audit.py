@@ -78,14 +78,14 @@ def _has_legacy_role_blocker(role_checks: list[dict[str, str]]) -> bool:
 
 
 def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
-    if _successful_minimax_b_only_retry(evidence_root).is_file():
+    if _successful_image_b_only_retry(evidence_root).is_file():
         return None
-    manifests = sorted(evidence_root.glob("live_minimax_image_runtime/**/B/keyframe_generation_safe_manifest.json"))
-    preflight_path = _preferred_minimax_preflight(evidence_root)
+    manifests = sorted(evidence_root.glob("live_image_runtime/**/B/keyframe_generation_safe_manifest.json"))
+    preflight_path = _preferred_image_preflight(evidence_root)
     if not manifests:
         return _missing_evidence_blocker(
             "P1-IMAGE-B-PROVIDER-READINESS",
-            "live_minimax_image_runtime/**/B/keyframe_generation_safe_manifest.json",
+            "live_image_runtime/**/B/keyframe_generation_safe_manifest.json",
         )
     manifest_path = manifests[-1]
     manifest = _read_json(manifest_path)
@@ -147,8 +147,8 @@ def _kling_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
 def _role_checks(evidence_root: Path, provider_blockers: list[dict[str, Any]]) -> list[dict[str, str]]:
     return [
         _file_check("ordinary_internal_tester", evidence_root, "gate_closed_8790_ui_smoke_corrected_report.json"),
-        _file_check("creative_director", evidence_root, "live_minimax_image_comparison_report.json"),
-        _file_check("asset_manager", evidence_root, "live_minimax_image_comparison_report.json"),
+        _file_check("creative_director", evidence_root, "live_image_comparison_report.json"),
+        _file_check("asset_manager", evidence_root, "live_image_comparison_report.json"),
         _video_qa_check(evidence_root, provider_blockers),
         _file_check("safety_release_qa", evidence_root, "ai_role_pre_acceptance_summary.json"),
         _file_check("runbook_paths_1_6", evidence_root, "ai_role_pre_acceptance_summary.json"),
@@ -194,9 +194,9 @@ def _next_actions(provider_blockers: list[dict[str, Any]]) -> list[str]:
             actions.append("Add an ignored local provider config containing kling_i2v plus valid Kling credential env vars before the next live video smoke.")
         if blocker["blocker_id"] == "P1-IMAGE-B-PROVIDER-READINESS":
             if blocker.get("preflight_status") == "ready":
-                actions.append("MiniMax image REST preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1.")
+                actions.append("Image provider preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1.")
             else:
-                actions.append("After explicit image retry approval, rerun MiniMax comparison and inspect arm-level block_ids/retry_count.")
+                actions.append("After explicit image retry approval, rerun image comparison and inspect arm-level block_ids/retry_count.")
     return actions
 
 
@@ -256,18 +256,18 @@ def _latest_existing(paths: list[Path]) -> Path:
     return max(existing, key=lambda path: path.stat().st_mtime)
 
 
-def _preferred_minimax_preflight(root: Path) -> Path:
-    paths = [path for path in root.glob("minimax_image_provider_preflight*.json") if path.is_file()]
+def _preferred_image_preflight(root: Path) -> Path:
+    paths = [path for path in root.glob("image_provider_preflight*.json") if path.is_file()]
     if not paths:
-        return root / "minimax_image_provider_preflight*.json"
+        return root / "image_provider_preflight*.json"
     ready_paths = [path for path in paths if _read_json(path).get("status") == "ready"]
     if ready_paths:
         return max(ready_paths, key=lambda path: path.stat().st_mtime)
     return max(paths, key=lambda path: path.stat().st_mtime)
 
 
-def _successful_minimax_b_only_retry(root: Path) -> Path:
-    paths = [path for path in root.glob("minimax_b_only_live_retry*.json") if path.is_file()]
+def _successful_image_b_only_retry(root: Path) -> Path:
+    paths = [path for path in root.glob("image_b_only_live_retry*.json") if path.is_file()]
     for path in sorted(paths, key=lambda item: item.stat().st_mtime, reverse=True):
         payload = _read_json(path)
         if (
@@ -278,7 +278,7 @@ def _successful_minimax_b_only_retry(root: Path) -> Path:
             and int(payload.get("provider_output_count") or 0) > 0
         ):
             return path
-    return root / "minimax_b_only_live_retry*.json"
+    return root / "image_b_only_live_retry*.json"
 
 
 def _first_existing_ref(root: Path, relative_paths: list[str]) -> str:

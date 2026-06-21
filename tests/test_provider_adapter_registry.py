@@ -11,7 +11,6 @@ from agentflow_studio.model_gateway.company_secrets import load_company_provider
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from agentflow_studio.model_gateway import openai_compatible
-from tests.minimax_image_test_helpers import provider_config
 from tests.provider_smoke_helpers import provider_config as legacy_kling_provider_config
 
 
@@ -21,9 +20,61 @@ def _store(tmp_path, payload: dict):
     return load_company_provider_secrets(path)
 
 
+def _codex_image_provider_config() -> dict:
+    return {
+        "schema_version": "company_provider_secrets.local.v2",
+        "accounts": {
+            "local_codex": {
+                "auth_type": "none",
+                "execution_backend": "codex_exec",
+                "cli_command": "codex",
+                "default_models": {"image": "image2"},
+            }
+        },
+        "account_pools": {
+            "codex_image_pool": {
+                "accounts": [
+                    {
+                        "account_id": "local_codex",
+                        "service_id": "codex_image",
+                        "enabled_capabilities": ["image"],
+                        "enabled": True,
+                        "priority": 10,
+                        "weight": 1,
+                        "concurrency_limit": 1,
+                        "health_state": "healthy",
+                    }
+                ]
+            }
+        },
+        "services": {
+            "codex_image": {
+                "provider": "codex_handoff",
+                "account_ref": "local_codex",
+                "capability": "image",
+                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                "descriptor": {
+                    "schema_version": "provider_descriptor.v0.1",
+                    "modality": "image",
+                    "execution_mode": "async",
+                    "capabilities": ["image"],
+                    "account_pool_id": "codex_image_pool",
+                    "reference_image_slots": 4,
+                    "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+                    "prompt_char_limit": 4000,
+                    "seed_supported": True,
+                    "cost_hint": "test-only",
+                    "rate_limit_hint": "test-only",
+                    "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                },
+            }
+        },
+    }
+
+
 def test_provider_registry_rejects_missing_descriptor(tmp_path) -> None:
-    payload = provider_config()
-    payload["services"]["minimax_image"].pop("descriptor", None)
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"].pop("descriptor", None)
     store = _store(tmp_path, payload)
 
     with pytest.raises(ModelConfigError, match="descriptor"):
@@ -31,50 +82,50 @@ def test_provider_registry_rejects_missing_descriptor(tmp_path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("field", "value", "match"),
-    [
-        ("required_gate", "MINIMAX_API_KEY", "required_gate"),
+        ("field", "value", "match"),
+        [
+        ("required_gate", "IMAGE_API_KEY", "required_gate"),
         ("reference_image_slots", -1, "reference_image_slots"),
         ("supported_aspect_ratios", ["wide"], "supported_aspect_ratios"),
     ],
 )
 def test_provider_registry_rejects_invalid_descriptor_fields(tmp_path, field, value, match) -> None:
-    payload = provider_config()
-    payload["services"]["minimax_image"]["descriptor"][field] = value
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"][field] = value
     store = _store(tmp_path, payload)
 
     with pytest.raises(ModelConfigError, match=match):
         ProviderRegistry.from_store(store)
 
 
-def test_provider_registry_exposes_minimax_descriptor(tmp_path) -> None:
-    store = _store(tmp_path, provider_config())
+def test_provider_registry_exposes_codex_image_descriptor(tmp_path) -> None:
+    store = _store(tmp_path, _codex_image_provider_config())
     registry = ProviderRegistry.from_store(store)
 
-    descriptor = registry.descriptor("minimax_image")
+    descriptor = registry.descriptor("codex_image")
 
     assert descriptor.modality == "image"
     assert descriptor.capabilities == ["image"]
-    assert descriptor.execution_mode == "sync"
-    assert descriptor.account_pool_id == "minimax_image_pool"
-    assert descriptor.reference_image_slots == 1
-    assert descriptor.prompt_char_limit == 1500
+    assert descriptor.execution_mode == "async"
+    assert descriptor.account_pool_id == "codex_image_pool"
+    assert descriptor.reference_image_slots == 4
+    assert descriptor.prompt_char_limit == 4000
     assert descriptor.rate_limit_hint == "test-only"
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_IMAGE"
 
 
 def test_provider_registry_normalizes_legacy_narratocut_gate_prefix(tmp_path) -> None:
-    payload = provider_config()
-    payload["services"]["minimax_image"]["descriptor"]["required_gate"] = "NARRATOCUT_ALLOW_REMOTE_IMAGE"
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"]["required_gate"] = "NARRATOCUT_ALLOW_REMOTE_IMAGE"
     store = _store(tmp_path, payload)
 
     registry = ProviderRegistry.from_store(store)
 
-    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+    assert registry.descriptor("codex_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
 
 
 def test_provider_registry_ignores_company_gateway_aggregate_service(tmp_path) -> None:
-    payload = provider_config()
+    payload = _codex_image_provider_config()
     payload["services"]["company_gateway"] = {
         "provider": "company_gateway",
         "capability": "llm/asr/image/video",
@@ -95,14 +146,14 @@ def test_provider_registry_ignores_company_gateway_aggregate_service(tmp_path) -
 
     registry = ProviderRegistry.from_store(store)
 
-    assert registry.descriptor("minimax_image").modality == "image"
+    assert registry.descriptor("codex_image").modality == "image"
     with pytest.raises(ModelConfigError, match="Provider service not found: company_gateway"):
         registry.descriptor("company_gateway")
 
 
 def test_provider_registry_rejects_disabled_account_pool_entry(tmp_path, monkeypatch) -> None:
-    payload = provider_config()
-    payload["account_pools"]["minimax_image_pool"]["accounts"][0]["enabled"] = False
+    payload = _codex_image_provider_config()
+    payload["account_pools"]["codex_image_pool"]["accounts"][0]["enabled"] = False
     store = _store(tmp_path, payload)
     registry = ProviderRegistry.from_store(store)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
@@ -110,28 +161,59 @@ def test_provider_registry_rejects_disabled_account_pool_entry(tmp_path, monkeyp
     with pytest.raises(ModelConfigError, match="No enabled provider account"):
         registry.dispatch(
             "image",
-            "minimax_image",
+            "codex_image",
             ProviderDispatchRequest(prompt="hello", output_dir=tmp_path, aspect_ratio="9:16"),
         )
 
 
-def test_provider_registry_reports_missing_credential_env_without_secret_value(tmp_path, monkeypatch) -> None:
-    payload = provider_config(use_env_key=True)
+def test_provider_registry_ignores_removed_minimax_provider_services(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["accounts"]["old_image"] = {
+        "auth_type": "api_key",
+        "base_url": "https://image-provider.example.invalid",
+        "api_key_env": "OLD_IMAGE_API_KEY",
+        "default_models": {"image": "retired"},
+    }
+    payload["account_pools"]["old_image_pool"] = {
+        "accounts": [
+            {
+                "account_id": "old_image",
+                "service_id": "old_image",
+                "enabled_capabilities": ["image"],
+                "enabled": True,
+                "priority": 10,
+                "weight": 1,
+                "concurrency_limit": 1,
+                "health_state": "healthy",
+            }
+        ]
+    }
+    payload["services"]["old_image"] = {
+        "provider": "minimax",
+        "account_ref": "old_image",
+        "capability": "image",
+        "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "image",
+            "execution_mode": "sync",
+            "capabilities": ["image"],
+            "account_pool_id": "old_image_pool",
+            "reference_image_slots": 1,
+            "supported_aspect_ratios": ["9:16"],
+            "prompt_char_limit": 1500,
+            "seed_supported": True,
+            "cost_hint": "retired",
+            "rate_limit_hint": "retired",
+            "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+        },
+    }
     store = _store(tmp_path, payload)
     registry = ProviderRegistry.from_store(store)
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
-    monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
 
-    with pytest.raises(ModelGatewayError) as exc:
-        registry.dispatch(
-            "image",
-            "minimax_image",
-            ProviderDispatchRequest(prompt="hello", output_dir=tmp_path, aspect_ratio="9:16"),
-        )
+    with pytest.raises(ModelConfigError, match="Provider service not found: old_image"):
+        registry.descriptor("old_image")
 
-    message = str(exc.value)
-    assert "MINIMAX_API_KEY" in message
-    assert "fk-" not in message
 
 
 def test_provider_registry_dispatches_openai_compatible_llm(tmp_path, monkeypatch) -> None:
@@ -161,51 +243,6 @@ def test_provider_registry_dispatches_openai_compatible_llm(tmp_path, monkeypatc
     assert "strict prompt formatter" in captured["payload"]["messages"][0]["content"]
     assert captured["payload"]["messages"][1] == {"role": "user", "content": "Improve this prompt"}
     assert captured["api_key"] == "secret-value"
-
-
-def test_provider_registry_dispatches_minimax_cli_llm_from_token_plan(tmp_path, monkeypatch) -> None:
-    captured: dict[str, object] = {}
-
-    def fake_run(args, **kwargs):
-        captured["args"] = args
-        captured["kwargs"] = kwargs
-        return subprocess.CompletedProcess(
-            args=args,
-            returncode=0,
-            stdout=json.dumps(
-                {
-                    "content": [
-                        {"type": "thinking", "thinking": "internal chain"},
-                        {"type": "text", "text": "enhanced by minimax cli"},
-                    ]
-                },
-                ensure_ascii=False,
-            ),
-            stderr="",
-        )
-
-    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.subprocess.run", fake_run)
-    monkeypatch.setattr("agentflow_studio.model_gateway.provider_adapter_impl.shutil.which", lambda value: value)
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    store = _store(tmp_path, _provider_gateway_config())
-    registry = ProviderRegistry.from_store(store)
-
-    result = registry.dispatch(
-        "llm",
-        "minimax_m3",
-        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
-    )
-
-    assert result["text"] == "enhanced by minimax cli"
-    assert result["provider_calls_started"] is True
-    args = list(captured["args"])
-    assert args[:3] == ["mmx", "text", "chat"]
-    assert "--message" in args
-    assert args[args.index("--message") + 1] == "Improve this prompt"
-    assert "--output" in args
-    assert args[args.index("--output") + 1] == "json"
-    assert "--non-interactive" in args
-    assert "secret" not in json.dumps(captured, ensure_ascii=False).lower()
 
 
 def test_provider_registry_dispatches_codex_local_llm(tmp_path, monkeypatch) -> None:
@@ -439,40 +476,6 @@ def test_provider_registry_derives_legacy_kling_i2v_descriptor(tmp_path) -> None
     assert descriptor.prompt_profile == "video_i2v_v1"
 
 
-def test_provider_registry_supports_minimax_llm_service_without_legacy_gate(tmp_path, monkeypatch) -> None:
-    payload = legacy_kling_provider_config()
-    payload["accounts"]["minimax"]["default_models"]["llm"] = "MiniMax-M3"
-    payload["services"]["minimax_llm"] = {
-        "provider": "minimax",
-        "account_ref": "minimax",
-        "capability": "llm",
-        "default_model_ref": "accounts.minimax.default_models.llm",
-        "required_gate": "AFS_ALLOW_REMOTE_LLM",
-    }
-    captured: dict[str, object] = {}
-
-    def fake_send(self, payload, api_key):
-        captured["payload"] = payload
-        captured["api_key"] = api_key
-        return {"choices": [{"message": {"content": "legacy minimax llm ok"}}]}
-
-    monkeypatch.setattr(openai_compatible.OpenAICompatibleProvider, "_send_request", fake_send)
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
-    store = _store(tmp_path, payload)
-    registry = ProviderRegistry.from_store(store)
-
-    result = registry.dispatch(
-        "llm",
-        "minimax_llm",
-        ProviderDispatchRequest(prompt="Improve this prompt", output_dir=tmp_path, task_type="prompt_enhancement"),
-    )
-
-    assert registry.descriptor("minimax_llm").required_gate == "AFS_ALLOW_REMOTE_LLM"
-    assert result["text"] == "legacy minimax llm ok"
-    assert captured["payload"]["model"] == "MiniMax-M3"
-    assert captured["api_key"] == "fake-minimax-key"
-
-
 def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, monkeypatch) -> None:
     payload = legacy_kling_provider_config()
     payload["accounts"]["deepseek"] = {
@@ -512,7 +515,7 @@ def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, 
     assert captured["api_key"] == "fake-deepseek-key"
 
 
-def test_provider_registry_normalizes_legacy_image_gate_before_inner_plan(tmp_path) -> None:
+def test_provider_registry_ignores_legacy_minimax_image_service(tmp_path) -> None:
     payload = legacy_kling_provider_config()
     payload["services"]["minimax_image"] = {
         "provider": "minimax",
@@ -523,7 +526,8 @@ def test_provider_registry_normalizes_legacy_image_gate_before_inner_plan(tmp_pa
     store = _store(tmp_path, payload)
     registry = ProviderRegistry.from_store(store)
 
-    assert registry.descriptor("minimax_image").required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+    with pytest.raises(ModelConfigError, match="Provider service not found: minimax_image"):
+        registry.descriptor("minimax_image")
 
 
 def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
@@ -989,13 +993,6 @@ def _provider_gateway_config() -> dict:
                 "base_url": "https://video.example.test",
                 "default_models": {"video": "fake-video"},
             },
-            "minimax_cli_account": {
-                "auth_type": "token_plan",
-                "execution_backend": "mmx_cli",
-                "cli_command": "mmx",
-                "region": "cn",
-                "default_models": {"llm": "MiniMax-M2.7"},
-            },
         },
         "account_pools": {
             "llm_pool": {
@@ -1004,20 +1001,6 @@ def _provider_gateway_config() -> dict:
                         "account_id": "openai_account",
                         "service_id": "openai_text",
                         "credential_env": "AFS_TEST_LLM_KEY",
-                        "enabled_capabilities": ["llm"],
-                        "enabled": True,
-                        "priority": 10,
-                        "weight": 1,
-                        "concurrency_limit": 1,
-                        "health_state": "healthy",
-                    }
-                ]
-            },
-            "minimax_llm_pool": {
-                "accounts": [
-                    {
-                        "account_id": "minimax_cli_account",
-                        "service_id": "minimax_m3",
                         "enabled_capabilities": ["llm"],
                         "enabled": True,
                         "priority": 10,
@@ -1061,29 +1044,6 @@ def _provider_gateway_config() -> dict:
                     "seed_supported": False,
                     "cost_hint": "test-only",
                     "rate_limit_hint": "test-only",
-                    "required_gate": "AFS_ALLOW_REMOTE_LLM",
-                },
-            },
-            "minimax_m3": {
-                "provider": "minimax_cli",
-                "account_ref": "minimax_cli_account",
-                "capability": "llm",
-                "model": "MiniMax-M2.7",
-                "temperature": 0.2,
-                "max_completion_tokens": 900,
-                "required_gate": "AFS_ALLOW_REMOTE_LLM",
-                "descriptor": {
-                    "schema_version": "provider_descriptor.v0.1",
-                    "modality": "llm",
-                    "execution_mode": "sync",
-                    "capabilities": ["llm"],
-                    "account_pool_id": "minimax_llm_pool",
-                    "reference_image_slots": 0,
-                    "supported_aspect_ratios": ["1:1"],
-                    "prompt_char_limit": 5000,
-                    "seed_supported": False,
-                    "cost_hint": "token-plan",
-                    "rate_limit_hint": "local mmx cli",
                     "required_gate": "AFS_ALLOW_REMOTE_LLM",
                 },
             },

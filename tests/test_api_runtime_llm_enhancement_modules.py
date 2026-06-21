@@ -53,7 +53,7 @@ def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
         assert len(source.splitlines()) <= 300, f"{name} exceeded the maintenance line threshold"
 
     constants = sources["runtime_llm_enhancement_constants.py"]
-    for label in ("意图", "人物/主体", "场景/美术", "连续性", "负面约束"):
+    for label in ("意图", "角色/主体", "场景/美术", "连续性", "负面约束"):
         assert label in constants
 
     for name in ("runtime_llm_enhancement_instructions.py", "runtime_llm_enhancement_fallback.py"):

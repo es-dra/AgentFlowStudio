@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from apps.api.runtime_director_compiler import compile_director_setup
@@ -45,7 +46,10 @@ def text_channel(
     director_compile: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     if mode == "optimize":
-        signatures = [f"{asset['label']}: {asset.get('signature')}" for asset, _detail in assets]
+        signatures = [
+            _sanitize_asset_line_for_visible_prompt(f"{asset['label']}: {asset.get('signature')}", visible_prompt)
+            for asset, _detail in assets
+        ]
         return {
             "visible_prompt": visible_prompt,
             "asset_signature_segment": "\n".join(signatures),
@@ -59,6 +63,7 @@ def text_channel(
     for asset, detail_level in assets:
         if detail_level != "full_card":
             line = f"{asset.get('label')}: {asset.get('signature')}".strip()
+            line = _sanitize_asset_line_for_visible_prompt(line, visible_prompt)
             if asset.get("asset_type") == "scene":
                 scene_lines.append(line)
             else:
@@ -72,6 +77,7 @@ def text_channel(
             if (str(asset.get("asset_id")), str(lock)) not in overrides
         ]
         line = f"{asset.get('label')}: {asset.get('signature')}. {card_text}. Locks: {'; '.join(locks)}".strip()
+        line = _sanitize_asset_line_for_visible_prompt(line, visible_prompt)
         if asset.get("asset_type") == "scene":
             scene_lines.append(line)
         else:
@@ -137,6 +143,45 @@ def _is_reference_localized_edit(bundle: dict[str, Any], visible_prompt: str) ->
     )
     preserve_terms = ("preserve", "keep", "保持", "不变")
     return any(term in prompt for term in edit_terms) and any(term in prompt for term in preserve_terms)
+
+
+def _sanitize_asset_line_for_visible_prompt(line: str, visible_prompt: str) -> str:
+    if not _prompt_is_animal_subject(visible_prompt):
+        return line
+    text = str(line or "")
+    replacements = {
+        "reference character": "reference animal subject",
+        "pending human confirmation": "pending confirmation",
+        "keep character identity": "keep animal identity",
+        "keep signature wardrobe": "do not add human wardrobe",
+        "参考图角色": "参考图动物主体",
+        "参考图人物": "参考图动物主体",
+        "角色身份": "动物主体身份",
+        "人物身份": "动物主体身份",
+        "角色主体": "动物主体",
+        "人物角色": "动物主体",
+        "角色资产": "主体资产",
+        "人物资产": "主体资产",
+        "标志性服装": "不要添加人类服装",
+        "服装": "不要添加人类服装",
+        "发型、发色": "毛色和毛发纹理",
+        "发型发色": "毛色和毛发纹理",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    text = re.sub(r";\s*wardrobe:\s*[^.;\n]+", "; no_human_clothing: do not add human clothing", text)
+    text = re.sub(r";\s*hair:\s*[^.;\n]+", "; fur: preserve animal fur color and markings", text)
+    return text
+
+
+def _prompt_is_animal_subject(value: str) -> bool:
+    text = str(value or "").casefold()
+    text = text.replace("角色/主体", "").replace("人物/主体", "").replace("角色：", "").replace("角色:", "").replace("人物：", "").replace("人物:", "")
+    if not text:
+        return False
+    animal_terms = ("猫", "狸花猫", "黑猫", "白猫", "橘猫", "宠物", "动物", "狗", "犬", "cat", "tabby", "kitten", "feline", "dog", "puppy", "animal", "pet")
+    human_terms = ("人像", "真人", "人类", "女孩", "男孩", "女人", "男人", "女性", "男性", "头发", "发型", "校服", "服装", "person", "human", "girl", "boy", "woman", "man", "hair", "wardrobe", "uniform")
+    return any(term.casefold() in text for term in animal_terms) and not any(term.casefold() in text for term in human_terms)
 
 
 __all__ = (

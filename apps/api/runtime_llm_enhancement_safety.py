@@ -156,13 +156,17 @@ def has_explicit_subject_reference(prompt: str) -> bool:
     subject_terms = (
         "这个人物",
         "这个角色",
+        "这个主体",
         "该人物",
         "该角色",
+        "该主体",
         "同一人物",
         "同一个人物",
         "同一角色",
+        "同一主体",
         "参考图中的人物",
         "参考图中的角色",
+        "参考图中的主体",
         "参考图主体",
         "原图主体",
         "当前图片",
@@ -172,8 +176,27 @@ def has_explicit_subject_reference(prompt: str) -> bool:
         "保持参考图",
         "基于参考图编辑",
         "基于当前图",
+        "上游节点的",
+        "参考上游节点",
+        "根据上游节点",
+        "上游参考图",
     )
     if any(term in text for term in subject_terms):
+        return True
+    animal_reference_terms = (
+        "这只猫",
+        "该猫",
+        "同一只猫",
+        "同一个猫",
+        "同一动物",
+        "参考图中的猫",
+        "参考图里的猫",
+        "原图中的猫",
+        "上游节点的猫",
+        "上游节点的狸花猫",
+        "参考上游节点的猫",
+    )
+    if any(term in text for term in animal_reference_terms):
         return True
     return bool(re.search(r"\b(same|current|reference)\s+(person|character|subject|image)\b", text, re.IGNORECASE))
 

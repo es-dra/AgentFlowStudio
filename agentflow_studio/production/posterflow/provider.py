@@ -7,7 +7,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from agentflow_studio.provider_contracts import ModelProviderError
 from agentflow_studio.production.posterflow.provider_common import ensure_remote_image_calls_allowed, input_hash
@@ -19,12 +19,7 @@ from agentflow_studio.production.posterflow.schemas import (
     PosterPromptPack,
 )
 
-if TYPE_CHECKING:
-    from agentflow_studio.production.posterflow.minimax_provider import MiniMaxImageProvider
-
-
 IMAGE_PROVIDER_ENV = "AFS_IMAGE_PROVIDER"
-MINIMAX_PROVIDER = "minimax"
 OPENAI_COMPATIBLE_PROVIDER = "openai_compatible"
 
 
@@ -206,14 +201,10 @@ def _safe_params(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def create_image_provider_from_env() -> OpenAICompatibleImageProvider | MiniMaxImageProvider:
+def create_image_provider_from_env() -> OpenAICompatibleImageProvider:
     provider_name = os.environ.get(IMAGE_PROVIDER_ENV, OPENAI_COMPATIBLE_PROVIDER).strip().lower()
     if provider_name in {"", OPENAI_COMPATIBLE_PROVIDER}:
         return OpenAICompatibleImageProvider.from_env()
-    if provider_name == MINIMAX_PROVIDER:
-        from agentflow_studio.production.posterflow.minimax_provider import MiniMaxImageProvider
-
-        return MiniMaxImageProvider.from_env()
     raise ModelProviderError(
-        f"Unsupported image provider '{provider_name}'; expected {OPENAI_COMPATIBLE_PROVIDER} or {MINIMAX_PROVIDER}"
+        f"Unsupported image provider '{provider_name}'; expected {OPENAI_COMPATIBLE_PROVIDER}"
     )

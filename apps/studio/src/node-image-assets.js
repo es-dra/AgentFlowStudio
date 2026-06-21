@@ -10,6 +10,25 @@ export function lastImageAsset(node) {
   return uploads[uploads.length - 1] || null;
 }
 
+export function imageAssetFromVisualAsset(asset) {
+  const refs = Array.isArray(asset?.image_asset_refs)
+    ? asset.image_asset_refs
+    : Array.isArray(asset?.source_image_asset_refs)
+      ? asset.source_image_asset_refs
+      : [];
+  const assetId = String(refs[0] || asset?.image_asset_id || asset?.source_image_asset_id || "").trim();
+  if (!assetId) return null;
+  return {
+    asset_id: assetId,
+    role: asset?.asset_type === "scene" ? "scene_reference" : "character_reference",
+    filename: asset?.title || asset?.label || `${assetId}.png`,
+    preview_url: asset?.preview_url || "",
+    width: asset?.width || null,
+    height: asset?.height || null,
+    aspect_ratio: asset?.aspect_ratio || null,
+  };
+}
+
 export function resizeNodeForImagePreview(node, preview, fallbackAspectRatio) {
   const [wRatio, hRatio] = previewRatio(preview, fallbackAspectRatio);
   const portrait = hRatio >= wRatio;

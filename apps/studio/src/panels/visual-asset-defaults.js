@@ -1,4 +1,4 @@
-export function visualAssetDefaults(node, imageAsset, assetType) {
+﻿export function visualAssetDefaults(node, imageAsset, assetType) {
   const text = [
     node?.title,
     node?.prompt,
@@ -10,8 +10,9 @@ export function visualAssetDefaults(node, imageAsset, assetType) {
 }
 
 function characterDefaults(node, text) {
-  const label = defaultLabel(node, "人物资产");
-  const personSection = sectionText(text, ["人物/主体", "人物", "主体"]);
+  if (isAnimalSubject(text)) return animalSubjectDefaults(node, text);
+  const label = defaultLabel(node, "角色资产");
+  const personSection = sectionText(text, ["角色/主体", "人物/主体", "人物", "主体"]);
   const hair = inferHair(text);
   const wardrobe = inferWardrobe(text);
   const palette = inferPalette(text);
@@ -22,21 +23,49 @@ function characterDefaults(node, text) {
   const demeanor = inferDemeanor(personSection);
   const card = {
     identity,
-    hair: hair || "保持参考图人物发型发色",
-    face: face || "保持参考图人物脸部五官与辨识度",
-    build: build || "保持参考图人物体型比例",
-    wardrobe: wardrobe || "保持参考图人物服装",
-    palette: palette || "保持参考图人物主色调",
-    demeanor: demeanor || "保持参考图人物气质和神态",
+    hair: hair || "保持参考图角色发型发色",
+    face: face || "保持参考图角色脸部五官与辨识度",
+    build: build || "保持参考图角色体型比例",
+    wardrobe: wardrobe || "保持参考图角色服装",
+    palette: palette || "保持参考图角色主色调",
+    demeanor: demeanor || "保持参考图角色气质和神态",
   };
   return {
     label: named || label,
-    signature: compact(uniqueTextParts([named || identity, hair, wardrobe, palette]).join("，")) || "参考图人物",
+    signature: compact(uniqueTextParts([named || identity, hair, wardrobe, palette]).join("，")) || "参考图角色",
     card,
     locks: [
-      "保持参考图人物身份和脸部辨识度",
+      "保持参考图角色身份和脸部辨识度",
       hair ? `保持${hair}` : "",
       wardrobe ? `保持${wardrobe}` : "",
+      palette ? `保持${palette}` : "",
+    ].filter(Boolean).join("\n"),
+  };
+}
+
+function animalSubjectDefaults(node, text) {
+  const label = animalLabel(node, text);
+  const personSection = sectionText(text, ["角色/主体", "人物/主体", "人物", "主体"]);
+  const identity = inferAnimalIdentity(personSection, label);
+  const fur = inferFur(text);
+  const palette = inferAnimalPalette(text) || inferPalette(text);
+  const card = {
+    identity,
+    hair: fur || "保持参考图动物主体的毛色、毛发纹理和斑纹",
+    face: "保持参考图动物主体的脸部斑纹、眼睛、耳朵和胡须辨识点",
+    build: "保持参考图动物主体的体型比例、四肢和尾巴形态",
+    wardrobe: "默认保持自然动物外观；服装、饰品或拟人化只在用户明确要求时添加",
+    palette: palette || "保持参考图动物主体的毛色主色调",
+    demeanor: "保持参考图动物主体的自然神态和姿态",
+  };
+  return {
+    label,
+    signature: compact(uniqueTextParts([label, fur, palette]).join("，")) || "参考图动物主体",
+    card,
+    locks: [
+      "保持参考图中同一只动物的毛色、斑纹、眼睛、耳朵、尾巴和体型比例",
+      "默认保持自然动物主体身份；拟人化或服装需由用户明确指定",
+      fur ? `保持${fur}` : "",
       palette ? `保持${palette}` : "",
     ].filter(Boolean).join("\n"),
   };
@@ -82,6 +111,16 @@ function inferHair(text) {
   return parts.join("") || "";
 }
 
+function inferFur(text) {
+  const parts = [];
+  if (includesAny(text, ["黑色狸花猫"])) return "黑色狸花猫毛色与虎斑纹";
+  if (includesAny(text, ["狸花猫", "tabby"])) parts.push("狸花猫虎斑纹");
+  if (includesAny(text, ["黑猫", "黑色的猫", "黑色猫"])) parts.push("黑色短毛");
+  if (includesAny(text, ["棕灰黑", "棕灰", "灰黑"])) parts.push("棕灰黑相间毛色");
+  if (includesAny(text, ["M 字纹", "M字纹", "额头 M"])) parts.push("额头 M 字纹");
+  return parts.join("，") || "";
+}
+
 function inferWardrobe(text) {
   if (includesAny(text, ["校服", "蓝白校服"])) return "蓝白校服";
   if (includesAny(text, ["运动服", "蓝白运动服", "蓝白色运动服"])) return "蓝白运动服";
@@ -99,6 +138,12 @@ function inferPalette(text) {
   return "";
 }
 
+function inferAnimalPalette(text) {
+  if (includesAny(text, ["棕灰黑", "狸花猫", "tabby"])) return "棕灰黑虎斑毛色";
+  if (includesAny(text, ["黑猫", "黑色的猫", "黑色猫"])) return "黑色毛色";
+  return "";
+}
+
 function inferLighting(text) {
   if (includesAny(text, ["夜晚", "暗光", "低照度"])) return "低照度夜景光线";
   if (includesAny(text, ["日光", "阳光", "白天"])) return "自然日光";
@@ -113,6 +158,7 @@ function inferTimeWeather(text) {
 
 const SECTION_LABELS = [
   "意图",
+  "角色/主体",
   "人物/主体",
   "人物",
   "主体",
@@ -159,9 +205,18 @@ function sectionText(text, labels) {
 function inferIdentity(personSection, named) {
   if (named) {
     const detail = firstClauses(personSection, 2);
-    return detail ? `${named}，${detail}` : `${named}，参考图中的人物角色`;
+    return detail ? `${named}，${detail}` : `${named}，参考图中的角色主体`;
   }
-  return firstClauses(personSection, 3) || "参考图中的人物角色";
+  return firstClauses(personSection, 3) || "参考图中的角色主体";
+}
+
+function inferAnimalIdentity(personSection, label) {
+  const identity = firstClauses(personSection, 3);
+  if (identity && !includesAny(identity, ["人物", "人像", "服装", "头发"])) return identity;
+  if (label.includes("狸花猫")) return "参考图中的同一只狸花猫";
+  if (label.includes("猫")) return "参考图中的同一只猫";
+  if (label.includes("狗")) return "参考图中的同一只狗";
+  return "参考图中的同一只动物主体";
 }
 
 function inferFace(personSection) {
@@ -214,6 +269,23 @@ function pushUniqueText(parts, value) {
 
 function includesAny(text, values) {
   return values.some((value) => String(text || "").includes(value));
+}
+
+function isAnimalSubject(text) {
+  const source = String(text || "");
+  const animalTerms = ["狸花猫", "黑猫", "白猫", "橘猫", "猫", "小狗", "狗", "犬", "宠物", "动物", "tabby", "cat", "kitten", "feline", "dog", "puppy", "animal", "pet"];
+  const humanTerms = ["人像", "真人", "人类", "女孩", "男孩", "女人", "男人", "女性", "男性", "头发", "发型", "校服", "服装", "person", "human", "girl", "boy", "woman", "man", "hair", "wardrobe", "uniform"];
+  return includesAny(source, animalTerms) && !includesAny(source.replaceAll("角色/主体", "").replaceAll("人物/主体", ""), humanTerms);
+}
+
+function animalLabel(node, text) {
+  const title = defaultLabel(node, "");
+  if (title && !includesAny(title, ["图片 / 关键帧", "图片", "关键帧"])) return title;
+  if (includesAny(text, ["黑色狸花猫"])) return "黑色狸花猫";
+  if (includesAny(text, ["狸花猫", "tabby"])) return "狸花猫";
+  if (includesAny(text, ["猫", "cat", "kitten", "feline"])) return "猫主体资产";
+  if (includesAny(text, ["狗", "犬", "dog", "puppy"])) return "狗主体资产";
+  return "动物主体资产";
 }
 
 function compact(value) {

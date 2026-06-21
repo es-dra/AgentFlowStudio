@@ -21,21 +21,8 @@ def provider_config() -> dict:
                     "t2v_query": "/v1/videos/text2video/{id}",
                 },
             },
-            "minimax": {
-                "auth_type": "api_key",
-                "base_url": "https://api.minimax.io",
-                "api_key": "fake-minimax-key",
-                "default_models": {"image": "image-01"},
-            },
         },
         "services": {
-            "minimax_image": {
-                "provider": "minimax",
-                "account_ref": "minimax",
-                "capability": "image",
-                "api_family": "t2i",
-                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
-            },
             "kling_i2v": {
                 "provider": "kling",
                 "account_ref": "kling",
@@ -66,12 +53,12 @@ def write_image_manifest(run_root, lane: str, state_id: str) -> None:
     image_dir.mkdir(parents=True, exist_ok=True)
     (image_dir / "candidate_001.png").write_bytes(b"fake-png")
     manifest = {
-        "schema_version": "minimax_image_smoke_manifest.v1",
+        "schema_version": "codex_image_smoke_manifest.v1",
         "status": "succeeded",
-        "service_id": "minimax_image",
-        "provider": "minimax_image",
-        "api_family": "t2i",
-        "model": "image-01",
+        "service_id": "codex_image",
+        "provider": "codex_image",
+        "api_family": "handoff",
+        "model": "image2",
         "outputs": [
             {
                 "image_path": "image_candidates/candidate_001.png",
@@ -82,7 +69,7 @@ def write_image_manifest(run_root, lane: str, state_id: str) -> None:
         ],
         "claim_boundary": "provider_smoke_only_not_creative_quality",
     }
-    (output_dir / "minimax_image_smoke_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (output_dir / "codex_image_smoke_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 def write_i2v_manifest(run_root, lane: str, state_id: str) -> None:

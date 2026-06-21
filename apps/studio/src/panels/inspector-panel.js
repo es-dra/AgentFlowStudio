@@ -173,7 +173,7 @@ function nextStepText(node) {
   if (node.status === "error") return "检查失败原因后重试，或先打开生成面板调整描述。";
   if (node.previewUrl || node.result) return "结果已经出现，可以继续生成、保存为素材，或打开过程查看引用与输出。";
   if (node.type === "script") return "补充故事设定后继续生成分镜和关键帧。";
-  if (node.type === "director") return "打开二维导演台，先把人物、机位、灯光和道具摆清楚。";
+  if (node.type === "director") return "打开二维导演台，先把角色、机位、灯光和道具摆清楚。";
   if (node.type === "image") return "填写画面描述或接入参考图，然后生成首帧。";
   if (node.type === "video") return "确认首帧和动作描述后生成视频；完成后再整理成视频素材卡。";
   return "补充内容后继续连接下游节点。";

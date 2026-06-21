@@ -12,6 +12,11 @@ import { icon } from "./icons.js";
 import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
+import {
+  expandTextIdeaToScript,
+  importScriptFileIntoTextNode,
+  splitTextNodeToStoryboardNodes,
+} from "./script-breakdown.js";
 
 const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script"]);
 
@@ -41,6 +46,7 @@ export function renderPromptBar(state, store, runtime) {
     else layer.appendChild(next);
     bar = next;
   }
+  syncPromptBarState(bar, node);
   positionBar(bar, state, node);
 }
 
@@ -96,6 +102,7 @@ function buildBar(store, runtime, node) {
   }
 
   bar.appendChild(buildBottomRow(store, runtime, node, textarea));
+  syncPromptBarState(bar, node);
   return bar;
 }
 
@@ -133,6 +140,15 @@ function buildBottomRow(store, runtime, node, textarea) {
     row.appendChild(motionBtn);
   }
 
+  if (node.type === "text") {
+    row.appendChild(textAction("upload", "导入剧本", () => importScriptFileIntoTextNode(store, node, textarea)));
+    row.appendChild(textAction("sparkles", "扩写剧本", () => expandTextIdeaToScript(store, runtime, node, textarea)));
+    row.appendChild(textAction("frames", "拆分分镜", () => {
+      const created = splitTextNodeToStoryboardNodes(store, node);
+      if (!created.length) flashTooltip(textarea, "先输入或导入剧本");
+    }));
+  }
+
   row.appendChild(el("span", "row-spacer"));
 
   const optimizeBtn = el("button", "bar-tool optimize-btn");
@@ -161,6 +177,30 @@ function buildBottomRow(store, runtime, node, textarea) {
   row.appendChild(send);
 
   return row;
+}
+
+function textAction(iconName, label, onClick) {
+  const button = el("button", "bar-tool text-script-tool");
+  button.innerHTML = `${icon(iconName, 14)}<span>${label}</span>`;
+  button.title = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function syncPromptBarState(bar, node) {
+  const running =
+    node.params?.promptOptimizationState?.status === "running" ||
+    node.params?.scriptExpansionState?.status === "running";
+  bar.classList.toggle("optimizing", running);
+  const textarea = bar.querySelector("textarea");
+  textarea?.classList.toggle("prompt-shimmer", running);
+  const optimizeBtn = bar.querySelector('[data-action="optimize-prompt"]');
+  if (optimizeBtn) {
+    optimizeBtn.classList.toggle("busy", running);
+    optimizeBtn.disabled = running;
+    const label = optimizeBtn.querySelector("span");
+    if (label) label.textContent = running ? "优化中" : "优化";
+  }
 }
 
 function runPromptBarGeneration(store, runtime, node) {

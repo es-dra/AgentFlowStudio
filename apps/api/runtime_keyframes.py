@@ -79,18 +79,21 @@ def build_keyframe_generation(
         limit=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
     )
     if context_bundle:
-        provider_prompt = provider_keyframe_prompt(
+        provider_prompt = _guarded_provider_keyframe_prompt(
             provider_prompt_from_bundle(context_bundle),
+            reference_count=len(reference_images),
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     else:
-        provider_prompt = provider_keyframe_prompt(
+        provider_prompt = _guarded_provider_keyframe_prompt(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
+            reference_count=len(reference_images),
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     if reference_images:
-        provider_prompt = provider_keyframe_prompt(
+        provider_prompt = _guarded_provider_keyframe_prompt(
             f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}",
+            reference_count=len(reference_images),
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
@@ -368,14 +371,19 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:
+    animal_reference = _looks_like_animal_reference_request(request)
     lines = [
         (
-            f"Connected reference images: {reference_count}. Use the uploaded reference as the subject source. "
-            "Only apply the user-requested edit; preserve all unspecified details. "
-            "Preserve the reference face, clothing, silhouette, body proportions, color palette, "
-            "camera relationship, and key visual traits."
+            f"Connected reference images: {reference_count}. 参考图只作为本次显式连线的视觉参考。"
+            "只保留与用户目标不冲突的相关主体特征、轮廓比例、颜色材质、镜头关系和关键视觉线索。"
+            "不要把无关背景、服装、图表、界面文字或旧失败风格带入结果。"
         )
     ]
+    if animal_reference:
+        lines.append(
+            "Animal subject reference: 如果参考主体是猫或动物，只保留同一动物主体的毛色、斑纹、眼睛、耳朵、尾巴和体型比例；"
+            "未明确要求时不要添加人类头发、服装或拟人身份；不要把参考图当作脸部贴图素材，必须重绘为统一完整的动物主体。"
+        )
     params = request.node_parameters or {}
     for item in list(params.get("connected_reference_nodes") or [])[:4]:
         if not isinstance(item, dict):
@@ -385,6 +393,17 @@ def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_
         if prompt:
             lines.append(f"Reference note {title}: {prompt}")
     return "\n".join(lines)
+
+
+def _looks_like_animal_reference_request(request: KeyframeGenerationRequest) -> bool:
+    params = request.node_parameters or {}
+    parts = [request.prompt_text, request.optimized_prompt]
+    for item in list(params.get("connected_reference_nodes") or [])[:4]:
+        if isinstance(item, dict):
+            parts.extend([str(item.get("title") or ""), str(item.get("prompt") or "")])
+    text = " ".join(str(part or "") for part in parts).casefold()
+    animal_terms = ("猫", "狸花猫", "黑猫", "白猫", "橘猫", "狗", "犬", "宠物", "动物", "cat", "tabby", "kitten", "feline", "dog", "puppy", "animal", "pet")
+    return any(term.casefold() in text for term in animal_terms)
 
 
 def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
@@ -419,6 +438,36 @@ def provider_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LI
     if len(prompt) <= limit:
         return prompt
     return prompt[:limit].rsplit(" ", 1)[0].strip()
+
+
+def _guarded_provider_keyframe_prompt(
+    value: str,
+    *,
+    reference_count: int = 0,
+    limit: int = DEFAULT_IMAGE_PROMPT_LIMIT,
+) -> str:
+    guard = _image_generation_guard(reference_count=reference_count)
+    reserve = len(guard) + 1
+    base_limit = max(240, limit - reserve)
+    prompt = provider_keyframe_prompt(value, limit=base_limit)
+    if not prompt:
+        return provider_keyframe_prompt(guard, limit=limit)
+    if "保真约束" in prompt:
+        return provider_keyframe_prompt(prompt, limit=limit)
+    return provider_keyframe_prompt(f"{prompt} {guard}", limit=limit)
+
+
+def _image_generation_guard(*, reference_count: int = 0) -> str:
+    base = (
+        "保真约束：按用户提示直接生成清晰自然的主体，主体身份、物种、材质和关键特征必须可读；"
+        "不要改成图标、标志、吉祥物、矢量插画、抽象符号或无关场景，除非用户明确要求这种风格。"
+    )
+    if reference_count <= 0:
+        return base
+    return (
+        f"{base} 参考图约束：本次携带 {reference_count} 张参考图；"
+        "参考图只补充相关视觉线索，不能覆盖用户本次明确的新目标。"
+    )
 
 
 class _DefaultImageDescriptor:

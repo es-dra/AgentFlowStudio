@@ -43,8 +43,10 @@ def test_visual_asset_panel_prefills_feature_card_from_node_context() -> None:
     assert "data-card" in render
     assert len(panel.splitlines()) <= 300
     assert len(render.splitlines()) <= 220
-    assert "短发" in defaults
-    assert "保持参考图人物身份和脸部辨识度" in defaults
+    assert "角色资产" in defaults
+    assert "动物主体" in defaults
+    assert "拟人化或服装需由用户明确指定" in defaults
+    assert "人物/主体" in defaults
 
 
 def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_assets() -> None:

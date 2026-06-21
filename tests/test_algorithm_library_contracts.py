@@ -67,6 +67,29 @@ def test_provider_safe_manifest_redacts_unsafe_boundaries() -> None:
     assert "d:\\" not in serialized
 
 
+def test_asset_card_drafting_uses_animal_role_defaults_for_cat_prompt() -> None:
+    from agentflow.algorithms.asset_card_drafting import draft_asset_card
+
+    draft = draft_asset_card(
+        asset_type="character",
+        project_id="proj_cat_asset",
+        draft_id="draft_cat",
+        source_image_asset_refs=["img_cat_ref"],
+        sampled_image_asset_refs=[],
+        source_video_artifact_id=None,
+        prompt_text="生成一只清晰自然的黑色狸花猫，保留虎斑纹、额头 M 字纹、短毛和明亮眼睛。",
+        provider_service_id="vision_image",
+    )
+
+    assert draft["asset_type"] == "character"
+    assert draft["label_suggestion"] == "黑色狸花猫"
+    assert "reference animal subject" in draft["signature"]
+    assert "reference character" not in draft["signature"]
+    assert "keep fur color and markings" in draft["candidate_locks"]
+    assert "only add human hair clothing or anthropomorphic traits when explicitly requested" in draft["candidate_locks"]
+    assert "用户明确要求" in draft["feature_card"]["wardrobe"]
+
+
 def test_quality_feedback_scoring_sanitizes_raw_evidence_without_memory_promotion() -> None:
     from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
 
@@ -120,7 +143,7 @@ def test_creative_intent_video_prompt_algorithm_handles_i2v_contract() -> None:
 
     assert "基于首帧生成视频" in fallback
     assert "单帧图像编辑" not in fallback
-    assert "不要把上游节点标题或完整旧提示词当成人物名字" in instruction
+    assert "不要把上游节点标题或完整旧提示词当成角色名字" in instruction
 
 
 def test_provider_gate_video_prompt_algorithm_strips_image_edit_language() -> None:

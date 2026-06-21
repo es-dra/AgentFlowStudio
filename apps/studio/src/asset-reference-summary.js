@@ -1,4 +1,4 @@
-export const MAX_CARRY_CHAIN_ITEMS = 4;
+﻿export const MAX_CARRY_CHAIN_ITEMS = 4;
 
 export function assetIdFromRef(ref) {
   return String(ref?.asset_id || ref?.assetId || ref?.visual_asset_id || ref || "").trim();
@@ -11,7 +11,7 @@ export function assetLabel(ref) {
 export function assetTypeLabel(ref) {
   const type = String(ref?.asset_type || ref?.type || "").toLowerCase();
   if (type === "scene") return "场景";
-  if (type === "character") return "人物";
+  if (type === "character") return "角色";
   return "资产";
 }
 
@@ -69,4 +69,3 @@ export function subjectSuffix(item, bundle) {
     ? "（含参考图）"
     : "";
 }
-

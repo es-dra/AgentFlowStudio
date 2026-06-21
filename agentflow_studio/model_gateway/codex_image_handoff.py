@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import shutil
-import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -31,7 +30,7 @@ def create_handoff_task(plan: dict[str, Any]) -> dict[str, Any]:
         "job_id": job_id,
         "service_id": str(plan["service_id"]),
         "capability": "image",
-        "prompt": str(plan["prompt"]),
+        "prompt": _guarded_codex_image_prompt(str(plan["prompt"])),
         "aspect_ratio": str(plan.get("aspect_ratio") or "9:16"),
         "candidate_count": 1,
         "seed": plan.get("seed"),
@@ -69,9 +68,6 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         raise ModelGatewayError("Codex image handoff job not found")
     state, job_dir = located
     if state in {"pending", "running"}:
-        recovered = _completed_running_candidate(output_dir, job_dir, job_id)
-        if recovered:
-            return recovered
         return {
             "status": state,
             "job_id": job_id,
@@ -100,47 +96,6 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         "provider_raw_response_stored": False,
         "outputs": outputs,
     }
-
-
-def _completed_running_candidate(output_dir: Path, job_dir: Path, job_id: str) -> dict[str, Any] | None:
-    candidate = _running_candidate_path(job_dir)
-    if not candidate or time.time() - candidate.stat().st_mtime < 5:
-        return None
-    target = candidate_output_path(output_dir)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if candidate.resolve() != target.resolve():
-        shutil.copyfile(candidate, target)
-    result = completed_result_payload(job_id=job_id, output_dir=output_dir, candidate_path=target)
-    write_json(job_dir / RESULT_FILENAME, result)
-    completed = job_dir.parents[1] / "completed" / job_id
-    completed.parent.mkdir(parents=True, exist_ok=True)
-    job_dir.rename(completed)
-    _trim_recovered_job_dir(completed)
-    return {
-        "status": "succeeded",
-        "job_id": job_id,
-        "provider_calls_started": True,
-        "provider_raw_response_stored": False,
-        "outputs": _safe_outputs(output_dir, result),
-    }
-
-
-def _running_candidate_path(job_dir: Path) -> Path | None:
-    for candidate in (job_dir / "candidate_001.png", job_dir / "image_candidates" / "candidate_001.png"):
-        if candidate.is_file() and candidate.stat().st_size > 0:
-            return candidate
-    return None
-
-
-def _trim_recovered_job_dir(job_dir: Path) -> None:
-    for name in (REQUEST_FILENAME, "worker_prompt.md"):
-        path = job_dir / name
-        if path.exists():
-            path.unlink()
-    for name in ("references", ".codex-home", "image_candidates"):
-        path = job_dir / name
-        if path.exists():
-            shutil.rmtree(path, ignore_errors=True)
 
 
 def completed_result_payload(*, job_id: str, output_dir: Path, candidate_path: Path) -> dict[str, Any]:
@@ -212,6 +167,45 @@ def _copy_reference_images(staging_dir: Path, reference_paths: Any) -> list[dict
             }
         )
     return copied
+
+
+def _guarded_codex_image_prompt(prompt: str) -> str:
+    text = str(prompt or "").strip()
+    if not text or _has_explicit_non_photo_style(text):
+        return text
+    return (
+        "默认写实照片风格，真实毛发/材质、合理解剖、自然光影、主体完整清晰。"
+        "不要生成插画、卡通、动漫、图标、logo、吉祥物、矢量图、抽象符号或 UI 元素，除非用户明确要求这些风格。\n"
+        f"用户目标：{text}"
+    )
+
+
+def _has_explicit_non_photo_style(prompt: str) -> bool:
+    lowered = prompt.lower()
+    return any(
+        token in lowered
+        for token in (
+            "插画",
+            "卡通",
+            "动漫",
+            "漫画",
+            "图标",
+            "logo",
+            "吉祥物",
+            "矢量",
+            "扁平",
+            "绘本",
+            "q版",
+            "illustration",
+            "cartoon",
+            "anime",
+            "manga",
+            "icon",
+            "mascot",
+            "vector",
+            "flat design",
+        )
+    )
 
 
 def _safe_outputs(output_dir: Path, result: dict[str, Any]) -> list[dict[str, Any]]:

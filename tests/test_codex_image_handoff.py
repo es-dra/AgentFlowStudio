@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import os
 import time
-from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway import codex_image_worker
 from agentflow_studio.model_gateway.codex_image_worker import (
     CodexExecImageExecutor,
     FakeCodexImageExecutor,
@@ -20,6 +20,32 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequ
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
 from apps.api.runtime_store import RuntimeStore
+
+
+class FakeCodexProcess:
+    def __init__(self, returncode: int | None = 0, stdout: str = "", stderr: str = "") -> None:
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        self.terminated = False
+        self.killed = False
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def communicate(self) -> tuple[str, str]:
+        return self.stdout, self.stderr
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def wait(self, timeout: float | None = None) -> int | None:  # noqa: ARG002 - fake process protocol.
+        return self.returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
 
 
 def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path, monkeypatch) -> None:
@@ -49,6 +75,7 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     request_payload = json.loads(request_path.read_text(encoding="utf-8"))
     serialized = json.dumps(request_payload, ensure_ascii=False).lower()
     assert request_payload["reference_images"][0]["path"] == "references/reference_001.png"
+    assert "默认写实照片风格" in request_payload["prompt"]
     assert str(reference).lower() not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
@@ -77,6 +104,23 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     assert str(output_dir).lower() not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_codex_image_worker_prompt_has_non_visual_job_nonce() -> None:
+    prompt = codex_image_worker._worker_prompt(  # noqa: SLF001 - guard regression for the worker prompt contract.
+        {
+            "job_id": "codex_img_parallel_001",
+            "prompt": "帮我生成一只黑色的狸花猫",
+            "aspect_ratio": "9:16",
+            "reference_images": [],
+        }
+    )
+
+    assert "Create a fresh image for this specific job" in prompt
+    assert "Do not reuse a previous job output" in prompt
+    assert "default to a realistic photographic image" in prompt
+    assert "Non-visual job nonce, do not draw or write this text: codex_img_parallel_001" in prompt
+    assert "帮我生成一只黑色的狸花猫" in prompt
 
 
 def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path, monkeypatch) -> None:
@@ -269,14 +313,14 @@ def test_codex_image_worker_resolves_user_local_codex_when_path_is_missing(tmp_p
     work_dir.mkdir()
     captured: dict[str, list[str]] = {}
 
-    def fake_run(command, *, cwd, **kwargs):  # noqa: ANN001, ANN202
+    def fake_popen(command, *, cwd, **kwargs):  # noqa: ANN001, ANN202
         captured["command"] = list(command)
         (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
-        return SimpleNamespace(returncode=0, stderr="", stdout="")
+        return FakeCodexProcess(returncode=0)
 
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: home)
-    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", fake_popen)
 
     produced = CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
 
@@ -293,7 +337,7 @@ def test_codex_image_worker_reports_missing_cli_as_safe_runtime_error(tmp_path, 
 
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: tmp_path / "missing-home")
-    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", missing_codex)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", missing_codex)
 
     with pytest.raises(RuntimeError, match="Codex image worker command is not available"):
         CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
@@ -400,7 +444,7 @@ def test_codex_image_handoff_reports_pending_queue_position(tmp_path, monkeypatc
     assert second_poll["progress"]["queue_position"] == 2
 
 
-def test_codex_image_handoff_poll_recovers_stable_running_candidate(tmp_path, monkeypatch) -> None:
+def test_codex_image_handoff_poll_keeps_active_running_candidate_with_worker(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     registry = ProviderRegistry.from_store(_store(tmp_path, _codex_provider_config()))
     output_dir = tmp_path / "run"
@@ -421,14 +465,36 @@ def test_codex_image_handoff_poll_recovers_stable_running_candidate(tmp_path, mo
 
     result = registry.poll("image", "codex_image", task)
 
-    assert result["status"] == "succeeded"
-    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
-    assert (output_dir / "image_candidates" / "candidate_001.png").read_bytes() == FakeCodexImageExecutor.PNG_BYTES
+    assert result["status"] == "running"
+    assert result["progress"]["mode"] == "indeterminate"
+    assert result["outputs"] == []
     completed_dir = output_dir / "codex_image_job" / "completed" / job_id
-    assert completed_dir.is_dir()
-    assert (completed_dir / "result.json").is_file()
-    assert not running_dir.exists()
-    assert not (completed_dir / "request.json").exists()
+    failed_dir = output_dir / "codex_image_job" / "failed" / job_id
+    assert running_dir.is_dir()
+    assert not completed_dir.exists()
+    assert not failed_dir.exists()
+    assert not (output_dir / "image_candidates" / "candidate_001.png").exists()
+
+
+def test_codex_image_executor_returns_candidate_written_before_timeout(tmp_path, monkeypatch) -> None:
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    process = FakeCodexProcess(returncode=None)
+
+    def fake_popen(command, *, cwd, **kwargs):  # noqa: ANN001, ANN202
+        (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+        return process
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda command: command)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", fake_popen)
+
+    produced = CodexExecImageExecutor(timeout_sec=1, poll_interval_sec=0.1, candidate_settled_sec=0).execute(
+        _image_worker_request(),
+        work_dir,
+    )
+
+    assert produced == work_dir / "candidate_001.png"
+    assert process.terminated is True
 
 
 def test_generated_image_asset_id_is_stable_for_same_job_candidate(tmp_path) -> None:
@@ -469,15 +535,15 @@ def test_codex_image_executor_uses_job_scoped_codex_home(tmp_path, monkeypatch) 
     work_dir.mkdir()
     captured: dict[str, dict[str, str]] = {}
 
-    def fake_run(command, *, cwd, env, **kwargs):  # noqa: ANN001, ANN202
+    def fake_popen(command, *, cwd, env, **kwargs):  # noqa: ANN001, ANN202
         captured["env"] = dict(env)
         (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
-        return SimpleNamespace(returncode=0, stderr="", stdout="")
+        return FakeCodexProcess(returncode=0)
 
     monkeypatch.setenv("AFS_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
     monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: home)
-    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", fake_run)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", fake_popen)
 
     CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
 

@@ -123,6 +123,10 @@
   display: inline-flex;
 }
 
+.node.hide-context-toolbar .node-context-toolbar {
+  display: none !important;
+}
+
 .node-context-toolbar button {
   height: 28px;
   display: inline-flex;

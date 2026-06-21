@@ -12,8 +12,6 @@ KNOWN_HIDDEN_COMMAND_DEBT = {
     "kling-i2v-smoke",
     "kling-t2v-smoke",
     "kling-video-resume",
-    "minimax-i2i-smoke",
-    "minimax-image-smoke",
     "production-memory-loop-asset-profile-context-projection",
     "production-memory-loop-asset-profile-readiness",
     "production-memory-loop-capture-operator-feedback",

@@ -8,7 +8,7 @@ from tools.afs_mvp_joint_qa_readiness_audit import build_readiness_audit
 
 def test_joint_qa_readiness_audit_summarizes_open_provider_blockers(tmp_path: Path) -> None:
     _write_json(
-        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        tmp_path / "live_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
         {
             "status": "blocked",
             "provider_calls_started": True,
@@ -78,7 +78,7 @@ def test_joint_qa_readiness_audit_marks_missing_kling_evidence_as_missing(tmp_pa
 
 def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(tmp_path: Path) -> None:
     _write_json(
-        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        tmp_path / "live_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
         {"status": "succeeded", "provider_calls_started": True},
     )
     _write_json(
@@ -112,9 +112,9 @@ def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(
     assert roles["video_qa"]["evidence_ref"] == "live_kling_i2v_startup_config_recovery_poll_report.json"
 
 
-def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(tmp_path: Path) -> None:
+def test_joint_qa_readiness_audit_uses_image_ready_preflight_for_next_action(tmp_path: Path) -> None:
     _write_json(
-        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        tmp_path / "live_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
         {
             "status": "blocked",
             "provider_calls_started": True,
@@ -122,7 +122,7 @@ def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(t
             "blocks": [{"block_id": "remote_image_provider_not_ready", "reason": "safe reason"}],
         },
     )
-    preflight_path = tmp_path / "minimax_image_provider_preflight_startup_secrets_config_gate_open.json"
+    preflight_path = tmp_path / "image_provider_preflight_startup_secrets_config_gate_open.json"
     preflight_path.write_text(
         json.dumps(
             {
@@ -138,7 +138,7 @@ def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(t
         encoding="utf-8-sig",
     )
     _write_json(
-        tmp_path / "minimax_image_provider_preflight_startup_secrets_config.json",
+        tmp_path / "image_provider_preflight_startup_secrets_config.json",
         {
             "status": "gate_closed",
             "checks": {
@@ -164,16 +164,16 @@ def test_joint_qa_readiness_audit_uses_minimax_ready_preflight_for_next_action(t
     image_blocker = blockers["P1-IMAGE-B-PROVIDER-READINESS"]
     assert image_blocker["status"] == "blocked"
     assert image_blocker["preflight_status"] == "ready"
-    assert "minimax_image_provider_preflight_startup_secrets_config_gate_open.json" in image_blocker["evidence_refs"]
-    assert "minimax_image_provider_preflight_startup_secrets_config.json" not in image_blocker["evidence_refs"]
+    assert "image_provider_preflight_startup_secrets_config_gate_open.json" in image_blocker["evidence_refs"]
+    assert "image_provider_preflight_startup_secrets_config.json" not in image_blocker["evidence_refs"]
     assert audit["next_actions"] == [
-        "MiniMax image REST preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1."
+        "Image provider preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1."
     ]
 
 
 def test_joint_qa_readiness_audit_clears_image_blocker_after_b_only_retry_success(tmp_path: Path) -> None:
     _write_json(
-        tmp_path / "live_minimax_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
+        tmp_path / "live_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
         {
             "status": "blocked",
             "provider_calls_started": True,
@@ -182,7 +182,7 @@ def test_joint_qa_readiness_audit_clears_image_blocker_after_b_only_retry_succes
         },
     )
     _write_json(
-        tmp_path / "minimax_b_only_live_retry_20260615.json",
+        tmp_path / "image_b_only_live_retry_20260615.json",
         {
             "status": "succeeded",
             "provider_calls_started": True,

@@ -2,10 +2,14 @@ import { createNode, connect } from "./nodes.js";
 import { isRemoteImageModel, isRemoteVideoModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
-import { lastImageAsset } from "./node-image-assets.js";
+import { imageAssetFromVisualAsset, lastImageAsset } from "./node-image-assets.js";
 import { setNodeError } from "./node-action-utils.js";
 import { startRemoteKeyframeGeneration } from "./node-keyframe-actions.js";
 import { startRemoteVideoGeneration, startRemoteVideoRevision } from "./node-video-actions.js";
+import {
+  importScriptFileIntoTextNode,
+  splitTextNodeToStoryboardNodes,
+} from "./script-breakdown.js";
 
 export { uploadNodeImage } from "./node-upload-actions.js";
 export { visibleAssetForNode } from "./node-visible-assets.js";
@@ -19,6 +23,19 @@ export {
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
+  if (node.type === "text" && intent === "上传完整剧本") {
+    importScriptFileIntoTextNode(store, node);
+    return;
+  }
+  if (node.type === "text" && intent === "想法扩写剧本") {
+    setNodeError(store, node.id, "请先在底部输入想法，再点击扩写剧本。");
+    return;
+  }
+  if (node.type === "text" && intent === "剧本拆分分镜") {
+    const created = splitTextNodeToStoryboardNodes(store, node);
+    if (!created.length) setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
+    return;
+  }
   if (node.type === "script" && intent === "剧本生成分镜脚本") {
     spawnSampleScriptFlow(store, node);
     return;
@@ -54,8 +71,20 @@ export function spawnSampleScriptFlow(store, scriptNode) {
 }
 
 export function fixNodeVisualAsset(store, runtime, node) {
-  const imageAsset = lastImageAsset(node);
-  openVisualAssetPanel({ store, runtime, node, imageAsset });
+  const existingAsset = lastFixedVisualAsset(node);
+  const imageAsset = lastImageAsset(node) || imageAssetFromVisualAsset(existingAsset);
+  openVisualAssetPanel({
+    store,
+    runtime,
+    node,
+    imageAsset,
+    existingAsset,
+  });
+}
+
+export function lastFixedVisualAsset(node) {
+  const assets = Array.isArray(node?.params?.visualAssets) ? node.params.visualAssets : [];
+  return [...assets].reverse().find((asset) => ["fixed", "ready", ""].includes(String(asset?.status || ""))) || null;
 }
 
 // 发送（Ctrl+Enter / 发送按钮）：当前 MVP 只允许图片节点触发真实 keyframe。

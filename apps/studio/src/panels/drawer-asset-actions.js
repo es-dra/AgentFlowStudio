@@ -1,4 +1,4 @@
-import { fitVisibleCanvasViewport } from "../canvas-safe-area.js";
+﻿import { fitVisibleCanvasViewport } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 import { el, showModal } from "../overlay.js";
 import { openVisualAssetPanel } from "./visual-asset-panel.js";
@@ -169,12 +169,12 @@ export function iconForAsset(asset) {
 
 export function kindLabel(assetOrKind) {
   const asset = typeof assetOrKind === "object" && assetOrKind ? assetOrKind : { kind: assetOrKind };
-  if (asset.kind === "visual_asset" && asset.asset_type === "character") return "人物资产";
+  if (asset.kind === "visual_asset" && asset.asset_type === "character") return "角色资产";
   if (asset.kind === "visual_asset" && asset.asset_type === "scene") return "场景资产";
   return {
-    character_asset: "人物资产",
+    character_asset: "角色资产",
     scene_asset: "场景资产",
-    character_turnaround: "人物三视图",
+    character_turnaround: "角色三视图",
     scene_board: "场景",
     keyframe: "关键帧",
     video_clip: "视频片段",

@@ -242,7 +242,7 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     )
     assert 'asset.kind === "visual_asset" && asset.asset_type === "character"' in drawer_source
     assert 'asset.kind === "character_asset"' in drawer_source
-    assert 'character_asset: "人物资产"' in drawer_source
+    assert 'character_asset: "角色资产"' in drawer_source
     assert "asset.preview_url" in drawer_source
     assert "node.params.visualAssets" in drawer_source
     assert "visualAssetRef" in drawer_source

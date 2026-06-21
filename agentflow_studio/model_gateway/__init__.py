@@ -16,10 +16,6 @@ from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGateway
 from agentflow_studio.model_gateway.gateway import ModelGateway
 from agentflow_studio.model_gateway.kling_plan import build_kling_request_plan
 from agentflow_studio.model_gateway.kling_video_smoke import run_kling_i2v_smoke, run_kling_t2v_smoke
-from agentflow_studio.model_gateway.minimax_image_smoke import (
-    build_minimax_image_request_plan,
-    run_minimax_image_smoke,
-)
 from agentflow_studio.model_gateway.mock_provider import MockLLMProvider
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 
@@ -37,11 +33,9 @@ __all__ = [
     "OpenAICompatibleProvider",
     "ProviderConfig",
     "build_kling_request_plan",
-    "build_minimax_image_request_plan",
     "load_company_provider_secrets",
     "load_model_gateway_config",
     "resolve_model_gateway_config_path",
     "run_kling_i2v_smoke",
-    "run_minimax_image_smoke",
     "run_kling_t2v_smoke",
 ]

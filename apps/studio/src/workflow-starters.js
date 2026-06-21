@@ -1,4 +1,4 @@
-import { createNode, connect } from "./nodes.js";
+﻿import { createNode, connect } from "./nodes.js";
 
 export const WORKFLOW_STARTERS = [
   {
@@ -84,17 +84,17 @@ function characterAssetFlow(store, x, y, gapX) {
   const card = createNode(store, "script", x + gapX * 2, y);
   store.set((s) => {
     Object.assign(s.nodes[brief.id], {
-      title: "人物设定",
-      content: "填写人物姓名、年龄、服装、发型、身份特征、不许漂移的锁定项。",
+      title: "角色设定",
+      content: "填写角色名称、年龄/阶段、服装或外观、发型或毛发、身份特征、不许漂移的锁定项。",
       status: "complete",
     });
     Object.assign(s.nodes[reference.id], {
-      title: "人物参考图",
-      prompt: "生成或上传人物参考图，再自动整理角色设定卡草稿。",
+      title: "角色参考图",
+      prompt: "生成或上传角色参考图，再自动整理角色设定卡草稿。",
     });
     Object.assign(s.nodes[card.id], {
       title: "角色设定卡草稿",
-      prompt: "自动识别人物外观、服饰、可保存特征和待补充信息，确认前不会用于后续生成。",
+      prompt: "自动识别角色外观、服饰或毛发、可保存特征和待补充信息，确认前不会用于后续生成。",
     });
     s.selection = { nodeIds: [brief.id, reference.id, card.id], edgeId: null };
   });
@@ -138,7 +138,7 @@ function firstFrameVideoFlow(store, x, y, gapX) {
     });
     Object.assign(s.nodes[video.id], {
       title: "图生视频",
-      prompt: "基于上游首帧生成 5 秒视频，保持人物身份和场景连续。",
+      prompt: "基于上游首帧生成 5 秒视频，保持角色身份和场景连续。",
     });
     s.selection = { nodeIds: [frame.id, video.id], edgeId: null };
   });

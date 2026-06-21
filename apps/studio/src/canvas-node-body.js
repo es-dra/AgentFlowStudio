@@ -10,7 +10,8 @@ export function buildNodeBody(node, def) {
   if (carry) out.push(carry);
   if (node.content) {
     const view = document.createElement("div");
-    view.className = "text-content-view";
+    const expanding = node.params?.scriptExpansionState?.status === "running";
+    view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
     view.textContent = node.content;
     out.push(view);
     return out;
@@ -88,6 +89,7 @@ export function nodeBodySignature(node) {
     node.collapsed ? 1 : 0,
     directorSig,
     node.params?.appliedDownstreamCount || 0,
+    node.params?.scriptExpansionState?.status || "",
   ].join("|");
 }
 
@@ -98,7 +100,7 @@ function directorBody(node, def) {
     ? ` / 已应用到 ${node.params.appliedDownstreamCount} 个相连节点`
     : "";
   out.push(iconBlock(def.icon));
-  out.push(textBlock("node-empty-label", "二维顶视图布置机位、人物、灯光和道具"));
+  out.push(textBlock("node-empty-label", "二维顶视图布置机位、角色、灯光和道具"));
   out.push(textBlock("director-node-summary", `${summary}${applied}`));
   const open = document.createElement("button");
   open.className = "director-open-btn";

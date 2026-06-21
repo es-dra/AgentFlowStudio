@@ -1,4 +1,5 @@
 from apps.api.runtime_context_text import provider_prompt_from_bundle
+from apps.api.runtime_context_text import text_channel
 
 
 def test_reference_localized_edit_prompt_leads_with_requested_delta() -> None:
@@ -64,3 +65,26 @@ def test_reference_localized_edit_detects_modify_only_language() -> None:
 
     assert prompt.startswith("Requested change / preserve policy")
     assert prompt.index("Modify only the key light") < prompt.index("keep cool gray lighting")
+
+
+def test_animal_prompt_sanitizes_legacy_character_asset_signature() -> None:
+    channel = text_channel(
+        "optimize",
+        "根据上游节点的狸花猫,生成这只猫在房间里跳舞的图片",
+        [
+            (
+                {
+                    "label": "Cute tabby cat reclining in a",
+                    "signature": "Cute tabby cat reclining in a reference character, pending human confirmation",
+                    "asset_type": "character",
+                },
+                "signature",
+            )
+        ],
+        set(),
+    )
+
+    segment = channel["asset_signature_segment"]
+    assert "reference animal subject" in segment
+    assert "pending human confirmation" not in segment
+    assert "reference character" not in segment

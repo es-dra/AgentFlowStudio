@@ -12,6 +12,43 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current prompt/template and provider cleanup addendum: 2026-06-21 pass repaired
+the reference-image prompt contract that was leaking old human-edit wording into
+animal image flows. Active prompt sections now use `角色/主体`; animal reference
+flows preserve fur, markings, eyes, ears, tail, and body ratio while treating
+old asset signatures and default locks as lower-priority context. Explicit
+animal clothing/stylization requests are allowed only when the user asks for
+them, preventing the previous conflict between "cat dancing" and human
+short-hair/uniform constraints. Minimax image/provider paths were removed from
+the active registry, CLI, posterflow provider, smoke helpers, and preflight
+tools; only negative compatibility tests remain. Prompt optimization now runs
+inline with shimmer feedback instead of a blocking modal, fixed assets can be
+reopened for adjustment, and the Codex image worker can recover stable
+candidate files from stale/running jobs. Verification: full pytest passed 582 /
+520 deselected / 2 existing warnings; `npm run check:studio-js` passed for 102
+files; CLI help and version passed; maintenance audit failed=0 with warnings
+only; `git diff --check` passed with existing CRLF/LF warnings only. Boundary:
+video provider execution remains out of scope; this is code/runtime evidence,
+not human acceptance, business validation, or durable memory promotion.
+
+Current text-to-storyboard authoring addendum: 2026-06-22 pass moved text-node
+script import and idea expansion results into the node body instead of the
+bottom prompt input, with a visible shimmer state while the source text is being
+expanded. Text nodes now hide the selected-node workflow toolbar to remove the
+`继续生成 / 保存素材 / 整理卡片 / 看过程` clutter from script drafting. Script
+breakdown now creates structured storyboard script nodes with explicit `镜号 /
+时长 / 画面描述 / 景别 / 光影氛围 / 运镜 / 对白/旁白 / 音效 / 资产` fields and
+candidate `@` asset references, then spawns downstream image asset-prep nodes
+for the identified角色/场景/道具 candidates. Verification: prompt/script
+focused static tests passed 5; Studio static regression set passed 30;
+`npm run check:studio-js` passed for 102 files; full coverage browser QA passed
+with `provider_calls_started=false`; `git diff --check` passed with existing
+CRLF/LF warnings only. Boundary: asset-prep nodes are candidates only, not
+fixed assets, durable memory promotion, human acceptance, provider smoke, or
+business validation; no Runtime API shape, provider gate, server state, secret,
+signed URL, session token, invite code, provider raw response, local media byte,
+or Company OS private source content was written.
+
 Current authenticated media and TuanTuan stability addendum: 2026-06-21 pass
 fixed broken uploaded/reference image rendering in image nodes and the asset
 drawer without weakening Runtime media auth. Studio now fetches protected

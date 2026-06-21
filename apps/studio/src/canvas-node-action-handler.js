@@ -1,6 +1,7 @@
 import { assetIdFromRef } from "./asset-reference-summary.js";
 import { duplicateNode } from "./nodes.js";
 import { fixNodeVisualAsset, handleNodeIntent, pollNodeVideoGeneration, startNodeGeneration, uploadNodeImage } from "./node-actions.js";
+import { importScriptFileIntoTextNode } from "./script-breakdown.js";
 import { openAssetDetailPopover } from "./panels/asset-detail-popover.js";
 import { openDirectorShell } from "./panels/director-shell.js";
 import { openNodeMenu } from "./panels/node-menu.js";
@@ -18,6 +19,7 @@ export function handleCanvasNodeClick(store, runtime, e) {
   if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
   else if (action === "open-director") openDirectorShell(store, node);
   else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
+  else if (node.type === "text" && action === "upload") importScriptFileIntoTextNode(store, node);
   else if (action === "upload") uploadNodeImage(store, runtime, node);
   else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
   else if (action === "open-generation-panel" || action === "continue-generate") {

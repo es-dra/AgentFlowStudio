@@ -104,9 +104,9 @@ def test_prompt_optimization_user_prompt_consumes_director_setup_2d(tmp_path) ->
     user_prompt = payload["user_prompt"]
     user_sections = {section["title"]: section["text"] for section in payload["user_prompt_sections"]}
 
-    assert list(user_sections) == ["人物", "场景", "镜头", "灯光", "运动", "负面约束"]
-    assert "男孩" in user_sections["人物"]
-    assert "坐姿抱膝" in user_sections["人物"]
+    assert list(user_sections) == ["角色", "场景", "镜头", "灯光", "运动", "负面约束"]
+    assert "男孩" in user_sections["角色"]
+    assert "坐姿抱膝" in user_sections["角色"]
     assert "海报" in user_sections["场景"]
     assert "机位1" in user_sections["镜头"]
     assert "FOV 48" not in user_sections["镜头"]

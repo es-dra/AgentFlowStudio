@@ -78,7 +78,7 @@ def _is_safe_secret_field_reference(line: str) -> bool:
         return True
     if value.startswith("<") and value.endswith(">"):
         return True
-    if value.startswith(("AFS_", "OPENAI_", "KLING_", "MINIMAX_")):
+    if value.startswith(("AFS_", "OPENAI_", "KLING_")):
         return True
     if _is_symbolic_secret_reference(value):
         return True
@@ -122,7 +122,7 @@ def _is_symbolic_secret_reference(value: str) -> bool:
 def _is_safe_env_reference(line: str) -> bool:
     return bool(
         re.search(
-            r"(?:AFS|OPENAI|KLING|MINIMAX)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*\s*=\s*(?:unset|\"?<[^>]+>\"?)",
+            r"(?:AFS|OPENAI|KLING)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*\s*=\s*(?:unset|\"?<[^>]+>\"?)",
             line,
             re.IGNORECASE,
         )
@@ -132,7 +132,7 @@ def _is_safe_env_reference(line: str) -> bool:
 def _is_safe_environment_lookup(value: str) -> bool:
     return bool(
         re.search(
-            r"os\.environ\.get\([\"'](?:AFS|OPENAI|KLING|MINIMAX)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*[\"']\)",
+            r"os\.environ\.get\([\"'](?:AFS|OPENAI|KLING)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*[\"']\)",
             value,
             re.IGNORECASE,
         )

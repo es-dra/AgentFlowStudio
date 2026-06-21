@@ -153,6 +153,18 @@
   padding: 7px 8px;
   color: var(--text-primary);
 }
+.visual-asset-panel.is-drafting input,
+.visual-asset-panel.is-drafting textarea {
+  background-image:
+    linear-gradient(90deg, transparent 0%, rgba(73, 224, 235, 0.14) 36%, rgba(255, 255, 255, 0.18) 50%, rgba(73, 224, 235, 0.12) 64%, transparent 100%);
+  background-size: 230% 100%;
+  animation: visualAssetFieldShimmer 1.35s linear infinite;
+  border-color: rgba(73, 224, 235, 0.28);
+}
+@keyframes visualAssetFieldShimmer {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
 .visual-asset-panel {
   max-height: 88vh;
   overflow-y: auto;

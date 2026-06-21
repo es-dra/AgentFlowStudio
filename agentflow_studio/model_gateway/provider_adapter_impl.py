@@ -1,73 +1,19 @@
 from __future__ import annotations
 
-import json
 import hashlib
 import os
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.kling_video_smoke import poll_kling_i2v_task_once, submit_kling_i2v_task
-from agentflow_studio.model_gateway.minimax_image_smoke import run_minimax_image_smoke
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
 from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
 
 
-DEFAULT_MINIMAX_TEXT_MODEL = "MiniMax-M2.7-highspeed"
 DEFAULT_DEEPSEEK_TEXT_MODEL = "deepseek-chat"
-
-
-class MiniMaxImageAdapter:
-    def __init__(self, store: CompanyProviderSecrets, service_id: str, descriptor: ProviderDescriptor) -> None:
-        self.store = store
-        self.service_id = service_id
-        self.descriptor = descriptor
-
-    def validate(self, request: ProviderDispatchRequest) -> None:
-        if request.aspect_ratio not in self.descriptor.supported_aspect_ratios:
-            raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
-        if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
-            raise ModelConfigError(
-                f"reference_image_slots exceeded for {self.service_id}: "
-                f"{len(request.reference_image_paths)} > {self.descriptor.reference_image_slots}"
-            )
-        _require_gate(self.descriptor.required_gate)
-
-    def translate(
-        self,
-        request: ProviderDispatchRequest,
-        account_selection: ProviderAccountSelection,
-    ) -> dict[str, Any]:
-        subject_reference = request.subject_reference_image_path
-        if subject_reference is None and request.reference_image_paths:
-            subject_reference = request.reference_image_paths[0]
-        return {
-            "prompt": request.prompt,
-            "output_dir": request.output_dir,
-            "aspect_ratio": request.aspect_ratio,
-            "candidate_count": request.candidate_count,
-            "timeout_sec": request.timeout_sec,
-            "model_name_override": request.model_name_override,
-            "subject_reference_image_path": subject_reference,
-            "seed": request.seed,
-        }
-
-    def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        manifest = run_minimax_image_smoke(self.store, service_id=self.service_id, **plan)
-        return {"status": "already_complete", "raw": manifest}
-
-    def poll(self, task: dict[str, Any]) -> dict[str, Any]:
-        return task["raw"]
-
-    def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return raw
-
-    def safe_error(self, error: Exception) -> dict[str, str]:
-        return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
 
 
 class OpenAICompatibleLLMAdapter:
@@ -131,75 +77,6 @@ class OpenAICompatibleLLMAdapter:
 
     def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         return raw
-
-    def safe_error(self, error: Exception) -> dict[str, str]:
-        return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
-
-
-class MiniMaxCliLLMAdapter:
-    def __init__(self, store: CompanyProviderSecrets, service_id: str, descriptor: ProviderDescriptor) -> None:
-        self.store = store
-        self.service_id = service_id
-        self.descriptor = descriptor
-
-    def validate(self, request: ProviderDispatchRequest) -> None:
-        _require_gate(self.descriptor.required_gate)
-        if len(request.prompt) > self.descriptor.prompt_char_limit:
-            raise ModelConfigError(f"prompt_char_limit exceeded for {self.service_id}")
-        if request.reference_image_paths:
-            raise ModelConfigError(f"LLM provider does not accept reference images: {self.service_id}")
-
-    def translate(
-        self,
-        request: ProviderDispatchRequest,
-        account_selection: ProviderAccountSelection,
-    ) -> dict[str, Any]:
-        service = self.store.service(self.service_id)
-        account = account_selection.account
-        default_models = account.get("default_models") if isinstance(account.get("default_models"), dict) else {}
-        model = request.model_name_override or service.get("model") or default_models.get("llm") or "MiniMax-M2.7"
-        args = [
-            *_resolve_cli_invocation(str(account.get("cli_command") or service.get("cli_command") or "mmx")),
-            "text",
-            "chat",
-            "--model",
-            str(model),
-            "--max-tokens",
-            str(service.get("max_completion_tokens") or 900),
-            "--temperature",
-            str(service.get("temperature") if service.get("temperature") is not None else 0.2),
-            "--output",
-            "json",
-            "--non-interactive",
-        ]
-        system_prompt = service.get("system_prompt")
-        if system_prompt:
-            args.extend(["--system", str(system_prompt)])
-        args.extend(["--message", request.prompt])
-        region = service.get("region") or account.get("region")
-        if region:
-            args.extend(["--region", str(region)])
-        return {"args": args, "timeout_sec": request.timeout_sec}
-
-    def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        completed = subprocess.run(
-            list(plan["args"]),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=float(plan["timeout_sec"]),
-            check=False,
-        )
-        if completed.returncode != 0:
-            raise ModelGatewayError(f"MiniMax CLI text generation failed: {_safe_error(completed.stderr or completed.stdout)}")
-        return {"status": "already_complete", "raw": {"stdout": completed.stdout, "provider_calls_started": True}}
-
-    def poll(self, task: dict[str, Any]) -> dict[str, Any]:
-        return task["raw"]
-
-    def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return {"text": _extract_cli_text(str(raw.get("stdout") or "")), "provider_calls_started": True}
 
     def safe_error(self, error: Exception) -> dict[str, str]:
         return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
@@ -367,57 +244,8 @@ def _model_from_ref(store: CompanyProviderSecrets, service: dict[str, Any]) -> s
 
 def _legacy_llm_default_model(service: dict[str, Any]) -> str:
     provider = str(service.get("provider") or "")
-    if provider == "minimax":
-        return DEFAULT_MINIMAX_TEXT_MODEL
     if provider == "deepseek":
         return DEFAULT_DEEPSEEK_TEXT_MODEL
-    return ""
-
-
-def _resolve_cli_invocation(command: str) -> list[str]:
-    resolved = shutil.which(command) or command
-    suffix = Path(resolved).suffix.lower()
-    if suffix == ".ps1":
-        return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", resolved]
-    return [resolved]
-
-
-def _extract_cli_text(stdout: str) -> str:
-    value = stdout.strip()
-    if not value:
-        raise ModelGatewayError("MiniMax CLI text generation returned empty output")
-    try:
-        payload = json.loads(value)
-    except json.JSONDecodeError:
-        return value
-    extracted = _walk_text_payload(payload)
-    if not extracted:
-        raise ModelGatewayError("MiniMax CLI text generation returned no text")
-    return extracted
-
-
-def _walk_text_payload(payload: Any) -> str:
-    if isinstance(payload, str):
-        return payload.strip()
-    if isinstance(payload, dict):
-        for key in ("text", "content", "output", "response", "message"):
-            value = payload.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-            nested = _walk_text_payload(value)
-            if nested:
-                return nested
-        choices = payload.get("choices")
-        if isinstance(choices, list):
-            for choice in choices:
-                nested = _walk_text_payload(choice)
-                if nested:
-                    return nested
-    if isinstance(payload, list):
-        for item in payload:
-            nested = _walk_text_payload(item)
-            if nested:
-                return nested
     return ""
 
 
@@ -428,7 +256,5 @@ def _first_or_default(values: list[Any], default: Any) -> Any:
 __all__ = (
     "FakeAsyncVideoAdapter",
     "KlingVideoAdapter",
-    "MiniMaxImageAdapter",
-    "MiniMaxCliLLMAdapter",
     "OpenAICompatibleLLMAdapter",
 )

@@ -145,6 +145,8 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("has-image-preview", Boolean(node.previewUrl));
   elNode.classList.toggle("has-media-result", Boolean(node.previewUrl || candidatePreviews(node).length));
   elNode.classList.toggle("is-generating", node.status === "generating");
+  elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
+  elNode.classList.toggle("hide-context-toolbar", node.type === "text");
   elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
 }
 

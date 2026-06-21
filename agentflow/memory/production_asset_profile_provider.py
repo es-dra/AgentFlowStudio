@@ -72,9 +72,14 @@ def provider_validation_blockers(
         blockers.append(_blocker("provider_config_missing", "provide --provider-config or AFS_PROVIDER_CONFIG"))
     if character_reference_image_path is None:
         blockers.append(_blocker("character_reference_image_missing", "provide a local ignored character reference image"))
-    if image_service == "gpt_image2":
-        blockers.append(_blocker("gpt_image2_adapter_unavailable", "GPT Image2 is not wired as a verified AFS smoke adapter"))
-    elif image_service != "minimax_image":
+    if image_service == "codex_image":
+        blockers.append(
+            _blocker(
+                "codex_image_legacy_smoke_unavailable",
+                "Codex image validation now runs through Studio Runtime, not this legacy asset package.",
+            )
+        )
+    else:
         blockers.append(_blocker("image_adapter_unavailable", f"unsupported image service for this package: {image_service}"))
     return blockers
 

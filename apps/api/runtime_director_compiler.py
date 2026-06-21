@@ -172,14 +172,14 @@ def _prop_text(props: list[dict[str, Any]], subject: dict[str, Any] | None, data
 def _motion_text(subjects: list[dict[str, Any]], camera: dict[str, Any] | None) -> str:
     actions = [_clean(item.get("action")) for item in subjects if _clean(item.get("action"))]
     if actions:
-        return f"主体动作以{'、'.join(actions[:3])}为核心；镜头只表达一个主要意图，保持人物方向、光线和空间连续。"
+        return f"主体动作以{'、'.join(actions[:3])}为核心；镜头只表达一个主要意图，保持角色方向、光线和空间连续。"
     if camera:
         return "静态关键帧通过姿态、视线和景深暗示动势；镜头之间保持空间轴线连续。"
     return "按原始提示词安排动作节奏，避免空间跳变和主体漂移。"
 
 
 def _negative_text(has_setup: bool) -> str:
-    base = "避免人物畸形、五官扭曲、多余肢体、文字乱码、水印、身份漂移。"
+    base = "避免角色畸形、五官扭曲、多余肢体、文字乱码、水印、身份漂移。"
     if has_setup:
         base += "避免机位冲突、景别冲突；避免光源冲突、主体站位和道具方位互相矛盾。"
     return base

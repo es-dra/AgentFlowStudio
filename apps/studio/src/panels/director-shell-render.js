@@ -75,7 +75,7 @@ export function renderDirectorObjectList({ scene, setup, onObjectSelect }) {
 
 export function renderDirectorBoard({ board, setup, onObjectPointerDown }) {
   board.replaceChildren();
-  const guide = el("div", "director-board-hint", "拖动相机、人物、灯光和道具来布置镜头");
+  const guide = el("div", "director-board-hint", "拖动相机、角色、灯光和道具来布置镜头");
   board.appendChild(guide);
   for (const entry of allDirectorObjects(setup)) {
     board.appendChild(renderBoardObject(entry, setup, onObjectPointerDown));

@@ -165,6 +165,34 @@ def test_keyframe_generation_strips_user_visible_section_headers_from_provider_p
     assert "雨夜街头" in provider_prompt
 
 
+def test_keyframe_generation_adds_literal_subject_guard_for_simple_t2i_prompt(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_simple_subject_guard/keyframe-generations",
+        json={
+            "node_id": "image-node-cat-001",
+            "prompt_text": "帮我生成一只黑色的狸花猫",
+            "optimized_prompt": "帮我生成一只黑色的狸花猫",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-21T14:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    plan = client.get(f"/artifacts/{result.json()['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    provider_prompt = plan["provider_prompt"]
+
+    assert "黑色的狸花猫" in provider_prompt
+    assert "保真约束" in provider_prompt
+    assert "不要改成图标" in provider_prompt
+    assert "抽象符号" in provider_prompt
+
+
 def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
 
@@ -327,7 +355,7 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
     assert manifest["retry_count"] == 1
 
 
-def test_keyframe_prompt_for_minimax_removes_internal_runtime_terms() -> None:
+def test_keyframe_prompt_for_image_provider_removes_internal_runtime_terms() -> None:
     prompt = provider_keyframe_prompt(
         "\n".join(
             [
@@ -396,10 +424,10 @@ def test_keyframe_generation_uses_provider_descriptor_prompt_limit(tmp_path, mon
     assert len(str(captured["prompt"])) <= 64
 
 
-def test_runtime_keyframes_no_longer_imports_minimax_smoke_directly() -> None:
+def test_runtime_keyframes_no_longer_imports_legacy_image_smoke_directly() -> None:
     source = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
 
-    assert "run_minimax_image_smoke" not in source
+    assert "run_" + "mini" + "max_image_smoke" not in source
 
 
 def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) -> None:

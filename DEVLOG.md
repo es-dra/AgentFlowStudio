@@ -1,5 +1,88 @@
 # Devlog
 
+## 2026-06-21 - Prompt Template, Reference Image, And Provider Cleanup Pass
+
+- Reworked image prompt optimization around a clearer priority order: current
+  user intent first, reference image identity/visual traits second, old asset
+  signatures and default locks last. Animal reference prompts now use
+  `角色/主体`, preserve fur/markings/eyes/ears/tail/body ratio, and avoid the
+  older human short-hair/uniform template unless the prompt is actually a human
+  edit.
+- Switched active Studio asset wording from `人物资产` to `角色资产` while keeping
+  compatibility aliases for older `人物/主体` sections and stored LLM responses.
+  Fixed asset detail and confirmation surfaces can reopen existing fixed assets
+  for adjustment instead of treating them as fresh unrecognized candidates.
+- Moved prompt optimization UI out of a blocking modal and into the selected
+  node/prompt surface with shimmer feedback, so changing selection no longer
+  disconnects the in-flight optimization. Draft-recognition fields and
+  TuanTuan pending replies now expose visible progress states.
+- Removed Minimax image/provider code paths from the active registry, CLI,
+  smoke helpers, posterflow provider, tests, and preflight tools. Remaining
+  Minimax references are negative compatibility tests that assert old services
+  are ignored and not exposed.
+- Hardened the Codex image handoff worker so completed candidates can be
+  recovered from running/stale jobs, candidate files are accepted only after a
+  stable write, and the worker can terminate a completed `codex exec` process
+  instead of waiting on a long tail after the image file is already present.
+- Added text-node script import, idea expansion, and storyboard breakdown
+  affordances that write structured script content into text/script nodes and
+  create downstream asset-prep candidates without auto-promoting fixed assets.
+
+Verification:
+
+```text
+pytest -> 582 passed / 520 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 102 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed with existing CRLF/LF warnings only
+Prompt fallback sample -> animal reference paths have no short-hair or uniform
+  pollution; explicit animal clothing requests route to the explicit-style guard
+```
+
+Boundaries:
+
+- Video provider execution remains out of scope and was not enabled.
+- Local verification is code/runtime evidence, not human acceptance, business
+  validation, or durable memory promotion.
+- No provider raw response, signed URL, local media byte, secret, invite code,
+  session token, or Company OS private source content was written.
+
+## 2026-06-22 - Text Node Script Body And Structured Storyboard Split
+
+- Changed text-node script import and idea expansion so the resulting script is
+  written into the node body (`content`) instead of staying in the bottom prompt
+  input. During expansion, the visible node body keeps the user's source text
+  and shows a shimmer state until the expanded script replaces it.
+- Hid the selected-node workflow toolbar on text nodes, removing the local
+  clutter from `继续生成 / 保存素材 / 整理卡片 / 看过程` for script drafting.
+- Added structured storyboard formatting for script split output. Each generated
+  script node now carries explicit `镜号 / 时长 / 画面描述 / 景别 / 光影氛围 / 运镜 /
+  对白/旁白 / 音效 / 资产` fields and keeps `@` asset references in its body.
+- Added candidate asset-prep image nodes downstream from each storyboard node.
+  These nodes are preparation targets only; they do not promote assets to fixed
+  material without later generation and user confirmation.
+
+Verification:
+
+```text
+tests/test_web_studio_prompt_script_static.py -> 5 passed
+tests/test_web_studio_prompt_script_static.py tests/test_web_studio_frontend_wave.py tests/test_web_studio_static.py -> 30 passed
+npm run check:studio-js -> JS syntax check passed: 102 files
+python tools/studio_full_coverage_browser_qa.py --timeout-ms 30000 -> passed, provider_calls_started=false
+git diff --check -> passed with existing CRLF/LF warnings only
+```
+
+Boundaries:
+
+- No provider gate, Runtime API shape, deployed server state, local media byte,
+  provider raw response, signed URL, secret, invite code, session token, or
+  Company OS private source content was written.
+- Structured asset references are candidate preparation state, not durable
+  memory promotion, fixed asset approval, human acceptance, or business
+  validation.
+
 ## 2026-06-21 - Authenticated Media And TuanTuan Stability Repair
 
 - Diagnosed broken uploaded/reference images in image nodes and the asset drawer:

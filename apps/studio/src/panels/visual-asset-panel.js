@@ -2,7 +2,7 @@ import { showModal, el } from "../overlay.js";
 import { visualAssetDefaults } from "./visual-asset-defaults.js";
 import { lockChipsForAssetType, renderVisualAssetPanel } from "./visual-asset-panel-render.js";
 
-export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character" }) {
+export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character", existingAsset = null }) {
   if (!runtime?.promoteVisualAsset) {
     markNodeError(store, node.id, "资产确认服务不可用，请确认本地创作服务已启动。");
     return;
@@ -12,13 +12,13 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     return;
   }
 
-  let assetType = initialAssetType === "scene" ? "scene" : "character";
+  let assetType = (existingAsset?.asset_type || initialAssetType) === "scene" ? "scene" : "character";
   const modal = el("div", "modal-card visual-asset-panel");
   const close = showModal(modal);
   render();
 
   function render() {
-    const previous = collectFieldValues(modal);
+    const previous = mergeFieldValues(seedFromExistingAsset(existingAsset), collectFieldValues(modal));
     const defaults = visualAssetDefaults(node, imageAsset, assetType);
     renderVisualAssetPanel(modal, { assetType, node, imageAsset, previous, defaults });
   }
@@ -58,6 +58,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
 
   async function draftCard() {
     if (!runtime?.draftAssetCard) return showError("自动识别服务暂不可用。");
+    setDrafting(true);
     setBusy(true);
     try {
       const response = await runtime.draftAssetCard({
@@ -96,6 +97,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
     } catch (error) {
       showError(`自动识别失败：${safeError(error)}`);
     } finally {
+      setDrafting(false);
       setBusy(false);
     }
   }
@@ -119,6 +121,7 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
         signature,
         featureCard: cardOrFallback,
         negativeLocks: lines(values.locks),
+        supersedesAssetId: decision === "fixed" ? assetIdFromRef(existingAsset) : "",
       });
       close();
     } catch (error) {
@@ -136,6 +139,12 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
 
   function setBusy(busy) {
     for (const btn of modal.querySelectorAll(".modal-actions button")) btn.disabled = busy;
+  }
+
+  function setDrafting(drafting) {
+    modal.classList.toggle("is-drafting", drafting);
+    const button = modal.querySelector('[data-action="draft-card"]');
+    if (button) button.textContent = drafting ? "识别中..." : "自动识别草稿";
   }
 }
 
@@ -161,7 +170,19 @@ function compactCard(card) {
   return result;
 }
 
-async function submitVisualAssetReview({ store, runtime, node, imageAsset, decision, label, assetType, signature, featureCard, negativeLocks }) {
+async function submitVisualAssetReview({
+  store,
+  runtime,
+  node,
+  imageAsset,
+  decision,
+  label,
+  assetType,
+  signature,
+  featureCard,
+  negativeLocks,
+  supersedesAssetId = "",
+}) {
   const payload = {
     source_image_asset_refs: [imageAsset.asset_id],
     asset_type: assetType,
@@ -170,6 +191,7 @@ async function submitVisualAssetReview({ store, runtime, node, imageAsset, decis
     feature_card: featureCard,
     negative_locks: negativeLocks,
     source_node_id: node.id,
+    supersedes_asset_id: supersedesAssetId || null,
     review_decision: decision,
     reviewed_at: new Date().toISOString(),
   };
@@ -186,7 +208,7 @@ async function submitVisualAssetReview({ store, runtime, node, imageAsset, decis
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n || !localAsset?.asset_id) return;
-    n.params.visualAssets = mergeVisualAssets(n.params.visualAssets || [], localAsset);
+    n.params.visualAssets = mergeVisualAssets(n.params.visualAssets || [], localAsset, supersedesAssetId);
     n.params.lastVisualAssetWarnings = response?.warnings || [];
     n.result = `${n.result || ""}\n${decision === "fixed" ? "资产已固定；画布撤销(Ctrl+Z)不影响已固定资产" : "候选未采用"}：${localAsset.label}：${localAsset.asset_id}`.trim();
     s.assets.unshift({
@@ -201,6 +223,8 @@ async function submitVisualAssetReview({ store, runtime, node, imageAsset, decis
       asset_type: localAsset.asset_type,
       asset_id: localAsset.asset_id,
       visual_asset_id: localAsset.asset_id,
+      image_asset_refs: Array.isArray(localAsset.image_asset_refs) ? localAsset.image_asset_refs : [imageAsset.asset_id],
+      preview_url: localAsset.preview_url || imageAsset.preview_url || "",
       signature: localAsset.signature,
       feature_card: localAsset.feature_card,
       negative_locks: localAsset.negative_locks,
@@ -222,10 +246,39 @@ function setInputValue(root, name, value, attr = "data-field") {
   if (input) input.value = String(value || "");
 }
 
-function mergeVisualAssets(existing, asset) {
+function mergeVisualAssets(existing, asset, supersedesAssetId = "") {
   const assetId = String(asset?.asset_id || "").trim();
   if (!assetId) return existing;
-  return [...existing.filter((item) => String(item?.asset_id || "") !== assetId), asset].slice(-8);
+  return [
+    ...existing.filter((item) => {
+      const current = String(item?.asset_id || "").trim();
+      return current !== assetId && current !== supersedesAssetId;
+    }),
+    asset,
+  ].slice(-8);
+}
+
+function seedFromExistingAsset(asset) {
+  if (!asset) return {};
+  return {
+    label: String(asset.label || asset.title || ""),
+    signature: String(asset.signature || asset.safe_summary || ""),
+    card: asset.feature_card && typeof asset.feature_card === "object" ? asset.feature_card : {},
+    locks: Array.isArray(asset.negative_locks) ? asset.negative_locks.join("\n") : "",
+  };
+}
+
+function mergeFieldValues(seed, current) {
+  return {
+    label: current.label || seed.label || "",
+    signature: current.signature || seed.signature || "",
+    locks: current.locks || seed.locks || "",
+    card: { ...(seed.card || {}), ...(current.card || {}) },
+  };
+}
+
+function assetIdFromRef(ref) {
+  return String(ref?.asset_id || ref?.visual_asset_id || ref?.assetId || "").trim();
 }
 
 function markNodeError(store, nodeId, message) {

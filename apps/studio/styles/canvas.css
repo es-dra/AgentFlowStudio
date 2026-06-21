@@ -278,6 +278,16 @@
   max-height: 220px;
   white-space: pre-wrap;
 }
+.node .text-content-view.content-shimmer {
+  background-image:
+    linear-gradient(90deg, transparent 0%, rgba(73, 224, 235, 0.14) 38%, rgba(255, 255, 255, 0.16) 50%, rgba(73, 224, 235, 0.10) 62%, transparent 100%);
+  background-size: 230% 100%;
+  border-radius: 8px;
+  animation: promptTextShimmer 1.45s linear infinite;
+}
+.node.script-expanding {
+  box-shadow: 0 0 0 1px rgba(73, 224, 235, 0.45), 0 0 22px rgba(73, 224, 235, 0.18);
+}
 
 /* 框选 */
 #marquee {

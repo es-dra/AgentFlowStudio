@@ -6,6 +6,8 @@ from typing import Any
 
 SECTION_HEADER_LABELS = (
     "意图",
+    "角色",
+    "角色/主体",
     "人物",
     "人物/主体",
     "主体",

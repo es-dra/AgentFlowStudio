@@ -87,7 +87,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default="")
     parser.add_argument("--report", default="")
     parser.add_argument("--provider-config", default="")
-    parser.add_argument("--provider-service-id", default="minimax_image")
+    parser.add_argument("--provider-service-id", default="codex_image")
     parser.add_argument("--character-reference", default="")
     parser.add_argument("--scene-reference", default="")
     parser.add_argument("--scenario", choices=["all", "group2", "group3"], default="all")

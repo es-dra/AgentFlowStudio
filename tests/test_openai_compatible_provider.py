@@ -115,16 +115,16 @@ def test_openai_compatible_provider_sends_extra_body(monkeypatch) -> None:
     monkeypatch.setattr(openai_compatible.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
     provider = OpenAICompatibleProvider(
-        base_url="https://api.minimax.io/v1",
+        base_url="https://llm.example.test/v1",
         api_key="fake-key",
-        model="MiniMax-M3",
+        model="example-chat",
         temperature=0.2,
         max_completion_tokens=900,
         extra_body={"thinking": {"type": "disabled"}},
     )
 
     assert provider.generate("hello") == "enhanced prompt"
-    assert captured["payload"]["model"] == "MiniMax-M3"
+    assert captured["payload"]["model"] == "example-chat"
     assert captured["payload"]["temperature"] == 0.2
     assert captured["payload"]["max_completion_tokens"] == 900
     assert captured["payload"]["thinking"] == {"type": "disabled"}

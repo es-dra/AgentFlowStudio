@@ -1,25 +1,27 @@
-import { showPopover, el } from "../overlay.js";
+﻿import { showPopover, el } from "../overlay.js";
+import { imageAssetFromVisualAsset, lastImageAsset } from "../node-image-assets.js";
+import { openVisualAssetPanel } from "./visual-asset-panel.js";
 
 export function openAssetDetailPopover(store, runtime, assetRef, anchor) {
   const assetId = assetIdFromRef(assetRef);
   const localAsset = resolveAsset(store.get(), assetRef) || (typeof assetRef === "object" ? assetRef : null);
   const visualAssetId = visualAssetIdFromRef(assetRef) || visualAssetIdFromRef(localAsset);
   const pop = el("div", "asset-detail-popover");
-  renderAssetDetail(pop, store, localAsset, assetId, visualAssetId);
+  renderAssetDetail(pop, store, runtime, localAsset, assetId, visualAssetId);
   showPopover(anchor, pop, { place: "bottom" });
   if (!visualAssetId || !runtime?.getVisualAsset) return;
   runtime.getVisualAsset(visualAssetId)
     .then((payload) => {
       const detail = payload?.asset || null;
       if (!detail) return;
-      renderAssetDetail(pop, store, { ...localAsset, ...detail }, assetId, visualAssetId);
+      renderAssetDetail(pop, store, runtime, { ...localAsset, ...detail }, assetId, visualAssetId);
     })
     .catch(() => {
-      if (!localAsset) renderAssetDetail(pop, store, null, assetId, visualAssetId);
+      if (!localAsset) renderAssetDetail(pop, store, runtime, null, assetId, visualAssetId);
     });
 }
 
-function renderAssetDetail(pop, store, asset, assetId, visualAssetId = "") {
+function renderAssetDetail(pop, store, runtime, asset, assetId, visualAssetId = "") {
   pop.replaceChildren();
   if (!asset) {
     pop.appendChild(el("div", "asset-detail-empty", "未找到资产详情"));
@@ -36,6 +38,9 @@ function renderAssetDetail(pop, store, asset, assetId, visualAssetId = "") {
   const actions = el("div", "asset-detail-actions");
   const selectedId = store.get().selection.nodeIds[0];
   if (selectedId && visualAssetId) {
+    if (runtime?.promoteVisualAsset) {
+      actions.appendChild(actionButton("调整资产", () => openExistingAssetPanel(store, runtime, asset, visualAssetId)));
+    }
     actions.appendChild(actionButton("从当前节点移除", () => removeAssetFromSelectedNode(store, visualAssetId)));
     actions.appendChild(actionButton("本次不携带", () => excludeAssetForNextRun(store, visualAssetId)));
   }
@@ -70,6 +75,31 @@ function actionButton(label, onClick) {
   const button = el("button", "asset-detail-action", label);
   button.addEventListener("click", onClick);
   return button;
+}
+
+function openExistingAssetPanel(store, runtime, asset, visualAssetId) {
+  const state = store.get();
+  const node = nodeForAsset(state, asset) || state.nodes[state.selection.nodeIds[0]];
+  if (!node) return;
+  openVisualAssetPanel({
+    store,
+    runtime,
+    node,
+    imageAsset: imageAssetFromVisualAsset(asset) || lastImageAsset(node),
+    initialAssetType: asset?.asset_type === "scene" ? "scene" : "character",
+    existingAsset: { ...asset, asset_id: visualAssetId || asset?.asset_id },
+  });
+}
+
+function nodeForAsset(state, asset) {
+  const sourceId = String(asset?.source_node_id || "").trim();
+  if (sourceId && state.nodes[sourceId]) return state.nodes[sourceId];
+  const assetId = assetIdFromRef(asset);
+  if (!assetId) return null;
+  return Object.values(state.nodes || {}).find((node) => (
+    Array.isArray(node.params?.visualAssets)
+    && node.params.visualAssets.some((item) => assetIdFromRef(item) === assetId)
+  )) || null;
 }
 
 function removeAssetFromSelectedNode(store, assetId) {
@@ -123,10 +153,10 @@ function featureCardRows(card) {
 function fieldLabel(key) {
   return {
     identity: "身份",
-    hair: "发型发色",
-    face: "面部特征",
+    hair: "发型/毛发/颜色",
+    face: "面部/头部特征",
     build: "体态身形",
-    wardrobe: "标志性服装",
+    wardrobe: "服装/饰品/外观",
     palette: "配色",
     demeanor: "气质神态",
     location: "地点定位",
@@ -150,7 +180,7 @@ function statusLabel(asset) {
 
 function assetTypeLabel(asset) {
   if (asset.asset_type === "scene") return "场景资产";
-  if (asset.asset_type === "character") return "人物资产";
+  if (asset.asset_type === "character") return "角色资产";
   if (asset.kind === "image_reference" || asset.role === "reference_image") return "参考图片";
   return "显性资产";
 }

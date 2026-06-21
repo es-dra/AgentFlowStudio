@@ -7,7 +7,7 @@ from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_prompt_text import plain_prompt_from_sections
 
 
-USER_SECTION_ORDER = ["人物", "场景", "镜头", "灯光", "运动", "负面约束"]
+USER_SECTION_ORDER = ["角色", "场景", "镜头", "灯光", "运动", "负面约束"]
 
 _EN_FALLBACKS = {
     "Primary character",
@@ -26,7 +26,7 @@ def build_user_prompt(request: PromptOptimizationRequest, slots: dict[str, str])
     if request.director_setup:
         return _compiled_director_user_prompt(request)
     sections = {
-        "人物": _character_section(slots, director),
+        "角色": _character_section(slots, director),
         "场景": _scene_section(request, slots, director),
         "镜头": _camera_section(request, slots, params, director),
         "灯光": _lighting_section(slots, director),
@@ -46,7 +46,7 @@ def _compiled_director_user_prompt(request: PromptOptimizationRequest) -> dict[s
     compiled = compile_director_setup(request.director_setup)
     compiled_by_title = {section["title"]: section["text"] for section in compiled["sections"]}
     sections = {
-        "人物": compiled_by_title.get("主体调度", ""),
+        "角色": compiled_by_title.get("主体调度", ""),
         "场景": compiled_by_title.get("空间道具", ""),
         "镜头": compiled_by_title.get("机位景别", ""),
         "灯光": compiled_by_title.get("光线", ""),
@@ -82,7 +82,7 @@ def _character_section(slots: dict[str, str], director: dict[str, Any]) -> str:
         parts.append(f"情绪基调为{emotion}")
     if not parts:
         parts.append("以原始描述中的主体为核心")
-    parts.append("保持人物身份、服装与神态在多镜头间一致，避免一次性动作改变人物设定。")
+    parts.append("保持角色身份、外观与神态在多镜头间一致，避免一次性动作改变角色设定。")
     return "，".join(filter(None, parts))
 
 
@@ -190,9 +190,9 @@ def _motion_section(
 
 
 def _negative_section(request: PromptOptimizationRequest, director: dict[str, Any]) -> str:
-    base = "避免人物畸形、五官扭曲、多余肢体、文字乱码与水印；避免镜头语言互相冲突；避免画面元素与上述设定矛盾。"
+    base = "避免角色畸形、五官扭曲、多余肢体、文字乱码与水印；避免镜头语言互相冲突；避免画面元素与上述设定矛盾。"
     if director:
-        base += "避免光源冲突、机位冲突、空间关系错乱、人物站位漂移和道具位置跳变。"
+        base += "避免光源冲突、机位冲突、空间关系错乱、角色站位漂移和道具位置跳变。"
     if request.generation_target == "video":
         base += "避免画面闪烁、场景跳变与身份漂移。"
     return base

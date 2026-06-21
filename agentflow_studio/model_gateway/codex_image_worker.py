@@ -44,9 +44,18 @@ class FakeCodexImageExecutor:
 
 
 class CodexExecImageExecutor:
-    def __init__(self, *, cli_command: str = "codex", timeout_sec: float = 900.0) -> None:
+    def __init__(
+        self,
+        *,
+        cli_command: str = "codex",
+        timeout_sec: float = 900.0,
+        poll_interval_sec: float = 2.0,
+        candidate_settled_sec: float = 5.0,
+    ) -> None:
         self.cli_command = cli_command
         self.timeout_sec = timeout_sec
+        self.poll_interval_sec = poll_interval_sec
+        self.candidate_settled_sec = candidate_settled_sec
 
     def execute(self, request: dict[str, Any], work_dir: Path) -> Path:
         work_dir = Path(work_dir).resolve()
@@ -55,8 +64,9 @@ class CodexExecImageExecutor:
         codex_env_source = dict(os.environ)
         codex_env_source["AFS_CODEX_HOME"] = str(work_dir / ".codex-home")
         codex_env = codex_subprocess_env(codex_env_source)
+        process: subprocess.Popen[str] | None = None
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 [
                     _resolve_codex_cli_command(self.cli_command),
                     "exec",
@@ -70,23 +80,32 @@ class CodexExecImageExecutor:
                     "Read worker_prompt.md in the current directory and create candidate_001.png.",
                 ],
                 cwd=str(work_dir),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
                 env=codex_env,
-                timeout=self.timeout_sec,
-                check=False,
+            )
+            completed = _wait_for_codex_image_process(
+                process,
+                work_dir,
+                timeout_sec=self.timeout_sec,
+                poll_interval_sec=self.poll_interval_sec,
+                candidate_settled_sec=self.candidate_settled_sec,
             )
         except OSError as exc:
             raise RuntimeError("Codex image worker command is not available") from exc
         finally:
             prune_codex_home(codex_env)
-        if completed.returncode != 0:
-            raise RuntimeError(_safe_process_error(completed.stderr or completed.stdout))
-        for candidate in (work_dir / "candidate_001.png", work_dir / "image_candidates" / "candidate_001.png"):
-            if candidate.is_file():
-                return candidate
+        if isinstance(completed, Path):
+            return completed
+        returncode, stdout, stderr = completed
+        if returncode != 0:
+            raise RuntimeError(_safe_process_error(stderr or stdout))
+        candidate = _existing_candidate(work_dir, settled_sec=0)
+        if candidate is not None:
+            return candidate
         raise RuntimeError("Codex image worker did not create candidate_001.png")
 
 
@@ -245,10 +264,66 @@ def _worker_prompt(request: dict[str, Any]) -> str:
         "You are running inside an AFS image generation job directory.\n"
         "Read request.json and create exactly one PNG image at candidate_001.png.\n"
         "Do not write provider raw responses, secrets, cookies, signed URLs, or media bytes into JSON logs.\n"
+        "Follow the prompt literally. For simple subject prompts, create a clear natural depiction of the requested subject.\n"
+        "If the prompt does not explicitly ask for illustration, cartoon, anime, icon, logo, mascot, or diagram style, default to a realistic photographic image with plausible texture and anatomy.\n"
+        "Do not turn the subject into an icon, logo, mascot, diagram, UI element, abstract symbol, or unrelated scene unless the prompt explicitly asks for that style.\n"
+        "If the prompt asks for a style, keep the subject identity, anatomy, material, and key visual traits readable.\n"
+        "Create a fresh image for this specific job. Do not reuse a previous job output.\n"
+        f"Non-visual job nonce, do not draw or write this text: {request.get('job_id') or 'unknown_job'}\n"
         f"Aspect ratio: {request.get('aspect_ratio')}\n"
         f"Prompt: {request.get('prompt')}\n"
         f"Reference image files:\n{reference_lines or '- none'}\n"
     )
+
+
+def _wait_for_codex_image_process(
+    process: subprocess.Popen[str],
+    work_dir: Path,
+    *,
+    timeout_sec: float,
+    poll_interval_sec: float,
+    candidate_settled_sec: float,
+) -> Path | tuple[int, str, str]:
+    deadline = time.monotonic() + max(timeout_sec, 0.1)
+    while True:
+        candidate = _existing_candidate(work_dir, settled_sec=candidate_settled_sec)
+        if candidate is not None:
+            _stop_process(process)
+            return candidate
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            return process.returncode or 0, stdout or "", stderr or ""
+        if time.monotonic() >= deadline:
+            _stop_process(process)
+            candidate = _existing_candidate(work_dir, settled_sec=0)
+            if candidate is not None:
+                return candidate
+            raise RuntimeError("Codex image worker timed out before creating a usable image")
+        time.sleep(max(poll_interval_sec, 0.1))
+
+
+def _stop_process(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+    except OSError:
+        return
+
+
+def _existing_candidate(work_dir: Path, *, settled_sec: float = 0) -> Path | None:
+    now = time.time()
+    for candidate in (work_dir / "candidate_001.png", work_dir / "image_candidates" / "candidate_001.png"):
+        if not candidate.is_file():
+            continue
+        stat = candidate.stat()
+        if stat.st_size > 0 and (settled_sec <= 0 or stat.st_mtime <= now - settled_sec):
+            return candidate
+    return None
 
 
 def _resolve_codex_cli_command(cli_command: str) -> str:

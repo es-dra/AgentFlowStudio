@@ -146,8 +146,6 @@ class ProviderAdapter(Protocol):
 from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     FakeAsyncVideoAdapter,
     KlingVideoAdapter,
-    MiniMaxCliLLMAdapter,
-    MiniMaxImageAdapter,
     OpenAICompatibleLLMAdapter,
 )
 from agentflow_studio.model_gateway.provider_api_relay import ApiRelayAdapter  # noqa: E402
@@ -181,9 +179,6 @@ class ProviderRegistry:
             descriptor = _descriptor_for_service(service_id, service, allow_legacy=legacy_descriptorless)
             descriptors[service_id] = descriptor
             capability = str(service.get("capability") or descriptor.modality)
-            if capability == "image" and provider == "minimax":
-                adapters[service_id] = MiniMaxImageAdapter(store, service_id, descriptor)
-                continue
             if capability == "image" and provider == "codex_handoff":
                 adapters[service_id] = CodexImageHandoffAdapter(store, service_id, descriptor)
                 continue
@@ -193,11 +188,8 @@ class ProviderRegistry:
             if capability in {"llm", "vision"} and provider == "codex_local":
                 adapters[service_id] = CodexLocalAdapter(store, service_id, descriptor)
                 continue
-            if capability == "llm" and provider in {"openai_compatible", "minimax", "deepseek"}:
+            if capability == "llm" and provider in {"openai_compatible", "deepseek"}:
                 adapters[service_id] = OpenAICompatibleLLMAdapter(store, service_id, descriptor)
-                continue
-            if capability == "llm" and provider == "minimax_cli":
-                adapters[service_id] = MiniMaxCliLLMAdapter(store, service_id, descriptor)
                 continue
             if capability == "video" and provider == "fake":
                 adapters[service_id] = FakeAsyncVideoAdapter(store, service_id, descriptor)
@@ -270,10 +262,7 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
     if descriptor.modality not in descriptor.capabilities:
         raise ModelConfigError(f"Provider service descriptor capabilities must include modality: {service_id}")
     provider = str(service.get("provider") or "")
-    if descriptor.min_reference_image_edge_px == 0 and (
-        (provider == "minimax" and descriptor.modality == "image")
-        or (provider == "kling" and descriptor.modality == "video")
-    ):
+    if descriptor.min_reference_image_edge_px == 0 and provider == "kling" and descriptor.modality == "video":
         descriptor = descriptor.model_copy(update={"min_reference_image_edge_px": 256})
     return descriptor
 
@@ -291,7 +280,15 @@ def _service_capability(service: dict[str, Any]) -> str:
 def _is_adapter_service(provider: str, capability: str) -> bool:
     if provider == "company_gateway" or "/" in capability:
         return False
-    return True
+    return provider in {
+        "api_relay",
+        "codex_handoff",
+        "codex_local",
+        "deepseek",
+        "fake",
+        "kling",
+        "openai_compatible",
+    }
 
 
 def _fill_default_required_gates(store: CompanyProviderSecrets) -> CompanyProviderSecrets:
@@ -429,12 +426,10 @@ def _required_gate_or_default(capability: str, configured: str) -> str:
 
 
 __all__ = (
-    "MiniMaxImageAdapter",
     "OpenAICompatibleLLMAdapter",
     "FakeAsyncVideoAdapter",
     "FakeVisionAdapter",
     "KlingVideoAdapter",
-    "MiniMaxCliLLMAdapter",
     "CodexImageHandoffAdapter",
     "CodexLocalAdapter",
     "ApiRelayAdapter",

@@ -243,7 +243,7 @@ def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:
     assert "current.prompt = prompt" not in director_shell
     assert "join(\"\\n\\n\")" in director_shell
     assert "directorVisualAssetIds" in director_shell
-    assert "绑定人物资产 ID" in director_fields
+    assert "绑定角色资产 ID" in director_fields
     assert len(director_shell.splitlines()) <= 300
     assert len(director_render.splitlines()) <= 180
 

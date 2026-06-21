@@ -24,7 +24,7 @@ def test_studio_state_prunes_runtime_bundle_details_before_safety_scan(tmp_path)
                 "prompt": "A character walks through a desert.",
                 "result": "Gate blocked\nReason: image provider gate is closed.",
                 "params": {
-                    "model": "minimax-image-01",
+                    "model": "image2-keyframe",
                     "temporaryLockOverrides": [{"asset_id": "va_1", "lock_text": "keep black hair"}],
                     "lastContextBundle": {
                         "trace_summary": "not persisted in studio state",

@@ -73,6 +73,20 @@
   color: var(--text-primary);
 }
 
+.prompt-bar textarea.prompt-shimmer,
+.prompt-expand textarea.prompt-shimmer {
+  background-image:
+    linear-gradient(90deg, transparent 0%, rgba(73, 224, 235, 0.16) 38%, rgba(255, 255, 255, 0.18) 50%, rgba(73, 224, 235, 0.12) 62%, transparent 100%);
+  background-size: 230% 100%;
+  animation: promptTextShimmer 1.45s linear infinite;
+  border-color: rgba(73, 224, 235, 0.28);
+}
+
+@keyframes promptTextShimmer {
+  from { background-position: 180% 0; }
+  to { background-position: -80% 0; }
+}
+
 .prompt-bar .bar-row {
   display: flex;
   align-items: center;
@@ -101,6 +115,7 @@
 .bar-tool.optimize-btn { color: var(--text-primary); }
 .bar-tool.optimize-btn:hover { background: var(--accent-soft); }
 .bar-tool.optimize-btn.busy { pointer-events: none; opacity: 0.6; }
+.text-script-tool span { white-space: nowrap; }
 
 .send-btn {
   width: 32px; height: 32px;

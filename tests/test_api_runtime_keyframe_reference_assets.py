@@ -98,8 +98,9 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
     assert plan["reference_image_count"] == 1
     assert plan["subject_reference_asset_id"] == asset["asset_id"]
     assert plan["reference_images"][0]["asset_id"] == asset["asset_id"]
-    assert "Only apply the user-requested edit" in str(captured["prompt"])
-    assert "Preserve the reference face, clothing, silhouette" in str(captured["prompt"])
+    assert "只保留与用户目标不冲突的相关主体特征" in str(captured["prompt"])
+    assert "不要把无关背景、服装、图表、界面文字或旧失败风格带入结果" in str(captured["prompt"])
+    assert "Preserve the reference face, clothing, silhouette" not in str(captured["prompt"])
     assert "data_base64" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized

@@ -1,4 +1,4 @@
-import { NODE_TYPES, createNode } from "./nodes.js";
+﻿import { NODE_TYPES, createNode } from "./nodes.js";
 
 export const ACTION_GROUPS = [
   {
@@ -23,7 +23,7 @@ export const ACTION_GROUPS = [
     id: "asset_nodes",
     label: "角色与场景",
     actions: [
-      { id: "asset_character", type: "image", label: "人物设定卡", icon: "user", tag: "草稿" },
+      { id: "asset_character", type: "image", label: "角色设定卡", icon: "user", tag: "草稿" },
       { id: "asset_scene", type: "image", label: "场景设定卡", icon: "image", tag: "草稿" },
       { id: "asset_video", type: "video", label: "视频片段卡", icon: "frames", tag: "草稿" },
     ],
@@ -72,8 +72,8 @@ function applyActionDefaults(node, action) {
   node.params.actionLabel = action.label;
   node.params.requiresGate = action.requires_gate || "";
   if (action.id === "asset_character") {
-    node.title = "人物设定卡草稿";
-    node.prompt = "上传或生成一张人物参考图，然后自动整理人物特征、可固定细节和待补充信息。";
+    node.title = "角色设定卡草稿";
+    node.prompt = "上传或生成一张角色参考图，然后自动整理角色特征、可固定细节和待补充信息。";
     return;
   }
   if (action.id === "asset_scene") {
@@ -88,7 +88,7 @@ function applyActionDefaults(node, action) {
   }
   if (action.id === "resource_upload") {
     node.title = "上传参考图";
-    node.prompt = "上传参考素材，并选择是否固定为人物或场景资产。";
+    node.prompt = "上传参考素材，并选择是否固定为角色或场景资产。";
     return;
   }
   if (action.id === "resource_history" || action.id === "resource_library") {

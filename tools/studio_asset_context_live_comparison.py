@@ -68,7 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--runtime-root", default="")
     parser.add_argument("--report", default="")
     parser.add_argument("--provider-config", default="")
-    parser.add_argument("--provider-service-id", default="minimax_image")
+    parser.add_argument("--provider-service-id", default="codex_image")
     parser.add_argument("--reference-image", default="", help="Optional local image to upload as the fixed character asset.")
     parser.add_argument("--sample-reference-output", default="", help="Write and use a deterministic sample reference PNG when --reference-image is not supplied.")
     parser.add_argument("--allow-live-provider", action="store_true", help="Required in addition to AFS_ALLOW_REMOTE_IMAGE=true.")

@@ -154,6 +154,6 @@ def test_support_command_registry_keeps_hidden_provider_and_demo_surface() -> No
 
     assert "hidden=True" in source
     assert "kling-i2v-smoke" in source
-    assert "minimax-image-smoke" in source
+    assert "minimax-image-smoke" not in source
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source

@@ -107,7 +107,7 @@ def test_kling_plan_rejects_removed_image_family(tmp_path) -> None:
         build_kling_request_plan(
             provider_store,
             service_id="kling_t2i",
-            prompt="image generation is intentionally handled by MiniMax",
+            prompt="image generation is intentionally handled outside Kling",
         )
 
 

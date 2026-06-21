@@ -357,6 +357,99 @@ def test_i2i_style_reference_fallback_does_not_reuse_reference_subject() -> None
     assert "对ChatGPT Image" not in fallback
 
 
+def test_i2i_animal_subject_reference_fallback_avoids_human_template() -> None:
+    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-animal-reference-fallback",
+        node_type="image",
+        prompt_text="根据上游节点的狸花猫,生成这只猫在房间里跳舞的图片",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        asset_refs=["img_upstream_cat"],
+        node_parameters={
+            "model": "image2-keyframe",
+            "connected_reference_nodes": [
+                {
+                    "title": "图片 / 关键帧",
+                    "prompt": "意图：生成一只清晰自然的狸花猫单帧画面，棕灰黑虎斑纹和额头 M 字纹清楚。",
+                }
+            ],
+        },
+        generated_at="2026-06-21T03:45:00+08:00",
+    )
+
+    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
+
+    assert "角色/主体" in fallback
+    assert "狸花猫" in fallback
+    assert "房间" in fallback
+    assert "跳舞" in fallback
+    assert "除非用户明确要求" in fallback
+    assert "必须重绘为统一、连贯的完整主体" in fallback
+    assert "短发" not in fallback
+    assert "校服" not in fallback
+
+
+def test_i2i_animal_subject_reference_allows_explicit_stylization() -> None:
+    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-animal-style-fallback",
+        node_type="image",
+        prompt_text="根据上游节点的狸花猫,生成这只猫穿红色外套在房间里跳舞的图片",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        asset_refs=["img_upstream_cat"],
+        node_parameters={
+            "model": "image2-keyframe",
+            "connected_reference_nodes": [
+                {"title": "狸花猫参考", "prompt": "参考图中的狸花猫，棕灰黑虎斑纹。"}
+            ],
+        },
+        generated_at="2026-06-21T03:46:00+08:00",
+    )
+
+    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
+
+    assert "角色/主体" in fallback
+    assert "狸花猫" in fallback
+    assert "红色外套" in fallback
+    assert "按用户明确要求处理拟人化、服装、饰品或卡通化" in fallback
+    assert "短发" not in fallback
+
+
+def test_i2i_animal_subject_reference_allows_english_clothing_request() -> None:
+    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-animal-english-style-fallback",
+        node_type="image",
+        prompt_text="use upstream tabby cat reference, make this cat wear a red little coat and dance",
+        generation_target="keyframe",
+        target_platform="short_video",
+        style="cinematic",
+        asset_refs=["img_upstream_cat"],
+        node_parameters={
+            "model": "image2-keyframe",
+            "connected_reference_nodes": [
+                {"title": "tabby cat reference", "prompt": "reference animal subject"}
+            ],
+        },
+        generated_at="2026-06-21T03:47:00+08:00",
+    )
+
+    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
+
+    assert "角色/主体" in fallback
+    assert "狸花猫" in fallback
+    assert "red little coat" in fallback
+    assert "按用户明确要求处理拟人化、服装、饰品或卡通化" in fallback
+    assert "短发" not in fallback
+
+
 def test_prompt_optimizer_falls_back_to_available_relay_llm_service(tmp_path, monkeypatch) -> None:
     class Descriptor:
         modality = "llm"
@@ -514,7 +607,7 @@ def test_prompt_optimizer_uses_chinese_fallback_when_provider_output_is_template
 
     assert payload["provider_calls_started"] is True
     assert payload["optimized_prompt"].startswith("意图：")
-    assert "人物/主体：" in payload["optimized_prompt"]
+    assert "角色/主体：" in payload["optimized_prompt"]
     assert "Primary character" not in payload["optimized_prompt"]
     assert trace["llm_enhancement"]["status"] == "discarded"
     assert trace["llm_enhancement"]["discard_reason"] == "enhancement missing required sections"
@@ -632,7 +725,7 @@ def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_
     assert result.status_code == 200
     payload = result.json()
     titles = [section["title"] for section in payload["user_prompt_sections"]]
-    assert "人物/主体" in titles
+    assert "角色/主体" in titles
     assert "场景/美术" in titles
     assert "镜头/构图" in titles
     assert "负面约束" in titles
@@ -720,7 +813,7 @@ def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
     instruction = strict_format_retry_instruction(request)
 
     assert "只输出九行" in instruction
-    assert "人物/主体" in instruction
+    assert "角色/主体" in instruction
     assert "负面约束" in instruction
     assert "????" not in instruction
 
@@ -926,7 +1019,7 @@ def test_video_prompt_optimizer_uses_i2v_instruction_with_first_frame(tmp_path, 
     payload = maybe_enhance_prompt_with_llm(request, {"selected_slots": {}})
     assert payload["optimization_mode"] == "i2v"
     assert "基于首帧生成视频" in captured["prompt"]
-    assert "不要把上游节点标题或完整旧提示词当成人物名字" in captured["prompt"]
+    assert "不要把上游节点标题或完整旧提示词当成角色名字" in captured["prompt"]
     assert "图生图编辑" not in payload["user_prompt"]
     assert "单帧图像编辑" not in payload["user_prompt"]
 

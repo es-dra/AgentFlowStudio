@@ -1,6 +1,6 @@
-export const DIRECTOR_OBJECTS = [
+﻿export const DIRECTOR_OBJECTS = [
   { kind: "camera", label: "镜头/机位" },
-  { kind: "subject", label: "人物/主体" },
+  { kind: "subject", label: "角色/主体" },
   { kind: "key_light", label: "Key Light" },
   { kind: "fill_light", label: "Fill Light" },
   { kind: "back_light", label: "Back Light" },

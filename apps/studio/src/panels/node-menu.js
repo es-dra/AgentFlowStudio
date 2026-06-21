@@ -11,6 +11,11 @@ import {
   startNodeGeneration,
   uploadNodeImage,
 } from "../node-actions.js";
+import {
+  expandTextIdeaToScript,
+  importScriptFileIntoTextNode,
+  splitTextNodeToStoryboardNodes,
+} from "../script-breakdown.js";
 
 const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
 
@@ -29,12 +34,26 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     const fresh = store.get().nodes[nodeId];
     if (fresh) startNodeGeneration(store, runtime, fresh);
   });
+  if (node.type === "text") {
+    addItem("upload", "导入/替换剧本", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) importScriptFileIntoTextNode(store, fresh);
+    });
+    addItem("sparkles", "扩写当前文本", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) expandTextIdeaToScript(store, runtime, fresh);
+    });
+    addItem("frames", "拆分为分镜", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) splitTextNodeToStoryboardNodes(store, fresh);
+    });
+  }
   if (node.type === "image") {
     addItem("upload", "上传/替换参考图", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);
     });
-    addItem("bookmark", "标记为人物/场景资产", () => {
+    addItem("bookmark", "标记为角色/场景资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
     });

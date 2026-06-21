@@ -11,8 +11,8 @@ def test_kling_preflight_reports_missing_service_without_secrets(tmp_path, monke
         json.dumps(
             {
                 "schema_version": "company_provider_secrets.local.v2",
-                "accounts": {"minimax": {}},
-                "services": {"minimax_image": {"provider": "minimax", "capability": "image"}},
+                "accounts": {"unused_image": {}},
+                "services": {"unused_image": {"provider": "codex_handoff", "capability": "image"}},
             }
         ),
         encoding="utf-8",

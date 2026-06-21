@@ -51,9 +51,11 @@ def draft_id_from_refs(project_id: str, generated_at: str, refs: list[str]) -> s
 
 
 def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
-    label = _label_from_prompt(prompt_text, fallback="人物资产草稿")
+    if _is_animal_subject_text(prompt_text):
+        return _animal_subject_draft(draft_id, project_id, refs, prompt_text)
+    label = _label_from_prompt(prompt_text, fallback="角色资产草稿")
     card = {
-        "identity": _sentence_or_default(prompt_text, "参考图中的主要人物，身份待人工确认"),
+        "identity": _sentence_or_default(prompt_text, "参考图中的主要角色，身份待人工确认"),
         "hair": "发型、发色待人工确认",
         "face": "面部辨识点待人工确认",
         "build": "体态比例待人工确认",
@@ -66,9 +68,42 @@ def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_tex
         project_id=project_id,
         asset_type="character",
         label=label,
-        signature=f"{label}: reference character, pending human confirmation",
+        signature=f"{label}: reference role subject, pending human confirmation",
         feature_card=card,
-        candidate_locks=["keep character identity", "keep face recognizability", "keep signature wardrobe"],
+        candidate_locks=["keep role identity", "keep face recognizability", "keep signature wardrobe"],
+        confidence=0.62,
+        missing_fields=_missing_fields(card),
+        source_image_asset_refs=refs,
+        sampled_image_asset_refs=[],
+        source_video_artifact_id=None,
+        prompt_text=prompt_text,
+    )
+
+
+def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: str) -> dict[str, Any]:
+    label = _animal_label_from_prompt(prompt_text)
+    card = {
+        "identity": _sentence_or_default(prompt_text, f"参考图中的同一只{label}，身份待人工确认"),
+        "hair": "毛色、毛发纹理和斑纹待人工确认",
+        "face": "脸部斑纹、眼睛、耳朵和胡须辨识点待人工确认",
+        "build": "体型比例、四肢和尾巴形态待人工确认",
+        "wardrobe": "默认保持自然动物外观；服装、饰品或拟人化只在用户明确要求时添加",
+        "palette": "主体毛色主色调待人工确认",
+        "demeanor": "动物神态和姿态待人工确认",
+    }
+    return _base_draft(
+        draft_id=draft_id,
+        project_id=project_id,
+        asset_type="character",
+        label=label,
+        signature=f"{label}: reference animal subject, pending confirmation",
+        feature_card=card,
+        candidate_locks=[
+            "keep animal identity",
+            "keep fur color and markings",
+            "keep eyes ears tail and body ratio",
+            "only add human hair clothing or anthropomorphic traits when explicitly requested",
+        ],
         confidence=0.62,
         missing_fields=_missing_fields(card),
         source_image_asset_refs=refs,
@@ -207,6 +242,26 @@ def _label_from_prompt(prompt_text: str, *, fallback: str) -> str:
         return fallback
     words = re.split(r"\s+", text)
     return " ".join(words[:6]).strip(" ,.;:，。；：")[:80] or fallback
+
+
+def _animal_label_from_prompt(prompt_text: str) -> str:
+    text = _clean_text(prompt_text).casefold()
+    if "黑色" in prompt_text and "狸花猫" in prompt_text:
+        return "黑色狸花猫"
+    if "狸花猫" in prompt_text or "tabby" in text:
+        return "狸花猫"
+    if "猫" in prompt_text or "cat" in text or "kitten" in text or "feline" in text:
+        return "猫主体资产"
+    if "狗" in prompt_text or "犬" in prompt_text or "dog" in text or "puppy" in text:
+        return "狗主体资产"
+    return "动物主体资产"
+
+
+def _is_animal_subject_text(prompt_text: str) -> bool:
+    text = _clean_text(prompt_text).casefold()
+    animal_terms = ("猫", "狸花猫", "黑猫", "白猫", "橘猫", "宠物", "动物", "狗", "犬", "cat", "tabby", "kitten", "feline", "dog", "puppy", "animal", "pet")
+    human_terms = ("人物", "人像", "真人", "人类", "女孩", "男孩", "女人", "男人", "女性", "男性", "头发", "发型", "校服", "服装", "person", "human", "girl", "boy", "woman", "man", "hair", "wardrobe", "uniform")
+    return any(term.casefold() in text for term in animal_terms) and not any(term.casefold() in text for term in human_terms)
 
 
 def _sentence_or_default(prompt_text: str, fallback: str) -> str:
