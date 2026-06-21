@@ -25,6 +25,16 @@ def poll_keyframe_generation(store: RuntimeStore, project_id: str, output_dir: P
     context_bundle = state.get("context_bundle") if isinstance(state.get("context_bundle"), dict) else None
     provider_gate = state.get("provider_gate") if isinstance(state.get("provider_gate"), dict) else image_provider_gate()
     if state.get("status") in {"succeeded", "failed", "blocked"}:
+        recovered = _recovered_terminal_provider_result(
+            output_dir,
+            project_id,
+            request,
+            state,
+            provider_gate,
+            context_bundle,
+        )
+        if recovered:
+            return recovered
         manifest = read_json(output_dir / "keyframe_generation_safe_manifest.json")
         outputs = manifest.get("outputs") if isinstance(manifest.get("outputs"), list) else []
         return _result(
@@ -57,6 +67,27 @@ def poll_keyframe_generation(store: RuntimeStore, project_id: str, output_dir: P
     if status in {"failed", "blocked", "poll_failed"}:
         reason = _safe_error(_json_dumps_safe(raw.get("blocks") or raw))
         return _keyframe_poll_failed_result(output_dir, project_id, request, state, provider_gate, context_bundle, reason)
+    return _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
+
+
+def _recovered_terminal_provider_result(
+    output_dir: Path,
+    project_id: str,
+    request: KeyframeGenerationRequest,
+    state: dict[str, Any],
+    provider_gate: dict[str, str],
+    context_bundle: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if state.get("status") == "succeeded" or not isinstance(state.get("task"), dict):
+        return None
+    provider_service_id = str(state.get("provider_service_id") or request.provider_service_id)
+    try:
+        registry = load_provider_registry()
+        raw = registry.poll("image", provider_service_id, _provider_task_for_poll(state.get("task"), output_dir))
+    except ModelGatewayError:
+        return None
+    if str(raw.get("status") or "").lower() != "succeeded":
+        return None
     return _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
 
 

@@ -21,6 +21,11 @@
   still marked `generating`, so an already completed or failed Runtime image
   job can be reconciled without requiring the user to manually restart the
   whole generation chain.
+- Repaired terminal-state polling recovery: if an older Runtime state was
+  already marked failed/blocked but the Codex handoff worker later wrote a
+  completed result with a safe candidate image, the next Runtime poll now
+  rebuilds the succeeded manifest and preview instead of keeping the node stuck
+  in a stale failure/running state.
 - Split the new media DOM logic out of `runtime-client.js`; the client is back
   under the 300-line target while the media helper stays single-purpose.
 
@@ -28,7 +33,9 @@ Verification:
 
 ```text
 tests/test_api_runtime_sprite.py tests/test_api_runtime_auth.py tests/test_codex_image_handoff.py tests/test_web_studio_sprite_static.py tests/test_web_studio_frontend_wave.py -> 33 passed / 1 existing warning
-pytest -q -> 574 passed / 527 deselected / 2 existing warnings
+tests/test_codex_image_handoff.py -> 9 passed / 1 existing warning
+tests/test_api_runtime_creative_agent_keyframes.py tests/test_web_studio_frontend_wave.py -> 22 passed / 1 existing warning
+pytest -q -> 575 passed / 527 deselected / 2 existing warnings
 npm run check:studio-js -> JS syntax check passed: 99 files
 python -m apps.cli.main --help -> passed
 python -m apps.cli.main version -> 0.1.0

@@ -23,8 +23,12 @@ and avoids full redraw during IME composition so Chinese input does not lose
 focus. Codex image handoff polling can recover a stable generated candidate
 from a job still marked running, and Studio startup/project switch now performs
 a one-shot refresh for image nodes still marked `generating`, reducing stale
-progress failures after a page refresh or interrupted session. Verification:
-focused regression passed 33 / 1 existing warning; full pytest passed 574 / 527
+progress failures after a page refresh or interrupted session. Runtime poll
+also now recovers a stale terminal failed/blocked state when the Codex handoff
+worker has already written a completed safe candidate result. Verification:
+focused regression passed 33 / 1 existing warning; Codex handoff regression
+passed 9 / 1 existing warning; keyframe/frontend regression passed 22 / 1
+existing warning; full pytest passed 575 / 527
 deselected / 2 existing warnings; `npm run check:studio-js` passed for 99
 files; CLI help and version passed; maintenance audit failed=0 with warnings
 only and oversized warning count reduced from 37 to 36 after moving protected

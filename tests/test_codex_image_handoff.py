@@ -142,6 +142,53 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     assert len(generated) == 1
 
 
+def test_codex_image_handoff_runtime_poll_recovers_terminal_failed_state_after_worker_success(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    provider_path = tmp_path / "providers.local.json"
+    provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_codex_terminal_recovery"
+
+    submit = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "image-node-1",
+            "prompt_text": "Generate a controlled tabby cat keyframe.",
+            "optimized_prompt": "A controlled tabby cat keyframe, cinematic lighting.",
+            "provider_service_id": "codex_image",
+            "generated_at": "2026-06-17T10:26:00+08:00",
+        },
+    )
+    assert submit.status_code == 200
+    job_id = submit.json()["job"]["job_id"]
+    output_dir = tmp_path / "runs" / project_id / job_id
+    running = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
+    assert running.status_code == 200
+    assert running.json()["job"]["status"] == "running"
+
+    processed = process_one(output_dir, executor=FakeCodexImageExecutor())
+    assert processed is not None
+    assert processed.status == "succeeded"
+    state_path = output_dir / "keyframe_task_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["status"] = "failed"
+    state["last_provider_poll"] = {"status": "running", "provider_raw_persisted": False}
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    recovered = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
+
+    assert recovered.status_code == 200
+    payload = recovered.json()
+    assert payload["job"]["status"] == "succeeded"
+    assert payload["candidate_previews"][0]["preview_url"].endswith("/candidate_001/preview")
+    assert payload["safe_manifest"]["status"] == "succeeded"
+    assert json.loads(state_path.read_text(encoding="utf-8"))["status"] == "succeeded"
+
+
 def test_codex_image_handoff_poll_fails_safely_when_provider_config_disappears(tmp_path, monkeypatch) -> None:
     provider_path = tmp_path / "providers.local.json"
     provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
