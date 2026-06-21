@@ -3611,6 +3611,7 @@ git diff --check: passed
 Browser plugin smoke on current branch Runtime 8807: page identity ok, image node full-bleed class present, image loaded, app-level asset context menu/delete worked, TuanTuan Chinese input kept focus/value, page console warn/error=0
 tools/studio_full_coverage_browser_qa.py: passed; asset preview/delete, TuanTuan pending shimmer + copy rotation, save/restore, small viewport
 Server queue audit: pending=0, running=0, completed=7, failed=3 historical; Runtime health ready; video gate false
+Deployment sync: local master, origin/master, server /home/afs-ops/AgentFlowStudio, and server /opt/afs/AgentFlowStudio aligned on the hardened Studio image/TuanTuan flow; afs-runtime active after deploy
 ```
 
 Boundaries:
