@@ -38,7 +38,7 @@ def has_visual_reference(
     ):
         if params.get(key):
             return True
-    for key in ("connected_reference_nodes", "uploads", "image_asset_refs", "reference_images"):
+    for key in ("connected_reference_nodes", "uploads", "uploaded_images", "image_asset_refs", "reference_images"):
         value = params.get(key)
         if isinstance(value, list) and value:
             return True

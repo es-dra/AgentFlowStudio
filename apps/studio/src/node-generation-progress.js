@@ -5,8 +5,6 @@ const KIND_LABELS = {
 };
 
 const STATUS_PROGRESS = {
-  pending: 16,
-  submitted: 24,
   succeeded: 100,
   failed: 100,
   blocked: 100,
@@ -15,13 +13,14 @@ const STATUS_PROGRESS = {
   cancelled_local_only: 100,
 };
 const INDETERMINATE_ACTIVE_STATUSES = new Set(["pending", "running"]);
+const ACTIVE_STATUSES = new Set(["submitted", "pending", "running"]);
 
 export function setSubmittingGenerationState(node, kind, options = {}) {
   const params = ensureParams(node);
   const label = options.label || `${kindLabel(kind)}已提交`;
   const hint = options.hint || "正在等待创作服务返回进度，页面会自动刷新节点。";
   params.jobProgress = {
-    percent: options.percent === null ? null : clampPercent(options.percent ?? 8),
+    percent: options.percent == null ? null : clampPercent(options.percent),
     label,
     hint,
     status: "submitted",
@@ -81,7 +80,7 @@ function normalizeCandidatePreview(item) {
 }
 
 function progressPercent(response, status, override) {
-  if (override === null || INDETERMINATE_ACTIVE_STATUSES.has(status)) return null;
+  if (override === null || ACTIVE_STATUSES.has(status)) return null;
   const explicit = override
     ?? response?.job?.progress?.percent
     ?? response?.job?.progress_percent
@@ -96,8 +95,8 @@ function progressPercent(response, status, override) {
 function progressMode(response, status) {
   const mode = response?.job?.progress?.mode || response?.progress?.mode;
   if (mode) return String(mode);
-  if (INDETERMINATE_ACTIVE_STATUSES.has(status)) return "indeterminate";
-  if (status === "submitted") return "queued";
+  if (status === "submitted" || status === "pending") return "queued";
+  if (status === "running") return "indeterminate";
   if (isTerminalStatus(status)) return "complete";
   return "idle";
 }
@@ -105,8 +104,8 @@ function progressMode(response, status) {
 function progressLabel(kind, status) {
   const label = kindLabel(kind);
   if (status === "succeeded") return `${label}已完成`;
-  if (status === "submitted") return `${label}已提交`;
-  if (status === "running" || status === "pending") return `${label}进行中`;
+  if (status === "submitted" || status === "pending") return `${label}排队中`;
+  if (status === "running") return `${label}进行中`;
   if (status === "cancelled_local_only" || status === "cancelled") return "已停止本地刷新";
   return `${label}需要检查`;
 }
@@ -114,8 +113,14 @@ function progressLabel(kind, status) {
 function progressHint(kind, status, response) {
   const jobId = response?.job?.job_id;
   if (status === "succeeded") return "预览已加载到节点，可继续生成、保存素材或整理卡片。";
-  if (status === "submitted" || status === "running" || status === "pending") {
-    return jobId ? `任务 ${jobId} 正在处理，保持页面打开即可。` : "任务正在处理，保持页面打开即可。";
+  if (status === "submitted" || status === "pending") {
+    const position = response?.job?.progress?.queue_position ?? response?.progress?.queue_position;
+    const pendingCount = response?.job?.progress?.pending_count ?? response?.progress?.pending_count;
+    if (Number(position) > 0) return `任务已进入队列，当前排第 ${position} 位${Number(pendingCount) > 0 ? `，队列共 ${pendingCount} 个` : ""}。`;
+    return jobId ? `任务 ${jobId} 已进入队列，保持页面打开即可。` : "任务已进入队列，保持页面打开即可。";
+  }
+  if (status === "running") {
+    return jobId ? `任务 ${jobId} 正在生成，完成后会自动显示预览。` : "任务正在生成，完成后会自动显示预览。";
   }
   if (status === "cancelled_local_only" || status === "cancelled") {
     return "这里只停止页面继续刷新，不代表平台侧任务已取消。";
@@ -128,7 +133,7 @@ function kindLabel(kind) {
 }
 
 function isTerminalStatus(status) {
-  return !["submitted", "running", "pending"].includes(status);
+  return !ACTIVE_STATUSES.has(status);
 }
 
 function ensureParams(node) {

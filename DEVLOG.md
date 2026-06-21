@@ -3583,3 +3583,38 @@ Boundaries:
 - No ASR or external download gate was opened.
 - No provider raw response, signed URL, local private media byte, secret, invite code, session token, or Company OS private source content was written to repo records.
 - Browser/runtime verification and provider smoke remain separate from human acceptance, creative quality scoring, business validation, and durable memory promotion.
+
+## 2026-06-21 - Studio Image/TuanTuan Concurrency Hardening
+
+- Fixed Codex image handoff queue semantics: pending jobs now remain `pending` until a worker atomically claims them, running jobs carry a worker claim record, and concurrent workers skip jobs already claimed by another worker.
+- Completed candidates recovered from a `running` handoff directory are now moved into `completed` and trimmed, so queue audits do not keep reporting stale running jobs after a successful recovery.
+- Replaced fake static image progress with queued/indeterminate progress metadata so Studio no longer jumps to a misleading percentage while long image jobs are still processing.
+- Made generated image asset IDs deterministic per source job/candidate to prevent duplicate reusable assets on repeated polls.
+- Scoped Codex image worker home/cache per job directory so same-project and cross-project image jobs do not share a transient execution workspace.
+- Split prompt optimizer reference handling into subject-reference versus style-reference paths. If the user clearly asks for a new subject, uploaded images are treated as style/quality references instead of overriding the subject.
+- Hardened i2i fallback and guardrails so a request like "生成一只狸花猫" with an unrelated reference image no longer forces the reference image filename or subject into the optimized prompt.
+- Cached authorized Runtime media object URLs at render boundaries and avoided re-fetching the same project image on node selection, drawer tab changes, or rerenders.
+- Made completed image nodes full-bleed in the node body and kept result overlays hover/selection driven instead of occupying permanent content space.
+- Added a TuanTuan focused-input DOM guard plus client-side prompt-leak fallback, so save-state rerenders do not interrupt typing/IME composition and prompt instructions are not shown to users.
+
+Verification:
+
+```text
+Focused regression set: 20 passed / 1 existing warning
+Prompt + sprite + handoff + Studio static set: 67 passed / 1 existing warning
+Full pytest: 585 passed / 527 deselected / 2 existing warnings
+npm run check:studio-js: JS syntax check passed for 99 files
+python -m apps.cli.main --help: passed
+python -m apps.cli.main version: 0.1.0
+python tools/maintenance_audit.py: failed=0, warnings only
+git diff --check: passed
+Browser plugin smoke on current branch Runtime 8807: page identity ok, image node full-bleed class present, image loaded, app-level asset context menu/delete worked, TuanTuan Chinese input kept focus/value, page console warn/error=0
+tools/studio_full_coverage_browser_qa.py: passed; asset preview/delete, TuanTuan pending shimmer + copy rotation, save/restore, small viewport
+Server queue audit: pending=0, running=0, completed=7, failed=3 historical; Runtime health ready; video gate false
+```
+
+Boundaries:
+
+- Video generation was not triggered and video gate remained closed.
+- Browser/runtime verification and server queue audit are not human acceptance, creative quality scoring, business validation, or durable-memory promotion.
+- No provider raw response, signed URL, local private media byte, secret, invite code, session token, or Company OS private source content was written to repo records.

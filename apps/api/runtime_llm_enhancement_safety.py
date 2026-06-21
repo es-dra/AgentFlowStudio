@@ -36,12 +36,13 @@ def validate_enhanced_prompt_specificity(prompt: str, request: PromptOptimizatio
     if prompt_optimization_mode(request) != "i2i":
         return
     terms = reference_hint_terms(request)
-    if terms and not any(term in prompt for term in terms):
+    require_reference_terms = should_require_reference_hint_terms(request)
+    if terms and require_reference_terms and not any(term in prompt for term in terms):
         raise ValueError("i2i enhancement did not use reference image hints")
     prompt_text = request.prompt_text
-    if "短发" in prompt_text and not any(term in prompt for term in ("不要染发", "不改变发色", "保持原参考图发色", "保持发色")):
+    if require_reference_terms and "短发" in prompt_text and not any(term in prompt for term in ("不要染发", "不改变发色", "保持原参考图发色", "保持发色")):
         raise ValueError("i2i short-hair enhancement missed hair color lock")
-    if any("校服" in term for term in terms) and not any(term in prompt for term in ("保持校服", "不改变校服", "校服款式", "校服配色")):
+    if require_reference_terms and any("校服" in term for term in terms) and not any(term in prompt for term in ("保持校服", "不改变校服", "校服款式", "校服配色")):
         raise ValueError("i2i school-uniform enhancement missed wardrobe lock")
 
 
@@ -123,6 +124,60 @@ def visual_reference_hint(request: PromptOptimizationRequest) -> str:
     return ""
 
 
+def reference_role(request: PromptOptimizationRequest) -> str:
+    terms = reference_hint_terms(request)
+    if not terms:
+        return "none"
+    prompt = str(request.prompt_text or "")
+    if has_explicit_subject_reference(prompt):
+        return "subject"
+    if has_explicit_new_subject(prompt):
+        return "style"
+    return "subject"
+
+
+def should_require_reference_hint_terms(request: PromptOptimizationRequest) -> bool:
+    return reference_role(request) == "subject"
+
+
+def has_explicit_new_subject(prompt: str) -> bool:
+    text = str(prompt or "").strip()
+    if not text:
+        return False
+    if re.search(r"(生成|创建|画|绘制|输出|制作|做)(一只|一个|一位|一名|一张|新的|全新)", text):
+        return True
+    if re.search(r"\b(generate|create|draw|render|make)\s+(a|an|one|new)\b", text, re.IGNORECASE):
+        return True
+    return False
+
+
+def has_explicit_subject_reference(prompt: str) -> bool:
+    text = str(prompt or "")
+    subject_terms = (
+        "这个人物",
+        "这个角色",
+        "该人物",
+        "该角色",
+        "同一人物",
+        "同一个人物",
+        "同一角色",
+        "参考图中的人物",
+        "参考图中的角色",
+        "参考图主体",
+        "原图主体",
+        "当前图片",
+        "这张图",
+        "原图",
+        "保留参考图",
+        "保持参考图",
+        "基于参考图编辑",
+        "基于当前图",
+    )
+    if any(term in text for term in subject_terms):
+        return True
+    return bool(re.search(r"\b(same|current|reference)\s+(person|character|subject|image)\b", text, re.IGNORECASE))
+
+
 def reference_hint_terms(request: PromptOptimizationRequest) -> list[str]:
     params = request.node_parameters or {}
     terms: list[str] = []
@@ -199,9 +254,11 @@ def safe_reason(value: str) -> str:
 __all__ = (
     "compact",
     "contains_cjk",
+    "reference_role",
     "safe_reason",
     "sanitize_enhanced_prompt",
     "sections_from_canonical",
+    "should_require_reference_hint_terms",
     "slot",
     "validate_enhanced_prompt_specificity",
     "visual_reference_hint",

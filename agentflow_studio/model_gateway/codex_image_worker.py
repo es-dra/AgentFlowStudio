@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -28,6 +29,9 @@ class CodexImageExecutor(Protocol):
     def execute(self, request: dict[str, Any], work_dir: Path) -> Path: ...
 
 
+CLAIM_FILENAME = "claim.json"
+
+
 class FakeCodexImageExecutor:
     PNG_BYTES = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
@@ -48,7 +52,9 @@ class CodexExecImageExecutor:
         work_dir = Path(work_dir).resolve()
         prompt_path = work_dir / "worker_prompt.md"
         prompt_path.write_text(_worker_prompt(request), encoding="utf-8")
-        codex_env = codex_subprocess_env()
+        codex_env_source = dict(os.environ)
+        codex_env_source["AFS_CODEX_HOME"] = str(work_dir / ".codex-home")
+        codex_env = codex_subprocess_env(codex_env_source)
         try:
             completed = subprocess.run(
                 [
@@ -89,22 +95,21 @@ def process_one(
     *,
     executor: CodexImageExecutor | None = None,
     stale_running_sec: float = 3600.0,
+    worker_id: str | None = None,
 ) -> ProcessResult | None:
     executor = executor or CodexExecImageExecutor()
+    resolved_worker_id = worker_id or _worker_id()
     recover_stale_running_jobs(root, stale_running_sec=stale_running_sec)
-    pending = _next_pending_job(Path(root))
-    if pending is None:
+    running = _claim_next_pending_job(Path(root), worker_id=resolved_worker_id)
+    if running is None:
         return None
-    return _process_pending(pending, executor)
+    return _process_running(running, executor, worker_id=resolved_worker_id)
 
 
-def _process_pending(pending: Path, executor: CodexImageExecutor) -> ProcessResult:
-    job_id = pending.name
-    job_root = pending.parents[1]
-    running = job_root / "running" / job_id
-    running.parent.mkdir(parents=True, exist_ok=True)
-    pending.rename(running)
-    append_worker_event(job_root, job_id=job_id, status="running")
+def _process_running(running: Path, executor: CodexImageExecutor, *, worker_id: str) -> ProcessResult:
+    job_id = running.name
+    job_root = running.parents[1]
+    append_worker_event(job_root, job_id=job_id, status="running", worker_id=worker_id)
     output_dir = running.parents[2]
     try:
         request = _read_request(running)
@@ -118,7 +123,13 @@ def _process_pending(pending: Path, executor: CodexImageExecutor) -> ProcessResu
         completed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(completed)
         trim_finished_job_dir(completed)
-        append_worker_event(job_root, job_id=job_id, status="succeeded", image_path="image_candidates/candidate_001.png")
+        append_worker_event(
+            job_root,
+            job_id=job_id,
+            status="succeeded",
+            image_path="image_candidates/candidate_001.png",
+            worker_id=worker_id,
+        )
         return ProcessResult(job_id=job_id, status="succeeded", job_dir=completed)
     except Exception as exc:  # noqa: BLE001 - worker boundary converts all failures to safe job results.
         result = failed_result_payload(job_id=job_id, reason=str(exc))
@@ -127,7 +138,13 @@ def _process_pending(pending: Path, executor: CodexImageExecutor) -> ProcessResu
         failed.parent.mkdir(parents=True, exist_ok=True)
         running.rename(failed)
         trim_finished_job_dir(failed)
-        append_worker_event(job_root, job_id=job_id, status="failed", error_summary=result["blocks"][0]["reason"])
+        append_worker_event(
+            job_root,
+            job_id=job_id,
+            status="failed",
+            error_summary=result["blocks"][0]["reason"],
+            worker_id=worker_id,
+        )
         return ProcessResult(job_id=job_id, status="failed", job_dir=failed)
 
 
@@ -157,8 +174,17 @@ def main(argv: list[str] | None = None) -> int:
         time.sleep(max(args.interval_sec, 0.2))
 
 
-def _next_pending_job(root: Path) -> Path | None:
+def _claim_next_pending_job(root: Path, *, worker_id: str) -> Path | None:
+    for pending in _pending_jobs(root):
+        running = _try_claim_pending_job(pending, worker_id=worker_id)
+        if running is not None:
+            return running
+    return None
+
+
+def _pending_jobs(root: Path) -> list[Path]:
     pending_dirs: list[Path] = []
+    jobs: list[Path] = []
     direct = root / JOB_ROOT_DIR / "pending"
     if direct.is_dir():
         pending_dirs.append(direct)
@@ -171,10 +197,39 @@ def _next_pending_job(root: Path) -> Path | None:
         if resolved in seen:
             continue
         seen.add(resolved)
-        for job_dir in sorted(pending_dir.iterdir(), key=lambda item: item.stat().st_mtime):
+        try:
+            candidates = sorted(pending_dir.iterdir(), key=lambda item: item.stat().st_mtime)
+        except FileNotFoundError:
+            continue
+        for job_dir in candidates:
             if job_dir.is_dir() and (job_dir / REQUEST_FILENAME).is_file():
-                return job_dir
-    return None
+                jobs.append(job_dir)
+    return jobs
+
+
+def _try_claim_pending_job(pending: Path, *, worker_id: str) -> Path | None:
+    job_id = pending.name
+    job_root = pending.parents[1]
+    running = job_root / "running" / job_id
+    running.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        pending.rename(running)
+    except (FileNotFoundError, FileExistsError):
+        return None
+    claim = {
+        "schema_version": "afs_codex_image_claim.v0.1",
+        "job_id": job_id,
+        "worker_id": worker_id,
+        "claimed_at": time.time(),
+        "provider_raw_response_stored": False,
+    }
+    write_json(running / CLAIM_FILENAME, claim)
+    return running
+
+
+def _next_pending_job(root: Path) -> Path | None:
+    jobs = _pending_jobs(root)
+    return jobs[0] if jobs else None
 
 
 def _read_request(job_dir: Path) -> dict[str, Any]:
@@ -215,6 +270,10 @@ def _safe_process_error(value: str) -> str:
     if any(term in lowered for term in ("api", "key", "secret", "token", "authorization", "cookie")):
         return "Codex image worker configuration is not ready."
     return " ".join(value.split())[:160] or "Codex image worker failed."
+
+
+def _worker_id() -> str:
+    return f"worker-{os.getpid()}"
 
 
 if __name__ == "__main__":

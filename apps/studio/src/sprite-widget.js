@@ -20,11 +20,7 @@ import {
   setTemporarySpritePose,
   spriteStoryLayers,
 } from "./sprite-character.js";
-import {
-  bindSpriteMotion,
-  pulseSpriteMotion,
-  setSpriteMotionMode,
-} from "./sprite-motion.js";
+import { bindSpriteMotion, pulseSpriteMotion, setSpriteMotionMode } from "./sprite-motion.js";
 import { canvasSummary, safeReply, selectedNodeId } from "./sprite-chat-context.js";
 import { captureSpriteInputFocus, captureSpriteLogScroll, isSpriteInputComposing, pendingSpriteText, rememberSpriteInputSelection, resetSpritePendingLine, restoreSpriteInputFocus, restoreSpriteLogScroll, spriteInputComposing, spriteInputFocused, startSpritePendingTicker, stopSpritePendingTicker } from "./sprite-pending-state.js";
 
@@ -50,7 +46,7 @@ export function renderSpriteWidget(state, runtime) {
   rememberSpritePositionFromRoot(root);
   applySpritePosition(root);
   root.dataset.spriteHidden = isSpriteHidden() ? "true" : "false";
-  if (isSpriteInputComposing() && spriteOpen && !spriteSettingsOpen && !spriteSending && root.querySelector(".afs-sprite-form input")) {
+  if (spriteInputShouldKeepDom(root)) {
     applySpritePose(root, spriteState());
     setSpriteMotionMode(spriteMotionMode(), root);
     return;
@@ -163,6 +159,12 @@ function spriteMotionMode() {
   return "observe";
 }
 
+function spriteInputShouldKeepDom(root) {
+  if (!spriteOpen || spriteSettingsOpen || spriteSending) return false;
+  const input = root.querySelector(".afs-sprite-form input");
+  return Boolean(input && (document.activeElement === input || isSpriteInputComposing()));
+}
+
 function spritePanel(state, runtime) {
   const panel = el("div", "afs-sprite-panel");
   const head = el("div", "afs-sprite-head");
@@ -206,15 +208,13 @@ function spriteSettingsPanel() {
   panel.appendChild(grid);
   const closeButton = el("button", "afs-sprite-close", "关闭团团");
   closeButton.type = "button";
-  closeButton.addEventListener("click", () => {
-    setSpriteHidden(true);
-    spriteOpen = false;
-    spriteSettingsOpen = false;
-    renderSpriteWidget(lastState, lastRuntime);
-  });
+  closeButton.addEventListener("click", () => closeSpriteWidget());
   panel.appendChild(closeButton);
   return panel;
 }
+
+function closeSpriteWidget() { setSpriteHidden(true); spriteOpen = false; spriteSettingsOpen = false; renderSpriteWidget(lastState, lastRuntime); }
+
 function spriteRestoreButton() {
   const button = el("button", "afs-sprite-restore", "显示团团");
   button.type = "button";

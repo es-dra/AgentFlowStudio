@@ -1,11 +1,16 @@
 import { authToken, runtimeBaseUrl, runtimeMediaUrl } from "./runtime-client.js";
 
 const mediaObjectUrls = new WeakMap();
+const mediaBlobCache = new Map();
 
 export async function setRuntimeMediaSource(element, value) {
   if (!element) return "";
+  const raw = String(value || "").trim();
   const url = runtimeMediaUrl(value);
-  revokeRuntimeMediaSource(element);
+  if (element.dataset.afsMediaRaw === raw && element.dataset.afsMediaResolved === url && currentMediaUrl(element)) {
+    return currentMediaUrl(element);
+  }
+  revokeRuntimeMediaSource(element, { keepCached: true });
   if (!url) {
     assignMediaUrl(element, "");
     return "";
@@ -19,7 +24,14 @@ export async function setRuntimeMediaSource(element, value) {
     assignMediaUrl(element, url);
     return url;
   }
+  const cached = cachedAuthorizedMediaUrl(url);
+  if (cached) {
+    assignCachedMediaUrl(element, raw, url, cached);
+    return cached;
+  }
   const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  element.dataset.afsMediaRaw = raw;
+  element.dataset.afsMediaResolved = url;
   element.dataset.afsMediaRequest = requestId;
   try {
     const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -29,7 +41,8 @@ export async function setRuntimeMediaSource(element, value) {
       URL.revokeObjectURL(objectUrl);
       return "";
     }
-    mediaObjectUrls.set(element, objectUrl);
+    mediaBlobCache.set(url, objectUrl);
+    mediaObjectUrls.set(element, { url: objectUrl, cached: true });
     assignMediaUrl(element, objectUrl);
     return objectUrl;
   } catch {
@@ -38,18 +51,36 @@ export async function setRuntimeMediaSource(element, value) {
   }
 }
 
-export function revokeRuntimeMediaSource(element) {
+export function revokeRuntimeMediaSource(element, options = {}) {
   const existing = element ? mediaObjectUrls.get(element) : "";
-  if (existing) URL.revokeObjectURL(existing);
+  const url = typeof existing === "string" ? existing : existing?.url;
+  if (url && !existing?.cached && !options.keepCached) URL.revokeObjectURL(url);
   if (element) {
     mediaObjectUrls.delete(element);
     delete element.dataset.afsMediaRequest;
+    delete element.dataset.afsMediaRaw;
+    delete element.dataset.afsMediaResolved;
   }
 }
 
 function assignMediaUrl(element, url) {
   if (element.tagName === "A") element.href = url;
   else element.src = url;
+}
+
+function assignCachedMediaUrl(element, raw, resolvedUrl, objectUrl) {
+  element.dataset.afsMediaRaw = raw;
+  element.dataset.afsMediaResolved = resolvedUrl;
+  mediaObjectUrls.set(element, { url: objectUrl, cached: true });
+  assignMediaUrl(element, objectUrl);
+}
+
+function cachedAuthorizedMediaUrl(url) {
+  return mediaBlobCache.get(url) || "";
+}
+
+function currentMediaUrl(element) {
+  return element.tagName === "A" ? element.href : element.src;
 }
 
 function shouldFetchAuthorizedMedia(value, resolvedUrl) {

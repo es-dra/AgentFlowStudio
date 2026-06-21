@@ -18,6 +18,8 @@ from agentflow_studio.model_gateway.codex_image_worker import (
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_generated_image_assets import register_generated_image_asset
+from apps.api.runtime_store import RuntimeStore
 
 
 def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path, monkeypatch) -> None:
@@ -54,9 +56,10 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     assert "http://" not in serialized
     assert "https://" not in serialized
 
-    running = registry.poll("image", "codex_image", task)
-    assert running["status"] == "running"
-    assert running["provider_calls_started"] is True
+    pending = registry.poll("image", "codex_image", task)
+    assert pending["status"] == "pending"
+    assert pending["progress"]["mode"] == "queued"
+    assert pending["provider_calls_started"] is True
 
     processed = process_one(output_dir, executor=FakeCodexImageExecutor())
     assert processed is not None
@@ -104,9 +107,10 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     assert submitted_payload["job"]["status"] == "submitted"
     assert submitted_payload["candidate_previews"] == []
 
-    running = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
-    assert running.status_code == 200
-    assert running.json()["job"]["status"] == "running"
+    pending = client.post(f"/projects/proj_codex_image/keyframe-generations/{job_id}/poll")
+    assert pending.status_code == 200
+    assert pending.json()["job"]["status"] == "pending"
+    assert pending.json()["job"]["progress"]["mode"] == "queued"
 
     processed = process_one(tmp_path, executor=FakeCodexImageExecutor())
     assert processed is not None
@@ -166,9 +170,10 @@ def test_codex_image_handoff_runtime_poll_recovers_terminal_failed_state_after_w
     assert submit.status_code == 200
     job_id = submit.json()["job"]["job_id"]
     output_dir = tmp_path / "runs" / project_id / job_id
-    running = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
-    assert running.status_code == 200
-    assert running.json()["job"]["status"] == "running"
+    pending = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
+    assert pending.status_code == 200
+    assert pending.json()["job"]["status"] == "pending"
+    assert pending.json()["job"]["progress"]["mode"] == "queued"
 
     processed = process_one(output_dir, executor=FakeCodexImageExecutor())
     assert processed is not None
@@ -330,6 +335,71 @@ def test_codex_image_worker_recovers_stale_running_jobs_without_blocking_queue(t
     assert registry.poll("image", "codex_image", second)["status"] == "succeeded"
 
 
+def test_codex_image_worker_skips_job_claimed_by_another_worker(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    store = _store(tmp_path, _codex_provider_config())
+    registry = ProviderRegistry.from_store(store)
+    output_dir = tmp_path / "run"
+
+    first = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="First queued job.", output_dir=output_dir, candidate_count=1),
+    )
+    second = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="Second queued job.", output_dir=output_dir, candidate_count=1),
+    )
+    first_pending = output_dir / "codex_image_job" / "pending" / first["task"]["job_id"]
+    first_running = output_dir / "codex_image_job" / "running" / first["task"]["job_id"]
+    original_rename = Path.rename
+    raced = {"done": False}
+
+    def race_once(self, target):  # noqa: ANN001, ANN202 - pathlib monkeypatch for worker claim race.
+        if not raced["done"] and self == first_pending:
+            raced["done"] = True
+            first_running.parent.mkdir(parents=True, exist_ok=True)
+            original_rename(self, first_running)
+            raise FileNotFoundError("already claimed")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", race_once)
+
+    processed = process_one(output_dir, executor=FakeCodexImageExecutor())
+
+    assert processed is not None
+    assert processed.job_id == second["task"]["job_id"]
+    assert processed.status == "succeeded"
+    assert first_running.is_dir()
+
+
+def test_codex_image_handoff_reports_pending_queue_position(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    registry = ProviderRegistry.from_store(_store(tmp_path, _codex_provider_config()))
+    output_dir = tmp_path / "run"
+    first = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="First queued job.", output_dir=output_dir, candidate_count=1),
+    )
+    second = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(prompt="Second queued job.", output_dir=output_dir, candidate_count=1),
+    )
+
+    first_poll = registry.poll("image", "codex_image", first)
+    second_poll = registry.poll("image", "codex_image", second)
+
+    assert first_poll["status"] == "pending"
+    assert first_poll["progress"]["mode"] == "queued"
+    assert first_poll["progress"]["queue_position"] == 1
+    assert first_poll["progress"]["pending_count"] == 2
+    assert second_poll["status"] == "pending"
+    assert second_poll["progress"]["queue_position"] == 2
+
+
 def test_codex_image_handoff_poll_recovers_stable_running_candidate(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     registry = ProviderRegistry.from_store(_store(tmp_path, _codex_provider_config()))
@@ -354,7 +424,66 @@ def test_codex_image_handoff_poll_recovers_stable_running_candidate(tmp_path, mo
     assert result["status"] == "succeeded"
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert (output_dir / "image_candidates" / "candidate_001.png").read_bytes() == FakeCodexImageExecutor.PNG_BYTES
-    assert (running_dir / "result.json").is_file()
+    completed_dir = output_dir / "codex_image_job" / "completed" / job_id
+    assert completed_dir.is_dir()
+    assert (completed_dir / "result.json").is_file()
+    assert not running_dir.exists()
+    assert not (completed_dir / "request.json").exists()
+
+
+def test_generated_image_asset_id_is_stable_for_same_job_candidate(tmp_path) -> None:
+    store = RuntimeStore(tmp_path)
+    project_id = "proj_stable_generated_asset"
+    store.ensure_project_manifest(project_id)
+    image_path = tmp_path / "runs" / project_id / "job_1" / "image_candidates" / "candidate_001.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+
+    first = register_generated_image_asset(
+        store,
+        project_id,
+        source_node_id="image_1",
+        source_job_id="job_1",
+        source_candidate_id="candidate_001",
+        image_path=image_path,
+    )
+    second = register_generated_image_asset(
+        store,
+        project_id,
+        source_node_id="image_1",
+        source_job_id="job_1",
+        source_candidate_id="candidate_001",
+        image_path=image_path,
+    )
+
+    assert first["asset"]["asset_id"] == second["asset"]["asset_id"]
+    assert first["asset"]["asset_id"].startswith("img_gen_")
+
+
+def test_codex_image_executor_uses_job_scoped_codex_home(tmp_path, monkeypatch) -> None:
+    home = tmp_path / "home"
+    codex = home / ".local" / "bin" / "codex"
+    codex.parent.mkdir(parents=True)
+    codex.write_text("#!/bin/sh\n", encoding="utf-8")
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_run(command, *, cwd, env, **kwargs):  # noqa: ANN001, ANN202
+        captured["env"] = dict(env)
+        (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    monkeypatch.setenv("AFS_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda _command: None)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.Path.home", lambda: home)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.run", fake_run)
+
+    CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
+
+    codex_home = Path(captured["env"]["CODEX_HOME"])
+    assert codex_home.parent == work_dir
+    assert codex_home.name == ".codex-home"
 
 
 def _store(tmp_path: Path, payload: dict):

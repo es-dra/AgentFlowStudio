@@ -82,6 +82,8 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_keyframe_generation")) from exc
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         job = runtime_job(job_id, project_id, "keyframe_generation", status, artifacts=artifacts)
+        if result.get("progress"):
+            job["progress"].update(result["progress"])
         job["ui_summary"] = {
             "provider_gate": {
                 "status": safe_manifest.get("status", status),
@@ -136,6 +138,8 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
         safe_manifest = dict(result["safe_manifest"])
         status = str(result["status"])
         job = runtime_job(job_id, project_id, "keyframe_generation", status, artifacts=artifacts)
+        if result.get("progress"):
+            job["progress"].update(result["progress"])
         job["ui_summary"] = {
             "provider_gate": {
                 "status": safe_manifest.get("status", status),

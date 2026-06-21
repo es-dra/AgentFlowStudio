@@ -63,7 +63,17 @@ def poll_keyframe_generation(store: RuntimeStore, project_id: str, output_dir: P
 
     status = str(raw.get("status") or "").lower()
     if status in {"running", "submitted", "pending"}:
-        return _keyframe_running_result(output_dir, project_id, request, state, provider_gate, context_bundle)
+        progress = raw.get("progress") if isinstance(raw.get("progress"), dict) else None
+        return _keyframe_active_result(
+            output_dir,
+            project_id,
+            request,
+            state,
+            provider_gate,
+            context_bundle,
+            status=status,
+            progress=progress,
+        )
     if status in {"failed", "blocked", "poll_failed"}:
         reason = _safe_error(_json_dumps_safe(raw.get("blocks") or raw))
         return _keyframe_poll_failed_result(output_dir, project_id, request, state, provider_gate, context_bundle, reason)
@@ -91,21 +101,24 @@ def _recovered_terminal_provider_result(
     return _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
 
 
-def _keyframe_running_result(
+def _keyframe_active_result(
     output_dir: Path,
     project_id: str,
     request: KeyframeGenerationRequest,
     state: dict[str, Any],
     provider_gate: dict[str, str],
     context_bundle: dict[str, Any] | None,
+    *,
+    status: str,
+    progress: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    state["status"] = "running"
-    state["last_provider_poll"] = {"status": "running", "provider_raw_persisted": False}
+    state["status"] = status
+    state["last_provider_poll"] = {"status": status, "provider_raw_persisted": False}
     _write_task_state(output_dir, state)
     manifest = keyframe_safe_manifest(
         project_id,
         request,
-        status="running",
+        status=status,
         provider_gate=provider_gate,
         blocks=[],
         provider_calls_started=True,
@@ -117,12 +130,13 @@ def _keyframe_running_result(
     )
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
     return _result(
-        status="running",
+        status=status,
         provider_gate=provider_gate,
         provider_calls_started=True,
         provider_outputs=[],
         safe_manifest=manifest,
         context_bundle=context_bundle,
+        progress=progress,
     )
 
 
@@ -243,8 +257,9 @@ def _result(
     provider_outputs: list[dict[str, Any]],
     safe_manifest: dict[str, Any],
     context_bundle: dict[str, Any] | None,
+    progress: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    result = {
         "status": status,
         "provider_gate": provider_gate,
         "provider_calls_started": provider_calls_started,
@@ -258,6 +273,9 @@ def _result(
             "remote_video": "blocked_by_default",
         },
     }
+    if progress:
+        result["progress"] = progress
+    return result
 
 
 def _json_dumps_safe(value: Any) -> str:

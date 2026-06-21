@@ -15,11 +15,13 @@ def append_worker_event(
     status: str,
     image_path: str | None = None,
     error_summary: str | None = None,
+    worker_id: str | None = None,
 ) -> None:
     event = {
         "time": datetime.now(timezone.utc).isoformat(),
         "job_id": job_id,
         "status": status,
+        "worker_id": worker_id,
         "image_path": image_path,
         "error_summary": error_summary,
         "provider_raw_response_stored": False,

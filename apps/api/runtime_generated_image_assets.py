@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.image_utils import image_dimensions
@@ -46,7 +45,7 @@ def register_generated_image_asset(
     if not dimensions:
         raise ValueError("generated image asset dimensions are required")
 
-    asset_id = f"img_{uuid4().hex[:12]}"
+    asset_id = _generated_asset_id(source_job_id, source_candidate_id)
     asset_dir = store.projects_dir / safe_id(project_id) / "image_assets" / safe_id(asset_id)
     asset_dir.mkdir(parents=True, exist_ok=True)
     (asset_dir / f"source{suffix}").write_bytes(image_bytes)
@@ -91,6 +90,11 @@ def _existing_generated_asset(
         reject_unsafe_payload(metadata)
         return metadata, metadata_path
     return None
+
+
+def _generated_asset_id(source_job_id: str, source_candidate_id: str) -> str:
+    seed = f"{safe_id(source_job_id)}:{safe_id(source_candidate_id)}".encode("utf-8")
+    return f"img_gen_{hashlib.sha256(seed).hexdigest()[:16]}"
 
 
 def _generated_metadata(

@@ -85,7 +85,7 @@ function assetCard(state, store, runtime, asset) {
   const retired = asset.status === "retired" || asset.asset_status === "retired" || asset.runtime_status === "excluded";
   const lifecycle = assetLifecycleState(asset);
   const card = el("div", `asset-card lifecycle-${lifecycle}${retired ? " retired" : ""}`);
-  const thumb = assetThumb(store, runtime, asset);
+  const thumb = assetThumb(state, store, runtime, asset, retired);
   const meta = assetMeta(store, runtime, asset, retired);
   const actions = assetActions(state, store, runtime, asset, retired);
   card.append(thumb, meta, actions);
@@ -93,7 +93,7 @@ function assetCard(state, store, runtime, asset) {
   return card;
 }
 
-function assetThumb(store, runtime, asset) {
+function assetThumb(state, store, runtime, asset, retired) {
   const thumb = el("button", `asset-thumb asset-thumb-${asset.thumbnail_ref || asset.kind || "reference"}`);
   if (asset.preview_url) {
     const img = document.createElement("img");
@@ -106,6 +106,7 @@ function assetThumb(store, runtime, asset) {
   }
   thumb.title = "查看素材详情";
   thumb.addEventListener("click", () => openAssetDetailPopover(store, runtime, asset, thumb));
+  thumb.addEventListener("contextmenu", (event) => openAssetContextMenu(event, state, store, runtime, asset, retired));
   return thumb;
 }
 

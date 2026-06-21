@@ -33,7 +33,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     n.status = "generating";
     n.result = null;
     n.previewUrl = null;
-    setSubmittingGenerationState(n, "keyframe", { label: "正在提交图片生成", percent: 8 });
+    setSubmittingGenerationState(n, "keyframe", { label: "正在提交图片生成", percent: null });
   });
   let submitAttempted = false;
   try {

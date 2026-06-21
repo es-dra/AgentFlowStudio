@@ -6,6 +6,7 @@ export function resultView(node) {
   const result = document.createElement("div");
   const candidates = candidatePreviews(node);
   result.className = `node-result${node.previewUrl ? " has-preview" : ""}${candidates.length > 1 ? " has-candidates" : ""}`;
+  if (node.type === "image" && node.previewUrl) result.classList.add("full-bleed-image");
   result.dataset.feedbackEvent = "afs:studio-quality-feedback";
   if (node.type === "video") {
     result.classList.add("video-asset-card-draft");

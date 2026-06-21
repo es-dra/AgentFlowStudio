@@ -34,10 +34,11 @@ export function candidatePreviews(node) {
 export function generationProgress(node) {
   const value = node.params?.progressPercent ?? node.params?.jobProgress?.percent ?? node.params?.terminalProgress?.percent;
   const mode = String(node.params?.jobProgress?.mode || "");
-  if (mode === "indeterminate") {
+  if (mode === "indeterminate" || mode === "queued") {
     return {
       percent: null,
       mode,
+      status: node.params?.jobProgress?.status || "",
       label: node.params?.jobProgress?.label || "正在生成",
       hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
     };
@@ -47,6 +48,7 @@ export function generationProgress(node) {
   return {
     percent: Math.max(0, Math.min(100, Math.round(percent))),
     mode,
+    status: node.params?.jobProgress?.status || "",
     label: node.params?.jobProgress?.label || "正在生成",
     hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
   };
@@ -124,11 +126,16 @@ function cancelledBody(node) {
 }
 
 function completeBody(node) {
+  if (node.type === "image" && node.previewUrl) return imageCompleteBody(node);
   const ok = document.createElement("div");
   ok.className = "node-status success";
   ok.innerHTML = `${icon("check", 13)}<span>已完成</span>`;
   const bundle = bundleSummary(node);
   return bundle ? [ok, bundle, resultView(node)] : [ok, resultView(node)];
+}
+
+function imageCompleteBody(node) {
+  return [resultView(node)];
 }
 
 function errorBody(node) {
@@ -165,9 +172,9 @@ function emptyBody(node, def) {
 function generationProgressView(node) {
   const progress = generationProgress(node);
   const status = document.createElement("div");
-  const isIndeterminate = !progress || progress?.mode === "indeterminate" || progress?.percent == null;
+  const isIndeterminate = !progress || progress?.mode === "indeterminate" || progress?.mode === "queued" || progress?.percent == null;
   status.className = `node-status generation-progress-layer${isIndeterminate ? " indeterminate" : ""}`;
-  const percentLabel = isIndeterminate ? "生成中" : `${progress.percent}%`;
+  const percentLabel = isIndeterminate ? (progress?.mode === "queued" ? "排队中" : "生成中") : `${progress.percent}%`;
   status.innerHTML = [
     '<span class="spinner"></span>',
     `<span class="generation-progress-copy"><strong>${escapeHtml(progress?.label || "正在生成")}</strong><small>${escapeHtml(progress?.hint || "结果完成后会自动回到节点中")}</small></span>`,

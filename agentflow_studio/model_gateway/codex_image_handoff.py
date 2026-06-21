@@ -15,6 +15,7 @@ from agentflow_studio.model_gateway.image_utils import image_dimensions
 JOB_ROOT_DIR = "codex_image_job"
 REQUEST_FILENAME = "request.json"
 RESULT_FILENAME = "result.json"
+CLAIM_FILENAME = "claim.json"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -72,10 +73,11 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         if recovered:
             return recovered
         return {
-            "status": "running",
+            "status": state,
             "job_id": job_id,
             "provider_calls_started": True,
             "provider_raw_response_stored": False,
+            "progress": _job_progress(job_root, job_id, state),
             "outputs": [],
         }
     result = _read_result(job_dir)
@@ -110,6 +112,10 @@ def _completed_running_candidate(output_dir: Path, job_dir: Path, job_id: str) -
         shutil.copyfile(candidate, target)
     result = completed_result_payload(job_id=job_id, output_dir=output_dir, candidate_path=target)
     write_json(job_dir / RESULT_FILENAME, result)
+    completed = job_dir.parents[1] / "completed" / job_id
+    completed.parent.mkdir(parents=True, exist_ok=True)
+    job_dir.rename(completed)
+    _trim_recovered_job_dir(completed)
     return {
         "status": "succeeded",
         "job_id": job_id,
@@ -124,6 +130,17 @@ def _running_candidate_path(job_dir: Path) -> Path | None:
         if candidate.is_file() and candidate.stat().st_size > 0:
             return candidate
     return None
+
+
+def _trim_recovered_job_dir(job_dir: Path) -> None:
+    for name in (REQUEST_FILENAME, "worker_prompt.md"):
+        path = job_dir / name
+        if path.exists():
+            path.unlink()
+    for name in ("references", ".codex-home", "image_candidates"):
+        path = job_dir / name
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
 
 
 def completed_result_payload(*, job_id: str, output_dir: Path, candidate_path: Path) -> dict[str, Any]:
@@ -234,6 +251,53 @@ def _locate_job_dir(job_root: Path, job_id: str) -> tuple[str, Path] | None:
         if path.is_dir():
             return state, path
     return None
+
+
+def _job_progress(job_root: Path, job_id: str, state: str) -> dict[str, Any]:
+    pending_jobs = _state_job_ids(job_root, "pending")
+    running_jobs = _state_job_ids(job_root, "running")
+    if state == "pending":
+        position = pending_jobs.index(job_id) + 1 if job_id in pending_jobs else None
+        return {
+            "mode": "queued",
+            "percent": None,
+            "queue_position": position,
+            "pending_count": len(pending_jobs),
+            "running_count": len(running_jobs),
+        }
+    progress: dict[str, Any] = {
+        "mode": "indeterminate",
+        "percent": None,
+        "pending_count": len(pending_jobs),
+        "running_count": len(running_jobs),
+    }
+    claim = _read_claim(job_root / "running" / job_id / CLAIM_FILENAME)
+    if claim.get("worker_id"):
+        progress["worker_id"] = str(claim["worker_id"])[:80]
+    return progress
+
+
+def _state_job_ids(job_root: Path, state: str) -> list[str]:
+    state_dir = job_root / state
+    if not state_dir.is_dir():
+        return []
+    try:
+        paths = sorted(state_dir.iterdir(), key=lambda item: item.stat().st_mtime)
+    except FileNotFoundError:
+        return []
+    return [path.name for path in paths if path.is_dir()]
+
+
+def _read_claim(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        import json
+
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _read_result(job_dir: Path) -> dict[str, Any]:

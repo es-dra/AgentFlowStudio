@@ -178,6 +178,7 @@ function syncNodeStateStrip(elNode, node, def) {
 function syncNodeBody(elNode, node, def) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
+  body.classList.toggle("full-bleed-media", node.type === "image" && node.status === "complete" && Boolean(node.previewUrl));
   const signature = nodeBodySignature(node);
   if (body.dataset.signature !== signature) {
     body.dataset.signature = signature;

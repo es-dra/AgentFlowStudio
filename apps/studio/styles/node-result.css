@@ -34,6 +34,14 @@
   border: 0;
   border-radius: 0 0 var(--radius-card) var(--radius-card);
 }
+.node.type-image .node-body.full-bleed-media {
+  padding: 0;
+  justify-content: stretch;
+  gap: 0;
+}
+.node.type-image .node-body.full-bleed-media .node-result.full-bleed-image {
+  border-radius: var(--radius-card);
+}
 .node.type-image .node-preview-frame.image {
   flex: 1;
   height: 100%;
@@ -43,6 +51,14 @@
 }
 .node.type-image .node-preview-img {
   height: 100%;
+}
+.node-result.full-bleed-image .node-preview-overlay {
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.node:hover .node-result.full-bleed-image .node-preview-overlay,
+.node.selected .node-result.full-bleed-image .node-preview-overlay {
+  opacity: 1;
 }
 .node-preview-frame {
   position: relative;

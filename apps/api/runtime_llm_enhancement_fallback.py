@@ -9,6 +9,7 @@ from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import (
     compact,
     contains_cjk,
+    reference_role,
     reference_hint_terms,
     slot,
     visual_reference_hint,
@@ -57,6 +58,22 @@ def deterministic_chinese_fallback_prompt(
 def deterministic_i2i_fallback_prompt(request: PromptOptimizationRequest) -> str:
     prompt_text = compact(request.prompt_text)
     reference_hint = visual_reference_hint(request)
+    if reference_role(request) == "style":
+        prompt = "\n".join(
+            [
+                f"意图：围绕“{prompt_text}”生成本轮节点可直接使用的单帧画面；参考图只作为风格、质感或画面可读性的辅助线索，不替换用户指定的新主体。",
+                f"人物/主体：以原始提示词为最高优先级，清晰呈现“{prompt_text}”中的主体；如果参考图主体与用户指定主体不一致，不继承参考图主体身份。",
+                f"场景/美术：未指定具体地点时保持干净自然的画面背景；可参考“{reference_hint or '上传参考图'}”的整体风格、质感、色调和可读性，但不要复制其主体或剧情。",
+                f"动作/情节：只执行原始提示词中的生成目标，不新增额外角色、身份、服装或复杂剧情。",
+                "镜头/构图：主体位于画面核心位置，完整可辨识，关键特征清晰呈现；构图稳定，不让背景元素抢走主体。",
+                "灯光：自然柔和、主体轮廓和关键特征清楚，不制造无来源强光或过度氛围化遮挡。",
+                "运动/时间推进：单帧关键画面，不制造多阶段动作或时间变化。",
+                "连续性：参考图仅提供视觉线索；主体、动作和生成目标以用户原始提示词为准，避免身份漂移和主体错配。",
+                "负面约束：不要水印、文字乱码、五官畸形、身体比例异常、毛色错乱、身份漂移、服装漂移、背景大幅变化。",
+            ]
+        )
+        reject_unsafe_text(prompt)
+        return prompt
     reference_subject = reference_hint or "参考图中的同一人物"
     wardrobe_guard = "保持参考图中的服装、体型比例、姿态、背景和整体风格"
     if "校服" in reference_hint:

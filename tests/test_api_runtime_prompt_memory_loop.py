@@ -234,6 +234,129 @@ def test_studio_prompt_optimizer_uses_llm_fields_even_when_image_model_is_select
 
     assert provider_text_requested(request) is True
 
+
+def test_visual_prompt_instruction_distinguishes_subject_and_style_references() -> None:
+    from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction
+    from apps.api.runtime_models import PromptOptimizationRequest
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-reference-role",
+        node_type="image",
+        prompt_text="生成一只清晰自然的狸花猫单帧画面，主体明确、质感真实。",
+        generation_target="image",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "model": "image2-keyframe",
+            "llm_provider": "prompt_optimizer",
+            "uploaded_images": [
+                {
+                    "asset_id": "img_ref_cat_lab",
+                    "filename": "ChatGPT Image Dec 28, 2025, 06_57_23 PM.png",
+                    "role": "reference_image",
+                }
+            ],
+        },
+        generated_at="2026-06-21T06:40:00+08:00",
+    )
+
+    instruction = enhancement_instruction(request, {})
+
+    assert "参考图用途" in instruction
+    assert "主体参考" in instruction
+    assert "风格参考" in instruction
+    assert "如果原始提示词明确指定新主体" in instruction
+    assert "不要把参考图主体替换用户指定主体" in instruction
+    assert "狸花猫" in instruction
+
+
+def test_i2i_guardrail_allows_new_subject_with_style_reference(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            return {"text": "\n".join(
+                [
+                    "意图：生成一只清晰自然的狸花猫单帧画面。",
+                    "人物/主体：狸花猫主体明确，棕灰黑相间虎斑纹、额头 M 字纹、短毛和明亮眼睛清楚。",
+                    "场景/美术：背景保持干净自然，参考图只提供画面质感和可读性，不复制参考图主体。",
+                    "动作/情节：只呈现一只狸花猫，不新增人物、服装或额外角色。",
+                    "镜头/构图：主体居中，完整可辨识，关键特征清晰呈现。",
+                    "灯光：自然柔和，毛色、眼神和轮廓清楚。",
+                    "运动/时间推进：单帧关键画面，不制造多阶段动作。",
+                    "连续性：用户指定主体优先，参考图仅作风格线索，不替换狸花猫主体。",
+                    "负面约束：不要水印、文字乱码、五官畸形、身体比例异常、毛色错乱或身份漂移。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_i2i_style_reference/prompt-optimizations",
+        json={
+            "node_id": "image-node-style-reference",
+            "node_type": "image",
+            "prompt_text": "生成一只清晰自然的狸花猫单帧画面，主体明确、质感真实。",
+            "generation_target": "image",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+                "uploaded_images": [
+                    {
+                        "asset_id": "img_ref_cat_lab",
+                        "filename": "ChatGPT Image Dec 28, 2025, 06_57_23 PM.png",
+                        "role": "reference_image",
+                    }
+                ],
+            },
+            "generated_at": "2026-06-21T06:50:00+08:00",
+        },
+    )
+
+    payload = result.json()
+    assert result.status_code == 200
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is False
+    assert "狸花猫" in payload["optimized_prompt"]
+    assert "ChatGPT Image Dec" not in payload["optimized_prompt"]
+    assert "参考图仅作风格线索" in payload["optimized_prompt"]
+
+
+def test_i2i_style_reference_fallback_does_not_reuse_reference_subject() -> None:
+    from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+
+    request = PromptOptimizationRequest(
+        node_id="image-node-style-reference-fallback",
+        node_type="image",
+        prompt_text="生成一只清晰自然的狸花猫单帧画面，主体明确、质感真实。",
+        generation_target="image",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "model": "image2-keyframe",
+            "uploaded_images": [
+                {
+                    "asset_id": "img_ref_cat_lab",
+                    "filename": "ChatGPT Image Dec 28, 2025, 06_57_23 PM.png",
+                    "role": "reference_image",
+                }
+            ],
+        },
+        generated_at="2026-06-21T06:55:00+08:00",
+    )
+
+    fallback = deterministic_chinese_fallback_prompt(request, {"selected_slots": {}})
+
+    assert "参考图只作为风格" in fallback
+    assert "不替换用户指定的新主体" in fallback
+    assert "狸花猫" in fallback
+    assert "对ChatGPT Image" not in fallback
+
+
 def test_prompt_optimizer_falls_back_to_available_relay_llm_service(tmp_path, monkeypatch) -> None:
     class Descriptor:
         modality = "llm"

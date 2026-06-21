@@ -270,6 +270,28 @@ def test_runtime_media_urls_are_normalized_only_at_render_boundaries() -> None:
     assert "runtimeMediaUrl" not in runtime_asset_sync
 
 
+def test_runtime_media_source_caches_authorized_project_media_between_rerenders() -> None:
+    runtime_media_source = _read("src/runtime-media-source.js")
+
+    assert "mediaBlobCache" in runtime_media_source
+    assert "cachedAuthorizedMediaUrl" in runtime_media_source
+    assert "element.dataset.afsMediaRaw" in runtime_media_source
+    assert "assignCachedMediaUrl" in runtime_media_source
+    assert "revokeRuntimeMediaSource(element, { keepCached: true })" in runtime_media_source
+
+
+def test_completed_image_nodes_use_full_bleed_preview_body() -> None:
+    canvas_body = _read("src/canvas-node-body.js")
+    result_view = _read("src/node-result-view.js")
+    styles = _read("styles/node-result.css")
+
+    assert "imageCompleteBody(node)" in canvas_body
+    assert "node.type === \"image\" && node.previewUrl" in canvas_body
+    assert 'classList.add("full-bleed-image")' in result_view
+    assert ".node.type-image .node-body.full-bleed-media" in styles
+    assert ".node-result.full-bleed-image .node-preview-overlay" in styles
+
+
 def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
     drawer_assets = _read("src/panels/drawer-assets.js")
     drawer_actions = _read("src/panels/drawer-asset-actions.js")
@@ -285,6 +307,7 @@ def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
         "preventDefault",
     ):
         assert marker in drawer_assets
+    assert "thumb.addEventListener(\"contextmenu\"" in drawer_assets
     assert "deleteImageAsset(assetId)" in runtime_client
     assert "deleteImageAssetFromDrawer" in drawer_actions
     assert "removeImageAssetFromStore" in drawer_actions
@@ -293,6 +316,18 @@ def test_asset_drawer_has_app_context_menu_and_image_delete_action() -> None:
     assert "runtime.getVisualAsset(visualAssetId)" in asset_detail
     assert 'asset.kind === "image_reference"' in asset_detail
     assert ".asset-context-menu" in styles
+
+
+def test_sprite_input_keeps_dom_while_typing_and_filters_prompt_leaks() -> None:
+    sprite_widget = _read("src/sprite-widget.js")
+    sprite_context = _read("src/sprite-chat-context.js")
+
+    assert "spriteInputShouldKeepDom(root)" in sprite_widget
+    assert "document.activeElement === input" in sprite_widget
+    assert "isSpriteInputComposing()" in sprite_widget
+    assert "SPRITE_PROMPT_LEAK_FRAGMENTS" in sprite_context
+    assert "你是团团" in sprite_context
+    assert "第一人称" in sprite_context
 
 
 def test_canvas_fit_uses_visible_safe_area_not_full_root_bounds() -> None:
