@@ -3,24 +3,21 @@ import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { icon } from "./icons.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 
-export function buildNodeBody(node, def) {
+export function buildNodeBody(node, def, store = null) {
   const out = [];
   if (node.collapsed) return out;
   const carry = carryChainView(node);
   if (carry) out.push(carry);
-  if (node.content) {
-    const view = document.createElement("div");
-    const expanding = node.params?.scriptExpansionState?.status === "running";
-    view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
-    view.textContent = node.content;
-    out.push(view);
-    return out;
-  }
   if (node.type === "director") return directorBody(node, def);
   if (node.status === "generating") return generationBody(node);
   if (node.status === "cancelled") return cancelledBody(node);
+  if (node.type === "image" && node.status === "complete" && node.previewUrl) return completeBody(node);
   if (node.status === "complete" && node.result) return completeBody(node);
   if (node.status === "error") return errorBody(node);
+  if (node.content) {
+    out.push(contentBlock(node, store));
+    return out;
+  }
   return emptyBody(node, def);
 }
 
@@ -138,6 +135,43 @@ function completeBody(node) {
 
 function imageCompleteBody(node) {
   return [resultView(node)];
+}
+
+function contentBlock(node, store) {
+  const expanding = node.params?.scriptExpansionState?.status === "running";
+  if (isEditableContentNode(node) && store) return editableContentBlock(node, store, expanding);
+  const view = document.createElement("div");
+  view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
+  view.textContent = node.content;
+  return view;
+}
+
+function editableContentBlock(node, store, expanding) {
+  const textarea = document.createElement("textarea");
+  textarea.className = `text-content-view node-content-editor${expanding ? " content-shimmer" : ""}`;
+  textarea.value = node.content || "";
+  textarea.spellcheck = false;
+  textarea.dataset.nodeId = node.id;
+  textarea.addEventListener("input", () => {
+    store.set((s) => {
+      const target = s.nodes[node.id];
+      if (!target) return;
+      target.content = textarea.value;
+      target.prompt = textarea.value;
+      target.status = target.status === "empty" ? "complete" : target.status;
+      if (target.params?.assetCardDraft) {
+        target.params.assetCardDraft.user_edited_text = textarea.value;
+        target.params.assetCardDraft.updated_by_user = true;
+      }
+    }, { history: false });
+  });
+  textarea.addEventListener("pointerdown", (event) => event.stopPropagation());
+  textarea.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+  return textarea;
+}
+
+function isEditableContentNode(node) {
+  return node.type === "text" || node.type === "script" || Boolean(node.params?.assetCardDraft);
 }
 
 function errorBody(node) {

@@ -164,7 +164,7 @@ def test_frontend_maturity_wave_has_canvas_generation_and_work_actions() -> None
         "canvas-context-menu",
         "openGenerationPanel",
         "generation-panel",
-        "node-context-toolbar",
+        "node-content-editor",
         "generation-progress-layer",
         "port-hovering",
         "inspector-actions",
@@ -179,6 +179,9 @@ def test_frontend_maturity_wave_has_canvas_generation_and_work_actions() -> None
         "studio-media-experience.css",
     ):
         assert marker in combined
+    assert "node-context-toolbar" not in combined
+    for retired_action in ("继续生成", "保存素材", "整理卡片", "看过程"):
+        assert retired_action not in _read("src/canvas-view.js")
 
     assert "window.prompt(" not in combined
     assert "provider raw" not in combined.lower()

@@ -9,7 +9,7 @@ export function renderCanvas(state, store) {
   const world = document.getElementById("world");
   world.style.transform = `translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${state.viewport.scale})`;
   const relations = relationSets(state);
-  renderNodes(state, relations);
+  renderNodes(state, relations, store);
   renderEdges(state, relations, store);
   renderEmptyState(state);
   const zoomLabel = document.querySelector("#corner-controls .zoom-label");
@@ -24,7 +24,7 @@ function renderEmptyState(state) {
   starterRow.dataset.mode = rail.mode;
 }
 
-function renderNodes(state, relations) {
+function renderNodes(state, relations, store) {
   const layer = document.getElementById("node-layer");
   const seen = new Set();
   for (const id of state.order) {
@@ -36,7 +36,7 @@ function renderNodes(state, relations) {
       elNode = buildNodeElement(node);
       layer.appendChild(elNode);
     }
-    syncNodeElement(elNode, node, state, relations);
+    syncNodeElement(elNode, node, state, relations, store);
   }
   for (const child of [...layer.children]) {
     if (!seen.has(child.dataset.nodeId)) child.remove();
@@ -51,7 +51,6 @@ function buildNodeElement(node) {
   elNode.appendChild(nodeStateStrip());
   elNode.appendChild(nodeActions());
   elNode.appendChild(uploadButton());
-  elNode.appendChild(contextToolbar());
   elNode.appendChild(nodeBody());
   elNode.appendChild(portButton("in"));
   elNode.appendChild(portButton("out"));
@@ -94,19 +93,6 @@ function uploadButton() {
   return upload;
 }
 
-function contextToolbar() {
-  const workflow = document.createElement("div");
-  workflow.className = "node-context-toolbar";
-  workflow.dataset.role = "context-toolbar";
-  workflow.innerHTML = [
-    `<button data-action="continue-generate" title="继续生成">${icon("play", 13)}<span>继续生成</span></button>`,
-    `<button data-action="fix-visual-asset" title="保存为素材">${icon("bookmark", 13)}<span>保存素材</span></button>`,
-    `<button data-action="content-card" title="整理卡片">${icon("frames", 13)}<span>整理卡片</span></button>`,
-    `<button data-action="open-creation-process" title="查看创作过程">${icon("layers", 13)}<span>看过程</span></button>`,
-  ].join("");
-  return workflow;
-}
-
 function nodeBody() {
   const body = document.createElement("div");
   body.className = "node-body";
@@ -122,14 +108,14 @@ function portButton(port) {
   return button;
 }
 
-function syncNodeElement(elNode, node, state, relations) {
+function syncNodeElement(elNode, node, state, relations, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   syncNodeFrame(elNode, node, state);
   syncNodeRelations(elNode, node, relations);
   syncNodeTitle(elNode, node, def);
   syncNodeStateStrip(elNode, node, def);
   syncRunAction(elNode, node);
-  syncNodeBody(elNode, node, def);
+  syncNodeBody(elNode, node, def, store);
 }
 
 function syncNodeFrame(elNode, node, state) {
@@ -146,7 +132,6 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("has-media-result", Boolean(node.previewUrl || candidatePreviews(node).length));
   elNode.classList.toggle("is-generating", node.status === "generating");
   elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
-  elNode.classList.toggle("hide-context-toolbar", node.type === "text");
   elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
 }
 
@@ -177,14 +162,18 @@ function syncNodeStateStrip(elNode, node, def) {
   stateStrip.innerHTML = `<span class="dot"></span><span>${escapeHtml(statusLabel(nodeStatus))}</span><span>${escapeHtml(def.label)}</span>`;
 }
 
-function syncNodeBody(elNode, node, def) {
+function syncNodeBody(elNode, node, def, store) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
   body.classList.toggle("full-bleed-media", node.type === "image" && node.status === "complete" && Boolean(node.previewUrl));
   const signature = nodeBodySignature(node);
   if (body.dataset.signature !== signature) {
+    if (body.contains(document.activeElement) && document.activeElement?.classList?.contains("node-content-editor")) {
+      body.dataset.signature = signature;
+      return;
+    }
     body.dataset.signature = signature;
-    body.replaceChildren(...buildNodeBody(node, def));
+    body.replaceChildren(...buildNodeBody(node, def, store));
   }
 }
 

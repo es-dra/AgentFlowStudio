@@ -12,6 +12,31 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current script review flow addendum: 2026-06-22 pass changed the active
+text-to-storyboard chain to the reviewed sequence. Text-node `拆分为分镜` now
+routes through Runtime `/storyboard-breakdowns`, uses LLM only behind the LLM
+provider gate, falls back to deterministic structured splitting when the gate is
+closed, and creates only editable storyboard script nodes. The canvas bottom
+workflow toolbar row (`继续生成 / 保存素材 / 整理卡片 / 看过程`) is retired across
+nodes. Text, script, and asset-card nodes expose editable scrollable body text,
+and node double-click opens the prompt bar while blank-canvas double-click still
+opens node creation. Storyboard nodes now gate downstream automation: `识别资产`
+creates editable asset-card image nodes from the current reviewed storyboard
+text, and `生成关键帧层` requires an existing asset layer rather than silently
+creating it. Completed asset image nodes show the generated image preview while
+preserving the editable asset draft in `params.assetCardDraft`. Verification:
+focused storyboard/API/static regression passed 39 / 1 existing warning; full
+pytest passed 592 / 520 deselected / 2 existing warnings; `npm run
+check:studio-js` passed for 107
+files; CLI help and version passed; full coverage browser QA passed with
+console_error_count=0, response_error_count=0, provider_calls_started=false;
+maintenance audit failed=0 with warnings only; `git diff --check` passed.
+Boundary: provider gates were not opened; no merge, push, deployment, server
+sync, generated media, raw provider response, signed URL, local media byte,
+secret, invite code, session token, or Company OS private source content was
+written; this is local code/runtime evidence, not human acceptance, provider
+smoke, business validation, or durable memory promotion.
+
 Current storyboard asset-card and keyframe-layer addendum: 2026-06-22 pass
 connected structured storyboard nodes to editable candidate asset cards and a
 fixed-asset-only keyframe layer. Script nodes now expose `识别资产` and

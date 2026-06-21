@@ -18,13 +18,13 @@ import {
   splitTextNodeToStoryboardNodes,
 } from "./script-breakdown.js";
 
-const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script"]);
+const PROMPT_NODE_TYPES = new Set(["text", "image", "video", "video_merge", "audio", "script", "director", "library"]);
 
 export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && !node.content;
+  const show = node && PROMPT_NODE_TYPES.has(node.type) && (!node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {
@@ -74,10 +74,15 @@ function buildBar(store, runtime, node) {
 
   const textarea = document.createElement("textarea");
   textarea.placeholder = promptPlaceholder(node.type, p.spec?.mode);
-  textarea.value = node.prompt || "";
+  textarea.value = node.prompt || node.content || "";
   textarea.addEventListener("input", () => {
     updateNode(store, node.id, (n) => {
       n.prompt = textarea.value;
+      if (n.type === "text" || n.type === "script" || n.params?.assetCardDraft) n.content = textarea.value;
+      if (n.params?.assetCardDraft) {
+        n.params.assetCardDraft.user_edited_text = textarea.value;
+        n.params.assetCardDraft.updated_by_user = true;
+      }
       delete n.params.lastOptimizedPromptPlain;
     }, { history: false });
   });
@@ -144,8 +149,9 @@ function buildBottomRow(store, runtime, node, textarea) {
     row.appendChild(textAction("upload", "导入剧本", () => importScriptFileIntoTextNode(store, node, textarea)));
     row.appendChild(textAction("sparkles", "扩写剧本", () => expandTextIdeaToScript(store, runtime, node, textarea)));
     row.appendChild(textAction("frames", "拆分分镜", () => {
-      const created = splitTextNodeToStoryboardNodes(store, node);
-      if (!created.length) flashTooltip(textarea, "先输入或导入剧本");
+      splitTextNodeToStoryboardNodes(store, node, runtime).then((created) => {
+        if (!created.length) flashTooltip(textarea, "先输入或导入剧本");
+      });
     }));
   }
 

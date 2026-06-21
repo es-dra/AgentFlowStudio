@@ -49,8 +49,7 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode) {
   if (!fresh) return [];
   const existing = existingShotAssetCardNodeIds(store.get(), fresh.id);
   if (existing.length) return existing;
-  const structuredShot = fresh.params?.structuredShot
-    || structuredShotFromSegment(fresh.content || fresh.prompt || "", Number(fresh.params?.scriptSegmentIndex || 1));
+  const structuredShot = structuredShotFromSegment(fresh.content || fresh.prompt || "", Number(fresh.params?.scriptSegmentIndex || 1));
   const created = createShotAssetPrepNodes(store, fresh.id, structuredShot, fresh.x + fresh.w + 160, fresh.y);
   store.set((s) => {
     const node = s.nodes[fresh.id];
@@ -66,7 +65,7 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode) {
   return created;
 }
 
-function existingShotAssetCardNodeIds(state, scriptNodeId) {
+export function existingShotAssetCardNodeIds(state, scriptNodeId) {
   return Object.values(state.nodes || {})
     .filter((node) => node?.params?.assetCardDraft?.source_script_node_id === scriptNodeId)
     .map((node) => node.id);

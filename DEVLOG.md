@@ -1,5 +1,54 @@
 # Devlog
 
+## 2026-06-22 - Script Review Flow And Runtime Storyboard Breakdown
+
+- Reworked text-to-storyboard flow so `拆分为分镜` now calls the Runtime
+  `/storyboard-breakdowns` route and creates only editable storyboard script
+  nodes. The Runtime route uses the LLM provider only when the LLM gate is open,
+  otherwise it returns a deterministic structured fallback; safe manifests store
+  summaries and artifact ids, not raw provider responses.
+- Removed the selected-node bottom workflow toolbar from the canvas, including
+  `继续生成 / 保存素材 / 整理卡片 / 看过程`. Text, script, and asset-card node
+  bodies now render as editable text areas with local scroll, so generated full
+  scripts and storyboard/asset descriptions can be reviewed and corrected in the
+  node body.
+- Changed storyboard downstream automation to the intended review order:
+  storyboard nodes expose `识别资产` and `生成关键帧层`, but asset-card image nodes
+  are created only after the user runs `识别资产` on a reviewed storyboard node.
+  `生成关键帧层` now requires an existing asset layer instead of silently creating
+  one.
+- Preserved the asset-card backstage model for image generation. Asset-card
+  nodes can be edited through the node body or prompt bar; after an actual image
+  generation completes, the node body shows the generated image preview while
+  the editable draft remains in `params.assetCardDraft`.
+- Added structured storyboard parsing from edited node text so later asset
+  recognition and keyframe prompts use the user's current `镜号 / 时长 / 画面描述
+  / 景别 / 光影氛围 / 运镜 / 对白/旁白 / 音效 / 资产` fields instead of stale
+  split metadata.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_prompt_script_static.py tests/test_web_studio_frontend_wave.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_service.py -q -> 39 passed / 1 existing warning
+pytest -> 592 passed / 520 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 107 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/studio_full_coverage_browser_qa.py --timeout-ms 30000 -> passed, console_error_count=0, response_error_count=0, provider_calls_started=false
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundaries:
+
+- No provider gate, image generation, video generation, merge, push,
+  deployment, server sync, raw provider response, signed URL, local media byte,
+  secret, invite code, session token, or Company OS private source content was
+  written.
+- This is local code/runtime evidence plus automated browser QA. It is not
+  human acceptance, provider smoke, business validation, or durable memory
+  promotion.
+
 ## 2026-06-22 - Storyboard Asset Cards And Keyframe Layer
 
 - Added editable candidate asset cards for storyboard-derived assets. Script

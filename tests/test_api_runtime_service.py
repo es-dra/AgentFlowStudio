@@ -55,6 +55,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "company_os_gfr_projection",
         "prompt_optimization",
         "script_draft_plan",
+        "storyboard_breakdown",
         "image_asset_upload",
         "asset_card_draft",
         "visual_asset_register",

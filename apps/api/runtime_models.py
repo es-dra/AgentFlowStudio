@@ -133,6 +133,16 @@ class PromptOptimizationRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class StoryboardBreakdownRequest(BaseModel):
+    node_id: str | None = None
+    script_text: str = Field(min_length=1)
+    target_platform: str = "short_video"
+    style: str = "cinematic"
+    shot_count_hint: int | None = Field(default=None, ge=1, le=80)
+    node_parameters: dict[str, Any] | None = None
+    generated_at: str = Field(min_length=1)
+
+
 class KeyframeGenerationRequest(BaseModel):
     node_id: str | None = None
     prompt_text: str = Field(min_length=1)
@@ -218,17 +228,6 @@ class GenerationComparisonRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
-class AssetCardDraftRequest(BaseModel):
-    asset_type: Literal["character", "scene", "prop", "video"]
-    source_image_asset_refs: list[str] = Field(default_factory=list)
-    source_video_artifact_id: str | None = None
-    sampled_image_asset_refs: list[str] = Field(default_factory=list)
-    node_id: str | None = None
-    prompt_text: str = ""
-    provider_service_id: str = "vision_image"
-    generated_at: str = Field(min_length=1)
-
-
 class VisualAssetPromoteRequest(BaseModel):
     source_image_asset_refs: list[str] = Field(min_length=1)
     asset_type: Literal["character", "scene", "prop"]
@@ -251,17 +250,6 @@ class AssetCardDraftRequest(BaseModel):
     prompt_text: str = Field(min_length=1)
     provider_service_id: str = "vision_image"
     generated_at: str = Field(min_length=1)
-
-
-class VideoAssetPromoteRequest(BaseModel):
-    source_video_artifact_id: str = Field(min_length=1)
-    label: str = Field(min_length=1)
-    summary: str = Field(min_length=1)
-    segments: list[dict[str, Any]] = Field(min_length=1)
-    feature_card: dict[str, Any] = Field(default_factory=dict)
-    source_node_id: str | None = None
-    review_decision: Literal["fixed", "rejected"]
-    reviewed_at: str = Field(min_length=1)
 
 
 class VideoAssetPromoteRequest(BaseModel):
@@ -306,7 +294,6 @@ class SpriteChatRequest(BaseModel):
 __all__ = (
     "AssetCardDraftRequest",
     "CanvasDraftRequest",
-    "AssetCardDraftRequest",
     "AssetExclusion",
     "ContentCardRegisterRequest",
     "ContextSubgraph",
@@ -325,12 +312,12 @@ __all__ = (
     "ReviewDecisionRecordRequest",
     "SceneInspectorUpdateRequest",
     "SourceAssetRegisterRequest",
+    "StoryboardBreakdownRequest",
     "SpriteChatRequest",
     "TemporaryLockOverride",
     "VisualAssetPromoteRequest",
     "VisualAssetRetireRequest",
     "VideoAssetPromoteRequest",
     "VideoGenerationRequest",
-    "VideoAssetPromoteRequest",
     "VideoRevisionRequest",
 )

@@ -25,6 +25,7 @@ from apps.api.runtime_models import (
 )
 from apps.api.runtime_prompt_memory_routes import register_runtime_prompt_memory_routes
 from apps.api.runtime_provider_script_routes import register_runtime_provider_script_routes
+from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
@@ -202,6 +203,7 @@ def create_runtime_app(
     register_runtime_company_os_routes(app)
     register_runtime_prompt_memory_routes(app, store)
     register_runtime_provider_script_routes(app, store)
+    register_runtime_storyboard_routes(app, store)
     register_runtime_image_asset_routes(app, store)
     register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)

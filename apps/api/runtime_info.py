@@ -86,6 +86,7 @@ def runtime_capabilities_payload() -> dict[str, Any]:
             "company_os_gfr_projection",
             "prompt_optimization",
             "script_draft_plan",
+            "storyboard_breakdown",
             "image_asset_upload",
             "asset_card_draft",
             "visual_asset_register",

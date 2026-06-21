@@ -48,7 +48,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     });
     addItem("frames", "拆分为分镜", () => {
       const fresh = store.get().nodes[nodeId];
-      if (fresh) splitTextNodeToStoryboardNodes(store, fresh);
+      if (fresh) splitTextNodeToStoryboardNodes(store, fresh, runtime);
     });
   }
   if (node.type === "image") {

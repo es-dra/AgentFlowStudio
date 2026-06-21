@@ -70,7 +70,13 @@ function bindSpacePan(viewportEl, setSpaceHeld) {
 
 function bindViewportWheel(rootEl, store, stopPanMomentum) {
   rootEl.addEventListener("wheel", (e) => {
-    if (e.target.closest(".prompt-bar") || e.target.closest(".popover") || e.target.closest(".modal-backdrop")) return;
+    if (
+      e.target.closest(".prompt-bar")
+      || e.target.closest(".popover")
+      || e.target.closest(".modal-backdrop")
+      || e.target.closest(".node-content-editor")
+      || e.target.closest(".text-content-view")
+    ) return;
     stopPanMomentum();
     e.preventDefault();
     store.set((s) => {
@@ -87,7 +93,15 @@ function bindViewportWheel(rootEl, store, stopPanMomentum) {
 
 function bindQuickMenus(rootEl, store, runtime) {
   rootEl.addEventListener("dblclick", (e) => {
-    if (e.target.closest(".node") || e.target.closest(".prompt-bar") || e.target.closest("#dock")) return;
+    const nodeEl = e.target.closest(".node");
+    if (nodeEl) {
+      if (!e.target.closest(".node-content-editor")) {
+        e.preventDefault();
+        openNodePromptEditor(store, nodeEl.dataset.nodeId);
+      }
+      return;
+    }
+    if (e.target.closest(".prompt-bar") || e.target.closest("#dock")) return;
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
   rootEl.addEventListener("contextmenu", (e) => {
@@ -96,6 +110,15 @@ function bindQuickMenus(rootEl, store, runtime) {
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
+}
+
+function openNodePromptEditor(store, nodeId) {
+  if (!nodeId) return;
+  store.set((s) => {
+    if (!s.nodes[nodeId]) return;
+    s.selection = { nodeIds: [nodeId], edgeId: null };
+    s.ui.promptBarNodeId = nodeId;
+  }, { history: false, persist: false });
 }
 
 function handlePointerDown(e, env) {

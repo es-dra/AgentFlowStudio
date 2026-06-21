@@ -35,36 +35,44 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     assert "剧本拆分分镜" in nodes
 
 
-def test_text_script_body_receives_generated_content_and_hides_workflow_toolbar() -> None:
+def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     styles = _styles()
 
     assert "node.content = prompt" in script_breakdown
     assert "visibleText" in script_breakdown
     assert "scriptExpansionState?.status === \"running\"" in canvas_view
-    assert "hide-context-toolbar" in canvas_view
-    assert ".node.hide-context-toolbar .node-context-toolbar" in styles
+    assert "node-content-editor" in canvas_body
+    assert "text-content-view" in canvas_body
+    assert "openNodePromptEditor" in canvas_input
+    assert "promptBarNodeId" in prompt_bar
     assert "content-shimmer" in canvas_body
     assert ".text-content-view.content-shimmer" in styles
+    assert "node-context-toolbar" not in canvas_view
+    assert "node-context-toolbar" not in styles
     assert 'node.type === "text" && action === "upload"' in action_handler
 
 
-def test_storyboard_breakdown_creates_structured_shots_and_asset_prep_nodes() -> None:
+def test_storyboard_breakdown_creates_reviewable_structured_shots_without_asset_prep_nodes() -> None:
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     structured_shot = (STUDIO_ROOT / "src" / "structured-shot.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
 
     assert "structuredShotFromSegment" in script_breakdown
-    assert "createShotAssetPrepNodes" in script_breakdown
+    assert "breakdownStoryboard" in script_breakdown
+    assert "createShotAssetPrepNodes" not in script_breakdown
     assert "export function structuredShotFromSegment" in structured_shot
     for field in ["镜号：", "时长：", "画面描述：", "景别：", "光影氛围：", "运镜：", "资产："]:
         assert field in structured_shot
     assert "export function extractShotAssetRefs" in structured_shot
     assert "shotAssetRefs" in script_breakdown
     assert "assetPrepState" in script_breakdown
+    assert "pending_user_review" in script_breakdown
     assert 'createNode(store, "image"' in asset_nodes
     assert "asset_prep" in asset_nodes
     assert "connect(store, scriptNodeId, assetNode.id)" in asset_nodes
@@ -91,6 +99,7 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
     keyframes = (STUDIO_ROOT / "src" / "storyboard-keyframes.js").read_text(encoding="utf-8")
 
     assert "识别资产" in nodes
@@ -100,6 +109,8 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "识别资产" in node_menu
     assert "生成关键帧层" in node_menu
     assert "createKeyframeNodesForStoryboard" in keyframes
+    assert "ensureShotAssetPrepNodesForScriptNode(store, fresh)" not in storyboard_actions
+    assert "existingShotAssetCardNodeIds" in storyboard_actions
     assert "fixed_visual_asset_ids" in keyframes
     assert "missing_asset_card_node_ids" in keyframes
     assert "asset.params?.visualAssets" in keyframes

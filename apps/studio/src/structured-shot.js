@@ -4,6 +4,8 @@ const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女�
 const PROP_HINTS = ["手机", "电脑", "键盘", "刀", "剑", "车", "信", "照片", "灯", "书", "门"];
 
 export function structuredShotFromSegment(segment, index) {
+  const parsed = structuredShotFromFormattedText(segment, index);
+  if (parsed) return parsed;
   const source = cleanText(segment);
   const assetRefs = extractShotAssetRefs(source);
   return {
@@ -18,6 +20,33 @@ export function structuredShotFromSegment(segment, index) {
     sound: inferSound(source),
     asset_refs: assetRefs,
     source_text: source,
+  };
+}
+
+export function structuredShotFromFormattedText(text, index) {
+  const fields = {};
+  for (const rawLine of String(text || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const match = line.match(/^([^：:]+)[：:]\s*(.+)$/);
+    if (!match) continue;
+    fields[match[1].trim()] = match[2].trim();
+  }
+  if (!fields["画面描述"] && !fields["景别"] && !fields["运镜"]) return null;
+  const description = fields["画面描述"] || cleanText(text);
+  const assetText = fields["资产"] || description;
+  const assetRefs = extractShotAssetRefs(assetText);
+  return {
+    shot_id: `shot_${String(index).padStart(2, "0")}`,
+    index,
+    duration: fields["时长"] || inferDuration(description),
+    description: descriptionWithAssets(description, assetRefs),
+    shot_size: fields["景别"] || inferShotSize(description),
+    light_atmosphere: fields["光影氛围"] || inferLighting(description),
+    camera_motion: fields["运镜"] || inferCameraMotion(description),
+    dialogue: fields["对白/旁白"] || fields["对白"] || fields["旁白"] || inferDialogue(description),
+    sound: fields["音效"] || inferSound(description),
+    asset_refs: assetRefs,
+    source_text: cleanText(text),
   };
 }
 

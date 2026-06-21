@@ -1,6 +1,5 @@
 import { createNode, connect } from "./nodes.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
-import { createShotAssetPrepNodes } from "./shot-asset-nodes.js";
 import { structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
@@ -52,16 +51,18 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
   }
 }
 
-export function splitTextNodeToStoryboardNodes(store, node) {
+export async function splitTextNodeToStoryboardNodes(store, node, runtime = null) {
   const fresh = store.get().nodes[node.id] || node;
   const source = String(fresh.content || fresh.prompt || "").trim();
-  const shots = splitScriptIntoShots(source);
+  if (!source) return [];
+  setStoryboardBreakdownState(store, fresh.id, "running");
+  const breakdown = await loadStoryboardBreakdown(store, runtime, fresh, source);
+  const shots = breakdown.shots;
   if (!shots.length) return [];
   const createdIds = [];
-  const assetNodeIds = [];
   const x = fresh.x + fresh.w + 180;
   for (const [index, shot] of shots.entries()) {
-    const structuredShot = structuredShotFromSegment(shot, index + 1);
+    const structuredShot = normalizeStoryboardShot(shot, index + 1);
     const shotText = structuredShotText(structuredShot);
     const shotNode = createNode(store, "script", x, fresh.y + index * 230);
     store.set((s) => {
@@ -76,30 +77,30 @@ export function splitTextNodeToStoryboardNodes(store, node) {
       target.params.scriptSegmentIndex = index + 1;
       target.params.structuredShot = structuredShot;
       target.params.shotAssetRefs = structuredShot.asset_refs;
-    });
-    connect(store, fresh.id, shotNode.id);
-    const shotAssetNodeIds = createShotAssetPrepNodes(store, shotNode.id, structuredShot, x + 440, fresh.y + index * 230);
-    assetNodeIds.push(...shotAssetNodeIds);
-    store.set((s) => {
-      const target = s.nodes[shotNode.id];
-      if (!target) return;
       target.params.assetPrepState = {
-        status: shotAssetNodeIds.length ? "card_ready" : "no_assets_detected",
-        downstream_node_ids: shotAssetNodeIds,
+        status: "pending_user_review",
+        downstream_node_ids: [],
         updated_at: new Date().toISOString(),
       };
     });
+    connect(store, fresh.id, shotNode.id);
     createdIds.push(shotNode.id);
   }
   store.set((s) => {
     const sourceNode = s.nodes[fresh.id];
     if (!sourceNode) return;
     sourceNode.params.storyboardBreakdown = {
+      status: "shots_ready_for_review",
+      mode: breakdown.mode,
       shot_count: createdIds.length,
       downstream_node_ids: createdIds,
-      asset_node_ids: assetNodeIds,
+      asset_node_ids: [],
+      asset_nodes_created: false,
+      provider_calls_started: Boolean(breakdown.provider_calls_started),
       updated_at: new Date().toISOString(),
     };
+    sourceNode.params.storyboardBreakdownState = { status: "complete", completed_at: new Date().toISOString() };
+    sourceNode.status = "complete";
   });
   return createdIds;
 }
@@ -152,6 +153,80 @@ function draftScriptFromIdea(idea) {
   ].join("\n\n");
 }
 
+async function loadStoryboardBreakdown(store, runtime, node, source) {
+  if (runtime?.breakdownStoryboard) {
+    try {
+      const payload = await runtime.breakdownStoryboard({
+        node_id: node.id,
+        script_text: source,
+        target_platform: "short_video",
+        style: "cinematic",
+        node_parameters: {
+          llm_provider: node.params?.llm_provider || node.params?.llmProvider || "prompt_optimizer",
+        },
+        generated_at: new Date().toISOString(),
+      });
+      const shots = normalizeStoryboardShotList(payload?.shots);
+      if (shots.length) {
+        return {
+          shots,
+          mode: payload?.safe_manifest?.status || "runtime_storyboard_breakdown",
+          provider_calls_started: Boolean(payload?.provider_calls_started),
+        };
+      }
+    } catch (error) {
+      setStoryboardBreakdownState(store, node.id, "fallback", safeBreakdownError(error));
+    }
+  }
+  return {
+    shots: splitScriptIntoShots(source).map((segment, index) => structuredShotFromSegment(segment, index + 1)),
+    mode: "local_fallback",
+    provider_calls_started: false,
+  };
+}
+
+function normalizeStoryboardShotList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((shot, index) => normalizeStoryboardShot(shot, index + 1));
+}
+
+function normalizeStoryboardShot(shot, fallbackIndex) {
+  if (typeof shot === "string") return structuredShotFromSegment(shot, fallbackIndex);
+  const source = String(shot?.source_text || shot?.description || "").trim();
+  const fallback = structuredShotFromSegment(source, fallbackIndex);
+  const assetRefs = Array.isArray(shot?.asset_refs) && shot.asset_refs.length
+    ? shot.asset_refs.map((asset, index) => normalizeAssetRef(asset, index)).filter(Boolean)
+    : fallback.asset_refs;
+  return {
+    ...fallback,
+    shot_id: String(shot?.shot_id || fallback.shot_id),
+    index: Number(shot?.index || fallbackIndex),
+    duration: String(shot?.duration || fallback.duration),
+    description: String(shot?.description || fallback.description),
+    shot_size: String(shot?.shot_size || fallback.shot_size),
+    light_atmosphere: String(shot?.light_atmosphere || fallback.light_atmosphere),
+    camera_motion: String(shot?.camera_motion || fallback.camera_motion),
+    dialogue: String(shot?.dialogue || fallback.dialogue),
+    sound: String(shot?.sound || fallback.sound),
+    asset_refs: assetRefs,
+    source_text: source || fallback.source_text,
+  };
+}
+
+function normalizeAssetRef(asset, index) {
+  if (!asset || typeof asset !== "object") return null;
+  const label = String(asset.label || asset.name || "").trim().slice(0, 24);
+  if (!label) return null;
+  const type = ["character", "scene", "prop"].includes(asset.asset_type) ? asset.asset_type : "character";
+  return {
+    label,
+    asset_id: String(asset.asset_id || `candidate:${type}:${index + 1}`),
+    asset_type: type,
+    status: String(asset.status || "candidate"),
+    source: String(asset.source || "llm"),
+  };
+}
+
 function updateTextNode(store, nodeId, prompt, params = {}) {
   store.set((s) => {
     const node = s.nodes[nodeId];
@@ -175,6 +250,20 @@ function setScriptExpansionState(store, nodeId, status, visibleText = "") {
       node.status = "generating";
     }
   }, { history: false, persist: false });
+}
+
+function setStoryboardBreakdownState(store, nodeId, status, message = "") {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.params.storyboardBreakdownState = { status, message, updated_at: new Date().toISOString() };
+    if (status === "running") node.status = "generating";
+  }, { history: false, persist: false });
+}
+
+function safeBreakdownError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 120);
 }
 
 function cleanSegment(value) {

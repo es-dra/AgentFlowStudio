@@ -26,8 +26,9 @@ export function handleNodeIntent(store, node, intent) {
     return;
   }
   if (node.type === "text" && intent === "剧本拆分分镜") {
-    const created = splitTextNodeToStoryboardNodes(store, node);
-    if (!created.length) setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
+    splitTextNodeToStoryboardNodes(store, node).then((created) => {
+      if (!created.length) setNodeError(store, node.id, "请先输入或导入完整剧本，再拆分分镜。");
+    });
     return;
   }
   if (node.type === "script" && intent === "剧本生成分镜脚本") {

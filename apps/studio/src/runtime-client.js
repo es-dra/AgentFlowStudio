@@ -172,6 +172,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     optimizePrompt(payload) {
       return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
     },
+    breakdownStoryboard(payload) {
+      return requestJson(`/projects/${encoded}/storyboard-breakdowns`, { method: "POST", payload });
+    },
     uploadImageAsset(payload) {
       return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
     },
