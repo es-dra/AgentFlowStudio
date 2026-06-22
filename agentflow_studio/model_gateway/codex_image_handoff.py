@@ -9,6 +9,7 @@ from uuid import uuid4
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.image_utils import image_dimensions
+from agentflow_studio.model_gateway.codex_image_timing import compact_timing, now_iso
 
 
 JOB_ROOT_DIR = "codex_image_job"
@@ -21,6 +22,7 @@ IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 def create_handoff_task(plan: dict[str, Any]) -> dict[str, Any]:
     output_dir = Path(plan["output_dir"]).resolve()
     job_id = f"codex_img_{uuid4().hex[:12]}"
+    created_at = now_iso()
     job_root = output_dir / JOB_ROOT_DIR
     staging_dir = job_root / "_staging" / job_id
     pending_dir = job_root / "pending" / job_id
@@ -28,6 +30,7 @@ def create_handoff_task(plan: dict[str, Any]) -> dict[str, Any]:
     request_payload = {
         "schema_version": "afs_codex_image_request.v0.1",
         "job_id": job_id,
+        "created_at": created_at,
         "service_id": str(plan["service_id"]),
         "capability": "image",
         "prompt": _guarded_codex_image_prompt(str(plan["prompt"])),
@@ -52,6 +55,7 @@ def create_handoff_task(plan: dict[str, Any]) -> dict[str, Any]:
         "job_id": job_id,
         "output_dir": str(output_dir),
         "relative_job_root": JOB_ROOT_DIR,
+        "created_at": created_at,
         "provider_calls_started": True,
         "provider_raw_response_stored": False,
     }
@@ -95,10 +99,17 @@ def poll_handoff_task(task: dict[str, Any]) -> dict[str, Any]:
         "provider_calls_started": True,
         "provider_raw_response_stored": False,
         "outputs": outputs,
+        "progress": _completed_progress(result),
     }
 
 
-def completed_result_payload(*, job_id: str, output_dir: Path, candidate_path: Path) -> dict[str, Any]:
+def completed_result_payload(
+    *,
+    job_id: str,
+    output_dir: Path,
+    candidate_path: Path,
+    timing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     output_dir = Path(output_dir).resolve()
     candidate_path = Path(candidate_path).resolve()
     image_bytes = candidate_path.read_bytes()
@@ -113,6 +124,7 @@ def completed_result_payload(*, job_id: str, output_dir: Path, candidate_path: P
         "provider_calls_started": True,
         "provider_raw_response_stored": False,
         "signed_urls_persisted": False,
+        "timing": dict(timing or {}),
         "outputs": [
             {
                 "candidate_id": "candidate_001",
@@ -250,6 +262,12 @@ def _locate_job_dir(job_root: Path, job_id: str) -> tuple[str, Path] | None:
 def _job_progress(job_root: Path, job_id: str, state: str) -> dict[str, Any]:
     pending_jobs = _state_job_ids(job_root, "pending")
     running_jobs = _state_job_ids(job_root, "running")
+    request = _read_request_safe(_locate_state_job_dir(job_root, state, job_id) / REQUEST_FILENAME)
+    claim = _read_claim(job_root / "running" / job_id / CLAIM_FILENAME)
+    timing = compact_timing(
+        created_at=request.get("created_at"),
+        started_at=claim.get("claimed_at_epoch") or claim.get("claimed_at"),
+    )
     if state == "pending":
         position = pending_jobs.index(job_id) + 1 if job_id in pending_jobs else None
         return {
@@ -258,17 +276,27 @@ def _job_progress(job_root: Path, job_id: str, state: str) -> dict[str, Any]:
             "queue_position": position,
             "pending_count": len(pending_jobs),
             "running_count": len(running_jobs),
+            **timing,
         }
     progress: dict[str, Any] = {
         "mode": "indeterminate",
         "percent": None,
         "pending_count": len(pending_jobs),
         "running_count": len(running_jobs),
+        **timing,
     }
-    claim = _read_claim(job_root / "running" / job_id / CLAIM_FILENAME)
     if claim.get("worker_id"):
         progress["worker_id"] = str(claim["worker_id"])[:80]
     return progress
+
+
+def _completed_progress(result: dict[str, Any]) -> dict[str, Any]:
+    timing = result.get("timing") if isinstance(result.get("timing"), dict) else {}
+    return {
+        "mode": "complete",
+        "percent": 100,
+        **timing,
+    }
 
 
 def _state_job_ids(job_root: Path, state: str) -> list[str]:
@@ -292,6 +320,22 @@ def _read_claim(path: Path) -> dict[str, Any]:
     except (OSError, ValueError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _read_request_safe(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        import json
+
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _locate_state_job_dir(job_root: Path, state: str, job_id: str) -> Path:
+    return job_root / state / job_id
 
 
 def _read_result(job_dir: Path) -> dict[str, Any]:

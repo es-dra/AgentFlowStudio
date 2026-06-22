@@ -74,6 +74,7 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     request_path = next((output_dir / "codex_image_job" / "pending").glob("*/request.json"))
     request_payload = json.loads(request_path.read_text(encoding="utf-8"))
     serialized = json.dumps(request_payload, ensure_ascii=False).lower()
+    assert request_payload["created_at"]
     assert request_payload["reference_images"][0]["path"] == "references/reference_001.png"
     assert "默认写实照片风格" in request_payload["prompt"]
     assert str(reference).lower() not in serialized
@@ -86,6 +87,8 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     pending = registry.poll("image", "codex_image", task)
     assert pending["status"] == "pending"
     assert pending["progress"]["mode"] == "queued"
+    assert pending["progress"]["created_at"]
+    assert pending["progress"]["elapsed_sec"] >= 0
     assert pending["provider_calls_started"] is True
 
     processed = process_one(output_dir, executor=FakeCodexImageExecutor())
@@ -95,6 +98,10 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
 
     result = registry.poll("image", "codex_image", task)
     assert result["status"] == "succeeded"
+    assert result["progress"]["mode"] == "complete"
+    assert result["progress"]["elapsed_sec"] >= 0
+    assert result["progress"]["queued_sec"] >= 0
+    assert result["progress"]["running_sec"] >= 0
     assert result["provider_calls_started"] is True
     assert result["provider_raw_response_stored"] is False
     assert result["outputs"][0]["candidate_id"] == "candidate_001"
@@ -155,6 +162,7 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     assert pending.status_code == 200
     assert pending.json()["job"]["status"] == "pending"
     assert pending.json()["job"]["progress"]["mode"] == "queued"
+    assert pending.json()["job"]["progress"]["elapsed_sec"] >= 0
 
     processed = process_one(tmp_path, executor=FakeCodexImageExecutor())
     assert processed is not None
@@ -165,6 +173,9 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     assert completed.status_code == 200
     payload = completed.json()
     assert payload["job"]["status"] == "succeeded"
+    assert payload["job"]["progress"]["mode"] == "complete"
+    assert payload["job"]["progress"]["elapsed_sec"] >= 0
+    assert payload["job"]["progress"]["running_sec"] >= 0
     assert payload["provider_calls_started"] is True
     assert payload["candidate_previews"][0]["preview_url"].endswith("/candidate_001/preview")
     assert payload["reusable_image_assets"][0]["source_candidate_id"] == "candidate_001"
@@ -440,6 +451,7 @@ def test_codex_image_handoff_reports_pending_queue_position(tmp_path, monkeypatc
     assert first_poll["progress"]["mode"] == "queued"
     assert first_poll["progress"]["queue_position"] == 1
     assert first_poll["progress"]["pending_count"] == 2
+    assert first_poll["progress"]["elapsed_sec"] >= 0
     assert second_poll["status"] == "pending"
     assert second_poll["progress"]["queue_position"] == 2
 
@@ -467,6 +479,7 @@ def test_codex_image_handoff_poll_keeps_active_running_candidate_with_worker(tmp
 
     assert result["status"] == "running"
     assert result["progress"]["mode"] == "indeterminate"
+    assert result["progress"]["elapsed_sec"] >= 0
     assert result["outputs"] == []
     completed_dir = output_dir / "codex_image_job" / "completed" / job_id
     failed_dir = output_dir / "codex_image_job" / "failed" / job_id

@@ -12,6 +12,28 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current asset image generation audit addendum: 2026-06-22 pass fixed the
+live-canvas issue where角色/场景 asset-card image nodes could generate the same
+abstract picture. Root cause was request construction: asset-card nodes often
+had empty `node.prompt`, so image generation fell back to a generic prompt and
+the context resolver injected the same upstream storyboard text for both assets.
+Asset-card image nodes now build requests from the editable asset card body and
+safe `asset_card_draft` snapshot, add type-specific guards for character /
+scene / prop asset images, label progress and result text as `资产图生成`, and
+store generated uploads as character / scene / prop references rather than
+generic keyframe references. Codex image handoff jobs now project safe
+created/started/completed plus elapsed/queued/running seconds through Runtime
+polling so long generation can be distinguished from queue wait. Verification:
+full pytest passed 598 / 520 deselected / 2 existing warnings; `npm run
+check:studio-js` passed for 108 files; CLI help and version passed; focused
+image-handoff and Studio asset/front-end regressions passed; `git diff --check`
+Python compile checks, and maintenance audit passed with warnings only. Boundary: no provider gate, deployment,
+generated media byte, provider raw response, signed URL, secret, invite code,
+session token, user account data, or Company OS private source content was
+written. Remaining user-facing risk: live image quality still depends on the
+active image provider/worker, but the request now gives role-specific inputs
+instead of duplicated keyframe prompts.
+
 Current Studio chain regeneration addendum: 2026-06-22 pass fixed the
 internal-test chain issues found on the live canvas. Runtime Studio state now
 keeps safe structured params for storyboard shots, asset-card drafts, fixed

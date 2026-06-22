@@ -130,6 +130,33 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
         assert forbidden not in node_actions + keyframe_actions
 
 
+def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> None:
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    asset_generation_prompt = (STUDIO_ROOT / "src" / "asset-card-generation-prompt.js").read_text(encoding="utf-8")
+    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
+    generation_progress = (STUDIO_ROOT / "src" / "node-generation-progress.js").read_text(encoding="utf-8")
+
+    assert "assetCardPromptText" in optimizer_contract
+    assert "safeAssetCardSnapshot" in optimizer_contract
+    assert "assetImagePrompt(draft)" in asset_generation_prompt
+    assert "assetCardPromptText(node)" in optimizer_contract
+    assert "node_role" in optimizer_contract
+    assert "asset_card_draft" in optimizer_contract
+    assert "场景资产不得加入角色主体" in asset_generation_prompt
+    assert "角色资产以主体身份、结构、材质、比例和关键辨识点为主" in asset_generation_prompt
+    assert 'nodeGenerationKind(node)' in keyframe_actions
+    assert 'nodeRole === "asset_card_draft" ? "asset" : "keyframe"' in keyframe_actions
+    assert "reusableAssetForNode(n, reusableAsset, kind)" in keyframe_actions
+    assert "character_reference" in keyframe_actions
+    assert "scene_reference" in keyframe_actions
+    assert 'kind === "asset" ? "资产图" : "关键帧"' in generation_results
+    assert "${label}已生成" in generation_results
+    assert "资产素材" in generation_results
+    assert 'asset: "资产图生成"' in generation_progress
+    assert "此前排队" in generation_progress
+
+
 def test_video_revision_and_fail_closed_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")

@@ -1,5 +1,46 @@
 # Devlog
 
+## 2026-06-22 - Asset Image Prompt And Timing Audit
+
+- Fixed the live-canvas issue where character and scene asset-card nodes could
+  generate nearly identical abstract images. Asset-card image nodes now build
+  the generation request from the editable asset card body when `node.prompt` is
+  empty, include a safe `asset_card_draft` snapshot, and add type-specific
+  guards: character assets focus on identity/material/proportion, scene assets
+  avoid adding a character subject unless explicitly required, and prop assets
+  focus on object form/material/use state.
+- Separated asset-image generation semantics from keyframe generation in the
+  Studio node path. Asset-card nodes now show `资产图生成` progress, return
+  `资产图已生成` result text, and store generated uploads as character / scene /
+  prop references instead of generic keyframe references.
+- Added safe timing projection for the Codex image handoff worker. Request,
+  pending, running, succeeded, and failed states now expose compact
+  created/started/completed and elapsed/queued/running seconds through Runtime
+  polling without storing provider raw responses or local absolute paths in API
+  payloads.
+
+Verification:
+
+```text
+pytest -> 598 passed / 520 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 108 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_frontend_wave.py tests/test_codex_image_handoff.py -> 41 passed / 1 existing warning
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed
+python -m py_compile for changed Runtime image modules -> passed
+```
+
+Boundary:
+
+- No provider gate, server deployment, generated media byte, provider raw
+  response, signed URL, secret, invite code, session token, user account data,
+  or Company OS private source content was written.
+- Internalized project lesson: asset-card generation is not a keyframe
+  generation with different labels. Asset type must affect prompt assembly,
+  node progress semantics, upload roles, and verification evidence.
+
 ## 2026-06-22 - Studio Chain Regeneration Guardrails
 
 - Hardened the Studio text -> storyboard -> asset-card -> keyframe chain around

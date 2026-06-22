@@ -23,36 +23,44 @@ export function videoResultText(response) {
   return `视频生成未开始或未完成。\n状态: ${status}\n原因: ${reason}`;
 }
 
-export function keyframeResultText(response, request, succeeded) {
+export function keyframeResultText(response, request, succeeded, options = {}) {
+  const kind = generationKind(request, options);
+  const label = kind === "asset" ? "资产图" : "关键帧";
   const jobId = response?.job?.job_id || "not_available";
   const status = response?.job?.status || "blocked";
   const outputCount = response?.safe_manifest?.output_count ?? 0;
   if (isKeyframeInProgress(response)) {
     return [
-      "图像生成中，预览完成后会自动更新到节点。",
+      `${label}生成中，预览完成后会自动更新到节点。`,
       `任务编号：${jobId}`,
     ].join("\n");
   }
   if (!succeeded) {
     const reason = response?.safe_manifest?.blocks?.[0]?.reason || "image generation service is not ready";
     return [
-      "图像生成未完成，本次没有可用预览。",
+      `${label}生成未完成，本次没有可用预览。`,
       `状态: ${status}`,
       `原因: ${reason}`,
     ].join("\n");
   }
   return [
-    "关键帧已生成",
+    `${label}已生成`,
     `任务编号：${jobId}`,
     `请求比例: ${request.aspect_ratio}`,
     `候选数量: ${outputCount}`,
-    response?.reusable_image_assets?.[0]?.asset_id ? `参考素材：${response.reusable_image_assets[0].asset_id}` : null,
+    response?.reusable_image_assets?.[0]?.asset_id ? `${kind === "asset" ? "资产素材" : "参考素材"}：${response.reusable_image_assets[0].asset_id}` : null,
     response?.candidate_previews?.[0]?.preview_url ? "预览已从安全预览地址加载。" : "未返回预览地址。",
   ].filter(Boolean).join("\n");
 }
 
 export function isKeyframeInProgress(response) {
   return ["submitted", "running", "pending"].includes(String(response?.job?.status || ""));
+}
+
+function generationKind(request, options) {
+  if (options.kind) return options.kind;
+  if (request?.node_parameters?.node_role === "asset_card_draft") return "asset";
+  return "keyframe";
 }
 
 export function parseDuration(value) {

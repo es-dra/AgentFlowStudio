@@ -170,6 +170,7 @@ def _keyframe_succeeded_result(
     manifest["outputs"] = provider_outputs
     _write_json_checked(output_dir / "keyframe_candidates_summary.json", candidates)
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
+    progress = raw.get("progress") if isinstance(raw.get("progress"), dict) else None
     return _result(
         status="succeeded",
         provider_gate=provider_gate,
@@ -177,6 +178,7 @@ def _keyframe_succeeded_result(
         provider_outputs=provider_outputs,
         safe_manifest=manifest,
         context_bundle=context_bundle,
+        progress=progress,
     )
 
 

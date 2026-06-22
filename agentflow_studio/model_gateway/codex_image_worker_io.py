@@ -16,6 +16,7 @@ def append_worker_event(
     image_path: str | None = None,
     error_summary: str | None = None,
     worker_id: str | None = None,
+    timing: dict[str, object] | None = None,
 ) -> None:
     event = {
         "time": datetime.now(timezone.utc).isoformat(),
@@ -24,6 +25,7 @@ def append_worker_event(
         "worker_id": worker_id,
         "image_path": image_path,
         "error_summary": error_summary,
+        "timing": dict(timing or {}),
         "provider_raw_response_stored": False,
     }
     path = job_root / "_logs" / "events.jsonl"

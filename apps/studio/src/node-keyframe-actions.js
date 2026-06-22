@@ -7,10 +7,8 @@ import { isKeyframeInProgress, keyframeResultText } from "./node-generation-resu
 import { clearOneRunOverrides, prepareGenerationRequest } from "./node-generation-guards.js";
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
-
 const MAX_KEYFRAME_POLL_ATTEMPTS = 540;
 const MAX_BOOTSTRAP_KEYFRAME_REFRESH = 4;
-
 export async function pollNodeKeyframeGeneration(store, runtime, node) {
   const jobId = node.params?.lastKeyframeJobId;
   if (!jobId || !runtime?.pollKeyframe) {
@@ -24,16 +22,16 @@ export async function pollNodeKeyframeGeneration(store, runtime, node) {
     await store.flushRuntimeSave?.();
   }
 }
-
 export async function startRemoteKeyframeGeneration(store, runtime, node) {
   const previousNodeState = generationRestoreSnapshot(node);
+  const generationKind = nodeGenerationKind(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
     n.result = null;
     n.previewUrl = null;
-    setSubmittingGenerationState(n, "keyframe", { label: "正在提交图片生成", percent: null });
+    setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: null });
   });
   let submitAttempted = false;
   try {
@@ -46,7 +44,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     }
     submitAttempted = true;
     const response = await runtime.generateKeyframe(request);
-    applyKeyframeResponse(store, node.id, response, request);
+    applyKeyframeResponse(store, node.id, response, request, { kind: generationKind });
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
     if (isKeyframeInProgress(response) && response?.job?.job_id && runtime?.pollKeyframe) {
@@ -58,7 +56,6 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     await store.flushRuntimeSave?.();
   }
 }
-
 export async function refreshPendingKeyframeGenerations(store, runtime, options = {}) {
   if (!runtime?.pollKeyframe) return;
   const limit = Number(options.limit || MAX_BOOTSTRAP_KEYFRAME_REFRESH);
@@ -69,14 +66,11 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
     const jobId = node.params.lastKeyframeJobId;
     try {
       const response = await runtime.pollKeyframe(jobId);
-      applyKeyframeResponse(store, node.id, response, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
+      applyKeyframeResponse(store, node.id, response, fallbackRequest(node), { kind: nodeGenerationKind(node) });
       await store.flushRuntimeSave?.();
-    } catch {
-      // Keep the saved generating state; the user can still retry from the node menu.
-    }
+    } catch {}
   }
 }
-
 async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
   let lastResponse = null;
   let lastSavedStatus = "";
@@ -84,7 +78,8 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
     if (attempt > 0) await sleep(pollDelayMs(attempt));
     const response = await runtime.pollKeyframe(jobId);
     lastResponse = response;
-    applyKeyframeResponse(store, nodeId, response, request);
+    const fresh = store.get().nodes[nodeId];
+    applyKeyframeResponse(store, nodeId, response, request, { kind: nodeGenerationKind(fresh) });
     const status = response?.job?.status || "";
     if (shouldSavePollState(attempt, status, lastSavedStatus, response)) {
       await store.flushRuntimeSave?.();
@@ -99,23 +94,21 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
   await store.flushRuntimeSave?.();
   return lastResponse;
 }
-
 function pollDelayMs(attempt) {
   if (attempt < 3) return 2000;
   if (attempt < 24) return 5000;
   return 10000;
 }
-
 function shouldSavePollState(attempt, status, lastSavedStatus, response) {
   if (!isKeyframeInProgress(response)) return true;
   if (status && status !== lastSavedStatus) return true;
   return attempt > 0 && attempt % 6 === 0;
 }
-
-function applyKeyframeResponse(store, nodeId, response, request) {
+function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
   const status = response?.job?.status || "blocked";
   const succeeded = status === "succeeded";
   const inProgress = isKeyframeInProgress(response);
+  const kind = options.kind || "keyframe";
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
@@ -123,7 +116,7 @@ function applyKeyframeResponse(store, nodeId, response, request) {
     const reusableAsset = response?.reusable_image_assets?.[0] || null;
     const jobId = response?.job?.job_id || null;
     const shouldRecordAsset = succeeded && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
-    updateNodeGenerationState(n, response, { kind: "keyframe" });
+    updateNodeGenerationState(n, response, { kind });
     n.params.lastKeyframeJobId = jobId || n.params.lastKeyframeJobId || null;
     n.status = succeeded ? "complete" : inProgress ? "generating" : "error";
     if (preview?.preview_url) {
@@ -131,11 +124,11 @@ function applyKeyframeResponse(store, nodeId, response, request) {
       resizeNodeForImagePreview(n, preview, request.aspect_ratio);
     }
     if (succeeded && reusableAsset?.asset_id) {
-      n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAsset).slice(-4);
+      n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAssetForNode(n, reusableAsset, kind)).slice(-4);
     }
     n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
-    n.result = keyframeResultText(response, request, succeeded);
+    n.result = keyframeResultText(response, request, succeeded, { kind });
     if (shouldRecordAsset) {
       n.params.lastKeyframeCompletedJobId = jobId;
       const asset = visibleAssetForNode(store, n);
@@ -151,18 +144,30 @@ function applyKeyframeResponse(store, nodeId, response, request) {
     }
   });
 }
-
 function markKeyframeStillProcessing(store, nodeId, jobId) {
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
+    const kind = nodeGenerationKind(n);
+    const label = kind === "asset" ? "资产图仍在生成" : "图片仍在生成";
     n.status = "generating";
-    updateNodeGenerationState(n, { job: { job_id: jobId, status: "running", progress: { mode: "indeterminate" } } }, {
-      kind: "keyframe",
-      label: "图片仍在生成",
-      hint: `任务 ${jobId} 还在处理，稍后可继续刷新节点。`,
-    });
-    n.result = `图像生成仍在进行中。\n任务编号：${jobId}`;
+    updateNodeGenerationState(n, { job: { job_id: jobId, status: "running", progress: { mode: "indeterminate" } } }, { kind, label, hint: `任务 ${jobId} 还在处理，稍后可继续刷新节点。` });
+    n.result = `${kind === "asset" ? "资产图" : "图像"}生成仍在进行中。\n任务编号：${jobId}`;
     n.params.lastKeyframeJobId = jobId;
   }, { history: false });
+}
+function nodeGenerationKind(node) {
+  return node?.params?.nodeRole === "asset_card_draft" ? "asset" : "keyframe";
+}
+function submitLabel(kind) {
+  return kind === "asset" ? "正在提交资产图生成" : "正在提交图片生成";
+}
+function fallbackRequest(node) {
+  return { aspect_ratio: node.params?.spec?.ratio || "9:16" };
+}
+function reusableAssetForNode(node, reusableAsset, kind) {
+  if (kind !== "asset") return reusableAsset;
+  const assetType = String(node?.params?.assetCardDraft?.asset_type || "");
+  const role = { character: "character_reference", scene: "scene_reference", prop: "prop_reference" }[assetType] || "asset_reference";
+  return { ...reusableAsset, role };
 }

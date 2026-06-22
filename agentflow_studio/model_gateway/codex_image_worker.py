@@ -23,6 +23,7 @@ from agentflow_studio.model_gateway.codex_runtime_env import codex_subprocess_en
 from agentflow_studio.model_gateway.codex_image_worker_io import append_worker_event, trim_finished_job_dir
 from agentflow_studio.model_gateway.codex_image_worker_recovery import recover_stale_running_jobs
 from agentflow_studio.model_gateway.codex_image_worker_result import ProcessResult
+from agentflow_studio.model_gateway.codex_image_timing import compact_timing, iso_from_epoch, now_epoch
 
 
 class CodexImageExecutor(Protocol):
@@ -128,15 +129,29 @@ def process_one(
 def _process_running(running: Path, executor: CodexImageExecutor, *, worker_id: str) -> ProcessResult:
     job_id = running.name
     job_root = running.parents[1]
-    append_worker_event(job_root, job_id=job_id, status="running", worker_id=worker_id)
     output_dir = running.parents[2]
+    claim = _read_json_safe(running / CLAIM_FILENAME)
+    started_at = claim.get("claimed_at_epoch") or claim.get("claimed_at")
     try:
         request = _read_request(running)
+        append_worker_event(
+            job_root,
+            job_id=job_id,
+            status="running",
+            worker_id=worker_id,
+            timing=compact_timing(created_at=request.get("created_at"), started_at=started_at),
+        )
         produced = executor.execute(request, running)
         target = candidate_output_path(output_dir)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(produced, target)
-        result = completed_result_payload(job_id=job_id, output_dir=output_dir, candidate_path=target)
+        completed_at = now_epoch()
+        timing = compact_timing(
+            created_at=request.get("created_at"),
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        result = completed_result_payload(job_id=job_id, output_dir=output_dir, candidate_path=target, timing=timing)
         write_json(running / RESULT_FILENAME, result)
         completed = job_root / "completed" / job_id
         completed.parent.mkdir(parents=True, exist_ok=True)
@@ -148,10 +163,19 @@ def _process_running(running: Path, executor: CodexImageExecutor, *, worker_id: 
             status="succeeded",
             image_path="image_candidates/candidate_001.png",
             worker_id=worker_id,
+            timing=timing,
         )
         return ProcessResult(job_id=job_id, status="succeeded", job_dir=completed)
     except Exception as exc:  # noqa: BLE001 - worker boundary converts all failures to safe job results.
+        completed_at = now_epoch()
+        request = _read_json_safe(running / REQUEST_FILENAME)
+        timing = compact_timing(
+            created_at=request.get("created_at"),
+            started_at=started_at,
+            completed_at=completed_at,
+        )
         result = failed_result_payload(job_id=job_id, reason=str(exc))
+        result["timing"] = timing
         write_json(running / RESULT_FILENAME, result)
         failed = job_root / "failed" / job_id
         failed.parent.mkdir(parents=True, exist_ok=True)
@@ -163,6 +187,7 @@ def _process_running(running: Path, executor: CodexImageExecutor, *, worker_id: 
             status="failed",
             error_summary=result["blocks"][0]["reason"],
             worker_id=worker_id,
+            timing=timing,
         )
         return ProcessResult(job_id=job_id, status="failed", job_dir=failed)
 
@@ -235,11 +260,13 @@ def _try_claim_pending_job(pending: Path, *, worker_id: str) -> Path | None:
         pending.rename(running)
     except (FileNotFoundError, FileExistsError):
         return None
+    claimed_at_epoch = now_epoch()
     claim = {
         "schema_version": "afs_codex_image_claim.v0.1",
         "job_id": job_id,
         "worker_id": worker_id,
-        "claimed_at": time.time(),
+        "claimed_at": iso_from_epoch(claimed_at_epoch),
+        "claimed_at_epoch": claimed_at_epoch,
         "provider_raw_response_stored": False,
     }
     write_json(running / CLAIM_FILENAME, claim)
@@ -256,6 +283,14 @@ def _read_request(job_dir: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise RuntimeError("request.json must be a JSON object")
     return payload
+
+
+def _read_json_safe(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def _worker_prompt(request: dict[str, Any]) -> str:

@@ -2,6 +2,7 @@ import { imageSpecLabel, videoSpecLabel } from "./presets/specs.js";
 import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
 import { providerServiceForImageModel } from "./presets/models.js";
+import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generation-prompt.js";
 
 const GENERATION_TARGET = {
   text: "prompt",
@@ -26,7 +27,7 @@ export function buildOptimizationRequest(state, node) {
   return {
     node_id: node.id,
     node_type: normalizeNodeType(node.type),
-    prompt_text: String(node.prompt || "").trim() || "请根据当前节点生成专业创作提示词。",
+    prompt_text: primaryPromptText(node),
     generation_target: GENERATION_TARGET[node.type] || "prompt",
     target_platform: "short_video",
     style: node.params?.styleRef || "cinematic",
@@ -52,6 +53,8 @@ function nodeParameterSnapshot(node) {
     llm_model: "prompt-optimizer",
     remote_optimizer_required: true,
   };
+  if (p.nodeRole) snapshot.node_role = String(p.nodeRole).slice(0, 80);
+  if (p.assetCardDraft) snapshot.asset_card_draft = safeAssetCardSnapshot(p.assetCardDraft);
   if (node.type === "image" && p.spec) {
     snapshot.spec = imageSpecLabel(p.spec);
     snapshot.panorama = Boolean(p.spec.panorama);
@@ -74,6 +77,16 @@ function nodeParameterSnapshot(node) {
   const uploadedImages = uploadReferenceSummaries(node);
   if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
   return snapshot;
+}
+
+function primaryPromptText(node) {
+  const explicit = String(node.prompt || "").trim();
+  if (explicit) return explicit;
+  const assetPrompt = assetCardPromptText(node);
+  if (assetPrompt) return assetPrompt;
+  const content = String(node.content || "").trim();
+  if (content) return content;
+  return "请根据当前节点生成专业创作提示词。";
 }
 
 export function buildKeyframeGenerationRequest(state, node) {
