@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-23 - Asset Card Source-Image Edit Path
+
+- Fixed the remaining asset-card local revision root cause: prior work made
+  prompts reference-first, but Runtime still sent the previous image only as a
+  generic reference image. Asset-card revisions with prior image refs now set
+  `image_operation=edit`, pass the first prior generated/uploaded image as
+  `edit_source_image_path`, pass ordered edit references, and request
+  `image_input_fidelity=high`.
+- Added OpenAI Images-compatible edit transport for external API providers.
+  `request_format=openai_images` still uses JSON `/images/generations` for new
+  images, but source-image edits now use multipart `/images/edits` with the
+  original image in `image[]`, matching the manual GPT-style edit flow.
+- Relaxed provider reference-image slot validation from 8 to 16 so providers
+  that support multiple edit/source images can be configured without AFS schema
+  blocking them first.
+- Changed the asset-card panel action label to `保存并局部修订生成` so the UI
+  reflects that this path should preserve the previous image and apply only the
+  card-field delta. Full redesign/regeneration remains a separate future UX
+  mode rather than this button's behavior.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_keyframe_reference_assets.py tests/test_provider_adapter_registry.py tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 58 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 113 files
+python -m pytest -q -> 626 passed / 520 deselected / 2 existing warnings
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo. The live visual result still requires a deployed provider smoke and
+  human acceptance.
+
 ## 2026-06-23 - Asset Card Image Revision References
 
 - Fixed the asset-card edit/regenerate path that behaved like pure

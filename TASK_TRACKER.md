@@ -31,12 +31,23 @@ reference image #1 is the primary visual source of truth for identity,
 proportions, reference-sheet layout, camera distance, and non-edited details;
 changed card fields are the only editable delta. Runtime avoids the generic
 "reference image is only supplemental" guard for asset-card local revision.
-Verification: `npm run check:studio-js` passed for 113 files; relevant
-asset-reference/state/static/Codex handoff/manifest/script pytest passed 50 / 1
-existing warning; `git diff --check` passed. Boundary: no provider gate was
-opened, no live image call was made, and no provider raw response, signed URL,
-secret, local private path, generated media byte, or Company OS private source
-content was written.
+The fourth pass upgrades provider dispatch from reference-backed regeneration
+to source-image edit semantics for external APIs: asset-card revisions with a
+prior image now set `image_operation=edit`, send the first prior image as
+`edit_source_image_path`, carry ordered edit references, and request
+`image_input_fidelity=high`. OpenAI Images-compatible API relay providers now
+use multipart `/images/edits` for this path while keeping ordinary generation
+on `/images/generations`. Provider descriptors can now allow up to 16 reference
+image slots for multi-source edit providers. Studio labels the action as
+`保存并局部修订生成`.
+Verification: source-image edit focused regression passed 58 / 1 existing
+warning; full pytest passed 626 / 520 deselected / 2 existing warnings;
+`npm run check:studio-js` passed for 113 files; CLI help/version passed;
+maintenance audit failed=0 with existing warnings only; `git diff --check`
+passed. Boundary: no provider raw response, signed URL, secret, local private
+path, generated media byte, or Company OS private source content was written to
+the repo. Remaining validation: deployed external-provider smoke with a
+robot local material edit, then human visual acceptance.
 
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and

@@ -825,6 +825,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     service["request_format"] = "openai_images"
     service["quality"] = "low"
     service["output_format"] = "png"
+    service["descriptor"]["reference_image_slots"] = 16
     service["allowed_artifact_hosts"] = [".crazyrouter.com"]
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
@@ -832,6 +833,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
     registry = ProviderRegistry.from_store(_store(tmp_path, config))
 
+    assert registry.descriptor("relay_image").reference_image_slots == 16
     result = registry.dispatch(
         "image",
         "relay_image",
@@ -853,6 +855,65 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert result["outputs"][0]["provider_url_persisted"] is False
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
     assert "media.crazyrouter.com" not in json.dumps(result, ensure_ascii=False)
+    assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_provider_registry_dispatches_api_relay_openai_images_edit_with_high_fidelity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+    source_image = tmp_path / "robot-source.png"
+    source_image.write_bytes(_png_bytes())
+
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/edits":
+            captured["authorization"] = request.get_header("Authorization")
+            captured["content_type"] = request.get_header("Content-type")
+            captured["body"] = request.data.decode("latin1")
+            captured["timeout"] = timeout
+            return _JsonResponse({"data": [{"b64_json": base64.b64encode(_png_bytes()).decode("ascii")}]})
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["quality"] = "low"
+    service["output_format"] = "png"
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_http.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    result = registry.dispatch(
+        "image",
+        "relay_image",
+        ProviderDispatchRequest(
+            prompt="Change only the metal body surface into plush fabric while preserving the same robot.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            image_operation="edit",
+            reference_image_paths=(source_image,),
+            edit_source_image_path=source_image,
+            edit_reference_image_paths=(source_image,),
+            image_input_fidelity="high",
+        ),
+    )
+
+    body = str(captured["body"])
+    assert captured["authorization"] == "Bearer secret-relay-key"
+    assert "multipart/form-data" in str(captured["content_type"])
+    assert 'name="model"' in body and "gpt-image-2" in body
+    assert 'name="prompt"' in body and "Change only the metal body surface into plush fabric" in body
+    assert 'name="input_fidelity"' in body and "high" in body
+    assert 'name="image[]"; filename="robot-source.png"' in body
+    assert captured["timeout"] == 120.0
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 

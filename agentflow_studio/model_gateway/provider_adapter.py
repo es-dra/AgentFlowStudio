@@ -29,7 +29,7 @@ class ProviderDescriptor(BaseModel):
     execution_mode: ProviderExecutionMode
     capabilities: list[ProviderCapability] = Field(default_factory=list)
     account_pool_id: str | None = None
-    reference_image_slots: int = Field(ge=0, le=8)
+    reference_image_slots: int = Field(ge=0, le=16)
     supported_aspect_ratios: list[str] = Field(min_length=1)
     prompt_char_limit: int = Field(gt=0, le=20000)
     seed_supported: bool
@@ -111,12 +111,16 @@ class ProviderDispatchRequest:
     prompt: str
     output_dir: Path
     task_type: str | None = None
+    image_operation: Literal["generate", "edit"] = "generate"
     aspect_ratio: str = "9:16"
     candidate_count: int = 1
     timeout_sec: float = 120.0
     model_name_override: str | None = None
     reference_image_paths: tuple[Path | str, ...] = ()
     subject_reference_image_path: Path | str | None = None
+    edit_source_image_path: Path | str | None = None
+    edit_reference_image_paths: tuple[Path | str, ...] = ()
+    image_input_fidelity: Literal["low", "high"] | None = None
     seed: int | None = None
     duration_sec: int | None = None
     resolution: str | None = None

@@ -26,6 +26,8 @@ MAX_IMAGE_DOWNLOAD_BYTES = 32 * 1024 * 1024
 
 
 def openai_images_payload(*, service: dict[str, Any], model: str, request: ProviderDispatchRequest) -> dict[str, Any]:
+    if request.image_operation == "edit" or request.edit_source_image_path is not None:
+        return _openai_images_edit_payload(service=service, model=model, request=request)
     if request.reference_image_paths or request.subject_reference_image_path is not None:
         raise ModelGatewayError("OpenAI Images relay generation does not accept reference images")
     payload: dict[str, Any] = {
@@ -42,6 +44,79 @@ def openai_images_payload(*, service: dict[str, Any], model: str, request: Provi
             if value not in (None, "", []):
                 payload[str(key)] = value
     return payload
+
+
+def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request: ProviderDispatchRequest) -> dict[str, Any]:
+    image_paths = _edit_image_paths(request)
+    if not image_paths:
+        raise ModelGatewayError("OpenAI Images relay edit requires a source image")
+    fields: dict[str, Any] = {
+        "model": model,
+        "prompt": request.prompt,
+        "n": request.candidate_count,
+        "size": str(service.get("size") or ASPECT_RATIO_SIZES.get(request.aspect_ratio) or "1024x1024"),
+        "quality": str(service.get("quality") or "low"),
+        "output_format": str(service.get("output_format") or "png"),
+        "input_fidelity": request.image_input_fidelity or str(service.get("input_fidelity") or "high"),
+    }
+    extra_body = service.get("extra_body")
+    if isinstance(extra_body, dict):
+        for key, value in extra_body.items():
+            if value not in (None, "", []):
+                fields[str(key)] = value
+    field_name = str(service.get("edit_image_field_name") or "image[]")
+    return {
+        "__transport": "multipart",
+        "__endpoint": _edit_endpoint(service),
+        "fields": fields,
+        "files": [_image_file_part(field_name, path) for path in image_paths],
+    }
+
+
+def _edit_endpoint(service: dict[str, Any]) -> str:
+    configured = str(service.get("edit_endpoint") or "").strip()
+    if configured:
+        return configured
+    endpoint = str(service.get("endpoint") or "").strip()
+    if endpoint.endswith("/generations"):
+        return f"{endpoint.removesuffix('/generations')}/edits"
+    return "/images/edits"
+
+
+def _edit_image_paths(request: ProviderDispatchRequest) -> list[Path | str]:
+    values: list[Path | str] = []
+    if request.edit_source_image_path is not None:
+        values.append(request.edit_source_image_path)
+    values.extend(request.edit_reference_image_paths or request.reference_image_paths)
+    seen: set[str] = set()
+    result: list[Path | str] = []
+    for value in values:
+        key = str(Path(value))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+        if len(result) >= 16:
+            break
+    return result
+
+
+def _image_file_part(field_name: str, path: Path | str) -> dict[str, Any]:
+    image_path = Path(path)
+    if not image_path.is_file():
+        raise ModelGatewayError("OpenAI Images relay edit source image is missing")
+    image_bytes = image_path.read_bytes()
+    mime_type = _mime_type_for_bytes(image_bytes)
+    if not mime_type:
+        raise ModelGatewayError("OpenAI Images relay edit source image must be PNG or JPEG")
+    return {
+        "field_name": field_name,
+        "filename": image_path.name or "source.png",
+        "mime_type": mime_type,
+        "byte_count": len(image_bytes),
+        "sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "data": image_bytes,
+    }
 
 
 def write_image_outputs(
@@ -144,6 +219,14 @@ def _host_allowed(host: str, allowed_url_hosts: tuple[str, ...]) -> bool:
         if host == item:
             return True
     return False
+
+
+def _mime_type_for_bytes(image_bytes: bytes) -> str:
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    return ""
 
 
 __all__ = ("openai_images_payload", "write_image_outputs")

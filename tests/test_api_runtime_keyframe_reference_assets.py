@@ -265,6 +265,10 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
     def fake_dispatch(capability, service_id, request):
         captured["reference_paths"] = list(request.reference_image_paths)
         captured["subject_reference_image_path"] = request.subject_reference_image_path
+        captured["edit_source_image_path"] = getattr(request, "edit_source_image_path", None)
+        captured["edit_reference_image_paths"] = list(getattr(request, "edit_reference_image_paths", ()))
+        captured["image_operation"] = getattr(request, "image_operation", "generate")
+        captured["image_input_fidelity"] = getattr(request, "image_input_fidelity", None)
         captured["prompt"] = request.prompt
         output_dir = Path(request.output_dir)
         image_dir = output_dir / "image_candidates"
@@ -331,6 +335,12 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
     assert [item["asset_id"] for item in plan["reference_images"]] == [first_ref, second_ref]
     assert Path(str(captured["reference_paths"][0])).name == "source.png"
     assert captured["subject_reference_image_path"] == captured["reference_paths"][0]
+    assert captured["edit_source_image_path"] == captured["reference_paths"][0]
+    assert captured["edit_reference_image_paths"] == captured["reference_paths"]
+    assert captured["image_operation"] == "edit"
+    assert captured["image_input_fidelity"] == "high"
+    assert plan["image_operation"] == "edit"
+    assert plan["edit_source_asset_id"] == first_ref
     assert "Asset-card revision mode" in str(captured["prompt"])
     assert "primary visual source of truth" in str(captured["prompt"])
     assert "The changed fields are the only editable delta" in str(captured["prompt"])

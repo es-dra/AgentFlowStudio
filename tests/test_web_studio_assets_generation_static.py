@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
 
 def test_studio_hardening_static_contract_markers() -> None:
@@ -136,6 +138,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     asset_generation_prompt = (STUDIO_ROOT / "src" / "asset-card-generation-prompt.js").read_text(encoding="utf-8")
     asset_revision_refs = (STUDIO_ROOT / "src" / "asset-revision-references.js").read_text(encoding="utf-8")
     asset_card_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
+    runtime_keyframes = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
     generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
@@ -149,6 +152,9 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
         assert marker in asset_revision_refs + asset_card_panel + optimizer_contract
     assert "assetCardRevisionImageRefs(node)" in optimizer_contract
     assert "assetCardRevisionPromptSupplement(node)" in asset_generation_prompt
+    assert "image_operation" in runtime_keyframes
+    assert "edit_source_image_path" in runtime_keyframes
+    assert "image_input_fidelity" in runtime_keyframes
     assert "Revision strength: conservative low-change pass" in asset_revision_refs
     assert "primary visual source of truth" in asset_revision_refs
     assert "only editable delta" in asset_revision_refs

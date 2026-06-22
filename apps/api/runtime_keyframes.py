@@ -94,10 +94,11 @@ def build_keyframe_generation(
             asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
+    image_operation = "edit" if _uses_asset_card_image_edit(request, reference_images) else "generate"
     if reference_images:
         reference_instruction = _reference_prompt_instruction(request, len(reference_images))
         prompt_with_references = (
-            f"{reference_instruction}\n{provider_prompt}"
+            reference_instruction
             if is_asset_card_revision
             else f"{provider_prompt}\n{reference_instruction}"
         )
@@ -120,6 +121,8 @@ def build_keyframe_generation(
             "required_gate": required_gate,
             "prompt_char_limit": int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
             "reference_image_slots": int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+            "image_operation": image_operation,
+            "image_input_fidelity": "high" if image_operation == "edit" else None,
         },
     )
     model_request_plan = build_request_plan(
@@ -151,11 +154,16 @@ def build_keyframe_generation(
             dispatch_request = ProviderDispatchRequest(
                 prompt=provider_prompt,
                 output_dir=output_dir,
+                task_type="asset_card_revision" if image_operation == "edit" else None,
+                image_operation=image_operation,
                 aspect_ratio=request.aspect_ratio,
                 candidate_count=request.candidate_count,
                 seed=request.seed,
                 reference_image_paths=tuple(item["path"] for item in reference_images),
                 subject_reference_image_path=reference_images[0]["path"] if reference_images else None,
+                edit_source_image_path=reference_images[0]["path"] if image_operation == "edit" else None,
+                edit_reference_image_paths=tuple(item["path"] for item in reference_images) if image_operation == "edit" else (),
+                image_input_fidelity="high" if image_operation == "edit" else None,
             )
             if str(getattr(descriptor, "execution_mode", "sync") or "sync") == "async":
                 provider_task = registry.submit("image", request.provider_service_id, dispatch_request)
@@ -169,6 +177,7 @@ def build_keyframe_generation(
                         provider_prompt=provider_prompt,
                         provider_gate=provider_gate,
                         reference_image_count=len(reference_images),
+                        image_operation=image_operation,
                         context_bundle=context_bundle,
                     ),
                 )
@@ -202,6 +211,10 @@ def build_keyframe_generation(
         context_bundle,
         KEYFRAME_NON_CLAIMS,
     )
+    request_plan["image_operation"] = image_operation
+    if image_operation == "edit" and reference_images:
+        request_plan["edit_source_asset_id"] = reference_images[0]["public"]["asset_id"]
+        request_plan["image_input_fidelity"] = "high"
     request_plan["model_call_context_id"] = model_call_context["context_id"]
     request_plan["model_request_plan_ref"] = "model_request_plan.json"
     candidates = keyframe_candidate_summary(request, provider_prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
@@ -241,6 +254,10 @@ def build_keyframe_generation(
             "remote_video": "blocked_by_default",
         },
     }
+
+
+def _uses_asset_card_image_edit(request: KeyframeGenerationRequest, reference_images: list[dict[str, Any]]) -> bool:
+    return _has_asset_card_revision(request) and bool(reference_images)
 
 def _context_bundle(
     store: RuntimeStore,
@@ -343,6 +360,7 @@ def _task_state(
     provider_prompt: str,
     provider_gate: dict[str, str],
     reference_image_count: int,
+    image_operation: str,
     context_bundle: dict[str, Any] | None,
 ) -> dict[str, Any]:
     return {
@@ -355,6 +373,7 @@ def _task_state(
         "provider_prompt": provider_prompt,
         "provider_gate": provider_gate,
         "reference_image_count": reference_image_count,
+        "image_operation": image_operation,
         "context_bundle": context_bundle,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "provider_raw_persisted": False,

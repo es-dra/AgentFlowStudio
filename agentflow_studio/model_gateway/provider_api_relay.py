@@ -11,6 +11,7 @@ from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
+from agentflow_studio.model_gateway.provider_api_relay_http import post_multipart
 from agentflow_studio.model_gateway.provider_api_relay_images import openai_images_payload, write_image_outputs
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
 from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
@@ -35,6 +36,14 @@ class ApiRelayAdapter:
             raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
         if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
             raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
+        if request.image_operation == "edit":
+            if self.descriptor.modality != "image":
+                raise ModelConfigError("image edit operation is only supported for image providers")
+            if request.edit_source_image_path is None:
+                raise ModelConfigError("image edit operation requires edit_source_image_path")
+            edit_refs = request.edit_reference_image_paths or (request.edit_source_image_path,)
+            if len(edit_refs) > self.descriptor.reference_image_slots:
+                raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
         if self.descriptor.modality == "image" and request.candidate_count < 1:
             raise ModelConfigError("image candidate_count must be at least 1")
 
@@ -60,9 +69,15 @@ class ApiRelayAdapter:
             service=service,
             request=request,
         )
+        endpoint = str(service.get("endpoint") or _endpoint_from_ref(self.store, service) or "/v1/afs/provider")
+        transport = "json"
+        if isinstance(payload, dict):
+            transport = str(payload.pop("__transport", "json") or "json")
+            endpoint = str(payload.pop("__endpoint", endpoint) or endpoint)
         return {
             "base_url": _base_url(account, service),
-            "endpoint": str(service.get("endpoint") or _endpoint_from_ref(self.store, service) or "/v1/afs/provider"),
+            "endpoint": endpoint,
+            "transport": transport,
             "credential_value": account.get("api_key"),
             "credential_env": account_selection.credential_env or account.get("api_key_env") or service.get("api_key_env"),
             "auth_header": str(service.get("auth_header") or account.get("auth_header") or "Authorization"),
@@ -76,16 +91,28 @@ class ApiRelayAdapter:
         }
 
     def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        response = _post_json(
-            base_url=str(plan["base_url"]),
-            endpoint=str(plan["endpoint"]),
-            payload=plan["payload"],
-            credential_value=plan.get("credential_value"),
-            credential_env=plan.get("credential_env"),
-            auth_header=str(plan.get("auth_header") or "Authorization"),
-            auth_scheme=str(plan.get("auth_scheme") or "Bearer"),
-            timeout_sec=float(plan.get("timeout_sec") or 120.0),
-        )
+        if str(plan.get("transport") or "json") == "multipart":
+            response = post_multipart(
+                base_url=str(plan["base_url"]),
+                endpoint=str(plan["endpoint"]),
+                payload=plan["payload"],
+                credential_value=plan.get("credential_value"),
+                credential_env=plan.get("credential_env"),
+                auth_header=str(plan.get("auth_header") or "Authorization"),
+                auth_scheme=str(plan.get("auth_scheme") or "Bearer"),
+                timeout_sec=float(plan.get("timeout_sec") or 120.0),
+            )
+        else:
+            response = _post_json(
+                base_url=str(plan["base_url"]),
+                endpoint=str(plan["endpoint"]),
+                payload=plan["payload"],
+                credential_value=plan.get("credential_value"),
+                credential_env=plan.get("credential_env"),
+                auth_header=str(plan.get("auth_header") or "Authorization"),
+                auth_scheme=str(plan.get("auth_scheme") or "Bearer"),
+                timeout_sec=float(plan.get("timeout_sec") or 120.0),
+            )
         if self.descriptor.modality == "image":
             response = {
                 **response,
@@ -141,11 +168,21 @@ def _relay_payload(
         "resolution": request.resolution,
         "motion": request.motion,
     }
-    refs = _reference_images_payload(request.reference_image_paths)
-    if refs:
-        payload["reference_images"] = refs
-    if request.subject_reference_image_path is not None:
-        payload["subject_reference_image"] = _reference_image_payload(request.subject_reference_image_path, 1)
+    if request.image_operation == "edit":
+        if request.edit_source_image_path is not None:
+            payload["operation"] = "image_edit"
+            payload["source_image"] = _reference_image_payload(request.edit_source_image_path, 1)
+        edit_refs = request.edit_reference_image_paths
+        if edit_refs:
+            payload["edit_reference_images"] = _reference_images_payload(edit_refs)
+        if request.image_input_fidelity:
+            payload["input_fidelity"] = request.image_input_fidelity
+    else:
+        refs = _reference_images_payload(request.reference_image_paths)
+        if refs:
+            payload["reference_images"] = refs
+        if request.subject_reference_image_path is not None:
+            payload["subject_reference_image"] = _reference_image_payload(request.subject_reference_image_path, 1)
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
 
 

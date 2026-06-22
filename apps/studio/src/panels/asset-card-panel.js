@@ -61,7 +61,7 @@ function render(modal, draft) {
     <div class="modal-actions">
       <button class="ghost-btn" data-action="close">取消</button>
       <button class="primary-btn" data-action="save">保存资产卡</button>
-      <button class="primary-btn" data-action="save-regenerate">保存并重新生成</button>
+      <button class="primary-btn" data-action="save-regenerate">保存并局部修订生成</button>
     </div>
   `;
 }
