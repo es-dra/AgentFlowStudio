@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-22 - Asset Reference Lookup and Keyframe Flow Repair
+
+- Changed generation context resolution so fixed assets can be injected by an
+  explicit `@label` mention even when the asset node is not directly connected.
+  Connected assets still win by graph distance; prompt-named fixed assets are
+  the fallback lookup path.
+- Replaced the front-end `named_asset_not_connected_fail_closed` hard stop with
+  a confirmation path. If a stale or unusual preflight still reports an
+  unconnected named asset, the user can continue by excluding it for that run
+  instead of losing the generation.
+- Let storyboard keyframe layers be created and generated without first fixing
+  candidate asset cards. Candidate cards remain review/edit material; fixed
+  assets only become generation constraints after promotion.
+- Added fixed-asset cancellation from the asset detail popover. Cancelling uses
+  the existing Runtime retire route and marks local node asset refs as retired
+  so they no longer participate in generation context.
+- Updated local storyboard fallback from mechanical three-sentence chunks to an
+  adaptive sentence/length-based distribution. Provider LLM breakdown remains
+  the preferred route when the LLM gate is enabled.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_context_resolver.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_visual_assets.py tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 49 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 110 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+git diff --check -> passed
+pytest -> 602 passed / 520 deselected / 2 existing warnings
+```
+
+Boundary:
+
+- No provider gate, secret, signed URL, generated media byte, provider raw
+  response, user account data, or Company OS private source content was written
+  to repo records. This pass fixes Studio/Runtime flow semantics; human visual
+  acceptance still requires a fresh canvas regeneration.
+
 ## 2026-06-22 - Asset Image Prompt Quality Tightening
 
 - Split provider-facing asset image prompts out of the asset-card data module

@@ -24,10 +24,20 @@ export async function prepareGenerationRequest(store, runtime, node, request, ki
     }
     const unconnectedNamed = unconnectedLabelMatchedAssets(outcome);
     if (unconnectedNamed.length) {
-      const labels = unconnectedNamed.map((asset) => asset.label || asset.asset_id).join(", ");
-      throw new Error(
-        `named_asset_not_connected_fail_closed: prompt mentions fixed asset(s) that are not connected to this node: ${labels}. Connect them first or exclude them for this run.`,
+      const decision = await showUnconnectedNamedAssetModal(unconnectedNamed, kind);
+      if (decision.action === "cancel") return null;
+      const nextExclusions = mergeAssetExclusions(
+        working.temporary_asset_exclusions,
+        decision.assetIds,
+        "user_excluded_unconnected_named_asset",
       );
+      if (nextExclusions.length === working.temporary_asset_exclusions.length) return { ...working, preflight_token: outcome?.preflight_token || null };
+      store.set((s) => {
+        const n = s.nodes[node.id];
+        if (n) n.params.temporaryAssetExclusions = nextExclusions;
+      }, { history: false });
+      working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
+      continue;
     }
     const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
     if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
@@ -154,6 +164,52 @@ function showCarryConfirmModal(preflight, node, kind) {
   });
 }
 
+function showUnconnectedNamedAssetModal(assets, kind) {
+  return new Promise((resolve) => {
+    const modal = el("div", "modal compact generation-carry-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "命名资产未注入"));
+    head.appendChild(el("span", "head-spacer"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.textContent = "×";
+    head.appendChild(closeBtn);
+
+    const body = el("div", "modal-body generation-carry-body");
+    body.appendChild(el(
+      "p",
+      "carry-note",
+      `当前${kind === "video" ? "视频" : "图片"}提示词提到了已固定资产，但本次上下文没有成功注入。可以先不携带这些资产继续，或取消后检查资产连接/固定状态。`,
+    ));
+    const list = el("div", "carry-asset-list");
+    for (const asset of assets) {
+      const row = el("div", "carry-asset-row");
+      row.appendChild(el("span", "carry-asset-text", `${assetTypeLabel(asset)} · ${asset.label || asset.asset_id}`));
+      row.appendChild(el("small", "", asset.reason || "未连接且未注入"));
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const submit = el("button", "primary-btn", "本次不携带并继续");
+    actions.append(cancel, submit);
+    modal.append(head, body, actions);
+
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve({ action: "cancel" }); } });
+    const finish = (decision) => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(decision);
+    };
+    const assetIds = () => assets.map((asset) => asset.asset_id).filter(Boolean);
+    closeBtn.addEventListener("click", () => finish({ action: "cancel" }));
+    cancel.addEventListener("click", () => finish({ action: "cancel" }));
+    submit.addEventListener("click", () => finish({ action: "exclude", assetIds: assetIds() }));
+  });
+}
+
 function assetTypeLabel(asset) {
   if (asset.asset_type === "scene") return "场景";
   if (asset.asset_type === "prop") return "道具";
@@ -172,14 +228,14 @@ function normalizeAssetExclusions(values) {
   return result;
 }
 
-function mergeAssetExclusions(existing, assetIds) {
+function mergeAssetExclusions(existing, assetIds, reason = "user_excluded_from_preflight_confirmation") {
   const result = normalizeAssetExclusions(existing);
   const seen = new Set(result.map((item) => item.asset_id));
   for (const assetId of assetIds || []) {
     const id = String(assetId || "").trim();
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    result.push({ asset_id: id, reason: "user_excluded_from_preflight_confirmation" });
+    result.push({ asset_id: id, reason });
   }
   return result;
 }

@@ -41,6 +41,9 @@ function renderAssetDetail(pop, store, runtime, asset, assetId, visualAssetId = 
     if (runtime?.promoteVisualAsset) {
       actions.appendChild(actionButton("调整资产", () => openExistingAssetPanel(store, runtime, asset, visualAssetId)));
     }
+    if (isFixedAsset(asset) && runtime?.retireVisualAsset) {
+      actions.appendChild(actionButton("取消固定", () => cancelFixedAsset(store, runtime, visualAssetId)));
+    }
     actions.appendChild(actionButton("从当前节点移除", () => removeAssetFromSelectedNode(store, visualAssetId)));
     actions.appendChild(actionButton("本次不携带", () => excludeAssetForNextRun(store, visualAssetId)));
   }
@@ -88,6 +91,47 @@ function openExistingAssetPanel(store, runtime, asset, visualAssetId) {
     imageAsset: imageAssetFromVisualAsset(asset) || lastImageAsset(node),
     initialAssetType: ["character", "scene", "prop"].includes(String(asset?.asset_type || "")) ? asset.asset_type : "character",
     existingAsset: { ...asset, asset_id: visualAssetId || asset?.asset_id },
+  });
+}
+
+function cancelFixedAsset(store, runtime, visualAssetId) {
+  if (!visualAssetId || !runtime?.retireVisualAsset) return;
+  runtime.retireVisualAsset(visualAssetId, {
+    reason: "user_cancelled_fixed_asset",
+    retired_at: new Date().toISOString(),
+  })
+    .then((payload) => {
+      applyRetiredVisualAssetToStore(store, payload?.asset || { asset_id: visualAssetId, status: "retired" });
+    })
+    .catch((error) => {
+      console.warn("cancel fixed asset failed", error);
+    });
+}
+
+function applyRetiredVisualAssetToStore(store, retiredAsset) {
+  const retiredId = assetIdFromRef(retiredAsset);
+  if (!retiredId) return;
+  store.set((s) => {
+    s.assets = (s.assets || []).map((asset) => (
+      assetIdFromRef(asset) === retiredId
+        ? { ...asset, ...retiredAsset, status: "retired", asset_status: "retired" }
+        : asset
+    ));
+    for (const node of Object.values(s.nodes || {})) {
+      if (!Array.isArray(node.params?.visualAssets)) continue;
+      node.params.visualAssets = node.params.visualAssets.map((asset) => (
+        assetIdFromRef(asset) === retiredId
+          ? {
+            ...asset,
+            ...retiredAsset,
+            status: "retired",
+            asset_status: "retired",
+            runtime_status: "excluded",
+            disabled_reason: "已取消固定，本次不携带",
+          }
+          : asset
+      ));
+    }
   });
 }
 
@@ -184,4 +228,8 @@ function assetTypeLabel(asset) {
   if (asset.asset_type === "prop") return "道具资产";
   if (asset.kind === "image_reference" || asset.role === "reference_image") return "参考图片";
   return "显性资产";
+}
+
+function isFixedAsset(asset) {
+  return ["fixed", "ready", ""].includes(String(asset?.status || asset?.asset_status || ""));
 }

@@ -1,5 +1,5 @@
 import { setNodeError } from "./node-action-utils.js";
-import { ensureShotAssetPrepNodesForScriptNode, existingShotAssetCardNodeIds } from "./shot-asset-nodes.js";
+import { ensureShotAssetPrepNodesForScriptNode } from "./shot-asset-nodes.js";
 import { createKeyframeNodesForStoryboard } from "./storyboard-keyframes.js";
 
 export function identifyScriptAssets(store, node) {
@@ -12,10 +12,5 @@ export function identifyScriptAssets(store, node) {
 
 export function createStoryboardKeyframeLayer(store, node) {
   const fresh = store.get().nodes[node.id] || node;
-  const assetIds = existingShotAssetCardNodeIds(store.get(), fresh.id);
-  if (!assetIds.length) {
-    setNodeError(store, fresh.id, "请先识别资产，再生成关键帧层。");
-    return [];
-  }
   return createKeyframeNodesForStoryboard(store, fresh);
 }

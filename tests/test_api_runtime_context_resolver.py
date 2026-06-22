@@ -167,6 +167,43 @@ def test_generate_context_uses_connected_fixed_assets_and_lock_overrides(tmp_pat
     assert retired["asset_id"] not in {item["asset_id"] for item in bundle["included_assets"]}
 
 
+def test_generate_context_uses_label_matched_fixed_assets_without_edges(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_generate_named_lookup"
+    image_id = _upload(client, project_id, "char-node")
+    asset = _promote(client, project_id, image_id, "主角")
+    graph = {
+        "target_node_id": "target-node",
+        "runtime_work_mode": "context_generate",
+        "nodes": [
+            {"id": "target-node", "type": "image", "title": "Target", "prompt": "@主角 looks at stars.", "visual_asset_ids": []}
+        ],
+        "edges": [],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations/preflight",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "@主角 looks at stars.",
+            "optimized_prompt": "@主角 stands on a quiet rooftop under the stars.",
+            "context_subgraph": graph,
+            "generated_at": "2026-06-22T11:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    bundle = response.json()["context_bundle"]
+    included = bundle["included_assets"]
+    assert [item["asset_id"] for item in included] == [asset["asset_id"]]
+    assert included[0]["connected"] is False
+    assert included[0]["label"] == "主角"
+    assert bundle["subject_reference_asset_id"] == asset["asset_id"]
+    assert bundle["reference_image_channel"][0]["asset_id"] == image_id
+    assert asset["asset_id"] not in {item["asset_id"] for item in bundle["excluded_assets"]}
+
+
 def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is_rejected(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_scene_subject_ref"

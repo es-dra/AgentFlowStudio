@@ -65,7 +65,11 @@ def resolve_context_bundle_core(
     if mode == "optimize":
         candidate_ids = optimize_asset_ids(assets, sorted_connected_ids, visible_prompt)
     elif mode == "generate":
-        candidate_ids = sorted_connected_ids if include_fixed_assets else []
+        candidate_ids = (
+            _generate_candidate_asset_ids(assets, sorted_connected_ids, visible_prompt)
+            if include_fixed_assets
+            else []
+        )
     else:
         raise ValueError("context resolver mode must be optimize or generate")
 
@@ -160,3 +164,20 @@ __all__ = (
     "provider_prompt_from_bundle",
     "resolve_context_bundle_core",
 )
+
+
+def _generate_candidate_asset_ids(
+    assets: dict[str, dict[str, Any]],
+    sorted_connected_ids: list[str],
+    visible_prompt: str,
+) -> list[str]:
+    result = list(sorted_connected_ids)
+    seen = set(result)
+    prompt_fold = str(visible_prompt or "").casefold()
+    for asset_id, asset in sorted(assets.items()):
+        label = str(asset.get("label") or "").strip()
+        if not label or label.casefold() not in prompt_fold or asset_id in seen:
+            continue
+        seen.add(asset_id)
+        result.append(asset_id)
+    return result

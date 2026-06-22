@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_storyboard_local import local_storyboard_shots
 
 
 def test_storyboard_breakdown_gate_closed_uses_safe_local_fallback(tmp_path, monkeypatch) -> None:
@@ -81,6 +82,16 @@ def test_storyboard_local_fallback_does_not_turn_signal_or_city_lights_into_prop
     refs = response.json()["shots"][0]["asset_refs"]
     assert [item["asset_type"] for item in refs] == ["character", "scene"]
     assert [item["label"] for item in refs] == ["主角", "主要场景"]
+
+
+def test_storyboard_local_fallback_uses_adaptive_shot_count_not_three_sentence_chunks() -> None:
+    script = "镜头一。镜头二。镜头三。镜头四。镜头五。镜头六。镜头七。镜头八。镜头九。"
+
+    shots = local_storyboard_shots(script)
+
+    assert len(shots) == 5
+    assert shots[0]["shot_id"] == "shot_01"
+    assert shots[-1]["shot_id"] == "shot_05"
 
 
 def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, monkeypatch) -> None:

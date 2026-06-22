@@ -166,7 +166,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "此前排队" in generation_progress
 
 
-def test_video_revision_and_fail_closed_submit_markers() -> None:
+def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
@@ -183,8 +183,10 @@ def test_video_revision_and_fail_closed_submit_markers() -> None:
     assert "error.status = response.status" in runtime_client
     assert "Restart the 8790 Runtime Service" in runtime_client
     assert "unconnectedLabelMatchedAssets" in generation_guards
+    assert "showUnconnectedNamedAssetModal" in generation_guards
+    assert "user_excluded_unconnected_named_asset" in generation_guards
     assert "label_matched" in inspector
-    assert "named_asset_not_connected_fail_closed" in generation_guards
+    assert "named_asset_not_connected_fail_closed" not in generation_guards
     assert "startRemoteVideoRevision" in node_actions
     assert "videoRevision" in video_actions
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in video_actions
@@ -218,7 +220,8 @@ def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> N
     assert "function buildAssetReferenceActions" in inspector_source
     assert "buildAssetReferenceActions" in optimizer
     assert "buildAssetReferenceActions" in generation_guards
-    assert "named_asset_not_connected_fail_closed" in generation_guards
+    assert "named_asset_not_connected_fail_closed" not in generation_guards
+    assert "showUnconnectedNamedAssetModal" in generation_guards
     assert "connect-named-asset" in optimizer
     assert "carry-chain-strip" in styles
     assert "carry-chain-chip.invalid" in styles

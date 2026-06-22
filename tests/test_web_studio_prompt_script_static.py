@@ -196,11 +196,13 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "生成关键帧层" in node_menu
     assert "createKeyframeNodesForStoryboard" in keyframes
     assert "ensureShotAssetPrepNodesForScriptNode(store, fresh)" not in storyboard_actions
-    assert "existingShotAssetCardNodeIds" in storyboard_actions
+    assert "existingShotAssetCardNodeIds" not in storyboard_actions
     assert "fixed_visual_asset_ids" in keyframes
     assert "missing_asset_card_node_ids" in keyframes
+    assert "candidate_asset_card_node_ids" in keyframes
+    assert "ready_without_fixed_assets" in keyframes
     assert "asset.params?.visualAssets" in keyframes
-    assert "needs_fixed_assets" in node_actions
+    assert "needs_fixed_assets" not in node_actions
     assert "shouldCollectConnectedUploads" in optimizer_contract
     assert 'node?.params?.nodeRole !== "keyframe_generation"' in optimizer_contract
     assert "asset_card_draft" in optimizer_contract
@@ -246,3 +248,6 @@ def test_visual_asset_draft_and_existing_asset_edit_show_inline_loading() -> Non
     assert "调整资产" in asset_detail
     assert "openVisualAssetPanel" in asset_detail
     assert "existingAsset" in asset_detail
+    assert "cancelFixedAsset" in asset_detail
+    assert "retireVisualAsset" in asset_detail
+    assert "applyRetiredVisualAssetToStore" in asset_detail

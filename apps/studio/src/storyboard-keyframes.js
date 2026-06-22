@@ -29,11 +29,13 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
     node.params.structuredShot = structuredShot;
     node.params.visualAssets = fixedAssets;
     node.params.keyframeLayer = {
-      status: missingIds.length ? "needs_fixed_assets" : "ready",
+      status: fixedAssets.length ? "ready_with_fixed_assets" : "ready_without_fixed_assets",
       source_script_node_id: scriptNode.id,
       source_asset_card_node_ids: assetNodes.map((asset) => asset.id),
+      candidate_asset_card_node_ids: assetNodes.map((asset) => asset.id),
       fixed_visual_asset_ids: fixedAssets.map((asset) => asset.asset_id).filter(Boolean),
       missing_asset_card_node_ids: missingIds,
+      unfixed_candidate_asset_card_node_ids: missingIds,
       updated_at: new Date().toISOString(),
     };
   });
@@ -78,13 +80,14 @@ function keyframePrompt(shot, fixedAssets, missingAssets) {
     const signature = asset.signature ? `：${asset.signature}` : "";
     return `- @${label}${signature}`;
   });
-  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（待确认固定）`);
+  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（候选资产卡，未固定时仅供审查，不作为参考图注入）`);
   return [
     `根据分镜生成关键帧：${shot.description || shot.source_text || ""}`,
     `镜头：${shot.shot_size || "中景"}；光影：${shot.light_atmosphere || "自然光影"}；运镜参考：${shot.camera_motion || "固定机位"}`,
     fixedLines.length ? "已固定资产（必须保持）：" : "",
     ...fixedLines,
-    missingLines.length ? "待固定资产（生成前应先确认，不作为参考图注入）：" : "",
+    fixedLines.length ? "" : "已固定资产：暂无；将仅根据分镜文本生成。",
+    missingLines.length ? "候选资产卡（可稍后固定；未固定不阻断关键帧生成）：" : "",
     ...missingLines,
     "画面要求：单张关键帧，主体清晰，延续分镜剧情，不添加文字、水印、UI 或边框。",
   ].filter(Boolean).join("\n");

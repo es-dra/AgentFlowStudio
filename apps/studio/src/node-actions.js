@@ -96,11 +96,6 @@ export function lastFixedVisualAsset(node) {
 export async function startNodeGeneration(store, runtime, node, resultText) {
   const fresh = store.get().nodes[node.id] || node;
   if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
-    if (fresh.params?.nodeRole === "keyframe_generation" && fresh.params?.keyframeLayer?.status === "needs_fixed_assets") {
-      setNodeError(store, fresh.id, "请先把该分镜下的候选资产图确认固定，再生成关键帧。候选资产卡不会作为参考图注入。");
-      await store.flushRuntimeSave?.();
-      return;
-    }
     await startRemoteKeyframeGeneration(store, runtime, fresh);
     return;
   }

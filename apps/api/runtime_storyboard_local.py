@@ -11,9 +11,7 @@ PROP_HINTS = ("手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "�
 
 
 def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None) -> list[dict[str, Any]]:
-    chunks = _script_chunks(script_text)
-    if shot_count_hint:
-        chunks = chunks[:shot_count_hint]
+    chunks = _script_chunks(script_text, shot_count_hint=shot_count_hint)
     return [structured_shot(chunk, index + 1) for index, chunk in enumerate(chunks[:80])]
 
 
@@ -53,17 +51,44 @@ def normalize_asset_ref(asset: Any, index: int) -> dict[str, str]:
     }
 
 
-def _script_chunks(text: str) -> list[str]:
+def _script_chunks(text: str, shot_count_hint: int | None = None) -> list[str]:
     source = str(text or "").strip()
     if not source:
         return []
     paragraphs = [_clean(part) for part in re.split(r"\n\s*\n", source) if _clean(part)]
     if len(paragraphs) > 1:
-        return paragraphs
-    sentences = [_clean(part) for part in re.split(r"(?<=[。！？!?；;])\s*", source) if _clean(part)]
-    if not sentences:
-        return [source]
-    return ["".join(sentences[index : index + 3]) for index in range(0, len(sentences), 3)]
+        units = paragraphs
+    else:
+        units = [_clean(part) for part in re.split(r"(?<=[。！？!?；;])\s*", source) if _clean(part)]
+        if not units:
+            return [source]
+    target_count = _target_shot_count(units, source, shot_count_hint)
+    return _balanced_chunks(units, target_count)
+
+
+def _target_shot_count(units: list[str], source: str, shot_count_hint: int | None = None) -> int:
+    if not units:
+        return 0
+    if shot_count_hint:
+        return max(1, min(int(shot_count_hint), len(units), 80))
+    by_units = (len(units) + 1) // 2
+    by_length = max(1, (len(source) + 179) // 180)
+    return max(1, min(max(by_units, by_length), len(units), 12))
+
+
+def _balanced_chunks(units: list[str], target_count: int) -> list[str]:
+    if target_count <= 0:
+        return []
+    if target_count >= len(units):
+        return units
+    chunks: list[str] = []
+    for index in range(target_count):
+        start = round(index * len(units) / target_count)
+        end = round((index + 1) * len(units) / target_count)
+        chunk = "".join(units[start:end]).strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
 
 
 def _asset_refs(text: str) -> list[dict[str, str]]:

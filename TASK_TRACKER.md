@@ -36,6 +36,28 @@ generated media byte, user account data, or Company OS private source content
 was written to repo records. Remaining validation: user canvas regeneration and
 human visual acceptance.
 
+Current asset reference lookup / keyframe flow addendum: 2026-06-22 pass fixed
+the live-canvas failure where editing a fixed asset card and regenerating could
+fail with `named_asset_not_connected_fail_closed`. Runtime context resolution
+now includes fixed assets explicitly mentioned by `@label` even if they are not
+connected to the target node; connected graph assets still retain distance
+priority. The Studio preflight guard no longer hard-fails on unconnected named
+assets and instead offers a one-run exclusion fallback. Storyboard keyframe
+layers can now be created and generated without fixed candidate asset cards;
+candidate cards remain editable review material until promoted. Fixed assets can
+also be cancelled from the asset detail popover, which calls the Runtime retire
+route and marks local refs as retired/excluded. Local storyboard fallback now
+uses adaptive sentence/length distribution instead of mechanical three-sentence
+chunks, reducing the apparent "always three shots" behavior when LLM breakdown
+is gated off or discarded. Verification: focused Runtime/Studio regressions
+passed 49 / 1 existing warning; `npm run check:studio-js` passed for 110 files;
+CLI help/version passed; maintenance audit failed=0 with existing warnings
+only; `git diff --check` passed; full pytest passed 602 / 520 deselected / 2
+existing warnings. Boundary: no provider secret, provider raw response, signed
+URL, generated media byte, user account data, or Company OS private source
+content was written. Remaining validation: fresh user canvas regeneration and
+human visual acceptance.
+
 Current Crazyrouter image relay addendum: 2026-06-22 pass added
 OpenAI Images-compatible `api_relay` support so `codex_image` can be switched
 server-side to Crazyrouter `gpt-image-2` without changing Studio front-end
