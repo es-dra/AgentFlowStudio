@@ -14,6 +14,7 @@ export function renderTopbar(options) {
     onSwitchProject,
     onCreateProject,
     onOpenHome,
+    onBeforeSiteHome,
     authUser,
     onSignOut,
   } = options;
@@ -35,9 +36,9 @@ export function renderTopbar(options) {
   topbar.replaceChildren();
 
   if (!state.ui.drawerOpen) {
-    renderCompactTopbar(topbar, { state, store, runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject, onOpenHome });
+    renderCompactTopbar(topbar, { state, store, runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject, onOpenHome, onBeforeSiteHome });
   } else {
-    topbar.appendChild(siteHomeLink());
+    topbar.appendChild(siteHomeLink(onBeforeSiteHome));
     topbar.appendChild(studioHomeButton(onOpenHome));
     appendProjectControls(topbar, { runtime, projectOptions, hiddenProjectCount, showAllProjects, onToggleProjectFilter, onSwitchProject, onCreateProject });
   }
@@ -52,7 +53,7 @@ export function renderTopbar(options) {
 }
 
 function renderCompactTopbar(topbar, options) {
-  const { state, store, projectOptions, onOpenHome } = options;
+  const { state, store, projectOptions, onOpenHome, onBeforeSiteHome } = options;
   const openDrawer = el("button", "icon-btn drawer-restore");
   openDrawer.innerHTML = icon("panel", 15);
   openDrawer.title = "展开侧栏";
@@ -60,7 +61,7 @@ function renderCompactTopbar(topbar, options) {
   topbar.appendChild(openDrawer);
 
   topbar.appendChild(el("div", "topbar-logo", "AFS"));
-  topbar.appendChild(siteHomeLink());
+  topbar.appendChild(siteHomeLink(onBeforeSiteHome));
   topbar.appendChild(studioHomeButton(onOpenHome));
 
   const title = el("div", "topbar-title compact-project");
@@ -72,11 +73,17 @@ function renderCompactTopbar(topbar, options) {
   appendProjectControls(topbar, { ...options, projectOptions });
 }
 
-function siteHomeLink() {
+function siteHomeLink(onBeforeSiteHome) {
   const home = el("a", "icon-btn site-home-btn");
   home.href = "/site/";
   home.innerHTML = `${icon("globe", 14)}<span>首页</span>`;
   home.title = "返回网站首页";
+  home.addEventListener("click", async (event) => {
+    if (!onBeforeSiteHome) return;
+    event.preventDefault();
+    await onBeforeSiteHome();
+    window.location.href = home.href;
+  });
   return home;
 }
 

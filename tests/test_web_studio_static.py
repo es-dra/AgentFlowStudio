@@ -66,6 +66,8 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     assert "localStorage.removeItem(STORAGE_KEY)" in persistence_source
     assert "localStorage.removeItem(LEGACY_STORAGE_KEY)" in persistence_source
     assert 'return { source: "stale", projectId: targetProjectId }' in store_source
+    assert 'return { source: "local_newer" }' in store_source
+    assert "shouldKeepLocalOverRemote" in store_source
     assert "hasStudioMeta(remoteState)" in store_source
     assert 'next.type === "video" && next.params.lastVideoPreviewUrl' in state_source
     assert '!String(next.previewUrl).includes("/video-generations/")' in state_source
@@ -105,6 +107,8 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "options.closeOnOutside === false" in overlay
     assert "site-home-btn" in topbar
     assert 'href = "/site/"' in topbar
+    assert "onBeforeSiteHome" in topbar
+    assert "store.flushRuntimeSave()" in main
     assert "首页" in topbar
 
 

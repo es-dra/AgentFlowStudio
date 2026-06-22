@@ -198,6 +198,7 @@ function renderAll(state) {
     onSwitchProject: projectController.switchProject,
     onCreateProject: projectController.createNewProject,
     onOpenHome: () => openStudioHome(state),
+    onBeforeSiteHome: () => store.flushRuntimeSave(),
     authUser: projectController.authUser,
     onSignOut: async () => {
       await signOut(runtime);

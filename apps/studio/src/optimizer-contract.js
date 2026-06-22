@@ -272,7 +272,7 @@ function connectedReferenceNodeSummaries(state, node) {
 }
 
 function shouldCollectConnectedUploads(node) {
-  return node?.params?.nodeRole !== "keyframe_generation";
+  return !["keyframe_generation", "asset_card_draft"].includes(node?.params?.nodeRole);
 }
 
 function hasFixedVisualAssets(node) {

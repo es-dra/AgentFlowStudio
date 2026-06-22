@@ -232,12 +232,17 @@ def test_director_shell_uses_active_ids_and_confirmed_append_only() -> None:
     assert "activeCameraId" in director_data
     assert "activeSubjectIds" in director_data
     assert "visual_asset_id" in director_data
+    assert "directorProductionPlan" in director_data
+    assert "镜头目标" in director_data
+    assert "主体调度" in director_data
     assert "Array.isArray(value) ? clone(value) : clone(fallback)" in director_data
     assert 'from "./director-shell-render.js"' in director_shell
     assert "createDirectorShellFrame" in director_render
     assert "renderDirectorObjectList" in director_render
     assert "renderDirectorBoard" in director_render
     assert "renderDirectorIntentPreview" in director_render
+    assert "director-production-plan" in director_render
+    assert "生产包" in director_render
     assert "confirmDirectorPromptAppend" in director_shell
     assert "window.confirm" not in director_shell
     assert "current.prompt = prompt" not in director_shell

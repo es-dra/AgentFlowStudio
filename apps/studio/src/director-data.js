@@ -142,6 +142,22 @@ export function directorPromptSummary(setup) {
   ].filter(Boolean).join("；");
 }
 
+export function directorProductionPlan(setup) {
+  const camera = setup.cameras.find((item) => item.id === setup.activeCameraId) || setup.cameras[0] || {};
+  const active = new Set(setup.activeSubjectIds || []);
+  const subjects = setup.subjects.filter((item) => !active.size || active.has(item.id));
+  const subjectNames = subjects.map((item) => item.name || item.id).filter(Boolean);
+  const lights = setup.lights.map((item) => `${item.name || item.kind || "灯光"} ${item.intensity || ""}`.trim()).filter(Boolean);
+  const props = setup.props.filter((item) => item.visible !== false).map((item) => item.name || item.kind).filter(Boolean);
+  return [
+    ["镜头目标", `${camera.name || "机位"} · ${camera.shot || "景别未设"} · ${camera.height || "高度未设"} · ${camera.composition || setup.composition || "构图待确认"}`],
+    ["主体调度", subjectNames.length ? subjectNames.join("、") : "未指定主体"],
+    ["空间约束", props.length ? props.slice(0, 5).join("、") : "无显式道具"],
+    ["灯光意图", lights.length ? lights.slice(0, 4).join("、") : "未布置灯光"],
+    ["生成用途", "保存后可应用到相连图片节点，作为关键帧生成的导演上下文"],
+  ];
+}
+
 export function safeDirectorSetup(setup) {
   const normalized = normalizeDirectorSetup(setup);
   return {

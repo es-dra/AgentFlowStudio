@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AFS Studio | 专业 AI 视频创作工作台</title>
+    <title>AFS Studio | AI 视频创作工作台</title>
     <meta
       name="description"
-      content="AFS Studio 是面向 AI 视频创作的专业工作台，帮助创作者从故事、角色、场景、关键帧到视频片段持续迭代。"
+      content="AFS Studio 是面向 AI 视频创作的工作台，帮助创作者把故事、资产、导演台、关键帧和反馈组织成连续生产链。"
     />
     <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/styles/site.css" />
@@ -20,202 +20,127 @@
         <span class="brand-mark" aria-hidden="true"></span>
         <span>AFS Studio</span>
       </a>
-      <nav class="nav-links" aria-label="页面章节">
-        <a href="#social-square">广场</a>
-        <a href="#templates">模板</a>
-        <a href="#works">作品</a>
-        <a href="#workflow">工作流</a>
+      <nav class="nav-links" aria-label="页面入口">
+        <a href="/site/social-square.html">社交广场</a>
+        <a href="#director">导演台</a>
+        <a href="#workflow">生产链</a>
+        <a href="#evidence">验收</a>
       </nav>
       <a class="nav-action" href="/studio/" data-auth-action>打开 Studio</a>
     </header>
 
     <main>
       <section class="hero-section creation-hero">
+        <div class="hero-visual" aria-hidden="true">
+          <div class="studio-wall">
+            <span class="wall-node script">脚本</span>
+            <span class="wall-node asset">角色资产</span>
+            <span class="wall-node director">导演台</span>
+            <span class="wall-node keyframe">关键帧</span>
+            <span class="wall-node video">视频片段</span>
+            <span class="wall-link a"></span>
+            <span class="wall-link b"></span>
+            <span class="wall-link c"></span>
+          </div>
+        </div>
         <div class="hero-copy">
-          <p class="eyebrow">AFS Studio</p>
-          <h1>专业 AI 视频创作工作台</h1>
-          <p class="hero-lede">从故事、角色、场景到首帧和视频片段，都在同一个画布里持续生成、确认、复用和修订。</p>
+          <p class="eyebrow">Agent-native Creative Workspace</p>
+          <h1>AFS Studio</h1>
+          <p class="hero-lede">把故事、设定图、镜头调度、生成结果和反馈放进同一张画布，让每一轮创作都能被继续使用。</p>
           <div class="hero-actions">
-            <a class="primary-action" href="/studio/" data-auth-action>新建视频项目</a>
-            <a class="secondary-action" href="#templates">选择创作模板</a>
-          </div>
-          <div class="hero-signal" aria-label="创作入口摘要">
-            <span><strong>01</strong> 写下创作意图</span>
-            <span><strong>02</strong> 固定角色与场景</span>
-            <span><strong>03</strong> 生成关键帧和视频</span>
+            <a class="primary-action" href="/studio/" data-auth-action>进入工作台</a>
+            <a class="secondary-action" href="/site/social-square.html">去社交广场</a>
           </div>
         </div>
-
-        <div class="hero-stage" aria-label="AFS Studio 创作入口预览">
-          <article class="showcase-card featured-work">
-            <div class="work-frame">
-              <span class="frame-status">首帧预览</span>
-              <div class="frame-subject"></div>
-              <div class="frame-caption">
-              <strong>雨夜追踪镜头</strong>
-              <span>角色一致性 / 场景参考 / 运动意图已锁定</span>
-              </div>
-            </div>
-            <div class="work-meta">
-              <span>最近作品</span>
-              <strong>AI 短剧开场片段</strong>
-            </div>
-          </article>
-
-          <div class="template-stack" id="templates" aria-label="常用创作模板">
-            <article class="template-card active">
-              <span>模板 01</span>
-              <strong>故事到关键帧</strong>
-              <small>脚本、导演台、关键帧三段式生产链。</small>
-            </article>
-            <article class="template-card">
-              <span>模板 02</span>
-              <strong>角色设定卡</strong>
-              <small>上传参考图，确认后保存为角色资产。</small>
-            </article>
-            <article class="template-card">
-              <span>模板 03</span>
-              <strong>图生视频迭代</strong>
-              <small>首帧、运动、预览和反馈连续处理。</small>
-            </article>
-          </div>
-
-          <div class="project-lane" aria-label="项目入口">
-            <article>
-              <span>当前项目</span>
-              <strong>未命名项目</strong>
-              <small>进入画布继续整理节点和素材。</small>
-            </article>
-            <article>
-              <span>素材状态</span>
-              <strong>按需确认</strong>
-              <small>候选资产不会自动污染下一次生成。</small>
-            </article>
-          </div>
+        <div class="hero-signal" aria-label="核心生产动作">
+          <span><strong>01</strong>拆解脚本</span>
+          <span><strong>02</strong>确认资产</span>
+          <span><strong>03</strong>摆放镜头</span>
+          <span><strong>04</strong>生成与修订</span>
         </div>
       </section>
 
-      <section class="social-square" id="social-square" aria-labelledby="social-square-title">
-        <div class="square-heading">
-          <div>
-            <p class="eyebrow">Social Square</p>
-            <h2 id="social-square-title">社交广场</h2>
-            <p>把需求发布出来，找到可以承接脚本、设定图、关键帧或工作流整理的协作者。</p>
-          </div>
-          <a class="secondary-action" href="/studio/" data-auth-action>进入 Studio</a>
-        </div>
-        <div class="square-grid">
-          <form class="square-form" data-social-square-form>
-            <div class="form-row">
-              <label>
-                <span>需求标题</span>
-                <input name="title" maxlength="80" placeholder="例如：需要一个雨夜开场脚本" required />
-              </label>
-              <label>
-                <span>类型</span>
-                <select name="need_type">
-                  <option value="script">脚本</option>
-                  <option value="image">设定图</option>
-                  <option value="video">视频</option>
-                  <option value="workflow">工作流</option>
-                  <option value="other">其他</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              <span>需求说明</span>
-              <textarea name="body" maxlength="1200" placeholder="讲清楚你想要什么、已有素材和期望风格。" required></textarea>
-            </label>
-            <label>
-              <span>期望交付</span>
-              <input name="deliverable_hint" maxlength="240" placeholder="例如：三段式脚本 + 关键画面说明" />
-            </label>
-            <button class="primary-action" type="submit">发布需求</button>
-            <p class="square-status" data-social-square-status>登录后可以发布、承接需求。</p>
-          </form>
-          <div class="square-board" aria-live="polite">
-            <div class="square-board-title">
-              <strong>最新需求</strong>
-              <span>发布需求 / 承接需求 / 提交成果</span>
-            </div>
-            <div class="square-list" data-social-square-list>
-              <article class="square-empty">正在读取社交广场。</article>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="works-section" id="works">
+      <section class="surface-band" id="workflow">
         <div class="section-heading">
-          <h2>从可复用资产开始，而不是每次重新碰运气</h2>
-        </div>
-        <div class="work-grid" aria-label="作品与项目预览">
-          <article>
-            <span class="work-thumb tone-blue"></span>
-            <strong>角色首帧</strong>
-            <small>角色资产、场景参考和生成记录会在画布里持续保留。</small>
-          </article>
-          <article>
-            <span class="work-thumb tone-gold"></span>
-            <strong>视频片段</strong>
-            <small>关键帧、动作意图和反馈约束进入下一轮调用。</small>
-          </article>
-          <article>
-            <span class="work-thumb tone-green"></span>
-            <strong>修订版本</strong>
-            <small>保留与改变分开处理，避免反馈直接覆盖资产记忆。</small>
-          </article>
-        </div>
-      </section>
-
-      <section class="workflow-section" id="workflow">
-        <div class="section-heading">
-          <h2>进入 Studio 后，创作动作会沉淀成连续生产链</h2>
+          <p class="eyebrow">Production Spine</p>
+          <h2>不是单次生成，而是可继续的内容生产链</h2>
         </div>
         <div class="workflow-line">
           <article>
-            <span>01</span>
-            <h3>输入创作意图</h3>
-            <p>用户描述目标，系统读取上游节点、固定资产、偏好和项目上下文。</p>
+            <span>Script</span>
+            <h3>故事进入画布</h3>
+            <p>从想法、剧本或分镜开始，把角色、场景、道具和镜头目标拆成可审查节点。</p>
           </article>
           <article>
-            <span>02</span>
-            <h3>生成和确认</h3>
-            <p>图片、视频和视觉理解结果先成为证据，再由用户确认是否沉淀为资产。</p>
+            <span>Asset</span>
+            <h3>候选资产先确认</h3>
+            <p>角色和场景先成为候选卡片，满意后再固定，避免不合格结果污染后续生成。</p>
           </article>
           <article>
-            <span>03</span>
-            <h3>继续迭代</h3>
-            <p>反馈进入下一次修订约束，固定资产进入后续上下文调度。</p>
+            <span>Iterate</span>
+            <h3>反馈进入下一轮</h3>
+            <p>生成、预览、修改、重生成和固定分开处理，让每次修订都有明确边界。</p>
           </article>
         </div>
       </section>
 
-      <section class="operation-section">
+      <section class="director-teaser" id="director">
         <div>
-          <h2>面向内测创作者的真实生产入口</h2>
+          <p class="eyebrow">Director Stage</p>
+          <h2>用导演台锁定站位、机位和构图，再进入生成</h2>
           <p>
-            进入工作台后，用户在画布中创建节点、确认资产、发起生成和修订。前端只展示安全摘要、项目状态和可操作入口，不暴露 provider secret、本地路径或原始响应。
+            导演台会把角色位置、机位高度、景别、灯光、道具和下游节点绑定为镜头包。
+            它不是单纯的 2D 图，而是为关键帧生成提供可复用的生产约束。
           </p>
-          <details class="technical-details">
-            <summary>查看底层算法边界</summary>
-            <div class="algorithm-rail" aria-label="AFS 六大核心算法">
-              <span>提示词智能优化</span>
-              <span>上下文智能调度</span>
-              <span>图片/视频智能识别</span>
-              <span>资产记忆与连续性约束</span>
-              <span>模型请求投影</span>
-              <span>质量反馈与漂移控制</span>
-            </div>
-          </details>
         </div>
-        <a class="primary-action" href="/studio/" data-auth-action>打开 Studio 工作台</a>
+        <div class="director-preview" aria-label="导演台预览">
+          <span class="camera-mark">Camera A</span>
+          <span class="stage-subject one">主角</span>
+          <span class="stage-subject two">对手</span>
+          <span class="stage-light"></span>
+          <span class="stage-frame"></span>
+        </div>
+      </section>
+
+      <section class="social-teaser" aria-labelledby="social-teaser-title">
+        <div class="square-heading">
+          <div>
+            <p class="eyebrow">Social Square</p>
+            <h2 id="social-teaser-title">把需求放到广场，找到协作者</h2>
+            <p>发布需求、承接需求、提交成果都在独立页面完成，首页只保留最新协作信号。</p>
+          </div>
+          <a class="secondary-action" href="/site/social-square.html">发布需求</a>
+        </div>
+        <div class="square-list compact" data-social-square-list>
+          <article class="square-empty">正在读取最新需求。</article>
+        </div>
+      </section>
+
+      <section class="evidence-section" id="evidence">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence</p>
+          <h2>每一次生成都保留可追溯状态</h2>
+        </div>
+        <div class="evidence-grid">
+          <article>
+            <strong>候选</strong>
+            <p>生成结果先作为候选，不自动写入固定资产。</p>
+          </article>
+          <article>
+            <strong>确认</strong>
+            <p>用户满意后再固定角色、场景或道具设定。</p>
+          </article>
+          <article>
+            <strong>继续</strong>
+            <p>固定资产、导演台和反馈进入下一轮上下文。</p>
+          </article>
+        </div>
       </section>
     </main>
 
     <footer class="site-footer">
       <span>AFS Studio</span>
-      <span>Runtime-backed creative workspace</span>
+      <span>Creative production workspace</span>
     </footer>
     <script type="module" src="/site/site.js"></script>
     <script type="module" src="/site/social-square.js"></script>

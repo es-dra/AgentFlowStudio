@@ -53,12 +53,12 @@ export function openDirectorShell(store, node) {
   layoutTab.addEventListener("click", () => switchView("layout"));
   intentTab.addEventListener("click", () => switchView("intent"));
   saveBtn.addEventListener("click", () => {
-    saveSetup(store, node.id, setup, "二维导演台已保存");
+    saveSetup(store, node.id, setup, "导演台已保存");
     close();
   });
   applyBtn.addEventListener("click", () => {
     const count = applyToDownstream(store, node.id, setup);
-    saveSetup(store, node.id, setup, `二维导演台已应用到 ${count} 个相连节点`);
+    saveSetup(store, node.id, setup, `导演台已应用到 ${count} 个相连节点`);
     close();
   });
   promptBtn.addEventListener("click", async () => {
@@ -255,7 +255,7 @@ function upsertDirectorAsset(state, nodeId, node, setup) {
   const payload = {
     id: assetId,
     kind: "director_setup",
-    title: node.title || "二维导演台布置",
+    title: node.title || "导演台布置",
     safe_summary: directorSummary(setup),
     thumbnail_ref: "director-board",
     source_node_id: nodeId,

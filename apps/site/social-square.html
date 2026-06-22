@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>社交广场 | AFS Studio</title>
+    <meta name="description" content="AFS Studio 社交广场用于发布创作需求、承接协作任务和提交成果。" />
+    <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/site/styles/site.css" />
+    <link rel="stylesheet" href="/site/styles/social-square.css" />
+    <link rel="stylesheet" href="/site/styles/site-responsive.css" />
+  </head>
+  <body class="square-page">
+    <header class="site-header" aria-label="AFS Studio 社交广场导航">
+      <a class="brand" href="/site/" aria-label="AFS Studio 首页">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>AFS Studio</span>
+      </a>
+      <nav class="nav-links" aria-label="社交广场入口">
+        <a href="/site/">首页</a>
+        <a href="#publish">发布需求</a>
+        <a href="#requests">需求池</a>
+      </nav>
+      <a class="nav-action" href="/studio/" data-auth-action>打开 Studio</a>
+    </header>
+
+    <main>
+      <section class="square-hero">
+        <div>
+          <p class="eyebrow">Social Square</p>
+          <h1>社交广场</h1>
+          <p class="hero-lede">把内容生产中的缺口讲清楚，找到愿意承接脚本、设定图、关键帧、视频或工作流整理的人。</p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#publish">发布需求</a>
+            <a class="secondary-action" href="#requests">查看需求池</a>
+          </div>
+        </div>
+        <aside class="square-sprite" aria-label="团团小精灵">
+          <div class="sprite-orbit" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div class="sprite-body" aria-hidden="true">
+            <span class="sprite-ear left"></span>
+            <span class="sprite-ear right"></span>
+            <span class="sprite-eye left"></span>
+            <span class="sprite-eye right"></span>
+            <span class="sprite-sprout"></span>
+          </div>
+          <strong>团团在广场值班</strong>
+          <p>它会提醒你把需求、素材状态和期望交付写清楚，方便别人判断能不能承接。</p>
+        </aside>
+      </section>
+
+      <section class="square-dashboard" aria-label="社交广场状态">
+        <article>
+          <span>Open</span>
+          <strong data-square-stat="open">0</strong>
+          <small>等待承接</small>
+        </article>
+        <article>
+          <span>Accepted</span>
+          <strong data-square-stat="accepted">0</strong>
+          <small>正在协作</small>
+        </article>
+        <article>
+          <span>Submitted</span>
+          <strong data-square-stat="submitted">0</strong>
+          <small>等待确认</small>
+        </article>
+        <article>
+          <span>Completed</span>
+          <strong data-square-stat="completed">0</strong>
+          <small>已完成</small>
+        </article>
+      </section>
+
+      <section class="social-square full" id="publish" aria-labelledby="publish-title">
+        <div class="square-heading">
+          <div>
+            <p class="eyebrow">Publish</p>
+            <h2 id="publish-title">发布一个可承接的需求</h2>
+            <p>标题讲目标，说明讲素材和风格，交付写清楚对方需要交回什么。</p>
+          </div>
+          <p class="square-status" data-social-square-status>登录后可以发布、承接和提交成果。</p>
+        </div>
+        <div class="square-grid">
+          <form class="square-form" data-social-square-form>
+            <div class="form-row">
+              <label>
+                <span>需求标题</span>
+                <input name="title" maxlength="80" placeholder="例如：需要一个雨夜开场脚本" required />
+              </label>
+              <label>
+                <span>类型</span>
+                <select name="need_type">
+                  <option value="script">脚本</option>
+                  <option value="image">设定图</option>
+                  <option value="video">视频</option>
+                  <option value="workflow">工作流</option>
+                  <option value="other">其他</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>需求说明</span>
+              <textarea name="body" maxlength="1200" placeholder="讲清楚你想做什么、已有素材、参考风格和不能接受的方向。" required></textarea>
+            </label>
+            <label>
+              <span>期望交付</span>
+              <input name="deliverable_hint" maxlength="240" placeholder="例如：三段式脚本 + 每段关键画面说明" />
+            </label>
+            <button class="primary-action" type="submit">发布需求</button>
+          </form>
+          <aside class="square-guide">
+            <strong>发布前检查</strong>
+            <ul>
+              <li>说明已有素材：脚本、角色图、场景图或参考链接。</li>
+              <li>写清成果格式：文本、图片、项目节点还是工作流说明。</li>
+              <li>不要发布私密凭据、私有链接或本地文件路径。</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section class="social-square full" id="requests" aria-labelledby="requests-title">
+        <div class="square-heading">
+          <div>
+            <p class="eyebrow">Requests</p>
+            <h2 id="requests-title">需求池</h2>
+            <p>筛选自己能承接的任务，提交成果后由发布者确认。</p>
+          </div>
+          <a class="secondary-action" href="/studio/" data-auth-action>进入 Studio</a>
+        </div>
+        <div class="square-tools">
+          <input data-square-search placeholder="搜索标题、说明或交付内容" />
+          <div class="square-filter" role="group" aria-label="需求类型筛选">
+            <button class="active" data-square-filter="all">全部</button>
+            <button data-square-filter="script">脚本</button>
+            <button data-square-filter="image">设定图</button>
+            <button data-square-filter="video">视频</button>
+            <button data-square-filter="workflow">工作流</button>
+          </div>
+        </div>
+        <div class="square-list rich" data-social-square-list>
+          <article class="square-empty">正在读取社交广场。</article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>AFS Studio Social Square</span>
+      <span>需求协作 / 成果提交 / 状态确认</span>
+    </footer>
+    <script type="module" src="/site/site.js"></script>
+    <script type="module" src="/site/social-square.js"></script>
+  </body>
+</html>

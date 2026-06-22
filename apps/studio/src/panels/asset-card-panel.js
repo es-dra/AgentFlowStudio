@@ -16,7 +16,7 @@ export function openAssetCardPanel(store, nodeId, runtime = null) {
   render(modal, normalizeAssetCardDraft(draft));
   const close = showModal(modal);
 
-  modal.addEventListener("click", (event) => {
+  modal.addEventListener("click", async (event) => {
     const action = event.target?.dataset?.action;
     if (action === "close") {
       close();
@@ -24,10 +24,12 @@ export function openAssetCardPanel(store, nodeId, runtime = null) {
     }
     if (action === "save") {
       saveAssetCard(store, nodeId, collect(modal, draft));
+      await store.flushRuntimeSave?.();
       close();
     }
     if (action === "save-regenerate") {
       saveAssetCard(store, nodeId, collect(modal, draft));
+      await store.flushRuntimeSave?.();
       const fresh = store.get().nodes[nodeId];
       if (fresh) startNodeGeneration(store, runtime, fresh);
       close();

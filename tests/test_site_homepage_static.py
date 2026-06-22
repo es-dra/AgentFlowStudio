@@ -14,6 +14,7 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert "<title>AFS Studio" in index
     assert 'class="brand" href="/site/"' in index
     assert 'href="/studio/"' in index
+    assert 'href="/site/social-square.html"' in index
     assert 'href="/site/styles/site.css"' in index
     assert 'href="/site/styles/site-preview.css"' in index
     assert 'href="/site/styles/social-square.css"' in index
@@ -21,21 +22,16 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert 'src="/site/site.js"' in index
     assert 'src="/site/social-square.js"' in index
     assert "data-auth-action" in index
-    assert "专业 AI 视频创作工作台" in index
-    assert "新建视频项目" in index
-    assert "hero-stage" in index
-    assert "featured-work" in index
-    assert "template-stack" in index
-    assert "project-lane" in index
-    assert "最近作品" in index
-    assert "雨夜追踪镜头" in index
+    assert "Agent-native Creative Workspace" in index
+    assert "进入工作台" in index
+    assert "hero-visual" in index
+    assert "studio-wall" in index
+    assert "wall-node director" in index
+    assert "Production Spine" in index
+    assert "导演台" in index
     assert "社交广场" in index
-    assert "查看底层算法边界" in index
-    assert "提示词智能优化" in index
-    assert "上下文智能调度" in index
-    assert "质量反馈与漂移控制" in index
-    assert 'class="algorithm-section"' not in index
     assert "Runtime Service" not in index
+    assert 'class="algorithm-section"' not in index
     assert "provider raw" not in index
 
 
@@ -74,20 +70,12 @@ def test_site_homepage_preview_uses_non_overlapping_flow_layout() -> None:
     preview = (SITE_ROOT / "styles" / "site-preview.css").read_text(encoding="utf-8")
     responsive = (SITE_ROOT / "styles" / "site-responsive.css").read_text(encoding="utf-8")
 
-    assert "hero-stage" in index
-    assert "模板 01" in index
-    assert "当前项目" in index
-    assert "grid-template-columns: minmax(0, 1.1fr) minmax(230px, 0.7fr);" in preview
-    assert ".template-stack" in preview
-    assert ".project-lane" in preview
-    assert ".technical-details" in (SITE_ROOT / "styles" / "site.css").read_text(encoding="utf-8")
-    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in preview
-    template_card_rule = preview.split(".template-card {", 1)[1].split(".template-card.active", 1)[0]
-    assert "position: absolute;" not in template_card_rule
-    assert "width: 210px;" not in preview
+    assert "hero-visual" in index
+    assert "studio-wall" in preview
+    assert ".wall-node.director" in preview
+    assert ".director-teaser" in (SITE_ROOT / "styles" / "site.css").read_text(encoding="utf-8")
+    assert "position: absolute;" in preview
     assert "left: 46px;" not in preview
-    assert "right: 42px;" not in preview
-    assert "bottom: 72px;" not in preview
     assert "grid-template-columns: 1fr;" in responsive
-    assert ".hero-stage" in responsive
-    assert ".project-lane" in responsive
+    assert ".hero-visual" in responsive
+    assert ".square-dashboard" in responsive

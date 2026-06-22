@@ -29,8 +29,12 @@ export function createStore(projectId = "studio-local-001") {
   function set(mutator, options = {}) {
     const before = snapshotStudioState(state);
     mutator(state);
-    const after = snapshotStudioState(state);
+    let after = snapshotStudioState(state);
     const changed = serializableChanged(before, after);
+    if (options.persist !== false && changed) {
+      state.meta.updated_at = new Date().toISOString();
+      after = snapshotStudioState(state);
+    }
     if (options.history !== false && changed) {
       pushHistory(history.past, before);
       history.future = [];
@@ -71,6 +75,10 @@ export function createStore(projectId = "studio-local-001") {
       const remoteState = payload?.state;
       const remote = normalizeSnapshot(remoteState);
       runtimeStateVersion = String(payload?.state_version || "");
+      if (shouldKeepLocalOverRemote(state, remote, payload)) {
+        await flushRuntimeSave();
+        return { source: "local_newer" };
+      }
       if (payload?.source === "runtime" && (hasStudioContent(remote) || hasStudioMeta(remoteState))) {
         remote.meta.projectId = runtime.projectId || state.meta.projectId;
         replaceSerializable(state, remote);
@@ -161,4 +169,19 @@ export function createStore(projectId = "studio-local-001") {
   }
 
   return { get, set, subscribe, nextId, attachRuntime, hydrateRuntime, switchProject, flushRuntimeSave, undo, redo };
+}
+
+function shouldKeepLocalOverRemote(localState, remoteState, payload) {
+  if (!hasStudioContent(localState) || payload?.source !== "runtime") return false;
+  const localUpdated = timestampMs(localState.meta?.updated_at);
+  const remoteUpdated = Math.max(
+    timestampMs(payload?.saved_at),
+    timestampMs(remoteState?.meta?.updated_at),
+  );
+  return localUpdated > remoteUpdated;
+}
+
+function timestampMs(value) {
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
 }

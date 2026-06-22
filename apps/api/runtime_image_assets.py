@@ -189,6 +189,8 @@ def resolve_reference_images(
     *,
     limit: int = 4,
 ) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
     images: list[dict[str, Any]] = []
     seen: set[str] = set()
     for raw_ref in asset_refs:

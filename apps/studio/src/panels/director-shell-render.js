@@ -1,15 +1,15 @@
 import { el } from "../overlay.js";
 import { icon } from "../icons.js";
-import { DIRECTOR_OBJECTS, allDirectorObjects, directorPromptSummary, directorSummary } from "../director-data.js";
+import { DIRECTOR_OBJECTS, allDirectorObjects, directorProductionPlan, directorPromptSummary, directorSummary } from "../director-data.js";
 
 export function createDirectorShellFrame() {
   const modal = el("div", "modal director-modal director-2d-modal");
   const top = el("div", "d-top");
-  top.appendChild(el("span", "d-title", "二维导演台"));
+  top.appendChild(el("span", "d-title", "导演台"));
 
   const views = el("div", "d-views");
-  const layoutTab = el("button", "modal-tab active", "顶视布置");
-  const intentTab = el("button", "modal-tab", "镜头意图");
+  const layoutTab = el("button", "modal-tab active", "镜头布置");
+  const intentTab = el("button", "modal-tab", "生产包");
   views.append(layoutTab, intentTab);
   top.appendChild(views);
 
@@ -38,19 +38,28 @@ export function createDirectorShellFrame() {
 
 export function renderDirectorIntentPreview({ scene, board, props, setup, warnings }) {
   scene.replaceChildren();
-  scene.appendChild(el("div", "d-scene-label", "编译预览"));
+  scene.appendChild(el("div", "d-scene-label", "镜头包"));
   scene.appendChild(el("div", "p-readonly", directorSummary(setup)));
 
   board.replaceChildren();
-  const preview = el("div", "director-intent-preview");
-  preview.textContent = directorPromptSummary(setup);
+  const preview = el("div", "director-intent-preview director-package-preview");
+  preview.appendChild(el("strong", "", "生成提示词片段"));
+  preview.appendChild(el("p", "", directorPromptSummary(setup)));
+  const plan = el("div", "director-production-plan");
+  for (const [label, value] of directorProductionPlan(setup)) {
+    const row = el("article", "");
+    row.append(el("span", "", label), el("strong", "", value));
+    plan.appendChild(row);
+  }
+  preview.appendChild(plan);
   board.appendChild(preview);
 
   props.replaceChildren();
-  props.appendChild(el("div", "d-scene-label", "检查"));
+  props.appendChild(el("div", "d-scene-label", "生产检查"));
   for (const warning of warnings) {
     props.appendChild(el("div", "bundle-warning", warning));
   }
+  props.appendChild(el("div", "p-readonly", "保存布置会写入导演台资产；应用到相连节点会把边类型标记为 director。"));
 }
 
 export function renderDirectorObjectList({ scene, setup, onObjectSelect }) {

@@ -4078,6 +4078,32 @@ Boundaries:
 - No provider raw response, signed URL, local private media byte, secret, invite code, session token, or Company OS private source content was written to repo records.
 - Browser/runtime verification and provider smoke remain separate from human acceptance, creative quality scoring, business validation, and durable memory promotion.
 
+## 2026-06-23 - Studio Web, Director, Social Square, and Asset Persistence Fixes
+
+- Fixed Studio node double-click routing so image nodes and other existing nodes open the node input editor, while blank canvas double-click still opens the create-node menu.
+- Fixed asset-card save-and-regenerate failures caused by asset-card drafts carrying prior reference images into a zero-slot image route; edited asset cards now save before regeneration and regenerate from prompt/card content.
+- Fixed a Studio persistence race where navigating from Studio to the homepage could leave Runtime state stale, then re-entering Studio could overwrite newer local asset-card state. The topbar now flushes before homepage navigation, and Runtime hydration keeps newer local canvas state over older remote state.
+- Reworked the public homepage into a cleaner product entry and split Social Square into a standalone collaboration page with publishing, filtering, status actions, submission/report flows, request stats, and a lightweight DOM sprite companion.
+- Upgraded the Director Stage surface from a plain 2D layout label to a production package workflow: shot arrangement plus prompt segments, spatial constraints, lighting intent, and generation-use notes.
+
+Verification:
+
+```text
+npm run check:studio-js: passed for 112 files
+focused Studio/site/API pytest set: 42 passed / 1 existing warning
+social/runtime/state pytest set: 52 passed / 1 existing warning
+local Runtime 8797 health: ready
+browser smoke: homepage + standalone Social Square loaded, demand publish/filter passed, console/network errors 0
+browser smoke: image node double-click opened prompt bar instead of add-node menu
+browser persistence smoke: newer local asset-card state survived homepage roundtrip and flushed over older Runtime state
+```
+
+Boundaries:
+
+- This change did not alter provider-gate policy; no live provider call, video generation, ASR, or external download was triggered.
+- Public pages avoid exposing COS/GFR source material, provider raw responses, signed URLs, local private paths, generated media bytes, or secrets.
+- Local automated verification does not claim human acceptance, creative quality acceptance, business validation, or durable memory promotion.
+
 ## 2026-06-21 - Studio Image/TuanTuan Concurrency Hardening
 
 - Fixed Codex image handoff queue semantics: pending jobs now remain `pending` until a worker atomically claims them, running jobs carry a worker claim record, and concurrent workers skip jobs already claimed by another worker.

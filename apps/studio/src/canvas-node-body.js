@@ -97,12 +97,12 @@ function directorBody(node, def) {
     ? ` / 已应用到 ${node.params.appliedDownstreamCount} 个相连节点`
     : "";
   out.push(iconBlock(def.icon));
-  out.push(textBlock("node-empty-label", "二维顶视图布置机位、角色、灯光和道具"));
+  out.push(textBlock("node-empty-label", "布置机位、角色、灯光和道具，输出镜头生产包"));
   out.push(textBlock("director-node-summary", `${summary}${applied}`));
   const open = document.createElement("button");
   open.className = "director-open-btn";
   open.dataset.action = "open-director";
-  open.textContent = "打开二维导演台";
+  open.textContent = "打开导演台";
   out.push(open);
   if (node.result) out.push(resultView(node));
   return out;

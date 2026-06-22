@@ -100,6 +100,7 @@ def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -
     assert "openAssetCardPanel" in asset_panel
     assert "保存并重新生成" in asset_panel
     assert "startNodeGeneration" in asset_panel
+    assert "await store.flushRuntimeSave?.();" in asset_panel
     assert "编辑资产卡" in node_menu
     assert "openAssetCardPanel(store, nodeId, runtime)" in node_menu
 
@@ -191,10 +192,14 @@ process.stdout.write(JSON.stringify({
 def test_prompt_bar_canvas_double_click_and_node_motion_are_stable() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    event_targets = (STUDIO_ROOT / "src" / "dom-event-targets.js").read_text(encoding="utf-8")
     styles = _styles()
 
     assert "s.ui.promptBarNodeId = node.id;" in prompt_bar
     assert "isBlankCanvasDoubleClick" in canvas_input
+    assert "closestFromEvent(e, \".node\")" in canvas_input
+    assert "event?.composedPath?.()" in event_targets
+    assert "document.elementFromPoint" in event_targets
     assert "#canvas-empty-hint" in canvas_input
     assert 'new Set(["canvas-root", "canvas-viewport", "world", "node-layer"])' in canvas_input
     assert "Math.abs(dx) + Math.abs(dy) <= 2 && !session.moved" in canvas_input
@@ -229,7 +234,7 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "asset.params?.visualAssets" in keyframes
     assert "needs_fixed_assets" not in node_actions
     assert "shouldCollectConnectedUploads" in optimizer_contract
-    assert 'node?.params?.nodeRole !== "keyframe_generation"' in optimizer_contract
+    assert '["keyframe_generation", "asset_card_draft"].includes(node?.params?.nodeRole)' in optimizer_contract
     assert "asset_card_draft" in optimizer_contract
     assert "character_asset_candidate" in visible_assets
     assert "prop_asset_candidate" in visible_assets

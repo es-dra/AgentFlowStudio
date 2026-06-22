@@ -11,6 +11,7 @@ import { duplicateNode } from "./nodes.js";
 import { hasOpenOverlay } from "./overlay.js";
 import { openAddNodeMenu } from "./panels/add-node-menu.js";
 import { openNodeMenu } from "./panels/node-menu.js";
+import { closestFromEvent } from "./dom-event-targets.js";
 
 export function bindCanvasInput(store, runtime) {
   const viewportEl = document.getElementById("canvas-viewport");
@@ -93,9 +94,9 @@ function bindViewportWheel(rootEl, store, stopPanMomentum) {
 
 function bindQuickMenus(rootEl, store, runtime) {
   rootEl.addEventListener("dblclick", (e) => {
-    const nodeEl = e.target.closest(".node");
+    const nodeEl = closestFromEvent(e, ".node");
     if (nodeEl) {
-      if (!e.target.closest(".node-content-editor")) {
+      if (!closestFromEvent(e, ".node-content-editor")) {
         e.preventDefault();
         openNodePromptEditor(store, nodeEl.dataset.nodeId);
       }
@@ -105,7 +106,7 @@ function bindQuickMenus(rootEl, store, runtime) {
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
   rootEl.addEventListener("contextmenu", (e) => {
-    const nodeEl = e.target.closest(".node");
+    const nodeEl = closestFromEvent(e, ".node");
     if (!nodeEl) return;
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });

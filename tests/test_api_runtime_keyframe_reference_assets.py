@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_keyframes import _reference_images
+from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
@@ -16,6 +17,25 @@ PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
 PNG_B64 = base64.b64encode(PNG_BYTES).decode("ascii")
+
+
+def test_reference_image_resolution_respects_zero_provider_slots(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    upload = client.post(
+        "/projects/proj_zero_slots/image-assets",
+        json={
+            "node_id": "asset-card-draft-node",
+            "filename": "candidate.png",
+            "mime_type": "image/png",
+            "data_base64": PNG_B64,
+            "role": "character_reference",
+            "generated_at": "2026-06-23T10:00:00+08:00",
+        },
+    )
+    assert upload.status_code == 200
+    asset_id = upload.json()["asset"]["asset_id"]
+
+    assert resolve_reference_images(RuntimeStore(tmp_path), "proj_zero_slots", [asset_id], limit=0) == []
 
 
 def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, monkeypatch) -> None:
