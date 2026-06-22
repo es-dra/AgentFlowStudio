@@ -5,9 +5,10 @@ import {
   normalizeAssetCardDraft,
 } from "../asset-card-drafts.js";
 import { assetImagePrompt, assetImageRatio } from "../asset-card-image-prompts.js";
+import { startNodeGeneration } from "../node-actions.js";
 import { el, showModal } from "../overlay.js";
 
-export function openAssetCardPanel(store, nodeId) {
+export function openAssetCardPanel(store, nodeId, runtime = null) {
   const node = store.get().nodes[nodeId];
   const draft = node?.params?.assetCardDraft;
   if (!node || !draft) return;
@@ -23,6 +24,12 @@ export function openAssetCardPanel(store, nodeId) {
     }
     if (action === "save") {
       saveAssetCard(store, nodeId, collect(modal, draft));
+      close();
+    }
+    if (action === "save-regenerate") {
+      saveAssetCard(store, nodeId, collect(modal, draft));
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) startNodeGeneration(store, runtime, fresh);
       close();
     }
   });
@@ -51,6 +58,7 @@ function render(modal, draft) {
     <div class="modal-actions">
       <button class="ghost-btn" data-action="close">取消</button>
       <button class="primary-btn" data-action="save">保存资产卡</button>
+      <button class="primary-btn" data-action="save-regenerate">保存并重新生成</button>
     </div>
   `;
 }

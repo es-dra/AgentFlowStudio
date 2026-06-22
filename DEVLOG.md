@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-23 - Studio Asset Semantics and Canvas UX Repair
+
+- Repaired storyboard asset semantics so local fallback and provider-discard
+  fallback no longer collapse robot/rooftop scripts into generic `主角` and
+  `主要场景` labels. The Studio and Runtime fallback paths now refine generic
+  asset refs into context-specific labels such as `未来机器人` and `夜晚城市屋顶`.
+- Changed right-click asset recognition to reuse the structured shot stored
+  during storyboard breakdown, then refine it, instead of reparsing the node
+  body and losing upstream context.
+- Fixed prompt bar editing for text/script/asset-card draft nodes. Typing into
+  the bottom prompt input now keeps the prompt bar open instead of switching
+  focus into the node body.
+- Restricted double-click creation to true blank canvas targets. Node
+  double-click now opens the node prompt editor path, while chrome, overlays,
+  controls, and existing nodes no longer open the create menu.
+- Removed node click/drag landing geometry motion that caused apparent
+  down-right jitter. Drag feedback keeps non-geometric states such as borders
+  and shadows.
+- Added an explicit asset-card edit loop: asset card drafts can be saved, or
+  saved and regenerated, before the user decides whether to fix the asset.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_storyboard_breakdown.py tests/test_web_studio_prompt_script_static.py -> 17 passed / 1 existing warning
+pytest tests/test_api_runtime_storyboard_provider_quality.py tests/test_web_studio_static.py tests/test_web_studio_mature_shell_static.py tests/test_studio_interaction_layer.py -> 33 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 111 files
+git diff --check -> passed
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+Playwright browser smoke on local Runtime 8797 -> passed for create text node, prompt input persistence, storyboard split, semantic asset recognition, and asset-card save/regenerate button
+```
+
+Boundary:
+
+- No provider gate was opened, and no provider secret, signed URL, provider raw
+  response, generated media byte, user account data, or Company OS private
+  source content was written. This is local structure/runtime/browser
+  verification, not human visual acceptance or business validation.
+
 ## 2026-06-23 - Parallel Feature Integration and Deploy Baseline Cleanup
 
 - Cleaned the deployed `/opt/afs/AgentFlowStudio` Git state before integrating

@@ -76,7 +76,10 @@ function buildBar(store, runtime, node) {
   textarea.placeholder = promptPlaceholder(node.type, p.spec?.mode);
   textarea.value = node.prompt || node.content || "";
   textarea.addEventListener("input", () => {
-    updateNode(store, node.id, (n) => {
+    store.set((s) => {
+      s.ui.promptBarNodeId = node.id;
+      const n = s.nodes[node.id];
+      if (!n) return;
       n.prompt = textarea.value;
       if (n.type === "text" || n.type === "script" || n.params?.assetCardDraft) n.content = textarea.value;
       if (n.params?.assetCardDraft) {

@@ -101,7 +101,7 @@ function bindQuickMenus(rootEl, store, runtime) {
       }
       return;
     }
-    if (e.target.closest(".prompt-bar") || e.target.closest("#dock")) return;
+    if (!isBlankCanvasDoubleClick(e)) return;
     openAddNodeMenu(store, runtime, { x: e.clientX, y: e.clientY });
   });
   rootEl.addEventListener("contextmenu", (e) => {
@@ -110,6 +110,21 @@ function bindQuickMenus(rootEl, store, runtime) {
     e.preventDefault();
     openNodeMenu(store, runtime, nodeEl.dataset.nodeId, { x: e.clientX, y: e.clientY });
   });
+}
+
+function isBlankCanvasDoubleClick(e) {
+  if (e.target.closest(".prompt-bar")
+    || e.target.closest(".popover")
+    || e.target.closest(".modal-backdrop")
+    || e.target.closest("#dock")
+    || e.target.closest("#drawer")
+    || e.target.closest("#topbar")
+    || e.target.closest("#corner-controls")
+    || e.target.closest("#starter-row")
+    || e.target.closest("button,input,textarea,select,a")) return false;
+  if (e.target.closest("#canvas-empty-hint")) return true;
+  const blankIds = new Set(["canvas-root", "canvas-viewport", "world", "node-layer"]);
+  return blankIds.has(e.target.id);
 }
 
 function openNodePromptEditor(store, nodeId) {
@@ -205,7 +220,8 @@ function moveNodeSession(store, session, e, rootEl) {
   const currentWorld = screenToWorld(state.viewport, e.clientX, e.clientY);
   const dx = currentWorld.x - session.startWorld.x;
   const dy = currentWorld.y - session.startWorld.y;
-  if (Math.abs(dx) + Math.abs(dy) > 2) session.moved = true;
+  if (Math.abs(dx) + Math.abs(dy) <= 2 && !session.moved) return;
+  session.moved = true;
   const snapResult = resolveDragSnap(state, session, {
     dx,
     dy,

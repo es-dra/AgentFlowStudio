@@ -81,7 +81,7 @@ def test_storyboard_local_fallback_does_not_turn_signal_or_city_lights_into_prop
     assert response.status_code == 200
     refs = response.json()["shots"][0]["asset_refs"]
     assert [item["asset_type"] for item in refs] == ["character", "scene"]
-    assert [item["label"] for item in refs] == ["主角", "主要场景"]
+    assert [item["label"] for item in refs] == ["未来机器人", "夜晚城市屋顶"]
 
 
 def test_storyboard_local_fallback_uses_adaptive_shot_count_not_three_sentence_chunks() -> None:

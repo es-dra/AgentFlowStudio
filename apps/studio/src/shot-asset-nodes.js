@@ -5,7 +5,7 @@ import {
 } from "./asset-card-drafts.js";
 import { assetImagePrompt, assetImageRatio } from "./asset-card-image-prompts.js";
 import { createNode, connect } from "./nodes.js";
-import { structuredShotFromSegment } from "./structured-shot.js";
+import { refineStructuredShotAssets, structuredShotFromSegment } from "./structured-shot.js";
 
 const MAX_ASSET_PREP_NODES_PER_SHOT = 4;
 
@@ -54,7 +54,10 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode) {
   if (!fresh) return [];
   const existing = existingShotAssetCardNodeIds(store.get(), fresh.id);
   if (existing.length) return existing;
-  const structuredShot = structuredShotFromSegment(fresh.content || fresh.prompt || "", Number(fresh.params?.scriptSegmentIndex || 1));
+  const context = fresh.content || fresh.prompt || "";
+  const structuredShot = fresh.params?.structuredShot
+    ? refineStructuredShotAssets(fresh.params.structuredShot, context)
+    : structuredShotFromSegment(context, Number(fresh.params?.scriptSegmentIndex || 1));
   const created = createShotAssetPrepNodes(store, fresh.id, structuredShot, fresh.x + fresh.w + 160, fresh.y);
   store.set((s) => {
     const node = s.nodes[fresh.id];

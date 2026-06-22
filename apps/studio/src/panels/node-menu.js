@@ -53,7 +53,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   }
   if (node.type === "image") {
     if (node.params?.assetCardDraft) {
-      addItem("pencil", "编辑资产卡", () => openAssetCardPanel(store, nodeId));
+      addItem("pencil", "编辑资产卡", () => openAssetCardPanel(store, nodeId, runtime));
       addItem("bolt", "生成资产图", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) startNodeGeneration(store, runtime, fresh);

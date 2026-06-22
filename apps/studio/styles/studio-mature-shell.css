@@ -57,7 +57,6 @@
 .tree-item,
 #dock .dock-btn,
 .inspector-action,
-.node,
 .starter-card {
   transition:
     background 0.16s ease,
@@ -122,9 +121,11 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 76px),
     rgba(32, 35, 39, 0.94);
   backdrop-filter: blur(10px);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
-
-.node:hover { transform: translateY(-1px); }
 
 .node.selected {
   border-color: rgba(90, 200, 250, 0.72);

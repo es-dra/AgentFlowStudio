@@ -73,7 +73,8 @@ def test_storyboard_breakdown_discards_sparse_provider_storyboard_for_long_scrip
     assert payload["safe_manifest"]["discard_reason"] == "provider storyboard response too sparse for source script"
     assert len(payload["shots"]) >= 3
     asset_labels = [ref["label"] for shot in payload["shots"] for ref in shot["asset_refs"]]
-    assert "主要场景" in asset_labels
+    assert "夜晚城市屋顶" in asset_labels
+    assert "主要场景" not in asset_labels
     assert "信" not in asset_labels
     assert "灯" not in asset_labels
 

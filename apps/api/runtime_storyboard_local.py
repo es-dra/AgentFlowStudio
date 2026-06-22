@@ -8,6 +8,8 @@ ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
 SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
 CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生")
 PROP_HINTS = ("手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
+GENERIC_CHARACTER_LABELS = {"主角", "角色", "人物"}
+GENERIC_SCENE_LABELS = {"主要场景", "场景"}
 
 
 def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None) -> list[dict[str, Any]]:
@@ -33,7 +35,7 @@ def structured_shot(text: str, index: int) -> dict[str, Any]:
     }
 
 
-def normalize_asset_ref(asset: Any, index: int) -> dict[str, str]:
+def normalize_asset_ref(asset: Any, index: int, context: str = "") -> dict[str, str]:
     if not isinstance(asset, dict):
         return {}
     label = str(asset.get("label") or asset.get("name") or "").strip()[:24]
@@ -42,6 +44,7 @@ def normalize_asset_ref(asset: Any, index: int) -> dict[str, str]:
         asset_type = "character"
     if not label:
         return {}
+    label = _semantic_asset_label(label, asset_type, context)
     return {
         "label": label,
         "asset_id": str(asset.get("asset_id") or f"candidate:{asset_type}:{index + 1}"),
@@ -94,23 +97,23 @@ def _balanced_chunks(units: list[str], target_count: int) -> list[str]:
 def _asset_refs(text: str) -> list[dict[str, str]]:
     refs: list[dict[str, str]] = []
     for match in ASSET_RE.finditer(text):
-        _push_ref(refs, match.group(1), _classify_asset(match.group(1), text), "explicit")
+        _push_ref(refs, match.group(1), _classify_asset(match.group(1), text), "explicit", text)
     if not any(ref["asset_type"] == "character" for ref in refs) and any(hint in text for hint in CHARACTER_HINTS):
-        _push_ref(refs, "主角", "character", "candidate")
+        _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
     if not any(ref["asset_type"] == "scene" for ref in refs) and any(hint in text for hint in SCENE_HINTS):
-        _push_ref(refs, "主要场景", "scene", "candidate")
+        _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
     if not any(ref["asset_type"] == "prop" for ref in refs):
         prop = next((hint for hint in PROP_HINTS if hint in text), "")
         if prop:
-            _push_ref(refs, prop, "prop", "candidate")
+            _push_ref(refs, prop, "prop", "candidate", text)
     if not refs:
-        _push_ref(refs, "主角", "character", "candidate")
-        _push_ref(refs, "主要场景", "scene", "candidate")
+        _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
+        _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
     return refs
 
 
-def _push_ref(refs: list[dict[str, str]], label: str, asset_type: str, source: str) -> None:
-    clean = re.sub(r"[，。；:：,.!?！？]+$", "", str(label or "")).strip()[:24]
+def _push_ref(refs: list[dict[str, str]], label: str, asset_type: str, source: str, context: str = "") -> None:
+    clean = _semantic_asset_label(label, asset_type, context)
     if not clean or any(ref["label"] == clean for ref in refs):
         return
     refs.append(
@@ -125,9 +128,67 @@ def _push_ref(refs: list[dict[str, str]], label: str, asset_type: str, source: s
 
 
 def _description_with_assets(source: str, refs: list[dict[str, str]]) -> str:
-    missing = [ref for ref in refs if f"@{ref['label']}" not in source]
+    visible_source = _replace_generic_asset_tokens(source, refs)
+    missing = [ref for ref in refs if f"@{ref['label']}" not in visible_source]
     prefix = " ".join(f"@{ref['label']}" for ref in missing)
-    return f"{prefix}。{source}" if prefix else source
+    return f"{prefix}。{visible_source}" if prefix else visible_source
+
+
+def _replace_generic_asset_tokens(source: str, refs: list[dict[str, str]]) -> str:
+    text = str(source or "")
+    character = next((ref for ref in refs if ref["asset_type"] == "character" and ref["label"] not in GENERIC_CHARACTER_LABELS), None)
+    scene = next((ref for ref in refs if ref["asset_type"] == "scene" and ref["label"] not in GENERIC_SCENE_LABELS), None)
+    if character:
+        for label in GENERIC_CHARACTER_LABELS:
+            text = text.replace(f"@{label}", f"@{character['label']}")
+    if scene:
+        for label in GENERIC_SCENE_LABELS:
+            text = text.replace(f"@{label}", f"@{scene['label']}")
+    return text
+
+
+def _semantic_asset_label(label: str, asset_type: str, context: str) -> str:
+    clean = re.sub(r"[，。；:：,.!?！？]+$", "", str(label or "")).strip()[:24]
+    if asset_type == "character" and clean in GENERIC_CHARACTER_LABELS:
+        return _infer_character_label(context) or clean
+    if asset_type == "scene" and clean in GENERIC_SCENE_LABELS:
+        return _infer_scene_label(context) or clean
+    return clean
+
+
+def _infer_character_label(text: str) -> str:
+    source = str(text or "")
+    if re.search(r"未来.*机器人|机器人.*未来", source):
+        return "未来机器人"
+    if re.search(r"机器人|机械人|仿生人", source):
+        return "机器人"
+    if re.search(r"女孩|少女", source):
+        return "女孩"
+    if re.search(r"男孩|少年", source):
+        return "男孩"
+    if "老人" in source:
+        return "老人"
+    if "孩子" in source:
+        return "孩子"
+    return ""
+
+
+def _infer_scene_label(text: str) -> str:
+    source = str(text or "")
+    is_night = bool(re.search(r"夜|星空|月光|霓虹|灯火", source))
+    is_city = bool(re.search(r"城市|高楼|天际线|霓虹|楼宇", source))
+    is_rooftop = bool(re.search(r"屋顶|楼顶|天台", source))
+    if is_night and is_city and is_rooftop:
+        return "夜晚城市屋顶"
+    if is_city and is_rooftop:
+        return "城市屋顶"
+    if is_night and is_city:
+        return "夜晚城市"
+    if is_rooftop:
+        return "屋顶平台"
+    if is_city:
+        return "城市场景"
+    return ""
 
 
 def _duration(text: str) -> str:

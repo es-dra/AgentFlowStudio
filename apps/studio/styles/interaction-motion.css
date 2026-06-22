@@ -63,15 +63,13 @@
     border-color 0.14s ease,
     box-shadow 0.14s ease,
     filter 0.14s ease,
-    opacity 0.14s ease,
-    scale 0.14s ease;
-  will-change: transform, scale;
+    opacity 0.14s ease;
+  will-change: transform;
 }
 
 .node.drag-moving {
   z-index: 12;
   opacity: 1;
-  scale: 1.012;
   filter: saturate(1.08);
   border-color: rgba(90, 200, 250, 0.54);
   box-shadow:
@@ -84,10 +82,6 @@
   border-color: rgba(90, 200, 250, 0.74);
 }
 
-.node.drag-landed {
-  animation: node-land 0.18s ease-out;
-}
-
 .node.connection-source {
   border-color: rgba(245, 196, 81, 0.62);
   box-shadow:
@@ -96,7 +90,7 @@
 }
 
 .node.drop-target {
-  scale: 1.01;
+  border-color: rgba(56, 212, 192, 0.50);
 }
 
 .node.drop-target .node-port.in {
@@ -145,12 +139,6 @@
   transition: none;
 }
 
-@keyframes node-land {
-  0% { scale: 1.018; }
-  55% { scale: 0.996; }
-  100% { scale: 1; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .node,
   .if-guide,
@@ -160,7 +148,5 @@
   }
 
   .node.drag-moving,
-  .node.drop-target {
-    scale: 1;
-  }
+  .node.drop-target { filter: none; }
 }

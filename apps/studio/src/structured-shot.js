@@ -2,6 +2,8 @@ const ASSET_RE = /@([A-Za-z0-9_\-\u4e00-\u9fff·]+)/g;
 const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
 const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生"];
 const PROP_HINTS = ["手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门"];
+const GENERIC_CHARACTER_LABELS = new Set(["主角", "角色", "人物"]);
+const GENERIC_SCENE_LABELS = new Set(["主要场景", "场景"]);
 
 export function structuredShotFromSegment(segment, index) {
   const parsed = structuredShotFromFormattedText(segment, index);
@@ -34,7 +36,7 @@ export function structuredShotFromFormattedText(text, index) {
   if (!fields["画面描述"] && !fields["景别"] && !fields["运镜"]) return null;
   const description = fields["画面描述"] || cleanText(text);
   const assetText = fields["资产"] || description;
-  const assetRefs = extractShotAssetRefs(assetText);
+  const assetRefs = extractShotAssetRefs(`${assetText}\n${description}`);
   return {
     shot_id: `shot_${String(index).padStart(2, "0")}`,
     index,
@@ -70,10 +72,34 @@ export function structuredShotText(shot) {
 export function extractShotAssetRefs(text) {
   const refs = [];
   for (const match of String(text || "").matchAll(ASSET_RE)) {
-    pushAssetRef(refs, match[1], classifyAsset(match[1], text), "explicit");
+    pushAssetRef(refs, match[1], classifyAsset(match[1], text), "explicit", text);
   }
   addImplicitRefs(refs, text);
   return refs;
+}
+
+export function normalizeShotAssetRefs(assetRefs, context = "") {
+  const refs = [];
+  for (const asset of Array.isArray(assetRefs) ? assetRefs : []) {
+    const assetType = ["character", "scene", "prop"].includes(asset?.asset_type) ? asset.asset_type : "character";
+    pushAssetRef(refs, asset.label || asset.name, assetType, asset.source || "candidate", context, {
+      asset_id: asset.asset_id,
+      status: asset.status,
+    });
+  }
+  return refs;
+}
+
+export function refineStructuredShotAssets(shot, context = "") {
+  if (!shot || typeof shot !== "object") return shot;
+  const source = [shot.description, shot.source_text, context].filter(Boolean).join("\n");
+  const assetRefs = normalizeShotAssetRefs(shot.asset_refs, source);
+  const refs = assetRefs.length ? assetRefs : extractShotAssetRefs(source);
+  return {
+    ...shot,
+    description: descriptionWithAssets(String(shot.description || source || ""), refs),
+    asset_refs: refs,
+  };
 }
 
 export function assetRefToken(asset) {
@@ -97,37 +123,82 @@ function addImplicitRefs(refs, text) {
   const hasScene = refs.some((asset) => asset.asset_type === "scene");
   const hasProp = refs.some((asset) => asset.asset_type === "prop");
   if (!hasCharacter && CHARACTER_HINTS.some((hint) => text.includes(hint))) {
-    pushAssetRef(refs, "主角", "character", "candidate");
+    pushAssetRef(refs, inferCharacterLabel(text) || "主角", "character", "candidate", text);
   }
   if (!hasScene && SCENE_HINTS.some((hint) => text.includes(hint))) {
-    pushAssetRef(refs, "主要场景", "scene", "candidate");
+    pushAssetRef(refs, inferSceneLabel(text) || "主要场景", "scene", "candidate", text);
   }
   if (!hasProp) {
     const prop = PROP_HINTS.find((hint) => text.includes(hint));
-    if (prop) pushAssetRef(refs, prop, "prop", "candidate");
+    if (prop) pushAssetRef(refs, prop, "prop", "candidate", text);
   }
   if (!refs.length) {
-    pushAssetRef(refs, "主角", "character", "candidate");
-    pushAssetRef(refs, "主要场景", "scene", "candidate");
+    pushAssetRef(refs, inferCharacterLabel(text) || "主角", "character", "candidate", text);
+    pushAssetRef(refs, inferSceneLabel(text) || "主要场景", "scene", "candidate", text);
   }
 }
 
-function pushAssetRef(refs, label, assetType, source) {
-  const clean = cleanAssetLabel(label);
+function pushAssetRef(refs, label, assetType, source, context = "", options = {}) {
+  const clean = cleanAssetLabel(semanticAssetLabel(label, assetType, context));
   if (!clean || refs.some((asset) => asset.label === clean)) return;
   refs.push({
     label: clean,
-    asset_id: `candidate:${assetType}:${slug(clean)}`,
+    asset_id: options.asset_id || `candidate:${assetType}:${slug(clean)}`,
     asset_type: assetType,
-    status: source === "explicit" ? "mentioned" : "candidate",
+    status: options.status || (source === "explicit" ? "mentioned" : "candidate"),
     source,
   });
 }
 
 function descriptionWithAssets(source, assetRefs) {
-  const missing = assetRefs.filter((asset) => !source.includes(assetRefToken(asset)));
+  const visibleSource = replaceGenericAssetTokens(String(source || ""), assetRefs);
+  const missing = assetRefs.filter((asset) => !visibleSource.includes(assetRefToken(asset)));
   const prefix = missing.length ? `${missing.map(assetRefToken).join(" ")}。` : "";
-  return `${prefix}${source}`;
+  return `${prefix}${visibleSource}`;
+}
+
+function replaceGenericAssetTokens(source, assetRefs) {
+  let text = source;
+  const character = assetRefs.find((asset) => asset.asset_type === "character" && !GENERIC_CHARACTER_LABELS.has(asset.label));
+  const scene = assetRefs.find((asset) => asset.asset_type === "scene" && !GENERIC_SCENE_LABELS.has(asset.label));
+  if (character) {
+    for (const label of GENERIC_CHARACTER_LABELS) text = text.replaceAll(`@${label}`, assetRefToken(character));
+  }
+  if (scene) {
+    for (const label of GENERIC_SCENE_LABELS) text = text.replaceAll(`@${label}`, assetRefToken(scene));
+  }
+  return text;
+}
+
+function semanticAssetLabel(label, assetType, context) {
+  const clean = cleanAssetLabel(label);
+  if (assetType === "character" && GENERIC_CHARACTER_LABELS.has(clean)) return inferCharacterLabel(context) || clean;
+  if (assetType === "scene" && GENERIC_SCENE_LABELS.has(clean)) return inferSceneLabel(context) || clean;
+  return clean;
+}
+
+function inferCharacterLabel(text) {
+  const source = String(text || "");
+  if (/未来.*机器人|机器人.*未来/.test(source)) return "未来机器人";
+  if (/机器人|机械人|仿生人/.test(source)) return "机器人";
+  if (/女孩|少女/.test(source)) return "女孩";
+  if (/男孩|少年/.test(source)) return "男孩";
+  if (/老人/.test(source)) return "老人";
+  if (/孩子/.test(source)) return "孩子";
+  return "";
+}
+
+function inferSceneLabel(text) {
+  const source = String(text || "");
+  const isNight = /夜|星空|月光|霓虹|灯火/.test(source);
+  const isCity = /城市|高楼|天际线|霓虹|楼宇/.test(source);
+  const isRooftop = /屋顶|楼顶|天台/.test(source);
+  if (isNight && isCity && isRooftop) return "夜晚城市屋顶";
+  if (isCity && isRooftop) return "城市屋顶";
+  if (isNight && isCity) return "夜晚城市";
+  if (isRooftop) return "屋顶平台";
+  if (isCity) return "城市场景";
+  return "";
 }
 
 function inferDuration(text) {

@@ -98,7 +98,10 @@ def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -
     assert 'node.params.nodeRole = "asset_card_draft"' in asset_nodes
     assert "node.params.visualAssets" not in asset_nodes
     assert "openAssetCardPanel" in asset_panel
+    assert "保存并重新生成" in asset_panel
+    assert "startNodeGeneration" in asset_panel
     assert "编辑资产卡" in node_menu
+    assert "openAssetCardPanel(store, nodeId, runtime)" in node_menu
 
 
 def test_asset_card_drafts_clean_legacy_tag_pollution_and_backfill_reference_views() -> None:
@@ -108,11 +111,13 @@ import {
   normalizeAssetCardDraft,
 } from "./apps/studio/src/asset-card-drafts.js";
 import { assetImagePrompt } from "./apps/studio/src/asset-card-image-prompts.js";
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
 
 const shot = {
   shot_id: "shot_01",
   description: "@主角 @主要场景。描绘一个来自未来的机器人在城市屋顶静静仰望星空的孤独、沉静、诗意的科幻瞬间。夜晚的高层城市屋顶，远处高楼灯火与天际线微弱闪烁，头顶星空清澈深远，冷蓝月光与星光主导。",
 };
+const structured = structuredShotFromSegment(shot.description, 1);
 const character = assetCardDraftFromRef({ label: "主角", asset_type: "character" }, shot);
 const scene = assetCardDraftFromRef({ label: "主要场景", asset_type: "scene" }, shot);
 const legacyCharacter = normalizeAssetCardDraft({
@@ -138,6 +143,7 @@ const legacyScene = normalizeAssetCardDraft({
 });
 
 process.stdout.write(JSON.stringify({
+  structured,
   character,
   scene,
   legacyCharacter,
@@ -154,6 +160,7 @@ process.stdout.write(JSON.stringify({
         encoding="utf-8",
     )
     payload = json.loads(completed.stdout)
+    labels = [item["label"] for item in payload["structured"]["asset_refs"]]
 
     generated_surface = json.dumps(
         {
@@ -166,6 +173,9 @@ process.stdout.write(JSON.stringify({
         },
         ensure_ascii=False,
     )
+    assert labels[:2] == ["未来机器人", "夜晚城市屋顶"]
+    assert "@主角" not in payload["structured"]["description"]
+    assert "@主要场景" not in payload["structured"]["description"]
     assert "@主角 @主要场景" not in generated_surface
     assert payload["character"]["feature_card"]["reference_views"]
     assert payload["scene"]["feature_card"]["view_set"]
@@ -176,6 +186,21 @@ process.stdout.write(JSON.stringify({
     for polluted in ("多视图角色设定表", "多视角场景设定图", "设定板", "软件界面"):
         assert polluted not in payload["legacyCharacterPrompt"] + payload["legacyScenePrompt"]
     assert "Forbidden: software dashboard, app interface, data chart" in payload["legacyCharacterPrompt"]
+
+
+def test_prompt_bar_canvas_double_click_and_node_motion_are_stable() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    styles = _styles()
+
+    assert "s.ui.promptBarNodeId = node.id;" in prompt_bar
+    assert "isBlankCanvasDoubleClick" in canvas_input
+    assert "#canvas-empty-hint" in canvas_input
+    assert 'new Set(["canvas-root", "canvas-viewport", "world", "node-layer"])' in canvas_input
+    assert "Math.abs(dx) + Math.abs(dy) <= 2 && !session.moved" in canvas_input
+    assert "node-land" not in styles
+    assert "scale: 1.012" not in styles
+    assert ".node:hover { transform" not in styles
 
 
 def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidate_pollution() -> None:

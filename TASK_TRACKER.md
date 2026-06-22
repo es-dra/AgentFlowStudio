@@ -12,6 +12,28 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
+canvas issues reported from the user screenshots. Storyboard fallback and
+provider-discard fallback now preserve semantic asset labels for robot/rooftop
+scripts instead of producing generic `主角` / `主要场景`; right-click
+`识别资产` reuses the stored structured shot and refines it before creating
+candidate asset cards. Text/script/asset-card prompt input now keeps the bottom
+prompt bar open while typing, all node double-clicks route to the prompt editor
+instead of the create menu, blank-canvas double-click remains the only create
+menu path, and node click/drag landing scale animation was removed to stop the
+down-right jitter. Asset-card drafts now expose `保存资产卡` and
+`保存并重新生成`, leaving final asset fixing optional after visual review.
+Verification: focused Runtime/Studio tests passed 17 / 1 existing warning;
+provider/static/interaction regression tests passed 33 / 1 existing warning;
+`npm run check:studio-js` passed for 111 files; `git diff --check` passed;
+maintenance audit failed=0 with existing warnings only; Playwright smoke on
+local Runtime 8797 passed for text-node creation, prompt persistence,
+storyboard split, semantic asset recognition, and asset-card save/regenerate
+visibility. Boundary: no provider gate, secret, signed URL, provider raw
+response, generated media byte, user account data, or Company OS private source
+content was written. Remaining validation after deploy: public `/studio/`
+smoke and human visual acceptance for regenerated asset images.
+
 Current parallel feature integration addendum: 2026-06-23 pass first repaired
 the server `/opt/afs/AgentFlowStudio` release checkout from dirty `b24dc57`
 metadata to clean `e201346`, preserving the prior diff backup at

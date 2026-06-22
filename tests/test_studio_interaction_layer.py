@@ -88,7 +88,6 @@ def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> N
         ".if-guide-y",
         ".if-snap-chip",
         ".node.drag-moving",
-        ".node.drag-landed",
         ".node.connection-source",
         ".node.drop-target .node-port.in",
         ".drag-incident-edge",
@@ -99,6 +98,8 @@ def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> N
     incident_rule = styles.split("#edge-layer [data-edge-id].drag-incident-edge", 1)[1].split("}", 1)[0]
     assert "opacity: 0" not in incident_rule
     assert "opacity: 1" in incident_rule
+    assert "node-land" not in styles
+    assert "scale: 1.012" not in styles
 
 
 def test_generating_text_shimmer_is_loaded_and_motion_safe() -> None:

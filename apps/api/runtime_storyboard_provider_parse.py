@@ -64,7 +64,7 @@ def _normalize_provider_shot(item: Any, index: int) -> dict[str, Any]:
     fallback = structured_shot(description, index)
     asset_refs = item.get("asset_refs")
     if isinstance(asset_refs, list) and asset_refs:
-        refs = [normalize_asset_ref(asset, idx) for idx, asset in enumerate(asset_refs)]
+        refs = [normalize_asset_ref(asset, idx, description) for idx, asset in enumerate(asset_refs)]
         refs = [ref for ref in refs if ref]
     else:
         refs = fallback["asset_refs"]

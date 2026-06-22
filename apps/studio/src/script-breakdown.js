@@ -1,6 +1,6 @@
 import { createNode, connect } from "./nodes.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
-import { structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
+import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
 
@@ -62,7 +62,7 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
   const createdIds = [];
   const x = fresh.x + fresh.w + 180;
   for (const [index, shot] of shots.entries()) {
-    const structuredShot = normalizeStoryboardShot(shot, index + 1);
+    const structuredShot = refineStructuredShotAssets(normalizeStoryboardShot(shot, index + 1), source);
     const shotText = structuredShotText(structuredShot);
     const shotNode = createNode(store, "script", x, fresh.y + index * 230);
     store.set((s) => {
@@ -136,9 +136,17 @@ function sentenceChunks(text) {
     .map(cleanSegment)
     .filter(Boolean);
   if (!sentences.length) return [text];
+  const targetCount = Math.max(1, Math.min(Math.max(Math.ceil(sentences.length / 2), Math.ceil(text.length / 180)), sentences.length, 12));
+  return balancedSentenceChunks(sentences, targetCount);
+}
+
+function balancedSentenceChunks(sentences, targetCount) {
   const chunks = [];
-  for (let index = 0; index < sentences.length; index += 3) {
-    chunks.push(sentences.slice(index, index + 3).join(""));
+  for (let index = 0; index < targetCount; index += 1) {
+    const start = Math.round(index * sentences.length / targetCount);
+    const end = Math.round((index + 1) * sentences.length / targetCount);
+    const chunk = sentences.slice(start, end).join("");
+    if (chunk) chunks.push(chunk);
   }
   return chunks;
 }
