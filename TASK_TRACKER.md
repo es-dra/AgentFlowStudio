@@ -12,6 +12,26 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current asset reference sheet addendum: 2026-06-22 pass changed the
+storyboard-to-asset target from generic asset pictures to reviewable reusable
+definition boards. Candidate role assets now ask for multi-view character
+sheets; scene assets ask for same-space multi-angle environment boards; prop
+assets ask for front/side/top/detail object sheets. Candidate asset cards and
+fixed-asset review cards now carry reference-view fields, and fixing a
+storyboard-derived asset image keeps the original asset-card draft defaults
+instead of degrading to generic reference-image wording. Asset-tag markers such
+as `@主角（角色）` are stripped before deriving short signature/mood text, and
+the current robot rooftop case now gets local defaults for robot structure,
+cold-blue metal palette, rooftop skyline layout, and moon/star/neon lighting.
+Verification: `npm run check:studio-js` passed for 109 files; focused Studio
+asset/prompt/runtime-state tests passed 48 / 1 existing warning; full pytest
+passed 598 / 520 deselected / 2 existing warnings; CLI help and version
+passed; maintenance audit failed=0 with existing warnings only; `git diff
+--check` passed. Boundary: provider gates were not changed and no media bytes,
+provider raw response, signed URL, secret, user account data, or Company OS
+private source content was written. Remaining user-facing risk: final visual
+quality still needs a fresh live generation and human acceptance on the canvas.
+
 Current asset image generation audit addendum: 2026-06-22 pass fixed the
 live-canvas issue where角色/场景 asset-card image nodes could generate the same
 abstract picture. Root cause was request construction: asset-card nodes often

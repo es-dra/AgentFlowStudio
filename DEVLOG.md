@@ -1,5 +1,49 @@
 # Devlog
 
+## 2026-06-22 - Asset Reference Sheet Definition Pass
+
+- Changed storyboard-derived asset-card generation from "single asset image"
+  toward explicit reusable definition boards. Character assets now request a
+  multi-view character sheet with front, side, back, and head/chest/detail
+  views; scene assets request a same-space multi-angle environment board; prop
+  assets request front/side/top/detail object views. The generation prompt now
+  explicitly rejects single cinematic story illustrations for asset definition.
+- Added reference-view fields to candidate asset cards and fixed-asset review
+  cards so users can inspect and edit the intended view set before generating
+  or fixing an asset. Candidate asset cards created from storyboard nodes now
+  preserve the original draft fields when the generated image is fixed as a
+  real visual asset, instead of falling back to generic "reference image
+  subject" wording.
+- Removed asset-tag pollution from short phrase extraction so `@主角（角色）`
+  and `@主要场景（场景）` no longer become the asset signature or mood text.
+  Added small local inference for the current robot rooftop case so character
+  and scene cards carry robot body structure, cold-blue metal palette,
+  rooftop/city skyline layout, and moon/star/low-saturation neon lighting.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed: 109 files
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py tests/test_algorithm_library_contracts.py tests/test_web_studio_frontend_wave.py tests/test_api_runtime_studio_state_persistence.py tests/test_api_runtime_studio_state_modules.py -> 48 passed / 1 existing warning
+pytest -> 598 passed / 520 deselected / 2 existing warnings
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+git diff --check -> passed
+Node REPL sample prompt check -> robot role prompt contains multi-view character sheet; rooftop scene prompt contains multi-angle scene board
+```
+
+Boundary:
+
+- No provider gate, secret, signed URL, generated media byte, provider raw
+  response, user account data, or Company OS private source content was
+  written. This is runtime/code evidence, not human acceptance of the new
+  generated images.
+- Project lesson: an AFS asset is not a prettier keyframe. The "asset
+  definition" target must be represented in the editable card schema, prompt
+  assembly, fixed-asset review panel, and tests, otherwise image providers
+  regress to single-shot illustrations.
+
 ## 2026-06-22 - Asset Image Prompt And Timing Audit
 
 - Fixed the live-canvas issue where character and scene asset-card nodes could

@@ -5,6 +5,7 @@ export const ASSET_CARD_FIELDS = {
     ["wardrobe", "服装/外观"],
     ["palette", "主色调"],
     ["demeanor", "气质状态"],
+    ["reference_views", "设定板视图组"],
   ],
   scene: [
     ["location", "地点定位"],
@@ -12,6 +13,7 @@ export const ASSET_CARD_FIELDS = {
     ["props", "关键道具"],
     ["lighting_mood", "光影氛围"],
     ["time_weather", "时间天气"],
+    ["view_set", "多视角视图组"],
   ],
   prop: [
     ["category", "道具类别"],
@@ -20,6 +22,7 @@ export const ASSET_CARD_FIELDS = {
     ["scale", "尺寸比例"],
     ["usage", "使用方式"],
     ["continuity", "连续性约束"],
+    ["reference_views", "道具视图组"],
   ],
 };
 
@@ -109,12 +112,12 @@ export function assetImagePrompt(draft) {
     .map(([key, label]) => `${label}：${card.feature_card[key] || "待补充"}`)
     .join("\n");
   return [
-    `生成可复用${assetCardTypeLabel(card.asset_type)}参考图：@${card.label}`,
-    "用途：资产定稿参考图，不直接生成关键帧或视频。",
+    `生成可复用${assetCardTypeLabel(card.asset_type)}设定板：@${card.label}`,
+    "用途：资产定稿参考图，不直接生成关键帧或视频；输出必须服务后续一致性约束。",
     assetImageModeInstruction(card.asset_type),
     `签名：${card.signature}`,
     fields,
-    "要求：主体清晰、便于后续固定为资产；不要添加文字、水印、UI、边框。",
+    "要求：同一张图内完成设定板排布，主体/空间清晰，便于后续固定为资产；不要添加文字、水印、UI、边框；不要只生成单张剧情插画。",
   ].filter(Boolean).join("\n");
 }
 
@@ -124,8 +127,9 @@ function defaultFeatureCard(assetType, label, shotText) {
       location: sceneLocation(label, shotText),
       layout: sceneLayout(shotText),
       props: sceneProps(shotText),
-      lighting_mood: phraseFromShot(shotText, "自然光影，氛围服务剧情"),
+      lighting_mood: sceneLightingMood(shotText),
       time_weather: sceneTimeWeather(shotText),
+      view_set: "同一场景的俯瞰全景、正向广角、入口/边缘视角、光影或材质细节视角，空间关系保持一致",
     };
   }
   if (assetType === "prop") {
@@ -136,6 +140,7 @@ function defaultFeatureCard(assetType, label, shotText) {
       scale: "与角色/场景比例一致",
       usage: propUsage(label, shotText),
       continuity: "后续镜头保持同一造型、材质和使用状态",
+      reference_views: "正面、侧面、俯视、局部结构/材质特写，比例与材质保持一致",
     };
   }
   return {
@@ -143,7 +148,8 @@ function defaultFeatureCard(assetType, label, shotText) {
     appearance: characterAppearance(label, shotText),
     wardrobe: characterWardrobe(shotText),
     palette: characterPalette(shotText),
-    demeanor: phraseFromShot(shotText, "神态服务当前剧情"),
+    demeanor: characterDemeanor(shotText),
+    reference_views: "正面全身、侧面全身、背面全身、头部/胸口或关键材质细节近景，比例与外观保持一致",
   };
 }
 
@@ -158,9 +164,9 @@ function signatureFor(assetType, label, shotText) {
 }
 
 function defaultLocks(assetType, label) {
-  if (assetType === "scene") return [`保持${label}空间结构`, "保持时间/光影氛围", "保持关键环境元素"];
-  if (assetType === "prop") return [`保持${label}外观`, "保持材质和尺寸比例", "保持使用状态连续"];
-  return [`保持${label}身份`, "保持外观辨识点", "保持体态比例", "保持主色调"];
+  if (assetType === "scene") return [`保持${label}空间结构`, "保持多视角空间关系一致", "保持时间/光影氛围", "保持关键环境元素"];
+  if (assetType === "prop") return [`保持${label}外观`, "保持多视图结构一致", "保持材质和尺寸比例", "保持使用状态连续"];
+  return [`保持${label}身份`, "保持正侧背视图一致", "保持外观辨识点", "保持体态比例", "保持主色调"];
 }
 
 function roleInShot(assetType, label) {
@@ -170,7 +176,7 @@ function roleInShot(assetType, label) {
 }
 
 function phraseFromShot(text, fallback) {
-  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  const clean = stripAssetTags(String(text || "")).replace(/\s+/g, " ").trim();
   if (!clean) return fallback;
   return clean.split(/[。；.!?！？]/u)[0].slice(0, 80) || fallback;
 }
@@ -179,10 +185,14 @@ function shotDescription(structuredShot) {
   return String(structuredShot?.description || structuredShot?.source_text || "").trim();
 }
 
+function stripAssetTags(text) {
+  return String(text || "").replace(/@[^\s，。、；：:]+(?:（[^）]*）)?/gu, "").replace(/^[\s，。、；：:]+/u, "").trim();
+}
+
 function assetImageModeInstruction(assetType) {
-  if (assetType === "scene") return "呈现方式：场景设定图或空场建立图，突出空间结构、时间、光影和可复用环境，不出现角色主体。";
-  if (assetType === "prop") return "呈现方式：单体道具设定图，主体居中、结构清楚、背景简洁，不让角色或场景抢主体。";
-  return "呈现方式：角色设定参考图，优先清晰全身和关键轮廓，背景简洁，不生成剧情关键帧。";
+  if (assetType === "scene") return "呈现方式：多视角场景设定图，四宫格或清晰分区展示同一空间的俯瞰全景、正向广角、入口/边缘视角、光影/材质细节；保持空间结构一致；不出现角色主体，不生成剧情关键帧。";
+  if (assetType === "prop") return "呈现方式：多视图道具设定表，展示正面、侧面、俯视和局部结构/材质特写；主体居中、结构清楚、背景简洁，不让角色或场景抢主体。";
+  return "呈现方式：多视图角色设定表，展示正面全身、侧面全身、背面全身和头部/胸口或关键材质特写；背景保持中性简洁，不生成剧情关键帧或单张氛围插画。";
 }
 
 function characterIdentity(label, text) {
@@ -204,9 +214,14 @@ function characterWardrobe(text) {
 }
 
 function characterPalette(text) {
-  if (/冷蓝|星光|月光|青蓝|蓝/.test(text)) return "冷灰金属与青蓝发光纹路，低饱和城市反射";
+  if (/冷蓝|星光|星空|月光|青蓝|蓝/.test(text)) return "冷灰金属与青蓝发光纹路，低饱和城市反射";
   if (/霓虹/.test(text)) return "低饱和霓虹反射与主体主色调保持一致";
   return "主色调按分镜语境确定，后续可人工补充";
+}
+
+function characterDemeanor(text) {
+  if (/安静|专注|孤独|沉静|忧伤/.test(text)) return "安静专注，孤独沉静，略带诗意的科幻疏离感";
+  return phraseFromShot(text, "神态服务当前剧情");
 }
 
 function sceneLocation(label, text) {
@@ -225,6 +240,12 @@ function sceneLayout(text) {
 function sceneProps(text) {
   if (/灯火|霓虹|高楼|天际线/.test(text)) return "城市灯火、远处高楼、低饱和霓虹反射作为环境元素";
   return "保留分镜中出现的关键环境元素，不额外新增无关道具";
+}
+
+function sceneLightingMood(text) {
+  if (/冷蓝|月光|星光|星空|霓虹|低饱和/.test(text)) return "冷蓝月光与星光主导，城市霓虹提供低饱和反射";
+  if (/低照度|夜晚|深夜/.test(text)) return "低照度夜景光线，暗部压低，主体轮廓清晰";
+  return phraseFromShot(text, "自然光影，氛围服务剧情");
 }
 
 function sceneTimeWeather(text) {

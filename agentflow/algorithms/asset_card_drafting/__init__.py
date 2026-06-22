@@ -73,6 +73,7 @@ def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_tex
         "wardrobe": "标志性服装待人工确认",
         "palette": "主色调待人工确认",
         "demeanor": "神态气质待人工确认",
+        "reference_views": "正面全身、侧面全身、背面全身、头部/关键细节视图待人工确认",
     }
     return _base_draft(
         draft_id=draft_id,
@@ -81,7 +82,7 @@ def _character_draft(draft_id: str, project_id: str, refs: list[str], prompt_tex
         label=label,
         signature=f"{label}: reference role subject, pending human confirmation",
         feature_card=card,
-        candidate_locks=["keep role identity", "keep face recognizability", "keep signature wardrobe"],
+        candidate_locks=["keep role identity", "keep face recognizability", "keep signature wardrobe", "keep reference-sheet views consistent"],
         confidence=0.62,
         missing_fields=missing_fields(card),
         source_image_asset_refs=refs,
@@ -101,6 +102,7 @@ def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], promp
         "wardrobe": "默认保持自然动物外观；服装、饰品或拟人化只在用户明确要求时添加",
         "palette": "主体毛色主色调待人工确认",
         "demeanor": "动物神态和姿态待人工确认",
+        "reference_views": "正面全身、侧面全身、背面全身、头部/脸部细节视图待人工确认",
     }
     return _base_draft(
         draft_id=draft_id,
@@ -110,10 +112,8 @@ def _animal_subject_draft(draft_id: str, project_id: str, refs: list[str], promp
         signature=f"{label}: reference animal subject, pending confirmation",
         feature_card=card,
         candidate_locks=[
-            "keep animal identity",
-            "keep fur color and markings",
-            "keep eyes ears tail and body ratio",
-            "only add human hair clothing or anthropomorphic traits when explicitly requested",
+            "keep animal identity", "keep fur color and markings", "keep eyes ears tail and body ratio",
+            "keep reference-sheet views consistent", "only add human hair clothing or anthropomorphic traits when explicitly requested",
         ],
         confidence=0.62,
         missing_fields=missing_fields(card),
@@ -133,6 +133,7 @@ def _scene_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: s
         "lighting_mood": "光线和氛围待人工确认",
         "palette": "场景配色待人工确认",
         "time_weather": "时间与天气待人工确认",
+        "view_set": "俯瞰全景、正向广角、入口/边缘视角、光影或材质细节视角待人工确认",
     }
     return _base_draft(
         draft_id=draft_id,
@@ -141,7 +142,7 @@ def _scene_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: s
         label=label,
         signature=f"{label}: reference scene, pending human confirmation",
         feature_card=card,
-        candidate_locks=["keep spatial layout", "keep key props", "keep lighting mood"],
+        candidate_locks=["keep spatial layout", "keep multi-angle scene views consistent", "keep key props", "keep lighting mood"],
         confidence=0.6,
         missing_fields=missing_fields(card),
         source_image_asset_refs=refs,
@@ -160,6 +161,7 @@ def _prop_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: st
         "scale": "与角色或场景的比例关系待人工确认",
         "usage": "使用方式待人工确认",
         "continuity": "后续镜头连续性待人工确认",
+        "reference_views": "正面、侧面、俯视、局部结构/材质特写待人工确认",
     }
     return _base_draft(
         draft_id=draft_id,
@@ -168,7 +170,7 @@ def _prop_draft(draft_id: str, project_id: str, refs: list[str], prompt_text: st
         label=label,
         signature=f"{label}: reusable prop, pending human confirmation",
         feature_card=card,
-        candidate_locks=["keep prop appearance", "keep material and scale", "keep usage continuity"],
+        candidate_locks=["keep prop appearance", "keep prop multi-view sheet consistent", "keep material and scale", "keep usage continuity"],
         confidence=0.58,
         missing_fields=missing_fields(card),
         source_image_asset_refs=refs,

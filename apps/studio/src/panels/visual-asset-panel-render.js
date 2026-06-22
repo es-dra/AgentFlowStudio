@@ -6,6 +6,7 @@
   ["wardrobe", "服装/饰品/外观", "红色及膝风衣；或不添加人类服装"],
   ["palette", "角色配色", "红黑为主，银色点缀"],
   ["demeanor", "气质神态", "寡言，惯于侧目观察"],
+  ["reference_views", "设定视图", "正面全身、侧面全身、背面全身、头部/关键材质细节特写"],
 ];
 
 const SCENE_FIELDS = [
@@ -15,6 +16,7 @@ const SCENE_FIELDS = [
   ["lighting_mood", "光线基调", "冷月光从西窗斜入，整体青蓝色调"],
   ["palette", "场景配色", "青蓝 + 锈橙"],
   ["time_weather", "时间天气", "深夜，雨后"],
+  ["view_set", "多视角视图组", "俯瞰全景、正向广角、入口/边缘视角、光影或材质细节视角"],
 ];
 
 const PROP_FIELDS = [
@@ -24,6 +26,7 @@ const PROP_FIELDS = [
   ["scale", "尺寸比例", "可单手握持，与角色手部比例一致"],
   ["usage", "使用方式", "角色查看方向时拿在右手"],
   ["continuity", "连续性约束", "后续镜头保持同一磨损状态和挂绳位置"],
+  ["reference_views", "道具视图组", "正面、侧面、俯视、局部结构/材质特写"],
 ];
 
 const CHARACTER_LOCK_CHIPS = [
@@ -31,12 +34,14 @@ const CHARACTER_LOCK_CHIPS = [
   ["保持服装/外观", "wardrobe"],
   ["保持面部/头部特征", "face"],
   ["不改变体型比例", null],
+  ["保持设定视图一致", "reference_views"],
 ];
 
 const SCENE_LOCK_CHIPS = [
   ["保持空间布局", "layout"],
   ["保持关键道具", "props"],
   ["保持光线基调", "lighting_mood"],
+  ["保持多视角一致", "view_set"],
 ];
 
 const PROP_LOCK_CHIPS = [
@@ -44,6 +49,7 @@ const PROP_LOCK_CHIPS = [
   ["保持材质工艺", "material"],
   ["保持尺寸比例", "scale"],
   ["保持使用状态", "continuity"],
+  ["保持多视图一致", "reference_views"],
 ];
 
 export function lockChipsForAssetType(assetType) {

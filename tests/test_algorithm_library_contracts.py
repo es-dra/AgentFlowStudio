@@ -86,6 +86,8 @@ def test_asset_card_drafting_uses_animal_role_defaults_for_cat_prompt() -> None:
     assert "reference animal subject" in draft["signature"]
     assert "reference character" not in draft["signature"]
     assert "keep fur color and markings" in draft["candidate_locks"]
+    assert "keep reference-sheet views consistent" in draft["candidate_locks"]
+    assert "reference_views" in draft["feature_card"]
     assert "only add human hair clothing or anthropomorphic traits when explicitly requested" in draft["candidate_locks"]
     assert "用户明确要求" in draft["feature_card"]["wardrobe"]
 

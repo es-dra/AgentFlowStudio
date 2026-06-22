@@ -8,6 +8,7 @@ export function propDefaults(node, text) {
     scale: "保持参考图与角色/场景的比例关系",
     usage: inferUsage(text) || "按分镜动作使用",
     continuity: "保持同一造型、磨损状态和摆放/持握方式",
+    reference_views: "正面、侧面、俯视、局部结构/材质特写保持一致",
   };
   return {
     label,
