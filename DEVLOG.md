@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-23 - Parallel Feature Integration and Deploy Baseline Cleanup
+
+- Cleaned the deployed `/opt/afs/AgentFlowStudio` Git state before integrating
+  new work. The directory had already received the `e201346` file contents but
+  still had `b24dc57` Git metadata and dirty files; the diff was backed up to
+  `/tmp/afs-opt-dirty-before-e201346-20260622-165701.patch`, then `/opt` was
+  aligned to clean `e201346` without using `git reset --hard`.
+- Integrated three parallel feature branches into local `master` with
+  fast-forward history: Director Stage V2 contract, TuanTuan confirmed memory
+  Runtime API, and the public site social square request board.
+- Preserved the AFS Debug Studio generation repair at `e201346`; the merged
+  features did not touch the repaired Studio generation guard, keyframe flow,
+  asset popover, storyboard fallback, or context resolver files.
+- Fixed one integration miss caught by focused tests: `runtime_service.py`
+  registered the social square route, but the new
+  `apps/api/runtime_social_square.py` file was initially not staged. A
+  follow-up commit added the missing route module before deployment.
+- Localized the Director Stage V2 handoff to Chinese so the integration did not
+  add a new human-doc Chinese coverage warning.
+
+Verification:
+
+```text
+pytest tests/test_runtime_director_compiler.py tests/test_runtime_director_compiler_v2.py tests/test_api_runtime_sprite.py tests/test_api_runtime_sprite_memory.py tests/test_api_runtime_social_square.py tests/test_site_homepage_static.py tests/test_site_social_square_static.py tests/test_api_runtime_auth.py tests/test_api_runtime_service.py -q -> 53 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 111 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+git diff --check -> passed
+pytest -q -> 622 passed / 520 deselected / 2 existing warnings
+```
+
+Boundary:
+
+- No provider gate, secret, signed URL, generated media byte, provider raw
+  response, user account data, or Company OS private source content was written.
+  This integration is structure/runtime verification, not human acceptance,
+  provider smoke, business validation, or durable memory promotion.
+
 ## 2026-06-22 - Asset Reference Lookup and Keyframe Flow Repair
 
 - Changed generation context resolution so fixed assets can be injected by an

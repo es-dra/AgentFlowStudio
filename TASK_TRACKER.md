@@ -6,11 +6,32 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-22 by Codex
+Last updated: 2026-06-23 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current parallel feature integration addendum: 2026-06-23 pass first repaired
+the server `/opt/afs/AgentFlowStudio` release checkout from dirty `b24dc57`
+metadata to clean `e201346`, preserving the prior diff backup at
+`/tmp/afs-opt-dirty-before-e201346-20260622-165701.patch`. It then merged the
+Director Stage V2 Runtime compiler contract, TuanTuan confirmed-memory Runtime
+API, and public-site social square request board into `master` with
+fast-forward commits. A focused test run caught a missing social-square route
+module after route registration; the missing `apps/api/runtime_social_square.py`
+file was added as a follow-up commit before deployment. The AFS Debug Studio
+generation repair at `e201346` was preserved: this integration did not modify
+the repaired Studio generation guard, keyframe flow, asset popover, storyboard
+fallback, or context resolver files. Verification: integration focused tests
+passed 53 / 1 existing warning; full pytest passed 622 / 520 deselected / 2
+existing warnings; `npm run check:studio-js` passed for 111 files; CLI
+help/version passed; maintenance audit failed=0 with existing warnings only;
+`git diff --check` passed. Boundary: no provider secret, provider raw response,
+signed URL, generated media byte, user account data, or Company OS private
+source content was written. Remaining validation after deploy: public social
+square and Runtime health smoke, plus human review for director/sprite/social
+product fit.
 
 Current asset image prompt quality addendum: 2026-06-22 pass tightened the
 storyboard-to-asset image request contract after live Crazyrouter `gpt-image-2`
