@@ -11,6 +11,7 @@
     <link rel="icon" href="/studio/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/site/styles/site.css" />
     <link rel="stylesheet" href="/site/styles/site-preview.css" />
+    <link rel="stylesheet" href="/site/styles/social-square.css" />
     <link rel="stylesheet" href="/site/styles/site-responsive.css" />
   </head>
   <body>
@@ -20,6 +21,7 @@
         <span>AFS Studio</span>
       </a>
       <nav class="nav-links" aria-label="页面章节">
+        <a href="#social-square">广场</a>
         <a href="#templates">模板</a>
         <a href="#works">作品</a>
         <a href="#workflow">工作流</a>
@@ -89,6 +91,56 @@
               <strong>按需确认</strong>
               <small>候选资产不会自动污染下一次生成。</small>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="social-square" id="social-square" aria-labelledby="social-square-title">
+        <div class="square-heading">
+          <div>
+            <p class="eyebrow">Social Square</p>
+            <h2 id="social-square-title">社交广场</h2>
+            <p>把需求发布出来，找到可以承接脚本、设定图、关键帧或工作流整理的协作者。</p>
+          </div>
+          <a class="secondary-action" href="/studio/" data-auth-action>进入 Studio</a>
+        </div>
+        <div class="square-grid">
+          <form class="square-form" data-social-square-form>
+            <div class="form-row">
+              <label>
+                <span>需求标题</span>
+                <input name="title" maxlength="80" placeholder="例如：需要一个雨夜开场脚本" required />
+              </label>
+              <label>
+                <span>类型</span>
+                <select name="need_type">
+                  <option value="script">脚本</option>
+                  <option value="image">设定图</option>
+                  <option value="video">视频</option>
+                  <option value="workflow">工作流</option>
+                  <option value="other">其他</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>需求说明</span>
+              <textarea name="body" maxlength="1200" placeholder="讲清楚你想要什么、已有素材和期望风格。" required></textarea>
+            </label>
+            <label>
+              <span>期望交付</span>
+              <input name="deliverable_hint" maxlength="240" placeholder="例如：三段式脚本 + 关键画面说明" />
+            </label>
+            <button class="primary-action" type="submit">发布需求</button>
+            <p class="square-status" data-social-square-status>登录后可以发布、承接需求。</p>
+          </form>
+          <div class="square-board" aria-live="polite">
+            <div class="square-board-title">
+              <strong>最新需求</strong>
+              <span>发布需求 / 承接需求 / 提交成果</span>
+            </div>
+            <div class="square-list" data-social-square-list>
+              <article class="square-empty">正在读取社交广场。</article>
+            </div>
           </div>
         </div>
       </section>
@@ -166,5 +218,6 @@
       <span>Runtime-backed creative workspace</span>
     </footer>
     <script type="module" src="/site/site.js"></script>
+    <script type="module" src="/site/social-square.js"></script>
   </body>
 </html>

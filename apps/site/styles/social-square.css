@@ -1,0 +1,183 @@
+.social-square {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 88px 0;
+}
+
+.square-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 30px;
+}
+
+.square-heading p {
+  max-width: 680px;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.square-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.48fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.square-form,
+.square-board,
+.square-card,
+.square-empty {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.square-form {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 18px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 12px;
+}
+
+.square-form label {
+  display: grid;
+  gap: 8px;
+  color: #dce3e7;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.square-form input,
+.square-form select,
+.square-form textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.square-form input,
+.square-form select {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.square-form textarea {
+  min-height: 118px;
+  resize: vertical;
+  padding: 11px 12px;
+  line-height: 1.55;
+}
+
+.square-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.square-board {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.square-board-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  color: var(--muted);
+}
+
+.square-board-title strong {
+  color: var(--text);
+  font-size: 20px;
+}
+
+.square-list {
+  display: grid;
+  gap: 12px;
+}
+
+.square-card,
+.square-empty {
+  padding: 16px;
+}
+
+.square-card {
+  display: grid;
+  gap: 12px;
+}
+
+.square-card-meta,
+.square-card-footer,
+.square-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.square-card-meta span {
+  border: 1px solid rgba(87, 213, 255, 0.22);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.square-card strong {
+  font-size: 21px;
+}
+
+.square-card p,
+.square-card small,
+.square-empty {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.square-card p {
+  margin: 0;
+}
+
+.square-card-actions button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e9f3f7;
+  font-weight: 800;
+}
+
+.square-card-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+@media (max-width: 900px) {
+  .square-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .square-grid,
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}

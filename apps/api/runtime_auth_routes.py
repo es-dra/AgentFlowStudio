@@ -10,7 +10,7 @@ from apps.api.runtime_auth import AuthLoginRequest, AuthRegisterRequest, Runtime
 from apps.api.runtime_store import safe_id
 
 
-PUBLIC_PREFIXES = ("/auth", "/health", "/capabilities", "/site", "/studio")
+PUBLIC_PREFIXES = ("/auth", "/health", "/capabilities", "/community", "/site", "/studio")
 
 
 def register_runtime_auth_routes(app: FastAPI, auth: RuntimeAuthStore) -> None:

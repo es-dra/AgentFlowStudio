@@ -16,8 +16,10 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert 'href="/studio/"' in index
     assert 'href="/site/styles/site.css"' in index
     assert 'href="/site/styles/site-preview.css"' in index
+    assert 'href="/site/styles/social-square.css"' in index
     assert 'href="/site/styles/site-responsive.css"' in index
     assert 'src="/site/site.js"' in index
+    assert 'src="/site/social-square.js"' in index
     assert "data-auth-action" in index
     assert "专业 AI 视频创作工作台" in index
     assert "新建视频项目" in index
@@ -27,6 +29,7 @@ def test_site_homepage_is_distinct_from_studio_workspace() -> None:
     assert "project-lane" in index
     assert "最近作品" in index
     assert "雨夜追踪镜头" in index
+    assert "社交广场" in index
     assert "查看底层算法边界" in index
     assert "提示词智能优化" in index
     assert "上下文智能调度" in index
@@ -44,6 +47,7 @@ def test_site_homepage_styles_remain_small_and_safe() -> None:
         "site.css",
         "site-preview.css",
         "site-responsive.css",
+        "social-square.css",
     }
     for path in style_paths:
         assert len(path.read_text(encoding="utf-8").splitlines()) <= 300, path
