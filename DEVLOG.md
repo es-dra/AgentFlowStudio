@@ -11,7 +11,11 @@
 - Added OpenAI Images-compatible edit transport for external API providers.
   `request_format=openai_images` still uses JSON `/images/generations` for new
   images, but source-image edits now use multipart `/images/edits` with the
-  original image in `image[]`, matching the manual GPT-style edit flow.
+  original image in the `image` multipart field, matching the manual GPT-style
+  edit flow.
+- Kept AFS request-plan semantics as high-fidelity source-image edits while
+  avoiding unsupported HTTP parameters by default: OpenAI Images multipart
+  requests omit `input_fidelity` unless a provider config explicitly opts in.
 - Relaxed provider reference-image slot validation from 8 to 16 so providers
   that support multiple edit/source images can be configured without AFS schema
   blocking them first.
@@ -24,6 +28,7 @@ Verification:
 
 ```text
 pytest tests/test_api_runtime_keyframe_reference_assets.py tests/test_provider_adapter_registry.py tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 58 passed / 1 existing warning
+pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py -> 37 passed / 1 existing warning
 npm run check:studio-js -> JS syntax check passed: 113 files
 python -m pytest -q -> 626 passed / 520 deselected / 2 existing warnings
 python -m apps.cli.main --help -> passed

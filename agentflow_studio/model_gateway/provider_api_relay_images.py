@@ -57,14 +57,16 @@ def _openai_images_edit_payload(*, service: dict[str, Any], model: str, request:
         "size": str(service.get("size") or ASPECT_RATIO_SIZES.get(request.aspect_ratio) or "1024x1024"),
         "quality": str(service.get("quality") or "low"),
         "output_format": str(service.get("output_format") or "png"),
-        "input_fidelity": request.image_input_fidelity or str(service.get("input_fidelity") or "high"),
     }
+    configured_fidelity = str(service.get("input_fidelity") or "").strip()
+    if configured_fidelity:
+        fields["input_fidelity"] = configured_fidelity
     extra_body = service.get("extra_body")
     if isinstance(extra_body, dict):
         for key, value in extra_body.items():
             if value not in (None, "", []):
                 fields[str(key)] = value
-    field_name = str(service.get("edit_image_field_name") or "image[]")
+    field_name = str(service.get("edit_image_field_name") or "image")
     return {
         "__transport": "multipart",
         "__endpoint": _edit_endpoint(service),

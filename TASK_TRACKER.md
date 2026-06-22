@@ -36,18 +36,24 @@ to source-image edit semantics for external APIs: asset-card revisions with a
 prior image now set `image_operation=edit`, send the first prior image as
 `edit_source_image_path`, carry ordered edit references, and request
 `image_input_fidelity=high`. OpenAI Images-compatible API relay providers now
-use multipart `/images/edits` for this path while keeping ordinary generation
-on `/images/generations`. Provider descriptors can now allow up to 16 reference
-image slots for multi-source edit providers. Studio labels the action as
-`保存并局部修订生成`.
+use multipart `/images/edits` with the source image in the `image` field for
+this path while keeping ordinary generation on `/images/generations`. AFS keeps
+the high-fidelity edit intent in request planning, but the OpenAI Images HTTP
+payload omits `input_fidelity` unless a provider config explicitly opts in, so
+the external API receives only supported default parameters. Provider
+descriptors can now allow up to 16 reference image slots for multi-source edit
+providers. Studio labels the action as `保存并局部修订生成`.
 Verification: source-image edit focused regression passed 58 / 1 existing
 warning; full pytest passed 626 / 520 deselected / 2 existing warnings;
 `npm run check:studio-js` passed for 113 files; CLI help/version passed;
 maintenance audit failed=0 with existing warnings only; `git diff --check`
-passed. Boundary: no provider raw response, signed URL, secret, local private
-path, generated media byte, or Company OS private source content was written to
-the repo. Remaining validation: deployed external-provider smoke with a
-robot local material edit, then human visual acceptance.
+passed. Follow-up provider compatibility regression passed 37 / 1 existing
+warning after defaulting multipart image field to `image` and omitting
+unsupported `input_fidelity`. Boundary: no provider raw response, signed URL,
+secret, local private path, generated media byte, or Company OS private source
+content was written to the repo. Remaining validation: deployed
+external-provider smoke with a robot local material edit, then human visual
+acceptance.
 
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and

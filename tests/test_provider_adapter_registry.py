@@ -858,7 +858,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
-def test_provider_registry_dispatches_api_relay_openai_images_edit_with_high_fidelity(
+def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_image_field(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -910,8 +910,8 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_high_fid
     assert "multipart/form-data" in str(captured["content_type"])
     assert 'name="model"' in body and "gpt-image-2" in body
     assert 'name="prompt"' in body and "Change only the metal body surface into plush fabric" in body
-    assert 'name="input_fidelity"' in body and "high" in body
-    assert 'name="image[]"; filename="robot-source.png"' in body
+    assert 'name="input_fidelity"' not in body
+    assert 'name="image"; filename="robot-source.png"' in body
     assert captured["timeout"] == 120.0
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
