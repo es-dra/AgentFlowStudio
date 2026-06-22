@@ -825,7 +825,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     service["request_format"] = "openai_images"
     service["quality"] = "low"
     service["output_format"] = "png"
-    service["allowed_artifact_hosts"] = ["media.crazyrouter.com"]
+    service["allowed_artifact_hosts"] = [".crazyrouter.com"]
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")

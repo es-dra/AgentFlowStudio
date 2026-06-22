@@ -121,7 +121,7 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "https" or not host:
         raise ModelGatewayError("API relay image URL must use HTTPS")
-    if not allowed_url_hosts or host not in {item.lower() for item in allowed_url_hosts}:
+    if not allowed_url_hosts or not _host_allowed(host, allowed_url_hosts):
         raise ModelGatewayError("API relay image URL host is not allowed")
     request = urllib.request.Request(url, headers={"Accept": "image/png,image/jpeg,image/webp,*/*"})
     try:
@@ -132,6 +132,18 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     if len(image_bytes) > MAX_IMAGE_DOWNLOAD_BYTES:
         raise ModelGatewayError("API relay image URL download exceeded size limit")
     return image_bytes
+
+
+def _host_allowed(host: str, allowed_url_hosts: tuple[str, ...]) -> bool:
+    for allowed in allowed_url_hosts:
+        item = allowed.lower().strip()
+        if not item:
+            continue
+        if item.startswith(".") and (host == item[1:] or host.endswith(item)):
+            return True
+        if host == item:
+            return True
+    return False
 
 
 __all__ = ("openai_images_payload", "write_image_outputs")
