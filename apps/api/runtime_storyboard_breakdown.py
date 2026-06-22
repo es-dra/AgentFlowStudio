@@ -93,7 +93,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
             )
             provider_result = dispatch_llm_with_fallback(registry, llm_request, dispatch_request)
             provider_calls_started = bool(provider_result.get("provider_calls_started", True))
-            shots = shots_from_provider_text(str(provider_result.get("text") or ""))
+            shots = shots_from_provider_text(str(provider_result.get("text") or ""), source_script_text=request.script_text)
             status = "provider_structured"
         except ValueError as exc:
             discard_reason = _safe_reason(str(exc))

@@ -12,7 +12,11 @@
   instead of silently falling back to rough text splitting. The deterministic
   fallback also stops treating contextual words like `信号` and `灯火` as
   standalone prop assets. Provider output parsing now lives in a separate
-  small module so the Runtime route remains orchestration-only.
+  small module so the Runtime route remains orchestration-only. A second live
+  check found that a provider can return syntactically valid but content-sparse
+  storyboard JSON; long scripts now require enough shots, visual detail, and
+  asset refs or the provider result is explicitly discarded and the safe local
+  fallback is used.
 - Tightened the candidate/fixed boundary: generated asset-card image candidates
   remain editable drafts until human confirmation, are saved as candidate asset
   kinds, and are not injected into keyframe prompt/context. Keyframe nodes now
@@ -25,7 +29,7 @@
 Verification:
 
 ```text
-pytest -> 596 passed / 520 deselected / 2 existing warnings
+pytest -> 597 passed / 520 deselected / 2 existing warnings
 npm run check:studio-js -> JS syntax check passed: 107 files
 python -m apps.cli.main --help -> passed
 python -m apps.cli.main version -> 0.1.0

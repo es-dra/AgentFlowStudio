@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from apps.api.runtime_storyboard_local import normalize_asset_ref, structured_shot
 
 
-def shots_from_provider_text(text: str) -> list[dict[str, Any]]:
+def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list[dict[str, Any]]:
     payload = _json_from_text(text)
     raw_shots = payload.get("shots")
     if not isinstance(raw_shots, list):
@@ -15,6 +16,7 @@ def shots_from_provider_text(text: str) -> list[dict[str, Any]]:
     shots = [item for item in shots if item]
     if not shots:
         raise ValueError("provider storyboard response has no usable shots")
+    _validate_provider_shots(shots, source_script_text)
     return shots
 
 
@@ -80,6 +82,30 @@ def _normalize_provider_shot(item: Any, index: int) -> dict[str, Any]:
         "asset_refs": refs,
         "source_text": _clean(item.get("source_text") or description),
     }
+
+
+def _validate_provider_shots(shots: list[dict[str, Any]], source_script_text: str) -> None:
+    source_len = len("".join(str(source_script_text or "").split()))
+    if source_len < 120:
+        return
+    if source_len >= 260 and len(shots) < 3:
+        raise ValueError("provider storyboard response too sparse for source script")
+    if len(shots) < 2:
+        raise ValueError("provider storyboard response too sparse for source script")
+
+    asset_ref_count = sum(len(item.get("asset_refs") or []) for item in shots)
+    if asset_ref_count == 0:
+        raise ValueError("provider storyboard response missing asset refs")
+
+    descriptive_len = sum(len(_descriptive_text(item.get("description"))) for item in shots)
+    required_len = min(120, max(40, source_len // 5))
+    if descriptive_len < required_len:
+        raise ValueError("provider storyboard response lacks visual detail")
+
+
+def _descriptive_text(value: Any) -> str:
+    text = re.sub(r"@[\w\u4e00-\u9fff-]+", "", str(value or ""))
+    return "".join(char for char in text if not char.isspace() and char not in "，。,.；;：:、")
 
 
 def _clean(value: Any) -> str:

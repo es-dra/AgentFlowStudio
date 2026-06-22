@@ -19,12 +19,14 @@ visual assets, keyframe layers, uploads, warnings, and one-run exclusions, so
 reload/server save no longer erases the reviewed production graph. Storyboard
 LLM JSON parsing accepts fenced/trailing output instead of silently degrading
 to coarse text splitting, and the local fallback no longer misclassifies
-contextual `信号` / `灯火` as prop assets. Candidate asset-card images remain
+contextual `信号` / `灯火` as prop assets. Valid-but-sparse provider storyboard
+JSON is now quality-gated for long scripts and falls back explicitly when it
+lacks enough shots, visual detail, or asset refs. Candidate asset-card images remain
 editable drafts and are excluded from keyframe prompt/context until human
 confirmation promotes them to fixed assets; keyframe nodes show missing
 candidate cards and block generation before fixed assets exist. Keyframe
 polling now reduces repeated full-state saves to lower Runtime pressure during
-long image jobs. Verification before merge: full pytest passed 596 / 520
+long image jobs. Verification before merge: full pytest passed 597 / 520
 deselected / 2 existing warnings; `npm run check:studio-js` passed for 107
 files; CLI help and version passed; full Studio browser QA passed; maintenance
 audit failed=0 with warnings only; `git diff --check` passed. Boundary: no
