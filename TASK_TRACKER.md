@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Crazyrouter image relay addendum: 2026-06-22 pass added
+OpenAI Images-compatible `api_relay` support so `codex_image` can be switched
+server-side to Crazyrouter `gpt-image-2` without changing Studio front-end
+model IDs. The relay can now send `/images/generations` payloads and download
+`data[0].url` provider media into local AFS candidate artifacts without
+persisting provider URLs or raw responses. Server diagnosis before the switch
+showed current `afs-runtime` was still loading
+`/opt/afs/AgentFlowStudio/configs/providers.local.json`, had no Crazyrouter
+service in the active registry, and did not have `CRAZYROUTER_API_KEY` in the
+service environment; a user shell export is not sufficient for live Runtime
+generation. Verification: provider registry tests passed 30; focused provider /
+Studio / image-handoff regressions passed 95 with 1 existing warning; JS syntax
+check passed for 109 files; `git diff --check` and provider module compile
+passed. Remaining blocker: persist the Crazyrouter key and provider config into
+systemd, restart Runtime, then run a real low-cost image smoke before claiming
+speed or visual-quality improvement.
+
 Current asset reference sheet addendum: 2026-06-22 pass changed the
 storyboard-to-asset target from generic asset pictures to reviewable reusable
 definition boards. Candidate role assets now ask for multi-view character

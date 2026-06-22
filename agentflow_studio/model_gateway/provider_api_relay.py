@@ -11,7 +11,7 @@ from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
-from agentflow_studio.model_gateway.image_utils import image_dimensions, image_extension
+from agentflow_studio.model_gateway.provider_api_relay_images import openai_images_payload, write_image_outputs
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
 from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
 
@@ -53,6 +53,13 @@ class ApiRelayAdapter:
             or default_models.get(self.descriptor.modality)
             or "server-configured"
         )
+        payload = _request_payload(
+            service_id=self.service_id,
+            capability=self.descriptor.modality,
+            model=str(model),
+            service=service,
+            request=request,
+        )
         return {
             "base_url": _base_url(account, service),
             "endpoint": str(service.get("endpoint") or _endpoint_from_ref(self.store, service) or "/v1/afs/provider"),
@@ -61,14 +68,11 @@ class ApiRelayAdapter:
             "auth_header": str(service.get("auth_header") or account.get("auth_header") or "Authorization"),
             "auth_scheme": str(service.get("auth_scheme") or account.get("auth_scheme") or "Bearer"),
             "timeout_sec": float(request.timeout_sec),
-            "payload": _relay_payload(
-                service_id=self.service_id,
-                capability=self.descriptor.modality,
-                model=str(model),
-                request=request,
-            ),
+            "payload": payload,
             "output_dir": request.output_dir,
             "candidate_count": request.candidate_count,
+            "allowed_url_hosts": _allowed_url_hosts(service),
+            "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
         }
 
     def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
@@ -85,10 +89,12 @@ class ApiRelayAdapter:
         if self.descriptor.modality == "image":
             response = {
                 **response,
-                "outputs": _write_image_outputs(
+                "outputs": write_image_outputs(
                     Path(plan["output_dir"]),
                     response,
                     int(plan.get("candidate_count") or 1),
+                    allowed_url_hosts=tuple(plan.get("allowed_url_hosts") or ()),
+                    download_timeout_sec=float(plan.get("download_timeout_sec") or 180.0),
                 ),
             }
         return {"status": "already_complete", "raw": response}
@@ -141,6 +147,30 @@ def _relay_payload(
     if request.subject_reference_image_path is not None:
         payload["subject_reference_image"] = _reference_image_payload(request.subject_reference_image_path, 1)
     return {key: value for key, value in payload.items() if value not in (None, "", [])}
+
+
+def _request_payload(
+    *,
+    service_id: str,
+    capability: str,
+    model: str,
+    service: dict[str, Any],
+    request: ProviderDispatchRequest,
+) -> dict[str, Any]:
+    if capability == "image" and _payload_format(service) == "openai_images":
+        return openai_images_payload(service=service, model=model, request=request)
+    return _relay_payload(service_id=service_id, capability=capability, model=model, request=request)
+
+
+def _payload_format(service: dict[str, Any]) -> str:
+    return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
+
+
+def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
+    value = service.get("allowed_artifact_hosts")
+    if not isinstance(value, list):
+        return ()
+    return tuple(str(item).lower().strip() for item in value if str(item).strip())
 
 
 def _reference_images_payload(paths: tuple[Path | str, ...]) -> list[dict[str, Any]]:
@@ -204,62 +234,6 @@ def _post_json(
     if not isinstance(decoded, dict):
         raise ModelGatewayError("API relay response JSON must be an object")
     return decoded
-
-
-def _write_image_outputs(output_root: Path, response: dict[str, Any], candidate_count: int) -> list[dict[str, Any]]:
-    images = _response_images(response)
-    if len(images) < candidate_count:
-        raise ModelGatewayError("API relay image response missing image entries")
-    image_dir = output_root / "image_candidates"
-    image_dir.mkdir(parents=True, exist_ok=True)
-    outputs: list[dict[str, Any]] = []
-    for index, item in enumerate(images[:candidate_count], start=1):
-        image_bytes = _decode_image_item(item)
-        extension = image_extension(image_bytes)
-        if not extension:
-            raise ModelGatewayError("API relay image response must be PNG or JPEG")
-        candidate_id = f"candidate_{index:03d}"
-        image_ref = f"image_candidates/{candidate_id}{extension}"
-        (output_root / image_ref).write_bytes(image_bytes)
-        outputs.append(
-            {
-                "candidate_id": candidate_id,
-                "image_path": image_ref,
-                "byte_count": len(image_bytes),
-                "sha256": hashlib.sha256(image_bytes).hexdigest(),
-                **image_dimensions(image_bytes),
-                "provider_url_persisted": False,
-            }
-        )
-    return outputs
-
-
-def _response_images(response: dict[str, Any]) -> list[Any]:
-    for key in ("images", "outputs", "candidates"):
-        value = response.get(key)
-        if isinstance(value, list):
-            return value
-    data = response.get("data")
-    if isinstance(data, dict):
-        value = data.get("images") or data.get("image_base64")
-        if isinstance(value, list):
-            return value
-    if isinstance(response.get("image_base64"), str):
-        return [response["image_base64"]]
-    return []
-
-
-def _decode_image_item(item: Any) -> bytes:
-    if isinstance(item, str):
-        encoded = item
-    elif isinstance(item, dict):
-        encoded = str(item.get("data_base64") or item.get("image_base64") or item.get("base64") or "")
-    else:
-        encoded = ""
-    try:
-        return base64.b64decode(encoded, validate=True)
-    except (ValueError, TypeError) as exc:
-        raise ModelGatewayError("API relay image response contains invalid base64") from exc
 
 
 def _normalize_vision(raw: dict[str, Any]) -> dict[str, Any]:

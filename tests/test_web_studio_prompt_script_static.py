@@ -1,3 +1,6 @@
+import json
+import subprocess
+
 from studio_static_helpers import STUDIO_ROOT, _styles
 
 
@@ -96,6 +99,81 @@ def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -
     assert "node.params.visualAssets" not in asset_nodes
     assert "openAssetCardPanel" in asset_panel
     assert "编辑资产卡" in node_menu
+
+
+def test_asset_card_drafts_clean_legacy_tag_pollution_and_backfill_reference_views() -> None:
+    script = r'''
+import {
+  assetCardDraftFromRef,
+  assetImagePrompt,
+  normalizeAssetCardDraft,
+} from "./apps/studio/src/asset-card-drafts.js";
+
+const shot = {
+  shot_id: "shot_01",
+  description: "@主角 @主要场景。描绘一个来自未来的机器人在城市屋顶静静仰望星空的孤独、沉静、诗意的科幻瞬间。夜晚的高层城市屋顶，远处高楼灯火与天际线微弱闪烁，头顶星空清澈深远，冷蓝月光与星光主导。",
+};
+const character = assetCardDraftFromRef({ label: "主角", asset_type: "character" }, shot);
+const scene = assetCardDraftFromRef({ label: "主要场景", asset_type: "scene" }, shot);
+const legacyCharacter = normalizeAssetCardDraft({
+  asset_type: "character",
+  label: "主角",
+  signature: "主角：@主角 @主要场景",
+  feature_card: {
+    identity: "来自未来的机器人主角",
+    appearance: "金属机身，精密发光纹路",
+    demeanor: "@主角 @主要场景",
+  },
+  evidence_text: shot.description,
+});
+const legacyScene = normalizeAssetCardDraft({
+  asset_type: "scene",
+  label: "主要场景",
+  signature: "主要场景：@主角 @主要场景",
+  feature_card: {
+    location: "夜晚城市屋顶/楼顶平台",
+    lighting_mood: "@主角 @主要场景",
+  },
+  evidence_text: shot.description,
+});
+
+process.stdout.write(JSON.stringify({
+  character,
+  scene,
+  legacyCharacter,
+  legacyScene,
+  legacyCharacterPrompt: assetImagePrompt(legacyCharacter),
+  legacyScenePrompt: assetImagePrompt(legacyScene),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    generated_surface = json.dumps(
+        {
+            "legacyCharacterSignature": payload["legacyCharacter"]["signature"],
+            "legacyCharacterFeatureCard": payload["legacyCharacter"]["feature_card"],
+            "legacySceneSignature": payload["legacyScene"]["signature"],
+            "legacySceneFeatureCard": payload["legacyScene"]["feature_card"],
+            "legacyCharacterPrompt": payload["legacyCharacterPrompt"],
+            "legacyScenePrompt": payload["legacyScenePrompt"],
+        },
+        ensure_ascii=False,
+    )
+    assert "@主角 @主要场景" not in generated_surface
+    assert payload["character"]["feature_card"]["reference_views"]
+    assert payload["scene"]["feature_card"]["view_set"]
+    assert payload["legacyCharacter"]["feature_card"]["reference_views"]
+    assert payload["legacyScene"]["feature_card"]["view_set"]
+    assert "多视图角色设定表" in payload["legacyCharacterPrompt"]
+    assert "多视角场景设定图" in payload["legacyScenePrompt"]
+    assert "不要只生成单张剧情插画" in payload["legacyCharacterPrompt"]
 
 
 def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidate_pollution() -> None:

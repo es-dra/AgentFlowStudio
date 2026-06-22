@@ -242,6 +242,9 @@ def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failu
     assert "MAX_KEYFRAME_POLL_ATTEMPTS" in keyframe_actions
     assert "markKeyframeStillProcessing" in keyframe_actions
     assert "refreshPendingKeyframeGenerations" in keyframe_actions
+    assert "activeKeyframePolls" in keyframe_actions
+    assert "startBackgroundKeyframePolling" in keyframe_actions
+    assert "void startBackgroundKeyframePolling" in keyframe_actions
     assert "runtime.pollKeyframe(jobId)" in keyframe_actions
     assert "refreshPendingKeyframeGenerations(store, runtime)" in main
     assert "onProjectReady?.(runtimeClient)" in project_controller

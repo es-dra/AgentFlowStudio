@@ -801,6 +801,61 @@ def test_provider_registry_dispatches_api_relay_image_and_writes_candidates(tmp_
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/generations":
+            captured["authorization"] = request.get_header("Authorization")
+            captured["payload"] = json.loads(request.data.decode("utf-8"))
+            captured["timeout"] = timeout
+            return _JsonResponse({"data": [{"url": "https://media.crazyrouter.com/task-artifacts/result.png"}]})
+        if request.full_url == "https://media.crazyrouter.com/task-artifacts/result.png":
+            captured["downloaded"] = True
+            return _BytesResponse(_png_bytes())
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["quality"] = "low"
+    service["output_format"] = "png"
+    service["allowed_artifact_hosts"] = ["media.crazyrouter.com"]
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    result = registry.dispatch(
+        "image",
+        "relay_image",
+        ProviderDispatchRequest(prompt="Generate a clean asset sheet", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+    )
+
+    assert captured["authorization"] == "Bearer secret-relay-key"
+    assert captured["payload"] == {
+        "model": "gpt-image-2",
+        "prompt": "Generate a clean asset sheet",
+        "n": 1,
+        "size": "720x1280",
+        "quality": "low",
+        "output_format": "png",
+    }
+    assert captured["downloaded"] is True
+    assert captured["timeout"] == 120.0
+    assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
+    assert result["outputs"][0]["provider_url_persisted"] is False
+    assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
+    assert "media.crazyrouter.com" not in json.dumps(result, ensure_ascii=False)
+    assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
+
+
 def test_provider_example_config_builds_registry_without_secret_values() -> None:
     store = load_company_provider_secrets("configs/providers.example.json")
     registry = ProviderRegistry.from_store(store)
@@ -839,6 +894,20 @@ class _JsonResponse:
 
     def read(self) -> bytes:
         return json.dumps(self.payload).encode("utf-8")
+
+
+class _BytesResponse:
+    def __init__(self, payload: bytes):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self, *_args) -> bytes:
+        return self.payload
 
 
 def _png_bytes() -> bytes:

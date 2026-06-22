@@ -9,6 +9,7 @@ import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
 const MAX_KEYFRAME_POLL_ATTEMPTS = 540;
 const MAX_BOOTSTRAP_KEYFRAME_REFRESH = 4;
+const activeKeyframePolls = new Map();
 export async function pollNodeKeyframeGeneration(store, runtime, node) {
   const jobId = node.params?.lastKeyframeJobId;
   if (!jobId || !runtime?.pollKeyframe) {
@@ -16,7 +17,7 @@ export async function pollNodeKeyframeGeneration(store, runtime, node) {
     return;
   }
   try {
-    await pollKeyframeUntilTerminal(store, runtime, node.id, jobId, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
+    await startBackgroundKeyframePolling(store, runtime, node.id, jobId, { aspect_ratio: node.params?.spec?.ratio || "9:16" });
   } catch (error) {
     setNodeError(store, node.id, `图像生成轮询失败: ${safeError(error)}`);
     await store.flushRuntimeSave?.();
@@ -48,7 +49,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
     if (isKeyframeInProgress(response) && response?.job?.job_id && runtime?.pollKeyframe) {
-      await pollKeyframeUntilTerminal(store, runtime, node.id, response.job.job_id, request);
+      await startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request);
     }
   } catch (error) {
     setNodeError(store, node.id, `图像生成请求失败: ${safeError(error)}`);
@@ -68,8 +69,20 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
       const response = await runtime.pollKeyframe(jobId);
       applyKeyframeResponse(store, node.id, response, fallbackRequest(node), { kind: nodeGenerationKind(node) });
       await store.flushRuntimeSave?.();
+      if (isKeyframeInProgress(response)) {
+        void startBackgroundKeyframePolling(store, runtime, node.id, jobId, fallbackRequest(node));
+      }
     } catch {}
   }
+}
+function startBackgroundKeyframePolling(store, runtime, nodeId, jobId, request) {
+  const key = String(jobId || "");
+  if (!key || !runtime?.pollKeyframe) return Promise.resolve(null);
+  if (activeKeyframePolls.has(key)) return activeKeyframePolls.get(key);
+  const poll = pollKeyframeUntilTerminal(store, runtime, nodeId, key, request)
+    .finally(() => activeKeyframePolls.delete(key));
+  activeKeyframePolls.set(key, poll);
+  return poll;
 }
 async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
   let lastResponse = null;
@@ -95,14 +108,10 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
   return lastResponse;
 }
 function pollDelayMs(attempt) {
-  if (attempt < 3) return 2000;
-  if (attempt < 24) return 5000;
-  return 10000;
+  return attempt < 3 ? 2000 : attempt < 24 ? 5000 : 10000;
 }
 function shouldSavePollState(attempt, status, lastSavedStatus, response) {
-  if (!isKeyframeInProgress(response)) return true;
-  if (status && status !== lastSavedStatus) return true;
-  return attempt > 0 && attempt % 6 === 0;
+  return !isKeyframeInProgress(response) || (status && status !== lastSavedStatus) || (attempt > 0 && attempt % 6 === 0);
 }
 function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
   const status = response?.job?.status || "blocked";
@@ -156,15 +165,9 @@ function markKeyframeStillProcessing(store, nodeId, jobId) {
     n.params.lastKeyframeJobId = jobId;
   }, { history: false });
 }
-function nodeGenerationKind(node) {
-  return node?.params?.nodeRole === "asset_card_draft" ? "asset" : "keyframe";
-}
-function submitLabel(kind) {
-  return kind === "asset" ? "正在提交资产图生成" : "正在提交图片生成";
-}
-function fallbackRequest(node) {
-  return { aspect_ratio: node.params?.spec?.ratio || "9:16" };
-}
+function nodeGenerationKind(node) { return node?.params?.nodeRole === "asset_card_draft" ? "asset" : "keyframe"; }
+function submitLabel(kind) { return kind === "asset" ? "正在提交资产图生成" : "正在提交图片生成"; }
+function fallbackRequest(node) { return { aspect_ratio: node.params?.spec?.ratio || "9:16" }; }
 function reusableAssetForNode(node, reusableAsset, kind) {
   if (kind !== "asset") return reusableAsset;
   const assetType = String(node?.params?.assetCardDraft?.asset_type || "");

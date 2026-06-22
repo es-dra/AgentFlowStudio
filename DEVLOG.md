@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-22 - Crazyrouter Image Relay Readiness Pass
+
+- Added an OpenAI Images-compatible request path to the existing `api_relay`
+  provider so a server-local `codex_image` service can call Crazyrouter
+  `gpt-image-2` through `/images/generations` without changing the Studio
+  front-end model mapping.
+- Split image relay payload/output handling into a focused helper. The relay
+  now supports `data[0].url` image responses by downloading the provider media
+  into local AFS candidate artifacts while keeping provider URLs, raw responses,
+  and credentials out of Runtime-safe results.
+- Server diagnosis before deployment showed the live `afs-runtime` service was
+  still loading `/opt/afs/AgentFlowStudio/configs/providers.local.json`, did
+  not have a Crazyrouter service in the active registry, and had no
+  `CRAZYROUTER_API_KEY` in the service environment. The user shell environment
+  is not enough; systemd must receive the key and provider config path before
+  a real image smoke can validate quality or speed.
+
+Verification:
+
+```text
+pytest tests/test_provider_adapter_registry.py -> 30 passed
+pytest tests/test_provider_adapter_registry.py tests/test_web_studio_prompt_script_static.py tests/test_web_studio_frontend_wave.py tests/test_web_studio_assets_generation_static.py tests/test_codex_image_handoff.py tests/test_api_runtime_creative_agent_keyframes.py tests/test_api_runtime_keyframe_reference_assets.py -> 95 passed / 1 existing warning
+npm run check:studio-js -> JS syntax check passed: 109 files
+git diff --check -> passed
+py_compile provider_api_relay.py provider_api_relay_images.py -> passed
+server diagnosis -> Runtime active, but still on old provider config and no Crazyrouter service loaded
+```
+
+Boundary:
+
+- No API key, provider raw response, signed URL, generated media byte, user
+  session data, or Company OS private source content was written to the repo.
+  The current evidence proves adapter readiness, not a successful live
+  Crazyrouter image generation or human acceptance of visual quality.
+
 ## 2026-06-22 - Asset Reference Sheet Definition Pass
 
 - Changed storyboard-derived asset-card generation from "single asset image"

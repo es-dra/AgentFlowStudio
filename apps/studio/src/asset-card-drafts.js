@@ -57,13 +57,14 @@ export function assetCardDraftFromRef(asset, structuredShot, options = {}) {
 export function normalizeAssetCardDraft(draft) {
   const assetType = safeAssetType(draft?.asset_type);
   const label = safeLabel(draft?.label, assetType);
+  const evidenceText = String(draft?.evidence_text || "");
   return {
     ...draft,
     asset_type: assetType,
     label,
     status: draft?.status || "draft",
-    signature: String(draft?.signature || signatureFor(assetType, label, draft?.evidence_text || "")).trim(),
-    feature_card: compactCard(draft?.feature_card),
+    signature: normalizedSignature(assetType, label, evidenceText, draft?.signature),
+    feature_card: normalizedFeatureCard(assetType, label, evidenceText, draft?.feature_card),
     negative_locks: lines(draft?.negative_locks),
     memory_policy: {
       writes_fixed_asset: false,
@@ -181,6 +182,40 @@ function phraseFromShot(text, fallback) {
   return clean.split(/[。；.!?！？]/u)[0].slice(0, 80) || fallback;
 }
 
+function normalizedSignature(assetType, label, evidenceText, value) {
+  const clean = cleanDraftField(value);
+  if (!signatureHasMeaning(clean, label)) return signatureFor(assetType, label, evidenceText);
+  if (clean.includes("：") || clean.includes(":")) return clean.slice(0, 120);
+  return `${label}：${clean}`.slice(0, 120);
+}
+
+function normalizedFeatureCard(assetType, label, evidenceText, card) {
+  const fallback = defaultFeatureCard(assetType, label, evidenceText);
+  const source = card && typeof card === "object" ? card : {};
+  const result = {};
+  for (const [key] of assetCardFieldsForType(assetType)) {
+    const clean = cleanDraftField(source[key]);
+    const text = clean && signatureHasMeaning(clean, label) ? clean : fallback[key];
+    if (text) result[key] = String(text).slice(0, 260);
+  }
+  return result;
+}
+
+function signatureHasMeaning(value, label) {
+  const clean = stripAssetTags(String(value || ""))
+    .replace(new RegExp(`^${escapeRegExp(label)}\\s*[：:]?\\s*`, "u"), "")
+    .replace(/[：:\s]+$/u, "")
+    .trim();
+  return clean.length > 0;
+}
+
+function cleanDraftField(value) {
+  return stripAssetTags(String(value || ""))
+    .replace(/\s+/g, " ")
+    .replace(/^[\s，。、；：:]+/u, "")
+    .trim();
+}
+
 function shotDescription(structuredShot) {
   return String(structuredShot?.description || structuredShot?.source_text || "").trim();
 }
@@ -278,15 +313,6 @@ function safeLabel(value, assetType) {
   return String(value || fallback).replace(/^@+/, "").trim().slice(0, 40) || fallback;
 }
 
-function compactCard(card) {
-  const result = {};
-  for (const [key, value] of Object.entries(card || {})) {
-    const text = String(value || "").trim();
-    if (key && text) result[key] = text.slice(0, 260);
-  }
-  return result;
-}
-
 function lines(value) {
   const source = Array.isArray(value) ? value : String(value || "").split(/\r?\n/);
   return source.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 16);
@@ -294,4 +320,8 @@ function lines(value) {
 
 function slug(value) {
   return encodeURIComponent(value).replace(/%/g, "").slice(0, 40).toLowerCase() || "asset";
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
