@@ -14,6 +14,7 @@ from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement import llm_provider_gate
 from apps.api.runtime_models import SpriteChatRequest
+from apps.api.runtime_sprite_memory import register_runtime_sprite_memory_routes
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
@@ -34,6 +35,8 @@ SPRITE_PROMPT_LEAK_FRAGMENTS = (
 
 
 def register_runtime_sprite_routes(app: FastAPI, store: RuntimeStore) -> None:
+    register_runtime_sprite_memory_routes(app, store)
+
     @app.post("/projects/{project_id}/sprite/chat")
     def sprite_chat(project_id: str, request: SpriteChatRequest) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
