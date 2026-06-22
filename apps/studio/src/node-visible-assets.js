@@ -1,5 +1,5 @@
 export function visibleAssetForNode(store, node) {
-  const kind = assetKind(node.type);
+  const kind = assetKind(node);
   return {
     id: store.nextId("asset"),
     kind,
@@ -11,7 +11,14 @@ export function visibleAssetForNode(store, node) {
   };
 }
 
-function assetKind(type) {
+function assetKind(node) {
+  if (node?.params?.nodeRole === "asset_card_draft") {
+    const assetType = String(node.params?.assetCardDraft?.asset_type || "");
+    if (assetType === "scene") return "scene_asset_candidate";
+    if (assetType === "prop") return "prop_asset_candidate";
+    return "character_asset_candidate";
+  }
+  const type = node?.type;
   return {
     text: "text_brief",
     image: "keyframe",
@@ -24,6 +31,7 @@ function assetKind(type) {
 }
 
 function assetTitle(node) {
+  if (node.params?.nodeRole === "asset_card_draft") return node.title || "候选资产图";
   const fallback = {
     text: "文本创作摘要",
     image: "关键帧预览",
@@ -51,5 +59,8 @@ function thumbnailForKind(kind) {
     storyboard: "storyboard",
     director_setup: "director-board",
     video_comp: "video",
+    character_asset_candidate: "character-sheet",
+    scene_asset_candidate: "scene-board",
+    prop_asset_candidate: "prop-sheet",
   }[kind] || "reference";
 }

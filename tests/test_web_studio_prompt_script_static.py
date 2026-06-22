@@ -70,6 +70,9 @@ def test_storyboard_breakdown_creates_reviewable_structured_shots_without_asset_
     for field in ["镜号：", "时长：", "画面描述：", "景别：", "光影氛围：", "运镜：", "资产："]:
         assert field in structured_shot
     assert "export function extractShotAssetRefs" in structured_shot
+    assert '"主要场景"' in structured_shot
+    assert '"路灯"' in structured_shot
+    assert '"信", "照片", "灯"' not in structured_shot
     assert "shotAssetRefs" in script_breakdown
     assert "assetPrepState" in script_breakdown
     assert "pending_user_review" in script_breakdown
@@ -101,6 +104,9 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
     keyframes = (STUDIO_ROOT / "src" / "storyboard-keyframes.js").read_text(encoding="utf-8")
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    visible_assets = (STUDIO_ROOT / "src" / "node-visible-assets.js").read_text(encoding="utf-8")
+    lifecycle = (STUDIO_ROOT / "src" / "asset-lifecycle.js").read_text(encoding="utf-8")
 
     assert "识别资产" in nodes
     assert "生成关键帧层" in nodes
@@ -114,6 +120,14 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "fixed_visual_asset_ids" in keyframes
     assert "missing_asset_card_node_ids" in keyframes
     assert "asset.params?.visualAssets" in keyframes
+    assert "needs_fixed_assets" in node_actions
+    assert "shouldCollectConnectedUploads" in optimizer_contract
+    assert 'node?.params?.nodeRole !== "keyframe_generation"' in optimizer_contract
+    assert "asset_card_draft" in optimizer_contract
+    assert "character_asset_candidate" in visible_assets
+    assert "prop_asset_candidate" in visible_assets
+    assert 'kind.endsWith("_candidate")' in lifecycle
+    assert 'kind === "prop_asset"' in lifecycle
     assert "connect(store, scriptNode.id, keyframeNode.id)" in keyframes
 
 

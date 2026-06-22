@@ -111,6 +111,7 @@ export function assetImagePrompt(draft) {
   return [
     `生成可复用${assetCardTypeLabel(card.asset_type)}参考图：@${card.label}`,
     "用途：资产定稿参考图，不直接生成关键帧或视频。",
+    assetImageModeInstruction(card.asset_type),
     `签名：${card.signature}`,
     fields,
     "要求：主体清晰、便于后续固定为资产；不要添加文字、水印、UI、边框。",
@@ -120,28 +121,28 @@ export function assetImagePrompt(draft) {
 function defaultFeatureCard(assetType, label, shotText) {
   if (assetType === "scene") {
     return {
-      location: label,
-      layout: "根据分镜画面确定空间结构和主体位置关系",
-      props: "保留分镜中出现的关键道具与环境元素",
+      location: sceneLocation(label, shotText),
+      layout: sceneLayout(shotText),
+      props: sceneProps(shotText),
       lighting_mood: phraseFromShot(shotText, "自然光影，氛围服务剧情"),
-      time_weather: "按分镜语境确定",
+      time_weather: sceneTimeWeather(shotText),
     };
   }
   if (assetType === "prop") {
     return {
       category: label,
-      appearance: "根据分镜描述确定外观轮廓和辨识细节",
-      material: "材质待人工确认",
+      appearance: propAppearance(label, shotText),
+      material: propMaterial(label, shotText),
       scale: "与角色/场景比例一致",
-      usage: "按分镜动作使用",
-      continuity: "后续镜头保持同一造型和损耗状态",
+      usage: propUsage(label, shotText),
+      continuity: "后续镜头保持同一造型、材质和使用状态",
     };
   }
   return {
-    identity: label,
-    appearance: "根据分镜描述确定脸部/体态/轮廓辨识点",
-    wardrobe: "服装或外观待人工确认",
-    palette: "主色调待人工确认",
+    identity: characterIdentity(label, shotText),
+    appearance: characterAppearance(label, shotText),
+    wardrobe: characterWardrobe(shotText),
+    palette: characterPalette(shotText),
     demeanor: phraseFromShot(shotText, "神态服务当前剧情"),
   };
 }
@@ -157,9 +158,9 @@ function signatureFor(assetType, label, shotText) {
 }
 
 function defaultLocks(assetType, label) {
-  if (assetType === "scene") return [`保持${label}空间结构`, "保持光影氛围", "保持关键环境元素"];
+  if (assetType === "scene") return [`保持${label}空间结构`, "保持时间/光影氛围", "保持关键环境元素"];
   if (assetType === "prop") return [`保持${label}外观`, "保持材质和尺寸比例", "保持使用状态连续"];
-  return [`保持${label}身份`, "保持外观辨识点", "保持体态比例"];
+  return [`保持${label}身份`, "保持外观辨识点", "保持体态比例", "保持主色调"];
 }
 
 function roleInShot(assetType, label) {
@@ -176,6 +177,75 @@ function phraseFromShot(text, fallback) {
 
 function shotDescription(structuredShot) {
   return String(structuredShot?.description || structuredShot?.source_text || "").trim();
+}
+
+function assetImageModeInstruction(assetType) {
+  if (assetType === "scene") return "呈现方式：场景设定图或空场建立图，突出空间结构、时间、光影和可复用环境，不出现角色主体。";
+  if (assetType === "prop") return "呈现方式：单体道具设定图，主体居中、结构清楚、背景简洁，不让角色或场景抢主体。";
+  return "呈现方式：角色设定参考图，优先清晰全身和关键轮廓，背景简洁，不生成剧情关键帧。";
+}
+
+function characterIdentity(label, text) {
+  if (/机器人|机械|金属机身/.test(text)) return label === "主角" ? "来自未来的机器人主角" : `${label}，未来科幻机器人角色`;
+  return label;
+}
+
+function characterAppearance(label, text) {
+  if (/机器人|机械|金属机身/.test(text)) {
+    return "金属机身，精密发光纹路，清晰头部轮廓、躯干比例和四肢结构";
+  }
+  if (/脸|眼神|表情|体态|轮廓/.test(text)) return "根据分镜保留脸部、体态和轮廓辨识点";
+  return "根据分镜描述确定可复用外观辨识点";
+}
+
+function characterWardrobe(text) {
+  if (/机器人|机械|金属机身/.test(text)) return "无传统服装，机械外壳与发光部件作为外观层";
+  return "服装或外观按分镜语境确定，后续可人工补充";
+}
+
+function characterPalette(text) {
+  if (/冷蓝|星光|月光|青蓝|蓝/.test(text)) return "冷灰金属与青蓝发光纹路，低饱和城市反射";
+  if (/霓虹/.test(text)) return "低饱和霓虹反射与主体主色调保持一致";
+  return "主色调按分镜语境确定，后续可人工补充";
+}
+
+function sceneLocation(label, text) {
+  if (/屋顶|楼顶|天台/.test(text)) return "夜晚城市屋顶/楼顶平台";
+  if (/城市|天际线/.test(text)) return "城市外景与天际线环境";
+  return label;
+}
+
+function sceneLayout(text) {
+  if (/星空|天际线|屋顶|楼顶|天台/.test(text)) {
+    return "屋顶边缘与平台前景，远处城市天际线，广阔星空占据主要空间";
+  }
+  return "根据分镜画面确定空间结构、主体位置和远近层次";
+}
+
+function sceneProps(text) {
+  if (/灯火|霓虹|高楼|天际线/.test(text)) return "城市灯火、远处高楼、低饱和霓虹反射作为环境元素";
+  return "保留分镜中出现的关键环境元素，不额外新增无关道具";
+}
+
+function sceneTimeWeather(text) {
+  if (/夜|星空|月光/.test(text)) return "晴朗夜晚，冷蓝月光与星光主导";
+  if (/雨|雾|风/.test(text)) return "按分镜天气与空气状态确定";
+  return "按分镜语境确定";
+}
+
+function propAppearance(label, text) {
+  if (/灯|路灯|灯具|灯柱/.test(label)) return "独立灯具/光源结构，外轮廓清楚，发光区域和支撑结构可辨认";
+  return "根据分镜描述确定外观轮廓和辨识细节";
+}
+
+function propMaterial(label, text) {
+  if (/灯|路灯|灯具|灯柱/.test(label) && /科幻|未来|金属/.test(text)) return "金属与半透明发光材料，冷色反射";
+  return "材质待人工确认";
+}
+
+function propUsage(label, text) {
+  if (/灯|路灯|灯具|灯柱/.test(label)) return "作为环境光源或局部照明使用";
+  return "按分镜动作使用";
 }
 
 function safeAssetType(value) {

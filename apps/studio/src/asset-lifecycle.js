@@ -13,13 +13,15 @@ export function assetLifecycleState(asset) {
 
   if (status === "retired" || runtime === "excluded") return "retired";
   if (status === "rejected") return "rejected";
-  if (status === "draft" || runtime === "candidate") return "draft";
+  if (status === "draft" || runtime === "candidate" || kind.endsWith("_candidate")) return "draft";
   if (
     kind === "visual_asset"
     || kind === "character_asset"
     || kind === "scene_asset"
+    || kind === "prop_asset"
     || type === "character"
     || type === "scene"
+    || type === "prop"
   ) return "fixed";
   return "draft";
 }

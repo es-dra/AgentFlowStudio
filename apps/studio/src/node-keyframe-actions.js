@@ -79,17 +79,37 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
 
 async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request) {
   let lastResponse = null;
+  let lastSavedStatus = "";
   for (let attempt = 0; attempt < MAX_KEYFRAME_POLL_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await sleep(2000);
+    if (attempt > 0) await sleep(pollDelayMs(attempt));
     const response = await runtime.pollKeyframe(jobId);
     lastResponse = response;
     applyKeyframeResponse(store, nodeId, response, request);
-    await store.flushRuntimeSave?.();
-    if (!isKeyframeInProgress(response)) return response;
+    const status = response?.job?.status || "";
+    if (shouldSavePollState(attempt, status, lastSavedStatus, response)) {
+      await store.flushRuntimeSave?.();
+      lastSavedStatus = status;
+    }
+    if (!isKeyframeInProgress(response)) {
+      await store.flushRuntimeSave?.();
+      return response;
+    }
   }
   markKeyframeStillProcessing(store, nodeId, lastResponse?.job?.job_id || jobId);
   await store.flushRuntimeSave?.();
   return lastResponse;
+}
+
+function pollDelayMs(attempt) {
+  if (attempt < 3) return 2000;
+  if (attempt < 24) return 5000;
+  return 10000;
+}
+
+function shouldSavePollState(attempt, status, lastSavedStatus, response) {
+  if (!isKeyframeInProgress(response)) return true;
+  if (status && status !== lastSavedStatus) return true;
+  return attempt > 0 && attempt % 6 === 0;
 }
 
 function applyKeyframeResponse(store, nodeId, response, request) {

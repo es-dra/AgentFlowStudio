@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS, sanitize_generation_param
 from apps.api.runtime_studio_state_assets import sanitize_assets
-from apps.api.runtime_studio_state_context import sanitize_context_bundle
+from apps.api.runtime_studio_state_params import SAFE_NODE_PARAM_KEYS, sanitize_node_params
 from apps.api.runtime_studio_state_preview import LOCAL_PATH_PATTERN, safe_node_preview_url, safe_preview_url
 from apps.api.runtime_store import safe_id
 
@@ -26,28 +25,6 @@ FORBIDDEN_STUDIO_KEYS = {
     "knowledge_weights",
     "hidden_memory",
 }
-SAFE_NODE_PARAM_KEYS = (
-    "model",
-    "spec",
-    "camera",
-    "motion",
-    "styleRef",
-    "attachments",
-    "directorSetup",
-    "isReference",
-    "intent",
-    "uploads",
-    "previewAspectRatio",
-    "visualAssets",
-    "visual_asset_ids",
-    "firstFrameImageAssetId",
-    "lastFrameImageAssetId",
-    "lastVideoJobId",
-    "lastVideoPreviewUrl",
-    *SAFE_GENERATION_PARAM_KEYS,
-    "quotaOverrideConfirmed",
-    "lastContextBundle",
-)
 PRUNED_RUNTIME_PARAM_KEYS = {
     "lastContextBundle",
     "temporaryLockOverrides",
@@ -146,36 +123,13 @@ def _edges(value: Any) -> dict[str, Any]:
 
 
 def _node_params(value: dict[str, Any], *, project_id: str | None = None) -> dict[str, Any]:
-    safe_params: dict[str, Any] = {}
-    for key in SAFE_NODE_PARAM_KEYS:
-        if key not in value:
-            continue
-        if key == "uploads":
-            safe_params[key] = _uploads(value[key], project_id=project_id)
-        elif key in {"firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId"}:
-            safe_params[key] = safe_id(str(value[key]))
-        elif key == "lastVideoPreviewUrl":
-            safe_params[key] = safe_preview_url(value[key], project_id=project_id)
-        elif key in SAFE_GENERATION_PARAM_KEYS:
-            generation_param = sanitize_generation_param(
-                key,
-                value[key],
-                project_id=project_id,
-                preview_url=safe_preview_url,
-                text=_text,
-                number=_number,
-            )
-            if generation_param not in (None, "", [], {}):
-                safe_params[key] = generation_param
-        elif key == "quotaOverrideConfirmed":
-            safe_params[key] = bool(value[key])
-        elif key == "lastContextBundle":
-            bundle = sanitize_context_bundle(value[key])
-            if bundle:
-                safe_params[key] = bundle
-        else:
-            safe_params[key] = value[key]
-    return safe_params
+    return sanitize_node_params(
+        value,
+        project_id=project_id,
+        text=_text,
+        number=_number,
+        preview_url=safe_preview_url,
+    )
 
 
 def _order(value: Any, nodes: Any) -> list[str]:
@@ -223,8 +177,6 @@ def _reject_node_params(params: Any) -> None:
         if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
             raise ValueError(f"studio state contains forbidden field: {key}")
         if key in SAFE_NODE_PARAM_KEYS:
-            if key == "uploads":
-                _uploads(item)
             _reject_forbidden(item)
 
 
@@ -246,20 +198,6 @@ def _jsonable(value: Any) -> Any:
     dumped = json.dumps(value, ensure_ascii=False)
     _reject_forbidden(value)
     return json.loads(dumped)
-
-
-def _uploads(value: Any, *, project_id: str | None = None) -> list[Any]:
-    if not isinstance(value, list):
-        return []
-    result: list[Any] = []
-    for item in value[:24]:
-        if not isinstance(item, dict):
-            continue
-        upload = dict(item)
-        if "preview_url" in upload:
-            upload["preview_url"] = safe_preview_url(upload.get("preview_url"), project_id=project_id)
-        result.append(upload)
-    return result
 
 
 __all__ = ("sanitize_studio_state",)

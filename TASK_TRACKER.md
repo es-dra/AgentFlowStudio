@@ -12,6 +12,27 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio chain regeneration addendum: 2026-06-22 pass fixed the
+internal-test chain issues found on the live canvas. Runtime Studio state now
+keeps safe structured params for storyboard shots, asset-card drafts, fixed
+visual assets, keyframe layers, uploads, warnings, and one-run exclusions, so
+reload/server save no longer erases the reviewed production graph. Storyboard
+LLM JSON parsing accepts fenced/trailing output instead of silently degrading
+to coarse text splitting, and the local fallback no longer misclassifies
+contextual `信号` / `灯火` as prop assets. Candidate asset-card images remain
+editable drafts and are excluded from keyframe prompt/context until human
+confirmation promotes them to fixed assets; keyframe nodes show missing
+candidate cards and block generation before fixed assets exist. Keyframe
+polling now reduces repeated full-state saves to lower Runtime pressure during
+long image jobs. Verification before merge: full pytest passed 596 / 520
+deselected / 2 existing warnings; `npm run check:studio-js` passed for 107
+files; CLI help and version passed; full Studio browser QA passed; maintenance
+audit failed=0 with warnings only; `git diff --check` passed. Boundary: no
+provider raw response, signed URL, local media byte, secret, invite code,
+session token, or Company OS private source content was written. Project
+lesson to retain: candidate/fixed asset separation must be enforced in
+Runtime state, node UI state, and prompt assembly, not only in labels.
+
 Current script review flow addendum: 2026-06-22 pass changed the active
 text-to-storyboard chain to the reviewed sequence. Text-node `拆分为分镜` now
 routes through Runtime `/storyboard-breakdowns`, uses LLM only behind the LLM

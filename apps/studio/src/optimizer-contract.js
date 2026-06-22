@@ -18,7 +18,7 @@ export function buildOptimizationRequest(state, node) {
   const nodeParameters = nodeParameterSnapshot(node);
   const assetRefs = safeAssetRefs(state, node);
   const contextSubgraph = buildContextSubgraph(state, node, "prompt_optimize");
-  const referenceCount = collectConnectedImageAssetRefs(state, node).length;
+  const referenceCount = shouldCollectConnectedUploads(node) ? collectConnectedImageAssetRefs(state, node).length : 0;
   const connectedReferences = connectedReferenceNodeSummaries(state, node);
   if (directorSetup) nodeParameters.director_summary = directorPromptSummary(normalizeDirectorSetup(directorSetup));
   if (referenceCount) nodeParameters.reference_image_count = referenceCount;
@@ -143,12 +143,13 @@ export function buildContextSubgraph(state, node, runtimeWorkMode = "context_gen
 }
 
 function safeContextNode(node) {
+  const suppressDraftUploads = node.params?.nodeRole === "asset_card_draft" && !hasFixedVisualAssets(node);
   return {
     id: String(node.id || ""),
     type: normalizeNodeType(node.type),
     title: String(node.title || "").slice(0, 80),
     prompt: String(node.prompt || node.content || "").replace(/\s+/g, " ").trim().slice(0, 240),
-    image_asset_refs: nodeImageAssetRefs(node).slice(0, 4),
+    image_asset_refs: suppressDraftUploads ? [] : nodeImageAssetRefs(node).slice(0, 4),
     visual_asset_ids: nodeVisualAssetIds(node).slice(0, 8),
     director_setup_summary: node.params?.directorSetup
       ? directorPromptSummary(normalizeDirectorSetup(node.params.directorSetup)).slice(0, 240)
@@ -185,7 +186,7 @@ function linkedDirectorSetup(state, node) {
 }
 
 function safeAssetRefs(state, node) {
-  const refs = collectConnectedImageAssetRefs(state, node);
+  const refs = shouldCollectConnectedUploads(node) ? collectConnectedImageAssetRefs(state, node) : [];
   if (node.params?.firstFrameImageAssetId) refs.push(String(node.params.firstFrameImageAssetId));
   if (node.params?.lastFrameImageAssetId) refs.push(String(node.params.lastFrameImageAssetId));
   for (const att of node.params?.attachments || []) refs.push(String(att.id || att));
@@ -241,6 +242,9 @@ function connectedReferenceNodeSummaries(state, node) {
   for (const edge of Object.values(state.edges)) {
     if (edge.to !== node.id) continue;
     const upstream = state.nodes[edge.from];
+    if (node.params?.nodeRole === "keyframe_generation" && upstream?.params?.nodeRole === "asset_card_draft" && !hasFixedVisualAssets(upstream)) {
+      continue;
+    }
     const refs = nodeImageAssetRefs(upstream);
     if (!upstream || (!refs.length && !String(upstream.prompt || "").trim())) continue;
     summaries.push({
@@ -252,6 +256,15 @@ function connectedReferenceNodeSummaries(state, node) {
     });
   }
   return summaries.slice(0, 6);
+}
+
+function shouldCollectConnectedUploads(node) {
+  return node?.params?.nodeRole !== "keyframe_generation";
+}
+
+function hasFixedVisualAssets(node) {
+  return (Array.isArray(node?.params?.visualAssets) ? node.params.visualAssets : [])
+    .some((asset) => ["fixed", "ready"].includes(String(asset?.status || "")));
 }
 
 export function normalizeOptimization(result, request) {

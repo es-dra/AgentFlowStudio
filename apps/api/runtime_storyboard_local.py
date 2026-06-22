@@ -5,9 +5,9 @@ from typing import Any
 
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
-SCENE_HINTS = ("办公室", "房间", "街道", "屋顶", "城市", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
+SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
 CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生")
-PROP_HINTS = ("手机", "电脑", "键盘", "刀", "剑", "车", "信", "照片", "灯", "书", "门", "地图")
+PROP_HINTS = ("手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
 
 
 def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None) -> list[dict[str, Any]]:
@@ -175,8 +175,12 @@ def _sound(text: str) -> str:
 
 
 def _classify_asset(label: str, context: str) -> str:
-    if any(hint in label or f"{label}里" in context for hint in SCENE_HINTS):
+    if any(hint in label or f"{label}里" in context or f"{label}中" in context for hint in SCENE_HINTS):
         return "scene"
+    if label == "灯":
+        return "prop" if re.search(r"@灯|路灯|台灯|灯具|灯柱|灯盏", context) else "scene"
+    if label == "信":
+        return "prop" if re.search(r"@信|信件|信封|信纸|一封信|书信", context) else "character"
     if any(hint in label for hint in PROP_HINTS):
         return "prop"
     return "character"

@@ -1,7 +1,7 @@
 const ASSET_RE = /@([A-Za-z0-9_\-\u4e00-\u9fff·]+)/g;
-const SCENE_HINTS = ["办公室", "房间", "街道", "屋顶", "城市", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
+const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
 const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生"];
-const PROP_HINTS = ["手机", "电脑", "键盘", "刀", "剑", "车", "信", "照片", "灯", "书", "门"];
+const PROP_HINTS = ["手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门"];
 
 export function structuredShotFromSegment(segment, index) {
   const parsed = structuredShotFromFormattedText(segment, index);
@@ -52,7 +52,7 @@ export function structuredShotFromFormattedText(text, index) {
 
 export function structuredShotText(shot) {
   const assetLine = shot.asset_refs.length
-    ? shot.asset_refs.map(assetRefToken).join("、")
+    ? shot.asset_refs.map(assetRefDisplay).join("、")
     : "@主角、@主要场景";
   return [
     `镜号：${String(shot.index).padStart(2, "0")}`,
@@ -78,6 +78,10 @@ export function extractShotAssetRefs(text) {
 
 export function assetRefToken(asset) {
   return `@${asset.label}`;
+}
+
+export function assetRefDisplay(asset) {
+  return `${assetRefToken(asset)}（${assetTypeShortLabel(asset.asset_type)}）`;
 }
 
 export function assetTypeLabel(asset) {
@@ -175,9 +179,19 @@ function inferSound(text) {
 }
 
 function classifyAsset(label, context) {
-  if (SCENE_HINTS.some((hint) => label.includes(hint) || context.includes(`${label}里`))) return "scene";
+  if (SCENE_HINTS.some((hint) => label.includes(hint) || context.includes(`${label}里`) || context.includes(`${label}中`))) return "scene";
+  if (label === "灯") return /@灯|路灯|台灯|灯具|灯柱|灯盏/.test(context) ? "prop" : "scene";
+  if (label === "信") return /@信|信件|信封|信纸|一封信|书信/.test(context) ? "prop" : "character";
   if (PROP_HINTS.some((hint) => label.includes(hint))) return "prop";
   return "character";
+}
+
+function assetTypeShortLabel(assetType) {
+  return {
+    character: "角色",
+    scene: "场景",
+    prop: "道具",
+  }[assetType] || "资产";
 }
 
 function cleanText(value) {

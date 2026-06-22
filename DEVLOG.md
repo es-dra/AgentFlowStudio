@@ -1,5 +1,47 @@
 # Devlog
 
+## 2026-06-22 - Studio Chain Regeneration Guardrails
+
+- Hardened the Studio text -> storyboard -> asset-card -> keyframe chain around
+  the current internal-test findings. Runtime Studio state now preserves only
+  safe structured node params for storyboard shots, candidate asset cards,
+  fixed visual assets, keyframe layer state, uploads, warnings, and one-run
+  exclusions through small sanitizer modules instead of dropping the production
+  graph semantics on save/reload.
+- Fixed storyboard breakdown parsing so fenced or trailing LLM JSON is accepted
+  instead of silently falling back to rough text splitting. The deterministic
+  fallback also stops treating contextual words like `信号` and `灯火` as
+  standalone prop assets. Provider output parsing now lives in a separate
+  small module so the Runtime route remains orchestration-only.
+- Tightened the candidate/fixed boundary: generated asset-card image candidates
+  remain editable drafts until human confirmation, are saved as candidate asset
+  kinds, and are not injected into keyframe prompt/context. Keyframe nodes now
+  record missing candidate cards and block generation until required assets are
+  fixed.
+- Reduced image-generation pressure by avoiding repeated full Studio-state
+  saves during every keyframe poll tick; state is flushed on terminal/status
+  changes and periodic checkpoints instead.
+
+Verification:
+
+```text
+pytest -> 596 passed / 520 deselected / 2 existing warnings
+npm run check:studio-js -> JS syntax check passed: 107 files
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/studio_full_coverage_browser_qa.py --timeout-ms 30000 -> passed
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider raw response, signed URL, local media byte, secret, invite code,
+  session token, or Company OS private source content was written.
+- Internalized project lesson: candidate assets and fixed assets are separate
+  evidence states. The boundary must be represented in persisted Runtime state,
+  user-visible node state, and prompt assembly; UI labels alone are not enough.
+
 ## 2026-06-22 - Script Review Flow And Runtime Storyboard Breakdown
 
 - Reworked text-to-storyboard flow so `拆分为分镜` now calls the Runtime

@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import json
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +13,8 @@ from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement_dispatch import dispatch_llm_with_fallback
 from apps.api.runtime_llm_enhancement_gate import llm_provider_gate
 from apps.api.runtime_models import PromptOptimizationRequest, StoryboardBreakdownRequest
-from apps.api.runtime_storyboard_local import local_storyboard_shots, normalize_asset_ref, structured_shot
+from apps.api.runtime_storyboard_local import local_storyboard_shots
+from apps.api.runtime_storyboard_provider_parse import shots_from_provider_text
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
@@ -94,7 +93,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
             )
             provider_result = dispatch_llm_with_fallback(registry, llm_request, dispatch_request)
             provider_calls_started = bool(provider_result.get("provider_calls_started", True))
-            shots = _shots_from_provider_text(str(provider_result.get("text") or ""))
+            shots = shots_from_provider_text(str(provider_result.get("text") or ""))
             status = "provider_structured"
         except ValueError as exc:
             discard_reason = _safe_reason(str(exc))
@@ -210,63 +209,6 @@ def _storyboard_instruction(request: StoryboardBreakdownRequest) -> str:
             request.script_text,
         ]
     )
-
-
-def _shots_from_provider_text(text: str) -> list[dict[str, Any]]:
-    payload = _json_from_text(text)
-    raw_shots = payload.get("shots")
-    if not isinstance(raw_shots, list):
-        raise ValueError("provider storyboard response missing shots")
-    shots = [_normalize_provider_shot(item, index + 1) for index, item in enumerate(raw_shots)]
-    shots = [item for item in shots if item]
-    if not shots:
-        raise ValueError("provider storyboard response has no usable shots")
-    return shots
-
-
-def _json_from_text(text: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start < 0 or end <= start:
-            raise ValueError("provider storyboard response is not json") from None
-        payload = json.loads(text[start : end + 1])
-    if not isinstance(payload, dict):
-        raise ValueError("provider storyboard response root is not object")
-    return payload
-
-
-def _normalize_provider_shot(item: Any, index: int) -> dict[str, Any]:
-    if not isinstance(item, dict):
-        return {}
-    description = _clean(item.get("description") or item.get("source_text") or "")
-    fallback = structured_shot(description, index)
-    asset_refs = item.get("asset_refs")
-    if isinstance(asset_refs, list) and asset_refs:
-        refs = [normalize_asset_ref(asset, idx) for idx, asset in enumerate(asset_refs)]
-        refs = [ref for ref in refs if ref]
-    else:
-        refs = fallback["asset_refs"]
-    return {
-        **fallback,
-        "shot_id": str(item.get("shot_id") or fallback["shot_id"]),
-        "index": int(item.get("index") or index),
-        "duration": str(item.get("duration") or fallback["duration"]),
-        "description": description or fallback["description"],
-        "shot_size": str(item.get("shot_size") or fallback["shot_size"]),
-        "light_atmosphere": str(item.get("light_atmosphere") or fallback["light_atmosphere"]),
-        "camera_motion": str(item.get("camera_motion") or fallback["camera_motion"]),
-        "dialogue": str(item.get("dialogue") or fallback["dialogue"]),
-        "sound": str(item.get("sound") or fallback["sound"]),
-        "asset_refs": refs,
-        "source_text": _clean(item.get("source_text") or description),
-    }
-
-
-def _clean(value: Any) -> str:
-    return " ".join(str(value or "").split())
 
 
 def _safe_reason(value: str) -> str:

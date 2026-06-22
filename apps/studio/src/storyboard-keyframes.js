@@ -10,6 +10,10 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
   const missingIds = assetNodes
     .filter((asset) => !(asset.params?.visualAssets || []).some(isFixedVisualAsset))
     .map((asset) => asset.id);
+  const missingAssets = assetNodes
+    .filter((asset) => missingIds.includes(asset.id))
+    .map((asset) => asset.params?.assetCardDraft || asset.params?.asset_prep?.asset_ref || null)
+    .filter(Boolean);
   const structuredShot = scriptNode.params?.structuredShot
     || structuredShotFromSegment(scriptNode.content || scriptNode.prompt || "", Number(scriptNode.params?.scriptSegmentIndex || 1));
   let keyframeNode = existingKeyframeNode(state, scriptNode.id);
@@ -18,7 +22,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
     const node = s.nodes[keyframeNode.id];
     if (!node) return;
     node.title = `关键帧 · ${scriptNode.title || structuredShot.shot_id || "分镜"}`;
-    node.prompt = keyframePrompt(structuredShot, fixedAssets);
+    node.prompt = keyframePrompt(structuredShot, fixedAssets, missingAssets);
     node.content = "";
     node.status = "empty";
     node.params.nodeRole = "keyframe_generation";
@@ -45,7 +49,7 @@ function downstreamAssetCardNodes(state, scriptNodeId) {
       .map((edge) => edge.to),
   );
   return Object.values(state.nodes || {})
-    .filter((node) => downstreamIds.has(node.id) && node.params?.assetCardDraft);
+    .filter((node) => downstreamIds.has(node.id) && isAssetCardNode(node));
 }
 
 function fixedVisualAssetsFromAssetNodes(assetNodes) {
@@ -68,21 +72,32 @@ function existingKeyframeNode(state, scriptNodeId) {
     .find((node) => node?.params?.keyframeLayer?.source_script_node_id === scriptNodeId) || null;
 }
 
-function keyframePrompt(shot, fixedAssets) {
+function keyframePrompt(shot, fixedAssets, missingAssets) {
   const fixedLines = fixedAssets.map((asset) => {
     const label = asset.label || asset.asset_id;
     const signature = asset.signature ? `：${asset.signature}` : "";
     return `- @${label}${signature}`;
   });
+  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（待确认固定）`);
   return [
     `根据分镜生成关键帧：${shot.description || shot.source_text || ""}`,
     `镜头：${shot.shot_size || "中景"}；光影：${shot.light_atmosphere || "自然光影"}；运镜参考：${shot.camera_motion || "固定机位"}`,
-    fixedLines.length ? "已固定资产（必须保持）：" : "已固定资产：暂无；候选资产卡不会作为约束注入。",
+    fixedLines.length ? "已固定资产（必须保持）：" : "",
     ...fixedLines,
+    missingLines.length ? "待固定资产（生成前应先确认，不作为参考图注入）：" : "",
+    ...missingLines,
     "画面要求：单张关键帧，主体清晰，延续分镜剧情，不添加文字、水印、UI 或边框。",
   ].filter(Boolean).join("\n");
 }
 
 function isFixedVisualAsset(asset) {
-  return ["fixed", "ready", ""].includes(String(asset?.status || ""));
+  return ["fixed", "ready"].includes(String(asset?.status || ""));
+}
+
+function isAssetCardNode(node) {
+  return Boolean(
+    node?.params?.assetCardDraft
+    || node?.params?.nodeRole === "asset_card_draft"
+    || node?.params?.asset_prep?.source_script_node_id,
+  );
 }
