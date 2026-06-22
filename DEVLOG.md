@@ -30,13 +30,14 @@ pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_f
 python tools/maintenance_audit.py -> failed=0, warnings only
 git diff --check -> passed
 python -m py_compile for changed Runtime image modules -> passed
+three-end deploy -> local/GitHub/server /home/server /opt aligned at 94fb9e1; afs-runtime and afs-codex-image-worker active; Runtime health ready
 ```
 
 Boundary:
 
-- No provider gate, server deployment, generated media byte, provider raw
-  response, signed URL, secret, invite code, session token, user account data,
-  or Company OS private source content was written.
+- Provider gates were not changed by this deployment. No generated media byte,
+  provider raw response, signed URL, secret, invite code, session token, user
+  account data, or Company OS private source content was written.
 - Internalized project lesson: asset-card generation is not a keyframe
   generation with different labels. Asset type must affect prompt assembly,
   node progress semantics, upload roles, and verification evidence.

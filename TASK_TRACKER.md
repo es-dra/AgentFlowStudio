@@ -27,12 +27,15 @@ polling so long generation can be distinguished from queue wait. Verification:
 full pytest passed 598 / 520 deselected / 2 existing warnings; `npm run
 check:studio-js` passed for 108 files; CLI help and version passed; focused
 image-handoff and Studio asset/front-end regressions passed; `git diff --check`
-Python compile checks, and maintenance audit passed with warnings only. Boundary: no provider gate, deployment,
-generated media byte, provider raw response, signed URL, secret, invite code,
-session token, user account data, or Company OS private source content was
-written. Remaining user-facing risk: live image quality still depends on the
-active image provider/worker, but the request now gives role-specific inputs
-instead of duplicated keyframe prompts.
+Python compile checks, and maintenance audit passed with warnings only.
+Deployment: GitHub `master`, server `/home/afs-ops/AgentFlowStudio`, and
+server `/opt/afs/AgentFlowStudio` aligned at `94fb9e1`; `afs-runtime` and
+`afs-codex-image-worker` are active; Runtime health is ready. Boundary:
+provider gates were not changed; no generated media byte, provider raw
+response, signed URL, secret, invite code, session token, user account data, or
+Company OS private source content was written. Remaining user-facing risk: live
+image quality still depends on the active image provider/worker, but the
+request now gives role-specific inputs instead of duplicated keyframe prompts.
 
 Current Studio chain regeneration addendum: 2026-06-22 pass fixed the
 internal-test chain issues found on the live canvas. Runtime Studio state now
