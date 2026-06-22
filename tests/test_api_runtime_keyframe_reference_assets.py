@@ -258,6 +258,93 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
     assert "d:\\" not in serialized
 
 
+def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_guard(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    captured: dict[str, object] = {}
+
+    def fake_dispatch(capability, service_id, request):
+        captured["reference_paths"] = list(request.reference_image_paths)
+        captured["subject_reference_image_path"] = request.subject_reference_image_path
+        captured["prompt"] = request.prompt
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                    "provider_url_persisted": False,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_keyframes.load_provider_registry",
+        lambda: _FakeRegistry(fake_dispatch, _FakeDescriptor(reference_image_slots=2)),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_asset_card_revision_refs"
+    first_ref = _upload_reference(client, project_id, "old-candidate.png")
+    second_ref = _upload_reference(client, project_id, "detail.png")
+
+    result = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "asset-card-node",
+            "prompt_text": "Regenerate the robot asset reference sheet after a card edit.",
+            "optimized_prompt": "Regenerate the robot asset reference sheet after a card edit.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "16:9",
+            "candidate_count": 1,
+            "asset_refs": [first_ref, second_ref],
+            "node_parameters": {
+                "node_role": "asset_card_draft",
+                "asset_card_revision": {
+                    "mode": "image_guided_partial_revision",
+                    "reference_assets": [
+                        {"asset_id": first_ref, "role": "identity_layout_anchor", "priority": 1},
+                        {"asset_id": second_ref, "role": "secondary_identity_reference", "priority": 2},
+                    ],
+                    "changed_fields": [
+                        {"field": "appearance", "label": "外形辨识", "from": "金属机身", "to": "毛绒机身"},
+                        {"field": "wardrobe", "label": "服装/外观", "from": "无传统服装", "to": "穿着传统服装"},
+                    ],
+                    "preserve_locks": ["保持体态比例", "保持正侧背视图一致"],
+                },
+            },
+            "generated_at": "2026-06-23T13:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    assert [item["asset_id"] for item in plan["reference_images"]] == [first_ref, second_ref]
+    assert Path(str(captured["reference_paths"][0])).name == "source.png"
+    assert captured["subject_reference_image_path"] == captured["reference_paths"][0]
+    assert "Asset-card revision mode" in str(captured["prompt"])
+    assert "primary visual source of truth" in str(captured["prompt"])
+    assert "The changed fields are the only editable delta" in str(captured["prompt"])
+    assert "参考图只作为本次显式连线的视觉参考" not in str(captured["prompt"])
+    assert "参考图只补充相关视觉线索" not in str(captured["prompt"])
+    assert "Apply only the changed asset-card details" in str(captured["prompt"])
+    assert "Revision strength: conservative low-change pass" in str(captured["prompt"])
+    assert "Wardrobe edit scope: add clothing as an outer garment layer only" in str(captured["prompt"])
+    assert "Plush/fabric material must read as a surface covering on the same existing robot frame" in str(captured["prompt"])
+    assert "Do not turn the subject into a toy, chibi, mascot" in str(captured["prompt"])
+    assert "外形辨识: 毛绒机身" in str(captured["prompt"])
+    assert "服装/外观: 穿着传统服装" in str(captured["prompt"])
+
+
 def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
 
@@ -309,20 +396,37 @@ def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path
 
 
 class _FakeDescriptor:
-    prompt_char_limit = 1500
-    reference_image_slots = 1
     required_gate = "AFS_ALLOW_REMOTE_IMAGE"
 
-    def __init__(self, min_reference_image_edge_px: int = 0) -> None:
+    def __init__(self, min_reference_image_edge_px: int = 0, reference_image_slots: int = 1) -> None:
         self.min_reference_image_edge_px = min_reference_image_edge_px
+        self.reference_image_slots = reference_image_slots
+        self.prompt_char_limit = 1500
 
 
 class _FakeRegistry:
-    def __init__(self, dispatch) -> None:
+    def __init__(self, dispatch, descriptor: _FakeDescriptor | None = None) -> None:
         self._dispatch = dispatch
+        self._descriptor = descriptor or _FakeDescriptor()
 
     def descriptor(self, service_id: str) -> _FakeDescriptor:
-        return _FakeDescriptor()
+        return self._descriptor
 
     def dispatch(self, capability: str, service_id: str, request):
         return self._dispatch(capability, service_id, request)
+
+
+def _upload_reference(client: TestClient, project_id: str, filename: str) -> str:
+    upload = client.post(
+        f"/projects/{project_id}/image-assets",
+        json={
+            "node_id": "asset-card-node",
+            "filename": filename,
+            "mime_type": "image/png",
+            "data_base64": PNG_B64,
+            "role": "character_reference",
+            "generated_at": "2026-06-23T13:19:00+08:00",
+        },
+    )
+    assert upload.status_code == 200
+    return upload.json()["asset"]["asset_id"]

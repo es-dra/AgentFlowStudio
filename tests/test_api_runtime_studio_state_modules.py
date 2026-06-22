@@ -42,8 +42,10 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     assert "sanitize_context_bundle" in params_source
     assert "def sanitize_node_params" in params_source
     assert "assetCardDraft" in params_source
+    assert "assetCardRevision" in params_source
     assert "keyframeLayer" in params_source
     assert "def asset_card_draft" in param_values_source
+    assert "def asset_card_revision" in param_values_source
     assert "def keyframe_layer" in param_values_source
     assert "safe_preview_url" in sanitizer_source
     assert "def sanitize_context_bundle" in context_source

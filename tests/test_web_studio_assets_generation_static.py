@@ -134,6 +134,8 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
     asset_image_prompts = (STUDIO_ROOT / "src" / "asset-card-image-prompts.js").read_text(encoding="utf-8")
     asset_generation_prompt = (STUDIO_ROOT / "src" / "asset-card-generation-prompt.js").read_text(encoding="utf-8")
+    asset_revision_refs = (STUDIO_ROOT / "src" / "asset-revision-references.js").read_text(encoding="utf-8")
+    asset_card_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
     generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
@@ -143,6 +145,16 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
 
     for marker in ("assetCardPromptText", "safeAssetCardSnapshot", "node_role", "asset_card_draft"):
         assert marker in optimizer_contract
+    for marker in ("assetCardRevision", "image_guided_partial_revision", "identity_layout_anchor", "changed_fields"):
+        assert marker in asset_revision_refs + asset_card_panel + optimizer_contract
+    assert "assetCardRevisionImageRefs(node)" in optimizer_contract
+    assert "assetCardRevisionPromptSupplement(node)" in asset_generation_prompt
+    assert "Revision strength: conservative low-change pass" in asset_revision_refs
+    assert "primary visual source of truth" in asset_revision_refs
+    assert "only editable delta" in asset_revision_refs
+    assert "Wardrobe edit scope: add the requested clothing as an outer garment layer only" in asset_revision_refs
+    assert "Plush/fabric material must read as a surface covering on the same existing robot frame" in asset_revision_refs
+    assert "Do not turn the subject into a toy, chibi, mascot" in asset_revision_refs
     assert "assetImagePrompt(draft)" in asset_generation_prompt
     assert "assetCardPromptText(node)" in optimizer_contract.split("function primaryPromptText", 1)[1].split("const explicit", 1)[0]
     for marker in ("Character turnaround", "Environment reference", "Object reference", "Forbidden: software dashboard, app interface, data chart"):

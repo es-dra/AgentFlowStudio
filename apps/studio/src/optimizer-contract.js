@@ -3,6 +3,7 @@ import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
 import { providerServiceForImageModel } from "./presets/models.js";
 import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generation-prompt.js";
+import { assetCardRevisionImageRefs, safeAssetCardRevisionSnapshot } from "./asset-revision-references.js";
 
 const GENERATION_TARGET = {
   text: "prompt",
@@ -19,7 +20,7 @@ export function buildOptimizationRequest(state, node) {
   const nodeParameters = nodeParameterSnapshot(node);
   const assetRefs = safeAssetRefs(state, node);
   const contextSubgraph = buildContextSubgraph(state, node, "prompt_optimize");
-  const referenceCount = shouldCollectConnectedUploads(node) ? collectConnectedImageAssetRefs(state, node).length : 0;
+  const referenceCount = assetRefs.length;
   const connectedReferences = connectedReferenceNodeSummaries(state, node);
   if (directorSetup) nodeParameters.director_summary = directorPromptSummary(normalizeDirectorSetup(directorSetup));
   if (referenceCount) nodeParameters.reference_image_count = referenceCount;
@@ -55,6 +56,7 @@ function nodeParameterSnapshot(node) {
   };
   if (p.nodeRole) snapshot.node_role = String(p.nodeRole).slice(0, 80);
   if (p.assetCardDraft) snapshot.asset_card_draft = safeAssetCardSnapshot(p.assetCardDraft);
+  if (p.assetCardRevision) snapshot.asset_card_revision = safeAssetCardRevisionSnapshot(p.assetCardRevision);
   if (node.type === "image" && p.spec) {
     snapshot.spec = imageSpecLabel(p.spec);
     snapshot.panorama = Boolean(p.spec.panorama);
@@ -162,7 +164,7 @@ function safeContextNode(node) {
     type: normalizeNodeType(node.type),
     title: String(node.title || "").slice(0, 80),
     prompt: String(node.prompt || node.content || "").replace(/\s+/g, " ").trim().slice(0, 240),
-    image_asset_refs: suppressDraftUploads ? [] : nodeImageAssetRefs(node).slice(0, 4),
+    image_asset_refs: suppressDraftUploads ? assetCardRevisionImageRefs(node).slice(0, 4) : nodeImageAssetRefs(node).slice(0, 4),
     visual_asset_ids: nodeVisualAssetIds(node).slice(0, 8),
     director_setup_summary: node.params?.directorSetup
       ? directorPromptSummary(normalizeDirectorSetup(node.params.directorSetup)).slice(0, 240)
@@ -199,7 +201,8 @@ function linkedDirectorSetup(state, node) {
 }
 
 function safeAssetRefs(state, node) {
-  const refs = shouldCollectConnectedUploads(node) ? collectConnectedImageAssetRefs(state, node) : [];
+  const refs = [...assetCardRevisionImageRefs(node)];
+  if (!refs.length && shouldCollectConnectedUploads(node)) refs.push(...collectConnectedImageAssetRefs(state, node));
   if (node.params?.firstFrameImageAssetId) refs.push(String(node.params.firstFrameImageAssetId));
   if (node.params?.lastFrameImageAssetId) refs.push(String(node.params.lastFrameImageAssetId));
   for (const att of node.params?.attachments || []) refs.push(String(att.id || att));
@@ -209,7 +212,7 @@ function safeAssetRefs(state, node) {
     .filter((v, i, arr) => arr.indexOf(v) === i)
     .filter((v) => !/[\\/]/.test(v))
     .filter((v) => !/(api_key|bearer|signed_url|token)/i.test(v))
-    .slice(0, 3);
+    .slice(0, 4);
 }
 
 export function collectConnectedImageAssetRefs(state, node) {

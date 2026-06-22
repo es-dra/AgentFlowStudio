@@ -18,6 +18,7 @@ from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resol
 from apps.api.runtime_model_call_context import keyframe_model_call_context
 from apps.api.runtime_models import KeyframeGenerationRequest, PromptOptimizationRequest
 from apps.api.runtime_media_validation import reference_image_size_blocks
+from apps.api.runtime_asset_card_revision_prompt import asset_card_revision_reference_instruction
 from apps.api.runtime_provider_dispatch import dispatch_provider_with_retry
 from apps.api.runtime_keyframe_payloads import (
     keyframe_candidate_summary,
@@ -78,22 +79,32 @@ def build_keyframe_generation(
         context_bundle,
         limit=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
     )
+    is_asset_card_revision = _has_asset_card_revision(request)
     if context_bundle:
         provider_prompt = _guarded_provider_keyframe_prompt(
             provider_prompt_from_bundle(context_bundle),
             reference_count=len(reference_images),
+            asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     else:
         provider_prompt = _guarded_provider_keyframe_prompt(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
             reference_count=len(reference_images),
+            asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     if reference_images:
+        reference_instruction = _reference_prompt_instruction(request, len(reference_images))
+        prompt_with_references = (
+            f"{reference_instruction}\n{provider_prompt}"
+            if is_asset_card_revision
+            else f"{provider_prompt}\n{reference_instruction}"
+        )
         provider_prompt = _guarded_provider_keyframe_prompt(
-            f"{provider_prompt}\n{_reference_prompt_instruction(request, len(reference_images))}",
+            prompt_with_references,
             reference_count=len(reference_images),
+            asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
@@ -372,13 +383,25 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
 
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:
     animal_reference = _looks_like_animal_reference_request(request)
-    lines = [
-        (
-            f"Connected reference images: {reference_count}. 参考图只作为本次显式连线的视觉参考。"
-            "只保留与用户目标不冲突的相关主体特征、轮廓比例、颜色材质、镜头关系和关键视觉线索。"
-            "不要把无关背景、服装、图表、界面文字或旧失败风格带入结果。"
+    revision = asset_card_revision_reference_instruction(request)
+    lines = []
+    if revision:
+        lines.append(revision)
+    if revision:
+        lines.append(
+            (
+                f"Connected reference images: {reference_count}. For this asset-card revision, reference image #1 is the primary visual source of truth; "
+                "other reference images are detail support only. Preserve original identity, sheet composition, proportions, camera distance, view layout, and all non-edited details."
+            )
         )
-    ]
+    else:
+        lines.append(
+            (
+                f"Connected reference images: {reference_count}. 参考图只作为本次显式连线的视觉参考。"
+                "只保留与用户目标不冲突的相关主体特征、轮廓比例、颜色材质、镜头关系和关键视觉线索。"
+                "不要把无关背景、服装、图表、界面文字或旧失败风格带入结果。"
+            )
+        )
     if animal_reference:
         lines.append(
             "Animal subject reference: 如果参考主体是猫或动物，只保留同一动物主体的毛色、斑纹、眼睛、耳朵、尾巴和体型比例；"
@@ -393,6 +416,11 @@ def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_
         if prompt:
             lines.append(f"Reference note {title}: {prompt}")
     return "\n".join(lines)
+
+
+def _has_asset_card_revision(request: KeyframeGenerationRequest) -> bool:
+    params = request.node_parameters if isinstance(request.node_parameters, dict) else {}
+    return isinstance(params.get("asset_card_revision"), dict)
 
 
 def _looks_like_animal_reference_request(request: KeyframeGenerationRequest) -> bool:
@@ -444,9 +472,10 @@ def _guarded_provider_keyframe_prompt(
     value: str,
     *,
     reference_count: int = 0,
+    asset_card_revision: bool = False,
     limit: int = DEFAULT_IMAGE_PROMPT_LIMIT,
 ) -> str:
-    guard = _image_generation_guard(reference_count=reference_count)
+    guard = _image_generation_guard(reference_count=reference_count, asset_card_revision=asset_card_revision)
     reserve = len(guard) + 1
     base_limit = max(240, limit - reserve)
     prompt = provider_keyframe_prompt(value, limit=base_limit)
@@ -457,13 +486,18 @@ def _guarded_provider_keyframe_prompt(
     return provider_keyframe_prompt(f"{prompt} {guard}", limit=limit)
 
 
-def _image_generation_guard(*, reference_count: int = 0) -> str:
+def _image_generation_guard(*, reference_count: int = 0, asset_card_revision: bool = False) -> str:
     base = (
         "保真约束：按用户提示直接生成清晰自然的主体，主体身份、物种、材质和关键特征必须可读；"
         "不要改成图标、标志、吉祥物、矢量插画、抽象符号或无关场景，除非用户明确要求这种风格。"
     )
     if reference_count <= 0:
         return base
+    if asset_card_revision:
+        return (
+            f"{base} 资产卡局部修订约束：本次携带 {reference_count} 张参考图；"
+            "reference image #1 is primary visual source of truth；changed fields are only editable delta；不要重设计身份、比例、版式或未编辑细节。"
+        )
     return (
         f"{base} 参考图约束：本次携带 {reference_count} 张参考图；"
         "参考图只补充相关视觉线索，不能覆盖用户本次明确的新目标。"

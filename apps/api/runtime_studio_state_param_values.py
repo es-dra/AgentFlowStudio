@@ -75,6 +75,45 @@ def asset_card_draft(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
     }
 
 
+def asset_card_revision(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    references: list[dict[str, Any]] = []
+    source_refs = value.get("reference_assets") if isinstance(value.get("reference_assets"), list) else []
+    for index, item in enumerate(source_refs):
+        if not isinstance(item, dict):
+            continue
+        asset_id = safe_id(text(item.get("asset_id") or item.get("assetId"), "", 120))
+        if not asset_id:
+            continue
+        role = text(item.get("role"), "identity_layout_anchor" if index == 0 else "secondary_identity_reference", 80)
+        references.append({"asset_id": asset_id, "role": role, "priority": len(references) + 1, "source": text(item.get("source"), "", 80)})
+        if len(references) >= 4:
+            break
+    changes: list[dict[str, str]] = []
+    source_changes = value.get("changed_fields") if isinstance(value.get("changed_fields"), list) else []
+    for item in source_changes:
+        if not isinstance(item, dict):
+            continue
+        field = safe_id(text(item.get("field"), "", 80))
+        target = text(item.get("to"), "", 240)
+        if not field or not target:
+            continue
+        changes.append({"field": field, "label": text(item.get("label"), "", 80), "from": text(item.get("from"), "", 240), "to": target})
+        if len(changes) >= 12:
+            break
+    return {
+        "schema_version": "afs_asset_card_revision.v0.1",
+        "mode": text(value.get("mode"), "text_only_revision", 80),
+        "asset_type": asset_type(value.get("asset_type")),
+        "asset_label": text(value.get("asset_label"), "", 80),
+        "reference_assets": references,
+        "changed_fields": changes,
+        "preserve_locks": text_list(value.get("preserve_locks"), text=text, max_items=12, max_length=500),
+        "created_at": text(value.get("created_at"), "", 80),
+    }
+
+
 def storyboard_breakdown(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
@@ -244,6 +283,7 @@ def asset_type(value: Any) -> str:
 
 
 __all__ = (
+    "asset_card_revision",
     "asset_card_draft",
     "asset_exclusions",
     "asset_refs",

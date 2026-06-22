@@ -12,6 +12,32 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current asset revision reference addendum: 2026-06-23 pass addresses asset-card
+regeneration drift where editing a single card detail, such as changing a robot
+surface from metal to plush, caused a full text-to-image reinterpretation. The
+fix adds a Studio-side `assetCardRevision` plan that preserves ordered safe
+image asset refs from prior generated/uploaded candidates, records changed card
+fields and preserve locks, and sends only those explicit refs into keyframe
+generation for asset-card drafts. Runtime adds an asset-card revision prompt
+guard so provider prompts treat references as identity/layout anchors and apply
+only the field delta instead of creating a new toy/chibi/mascot-style subject.
+The second pass adds field-specific edit policy and prompt-priority handling:
+`服装/外观` edits are constrained to outer-garment layering, `外形辨识` material
+edits are constrained to surface treatment, and revision instructions are
+prepended for asset-card revisions so prompt-length trimming preserves the
+changed-field delta and anti-drift constraints.
+The third pass upgrades this into reference-first / delta-only semantics:
+reference image #1 is the primary visual source of truth for identity,
+proportions, reference-sheet layout, camera distance, and non-edited details;
+changed card fields are the only editable delta. Runtime avoids the generic
+"reference image is only supplemental" guard for asset-card local revision.
+Verification: `npm run check:studio-js` passed for 113 files; relevant
+asset-reference/state/static/Codex handoff/manifest/script pytest passed 50 / 1
+existing warning; `git diff --check` passed. Boundary: no provider gate was
+opened, no live image call was made, and no provider raw response, signed URL,
+secret, local private path, generated media byte, or Company OS private source
+content was written.
+
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and
 provider-discard fallback now preserve semantic asset labels for robot/rooftop

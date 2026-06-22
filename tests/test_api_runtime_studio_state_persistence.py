@@ -107,6 +107,18 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
                 "params": {
                     "nodeRole": "asset_card_draft",
                     "assetCardDraft": asset_card,
+                    "assetCardRevision": {
+                        "mode": "image_guided_partial_revision",
+                        "asset_type": "character",
+                        "asset_label": "主角",
+                        "reference_assets": [
+                            {"asset_id": "img_ref_001", "role": "identity_layout_anchor", "priority": 1},
+                        ],
+                        "changed_fields": [
+                            {"field": "appearance", "label": "外形辨识", "from": "金属机身", "to": "毛绒机身"},
+                        ],
+                        "preserve_locks": ["保持体态比例", "保持正侧背视图一致"],
+                    },
                     "asset_prep": {"status": "card_ready", "source_script_node_id": "script_1"},
                     "uploads": [{"asset_id": "img_ref_001", "preview_url": preview_url}],
                     "visualAssets": [
@@ -158,6 +170,8 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
     assert script_params["structuredShot"]["asset_refs"][1]["asset_type"] == "scene"
     assert script_params["assetPrepState"]["status"] == "pending_user_review"
     assert asset_params["assetCardDraft"]["feature_card"]["appearance"] == "金属机身和青蓝发光纹路"
+    assert asset_params["assetCardRevision"]["reference_assets"][0]["asset_id"] == "img_ref_001"
+    assert asset_params["assetCardRevision"]["changed_fields"][0]["to"] == "毛绒机身"
     assert asset_params["visualAssets"][0]["preview_url"] == preview_url
     assert asset_params["lastVisualAssetWarnings"][0]["warning_id"] == "duplicate_visual_asset_label"
     assert keyframe_params["keyframeLayer"]["fixed_visual_asset_ids"] == ["vas_fixed_001"]

@@ -1,5 +1,49 @@
 # Devlog
 
+## 2026-06-23 - Asset Card Image Revision References
+
+- Fixed the asset-card edit/regenerate path that behaved like pure
+  text-to-image after a card detail changed. Studio now records an
+  `assetCardRevision` plan with ordered prior generated/uploaded image asset
+  refs, changed card fields, and preserve locks whenever a candidate asset card
+  is saved.
+- Asset-card drafts no longer collect arbitrary connected uploads. They carry
+  only the explicit revision refs, which keeps the previous reference-slot
+  overflow fix while allowing image-guided regeneration.
+- Runtime now appends an asset-card revision guard to provider prompts when
+  references are present: treat reference images as identity/layout anchors,
+  apply only the card-field delta, and avoid changing the subject into a toy,
+  chibi, mascot, unrelated character, or different body type.
+- Tightened field-level revision policy after the plush-robot clothing edit
+  still drifted visibly: `服装/外观` changes are now framed as an outer-garment
+  layer only, `外形辨识` material changes are limited to surface treatment, and
+  asset-card revision instructions are prepended ahead of the base prompt so
+  provider prompt-length trimming keeps the changed fields and preserve policy.
+- Strengthened the revision contract to reference-first / delta-only semantics:
+  for asset-card local edits, the first reference image is the primary visual
+  source of truth for identity, proportions, sheet layout, camera distance, and
+  all non-edited details; the changed card fields are the only editable delta.
+  Runtime no longer appends the generic "reference image is only supplemental"
+  guard on this path.
+- Studio state persistence now preserves the revision plan through Runtime
+  sanitization, so saving a card and navigating away does not discard the
+  reference logic.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed: 113 files
+pytest tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_studio_state_persistence.py tests/test_api_runtime_studio_state_modules.py tests/test_web_studio_assets_generation_static.py tests/test_codex_image_handoff.py tests/test_api_runtime_generation_manifest_safety.py tests/test_web_studio_prompt_script_static.py -> 50 passed / 1 existing warning
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider gate was opened and no live image generation was triggered. The
+  change writes only safe asset ids and prompt/test code to the repo; no
+  provider raw response, signed URL, secret, local private path, generated media
+  byte, or Company OS private source content was written.
+
 ## 2026-06-23 - Studio Asset Semantics and Canvas UX Repair
 
 - Repaired storyboard asset semantics so local fallback and provider-discard

@@ -5,6 +5,7 @@ import {
   normalizeAssetCardDraft,
 } from "../asset-card-drafts.js";
 import { assetImagePrompt, assetImageRatio } from "../asset-card-image-prompts.js";
+import { buildAssetCardRevisionState } from "../asset-revision-references.js";
 import { startNodeGeneration } from "../node-actions.js";
 import { el, showModal } from "../overlay.js";
 
@@ -23,12 +24,12 @@ export function openAssetCardPanel(store, nodeId, runtime = null) {
       return;
     }
     if (action === "save") {
-      saveAssetCard(store, nodeId, collect(modal, draft));
+      saveAssetCard(store, nodeId, collect(modal, draft), currentDraft(store, nodeId, draft));
       await store.flushRuntimeSave?.();
       close();
     }
     if (action === "save-regenerate") {
-      saveAssetCard(store, nodeId, collect(modal, draft));
+      saveAssetCard(store, nodeId, collect(modal, draft), currentDraft(store, nodeId, draft));
       await store.flushRuntimeSave?.();
       const fresh = store.get().nodes[nodeId];
       if (fresh) startNodeGeneration(store, runtime, fresh);
@@ -81,11 +82,12 @@ function collect(modal, prior) {
   });
 }
 
-function saveAssetCard(store, nodeId, draft) {
+function saveAssetCard(store, nodeId, draft, previousDraft) {
   store.set((s) => {
     const node = s.nodes[nodeId];
     if (!node) return;
     node.params.assetCardDraft = draft;
+    node.params.assetCardRevision = buildAssetCardRevisionState(node, previousDraft, draft);
     node.params.asset_prep = {
       ...(node.params.asset_prep || {}),
       status: "card_ready",
@@ -101,6 +103,10 @@ function saveAssetCard(store, nodeId, draft) {
       count: 1,
     };
   });
+}
+
+function currentDraft(store, nodeId, fallback) {
+  return normalizeAssetCardDraft(store.get().nodes[nodeId]?.params?.assetCardDraft || fallback);
 }
 
 function field(root, name) {

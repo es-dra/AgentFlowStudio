@@ -1,10 +1,12 @@
 import { assetCardTypeLabel } from "./asset-card-drafts.js";
 import { assetImagePrompt, assetPromptSupplementFromNode } from "./asset-card-image-prompts.js";
+import { assetCardRevisionPromptSupplement } from "./asset-revision-references.js";
 
 export function assetCardPromptText(node) {
   const draft = node.params?.assetCardDraft;
   if (!draft || node.params?.nodeRole !== "asset_card_draft") return "";
   const generated = assetImagePrompt(draft);
+  const revision = assetCardRevisionPromptSupplement(node);
   const manual = assetPromptSupplementFromNode(node);
   const typeLabel = assetCardTypeLabel(draft.asset_type);
   const guard = [
@@ -14,7 +16,7 @@ export function assetCardPromptText(node) {
     draft.asset_type === "character" ? "角色资产必须是同一角色的正面全身、侧面全身、背面全身和头部/关键材质细节参考；以身份、结构、材质、比例和辨识点为主，背景保持中性。" : "",
     draft.asset_type === "prop" ? "道具资产必须是单一道具的正面、侧面、俯视和局部结构/材质参考；以单体外观、材质、比例和使用状态为主，背景保持简洁。" : "",
   ].filter(Boolean).join("\n");
-  return [generated, manual, guard].filter(Boolean).join("\n");
+  return [generated, revision, manual, guard].filter(Boolean).join("\n");
 }
 
 export function safeAssetCardSnapshot(draft) {
