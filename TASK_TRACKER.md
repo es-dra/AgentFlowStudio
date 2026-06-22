@@ -26,11 +26,15 @@ provider. Verification: prompt static regressions passed 20; full pytest passed
 600 / 520 deselected / 2 existing warnings; `npm run check:studio-js` passed for
 110 files; CLI help/version passed; maintenance audit failed=0 with existing
 warnings only; `git diff --check` passed; Node prompt sample confirmed no `@`
-labels in provider-facing character/scene prompts. Boundary: no provider
-secret, provider raw response, signed URL, generated media byte, user account
-data, or Company OS private source content was written. Remaining validation:
-deploy, run a real Crazyrouter smoke, measure elapsed time, inspect the output,
-and leave final visual acceptance to the user.
+labels in provider-facing character/scene prompts. Deployment: local, GitHub,
+server `/home`, and server `/opt` aligned at `1b9892e`; `afs-runtime` restarted
+and health is ready. Live Crazyrouter smoke: character reference image succeeded
+in 30.34s; scene reference image succeeded in 29.23s; both produced 16:9
+non-UI reference images and did not collapse role/scene into the same abstract
+picture. Boundary: no provider secret, provider raw response, signed URL,
+generated media byte, user account data, or Company OS private source content
+was written to repo records. Remaining validation: user canvas regeneration and
+human visual acceptance.
 
 Current Crazyrouter image relay addendum: 2026-06-22 pass added
 OpenAI Images-compatible `api_relay` support so `codex_image` can be switched

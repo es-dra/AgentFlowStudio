@@ -28,14 +28,17 @@ python -m apps.cli.main version -> 0.1.0
 python tools/maintenance_audit.py -> failed=0, existing warnings only
 git diff --check -> passed
 Node prompt sample -> character/scene prompts use reference targets, 16:9 ratio, and no @ labels
+deployment -> local/GitHub/server home/server opt aligned at 1b9892e; afs-runtime restarted and health ready
+Crazyrouter smoke -> character reference succeeded in 30.34s; scene reference succeeded in 29.23s; both produced 16:9 non-UI reference images
 ```
 
 Boundary:
 
 - No provider gate, secret, signed URL, generated media byte, provider raw
   response, user account data, or Company OS private source content was
-  written. This is code/runtime contract evidence; live Crazyrouter visual
-  quality and speed still need a fresh provider smoke plus human acceptance.
+  written to repo records. The smoke proves Runtime/provider connectivity and a
+  much faster direct image path, but final visual acceptance remains a human
+  review on the Studio canvas.
 
 ## 2026-06-22 - Crazyrouter Image Relay Readiness Pass
 
