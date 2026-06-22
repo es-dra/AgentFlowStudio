@@ -64,20 +64,22 @@ def build_keyframe_generation(
         descriptor = registry.descriptor(request.provider_service_id)
     except (ModelGatewayError, OSError, ValueError):
         registry = None
+    configured_reference_slots = int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS))
+    effective_reference_slots = _effective_reference_image_slots(request, configured_reference_slots)
     context_bundle = _context_bundle(
         store,
         project_id,
         request,
         include_fixed_assets=include_fixed_assets,
         prompt_char_limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
-        reference_image_slots=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+        reference_image_slots=effective_reference_slots,
     )
     reference_images = _reference_images(
         store,
         project_id,
         request,
         context_bundle,
-        limit=int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+        limit=effective_reference_slots,
     )
     is_asset_card_revision = _has_asset_card_revision(request)
     if context_bundle:
@@ -120,7 +122,7 @@ def build_keyframe_generation(
             "provider_service_id": request.provider_service_id,
             "required_gate": required_gate,
             "prompt_char_limit": int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
-            "reference_image_slots": int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS)),
+            "reference_image_slots": effective_reference_slots,
             "image_operation": image_operation,
             "image_input_fidelity": "high" if image_operation == "edit" else None,
         },
@@ -258,6 +260,13 @@ def build_keyframe_generation(
 
 def _uses_asset_card_image_edit(request: KeyframeGenerationRequest, reference_images: list[dict[str, Any]]) -> bool:
     return _has_asset_card_revision(request) and bool(reference_images)
+
+
+def _effective_reference_image_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+    if _has_asset_card_revision(request) and configured_slots <= 0:
+        return 1
+    return configured_slots
+
 
 def _context_bundle(
     store: RuntimeStore,

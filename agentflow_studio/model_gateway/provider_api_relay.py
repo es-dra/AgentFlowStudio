@@ -34,7 +34,10 @@ class ApiRelayAdapter:
             raise ModelConfigError(f"prompt_char_limit exceeded for {self.service_id}")
         if request.aspect_ratio not in self.descriptor.supported_aspect_ratios:
             raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
-        if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
+        reference_slots = self.descriptor.reference_image_slots
+        if request.image_operation == "edit":
+            reference_slots = max(1, reference_slots)
+        if len(request.reference_image_paths) > reference_slots:
             raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
         if request.image_operation == "edit":
             if self.descriptor.modality != "image":
@@ -42,7 +45,7 @@ class ApiRelayAdapter:
             if request.edit_source_image_path is None:
                 raise ModelConfigError("image edit operation requires edit_source_image_path")
             edit_refs = request.edit_reference_image_paths or (request.edit_source_image_path,)
-            if len(edit_refs) > self.descriptor.reference_image_slots:
+            if len(edit_refs) > reference_slots:
                 raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
         if self.descriptor.modality == "image" and request.candidate_count < 1:
             raise ModelConfigError("image candidate_count must be at least 1")

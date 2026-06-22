@@ -885,10 +885,12 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_i
     service["request_format"] = "openai_images"
     service["quality"] = "low"
     service["output_format"] = "png"
+    service["descriptor"]["reference_image_slots"] = 0
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_http.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
     registry = ProviderRegistry.from_store(_store(tmp_path, config))
+    assert registry.descriptor("relay_image").reference_image_slots == 0
 
     result = registry.dispatch(
         "image",

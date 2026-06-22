@@ -42,18 +42,21 @@ the high-fidelity edit intent in request planning, but the OpenAI Images HTTP
 payload omits `input_fidelity` unless a provider config explicitly opts in, so
 the external API receives only supported default parameters. Provider
 descriptors can now allow up to 16 reference image slots for multi-source edit
-providers. Studio labels the action as `保存并局部修订生成`.
+providers. Runtime also tolerates deployed legacy descriptors that still report
+`reference_image_slots=0` by allowing the first prior image to act as the
+required edit source for asset-card revisions. Studio labels the action as
+`保存并局部修订生成`.
 Verification: source-image edit focused regression passed 58 / 1 existing
 warning; full pytest passed 626 / 520 deselected / 2 existing warnings;
 `npm run check:studio-js` passed for 113 files; CLI help/version passed;
 maintenance audit failed=0 with existing warnings only; `git diff --check`
 passed. Follow-up provider compatibility regression passed 37 / 1 existing
 warning after defaulting multipart image field to `image` and omitting
-unsupported `input_fidelity`. Boundary: no provider raw response, signed URL,
-secret, local private path, generated media byte, or Company OS private source
-content was written to the repo. Remaining validation: deployed
-external-provider smoke with a robot local material edit, then human visual
-acceptance.
+unsupported `input_fidelity`; legacy zero-slot source-edit regression passed
+38 / 1 existing warning. Boundary: no provider raw response, signed URL, secret,
+local private path, generated media byte, or Company OS private source content
+was written to the repo. Remaining validation: deployed external-provider smoke
+with a robot local material edit, then human visual acceptance.
 
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and

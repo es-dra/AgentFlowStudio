@@ -16,6 +16,11 @@
 - Kept AFS request-plan semantics as high-fidelity source-image edits while
   avoiding unsupported HTTP parameters by default: OpenAI Images multipart
   requests omit `input_fidelity` unless a provider config explicitly opts in.
+- Added compatibility for deployed provider descriptors that still declare
+  `reference_image_slots=0`: asset-card revisions now treat the first prior
+  image as the required edit source instead of dropping it before dispatch, and
+  API relay edit validation allows that source image even under old slot
+  config.
 - Relaxed provider reference-image slot validation from 8 to 16 so providers
   that support multiple edit/source images can be configured without AFS schema
   blocking them first.
@@ -29,6 +34,7 @@ Verification:
 ```text
 pytest tests/test_api_runtime_keyframe_reference_assets.py tests/test_provider_adapter_registry.py tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 58 passed / 1 existing warning
 pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py -> 37 passed / 1 existing warning
+pytest tests/test_api_runtime_asset_card_revision_legacy_slots.py tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py -> 38 passed / 1 existing warning
 npm run check:studio-js -> JS syntax check passed: 113 files
 python -m pytest -q -> 626 passed / 520 deselected / 2 existing warnings
 python -m apps.cli.main --help -> passed
