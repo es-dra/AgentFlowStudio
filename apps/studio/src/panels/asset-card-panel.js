@@ -2,9 +2,9 @@ import {
   assetCardFieldsForType,
   assetCardText,
   assetCardTypeLabel,
-  assetImagePrompt,
   normalizeAssetCardDraft,
 } from "../asset-card-drafts.js";
+import { assetImagePrompt, assetImageRatio } from "../asset-card-image-prompts.js";
 import { el, showModal } from "../overlay.js";
 
 export function openAssetCardPanel(store, nodeId) {
@@ -85,6 +85,11 @@ function saveAssetCard(store, nodeId, draft) {
     node.content = assetCardText(draft);
     node.title = `${assetCardTypeLabel(draft.asset_type)} · @${draft.label}`;
     node.status = "complete";
+    node.params.spec = {
+      ...(node.params.spec || {}),
+      ratio: assetImageRatio(draft.asset_type),
+      count: 1,
+    };
   });
 }
 

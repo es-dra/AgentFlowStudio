@@ -2,8 +2,8 @@ import {
   assetCardDraftFromRef,
   assetCardText,
   assetCardTypeLabel,
-  assetImagePrompt,
 } from "./asset-card-drafts.js";
+import { assetImagePrompt, assetImageRatio } from "./asset-card-image-prompts.js";
 import { createNode, connect } from "./nodes.js";
 import { structuredShotFromSegment } from "./structured-shot.js";
 
@@ -25,6 +25,11 @@ export function createShotAssetPrepNodes(store, scriptNodeId, structuredShot, x,
       node.h = Math.max(300, Math.min(460, 210 + Object.keys(draft.feature_card || {}).length * 22));
       node.params.nodeRole = "asset_card_draft";
       node.params.assetCardDraft = draft;
+      node.params.spec = {
+        ...(node.params.spec || {}),
+        ratio: assetImageRatio(draft.asset_type),
+        count: 1,
+      };
       node.params.asset_prep = {
         status: "card_ready",
         source_script_node_id: scriptNodeId,

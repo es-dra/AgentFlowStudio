@@ -75,16 +75,10 @@ export function normalizeAssetCardDraft(draft) {
   };
 }
 
-export function assetCardFieldsForType(assetType) {
-  return ASSET_CARD_FIELDS[safeAssetType(assetType)] || ASSET_CARD_FIELDS.character;
-}
+export function assetCardFieldsForType(assetType) { return ASSET_CARD_FIELDS[safeAssetType(assetType)] || ASSET_CARD_FIELDS.character; }
 
 export function assetCardTypeLabel(assetType) {
-  return {
-    character: "角色资产",
-    scene: "场景资产",
-    prop: "道具资产",
-  }[safeAssetType(assetType)];
+  return { character: "角色资产", scene: "场景资产", prop: "道具资产" }[safeAssetType(assetType)];
 }
 
 export function assetCardText(draft) {
@@ -105,21 +99,6 @@ export function assetCardText(draft) {
     ...lockLines,
     `来源分镜：${card.source_shot_id || "未标记"}`,
   ].join("\n");
-}
-
-export function assetImagePrompt(draft) {
-  const card = normalizeAssetCardDraft(draft);
-  const fields = assetCardFieldsForType(card.asset_type)
-    .map(([key, label]) => `${label}：${card.feature_card[key] || "待补充"}`)
-    .join("\n");
-  return [
-    `生成可复用${assetCardTypeLabel(card.asset_type)}设定板：@${card.label}`,
-    "用途：资产定稿参考图，不直接生成关键帧或视频；输出必须服务后续一致性约束。",
-    assetImageModeInstruction(card.asset_type),
-    `签名：${card.signature}`,
-    fields,
-    "要求：同一张图内完成设定板排布，主体/空间清晰，便于后续固定为资产；不要添加文字、水印、UI、边框；不要只生成单张剧情插画。",
-  ].filter(Boolean).join("\n");
 }
 
 function defaultFeatureCard(assetType, label, shotText) {
@@ -216,18 +195,10 @@ function cleanDraftField(value) {
     .trim();
 }
 
-function shotDescription(structuredShot) {
-  return String(structuredShot?.description || structuredShot?.source_text || "").trim();
-}
+function shotDescription(structuredShot) { return String(structuredShot?.description || structuredShot?.source_text || "").trim(); }
 
 function stripAssetTags(text) {
   return String(text || "").replace(/@[^\s，。、；：:]+(?:（[^）]*）)?/gu, "").replace(/^[\s，。、；：:]+/u, "").trim();
-}
-
-function assetImageModeInstruction(assetType) {
-  if (assetType === "scene") return "呈现方式：多视角场景设定图，四宫格或清晰分区展示同一空间的俯瞰全景、正向广角、入口/边缘视角、光影/材质细节；保持空间结构一致；不出现角色主体，不生成剧情关键帧。";
-  if (assetType === "prop") return "呈现方式：多视图道具设定表，展示正面、侧面、俯视和局部结构/材质特写；主体居中、结构清楚、背景简洁，不让角色或场景抢主体。";
-  return "呈现方式：多视图角色设定表，展示正面全身、侧面全身、背面全身和头部/胸口或关键材质特写；背景保持中性简洁，不生成剧情关键帧或单张氛围插画。";
 }
 
 function characterIdentity(label, text) {
@@ -304,9 +275,7 @@ function propUsage(label, text) {
   return "按分镜动作使用";
 }
 
-function safeAssetType(value) {
-  return ["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character";
-}
+function safeAssetType(value) { return ["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character"; }
 
 function safeLabel(value, assetType) {
   const fallback = assetType === "scene" ? "主要场景" : assetType === "prop" ? "关键道具" : "主角";
@@ -318,9 +287,7 @@ function lines(value) {
   return source.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 16);
 }
 
-function slug(value) {
-  return encodeURIComponent(value).replace(/%/g, "").slice(0, 40).toLowerCase() || "asset";
-}
+function slug(value) { return encodeURIComponent(value).replace(/%/g, "").slice(0, 40).toLowerCase() || "asset"; }
 
 function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

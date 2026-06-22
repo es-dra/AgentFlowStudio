@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-06-22 - Asset Image Prompt Quality Tightening
+
+- Split provider-facing asset image prompts out of the asset-card data module
+  into `asset-card-image-prompts.js`, keeping the editable card schema separate
+  from model prompt assembly.
+- Replaced Chinese `setting board / sheet / UI-like layout` wording with
+  model-friendly visual targets: character turnaround, environment reference,
+  and object reference. The prompt now explicitly forbids dashboards, app UI,
+  charts, typography, labels, watermarks, and decorative card layouts.
+- Asset-card image generation now prioritizes the current structured asset
+  card prompt before stale `node.prompt`, which matters for existing live canvas
+  nodes created before the prompt fix. Candidate character and scene assets
+  default to `16:9`; props default to `1:1`.
+- Provider-facing asset prompts no longer expose `@asset` tags. Studio keeps
+  `@` labels in node titles and scripts, but image models receive plain asset
+  names to reduce rendered text and label artifacts.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 20 passed
+npm run check:studio-js -> JS syntax check passed: 110 files
+pytest -> 600 passed / 520 deselected / 2 existing warnings
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, existing warnings only
+git diff --check -> passed
+Node prompt sample -> character/scene prompts use reference targets, 16:9 ratio, and no @ labels
+```
+
+Boundary:
+
+- No provider gate, secret, signed URL, generated media byte, provider raw
+  response, user account data, or Company OS private source content was
+  written. This is code/runtime contract evidence; live Crazyrouter visual
+  quality and speed still need a fresh provider smoke plus human acceptance.
+
 ## 2026-06-22 - Crazyrouter Image Relay Readiness Pass
 
 - Added an OpenAI Images-compatible request path to the existing `api_relay`

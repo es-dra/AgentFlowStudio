@@ -132,28 +132,28 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
 
 def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> None:
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
-    asset_drafts = (STUDIO_ROOT / "src" / "asset-card-drafts.js").read_text(encoding="utf-8")
+    asset_image_prompts = (STUDIO_ROOT / "src" / "asset-card-image-prompts.js").read_text(encoding="utf-8")
     asset_generation_prompt = (STUDIO_ROOT / "src" / "asset-card-generation-prompt.js").read_text(encoding="utf-8")
+    asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
     generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
     generation_progress = (STUDIO_ROOT / "src" / "node-generation-progress.js").read_text(encoding="utf-8")
     visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
     visual_defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
 
-    assert "assetCardPromptText" in optimizer_contract
-    assert "safeAssetCardSnapshot" in optimizer_contract
+    for marker in ("assetCardPromptText", "safeAssetCardSnapshot", "node_role", "asset_card_draft"):
+        assert marker in optimizer_contract
     assert "assetImagePrompt(draft)" in asset_generation_prompt
-    assert "assetCardPromptText(node)" in optimizer_contract
-    assert "node_role" in optimizer_contract
-    assert "asset_card_draft" in optimizer_contract
-    for marker in ("多视图角色设定表", "多视角场景设定图", "多视图道具设定表", "不要只生成单张剧情插画"):
-        assert marker in asset_drafts
-    for marker in ("场景资产必须是同一空间的多视角场景设定图", "角色资产必须是多视图角色设定表", "道具资产必须是多视图道具设定表"):
+    assert "assetCardPromptText(node)" in optimizer_contract.split("function primaryPromptText", 1)[1].split("const explicit", 1)[0]
+    for marker in ("Character turnaround", "Environment reference", "Object reference", "Forbidden: software dashboard, app interface, data chart"):
+        assert marker in asset_image_prompts
+    assert all(polluted not in asset_image_prompts + asset_generation_prompt for polluted in ("多视图角色设定表", "多视角场景设定图", "多视图道具设定表", "设定板排布"))
+    for marker in ("场景资产必须是同一空间的多角度环境参考图", "角色资产必须是同一角色的正面全身", "道具资产必须是单一道具的正面"):
         assert marker in asset_generation_prompt
+    assert "assetImageRatio(draft.asset_type)" in asset_nodes
     assert "visualAssetDefaultsFromAssetCardDraft" in visual_defaults
-    assert "设定视图" in visual_render
-    assert "多视角视图组" in visual_render
-    assert "道具视图组" in visual_render
+    for marker in ("设定视图", "多视角视图组", "道具视图组"):
+        assert marker in visual_render
     assert 'nodeGenerationKind(node)' in keyframe_actions
     assert 'nodeRole === "asset_card_draft" ? "asset" : "keyframe"' in keyframe_actions
     assert "reusableAssetForNode(n, reusableAsset, kind)" in keyframe_actions

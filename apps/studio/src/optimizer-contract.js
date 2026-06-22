@@ -80,10 +80,10 @@ function nodeParameterSnapshot(node) {
 }
 
 function primaryPromptText(node) {
-  const explicit = String(node.prompt || "").trim();
-  if (explicit) return explicit;
   const assetPrompt = assetCardPromptText(node);
   if (assetPrompt) return assetPrompt;
+  const explicit = String(node.prompt || "").trim();
+  if (explicit) return explicit;
   const content = String(node.content || "").trim();
   if (content) return content;
   return "请根据当前节点生成专业创作提示词。";

@@ -92,7 +92,7 @@ def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -
 
     assert "assetCardDraftFromRef" in asset_drafts
     assert "assetCardText" in asset_drafts
-    assert "assetImagePrompt" in asset_drafts
+    assert "asset-card-image-prompts.js" in asset_nodes
     assert "included_in_context_before_confirmation: false" in asset_drafts
     assert "node.params.assetCardDraft" in asset_nodes
     assert 'node.params.nodeRole = "asset_card_draft"' in asset_nodes
@@ -105,9 +105,9 @@ def test_asset_card_drafts_clean_legacy_tag_pollution_and_backfill_reference_vie
     script = r'''
 import {
   assetCardDraftFromRef,
-  assetImagePrompt,
   normalizeAssetCardDraft,
 } from "./apps/studio/src/asset-card-drafts.js";
+import { assetImagePrompt } from "./apps/studio/src/asset-card-image-prompts.js";
 
 const shot = {
   shot_id: "shot_01",
@@ -171,9 +171,11 @@ process.stdout.write(JSON.stringify({
     assert payload["scene"]["feature_card"]["view_set"]
     assert payload["legacyCharacter"]["feature_card"]["reference_views"]
     assert payload["legacyScene"]["feature_card"]["view_set"]
-    assert "多视图角色设定表" in payload["legacyCharacterPrompt"]
-    assert "多视角场景设定图" in payload["legacyScenePrompt"]
-    assert "不要只生成单张剧情插画" in payload["legacyCharacterPrompt"]
+    assert "Character turnaround" in payload["legacyCharacterPrompt"]
+    assert "Environment reference" in payload["legacyScenePrompt"]
+    for polluted in ("多视图角色设定表", "多视角场景设定图", "设定板", "软件界面"):
+        assert polluted not in payload["legacyCharacterPrompt"] + payload["legacyScenePrompt"]
+    assert "Forbidden: software dashboard, app interface, data chart" in payload["legacyCharacterPrompt"]
 
 
 def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidate_pollution() -> None:

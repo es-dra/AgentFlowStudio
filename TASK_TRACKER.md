@@ -12,6 +12,26 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current asset image prompt quality addendum: 2026-06-22 pass tightened the
+storyboard-to-asset image request contract after live Crazyrouter `gpt-image-2`
+outputs still looked abstract and UI-like. Provider-facing asset prompts are now
+assembled in `asset-card-image-prompts.js` instead of the asset-card data module;
+existing live asset nodes prefer the current structured `asset_card_draft`
+prompt before stale `node.prompt`; character/scene candidates default to `16:9`
+reference images and prop candidates to `1:1`. The model prompt now says
+character turnaround, environment reference, or object reference, explicitly
+forbids dashboards, app UI, charts, typography, labels, watermarks, and
+decorative card layouts, and strips `@` asset tags before calling the image
+provider. Verification: prompt static regressions passed 20; full pytest passed
+600 / 520 deselected / 2 existing warnings; `npm run check:studio-js` passed for
+110 files; CLI help/version passed; maintenance audit failed=0 with existing
+warnings only; `git diff --check` passed; Node prompt sample confirmed no `@`
+labels in provider-facing character/scene prompts. Boundary: no provider
+secret, provider raw response, signed URL, generated media byte, user account
+data, or Company OS private source content was written. Remaining validation:
+deploy, run a real Crazyrouter smoke, measure elapsed time, inspect the output,
+and leave final visual acceptance to the user.
+
 Current Crazyrouter image relay addendum: 2026-06-22 pass added
 OpenAI Images-compatible `api_relay` support so `codex_image` can be switched
 server-side to Crazyrouter `gpt-image-2` without changing Studio front-end
