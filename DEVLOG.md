@@ -4104,6 +4104,19 @@ Boundaries:
 - Public pages avoid exposing COS/GFR source material, provider raw responses, signed URLs, local private paths, generated media bytes, or secrets.
 - Local automated verification does not claim human acceptance, creative quality acceptance, business validation, or durable memory promotion.
 
+Deployment:
+
+```text
+Commit: 53a0f17 feat(studio): polish web flows and asset persistence
+GitHub master: pushed and aligned
+Server /home/afs-ops/AgentFlowStudio: fast-forwarded to 53a0f17
+Server /opt/afs/AgentFlowStudio: fast-forwarded to 53a0f17
+afs-runtime and afs-codex-image-worker: restarted by terminating old afs-ops user processes after sudo restart was blocked
+Runtime health: ready; studio_static.status=ready
+Public HTTP checks: https://afstudio.art/site/ -> 200; https://afstudio.art/site/social-square.html -> 200
+Three-end report: runs/three_end_status_20260623_web_director_polish_final_after_restart.json -> aligned
+```
+
 ## 2026-06-21 - Studio Image/TuanTuan Concurrency Hardening
 
 - Fixed Codex image handoff queue semantics: pending jobs now remain `pending` until a worker atomically claims them, running jobs carry a worker claim record, and concurrent workers skip jobs already claimed by another worker.
