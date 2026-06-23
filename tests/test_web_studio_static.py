@@ -120,6 +120,10 @@ def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
     assert "saveStudioState(snapshotStudioState(state), runtimeStateVersion)" in store_source
     assert "error?.status === 409" in store_source
     assert "项目已在其他窗口更新" in store_source
+    state_source = (STUDIO_ROOT / "src" / "store-state.js").read_text(encoding="utf-8")
+    assert "sanitizeSnapshotForPersistence" in state_source
+    assert "SAFE_PREVIEW_ROUTE_RE" in state_source
+    assert "图像生成等待超时，已尝试从素材库恢复结果。" in state_source
 
 
 def test_studio_user_surface_does_not_reintroduce_old_workbench_terms() -> None:

@@ -120,6 +120,7 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    keyframe_recovery = (STUDIO_ROOT / "src" / "node-keyframe-recovery.js").read_text(encoding="utf-8")
 
     assert "pollKeyframe(jobId)" in runtime_client
     assert "/keyframe-generations/${encodeURIComponent(jobId)}/poll" in runtime_client
@@ -128,7 +129,7 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
     assert "pollKeyframeUntilTerminal" in keyframe_actions
     assert "lastKeyframeJobId" in keyframe_actions
     assert "recoverTimedOutKeyframeFromAssets" in keyframe_actions
-    assert "source_node_id" in keyframe_actions
+    assert "source_node_id" in keyframe_recovery
     assert "Gateway timeout while waiting for image generation" in runtime_client
     assert "MiniMax keyframe request failed" not in node_actions
     for forbidden in ("Codex", "codex", "handoff", "request.json", "codex_image_job"):
@@ -145,6 +146,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     runtime_keyframes = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    keyframe_response = (STUDIO_ROOT / "src" / "node-keyframe-response.js").read_text(encoding="utf-8")
     generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
     generation_progress = (STUDIO_ROOT / "src" / "node-generation-progress.js").read_text(encoding="utf-8")
     visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
@@ -167,25 +169,29 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "Do not turn the subject into a toy, chibi, mascot" in asset_revision_refs
     assert "assetImagePrompt(draft)" in asset_generation_prompt
     assert "assetCardPromptText(node)" in optimizer_contract.split("function primaryPromptText", 1)[1].split("const explicit", 1)[0]
-    for marker in ("Character turnaround", "Environment reference", "Object reference", "Forbidden: software dashboard, app interface, data chart"):
+    for marker in ("Character reference sheet", "front half-body close-up", "Environment reference", "Object reference", "Forbidden: software dashboard, app interface, data chart"):
         assert marker in asset_image_prompts
     assert "same rooftop/location" not in asset_image_prompts
     assert "same environment/location" in asset_image_prompts
     assert "雨夜城市街道/街区外景" in asset_card_drafts
     assert "可通行的城市街道/人行道前景" in asset_card_drafts
     assert "雨夜，空气潮湿" in asset_card_drafts
+    for marker in ("发型/毛发/颜色", "面部/头部特征", "体态身形", "场景配色", "持握/互动关系", "金箍棒", "山巅石台战场"):
+        assert marker in asset_card_drafts
+    for marker in ("Facial-mark edit scope", "front half-body close-up", "exactly the requested scar"):
+        assert marker in asset_revision_refs
     assert all(polluted not in asset_image_prompts + asset_generation_prompt for polluted in ("多视图角色设定表", "多视角场景设定图", "多视图道具设定表", "设定板排布"))
-    for marker in ("场景资产必须是同一空间的多角度环境参考图", "角色资产必须是同一角色的正面全身", "道具资产必须是单一道具的正面"):
+    for marker in ("场景资产必须是同一空间的多角度环境参考图", "角色资产必须按固定布局输出", "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身", "道具资产必须是单一道具的正面"):
         assert marker in asset_generation_prompt
     assert "assetImageRatio(draft.asset_type)" in asset_nodes
     assert "visualAssetDefaultsFromAssetCardDraft" in visual_defaults
     for marker in ("设定视图", "多视角视图组", "道具视图组"):
         assert marker in visual_render
     assert 'nodeGenerationKind(node)' in keyframe_actions
-    assert 'nodeRole === "asset_card_draft" ? "asset" : "keyframe"' in keyframe_actions
-    assert "reusableAssetForNode(n, reusableAsset, kind)" in keyframe_actions
-    assert "character_reference" in keyframe_actions
-    assert "scene_reference" in keyframe_actions
+    assert 'nodeRole === "asset_card_draft" ? "asset" : "keyframe"' in keyframe_response
+    assert "reusableAssetForNode(n, reusableAsset, kind)" in keyframe_response
+    assert "character_reference" in keyframe_response
+    assert "scene_reference" in keyframe_response
     assert 'kind === "asset" ? "资产图" : "关键帧"' in generation_results
     assert "${label}已生成" in generation_results
     assert "资产素材" in generation_results
@@ -289,7 +295,11 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "video-asset-card-draft" in result_view
     assert "node-preview-download" in result_view
     assert "下载视频" in result_view
-    assert "下载图片" in result_view
+    assert "导出原图" in result_view
+    assert '["image", "video"].includes(node.type)' in result_view
+    drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
+    assert "downloadImageAsset" in drawer_assets
+    assert "导出原图" in drawer_assets
     assert "qualityFeedbackView" not in result_view
     assert "openQualityFeedbackMenu" in node_menu
     assert "反馈图片质量" in node_menu

@@ -145,6 +145,10 @@ function revisionEditPolicyLines(revision) {
       if (/plush|fur|furry|fabric|毛绒|绒|布料|织物/u.test(target)) {
         lines.push("Plush/fabric material must read as a surface covering on the same existing robot frame, not as a cute toy, chibi body, stuffed doll, or new rounded robot design.");
       }
+      if (/scar|疤|伤疤|刀疤|面部.*痕|脸.*痕|左边面部|左脸/u.test(target)) {
+        lines.push("Facial-mark edit scope: add exactly the requested scar/mark on the subject's left side of the face only; preserve face identity, eyes, brow, hair, expression, costume, armor, body, weapons/props, and all view positions.");
+        lines.push("Make the scar visible in the front half-body close-up and consistent on matching front/side views; do not add extra scars, wounds, blood, different facial structure, or a new character design.");
+      }
     }
     if (field === "palette") {
       lines.push("Palette edit scope: change colors only; preserve form, materials, proportions, clothing cut, lighting direction, and reference sheet layout.");

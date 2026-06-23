@@ -36,7 +36,7 @@ function characterDefaults(node, text) {
     wardrobe: wardrobe || "保持参考图角色服装",
     palette: palette || "保持参考图角色主色调",
     demeanor: demeanor || "保持参考图角色气质和神态",
-    reference_views: "正面全身、侧面全身、背面全身、头部/胸口或关键材质细节近景保持一致",
+    reference_views: "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身；无任何道具或背景物体，保持一致",
   };
   return {
     label: named || label,
@@ -65,7 +65,7 @@ function animalSubjectDefaults(node, text) {
     wardrobe: "默认保持自然动物外观；服装、饰品或拟人化只在用户明确要求时添加",
     palette: palette || "保持参考图动物主体的毛色主色调",
     demeanor: "保持参考图动物主体的自然神态和姿态",
-    reference_views: "正面全身、侧面全身、背面全身、头部/脸部细节近景保持同一只动物特征",
+    reference_views: "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身；无任何道具或背景物体，保持同一只动物特征",
   };
   return {
     label,

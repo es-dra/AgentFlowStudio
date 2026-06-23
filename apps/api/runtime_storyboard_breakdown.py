@@ -203,6 +203,7 @@ def _storyboard_instruction(request: StoryboardBreakdownRequest) -> str:
             count_line,
             "JSON 格式：{\"shots\":[{shot_id,index,duration,description,shot_size,light_atmosphere,camera_motion,dialogue,sound,asset_refs}]}",
             "asset_refs 每项必须包含 label, asset_type(character|scene|prop), status, source。描述中涉及角色、场景、道具时必须用 @名称 显式标注。",
+            "不要用泛化的“主角”“主要场景”替代剧本里的真实名称；例如孙悟空、金刚狼必须分别作为 character，金箍棒、武器、信件、地图等必须作为 prop。",
             "每个镜头要包含时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效。",
             f"平台：{request.target_platform}；风格：{request.style}",
             "剧本：",

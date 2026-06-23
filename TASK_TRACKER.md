@@ -79,6 +79,31 @@ passed. Maintenance follow-up: extract provider status normalization and
 keyframe result recovery out of the existing 500+ line
 `apps/api/runtime_keyframes.py`.
 
+Current storyboard / asset intelligence addendum: 2026-06-23 pass upgrades the
+script-to-shot and shot-to-asset contract. Local storyboard fallback now uses a
+global entity pass plus per-shot resolution, keeps line-based scripts as
+line-based shot units, inherits named subjects into pronoun/continuation shots,
+and avoids generic `主角` / `主要场景` when concrete script labels exist. It
+detects named characters such as `孙悟空`, `金刚狼`, repeated CJK actor names
+such as `沈昭昭`, concrete scenes such as `暗办公室` / `山巅石台战场`, and prop
+assets such as `金箍棒`. Provider storyboard prompts now explicitly require the
+same real-name and prop classification behavior. Asset-card drafts now use a
+more detailed typed feature card: character hair/face/build, scene palette, and
+prop interaction/continuity are included by default, while character asset
+generation is constrained to the fixed layout `正面半身特写 + 全身正面居中 +
+左侧面全身 + 背面全身` with no weapons or background objects. Studio also
+recovers nodes from reusable image asset previews when candidates are missing,
+adds original-resolution image export, and prunes unsafe stale preview state
+before Runtime saves. Verification: Studio JS passed for 115 files; storyboard
+regressions passed 9 / 1 existing warning; web Studio static contract
+regressions passed 31; full `pytest -q` passed 630 / 520 deselected / 2
+existing warnings; `git diff --check` passed; added-line sensitive pattern scan
+had no output. Remaining validation: deployment to GitHub + server `/home` +
+server `/opt`, runtime health, and user visual acceptance in browser.
+Maintenance follow-up: split storyboard local entity inference and asset-card
+draft heuristics, because the two files are now just over the 300-line warning
+threshold but below the 500-line hard split line.
+
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and
 provider-discard fallback now preserve semantic asset labels for robot/rooftop

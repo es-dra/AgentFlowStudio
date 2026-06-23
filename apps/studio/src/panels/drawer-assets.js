@@ -142,6 +142,7 @@ function assetActions(state, store, runtime, asset, retired) {
   }
   actions.appendChild(assetAction("定位来源", () => focusAssetSource(store, asset)));
   if (isImageAsset(asset)) {
+    if (asset.preview_url) actions.appendChild(assetAction("导出原图", () => downloadImageAsset(asset)));
     actions.appendChild(assetAction("保存角色", () => promoteImageAssetFromDrawer(state, store, runtime, asset, "character")));
     actions.appendChild(assetAction("保存场景", () => promoteImageAssetFromDrawer(state, store, runtime, asset, "scene")));
   }
@@ -181,6 +182,9 @@ function openAssetContextMenu(event, state, store, runtime, asset, retired) {
   appendItem("查看详情", "image", "打开素材记录和来源", () => openAssetDetailPopover(store, runtime, asset, menu));
   appendItem("用作参考", "bookmark", "标记为当前生成参考", () => markAssetReference(store, asset));
   appendContextAttachAction(appendItem, state, store, asset);
+  if (isImageAsset(asset) && asset.preview_url) {
+    appendItem("导出原图", "archive", "下载原始分辨率图片", () => downloadImageAsset(asset));
+  }
   appendItem("定位来源", "layers", "回到产生该素材的节点", () => focusAssetSource(store, asset), !asset.source_node_id);
   if (isFixedVisualAsset(asset)) {
     appendItem("停用素材", "x", "不再默认带入后续生成", () => openRetireAssetModal(store, runtime, asset), retired);
@@ -214,6 +218,23 @@ function assetAction(label, onClick) {
   const btn = el("button", "asset-action", label);
   btn.addEventListener("click", onClick);
   return btn;
+}
+
+async function downloadImageAsset(asset) {
+  const link = document.createElement("a");
+  await setRuntimeMediaSource(link, asset.preview_url);
+  link.download = assetDownloadName(asset);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function assetDownloadName(asset) {
+  const base = String(asset.title || asset.label || asset.asset_id || "afs-image")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .trim()
+    .slice(0, 80) || "afs-image";
+  return `${base}.png`;
 }
 
 function escapeHtml(value) {

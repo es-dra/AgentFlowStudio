@@ -37,9 +37,9 @@ function assetImageModeInstruction(assetType, label) {
   if (assetType === "scene") {
     return [
       `Environment reference for asset named ${assetName}: show the same environment/location from multiple clear camera angles in one image.`,
-      "Required views: wide establishing view, reverse angle, overhead/spatial layout view, and lighting/material detail view.",
+      "Required layout: clean 2x2 grid of four independent 16:9 environment views: center-axis wide establishing view, reverse angle, overhead/spatial layout view, and lighting/material detail view.",
       "Keep the same architecture, skyline, horizon, props, lighting direction, time of day, and spatial relationship across all views.",
-      "No main character or robot unless a tiny scale reference is explicitly needed.",
+      "No people, character shadows, silhouettes, hands, vehicles as subjects, text, labels, border captions, UI, or unrelated story objects unless explicitly listed as environment elements.",
     ].join(" ");
   }
   if (assetType === "prop") {
@@ -50,9 +50,9 @@ function assetImageModeInstruction(assetType, label) {
     ].join(" ");
   }
   return [
-    `Character turnaround for asset named ${assetName}: show the same character in front full-body, side full-body, back full-body, and head/chest material detail views.`,
+    `Character reference sheet for asset named ${assetName}: use this exact layout in one image: front half-body close-up, centered full-body front view, left-side full-body profile view, and back full-body view.`,
     "Keep one consistent identity, head shape, body proportions, limb structure, silhouette, palette, material, and expression across every view.",
-    "Use a plain neutral studio background with minimal ground shadow; do not include the rooftop scene as the main background.",
+    "Use a plain neutral studio background with minimal ground shadow; no weapons, handheld props, background objects, typography, labels, or scene environment.",
   ].join(" ");
 }
 
@@ -70,7 +70,10 @@ function providerFieldLabel(assetType, key, fallback) {
   const labels = {
     character: {
       identity: "Identity",
-      appearance: "Recognizable structure",
+      appearance: "Overall recognizable structure",
+      hair: "Hair / fur / head covering",
+      face: "Face / head details",
+      build: "Body build and proportions",
       wardrobe: "Outer shell / clothing",
       palette: "Color palette",
       demeanor: "Mood / expression",
@@ -81,6 +84,7 @@ function providerFieldLabel(assetType, key, fallback) {
       layout: "Spatial layout",
       props: "Environment elements",
       lighting_mood: "Lighting mood",
+      palette: "Scene color palette",
       time_weather: "Time and weather",
       view_set: "Required camera angles",
     },
@@ -90,6 +94,7 @@ function providerFieldLabel(assetType, key, fallback) {
       material: "Materials and craft",
       scale: "Scale relationship",
       usage: "Usage state",
+      interaction: "Holding / interaction relationship",
       continuity: "Continuity constraint",
       reference_views: "Required reference views",
     },

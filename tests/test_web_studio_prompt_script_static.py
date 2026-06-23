@@ -182,7 +182,8 @@ process.stdout.write(JSON.stringify({
     assert payload["scene"]["feature_card"]["view_set"]
     assert payload["legacyCharacter"]["feature_card"]["reference_views"]
     assert payload["legacyScene"]["feature_card"]["view_set"]
-    assert "Character turnaround" in payload["legacyCharacterPrompt"]
+    assert "Character reference sheet" in payload["legacyCharacterPrompt"]
+    assert "front half-body close-up" in payload["legacyCharacterPrompt"]
     assert "Environment reference" in payload["legacyScenePrompt"]
     for polluted in ("多视图角色设定表", "多视角场景设定图", "设定板", "软件界面"):
         assert polluted not in payload["legacyCharacterPrompt"] + payload["legacyScenePrompt"]

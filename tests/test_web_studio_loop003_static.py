@@ -14,13 +14,15 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
     )
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    keyframe_response = (STUDIO_ROOT / "src" / "node-keyframe-response.js").read_text(encoding="utf-8")
+    keyframe_generation = keyframe_actions + keyframe_response
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
     visual_asset_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
 
     assert 'data-action="fix-visual-asset"' in canvas_view
     assert "fixNodeVisualAsset" in node_actions
-    assert "candidate_previews" in keyframe_actions
-    assert "reusable_image_assets" in keyframe_actions
+    assert "candidate_previews" in keyframe_generation
+    assert "reusable_image_assets" in keyframe_generation
     assert 'initialAssetType: assetType' in drawer
     assert 'initialAssetType = "character"' in visual_asset_panel
     assert 'data-action="draft-card"' in visual_asset_render

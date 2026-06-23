@@ -1,5 +1,66 @@
 # Devlog
 
+## 2026-06-23 - Storyboard Asset Intelligence And Preview Recovery
+
+- Hardened storyboard fallback into a two-pass local agent contract:
+  first infer global named characters, scenes, and props from the whole script,
+  then resolve each shot with local evidence plus inherited global entities.
+  Line-based scripts now preserve line units as shots instead of collapsing
+  them into a fixed-looking five-shot plan. Battle scripts such as
+  `孙悟空大战金刚狼` now identify `孙悟空` and `金刚狼` as separate character
+  assets, `金箍棒` as a prop asset, and concrete scene labels such as
+  `山巅石台战场` instead of falling back to `主角` / `主要场景`.
+- Tightened the provider storyboard instruction so remote LLM parsing is also
+  told not to replace real names with generic labels, and to classify props
+  such as weapons, maps, letters, and hand-held items as `prop`.
+- Expanded automatic asset-card drafts toward the existing feature-card
+  template: character cards now include appearance overview, hair/fur, face/head
+  details, body build, wardrobe, palette, demeanor, and fixed reference-sheet
+  layout; scenes include palette; props include holding / interaction relation.
+  Defaults now include stronger heuristics for Sun Wukong, Wolverine-style
+  opponent prompts, golden staff props, rainy city streets, and mountain-stage
+  battlefields.
+- Updated character asset generation prompts to require the fixed layout:
+  front half-body close-up + centered full-body front + left-side full-body
+  profile + back full-body, with no weapons, hand-held props, or background
+  objects. Scene prompts now ask for a clean 2x2 grid of independent 16:9
+  environment views.
+- Improved asset-card local revision prompts for facial marks: a request like
+  adding a scar on the left side of the face is treated as a localized
+  image-guided edit, with the reference image dominating identity, layout,
+  costume, body, props, and non-edited details.
+- Fixed Studio node/result recovery surfaces: when Runtime has saved a
+  reusable image asset but the first response lacks `candidate_previews`, the
+  node can still complete from the reusable asset preview. Image result nodes
+  and the asset drawer now expose an original-resolution export path using the
+  safe Runtime preview route.
+- Added pre-save Studio snapshot cleanup so stale local state with unsafe,
+  wrong-project, or HTML timeout preview data is pruned before saving to
+  Runtime. The backend safe-state validator remains strict.
+- Maintenance note: `apps/api/runtime_storyboard_local.py` and
+  `apps/studio/src/asset-card-drafts.js` are now slightly above 300 lines. They
+  should be split into storyboard entity inference and typed asset-card heuristic
+  modules in the next cleanup pass; both remain below the 500-line hard split
+  threshold.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed: 115 files
+pytest tests/test_api_runtime_storyboard_breakdown.py -q -> 9 passed / 1 existing warning
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py tests/test_web_studio_static.py -q -> 31 passed
+pytest -q -> 630 passed / 520 deselected / 2 existing warnings
+git diff --check -> passed
+added-line sensitive pattern scan -> no output
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo. Live visual/provider acceptance remains a browser/manual verification
+  step after deployment.
+
 ## 2026-06-23 - Keyframe Timeout Recovery And Scene Asset Anchors
 
 - Fixed the Runtime image provider status mismatch where an async-described API

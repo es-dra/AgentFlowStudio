@@ -5,21 +5,23 @@ from typing import Any
 
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
-SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
-CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生")
-PROP_HINTS = ("手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
+SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
+KNOWN_CHARACTER_NAMES = ("孙悟空", "金刚狼")
+CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "女生", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", "皇帝", "侦探", *KNOWN_CHARACTER_NAMES)
+PROP_HINTS = ("金箍棒", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
 GENERIC_CHARACTER_LABELS = {"主角", "角色", "人物"}
 GENERIC_SCENE_LABELS = {"主要场景", "场景"}
 
 
 def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None) -> list[dict[str, Any]]:
     chunks = _script_chunks(script_text, shot_count_hint=shot_count_hint)
-    return [structured_shot(chunk, index + 1) for index, chunk in enumerate(chunks[:80])]
+    global_refs = _asset_refs(_clean(script_text))
+    return [structured_shot(chunk, index + 1, global_refs=global_refs) for index, chunk in enumerate(chunks[:80])]
 
 
-def structured_shot(text: str, index: int) -> dict[str, Any]:
+def structured_shot(text: str, index: int, global_refs: list[dict[str, str]] | None = None) -> dict[str, Any]:
     source = _clean(text)
-    refs = _asset_refs(source)
+    refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
     return {
         "shot_id": f"shot_{index:02d}",
         "index": index,
@@ -33,6 +35,23 @@ def structured_shot(text: str, index: int) -> dict[str, Any]:
         "asset_refs": refs,
         "source_text": source,
     }
+
+
+def _resolve_shot_refs(source: str, refs: list[dict[str, str]], global_refs: list[dict[str, str]]) -> list[dict[str, str]]:
+    named_characters = [ref for ref in global_refs if ref["asset_type"] == "character" and ref["label"] not in GENERIC_CHARACTER_LABELS]
+    named_scenes = [ref for ref in global_refs if ref["asset_type"] == "scene" and ref["label"] not in GENERIC_SCENE_LABELS]
+    if named_characters and (
+        any(ref["asset_type"] == "character" and ref["label"] in GENERIC_CHARACTER_LABELS for ref in refs)
+        or re.search(r"两人|二人|双方|对方|他们|她们|主角|主体", source)
+        or any(ref["label"] in source for ref in named_characters)
+    ):
+        refs = [ref for ref in refs if ref["asset_type"] != "character" or ref["label"] not in GENERIC_CHARACTER_LABELS]
+        for ref in named_characters[:3]:
+            _push_ref(refs, ref["label"], "character", "context", source)
+    if named_scenes and any(ref["asset_type"] == "scene" and ref["label"] in GENERIC_SCENE_LABELS for ref in refs):
+        refs = [ref for ref in refs if ref["asset_type"] != "scene" or ref["label"] not in GENERIC_SCENE_LABELS]
+        _push_ref(refs, named_scenes[0]["label"], "scene", "context", source)
+    return refs
 
 
 def normalize_asset_ref(asset: Any, index: int, context: str = "") -> dict[str, str]:
@@ -62,7 +81,13 @@ def _script_chunks(text: str, shot_count_hint: int | None = None) -> list[str]:
     if len(paragraphs) > 1:
         units = paragraphs
     else:
-        units = [_clean(part) for part in re.split(r"(?<=[。！？!?；;])\s*", source) if _clean(part)]
+        line_units = [_clean(part) for part in source.splitlines() if _clean(part)]
+        if _looks_like_line_based_script(line_units):
+            units = line_units
+            target_count = _line_based_target_count(units, shot_count_hint)
+            return _balanced_chunks(units, target_count)
+        else:
+            units = [_clean(part) for part in re.split(r"(?<=[。！？!?；;])\s*", source) if _clean(part)]
         if not units:
             return [source]
     target_count = _target_shot_count(units, source, shot_count_hint)
@@ -77,6 +102,22 @@ def _target_shot_count(units: list[str], source: str, shot_count_hint: int | Non
     by_units = (len(units) + 1) // 2
     by_length = max(1, (len(source) + 179) // 180)
     return max(1, min(max(by_units, by_length), len(units), 12))
+
+
+def _looks_like_line_based_script(lines: list[str]) -> bool:
+    if len(lines) < 6:
+        return False
+    meaningful = [line for line in lines if len(line) >= 8]
+    if len(meaningful) < 6:
+        return False
+    numbered = sum(1 for line in meaningful if re.match(r"^\s*(?:\d{1,3}[.、)]|镜(?:头|号)?\s*\d{1,3}|[一二三四五六七八九十]+[、.])", line))
+    return numbered >= 3 or len(meaningful) >= 10
+
+
+def _line_based_target_count(units: list[str], shot_count_hint: int | None = None) -> int:
+    if shot_count_hint:
+        return max(1, min(int(shot_count_hint), len(units), 80))
+    return max(1, min(len(units), 80))
 
 
 def _balanced_chunks(units: list[str], target_count: int) -> list[str]:
@@ -98,13 +139,15 @@ def _asset_refs(text: str) -> list[dict[str, str]]:
     refs: list[dict[str, str]] = []
     for match in ASSET_RE.finditer(text):
         _push_ref(refs, match.group(1), _classify_asset(match.group(1), text), "explicit", text)
+    for label in _infer_character_labels(text):
+        if not any(ref["asset_type"] == "character" and ref["label"] == label for ref in refs):
+            _push_ref(refs, label, "character", "candidate", text)
     if not any(ref["asset_type"] == "character" for ref in refs) and any(hint in text for hint in CHARACTER_HINTS):
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
     if not any(ref["asset_type"] == "scene" for ref in refs) and any(hint in text for hint in SCENE_HINTS):
         _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
     if not any(ref["asset_type"] == "prop" for ref in refs):
-        prop = next((hint for hint in PROP_HINTS if hint in text), "")
-        if prop:
+        for prop in _infer_prop_labels(text):
             _push_ref(refs, prop, "prop", "candidate", text)
     if not refs:
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
@@ -156,14 +199,33 @@ def _semantic_asset_label(label: str, asset_type: str, context: str) -> str:
     return clean
 
 
+def _infer_character_labels(text: str) -> list[str]:
+    source = str(text or "")
+    labels: list[str] = []
+    for left, right in re.findall(r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})大战([\u4e00-\u9fffA-Za-z0-9·]{2,12})", source):
+        for item in (left, right):
+            _append_label(labels, _trim_character_name(item))
+    for name in KNOWN_CHARACTER_NAMES:
+        if name in source:
+            _append_label(labels, name)
+    if re.search(r"女生|女孩|少女", source):
+        _append_label(labels, "女生" if "女生" in source else "女孩")
+    for name in _repeated_actor_names(source):
+        _append_label(labels, name)
+    return labels[:6]
+
+
 def _infer_character_label(text: str) -> str:
+    labels = _infer_character_labels(text)
+    if labels:
+        return labels[0]
     source = str(text or "")
     if re.search(r"未来.*机器人|机器人.*未来", source):
         return "未来机器人"
     if re.search(r"机器人|机械人|仿生人", source):
         return "机器人"
-    if re.search(r"女孩|少女", source):
-        return "女孩"
+    if re.search(r"女生|女孩|少女", source):
+        return "女生" if "女生" in source else "女孩"
     if re.search(r"男孩|少年", source):
         return "男孩"
     if "老人" in source:
@@ -171,6 +233,29 @@ def _infer_character_label(text: str) -> str:
     if "孩子" in source:
         return "孩子"
     return ""
+
+
+def _infer_prop_labels(text: str) -> list[str]:
+    source = str(text or "")
+    labels: list[str] = []
+    for hint in PROP_HINTS:
+        if hint in source:
+            if hint in {"棒", "棍"} and "金箍棒" in source:
+                continue
+            _append_label(labels, hint)
+    return labels[:6]
+
+
+def _append_label(labels: list[str], value: str) -> None:
+    clean = re.sub(r"^[以把将和与及、，。；：:\s]+|[的与和及、，。；：:\s]+$", "", str(value or "")).strip()
+    if clean and clean not in labels:
+        labels.append(clean[:24])
+
+
+def _trim_character_name(value: str) -> str:
+    clean = re.sub(r"^(以|把|将|当|用|和|与|及|、)+", "", str(value or "")).strip()
+    clean = re.sub(r"(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$", "", clean).strip()
+    return clean
 
 
 def _infer_scene_label(text: str) -> str:
@@ -188,7 +273,30 @@ def _infer_scene_label(text: str) -> str:
         return "屋顶平台"
     if is_city:
         return "城市场景"
+    if re.search(r"暗办公室|昏暗办公室", source):
+        return "暗办公室"
+    if "办公室" in source:
+        return "办公室"
+    if re.search(r"房间|室内", source):
+        return "室内空间"
+    if re.search(r"街道|街区|路面", source):
+        return "街道空间"
+    if re.search(r"山巅|山脊|石台|云海|战场", source):
+        return "山巅石台战场"
     return ""
+
+
+def _repeated_actor_names(source: str) -> list[str]:
+    candidates: dict[str, int] = {}
+    pattern = re.compile(
+        r"([\u4e00-\u9fff]{2,4})(?=(?:在|从|向|朝|把|将|对|低头|抬头|伸出|手持|推进|冲|走|跑|跃|后撤|咆哮|看|望|眼神|侧身|跪|坐|握|拿))"
+    )
+    for match in pattern.finditer(source):
+        name = match.group(1)
+        if name in {"镜头", "画面", "远处", "两人", "双方", "办公室", "山巅", "石台", "战场"}:
+            continue
+        candidates[name] = candidates.get(name, 0) + 1
+    return [name for name, count in sorted(candidates.items(), key=lambda item: (-item[1], source.find(item[0]))) if count >= 2][:4]
 
 
 def _duration(text: str) -> str:

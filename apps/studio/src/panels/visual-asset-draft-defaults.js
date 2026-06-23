@@ -45,7 +45,7 @@ export function visualAssetDefaultsFromAssetCardDraft(draft, assetType) {
       wardrobe: card.wardrobe || "保持服装、外壳或外观层",
       palette: card.palette || "保持角色主色调",
       demeanor: card.demeanor || "保持角色气质和神态",
-      reference_views: card.reference_views || "正面全身、侧面全身、背面全身、头部/胸口或关键材质细节近景",
+      reference_views: card.reference_views || "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身；无任何道具或背景物体",
     },
   };
 }

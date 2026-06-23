@@ -1,7 +1,10 @@
 export const ASSET_CARD_FIELDS = {
   character: [
     ["identity", "身份定位"],
-    ["appearance", "外形辨识"],
+    ["appearance", "外形总览"],
+    ["hair", "发型/毛发/颜色"],
+    ["face", "面部/头部特征"],
+    ["build", "体态身形"],
     ["wardrobe", "服装/外观"],
     ["palette", "主色调"],
     ["demeanor", "气质状态"],
@@ -12,6 +15,7 @@ export const ASSET_CARD_FIELDS = {
     ["layout", "空间结构"],
     ["props", "关键道具"],
     ["lighting_mood", "光影氛围"],
+    ["palette", "场景配色"],
     ["time_weather", "时间天气"],
     ["view_set", "多视角视图组"],
   ],
@@ -21,6 +25,7 @@ export const ASSET_CARD_FIELDS = {
     ["material", "材质工艺"],
     ["scale", "尺寸比例"],
     ["usage", "使用方式"],
+    ["interaction", "持握/互动关系"],
     ["continuity", "连续性约束"],
     ["reference_views", "道具视图组"],
   ],
@@ -108,6 +113,7 @@ function defaultFeatureCard(assetType, label, shotText) {
       layout: sceneLayout(shotText),
       props: sceneProps(shotText),
       lighting_mood: sceneLightingMood(shotText),
+      palette: scenePalette(shotText),
       time_weather: sceneTimeWeather(shotText),
       view_set: "同一场景的俯瞰全景、正向广角、入口/边缘视角、光影或材质细节视角，空间关系保持一致",
     };
@@ -119,6 +125,7 @@ function defaultFeatureCard(assetType, label, shotText) {
       material: propMaterial(label, shotText),
       scale: "与角色/场景比例一致",
       usage: propUsage(label, shotText),
+      interaction: propInteraction(label, shotText),
       continuity: "后续镜头保持同一造型、材质和使用状态",
       reference_views: "正面、侧面、俯视、局部结构/材质特写，比例与材质保持一致",
     };
@@ -126,10 +133,13 @@ function defaultFeatureCard(assetType, label, shotText) {
   return {
     identity: characterIdentity(label, shotText),
     appearance: characterAppearance(label, shotText),
+    hair: characterHair(label, shotText),
+    face: characterFace(label, shotText),
+    build: characterBuild(label, shotText),
     wardrobe: characterWardrobe(shotText),
     palette: characterPalette(shotText),
     demeanor: characterDemeanor(shotText),
-    reference_views: "正面全身、侧面全身、背面全身、头部/胸口或关键材质细节近景，比例与外观保持一致",
+    reference_views: "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身；无任何道具或背景物体，比例与外观保持一致",
   };
 }
 
@@ -202,16 +212,46 @@ function stripAssetTags(text) {
 }
 
 function characterIdentity(label, text) {
+  if (/孙悟空/.test(label)) return "孙悟空，东方神话战士角色，身手敏捷，战斗姿态强";
+  if (/金刚狼/.test(label)) return "金刚狼，硬派近身格斗角色，强韧、压迫感强";
   if (/机器人|机械|金属机身/.test(text)) return label === "主角" ? "来自未来的机器人主角" : `${label}，未来科幻机器人角色`;
   return label;
 }
 
 function characterAppearance(label, text) {
+  if (/孙悟空/.test(label)) return "猴相人形战士轮廓，面部毛发与锐利眼神清晰，保留神话战斗辨识度";
+  if (/金刚狼/.test(label)) return "强壮近战战士轮廓，肩背紧实，面部线条硬朗，动作姿态有压迫感";
   if (/机器人|机械|金属机身/.test(text)) {
     return "金属机身，精密发光纹路，清晰头部轮廓、躯干比例和四肢结构";
   }
   if (/脸|眼神|表情|体态|轮廓/.test(text)) return "根据分镜保留脸部、体态和轮廓辨识点";
   return "根据分镜描述确定可复用外观辨识点";
+}
+
+function characterHair(label, text) {
+  if (/孙悟空/.test(label)) return "棕金色竖立毛发，猴相鬓毛清晰，发冠或头饰不改变主体头部比例";
+  if (/金刚狼/.test(label)) return "深色短发或粗硬发型，鬓角与胡须轮廓保持硬派辨识度";
+  if (/黑发|黑色头发|黑色短发|黑色长发/.test(text)) return "黑色头发，长度和发型按分镜语境确定";
+  if (/短发/.test(text)) return "短发，发型保持可复用辨识点";
+  if (/长发/.test(text)) return "长发，发型保持可复用辨识点";
+  if (/机器人|机械|金属机身/.test(text)) return "无自然毛发，头部外壳或发光结构作为识别点";
+  return "按分镜语境确定发型、毛发或头部外观，后续可人工补充";
+}
+
+function characterFace(label, text) {
+  if (/孙悟空/.test(label)) return "猴相面部，眉眼锐利，脸部毛发自然，表情坚毅；面部新增标记需保持自然皮肤或毛发质感";
+  if (/金刚狼/.test(label)) return "硬朗面部线条，眉眼紧张，胡须或鬓角清楚，表情克制凶猛";
+  if (/疤|伤疤|刀疤/.test(text)) return "面部标记按分镜描述保留，疤痕需细小自然，不符号化、不变成妆容";
+  if (/脸|眼神|表情|五官/.test(text)) return "根据分镜保留脸部、五官、眼神与显著标记";
+  return "保持面部/头部可识别特征，后续可人工补充";
+}
+
+function characterBuild(label, text) {
+  if (/孙悟空/.test(label)) return "敏捷精瘦的战士体态，四肢有爆发力，比例不变形";
+  if (/金刚狼/.test(label)) return "结实强韧的近战体态，肩背和手臂力量感明显";
+  if (/机器人|机械|金属机身/.test(text)) return "保持成年类人比例、头身比、躯干和四肢机械结构关系";
+  if (/瘦|偏瘦|纤细/.test(text)) return "偏瘦体型，身形比例稳定";
+  return "根据分镜保持体态、身高比例和动作能力设定";
 }
 
 function characterWardrobe(text) {
@@ -233,6 +273,7 @@ function characterDemeanor(text) {
 function sceneLocation(label, text) {
   if (/屋顶|楼顶|天台/.test(text)) return "夜晚城市屋顶/楼顶平台";
   if (/街道|街区|路面|人行道|独自行走|街道氛围|雨夜/.test(text)) return "雨夜城市街道/街区外景";
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "山巅石台战场";
   if (/城市|天际线/.test(text)) return "城市外景与天际线环境";
   return label;
 }
@@ -247,11 +288,16 @@ function sceneLayout(text) {
   if (/城市|天际线/.test(text)) {
     return "城市街区或外景空间，前景可行走区域、中景建筑界面和远处天际线层次清晰";
   }
+  if (/山巅|山脊|石台|云海|战场/.test(text)) {
+    return "破碎山巅石台作为战斗中心，周围云海、山脊和碎石形成远近层次";
+  }
   return "根据分镜画面确定空间结构、主体位置和远近层次";
 }
 
 function sceneProps(text) {
+  if (/金箍棒|钢爪|武器/.test(text)) return "角色手持道具应拆为道具资产，场景只保留环境元素";
   if (/灯火|霓虹|高楼|天际线/.test(text)) return "城市灯火、远处高楼、低饱和霓虹反射作为环境元素";
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "山石平台、破碎石块、云雾层次和远处山脊作为环境元素";
   return "保留分镜中出现的关键环境元素，不额外新增无关道具";
 }
 
@@ -262,6 +308,13 @@ function sceneLightingMood(text) {
   return phraseFromShot(text, "自然光影，氛围服务剧情");
 }
 
+function scenePalette(text) {
+  if (/雨夜|街道|霓虹/.test(text)) return "冷蓝、黑灰和低饱和霓虹反射";
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "冷灰山石、暗蓝云雾、雷光高亮和低饱和金属火花";
+  if (/冷蓝|月光|星光|青蓝/.test(text)) return "冷蓝、青蓝和低饱和暗部";
+  return "场景配色按分镜语境确定，后续可人工补充";
+}
+
 function sceneTimeWeather(text) {
   if (/雨夜/.test(text)) return "雨夜，空气潮湿，路面有反光和轻微雨雾";
   if (/雨|雾|风/.test(text)) return "按分镜天气与空气状态确定，保留雨/雾/风等已出现天气线索";
@@ -270,18 +323,31 @@ function sceneTimeWeather(text) {
 }
 
 function propAppearance(label, text) {
+  if (/金箍棒/.test(label)) return "长棍类神话武器，金属质感，两端箍纹与棒身比例清楚，轮廓修长";
+  if (/钢爪/.test(label)) return "三刃金属爪，锋利、对称、可从手部伸出，结构清楚";
   if (/灯|路灯|灯具|灯柱/.test(label)) return "独立灯具/光源结构，外轮廓清楚，发光区域和支撑结构可辨认";
   return "根据分镜描述确定外观轮廓和辨识细节";
 }
 
 function propMaterial(label, text) {
+  if (/金箍棒/.test(label)) return "金属或鎏金材质，磨损边缘与雕刻纹路可见";
+  if (/钢爪/.test(label)) return "冷色金属材质，边缘高光锐利";
   if (/灯|路灯|灯具|灯柱/.test(label) && /科幻|未来|金属/.test(text)) return "金属与半透明发光材料，冷色反射";
   return "材质待人工确认";
 }
 
 function propUsage(label, text) {
+  if (/金箍棒/.test(label)) return "由孙悟空持握、横扫、格挡或立在身侧使用";
+  if (/钢爪/.test(label)) return "由金刚狼近身格斗、迎击和格挡使用";
   if (/灯|路灯|灯具|灯柱/.test(label)) return "作为环境光源或局部照明使用";
   return "按分镜动作使用";
+}
+
+function propInteraction(label, text) {
+  if (/金箍棒/.test(label)) return "与孙悟空手部动作绑定，不能变成独立场景装饰或其他武器";
+  if (/钢爪/.test(label)) return "与金刚狼手部和近战动作绑定，数量、朝向和长度保持一致";
+  if (/手持|持握|拿着|挥|横扫|格挡|刺|砍/.test(text)) return "与角色手部动作和镜头连续性保持一致";
+  return "与角色、场景的互动关系按分镜语境确定";
 }
 
 function safeAssetType(value) { return ["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character"; }

@@ -94,6 +94,52 @@ def test_storyboard_local_fallback_uses_adaptive_shot_count_not_three_sentence_c
     assert shots[-1]["shot_id"] == "shot_05"
 
 
+def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_count() -> None:
+    script = (
+        "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。"
+        "孙悟空手持金箍棒向前压低身形。"
+        "金刚狼伸出钢爪迎面冲来。"
+        "两人短兵相接，火花从金箍棒和钢爪之间迸出。"
+        "孙悟空侧身跃起，金箍棒横扫。"
+        "金刚狼后撤，脚下碎石飞溅。"
+        "远处雷光照亮山脊。"
+        "两人再次对峙，气氛压迫。"
+        "孙悟空眼神锐利，金箍棒立在身侧。"
+        "金刚狼低声咆哮，钢爪反射冷光。"
+        "镜头拉远，山巅战场被云海包围。"
+        "最后两人同时冲向对方。"
+    )
+
+    shots = local_storyboard_shots(script)
+    refs = [ref for shot in shots for ref in shot["asset_refs"]]
+    labels_by_type = {(ref["label"], ref["asset_type"]) for ref in refs}
+    descriptions = "\n".join(shot["description"] for shot in shots)
+
+    assert len(shots) > 5
+    assert ("孙悟空", "character") in labels_by_type
+    assert ("金刚狼", "character") in labels_by_type
+    assert ("金箍棒", "prop") in labels_by_type
+    assert "@主角" not in descriptions
+    assert "@主要场景" not in descriptions
+
+
+def test_storyboard_local_fallback_respects_line_based_script_units() -> None:
+    script = "\n".join(
+        f"{index}. 沈昭昭在暗办公室推进调查，镜头捕捉第{index}个动作节拍。"
+        for index in range(1, 17)
+    )
+
+    shots = local_storyboard_shots(script)
+    refs = [ref for shot in shots for ref in shot["asset_refs"]]
+
+    assert len(shots) >= 12
+    assert ("沈昭昭", "character") in {(ref["label"], ref["asset_type"]) for ref in refs}
+    assert ("暗办公室", "scene") in {(ref["label"], ref["asset_type"]) for ref in refs}
+    assert "@主要场景" not in "\n".join(shot["description"] for shot in shots)
+    assert shots[0]["index"] == 1
+    assert shots[-1]["index"] == len(shots)
+
+
 def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
     calls: list[object] = []

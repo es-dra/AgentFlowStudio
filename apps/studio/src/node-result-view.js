@@ -36,7 +36,7 @@ export function resultView(node) {
     frame.appendChild(previewOverlay(node));
     result.appendChild(frame);
     if (candidates.length > 1) result.appendChild(candidateGrid(candidates));
-    if (node.type === "video") result.appendChild(resultActions(node, result));
+    if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result));
   }
   const text = document.createElement("div");
   text.className = "node-result-text";
@@ -73,7 +73,7 @@ function resultActions(node, result) {
   actions.appendChild(assetButton);
 
   const download = downloadPreviewLink(node);
-  download.innerHTML = `${icon("archive", 12)}<span>${node.type === "video" ? "下载视频" : "下载图片"}</span>`;
+  download.innerHTML = `${icon("archive", 12)}<span>${node.type === "video" ? "下载视频" : "导出原图"}</span>`;
   actions.appendChild(download);
   if (node.type === "video") {
     const draftButton = document.createElement("button");
@@ -247,7 +247,7 @@ function downloadPreviewLink(node) {
   link.className = "mini-btn node-preview-download";
   setRuntimeMediaSource(link, node.previewUrl);
   link.download = previewDownloadName(node);
-  link.textContent = node.type === "video" ? "下载视频" : "下载图片";
+  link.textContent = node.type === "video" ? "下载视频" : "导出原图";
   return link;
 }
 

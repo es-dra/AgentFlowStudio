@@ -53,6 +53,9 @@ def _edit_policy_lines(revision: dict[str, Any]) -> list[str]:
             lines.append("Appearance edit scope: change only the named surface or recognizable detail; preserve identity, adult/humanoid scale, head-to-body ratio, joint layout, limb length, camera distance, and sheet composition.")
             if any(term in target for term in ("plush", "fur", "furry", "fabric", "毛绒", "绒", "布料", "织物")):
                 lines.append("Plush/fabric material must read as a surface covering on the same existing robot frame, not as a cute toy, chibi body, stuffed doll, or new rounded robot design.")
+            if any(term in target for term in ("scar", "疤", "伤疤", "刀疤", "左边面部", "左脸")):
+                lines.append("Facial-mark edit scope: add exactly the requested scar or mark on the subject's left side of the face only; preserve face identity, eyes, brow, hair, expression, costume, armor, body, weapons or props, and all view positions.")
+                lines.append("Make the scar visible in the front half-body close-up and consistent on matching front or side views; do not add extra scars, wounds, blood, different facial structure, or a new character design.")
         if field == "palette":
             lines.append("Palette edit scope: change colors only; preserve form, materials, proportions, clothing cut, lighting direction, and reference sheet layout.")
         if field == "demeanor":
