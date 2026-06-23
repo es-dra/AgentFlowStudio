@@ -84,7 +84,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     const projectName = name.trim() || "AFS Studio project";
     const nextRuntime = createRuntimeClient(projectId);
     try {
-      await nextRuntime.createProject({ project_id: projectId, goal: projectName });
+      await createProjectWithRetry(nextRuntime, { project_id: projectId, goal: projectName });
       await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
     } catch (error) {
       showProjectCreateError(error);
@@ -237,6 +237,26 @@ function requestProjectName() {
   });
 }
 
+async function createProjectWithRetry(runtime, payload) {
+  try {
+    return await runtime.createProject(payload);
+  } catch (error) {
+    if (!isTransientRuntimeError(error)) throw error;
+    await delay(900);
+    return runtime.createProject(payload);
+  }
+}
+
+function isTransientRuntimeError(error) {
+  const status = Number(error?.status || 0);
+  const message = error instanceof Error ? error.message : String(error || "");
+  return status === 0 || status === 502 || status === 503 || status === 504 || /network connection interrupted|Failed to fetch|Gateway timeout/i.test(message);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function showProjectCreateError(error) {
   const message = safeError(error);
   const modal = el("div", "modal compact project-create-modal");
@@ -259,7 +279,11 @@ function showProjectCreateError(error) {
 
 function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  if (/network connection interrupted|Failed to fetch|Gateway timeout/i.test(clean)) {
+    return "Runtime 连接短暂中断。项目可能已经创建，请刷新项目列表后再重试。";
+  }
+  return clean.slice(0, 180);
 }
 
 function isTestProject(item) {

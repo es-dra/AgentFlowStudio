@@ -9,6 +9,7 @@ import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
 const MAX_KEYFRAME_POLL_ATTEMPTS = 540;
 const MAX_BOOTSTRAP_KEYFRAME_REFRESH = 4;
+const MAX_ASSET_RECOVERY_ATTEMPTS = 18;
 const activeKeyframePolls = new Map();
 export async function pollNodeKeyframeGeneration(store, runtime, node) {
   const jobId = node.params?.lastKeyframeJobId;
@@ -35,6 +36,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: null });
   });
   let submitAttempted = false;
+  let submittedAtMs = 0;
   try {
     let request = buildKeyframeGenerationRequest(store.get(), node);
     request = await prepareGenerationRequest(store, runtime, node, request, "keyframe");
@@ -44,6 +46,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
       return;
     }
     submitAttempted = true;
+    submittedAtMs = Date.now();
     const response = await runtime.generateKeyframe(request);
     applyKeyframeResponse(store, node.id, response, request, { kind: generationKind });
     clearOneRunOverrides(store, node.id);
@@ -52,8 +55,14 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
       await startBackgroundKeyframePolling(store, runtime, node.id, response.job.job_id, request);
     }
   } catch (error) {
-    setNodeError(store, node.id, `图像生成请求失败: ${safeError(error)}`);
     if (submitAttempted) clearOneRunOverrides(store, node.id);
+    if (submitAttempted && isRecoverableSubmitError(error)) {
+      markKeyframeRecovering(store, node.id, nodeGenerationKind(node));
+      await store.flushRuntimeSave?.();
+      void recoverTimedOutKeyframeFromAssets(store, runtime, node.id, generationKind, submittedAtMs, error);
+      return;
+    }
+    setNodeError(store, node.id, `图像生成请求失败: ${safeError(error)}`);
     await store.flushRuntimeSave?.();
   }
 }
@@ -115,7 +124,6 @@ function shouldSavePollState(attempt, status, lastSavedStatus, response) {
 }
 function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
   const status = response?.job?.status || "blocked";
-  const succeeded = status === "succeeded";
   const inProgress = isKeyframeInProgress(response);
   const kind = options.kind || "keyframe";
   store.set((s) => {
@@ -123,6 +131,7 @@ function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
     if (!n) return;
     const preview = response?.candidate_previews?.[0] || null;
     const reusableAsset = response?.reusable_image_assets?.[0] || null;
+    const succeeded = status === "succeeded" || Boolean(preview?.preview_url && (response?.safe_manifest?.output_count ?? 0) > 0);
     const jobId = response?.job?.job_id || null;
     const shouldRecordAsset = succeeded && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
     updateNodeGenerationState(n, response, { kind });
@@ -152,6 +161,93 @@ function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
       });
     }
   });
+}
+function markKeyframeRecovering(store, nodeId, kind) {
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    const label = kind === "asset" ? "正在找回资产图结果" : "正在找回图片结果";
+    n.status = "generating";
+    updateNodeGenerationState(n, { job: { status: "running", progress: { mode: "indeterminate" } } }, {
+      kind,
+      label,
+      hint: "浏览器连接超时或中断，但 Runtime 可能仍在完成生成；正在从素材库补偿回填。",
+    });
+    n.result = `${kind === "asset" ? "资产图" : "图像"}请求连接中断，正在尝试找回已完成结果。`;
+  }, { history: false });
+}
+async function recoverTimedOutKeyframeFromAssets(store, runtime, nodeId, kind, submittedAtMs, originalError) {
+  for (let attempt = 0; attempt < MAX_ASSET_RECOVERY_ATTEMPTS; attempt += 1) {
+    if (nodeAlreadyRecovered(store, nodeId)) return;
+    if (attempt > 0) await sleep(attempt < 4 ? 3000 : 5000);
+    const recovered = await recoverNodeFromGeneratedAssets(store, runtime, nodeId, kind, submittedAtMs);
+    if (recovered) {
+      await store.flushRuntimeSave?.();
+      return;
+    }
+  }
+  if (nodeAlreadyRecovered(store, nodeId)) return;
+  setNodeError(store, nodeId, `图像生成请求失败: ${safeError(originalError)} 可稍后在素材库中查看是否已有候选图，或在节点菜单重试。`);
+  await store.flushRuntimeSave?.();
+}
+async function recoverNodeFromGeneratedAssets(store, runtime, nodeId, kind, submittedAtMs) {
+  if (!runtime?.listImageAssets) return false;
+  let payload = null;
+  try {
+    payload = await runtime.listImageAssets();
+  } catch {
+    return false;
+  }
+  const assets = Array.isArray(payload?.assets) ? payload.assets : [];
+  const matching = assets
+    .filter((item) => String(item?.source_node_id || "") === String(nodeId) && item?.preview_url)
+    .sort((a, b) => assetCreatedAtMs(b) - assetCreatedAtMs(a));
+  const asset = matching.find((item) => assetCreatedAtMs(item) >= submittedAtMs - 1000) || matching.find((item) => !assetCreatedAtMs(item));
+  if (!asset) return false;
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    n.status = "complete";
+    n.previewUrl = asset.preview_url;
+    n.params.uploads = mergeImageAssets(n.params.uploads || [], recoveredAssetForNode(asset, kind)).slice(-4);
+    if (asset.source_job_id) {
+      n.params.lastKeyframeJobId = asset.source_job_id;
+      n.params.lastKeyframeCompletedJobId = asset.source_job_id;
+    }
+    resizeNodeForImagePreview(n, asset, n.params?.spec?.ratio || "16:9");
+    n.result = [
+      `${kind === "asset" ? "资产图" : "关键帧"}已从已落盘素材找回`,
+      asset.source_job_id ? `任务编号：${asset.source_job_id}` : null,
+      "预览已从安全素材地址加载。",
+    ].filter(Boolean).join("\n");
+  }, { history: false });
+  return true;
+}
+function nodeAlreadyRecovered(store, nodeId) {
+  const node = store.get().nodes?.[nodeId];
+  return node?.status === "complete" && Boolean(node.previewUrl);
+}
+function assetCreatedAtMs(asset) {
+  const parsed = Date.parse(String(asset?.created_at || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+function recoveredAssetForNode(asset, kind) {
+  const role = kind === "asset" ? asset.role || "asset_reference" : asset.role || "generated_keyframe_reference";
+  return {
+    asset_id: asset.asset_id,
+    role,
+    filename: asset.filename || `${asset.asset_id}.png`,
+    preview_url: asset.preview_url,
+    width: asset.width || null,
+    height: asset.height || null,
+    aspect_ratio: asset.aspect_ratio || null,
+  };
+}
+function isRecoverableSubmitError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const status = Number(error?.status || 0);
+  return status === 0 || status === 502 || status === 503 || status === 504
+    || /Gateway timeout|network connection interrupted|Failed to fetch|timed out/i.test(message);
 }
 function markKeyframeStillProcessing(store, nodeId, jobId) {
   store.set((s) => {

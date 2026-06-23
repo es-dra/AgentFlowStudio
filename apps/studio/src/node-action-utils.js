@@ -1,6 +1,9 @@
 export function safeError(error) {
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  if (/Gateway timeout|504|network connection interrupted|Failed to fetch/i.test(clean)) {
+    return "生成请求连接中断，正在尝试从已落盘素材找回结果。";
+  }
   if (/AFS_ALLOW_REMOTE_|provider service not found|provider gate is closed|Remote .* calls are disabled/i.test(clean)) {
     return "生成服务未就绪，请检查本机配置与创作服务启动状态后重试。";
   }

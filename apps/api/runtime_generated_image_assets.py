@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -128,6 +129,7 @@ def _generated_metadata(
         "source_kind": "keyframe_candidate",
         "source_job_id": safe_id(source_job_id),
         "source_candidate_id": safe_id(source_candidate_id),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "media_bytes_returned_by_api": False,
         "provider_raw_response_stored": False,
         "writes_long_term_memory": False,

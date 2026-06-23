@@ -36,7 +36,7 @@ function assetImageModeInstruction(assetType, label) {
   const assetName = cleanAssetName(label);
   if (assetType === "scene") {
     return [
-      `Environment reference for asset named ${assetName}: show the same rooftop/location from multiple clear camera angles in one image.`,
+      `Environment reference for asset named ${assetName}: show the same environment/location from multiple clear camera angles in one image.`,
       "Required views: wide establishing view, reverse angle, overhead/spatial layout view, and lighting/material detail view.",
       "Keep the same architecture, skyline, horizon, props, lighting direction, time of day, and spatial relationship across all views.",
       "No main character or robot unless a tiny scale reference is explicitly needed.",

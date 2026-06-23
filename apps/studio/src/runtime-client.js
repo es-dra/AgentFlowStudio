@@ -83,11 +83,20 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
   const token = authToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${runtimeBaseUrl()}${route}`, {
-    method,
-    headers,
-    body: payload == null ? undefined : JSON.stringify(payload),
-  });
+  let response;
+  try {
+    response = await fetch(`${runtimeBaseUrl()}${route}`, {
+      method,
+      headers,
+      body: payload == null ? undefined : JSON.stringify(payload),
+    });
+  } catch (fetchError) {
+    const error = new Error("Runtime request failed: network connection interrupted");
+    error.status = 0;
+    error.route = route;
+    error.cause = fetchError;
+    throw error;
+  }
   const body = await response.text();
   if (!response.ok) {
     const error = new Error(staleRuntimeRouteMessage(response, route, body) || runtimeErrorMessage(response, body));
@@ -113,10 +122,21 @@ function runtimeErrorMessage(response, body) {
     const payload = body ? JSON.parse(body) : {};
     detail = String(payload?.detail || payload?.message || "").trim();
   } catch {
-    detail = String(body || "").trim();
+    detail = cleanTextResponseError(body, response);
   }
   const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
+}
+
+function cleanTextResponseError(body, response) {
+  const raw = String(body || "").trim();
+  if (!raw) return response.statusText || "";
+  if (/^\s*</.test(raw) || /<html|<body|<\/\w+>/i.test(raw)) {
+    return response.status === 504
+      ? "Gateway timeout while waiting for image generation; checking saved Runtime assets may recover the result."
+      : (response.statusText || "HTTP response was not JSON");
+  }
+  return raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 export function authToken() {

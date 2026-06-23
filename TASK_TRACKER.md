@@ -61,6 +61,24 @@ provider raw response, signed URL, secret, local private path, generated media
 byte, or Company OS private source content was written to the repo. Remaining
 validation: human visual acceptance in the browser workflow.
 
+Current keyframe timeout recovery addendum: 2026-06-23 pass fixes the browser
+state mismatch where a long image/asset generation can complete in Runtime
+after Nginx/browser request timeout, leaving the asset drawer populated while
+the source node still displays failure. Runtime now treats an async-described
+API relay result with `already_complete` as a completed image response and
+returns safe previews/assets immediately. Studio sanitizes non-JSON 504 HTML,
+keeps timed-out generation nodes in recovery, polls Runtime image assets by
+`source_node_id`, and restores the node preview/upload refs if the saved asset
+appears. Project creation also retries once on transient Runtime network
+errors. Scene asset draft defaults now preserve rain-night street cues and only
+select rooftop when the shot explicitly mentions rooftop/roof/terrace.
+Verification: Studio JS syntax check passed for 113 files; focused timeout /
+scene-asset regressions passed 4 / 1 existing warning; broader Runtime/Studio
+keyframe-state suite passed 44 / 1 existing warning; `git diff --check`
+passed. Maintenance follow-up: extract provider status normalization and
+keyframe result recovery out of the existing 500+ line
+`apps/api/runtime_keyframes.py`.
+
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and
 provider-discard fallback now preserve semantic asset labels for robot/rooftop

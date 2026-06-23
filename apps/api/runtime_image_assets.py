@@ -165,6 +165,8 @@ def public_image_asset(metadata: dict[str, Any]) -> dict[str, Any]:
         payload["source_job_id"] = metadata.get("source_job_id")
     if metadata.get("source_candidate_id"):
         payload["source_candidate_id"] = metadata.get("source_candidate_id")
+    if metadata.get("created_at"):
+        payload["created_at"] = metadata.get("created_at")
     return payload
 
 

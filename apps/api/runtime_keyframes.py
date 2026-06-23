@@ -169,20 +169,52 @@ def build_keyframe_generation(
             )
             if str(getattr(descriptor, "execution_mode", "sync") or "sync") == "async":
                 provider_task = registry.submit("image", request.provider_service_id, dispatch_request)
-                status = str((provider_task.get("task") or {}).get("status") or "submitted")
-                _write_task_state(
-                    output_dir,
-                    _task_state(
-                        request=request,
-                        provider_task=provider_task,
-                        status=status,
-                        provider_prompt=provider_prompt,
-                        provider_gate=provider_gate,
-                        reference_image_count=len(reference_images),
-                        image_operation=image_operation,
-                        context_bundle=context_bundle,
-                    ),
-                )
+                task_status = str((provider_task.get("task") or {}).get("status") or "submitted")
+                if task_status == "already_complete":
+                    raw = registry.poll("image", request.provider_service_id, provider_task)
+                    raw_status = str(raw.get("status") or "succeeded").lower()
+                    if raw_status == "succeeded":
+                        status = "succeeded"
+                        provider_outputs = _provider_outputs(raw)
+                    elif raw_status in {"running", "submitted", "pending"}:
+                        status = raw_status
+                        _write_task_state(
+                            output_dir,
+                            _task_state(
+                                request=request,
+                                provider_task=provider_task,
+                                status=status,
+                                provider_prompt=provider_prompt,
+                                provider_gate=provider_gate,
+                                reference_image_count=len(reference_images),
+                                image_operation=image_operation,
+                                context_bundle=context_bundle,
+                            ),
+                        )
+                    else:
+                        status = "blocked"
+                        blocks.append(
+                            {
+                                "block_id": "remote_image_provider_not_ready",
+                                "reason": _safe_error(str(raw.get("error") or raw_status or "image provider did not complete")),
+                                "required_gate": required_gate,
+                            }
+                        )
+                else:
+                    status = task_status
+                    _write_task_state(
+                        output_dir,
+                        _task_state(
+                            request=request,
+                            provider_task=provider_task,
+                            status=status,
+                            provider_prompt=provider_prompt,
+                            provider_gate=provider_gate,
+                            reference_image_count=len(reference_images),
+                            image_operation=image_operation,
+                            context_bundle=context_bundle,
+                        ),
+                    )
             else:
                 manifest, retry_count = dispatch_provider_with_retry(
                     registry,

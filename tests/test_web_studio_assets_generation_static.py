@@ -127,6 +127,9 @@ def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() 
     assert "pollKeyframeUntilTerminal" not in node_actions
     assert "pollKeyframeUntilTerminal" in keyframe_actions
     assert "lastKeyframeJobId" in keyframe_actions
+    assert "recoverTimedOutKeyframeFromAssets" in keyframe_actions
+    assert "source_node_id" in keyframe_actions
+    assert "Gateway timeout while waiting for image generation" in runtime_client
     assert "MiniMax keyframe request failed" not in node_actions
     for forbidden in ("Codex", "codex", "handoff", "request.json", "codex_image_job"):
         assert forbidden not in node_actions + keyframe_actions
@@ -137,6 +140,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     asset_image_prompts = (STUDIO_ROOT / "src" / "asset-card-image-prompts.js").read_text(encoding="utf-8")
     asset_generation_prompt = (STUDIO_ROOT / "src" / "asset-card-generation-prompt.js").read_text(encoding="utf-8")
     asset_revision_refs = (STUDIO_ROOT / "src" / "asset-revision-references.js").read_text(encoding="utf-8")
+    asset_card_drafts = (STUDIO_ROOT / "src" / "asset-card-drafts.js").read_text(encoding="utf-8")
     asset_card_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
     runtime_keyframes = Path("apps/api/runtime_keyframes.py").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
@@ -165,6 +169,11 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "assetCardPromptText(node)" in optimizer_contract.split("function primaryPromptText", 1)[1].split("const explicit", 1)[0]
     for marker in ("Character turnaround", "Environment reference", "Object reference", "Forbidden: software dashboard, app interface, data chart"):
         assert marker in asset_image_prompts
+    assert "same rooftop/location" not in asset_image_prompts
+    assert "same environment/location" in asset_image_prompts
+    assert "雨夜城市街道/街区外景" in asset_card_drafts
+    assert "可通行的城市街道/人行道前景" in asset_card_drafts
+    assert "雨夜，空气潮湿" in asset_card_drafts
     assert all(polluted not in asset_image_prompts + asset_generation_prompt for polluted in ("多视图角色设定表", "多视角场景设定图", "多视图道具设定表", "设定板排布"))
     for marker in ("场景资产必须是同一空间的多角度环境参考图", "角色资产必须是同一角色的正面全身", "道具资产必须是单一道具的正面"):
         assert marker in asset_generation_prompt

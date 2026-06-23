@@ -232,13 +232,20 @@ function characterDemeanor(text) {
 
 function sceneLocation(label, text) {
   if (/屋顶|楼顶|天台/.test(text)) return "夜晚城市屋顶/楼顶平台";
+  if (/街道|街区|路面|人行道|独自行走|街道氛围|雨夜/.test(text)) return "雨夜城市街道/街区外景";
   if (/城市|天际线/.test(text)) return "城市外景与天际线环境";
   return label;
 }
 
 function sceneLayout(text) {
-  if (/星空|天际线|屋顶|楼顶|天台/.test(text)) {
+  if (/屋顶|楼顶|天台/.test(text)) {
     return "屋顶边缘与平台前景，远处城市天际线，广阔星空占据主要空间";
+  }
+  if (/街道|街区|路面|人行道|独自行走|街道氛围|雨夜/.test(text)) {
+    return "可通行的城市街道/人行道前景，路面雨水反光，街边建筑与远处城市灯光形成纵深";
+  }
+  if (/城市|天际线/.test(text)) {
+    return "城市街区或外景空间，前景可行走区域、中景建筑界面和远处天际线层次清晰";
   }
   return "根据分镜画面确定空间结构、主体位置和远近层次";
 }
@@ -249,14 +256,16 @@ function sceneProps(text) {
 }
 
 function sceneLightingMood(text) {
+  if (/雨夜|雨|潮湿|湿地|积水/.test(text) && /夜|低照度|深夜/.test(text)) return "低照度雨夜光线，冷色阴影压低环境，湿润路面保留城市反射";
   if (/冷蓝|月光|星光|星空|霓虹|低饱和/.test(text)) return "冷蓝月光与星光主导，城市霓虹提供低饱和反射";
   if (/低照度|夜晚|深夜/.test(text)) return "低照度夜景光线，暗部压低，主体轮廓清晰";
   return phraseFromShot(text, "自然光影，氛围服务剧情");
 }
 
 function sceneTimeWeather(text) {
+  if (/雨夜/.test(text)) return "雨夜，空气潮湿，路面有反光和轻微雨雾";
+  if (/雨|雾|风/.test(text)) return "按分镜天气与空气状态确定，保留雨/雾/风等已出现天气线索";
   if (/夜|星空|月光/.test(text)) return "晴朗夜晚，冷蓝月光与星光主导";
-  if (/雨|雾|风/.test(text)) return "按分镜天气与空气状态确定";
   return "按分镜语境确定";
 }
 

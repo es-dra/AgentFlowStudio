@@ -301,6 +301,69 @@ def test_uploaded_image_asset_can_be_deleted_from_project_runtime(tmp_path) -> N
     assert assets == []
 
 
+def test_async_image_provider_already_complete_returns_succeeded_preview(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    class DoneDescriptor:
+        prompt_char_limit = DEFAULT_IMAGE_PROMPT_LIMIT
+        reference_image_slots = 1
+        required_gate = "AFS_ALLOW_REMOTE_IMAGE"
+        execution_mode = "async"
+
+    class DoneRegistry:
+        def descriptor(self, service_id: str) -> DoneDescriptor:
+            return DoneDescriptor()
+
+        def submit(self, capability: str, service_id: str, request):
+            output_dir = Path(request.output_dir)
+            image_dir = output_dir / "image_candidates"
+            image_dir.mkdir(parents=True, exist_ok=True)
+            image_path = image_dir / "candidate_001.png"
+            image_path.write_bytes(PNG_BYTES)
+            return {"service_id": service_id, "capability": capability, "task": {"status": "already_complete"}}
+
+        def poll(self, capability: str, service_id: str, task):
+            image_path = Path(task["task"]["output_dir"]) / "image_candidates" / "candidate_001.png" if "output_dir" in task.get("task", {}) else None
+            byte_count = image_path.stat().st_size if image_path and image_path.is_file() else len(PNG_BYTES)
+            return {
+                "status": "succeeded",
+                "outputs": [
+                    {
+                        "candidate_id": "candidate_001",
+                        "image_path": "image_candidates/candidate_001.png",
+                        "byte_count": byte_count,
+                        "sha256": "fake-sha256",
+                        "width": 1,
+                        "height": 1,
+                        "aspect_ratio": "1:1",
+                        "provider_url_persisted": False,
+                    }
+                ],
+            }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: DoneRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_keyframe_async_done/keyframe-generations",
+        json={
+            "node_id": "image-node-async-done-001",
+            "prompt_text": "A controlled character sheet.",
+            "optimized_prompt": "A controlled character sheet.",
+            "aspect_ratio": "16:9",
+            "candidate_count": 1,
+            "generated_at": "2026-06-23T06:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["job"]["status"] == "succeeded"
+    assert payload["candidate_previews"][0]["candidate_id"] == "candidate_001"
+    assert payload["reusable_image_assets"][0]["source_node_id"] == "image-node-async-done-001"
+    assert payload["reusable_image_assets"][0]["created_at"]
+
+
 def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     monkeypatch.setattr("apps.api.runtime_provider_dispatch.time.sleep", lambda _seconds: None)

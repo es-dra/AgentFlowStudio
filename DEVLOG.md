@@ -1,5 +1,46 @@
 # Devlog
 
+## 2026-06-23 - Keyframe Timeout Recovery And Scene Asset Anchors
+
+- Fixed the Runtime image provider status mismatch where an async-described API
+  relay could synchronously finish and return `already_complete`; Runtime now
+  normalizes that path into `succeeded` and returns safe candidate previews and
+  generated image assets in the first response.
+- Hardened Studio image/asset generation after Nginx or browser 504 timeouts:
+  raw HTML error bodies are sanitized, network interruptions become safe
+  user-facing errors, and Studio keeps the node in a recovery state while it
+  polls the Runtime image-asset list by `source_node_id`. If Runtime completed
+  after the browser timed out, the node is restored to complete with the saved
+  preview and image asset ref instead of staying failed while the asset drawer
+  already contains the image.
+- Added one conservative retry around project creation for transient Runtime
+  network errors, with copy that distinguishes short connection interruption
+  from a confirmed create failure.
+- Corrected scene asset defaults that overfit "night city" into a rooftop:
+  scene cards now only choose rooftop when the shot explicitly says roof /
+  rooftop / terrace, while rain-night street cues prioritize city street,
+  walkable ground, wet-road reflections, and rainy night atmosphere. Scene
+  asset image prompts no longer hardcode "rooftop/location".
+- Maintenance note: `apps/api/runtime_keyframes.py` remains a historical
+  500+ line file. The next cleanup should extract async/sync provider status
+  normalization and keyframe result recovery into a dedicated helper module.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed: 113 files
+pytest tests/test_api_runtime_creative_agent_keyframes.py::test_async_image_provider_already_complete_returns_succeeded_preview tests/test_api_runtime_creative_agent_keyframes.py::test_keyframe_generation_returns_safe_image_preview_url tests/test_web_studio_assets_generation_static.py::test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon tests/test_web_studio_assets_generation_static.py::test_asset_card_image_generation_uses_asset_prompt_and_asset_labels -q -> 4 passed / 1 existing warning
+pytest tests/test_api_runtime_creative_agent_keyframes.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_asset_card_revision_legacy_slots.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py tests/test_web_studio_assets_generation_static.py -q -> 44 passed / 1 existing warning
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo. Live browser/provider acceptance remains the user's manual test after
+  deployment.
+
 ## 2026-06-23 - Asset Card Source-Image Edit Path
 
 - Fixed the remaining asset-card local revision root cause: prior work made
