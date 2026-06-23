@@ -1,4 +1,5 @@
 import { icon } from "../icons.js";
+import { downloadResolvedMedia } from "../media-preview-modal.js";
 import { el, showPopover } from "../overlay.js";
 import { setRuntimeMediaSource } from "../runtime-media-source.js";
 import {
@@ -221,12 +222,7 @@ function assetAction(label, onClick) {
 }
 
 async function downloadImageAsset(asset) {
-  const link = document.createElement("a");
-  await setRuntimeMediaSource(link, asset.preview_url);
-  link.download = assetDownloadName(asset);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  await downloadResolvedMedia(asset.preview_url, assetDownloadName(asset));
 }
 
 function assetDownloadName(asset) {

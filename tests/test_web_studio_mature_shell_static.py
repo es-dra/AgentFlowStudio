@@ -150,6 +150,18 @@ def test_studio_shell_supports_resizable_drawer_collapsible_inspector_and_no_sel
     assert "user-select: text;" in base
 
 
+def test_studio_ports_support_upstream_and_downstream_node_creation() -> None:
+    canvas_connection = (STUDIO_ROOT / "src" / "canvas-connection.js").read_text(encoding="utf-8")
+    canvas_input = (STUDIO_ROOT / "src" / "canvas-input.js").read_text(encoding="utf-8")
+    add_menu = (STUDIO_ROOT / "src" / "panels" / "add-node-menu.js").read_text(encoding="utf-8")
+
+    assert "findPortAtPoint" in canvas_connection
+    assert "startConnectSession(store, nodeEl.dataset.nodeId, portBtn.dataset.port, e)" in canvas_input
+    assert 'session.direction === "upstream"' in canvas_connection
+    assert "openReferenceMenu(store, runtime, node, portEl, { direction: session.direction })" in canvas_connection
+    assert 'direction === "upstream"' in add_menu
+
+
 def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     index = (STUDIO_ROOT / "index.html").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")

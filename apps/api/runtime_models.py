@@ -143,6 +143,16 @@ class StoryboardBreakdownRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class ShotAssetPlanRequest(BaseModel):
+    node_id: str | None = None
+    shot: dict[str, Any] = Field(default_factory=dict)
+    script_text: str | None = None
+    existing_assets: list[dict[str, Any]] = Field(default_factory=list)
+    target_platform: str = "short_video"
+    style: str = "cinematic"
+    generated_at: str = Field(min_length=1)
+
+
 class KeyframeGenerationRequest(BaseModel):
     node_id: str | None = None
     prompt_text: str = Field(min_length=1)
@@ -311,6 +321,7 @@ __all__ = (
     "ProjectStatus",
     "ReviewDecisionRecordRequest",
     "SceneInspectorUpdateRequest",
+    "ShotAssetPlanRequest",
     "SourceAssetRegisterRequest",
     "StoryboardBreakdownRequest",
     "SpriteChatRequest",

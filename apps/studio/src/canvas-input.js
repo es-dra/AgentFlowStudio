@@ -1,4 +1,4 @@
-import { findOutputPortAtPoint, finishConnectSession, moveConnectSession, startConnectSession } from "./canvas-connection.js";
+import { findPortAtPoint, finishConnectSession, moveConnectSession, startConnectSession } from "./canvas-connection.js";
 import { handleCanvasNodeClick } from "./canvas-node-action-handler.js";
 import { dragSession, isEditable, selectInRect, updatePortHover } from "./canvas-selection.js";
 import { screenToWorld, zoomAt } from "./geometry.js";
@@ -154,11 +154,11 @@ function handlePointerDown(e, env) {
   }
   if (e.button !== 0 || isChromeTarget(e)) return null;
 
-  const stackedOutputPort = findOutputPortAtPoint(e) || outputPortFromMagnet(e);
+  const stackedOutputPort = findPortAtPoint(e) || outputPortFromMagnet(e);
   const portBtn = stackedOutputPort || e.target.closest(".node-port");
   const nodeEl = stackedOutputPort ? stackedOutputPort.closest(".node") : e.target.closest(".node");
-  if (portBtn && nodeEl && portBtn.dataset.port === "out") {
-    const session = startConnectSession(store, nodeEl.dataset.nodeId, e);
+  if (portBtn && nodeEl) {
+    const session = startConnectSession(store, nodeEl.dataset.nodeId, portBtn.dataset.port, e);
     rootEl.setPointerCapture(e.pointerId);
     e.preventDefault();
     return session;

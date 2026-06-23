@@ -36,7 +36,7 @@ export function handleNodeIntent(store, node, intent) {
     return;
   }
   if (node.type === "script" && intent === "识别资产") {
-    identifyScriptAssets(store, node);
+    identifyScriptAssets(store, null, node);
     return;
   }
   if (node.type === "script" && intent === "生成关键帧层") {

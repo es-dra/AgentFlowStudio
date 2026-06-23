@@ -220,6 +220,34 @@
 .menu-item.danger { color: var(--danger); }
 .menu-item.danger .mi-icon { color: var(--danger); }
 
+.mention-popover {
+  min-width: 220px;
+  max-width: 320px;
+  padding: 8px;
+}
+
+.mention-title {
+  padding: 4px 8px 8px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.mention-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mention-item:hover { background: var(--bg-chip); }
+.mention-item small { color: var(--text-faint); font-size: 11px; }
+
 /* 重命名弹层 */
 .rename-pop { padding: 8px; }
 .rename-input {

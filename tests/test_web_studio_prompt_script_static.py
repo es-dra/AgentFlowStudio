@@ -73,6 +73,12 @@ def test_storyboard_breakdown_creates_reviewable_structured_shots_without_asset_
     for field in ["镜号：", "时长：", "画面描述：", "景别：", "光影氛围：", "运镜：", "资产："]:
         assert field in structured_shot
     assert "export function extractShotAssetRefs" in structured_shot
+    assert "KNOWN_CHARACTER_NAMES" in structured_shot
+    assert '"孙悟空"' in structured_shot
+    assert '"金刚狼"' in structured_shot
+    assert '"金箍棒"' in structured_shot
+    assert '"山巅"' in structured_shot
+    assert '"战场"' in structured_shot
     assert '"主要场景"' in structured_shot
     assert '"路灯"' in structured_shot
     assert '"信", "照片", "灯"' not in structured_shot
@@ -242,6 +248,45 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert 'kind.endsWith("_candidate")' in lifecycle
     assert 'kind === "prop_asset"' in lifecycle
     assert "connect(store, scriptNode.id, keyframeNode.id)" in keyframes
+
+
+def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_asset_nodes() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
+    asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "planShotAssets(payload)" in runtime_client
+    assert "shot-asset-plans" in runtime_client
+    assert "identifyScriptAssets(store, runtime, node)" in storyboard_actions
+    assert "runtime?.planShotAssets" in storyboard_actions
+    assert "createManualShotAssetNode" in asset_nodes
+    assert "添加角色资产" in node_menu
+    assert "添加场景资产" in node_menu
+    assert "添加道具资产" in node_menu
+
+
+def test_asset_mentions_scope_fixed_project_assets_and_tree_candidates() -> None:
+    candidates = (STUDIO_ROOT / "src" / "asset-reference-candidates.js").read_text(encoding="utf-8")
+    mentions = (STUDIO_ROOT / "src" / "mention-suggestions.js").read_text(encoding="utf-8")
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "assetReferenceCandidates" in candidates
+    assert "fixedProjectAssets" in candidates
+    assert "treeCandidateAssets" in candidates
+    assert "connectedNodeIds" in candidates
+    assert '"project_fixed"' in candidates
+    assert '"shot_tree_candidate"' in candidates
+    assert "isRetired(asset)" in candidates
+    assert "bindAssetMentionSuggestions" in mentions
+    assert "assetReferenceCandidates(store.get(), nodeId, match.query)" in mentions
+    assert "MENTION_QUERY_RE" in mentions
+    assert "bindAssetMentionSuggestions(textarea, store, node.id)" in prompt_bar
+    assert "bindAssetMentionSuggestions(textarea, store, node.id)" in canvas_body
+    assert "取消固定资产" in node_menu
+    assert "openRetireAssetModal" in node_menu
 
 
 def test_visual_asset_cards_support_prop_assets_across_frontend_and_runtime_contract() -> None:

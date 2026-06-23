@@ -25,10 +25,11 @@ export function openAddNodeMenu(store, runtime, screenPoint, anchorEl = null) {
   return closeRef;
 }
 
-export function openReferenceMenu(store, runtime, fromNode, anchorEl) {
-  const allowed = new Set(downstreamTypesFor(fromNode.type));
+export function openReferenceMenu(store, runtime, fromNode, anchorEl, options = {}) {
+  const direction = options.direction || "downstream";
+  const allowed = new Set(direction === "upstream" ? upstreamTypesFor(fromNode.type) : downstreamTypesFor(fromNode.type));
   const pop = el("div");
-  pop.appendChild(el("div", "menu-title", "引用该节点生成"));
+  pop.appendChild(el("div", "menu-title", direction === "upstream" ? "在前面添加节点" : "引用该节点生成"));
   for (const type of NODE_MENU_ORDER) {
     if (type === "library") continue;
     const def = NODE_TYPES[type];
@@ -36,15 +37,18 @@ export function openReferenceMenu(store, runtime, fromNode, anchorEl) {
     item.disabled = !allowed.has(type);
     item.addEventListener("click", () => {
       if (item.disabled) return;
-      const node = spawn(store, { id: `node_${type}`, type, label: def.label }, fromNode.x + fromNode.w + 160, fromNode.y);
-      connect(store, fromNode.id, node.id);
+      const x = direction === "upstream" ? fromNode.x - def.size.w - 160 : fromNode.x + fromNode.w + 160;
+      const node = spawn(store, { id: `node_${type}`, type, label: def.label }, x, fromNode.y);
+      if (direction === "upstream") connect(store, node.id, fromNode.id);
+      else connect(store, fromNode.id, node.id);
       close();
     });
     pop.appendChild(item);
   }
   const refItem = menuItem("link", "参考节点");
   refItem.addEventListener("click", () => {
-    const node = spawn(store, { id: "node_reference", type: "text", label: "参考节点" }, fromNode.x + fromNode.w + 160, fromNode.y);
+    const x = direction === "upstream" ? fromNode.x - NODE_TYPES.text.size.w - 160 : fromNode.x + fromNode.w + 160;
+    const node = spawn(store, { id: "node_reference", type: "text", label: "参考节点" }, x, fromNode.y);
     store.set((s) => {
       const n = s.nodes[node.id];
       n.title = "参考节点";
@@ -52,7 +56,8 @@ export function openReferenceMenu(store, runtime, fromNode, anchorEl) {
       n.h = 160;
       n.params.isReference = true;
     });
-    connect(store, fromNode.id, node.id);
+    if (direction === "upstream") connect(store, node.id, fromNode.id);
+    else connect(store, fromNode.id, node.id);
     close();
   });
   pop.appendChild(refItem);
@@ -152,6 +157,10 @@ function spawn(store, action, wx, wy) {
     return node;
   }
   return createActionNode(store, action, wx, wy);
+}
+
+function upstreamTypesFor(targetType) {
+  return NODE_MENU_ORDER.filter((type) => downstreamTypesFor(type).includes(targetType));
 }
 
 function openPositionNear(store, action, wx, wy) {

@@ -195,6 +195,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     breakdownStoryboard(payload) {
       return requestJson(`/projects/${encoded}/storyboard-breakdowns`, { method: "POST", payload });
     },
+    planShotAssets(payload) {
+      return requestJson(`/projects/${encoded}/shot-asset-plans`, { method: "POST", payload });
+    },
     uploadImageAsset(payload) {
       return requestJson(`/projects/${encoded}/image-assets`, { method: "POST", payload });
     },

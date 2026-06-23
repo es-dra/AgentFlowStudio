@@ -296,10 +296,19 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node-preview-download" in result_view
     assert "下载视频" in result_view
     assert "导出原图" in result_view
+    assert "openMediaPreviewModal" in result_view
+    assert "downloadResolvedMedia" in result_view
+    assert "放大查看" in result_view
     assert '["image", "video"].includes(node.type)' in result_view
     drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
     assert "downloadImageAsset" in drawer_assets
+    assert "downloadResolvedMedia(asset.preview_url" in drawer_assets
     assert "导出原图" in drawer_assets
+    media_preview = (STUDIO_ROOT / "src" / "media-preview-modal.js").read_text(encoding="utf-8")
+    assert "openMediaPreviewModal" in media_preview
+    assert "downloadResolvedMedia" in media_preview
+    assert "setRuntimeMediaSource(link, url)" in media_preview
+    assert "media-preview-modal" in media_preview
     assert "qualityFeedbackView" not in result_view
     assert "openQualityFeedbackMenu" in node_menu
     assert "反馈图片质量" in node_menu

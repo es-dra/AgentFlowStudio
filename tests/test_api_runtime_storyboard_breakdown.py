@@ -118,9 +118,63 @@ def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_c
     assert len(shots) > 5
     assert ("孙悟空", "character") in labels_by_type
     assert ("金刚狼", "character") in labels_by_type
+    assert ("山巅石台战场", "scene") in labels_by_type
     assert ("金箍棒", "prop") in labels_by_type
     assert "@主角" not in descriptions
     assert "@主要场景" not in descriptions
+
+
+def test_shot_asset_plan_endpoint_returns_character_scene_and_prop_assets(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_shot_asset_plan"
+    client.post(
+        "/projects",
+        json={
+            "project_id": project_id,
+            "project_type": "short_video_campaign",
+            "goal": "Create a visual story from a complete script.",
+        },
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/shot-asset-plans",
+        json={
+            "node_id": "shot_01",
+            "shot": {
+                "shot_id": "shot_01",
+                "index": 1,
+                "duration": "5s",
+                "description": "@孙悟空 @金刚狼。以孙悟空大战金刚狼为核心，破碎山巅石台上云雾翻卷。孙悟空手持金箍棒，金刚狼压低身体迎面冲来。",
+                "shot_size": "中景",
+                "light_atmosphere": "自然光影，气氛服务情绪推进",
+                "camera_motion": "固定机位，轻微呼吸感",
+                "dialogue": "无明确对白",
+                "sound": "环境底噪，动作音随画面同步",
+                "asset_refs": [
+                    {"label": "孙悟空", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                    {"label": "金刚狼", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                    {"label": "金箍棒", "asset_type": "prop", "status": "candidate", "source": "candidate"},
+                ],
+            },
+            "script_text": "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。孙悟空手持金箍棒向前压低身形。",
+            "generated_at": "2026-06-24T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    labels_by_type = {(item["label"], item["asset_type"]) for item in payload["asset_refs"]}
+
+    assert payload["safe_manifest"]["status"] == "local_asset_plan"
+    assert payload["safe_manifest"]["raw_provider_response_stored"] is False
+    assert payload["asset_nodes_created"] is False
+    assert ("孙悟空", "character") in labels_by_type
+    assert ("金刚狼", "character") in labels_by_type
+    assert ("山巅石台战场", "scene") in labels_by_type
+    assert ("金箍棒", "prop") in labels_by_type
+    assert all(item["evidence_text"] for item in payload["asset_refs"])
+    assert response_contains_unsafe_marker(payload) is False
 
 
 def test_storyboard_local_fallback_respects_line_based_script_units() -> None:

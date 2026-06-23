@@ -1,7 +1,8 @@
 const ASSET_RE = /@([A-Za-z0-9_\-\u4e00-\u9fff·]+)/g;
-const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
-const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生"];
-const PROP_HINTS = ["手机", "电脑", "键盘", "刀", "剑", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门"];
+const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
+const KNOWN_CHARACTER_NAMES = ["孙悟空", "金刚狼"];
+const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", ...KNOWN_CHARACTER_NAMES];
+const PROP_HINTS = ["金箍棒", "钢爪", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门"];
 const GENERIC_CHARACTER_LABELS = new Set(["主角", "角色", "人物"]);
 const GENERIC_SCENE_LABELS = new Set(["主要场景", "场景"]);
 
@@ -122,6 +123,9 @@ function addImplicitRefs(refs, text) {
   const hasCharacter = refs.some((asset) => asset.asset_type === "character");
   const hasScene = refs.some((asset) => asset.asset_type === "scene");
   const hasProp = refs.some((asset) => asset.asset_type === "prop");
+  for (const label of inferCharacterLabels(text)) {
+    pushAssetRef(refs, label, "character", "candidate", text);
+  }
   if (!hasCharacter && CHARACTER_HINTS.some((hint) => text.includes(hint))) {
     pushAssetRef(refs, inferCharacterLabel(text) || "主角", "character", "candidate", text);
   }
@@ -129,8 +133,7 @@ function addImplicitRefs(refs, text) {
     pushAssetRef(refs, inferSceneLabel(text) || "主要场景", "scene", "candidate", text);
   }
   if (!hasProp) {
-    const prop = PROP_HINTS.find((hint) => text.includes(hint));
-    if (prop) pushAssetRef(refs, prop, "prop", "candidate", text);
+    for (const prop of inferPropLabels(text)) pushAssetRef(refs, prop, "prop", "candidate", text);
   }
   if (!refs.length) {
     pushAssetRef(refs, inferCharacterLabel(text) || "主角", "character", "candidate", text);
@@ -178,6 +181,8 @@ function semanticAssetLabel(label, assetType, context) {
 }
 
 function inferCharacterLabel(text) {
+  const labels = inferCharacterLabels(text);
+  if (labels.length) return labels[0];
   const source = String(text || "");
   if (/未来.*机器人|机器人.*未来/.test(source)) return "未来机器人";
   if (/机器人|机械人|仿生人/.test(source)) return "机器人";
@@ -186,6 +191,31 @@ function inferCharacterLabel(text) {
   if (/老人/.test(source)) return "老人";
   if (/孩子/.test(source)) return "孩子";
   return "";
+}
+
+function inferCharacterLabels(text) {
+  const source = String(text || "");
+  const labels = [];
+  const battle = source.match(/([\u4e00-\u9fffA-Za-z0-9·]{2,12})大战([\u4e00-\u9fffA-Za-z0-9·]{2,12})/u);
+  if (battle) {
+    appendLabel(labels, trimCharacterName(battle[1]));
+    appendLabel(labels, trimCharacterName(battle[2]));
+  }
+  for (const name of KNOWN_CHARACTER_NAMES) {
+    if (source.includes(name)) appendLabel(labels, name);
+  }
+  return labels.slice(0, 6);
+}
+
+function inferPropLabels(text) {
+  const source = String(text || "");
+  const labels = [];
+  for (const hint of PROP_HINTS) {
+    if (!source.includes(hint)) continue;
+    if (["棒", "棍"].includes(hint) && source.includes("金箍棒")) continue;
+    appendLabel(labels, hint);
+  }
+  return labels.slice(0, 6);
 }
 
 function inferSceneLabel(text) {
@@ -198,6 +228,7 @@ function inferSceneLabel(text) {
   if (isNight && isCity) return "夜晚城市";
   if (isRooftop) return "屋顶平台";
   if (isCity) return "城市场景";
+  if (/山巅|山脊|石台|云海|战场/.test(source)) return "山巅石台战场";
   return "";
 }
 
@@ -255,6 +286,18 @@ function classifyAsset(label, context) {
   if (label === "信") return /@信|信件|信封|信纸|一封信|书信/.test(context) ? "prop" : "character";
   if (PROP_HINTS.some((hint) => label.includes(hint))) return "prop";
   return "character";
+}
+
+function appendLabel(labels, value) {
+  const clean = String(value || "").replace(/^[以把将和与及、，。；：:\s]+|[的与和及、，。；：:\s]+$/g, "").trim();
+  if (clean && !labels.includes(clean)) labels.push(clean.slice(0, 24));
+}
+
+function trimCharacterName(value) {
+  return String(value || "")
+    .replace(/^(以|把|将|当|用|和|与|及|、)+/, "")
+    .replace(/(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$/, "")
+    .trim();
 }
 
 function assetTypeShortLabel(assetType) {

@@ -18,7 +18,9 @@ import {
   importScriptFileIntoTextNode,
   splitTextNodeToStoryboardNodes,
 } from "../script-breakdown.js";
+import { createManualShotAssetNode } from "../shot-asset-nodes.js";
 import { openAssetCardPanel } from "./asset-card-panel.js";
+import { openRetireAssetModal } from "./drawer-asset-actions.js";
 
 const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
 
@@ -67,6 +69,10 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
     });
+    const fixedAsset = activeFixedVisualAsset(node);
+    if (fixedAsset) {
+      addItem("x", "取消固定资产", () => openRetireAssetModal(store, runtime, fixedAsset));
+    }
     if (node.status === "complete" && (node.previewUrl || node.result)) {
       addItem("sparkles", "反馈图片质量", () => {
         const fresh = store.get().nodes[nodeId];
@@ -114,7 +120,19 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   if (node.type === "script") {
     addItem("sparkles", "识别资产", () => {
       const fresh = store.get().nodes[nodeId];
-      if (fresh) identifyScriptAssets(store, fresh);
+      if (fresh) identifyScriptAssets(store, runtime, fresh);
+    });
+    addItem("user", "添加角色资产", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) createManualShotAssetNode(store, fresh, "character");
+    });
+    addItem("image", "添加场景资产", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) createManualShotAssetNode(store, fresh, "scene");
+    });
+    addItem("bookmark", "添加道具资产", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) createManualShotAssetNode(store, fresh, "prop");
     });
     addItem("image", "生成关键帧层", () => {
       const fresh = store.get().nodes[nodeId];
@@ -133,6 +151,14 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     item.addEventListener("click", () => { close(); onClick(); });
     pop.appendChild(item);
   }
+}
+
+function activeFixedVisualAsset(node) {
+  const assets = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+  return [...assets].reverse().find((asset) => {
+    const status = String(asset?.status || asset?.asset_status || "fixed");
+    return status !== "retired" && status !== "excluded";
+  }) || null;
 }
 
 export function openQualityFeedbackMenu(node, anchorOrPoint) {

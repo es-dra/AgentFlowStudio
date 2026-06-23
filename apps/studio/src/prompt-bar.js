@@ -12,6 +12,7 @@ import { icon } from "./icons.js";
 import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
+import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -99,6 +100,7 @@ function buildBar(store, runtime, node) {
       runPromptBarGeneration(store, runtime, node);
     }
   });
+  bindAssetMentionSuggestions(textarea, store, node.id);
   bar.appendChild(textarea);
 
   if (node.type === "video" || node.type === "script") {

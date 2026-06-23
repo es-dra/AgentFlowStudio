@@ -1,6 +1,7 @@
 import { assetsFromNode, carryChainItems, assetCarryLabel, assetCarryState, assetLabel, assetTypeLabel } from "./asset-reference-summary.js";
 import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { icon } from "./icons.js";
+import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 
 export function buildNodeBody(node, def, store = null) {
@@ -165,6 +166,7 @@ function editableContentBlock(node, store, expanding) {
       }
     }, { history: false });
   });
+  bindAssetMentionSuggestions(textarea, store, node.id);
   textarea.addEventListener("pointerdown", (event) => event.stopPropagation());
   textarea.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
   return textarea;

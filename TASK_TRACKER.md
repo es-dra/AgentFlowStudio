@@ -6,11 +6,28 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-23 by Codex
+Last updated: 2026-06-24 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current Runtime-backed shot asset planning addendum: 2026-06-24 pass adds a
+safe `/shot-asset-plans` Runtime route and rewires Studio right-click
+`识别资产` to prefer that Runtime planning contract before falling back locally.
+The route returns character / scene / prop refs with evidence text and a safe
+manifest; it does not create nodes, call media providers, write provider raw
+responses, store generated media bytes, or promote fixed memory. Studio now
+supports manual `添加角色资产` / `添加场景资产` / `添加道具资产` from script nodes,
+project-wide `@` suggestions for fixed assets, connected-tree-only suggestions
+for unfixed asset-card drafts, filtering of retired assets, left-port upstream
+node creation, and visible `取消固定资产` from image node menus. Generated image
+and video results now support `放大查看`, and image/video export resolves Runtime
+media at click time so `导出原图` / `下载视频` is an actual download action instead
+of a stale link. Verification: Studio JS syntax check passed for 118 files;
+full pytest passed 634 / 520 deselected / 2 existing warnings; CLI help/version
+passed; `git diff --check` passed. Remaining validation: GitHub + server
+three-end sync, Runtime health after restart, and browser visual acceptance.
 
 Current asset revision reference addendum: 2026-06-23 pass addresses asset-card
 regeneration drift where editing a single card detail, such as changing a robot

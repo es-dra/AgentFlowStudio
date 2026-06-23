@@ -1,5 +1,6 @@
 import { assetTypeLabel, assetLabel, subjectSuffix } from "./asset-reference-summary.js";
 import { icon } from "./icons.js";
+import { downloadResolvedMedia, openMediaPreviewModal } from "./media-preview-modal.js";
 import { setRuntimeMediaSource } from "./runtime-media-source.js";
 
 export function resultView(node) {
@@ -34,6 +35,7 @@ export function resultView(node) {
       frame.appendChild(img);
     }
     frame.appendChild(previewOverlay(node));
+    frame.addEventListener("dblclick", () => openNodeMediaPreview(node));
     result.appendChild(frame);
     if (candidates.length > 1) result.appendChild(candidateGrid(candidates));
     if (["image", "video"].includes(node.type)) result.appendChild(resultActions(node, result));
@@ -72,8 +74,14 @@ function resultActions(node, result) {
   assetButton.innerHTML = `${icon("bookmark", 12)}<span>固定素材</span>`;
   actions.appendChild(assetButton);
 
-  const download = downloadPreviewLink(node);
-  download.innerHTML = `${icon("archive", 12)}<span>${node.type === "video" ? "下载视频" : "导出原图"}</span>`;
+  const previewButton = document.createElement("button");
+  previewButton.className = "mini-btn";
+  previewButton.type = "button";
+  previewButton.innerHTML = `${icon("expand", 12)}<span>放大查看</span>`;
+  previewButton.addEventListener("click", () => openNodeMediaPreview(node));
+  actions.appendChild(previewButton);
+
+  const download = downloadPreviewButton(node);
   actions.appendChild(download);
   if (node.type === "video") {
     const draftButton = document.createElement("button");
@@ -97,6 +105,12 @@ function candidateGrid(candidates) {
     item.className = "candidate-card";
     item.type = "button";
     item.title = `候选 ${index + 1}`;
+    item.addEventListener("click", () => openMediaPreviewModal({
+      url: candidate.url || candidate.preview_url,
+      type: "image",
+      title: `候选 ${index + 1}`,
+      downloadName: `候选-${String(index + 1).padStart(2, "0")}.png`,
+    }));
     const img = document.createElement("img");
     setRuntimeMediaSource(img, candidate.url || candidate.preview_url);
     img.alt = `候选 ${index + 1}`;
@@ -242,13 +256,13 @@ function previewAspectRatio(node) {
   return /^\d+:\d+$/.test(value) ? value.replace(":", " / ") : "9 / 16";
 }
 
-function downloadPreviewLink(node) {
-  const link = document.createElement("a");
-  link.className = "mini-btn node-preview-download";
-  setRuntimeMediaSource(link, node.previewUrl);
-  link.download = previewDownloadName(node);
-  link.textContent = node.type === "video" ? "下载视频" : "导出原图";
-  return link;
+function downloadPreviewButton(node) {
+  const button = document.createElement("button");
+  button.className = "mini-btn node-preview-download";
+  button.type = "button";
+  button.innerHTML = `${icon("archive", 12)}<span>${node.type === "video" ? "下载视频" : "导出原图"}</span>`;
+  button.addEventListener("click", () => downloadResolvedMedia(node.previewUrl, previewDownloadName(node), button));
+  return button;
 }
 
 function previewDownloadName(node) {
@@ -258,4 +272,14 @@ function previewDownloadName(node) {
     .trim()
     .slice(0, 80) || fallback;
   return `${base}.${node.type === "video" ? "mp4" : "png"}`;
+}
+
+function openNodeMediaPreview(node) {
+  openMediaPreviewModal({
+    url: node.previewUrl,
+    type: node.type === "video" ? "video" : "image",
+    title: node.title || (node.type === "video" ? "视频预览" : "图片预览"),
+    aspectRatio: previewAspectRatio(node),
+    downloadName: previewDownloadName(node),
+  });
 }
