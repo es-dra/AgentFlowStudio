@@ -53,10 +53,13 @@ maintenance audit failed=0 with existing warnings only; `git diff --check`
 passed. Follow-up provider compatibility regression passed 37 / 1 existing
 warning after defaulting multipart image field to `image` and omitting
 unsupported `input_fidelity`; legacy zero-slot source-edit regression passed
-38 / 1 existing warning. Boundary: no provider raw response, signed URL, secret,
-local private path, generated media byte, or Company OS private source content
-was written to the repo. Remaining validation: deployed external-provider smoke
-with a robot local material edit, then human visual acceptance.
+38 / 1 existing warning. Deployed server provider smoke then succeeded for the
+robot metal-to-plush source-image edit: the output preserved multi-view
+character-sheet layout, adult humanoid proportions, head shape, blue glow
+details, and neutral grey background without chibi/toy drift. Boundary: no
+provider raw response, signed URL, secret, local private path, generated media
+byte, or Company OS private source content was written to the repo. Remaining
+validation: human visual acceptance in the browser workflow.
 
 Current Studio asset UX repair addendum: 2026-06-23 pass fixes the active
 canvas issues reported from the user screenshots. Storyboard fallback and

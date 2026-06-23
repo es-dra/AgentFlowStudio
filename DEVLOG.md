@@ -41,14 +41,15 @@ python -m apps.cli.main --help -> passed
 python -m apps.cli.main version -> 0.1.0
 python tools/maintenance_audit.py -> failed=0, existing warnings only
 git diff --check -> passed
+server provider smoke -> source-image edit succeeded for robot metal-to-plush material revision; output preserved multi-view character sheet layout, adult humanoid proportions, head shape, blue glow details, and neutral grey background without chibi/toy drift
 ```
 
 Boundary:
 
 - No provider key, provider raw response, signed URL, local private path,
   generated media byte, or Company OS private source content was written to the
-  repo. The live visual result still requires a deployed provider smoke and
-  human acceptance.
+  repo. The live visual result has runtime/provider smoke evidence and still
+  needs human acceptance in the browser workflow.
 
 ## 2026-06-23 - Asset Card Image Revision References
 
