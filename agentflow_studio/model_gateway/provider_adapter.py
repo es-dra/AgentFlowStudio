@@ -156,6 +156,7 @@ from agentflow_studio.model_gateway.provider_api_relay import ApiRelayAdapter  #
 from agentflow_studio.model_gateway.provider_codex_handoff import CodexImageHandoffAdapter  # noqa: E402
 from agentflow_studio.model_gateway.provider_codex_local import CodexLocalAdapter  # noqa: E402
 from agentflow_studio.model_gateway.provider_fake_vision import FakeVisionAdapter  # noqa: E402
+from agentflow_studio.model_gateway.volc_seedance_video import VolcSeedanceVideoAdapter  # noqa: E402
 
 
 class ProviderRegistry:
@@ -203,6 +204,9 @@ class ProviderRegistry:
                 continue
             if capability == "video" and provider == "kling":
                 adapters[service_id] = KlingVideoAdapter(store, service_id, descriptor)
+                continue
+            if capability == "video" and provider in {"volc_seedance", "seedance"}:
+                adapters[service_id] = VolcSeedanceVideoAdapter(store, service_id, descriptor)
                 continue
         return cls(store, adapters, descriptors)
 
@@ -292,6 +296,8 @@ def _is_adapter_service(provider: str, capability: str) -> bool:
         "fake",
         "kling",
         "openai_compatible",
+        "seedance",
+        "volc_seedance",
     }
 
 
@@ -437,6 +443,7 @@ __all__ = (
     "CodexImageHandoffAdapter",
     "CodexLocalAdapter",
     "ApiRelayAdapter",
+    "VolcSeedanceVideoAdapter",
     "ProviderAdapter",
     "ProviderCapability",
     "ProviderDescriptor",

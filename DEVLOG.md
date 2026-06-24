@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-24 - Seedance Video Relay Adapter
+
+- Added a `volc_seedance` video provider adapter for relay-style Volc/Seedance
+  task APIs. It builds a safe task payload for `doubao-seedance-2-0-fast`, sends
+  text plus first/last frame image references, polls the task endpoint, downloads
+  the resulting video into local Runtime candidate storage, and does not persist
+  provider URLs or raw provider responses.
+- Extended Runtime video dispatch so `last_frame_image_asset_id` is passed into
+  provider dispatch as the second reference image. Existing first-frame-only
+  providers still receive the first frame as before.
+- Added `seedance_i2v` to `configs/providers.example.json` with only environment
+  variable names, model/endpoint shape, and descriptor metadata. No real relay
+  base URL, key, signed URL, or provider-local config was written.
+- Added focused regressions for Seedance descriptor registration, video gate
+  blocking before network, safe submit/poll/download behavior, and Runtime
+  first/last frame propagation.
+
+Verification:
+
+```text
+pytest tests/test_volc_seedance_video_adapter.py -> 4 passed / 1 existing warning
+pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_video_generations.py -> 41 passed / 1 existing warning
+npm.cmd run check:studio-js -> JS syntax check passed: 118 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- This is adapter/Runtime contract verification, not a live provider smoke,
+  video-quality validation, human acceptance, or business validation. Server
+  provider credentials and local provider config remain outside the repo.
+
 ## 2026-06-24 - Asset Card Fixed Asset Carry Policy
 
 - Fixed Studio generation preflight for asset-card image nodes. Character

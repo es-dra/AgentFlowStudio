@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+import base64
+import json
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
+from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
+from apps.api import runtime_video_routes
+from apps.api.runtime_service import create_runtime_app
+
+
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+)
+
+
+def test_provider_registry_builds_seedance_example_descriptor() -> None:
+    store = load_company_provider_secrets("configs/providers.example.json")
+    registry = ProviderRegistry.from_store(store)
+
+    descriptor = registry.descriptor("seedance_i2v")
+
+    assert descriptor.modality == "video"
+    assert descriptor.required_gate == "AFS_ALLOW_REMOTE_VIDEO"
+    assert descriptor.frame_slots == {"first_frame": "required", "last_frame": "optional"}
+    assert descriptor.supported_resolutions == ["480p", "720p"]
+    assert store.services["seedance_i2v"]["provider"] == "volc_seedance"
+
+
+def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    first = tmp_path / "first.png"
+    last = tmp_path / "last.png"
+    first.write_bytes(PNG_BYTES)
+    last.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/volc/v1/contents/generations/tasks":
+            captured["create_auth"] = request.get_header("Authorization")
+            captured["create_payload"] = json.loads(request.data.decode("utf-8"))
+            captured["create_timeout"] = timeout
+            return _JsonResponse({"id": "cgt-seedance-123", "status": "queued"})
+        if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-123":
+            captured["poll_auth"] = request.get_header("Authorization")
+            return _JsonResponse(
+                {
+                    "id": "cgt-seedance-123",
+                    "status": "succeeded",
+                    "content": {"video_url": "https://media.seedance.test/result.mp4"},
+                    }
+                )
+        if url == "https://media.seedance.test/result.mp4":
+            captured["download_timeout"] = timeout
+            return _BytesResponse(b"fake-seedance-video", "video/mp4")
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    result = registry.dispatch(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="A controlled cinematic move from first to last frame.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=(first, last),
+            subject_reference_image_path=first,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    payload = captured["create_payload"]
+    assert captured["create_auth"] == "Bearer secret-video-key"
+    assert captured["poll_auth"] == "Bearer secret-video-key"
+    assert captured["create_timeout"] == 120.0
+    assert captured["download_timeout"] == 180.0
+    assert payload["model"] == "doubao-seedance-2-0-fast"
+    assert payload["ratio"] == "16:9"
+    assert payload["duration"] == 5
+    assert payload["resolution"] == "720p"
+    assert payload["watermark"] is False
+    assert payload["content"][0] == {"type": "text", "text": "A controlled cinematic move from first to last frame."}
+    assert payload["content"][1]["role"] == "first_frame"
+    assert payload["content"][2]["role"] == "last_frame"
+    assert payload["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert result["status"] == "succeeded"
+    assert result["outputs"][0]["video_path"] == "video_candidates/candidate_001.mp4"
+    assert (tmp_path / "run" / "video_candidates" / "candidate_001.mp4").read_bytes() == b"fake-seedance-video"
+    assert "secret-video-key" not in json.dumps(result, ensure_ascii=False)
+    assert "media.seedance.test" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> None:
+    called = {"count": 0}
+
+    def fake_urlopen(*_args, **_kwargs):
+        called["count"] += 1
+        raise AssertionError("network must not be called while video gate is closed")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    with pytest.raises(ModelGatewayError, match="AFS_ALLOW_REMOTE_VIDEO"):
+        registry.dispatch(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(prompt="blocked", output_dir=tmp_path, aspect_ratio="16:9"),
+        )
+
+    assert called["count"] == 0
+
+
+def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class CaptureRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "seedance_i2v"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO", min_reference_image_edge_px=0)
+
+        def submit(self, capability: str, service_id: str, request):
+            captured["capability"] = capability
+            captured["service_id"] = service_id
+            captured["reference_image_paths"] = tuple(request.reference_image_paths)
+            return {"task": {"status": "already_complete", "raw": {"status": "succeeded", "outputs": []}}}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: CaptureRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "seedance-first-last-frame"
+    client.post("/projects", json={"project_id": project_id, "goal": "Seedance first last frame"})
+    first_id = _upload_image(client, project_id, "first_frame")
+    last_id = _upload_image(client, project_id, "last_frame")
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "prompt_text": "Move from first frame to last frame.",
+            "provider_service_id": "seedance_i2v",
+            "first_frame_image_asset_id": first_id,
+            "last_frame_image_asset_id": last_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "aspect_ratio": "16:9",
+            "generated_at": "2026-06-24T20:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["job"]["status"] == "succeeded"
+    assert captured["capability"] == "video"
+    assert captured["service_id"] == "seedance_i2v"
+    assert len(captured["reference_image_paths"]) == 2
+
+
+def _upload_image(client: TestClient, project_id: str, role: str) -> str:
+    response = client.post(
+        f"/projects/{project_id}/image-assets",
+        json={
+            "node_id": role,
+            "filename": f"{role}.png",
+            "mime_type": "image/png",
+            "data_base64": base64.b64encode(PNG_BYTES).decode("ascii"),
+            "role": role,
+            "generated_at": "2026-06-24T20:00:00+08:00",
+        },
+    )
+    assert response.status_code == 200
+    return response.json()["asset"]["asset_id"]
+
+
+def _seedance_provider_config(tmp_path) -> str:
+    payload = {
+        "schema_version": "company_provider_secrets.local.v2",
+        "accounts": {
+            "volc_seedance_relay": {
+                "auth_type": "api_key",
+                "base_url": "https://relay.test",
+                "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
+                "default_models": {"video": "doubao-seedance-2-0-fast"},
+            }
+        },
+        "account_pools": {
+            "seedance_video_pool": {
+                "accounts": [
+                    {
+                        "account_id": "volc_seedance_relay",
+                        "service_id": "seedance_i2v",
+                        "credential_env": "AFS_VIDEO_RELAY_API_KEY",
+                        "enabled_capabilities": ["video"],
+                        "enabled": True,
+                        "priority": 10,
+                        "weight": 1,
+                        "concurrency_limit": 1,
+                        "health_state": "healthy",
+                    }
+                ]
+            }
+        },
+        "services": {
+            "seedance_i2v": {
+                "provider": "volc_seedance",
+                "account_ref": "volc_seedance_relay",
+                "capability": "video",
+                "endpoint": "/volc/v1/contents/generations/tasks",
+                "model": "doubao-seedance-2-0-fast",
+                "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+                "reference_roles": ["first_frame", "last_frame"],
+                "watermark": False,
+                "allowed_artifact_hosts": ["media.seedance.test"],
+                "descriptor": {
+                    "schema_version": "provider_descriptor.v0.2",
+                    "modality": "video",
+                    "execution_mode": "async",
+                    "capabilities": ["video"],
+                    "account_pool_id": "seedance_video_pool",
+                    "reference_image_slots": 2,
+                    "supported_aspect_ratios": ["16:9", "9:16"],
+                    "prompt_char_limit": 5000,
+                    "seed_supported": True,
+                    "cost_hint": "test-only",
+                    "rate_limit_hint": "test-only",
+                    "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+                    "frame_slots": {"first_frame": "required", "last_frame": "optional"},
+                    "frame_modes": ["first_frame", "first_last_frame"],
+                    "supported_durations_sec": [5, 10],
+                    "supported_resolutions": ["480p", "720p"],
+                    "async_poll_interval_sec": 5,
+                    "async_timeout_sec": 900,
+                    "async_max_polls": 180,
+                    "prompt_profile": "video_i2v_v1",
+                },
+            }
+        },
+    }
+    path = tmp_path / "providers.local.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return str(path)
+
+
+class _JsonResponse:
+    def __init__(self, payload: dict):
+        self.payload = payload
+        self.headers = {"Content-Type": "application/json"}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+class _BytesResponse:
+    def __init__(self, payload: bytes, content_type: str):
+        self.payload = payload
+        self.headers = {"Content-Type": content_type}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self, *_args) -> bytes:
+        return self.payload

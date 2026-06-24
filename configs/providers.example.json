@@ -19,6 +19,14 @@
         "video": "fake-video"
       }
     },
+    "volc_seedance_relay": {
+      "auth_type": "api_key",
+      "base_url_env": "AFS_VIDEO_RELAY_BASE_URL",
+      "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
+      "default_models": {
+        "video": "doubao-seedance-2-0-fast"
+      }
+    },
     "kling": {
       "auth_type": "jwt_hs256_from_ak_sk",
       "base_url": "https://api-beijing.klingai.com",
@@ -98,6 +106,21 @@
           "enabled_capabilities": ["video"],
           "enabled": true,
           "priority": 10,
+          "weight": 1,
+          "concurrency_limit": 1,
+          "health_state": "unknown"
+        }
+      ]
+    },
+    "seedance_video_pool": {
+      "accounts": [
+        {
+          "account_id": "volc_seedance_relay",
+          "service_id": "seedance_i2v",
+          "credential_env": "AFS_VIDEO_RELAY_API_KEY",
+          "enabled_capabilities": ["video"],
+          "enabled": true,
+          "priority": 15,
           "weight": 1,
           "concurrency_limit": 1,
           "health_state": "unknown"
@@ -222,6 +245,46 @@
         "cost_hint": "Fake adapter only; no provider cost.",
         "rate_limit_hint": "Fake adapter is deterministic and local.",
         "required_gate": "AFS_ALLOW_REMOTE_VIDEO"
+      }
+    },
+    "seedance_i2v": {
+      "provider": "volc_seedance",
+      "account_ref": "volc_seedance_relay",
+      "capability": "video",
+      "endpoint": "/volc/v1/contents/generations/tasks",
+      "model": "doubao-seedance-2-0-fast",
+      "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+      "reference_roles": ["first_frame", "last_frame"],
+      "watermark": false,
+      "generate_audio": false,
+      "descriptor": {
+        "schema_version": "provider_descriptor.v0.2",
+        "modality": "video",
+        "execution_mode": "async",
+        "capabilities": ["video"],
+        "account_pool_id": "seedance_video_pool",
+        "reference_image_slots": 2,
+        "supported_aspect_ratios": ["16:9", "9:16", "1:1", "4:3", "3:4"],
+        "prompt_char_limit": 5000,
+        "seed_supported": true,
+        "cost_hint": "Volc/Seedance relay usage is billed by provider duration and selected model.",
+        "rate_limit_hint": "Use one live Seedance video task at a time during MVP validation.",
+        "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+        "frame_slots": {
+          "first_frame": "required",
+          "last_frame": "optional"
+        },
+        "frame_modes": ["first_frame", "first_last_frame"],
+        "supported_durations_sec": [5, 10],
+        "supported_resolutions": ["480p", "720p"],
+        "async_poll_interval_sec": 5,
+        "async_timeout_sec": 900,
+        "async_max_polls": 180,
+        "prompt_profile": "video_i2v_v1",
+        "cost_estimate": {
+          "unit": "task",
+          "disclaimer": "Example only; use local provider terms for actual cost."
+        }
       }
     },
     "kling_i2v": {

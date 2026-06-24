@@ -6,7 +6,7 @@ backlog；如果某项任务已经不能服务当前主线，应直接删除，�
 
 | # | 事项 | 来源 | 优先级 | 建议时机 | 记录时间 | 说明 |
 |---|---|---|---|---|---|---|
-| 1 | 拆分 oversized Runtime/Studio 文件 | `tools/maintenance_audit.py` oversized warning | P1 | 下一轮维护切片 | 2026-06-12 by Codex | 当前 warning 覆盖 `runtime_context_resolver.py`、`runtime_director_compiler.py`、`runtime_keyframes.py`、`runtime_service.py`、`director-shell.js` 和两个大型测试文件。不要在 provider 接入切片里顺手强拆，避免扩大风险。 |
+| 1 | 拆分 oversized Runtime/Studio 文件 | `tools/maintenance_audit.py` oversized warning | P1 | 下一轮维护切片 | 2026-06-12 by Codex; updated 2026-06-24 by Codex | 当前 warning 覆盖 `runtime_context_resolver.py`、`runtime_director_compiler.py`、`runtime_keyframes.py`、`runtime_service.py`、`provider_adapter.py`、`director-shell.js` 和两个大型测试文件。不要在 provider 接入切片里顺手强拆，避免扩大风险。 |
 | 2 | 实现 Kling video adapter v0.2 | Provider Gateway v0.1 非目标 | P1 | keyframe 可控性证据稳定后 | 2026-06-12 by Codex | v0.1 已用 fake video 表达 async 生命周期，但 Kling 的 submit/poll/normalize、任务状态恢复和 video gate 需要独立切片。 |
 | 3 | 清理 ACL 阻塞的 pytest basetemp 缓存 | AFS-PROJECT-INVENTORY-001 cleanup manifest | P1 | 下一次管理员 shell 或所有权修复窗口 | 2026-06-12 by Codex | `data/processed/pytest-basetemp` 是 ignored 测试缓存，但当前用户无法完全删除历史 ACL-denied 目录。这不是 repo 代码问题，需要目录所有者或管理员 shell 清理。 |
 | 4 | 制定媒体/evidence 保留规则 | AFS-PROJECT-INVENTORY-001 inventory report | P1 | provider gateway v0.2 或大批 live smoke 前 | 2026-06-12 by Codex | 深度本地盘点发现 80 组 exact duplicate media/evidence，理论可回收约 827MB。只有在 canonical run/manifest 保留规则确定后才能删除。 |

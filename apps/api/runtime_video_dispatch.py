@@ -48,8 +48,9 @@ def submit_video_generation(
         raise ValueError("video candidate_count must be 1")
     first_frame_path = image_asset_file_path(store, project_id, request.first_frame_image_asset_id)
     frame_metadata = [image_asset_metadata(store, project_id, request.first_frame_image_asset_id)]
+    last_frame_path = None
     if request.last_frame_image_asset_id:
-        image_asset_file_path(store, project_id, request.last_frame_image_asset_id)
+        last_frame_path = image_asset_file_path(store, project_id, request.last_frame_image_asset_id)
         frame_metadata.append(image_asset_metadata(store, project_id, request.last_frame_image_asset_id))
     preflight = video_generation_preflight(store, project_id, request)
     context_bundle = preflight.get("context_bundle")
@@ -75,12 +76,13 @@ def submit_video_generation(
         return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, size_blocks[0], gate, blocks=size_blocks)
     if daily_submit_count(store, project_id) >= daily_submit_limit() and not request.quota_override_confirmed:
         raise ValueError("daily video submit quota requires quota_override_confirmed")
+    reference_paths = (first_frame_path, last_frame_path) if last_frame_path else (first_frame_path,)
     dispatch_request = ProviderDispatchRequest(
         prompt=provider_prompt,
         output_dir=output_dir,
         aspect_ratio=request.aspect_ratio,
         candidate_count=1,
-        reference_image_paths=(first_frame_path,),
+        reference_image_paths=reference_paths,
         subject_reference_image_path=first_frame_path,
         duration_sec=request.duration_sec,
         resolution=request.resolution,
