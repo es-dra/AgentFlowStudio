@@ -137,9 +137,9 @@ function defaultFeatureCard(assetType, label, shotText) {
     hair: characterHair(label, shotText),
     face: characterFace(label, shotText),
     build: characterBuild(label, shotText),
-    wardrobe: characterWardrobe(shotText),
-    palette: characterPalette(shotText),
-    demeanor: characterDemeanor(shotText),
+    wardrobe: characterWardrobe(label, shotText),
+    palette: characterPalette(label, shotText),
+    demeanor: characterDemeanor(label, shotText),
     reference_views: "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身；无任何道具或背景物体，比例与外观保持一致",
   };
 }
@@ -147,6 +147,9 @@ function defaultFeatureCard(assetType, label, shotText) {
 function signatureFor(assetType, label, shotText) {
   if (assetType === "scene") {
     return `${label}：${sceneSignatureHint(label, shotText)}`.slice(0, 120);
+  }
+  if (assetType === "character") {
+    return `${label}：${characterSignatureHint(label, shotText)}`.slice(0, 120);
   }
   const suffix = {
     character: "可复用角色，身份与外观待确认",
@@ -178,6 +181,7 @@ function phraseFromShot(text, fallback) {
 function normalizedSignature(assetType, label, evidenceText, value) {
   let clean = cleanDraftField(value);
   if (assetType === "scene") clean = cleanSceneDraftField(clean);
+  if (assetType === "character") clean = cleanCharacterDraftField(label, clean);
   if (!signatureHasMeaning(clean, label)) return signatureFor(assetType, label, evidenceText);
   if (clean.includes("：") || clean.includes(":")) return clean.slice(0, 120);
   return `${label}：${clean}`.slice(0, 120);
@@ -190,6 +194,7 @@ function normalizedFeatureCard(assetType, label, evidenceText, card) {
   for (const [key] of assetCardFieldsForType(assetType)) {
     let clean = cleanDraftField(source[key]);
     if (assetType === "scene") clean = cleanSceneDraftField(clean);
+    if (assetType === "character") clean = cleanCharacterDraftField(label, clean);
     const text = clean && signatureHasMeaning(clean, label) ? clean : fallback[key];
     if (text) result[key] = String(text).slice(0, 260);
   }
@@ -218,6 +223,32 @@ function cleanSceneDraftField(value) {
   return clean;
 }
 
+function cleanCharacterDraftField(label, value) {
+  const clean = stripAssetTags(value);
+  if (!clean) return "";
+  if (characterFieldLooksLikeStoryContext(label, clean)) return "";
+  return clean;
+}
+
+function characterFieldLooksLikeStoryContext(label, value) {
+  const text = String(value || "");
+  const otherCharacters = ["孙悟空", "金刚狼"].filter((name) => !sameAssetName(name, label));
+  if (otherCharacters.some((name) => text.includes(name))) return true;
+  if (/镜号|画面描述|景别|光影氛围|运镜|对白|旁白|音效|资产：|来源分镜/u.test(text)) return true;
+  if (/金箍棒|山巅|石台|战场|云海|大战|对决|碰撞|冲击波|火花/u.test(text)) return true;
+  return false;
+}
+
+function sameAssetName(left, right) {
+  const a = cleanAssetNameForCompare(left);
+  const b = cleanAssetNameForCompare(right);
+  return Boolean(a && b && (a === b || a.includes(b) || b.includes(a)));
+}
+
+function cleanAssetNameForCompare(value) {
+  return String(value || "").replace(/^@+/, "").replace(/\s+/g, "").trim();
+}
+
 function shotDescription(structuredShot) { return String(structuredShot?.description || structuredShot?.source_text || "").trim(); }
 
 function stripAssetTags(text) {
@@ -233,7 +264,7 @@ function characterIdentity(label, text) {
 
 function characterAppearance(label, text) {
   if (/孙悟空/.test(label)) return "猴相人形战士轮廓，面部毛发与锐利眼神清晰，保留神话战斗辨识度";
-  if (/金刚狼/.test(label)) return "强壮近战战士轮廓，肩背紧实，面部线条硬朗，动作姿态有压迫感";
+  if (/金刚狼/.test(label)) return "强壮成人近战战士轮廓，肩背紧实，面部线条硬朗，动作姿态有压迫感；不是猴相、不是神话战士、不是金色竖毛";
   if (/机器人|机械|金属机身/.test(text)) {
     return "金属机身，精密发光纹路，清晰头部轮廓、躯干比例和四肢结构";
   }
@@ -243,7 +274,7 @@ function characterAppearance(label, text) {
 
 function characterHair(label, text) {
   if (/孙悟空/.test(label)) return "棕金色竖立毛发，猴相鬓毛清晰，发冠或头饰不改变主体头部比例";
-  if (/金刚狼/.test(label)) return "深色短发或粗硬发型，鬓角与胡须轮廓保持硬派辨识度";
+  if (/金刚狼/.test(label)) return "深色短发或粗硬发型，夸张鬓角与胡须轮廓保持硬派辨识度；不使用金色猴毛、发冠或神话头饰";
   if (/黑发|黑色头发|黑色短发|黑色长发/.test(text)) return "黑色头发，长度和发型按分镜语境确定";
   if (/短发/.test(text)) return "短发，发型保持可复用辨识点";
   if (/长发/.test(text)) return "长发，发型保持可复用辨识点";
@@ -259,6 +290,12 @@ function characterFace(label, text) {
   return "保持面部/头部可识别特征，后续可人工补充";
 }
 
+function characterSignatureHint(label, text) {
+  if (/孙悟空/.test(label)) return "东方神话战士角色，猴相面部、棕金毛发和敏捷体态清晰";
+  if (/金刚狼/.test(label)) return "硬派近身格斗角色，深色短发鬓角、强韧成人体态和压迫感清晰";
+  return phraseFromShot(cleanCharacterDraftField(label, text), "可复用角色，身份与外观待确认");
+}
+
 function characterBuild(label, text) {
   if (/孙悟空/.test(label)) return "敏捷精瘦的战士体态，四肢有爆发力，比例不变形";
   if (/金刚狼/.test(label)) return "结实强韧的近战体态，肩背和手臂力量感明显";
@@ -267,20 +304,26 @@ function characterBuild(label, text) {
   return "根据分镜保持体态、身高比例和动作能力设定";
 }
 
-function characterWardrobe(text) {
+function characterWardrobe(label, text) {
+  if (/孙悟空/.test(label)) return "东方神话战斗服饰或护甲层，保持敏捷战士轮廓，不携带手持道具";
+  if (/金刚狼/.test(label)) return "硬派旧皮革或深色战斗服，贴合近身格斗体态；无东方神话盔甲、披帛、发冠或手持道具";
   if (/机器人|机械|金属机身/.test(text)) return "无传统服装，机械外壳与发光部件作为外观层";
   return "服装或外观按分镜语境确定，后续可人工补充";
 }
 
-function characterPalette(text) {
+function characterPalette(label, text) {
+  if (/孙悟空/.test(label)) return "棕金毛发、赤褐战斗服和暗金护甲点缀";
+  if (/金刚狼/.test(label)) return "深棕、黑色、旧皮革和低饱和金属色，避免金色神话主色";
   if (/冷蓝|星光|星空|月光|青蓝|蓝/.test(text)) return "冷灰金属与青蓝发光纹路，低饱和城市反射";
   if (/霓虹/.test(text)) return "低饱和霓虹反射与主体主色调保持一致";
   return "主色调按分镜语境确定，后续可人工补充";
 }
 
-function characterDemeanor(text) {
+function characterDemeanor(label, text) {
+  if (/孙悟空/.test(label)) return "凌厉昂扬、敏捷自信，战意清晰";
+  if (/金刚狼/.test(label)) return "克制凶猛、目光压迫，低身蓄力的近战攻击感";
   if (/安静|专注|孤独|沉静|忧伤/.test(text)) return "安静专注，孤独沉静，略带诗意的科幻疏离感";
-  return phraseFromShot(text, "神态服务当前剧情");
+  return phraseFromShot(cleanCharacterDraftField(label, text), "神态服务当前剧情");
 }
 
 function sceneLocation(label, text) {

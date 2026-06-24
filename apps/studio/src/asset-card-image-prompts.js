@@ -72,9 +72,10 @@ function assetImageModeInstruction(assetType, label) {
     ].join(" ");
   }
   return [
+    `角色参考图：只生成名为 ${assetName} 的单一角色资产；上游剧情里的其他角色名、道具名和场景名不进入画面。`,
     `Character reference sheet for asset named ${assetName}: use this exact layout in one image: front half-body close-up, centered full-body front view, left-side full-body profile view, and back full-body view.`,
     "Keep one consistent identity, head shape, body proportions, limb structure, silhouette, palette, material, and expression across every view.",
-    "Use a plain neutral studio background with minimal ground shadow; no weapons, handheld props, background objects, typography, labels, or scene environment.",
+    "Use a plain neutral studio background with minimal ground shadow; no second character, weapons, handheld props, background objects, typography, labels, or scene environment.",
   ].join(" ");
 }
 

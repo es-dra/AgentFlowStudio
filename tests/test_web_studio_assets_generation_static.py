@@ -351,6 +351,44 @@ process.stdout.write(JSON.stringify({
     assert "上游剧情中的角色名只作为环境痕迹参考" in prompt
 
 
+def test_character_asset_card_keeps_other_story_assets_out_of_target_prompt() -> None:
+    script = r'''
+import { assetCardDraftFromRef } from "./apps/studio/src/asset-card-drafts.js";
+import { assetImagePrompt } from "./apps/studio/src/asset-card-image-prompts.js";
+
+const shot = {
+  shot_id: "shot_01",
+  description: "镜号：01\n画面描述：@孙悟空 @金刚狼 @金箍棒。以“孙悟空大战金刚狼”为核心，孙悟空手持金箍棒，神情凌厉、战意昂扬；金刚狼双爪出鞘，低身蓄力、目光凶狠，二者都是画面绝对主体。\n光影氛围：自然光影，气氛服务情绪推进",
+};
+const draft = assetCardDraftFromRef({ label: "金刚狼", asset_type: "character" }, shot);
+const prompt = assetImagePrompt(draft);
+process.stdout.write(JSON.stringify({
+  signature: draft.signature,
+  featureCard: draft.feature_card,
+  prompt,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    prompt = payload["prompt"]
+    fields = "\n".join(str(value) for value in payload["featureCard"].values())
+
+    for polluted in ("孙悟空", "金箍棒", "大战", "镜号", "画面描述"):
+        assert polluted not in payload["signature"]
+        assert polluted not in fields
+        assert polluted not in prompt
+    assert "金刚狼" in payload["signature"] + fields + prompt
+    assert "硬派近身格斗角色" in fields + prompt
+    assert "不是猴相" in fields + prompt
+    assert "只生成名为 金刚狼 的单一角色资产" in prompt
+
+
 def test_asset_card_generation_only_carries_user_uploaded_reference_images() -> None:
     script = r'''
 import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";

@@ -24,8 +24,13 @@ permission to render characters, portraits, turnarounds, weapons, or
 silhouettes. Asset-card image nodes now carry only user-uploaded reference
 images into a new generation request; prior generated `scene_reference` /
 `generated_keyframe_reference` outputs stay in node/history state but do not
-auto-contaminate the next asset-card generation. Verification: focused Studio
-regressions passed 2, broader Studio static set passed 30, and
+auto-contaminate the next asset-card generation. The follow-up pass applies the
+same isolation to target character cards: a `金刚狼` role card rejects unrelated
+story characters, props, scene labels, shot metadata, and combat-summary text,
+and the generated character prompt explicitly requests one target character
+only with no second character, handheld prop, or scene background.
+Verification: focused Studio regressions passed 3, broader Studio static set
+passed 31, and
 `npm.cmd run check:studio-js` passed for 119 files. Remaining validation:
 GitHub/server three-end sync, Runtime health after restart, live low-cost scene
 asset smoke, and browser visual acceptance.

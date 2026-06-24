@@ -14,13 +14,20 @@
   generated `scene_reference` / `generated_keyframe_reference` outputs remain
   available as node/history assets but no longer auto-contaminate the next
   asset-card generation request.
+- Extended the same isolation to target character asset cards. A character card
+  such as `金刚狼` now rejects unrelated story characters, props, scene labels,
+  shot metadata, and combat-summary text from the target asset signature and
+  fields. The generated character prompt explicitly asks for one target
+  character only, with no second character, handheld prop, or scene background.
 
 Verification:
 
 ```text
 pytest tests/test_web_studio_assets_generation_static.py::test_scene_asset_card_keeps_story_characters_out_of_environment_prompt tests/test_web_studio_assets_generation_static.py::test_asset_card_generation_only_carries_user_uploaded_reference_images -> 2 passed
-pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 30 passed
+pytest tests/test_web_studio_assets_generation_static.py::test_character_asset_card_keeps_other_story_assets_out_of_target_prompt -> 1 passed
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 31 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+git diff --check -> passed
 ```
 
 Boundary:
