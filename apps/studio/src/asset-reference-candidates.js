@@ -87,9 +87,11 @@ function isFixedVisualAsset(asset) {
   if (isRetired(asset)) return false;
   const kind = String(asset?.kind || "").trim();
   const status = String(asset?.status || asset?.asset_status || "fixed").trim();
+  const assetType = normalizeAssetType(asset?.asset_type || asset?.type);
+  const hasAssetCardShape = Boolean(asset?.label || asset?.signature || asset?.feature_card) && ["character", "scene", "prop"].includes(assetType);
   return ["visual_asset", "character_asset", "scene_asset", "prop_asset"].includes(kind)
     || Boolean(asset?.visual_asset_id)
-    || ["fixed", "ready"].includes(status);
+    || (hasAssetCardShape && ["fixed", "ready"].includes(status));
 }
 
 function isRetired(asset) {

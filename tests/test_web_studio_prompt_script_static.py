@@ -255,15 +255,21 @@ def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_ass
     storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    add_asset_modal = (STUDIO_ROOT / "src" / "panels" / "add-asset-modal.js").read_text(encoding="utf-8")
 
     assert "planShotAssets(payload)" in runtime_client
     assert "shot-asset-plans" in runtime_client
     assert "identifyScriptAssets(store, runtime, node)" in storyboard_actions
     assert "runtime?.planShotAssets" in storyboard_actions
     assert "createManualShotAssetNode" in asset_nodes
-    assert "添加角色资产" in node_menu
-    assert "添加场景资产" in node_menu
-    assert "添加道具资产" in node_menu
+    assert "openAddAssetModal" in node_menu
+    assert "新增资产" in node_menu
+    assert "添加角色资产" not in node_menu
+    assert "添加场景资产" not in node_menu
+    assert "添加道具资产" not in node_menu
+    assert "inferManualAssetType" in add_asset_modal
+    assert "createManualShotAssetNode(store, fresh, assetType, label)" in add_asset_modal
+    assert "金刚狼" in add_asset_modal
 
 
 def test_asset_mentions_scope_fixed_project_assets_and_tree_candidates() -> None:
@@ -287,6 +293,56 @@ def test_asset_mentions_scope_fixed_project_assets_and_tree_candidates() -> None
     assert "bindAssetMentionSuggestions(textarea, store, node.id)" in canvas_body
     assert "取消固定资产" in node_menu
     assert "openRetireAssetModal" in node_menu
+
+
+def test_asset_mentions_exclude_generated_history_from_unconnected_nodes() -> None:
+    script = r'''
+import { assetReferenceCandidates } from "./apps/studio/src/asset-reference-candidates.js";
+
+const state = {
+  nodes: {
+    isolated: { id: "isolated", type: "image", params: {} },
+    shot_01: { id: "shot_01", type: "script", params: {} },
+    wolverine_asset: {
+      id: "wolverine_asset",
+      type: "image",
+      title: "角色资产 · @金刚狼",
+      params: { assetCardDraft: { card_id: "card_wolverine", label: "金刚狼", asset_type: "character", status: "draft" } },
+    },
+    staff_asset: {
+      id: "staff_asset",
+      type: "image",
+      title: "道具资产 · @金箍棒",
+      params: { assetCardDraft: { card_id: "card_staff", label: "金箍棒", asset_type: "prop", status: "draft" } },
+    },
+  },
+  edges: {
+    e1: { from: "shot_01", to: "wolverine_asset" },
+  },
+  assets: [
+    { kind: "visual_asset", asset_id: "visual_swk", visual_asset_id: "visual_swk", label: "孙悟空", asset_type: "character", status: "fixed" },
+    { kind: "image_reference", asset_id: "img_old", title: "candidate_001.png", role: "generated_keyframe_reference", status: "ready", source_node_id: "shot_01" },
+  ],
+};
+
+process.stdout.write(JSON.stringify({
+  isolated: assetReferenceCandidates(state, "isolated").map((item) => item.label),
+  connected: assetReferenceCandidates(state, "shot_01").map((item) => item.label),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["isolated"] == ["孙悟空"]
+    assert payload["connected"] == ["孙悟空", "金刚狼"]
+    assert "candidate_001.png" not in payload["isolated"] + payload["connected"]
+    assert "金箍棒" not in payload["connected"]
 
 
 def test_visual_asset_cards_support_prop_assets_across_frontend_and_runtime_contract() -> None:

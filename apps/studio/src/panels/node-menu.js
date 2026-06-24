@@ -18,7 +18,7 @@ import {
   importScriptFileIntoTextNode,
   splitTextNodeToStoryboardNodes,
 } from "../script-breakdown.js";
-import { createManualShotAssetNode } from "../shot-asset-nodes.js";
+import { openAddAssetModal } from "./add-asset-modal.js";
 import { openAssetCardPanel } from "./asset-card-panel.js";
 import { openRetireAssetModal } from "./drawer-asset-actions.js";
 
@@ -122,17 +122,9 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) identifyScriptAssets(store, runtime, fresh);
     });
-    addItem("user", "添加角色资产", () => {
+    addItem("plus", "新增资产", () => {
       const fresh = store.get().nodes[nodeId];
-      if (fresh) createManualShotAssetNode(store, fresh, "character");
-    });
-    addItem("image", "添加场景资产", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) createManualShotAssetNode(store, fresh, "scene");
-    });
-    addItem("bookmark", "添加道具资产", () => {
-      const fresh = store.get().nodes[nodeId];
-      if (fresh) createManualShotAssetNode(store, fresh, "prop");
+      if (fresh) openAddAssetModal(store, fresh);
     });
     addItem("image", "生成关键帧层", () => {
       const fresh = store.get().nodes[nodeId];

@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-24 - Studio Asset Reference Scope And Asset Library History
+
+- Tightened Studio `@` asset suggestions so ordinary generated image
+  candidates are no longer treated as project-fixed assets. Unconnected nodes
+  only see fixed visual assets; connected script trees can also see unfixed
+  asset-card draft nodes in that same connected tree.
+- Split the asset drawer view from generated history. The active material list
+  now keeps fixed visual assets and the latest renderable candidate per source
+  node, while older generated candidates move to `历史资产`.
+- Updated the history modal to list historical image assets and render safe
+  Runtime previews when available.
+- Replaced the three script-node context menu entries for adding character /
+  scene / prop assets with one `新增资产` action. The modal asks for the asset
+  name, infers asset type from current script/shot context plus conservative
+  local rules, and creates the same editable asset-card node path as other
+  asset nodes.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_prompt_script_static.py::test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_asset_nodes tests/test_web_studio_prompt_script_static.py::test_asset_mentions_scope_fixed_project_assets_and_tree_candidates tests/test_web_studio_prompt_script_static.py::test_asset_mentions_exclude_generated_history_from_unconnected_nodes -> 3 passed
+pytest tests/test_web_studio_assets_generation_static.py::test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_assets tests/test_web_studio_assets_generation_static.py::test_asset_drawer_splits_current_assets_from_generated_history -> 2 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+```
+
+Boundary:
+
+- This is Studio frontend state and interaction logic only. No provider gate,
+  provider config, secret, signed URL, raw provider response, generated media
+  byte, or Company OS private source content was written to the repo.
+
 ## 2026-06-24 - Seedance Video Relay Adapter
 
 - Added a `volc_seedance` video provider adapter for relay-style Volc/Seedance

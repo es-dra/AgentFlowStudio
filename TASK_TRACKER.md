@@ -12,20 +12,35 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current Studio asset scope addendum: 2026-06-24 pass tightens Studio asset
+reference scope and the material/history split. `@` suggestions now treat
+ordinary generated image candidates as history, not project-fixed assets:
+unconnected nodes only see fixed visual assets, while connected script trees
+can also see unfixed asset-card draft nodes in that same connected tree. The
+asset drawer now keeps fixed visual assets plus the latest renderable candidate
+per source node, and older generated candidates move into `历史资产` with safe
+Runtime previews when available. Script node context menus now expose one
+`新增资产` action instead of separate role/scene/prop entries; the modal asks for
+the asset name, infers the asset type from script/shot context plus conservative
+local rules, and creates the same editable asset-card node path. Verification:
+focused Studio static regressions passed 5 and `npm.cmd run check:studio-js`
+passed for 119 files. Remaining validation: browser visual acceptance,
+GitHub/server three-end sync, and Runtime health after restart.
+
 Current Runtime-backed shot asset planning addendum: 2026-06-24 pass adds a
 safe `/shot-asset-plans` Runtime route and rewires Studio right-click
 `识别资产` to prefer that Runtime planning contract before falling back locally.
 The route returns character / scene / prop refs with evidence text and a safe
 manifest; it does not create nodes, call media providers, write provider raw
 responses, store generated media bytes, or promote fixed memory. Studio now
-supports manual `添加角色资产` / `添加场景资产` / `添加道具资产` from script nodes,
-project-wide `@` suggestions for fixed assets, connected-tree-only suggestions
-for unfixed asset-card drafts, filtering of retired assets, left-port upstream
-node creation, and visible `取消固定资产` from image node menus. Generated image
-and video results now support `放大查看`, and image/video export resolves Runtime
+supports manual asset-card creation from script nodes, project-wide `@`
+suggestions for fixed assets, connected-tree-only suggestions for unfixed
+asset-card drafts, filtering of retired assets, left-port upstream node
+creation, and visible `取消固定资产` from image node menus. Generated image and
+video results now support `放大查看`, and image/video export resolves Runtime
 media at click time so `导出原图` / `下载视频` is an actual download action instead
-of a stale link. Verification: Studio JS syntax check passed for 118 files;
-full pytest passed 634 / 520 deselected / 2 existing warnings; CLI help/version
+of a stale link. Verification: Studio JS syntax check passed for 118 files; full
+pytest passed 634 / 520 deselected / 2 existing warnings; CLI help/version
 passed; `git diff --check` passed. Remaining validation: GitHub + server
 three-end sync, Runtime health after restart, and browser visual acceptance.
 

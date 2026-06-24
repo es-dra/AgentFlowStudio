@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
@@ -55,6 +57,9 @@ def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_asse
     store = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
     runtime_asset_sync = (STUDIO_ROOT / "src" / "runtime-asset-sync.js").read_text(encoding="utf-8")
+    drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
+    history_modal = (STUDIO_ROOT / "src" / "panels" / "history-modal.js").read_text(encoding="utf-8")
+    lifecycle = (STUDIO_ROOT / "src" / "asset-lifecycle.js").read_text(encoding="utf-8")
 
     assert "seedAssets()" not in store
     for placeholder in ("asset_director_seed", "asset_character_seed", "asset_keyframe_seed"):
@@ -66,6 +71,45 @@ def test_asset_drawer_does_not_seed_placeholder_assets_or_duplicate_runtime_asse
     assert "visualAssetPreviewUrl" in runtime_asset_sync
     assert "image_asset_refs" in runtime_asset_sync
     assert "uploaded_images" in (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    assert "currentAssetLibraryAssets(state.assets || [])" in drawer_assets
+    assert "historicalAssetLibraryAssets(store.get().assets, tabId)" in history_modal
+    assert "latestRenderableAssetBySource" in lifecycle
+    assert "visualImageAssetRefs" in lifecycle
+    assert "generated_keyframe_reference" in lifecycle
+
+
+def test_asset_drawer_splits_current_assets_from_generated_history() -> None:
+    script = r'''
+import {
+  currentAssetLibraryAssets,
+  historicalAssetLibraryAssets,
+} from "./apps/studio/src/asset-lifecycle.js";
+
+const assets = [
+  { kind: "visual_asset", title: "孙悟空", asset_id: "visual_swk", visual_asset_id: "visual_swk", image_asset_refs: ["img_fixed"], asset_type: "character", status: "fixed" },
+  { kind: "image_reference", title: "candidate_old.png", asset_id: "img_old", role: "generated_keyframe_reference", source_node_id: "asset_node_1", created_at: "2026-06-24T09:00:00Z" },
+  { kind: "image_reference", title: "candidate_new.png", asset_id: "img_new", role: "generated_keyframe_reference", source_node_id: "asset_node_1", created_at: "2026-06-24T10:00:00Z" },
+  { kind: "image_reference", title: "candidate_fixed_source.png", asset_id: "img_fixed", role: "generated_keyframe_reference", source_node_id: "asset_node_2", created_at: "2026-06-24T11:00:00Z" },
+];
+
+process.stdout.write(JSON.stringify({
+  current: currentAssetLibraryAssets(assets).map((asset) => asset.title),
+  imageHistory: historicalAssetLibraryAssets(assets, "image").map((asset) => asset.title),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["current"] == ["孙悟空", "candidate_new.png"]
+    assert "candidate_old.png" in payload["imageHistory"]
+    assert "candidate_new.png" not in payload["imageHistory"]
+    assert "candidate_fixed_source.png" not in payload["current"]
 
 
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:

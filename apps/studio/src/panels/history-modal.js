@@ -1,14 +1,14 @@
 import { showModal, el } from "../overlay.js";
 import { coverGradient } from "../presets/galleries.js";
 import { icon } from "../icons.js";
+import { historicalAssetLibraryAssets } from "../asset-lifecycle.js";
+import { setRuntimeMediaSource } from "../runtime-media-source.js";
 
 const TABS = [
   { id: "image", label: "图片历史" },
   { id: "video", label: "视频历史" },
   { id: "audio", label: "音频历史" },
 ];
-
-const KIND_MAP = { image: ["image"], video: ["video", "video_merge"], audio: ["audio"] };
 
 export function openHistoryModal(store) {
   const modal = el("div", "modal");
@@ -54,15 +54,23 @@ export function openHistoryModal(store) {
     assets.forEach((asset, i) => {
       const card = el("div", "gallery-card");
       const cover = el("div", "card-cover wide");
-      const art = el("div", "cover-art");
-      art.style.background = coverGradient((i * 47) % 360);
-      cover.appendChild(art);
+      if (asset.preview_url) {
+        const img = document.createElement("img");
+        img.alt = asset.title || asset.filename || asset.asset_id || "history asset";
+        img.loading = "lazy";
+        setRuntimeMediaSource(img, asset.preview_url);
+        cover.appendChild(img);
+      } else {
+        const art = el("div", "cover-art");
+        art.style.background = coverGradient((i * 47) % 360);
+        cover.appendChild(art);
+      }
       card.appendChild(cover);
       const name = el("div", "card-name");
-      name.appendChild(el("span", "", asset.title));
+      name.appendChild(el("span", "", asset.title || asset.filename || asset.asset_id || "历史素材"));
       card.appendChild(name);
       const meta = el("div", "card-meta");
-      meta.appendChild(el("span", "", asset.summary || "（无提示词）"));
+      meta.appendChild(el("span", "", asset.safe_summary || asset.summary || asset.role || "（无提示词）"));
       card.appendChild(meta);
       grid.appendChild(card);
     });
@@ -70,8 +78,7 @@ export function openHistoryModal(store) {
   }
 
   function assetsFor(tabId) {
-    const kinds = KIND_MAP[tabId] || [];
-    return store.get().assets.filter((a) => kinds.includes(a.kind));
+    return historicalAssetLibraryAssets(store.get().assets, tabId);
   }
 
   render();

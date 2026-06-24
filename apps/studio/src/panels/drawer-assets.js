@@ -7,6 +7,7 @@ import {
   assetLifecycleLabel,
   assetLifecycleState,
   assetLifecycleSummary,
+  currentAssetLibraryAssets,
   matchesAssetLifecycleFilter,
 } from "../asset-lifecycle.js";
 import { openAssetDetailPopover } from "./asset-detail-popover.js";
@@ -42,7 +43,8 @@ export function renderAssetDrawer(state, store, runtime, drawer, body) {
 function renderAssets(state, store, runtime, body) {
   const query = String(state.ui.drawerSearch || "").trim().toLowerCase();
   const filter = state.ui.assetLifecycleFilter || "all";
-  const assets = (state.assets || []).filter((asset) => {
+  const currentAssets = currentAssetLibraryAssets(state.assets || []);
+  const assets = currentAssets.filter((asset) => {
     const matchesQuery = !query
       || `${asset.title || ""} ${asset.safe_summary || ""} ${asset.asset_id || ""}`.toLowerCase().includes(query);
     return matchesQuery && matchesAssetLifecycleFilter(asset, filter);
@@ -55,7 +57,7 @@ function renderAssets(state, store, runtime, body) {
 }
 
 function assetLifecycleFilter(state, store) {
-  const counts = assetLifecycleSummary(state.assets || []);
+  const counts = assetLifecycleSummary(currentAssetLibraryAssets(state.assets || []));
   const wrap = el("div", "asset-lifecycle-filter");
   for (const item of ASSET_LIFECYCLE_FILTERS) {
     const active = (state.ui.assetLifecycleFilter || "all") === item.id;
