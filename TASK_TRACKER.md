@@ -29,6 +29,19 @@ full pytest passed 634 / 520 deselected / 2 existing warnings; CLI help/version
 passed; `git diff --check` passed. Remaining validation: GitHub + server
 three-end sync, Runtime health after restart, and browser visual acceptance.
 
+Current asset-card fixed-asset carry addendum: 2026-06-24 pass narrows fixed
+asset carry behavior for asset-card image generation. Character asset-card
+generation automatically excludes unrelated fixed assets, so creating a new
+character such as `金刚狼` is not constrained by another fixed character such as
+`孙悟空`. Scene and prop asset-card generation treats fixed assets as optional
+references: checked assets carry into that one request, unchecked fixed assets
+are excluded. Ordinary image and video generation still use the stricter
+fixed-asset confirmation path. Verification route: focused Studio static
+regression passed 1, `npm.cmd run check:studio-js` passed for 118 files, and
+`git diff --check` passed. Remaining validation: GitHub + server three-end
+sync, Runtime health after restart, video gate state, and browser visual
+acceptance.
+
 Current asset revision reference addendum: 2026-06-23 pass addresses asset-card
 regeneration drift where editing a single card detail, such as changing a robot
 surface from metal to plush, caused a full text-to-image reinterpretation. The

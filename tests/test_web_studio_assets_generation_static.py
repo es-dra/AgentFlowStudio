@@ -116,6 +116,17 @@ def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers(
     assert "Restart the 8790 Runtime Service and retry" in generation_guards
 
 
+def test_asset_card_generation_uses_optional_fixed_asset_carry_policy() -> None:
+    generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
+
+    assert "assetCardCarryPolicy(node, kind)" in generation_guards
+    assert "unrelatedAssetIdsForStandaloneCharacterAsset" in generation_guards
+    assert "optional_asset_reference_not_selected" in generation_guards
+    assert "asset_card_optional_reference" in generation_guards
+    assert "未勾选的固定资产不会在本次资产图生成中携带" in generation_guards
+    assert "角色资产会自动排除其他固定资产" in generation_guards
+
+
 def test_keyframe_generation_polls_async_runtime_jobs_without_provider_jargon() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")

@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-24 - Asset Card Fixed Asset Carry Policy
+
+- Fixed Studio generation preflight for asset-card image nodes. Character
+  asset-card generation now automatically excludes unrelated fixed assets so a
+  new character card is not visually constrained by another fixed character in
+  the project.
+- Changed scene and prop asset-card generation to treat fixed assets as
+  optional references. The confirmation modal now carries only checked assets
+  for this one generation and excludes unchecked fixed assets from the request.
+- Kept ordinary image/video generation on the stricter fixed-asset confirmation
+  path, because those outputs should still preserve approved continuity unless
+  the user explicitly excludes a fixed asset for the run.
+- Added a static Studio regression covering the optional fixed-asset carry
+  policy markers and user-facing confirmation text.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py::test_asset_card_generation_uses_optional_fixed_asset_carry_policy -> 1 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 118 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- Provider gates, provider configs, secrets, signed URLs, provider raw
+  responses, and generated media bytes were not written to the repo. Browser
+  visual acceptance and live provider quality remain separate validation claims.
+
 ## 2026-06-24 - Runtime Shot Asset Planning And Media Preview Controls
 
 - Added a safe Runtime `/shot-asset-plans` route for shot-level asset planning.

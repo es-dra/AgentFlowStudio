@@ -41,10 +41,33 @@ export async function prepareGenerationRequest(store, runtime, node, request, ki
     }
     const included = Array.isArray(outcome?.included_assets) ? outcome.included_assets : [];
     if (!included.length) return { ...working, preflight_token: outcome?.preflight_token || null };
-    const decision = await showCarryConfirmModal(outcome, node, kind);
+    const carryPolicy = assetCardCarryPolicy(node, kind);
+    if (carryPolicy.mode === "asset_card_standalone_character") {
+      const autoExcluded = unrelatedAssetIdsForStandaloneCharacterAsset(outcome, node);
+      if (autoExcluded.length) {
+        const nextExclusions = mergeAssetExclusions(
+          working.temporary_asset_exclusions,
+          autoExcluded,
+          "asset_card_character_unrelated_reference",
+        );
+        if (nextExclusions.length !== working.temporary_asset_exclusions.length) {
+          store.set((s) => {
+            const n = s.nodes[node.id];
+            if (n) n.params.temporaryAssetExclusions = nextExclusions;
+          }, { history: false });
+          working = { ...working, temporary_asset_exclusions: nextExclusions, preflight_token: null };
+          continue;
+        }
+      }
+    }
+    const decision = await showCarryConfirmModal(outcome, node, kind, carryPolicy);
     if (decision.action === "cancel") return null;
     if (decision.action === "continue") return { ...working, preflight_token: outcome?.preflight_token || null };
-    const nextExclusions = mergeAssetExclusions(working.temporary_asset_exclusions, decision.assetIds);
+    const nextExclusions = mergeAssetExclusions(
+      working.temporary_asset_exclusions,
+      decision.assetIds,
+      decision.reason || "user_excluded_from_preflight_confirmation",
+    );
     if (nextExclusions.length === working.temporary_asset_exclusions.length) continue;
     store.set((s) => {
       const n = s.nodes[node.id];
@@ -90,8 +113,9 @@ function staleRuntimePreflightMessage(kind) {
   return `Runtime Service version is stale or not started from this branch: missing ${label} preflight route. Restart the 8790 Runtime Service and retry.`;
 }
 
-function showCarryConfirmModal(preflight, node, kind) {
+function showCarryConfirmModal(preflight, node, kind, policy = {}) {
   return new Promise((resolve) => {
+    const optionalCarry = policy.mode === "asset_card_optional_reference";
     const included = Array.isArray(preflight?.included_assets) ? preflight.included_assets : [];
     const excluded = Array.isArray(preflight?.excluded_assets) ? preflight.excluded_assets : [];
     const conflicts = Array.isArray(preflight?.asset_conflicts) ? preflight.asset_conflicts : [];
@@ -109,7 +133,13 @@ function showCarryConfirmModal(preflight, node, kind) {
     head.appendChild(closeBtn);
 
     const body = el("div", "modal-body generation-carry-body");
-    body.appendChild(el("p", "carry-note", `${kind === "video" ? "视频" : "图片"}生成将携带以下固定资产。固定资产会约束结果，即使未检测到冲突也会生效。`));
+    body.appendChild(el(
+      "p",
+      "carry-note",
+      optionalCarry
+        ? "本次是资产图生成；固定资产只作为可选参考。未勾选的固定资产不会在本次资产图生成中携带。"
+        : `${kind === "video" ? "视频" : "图片"}生成将携带以下固定资产。固定资产会约束结果，即使未检测到冲突也会生效。`,
+    ));
     const list = el("div", "carry-asset-list");
     const checks = new Map();
     for (const asset of included) {
@@ -126,9 +156,15 @@ function showCarryConfirmModal(preflight, node, kind) {
     }
     body.appendChild(list);
     const warningBox = el("div", conflicts.length ? "carry-warning" : "carry-muted");
-    warningBox.textContent = conflicts.length
-      ? `检测到 ${conflicts.length} 条疑似冲突；未排除资产或解除锁定时，固定资产约束优先生效。`
-      : "未检测到明显冲突，但固定资产仍会约束结果。";
+    if (optionalCarry) {
+      warningBox.textContent = conflicts.length
+        ? `检测到 ${conflicts.length} 条疑似冲突；只勾选仍需携带的资产，其余会在本次生成中排除。`
+        : "未勾选的固定资产默认不携带；只勾选与当前场景或道具有明确关系的资产。";
+    } else {
+      warningBox.textContent = conflicts.length
+        ? `检测到 ${conflicts.length} 条疑似冲突；未排除资产或解除锁定时，固定资产约束优先生效。`
+        : "未检测到明显冲突，但固定资产仍会约束结果。";
+    }
     body.appendChild(warningBox);
     if (overrides.length) {
       body.appendChild(el("div", "carry-muted", `本次已解除 ${overrides.length} 条锁定。`));
@@ -140,9 +176,13 @@ function showCarryConfirmModal(preflight, node, kind) {
     const actions = el("div", "modal-actions");
     const cancel = el("button", "ghost-btn", "取消");
     const exclude = el("button", "ghost-btn", "本次不携带选中项");
-    const submit = el("button", "primary-btn", "继续生成");
+    const submit = el("button", "primary-btn", optionalCarry ? "按选择继续" : "继续生成");
     exclude.disabled = true;
-    actions.append(cancel, exclude, submit);
+    if (optionalCarry) {
+      actions.append(cancel, submit);
+    } else {
+      actions.append(cancel, exclude, submit);
+    }
     modal.append(head, body, actions);
 
     let settled = false;
@@ -154,16 +194,57 @@ function showCarryConfirmModal(preflight, node, kind) {
       resolve(decision);
     };
     const selectedIds = () => [...checks.entries()].filter(([, input]) => input.checked).map(([assetId]) => assetId);
+    const unselectedIds = () => [...checks.entries()].filter(([, input]) => !input.checked).map(([assetId]) => assetId);
     list.addEventListener("change", () => {
       exclude.disabled = selectedIds().length === 0;
     });
     closeBtn.addEventListener("click", () => finish({ action: "cancel" }));
     cancel.addEventListener("click", () => finish({ action: "cancel" }));
-    submit.addEventListener("click", () => finish({ action: "continue" }));
+    submit.addEventListener("click", () => {
+      if (!optionalCarry) {
+        finish({ action: "continue" });
+        return;
+      }
+      const assetIds = unselectedIds();
+      finish(assetIds.length
+        ? { action: "exclude", assetIds, reason: "optional_asset_reference_not_selected" }
+        : { action: "continue" });
+    });
     exclude.addEventListener("click", () => finish({ action: "exclude", assetIds: selectedIds() }));
   });
 }
 
+function assetCardCarryPolicy(node, kind) {
+  if (kind === "video" || kind === "video_revision") return { mode: "fixed_asset_guard" };
+  if (node?.params?.nodeRole !== "asset_card_draft") return { mode: "fixed_asset_guard" };
+  const assetType = String(node.params?.assetCardDraft?.asset_type || "").trim();
+  if (assetType === "character") return { mode: "asset_card_standalone_character" };
+  if (assetType === "scene" || assetType === "prop") return { mode: "asset_card_optional_reference" };
+  return { mode: "fixed_asset_guard" };
+}
+
+function unrelatedAssetIdsForStandaloneCharacterAsset(preflight, node) {
+  // 角色资产会自动排除其他固定资产，避免新角色被已有角色约束。
+  const currentLabel = normalizeAssetLabel(node?.params?.assetCardDraft?.label || node?.title || "");
+  const included = Array.isArray(preflight?.included_assets) ? preflight.included_assets : [];
+  return included
+    .filter((asset) => !sameAssetLabel(asset, currentLabel))
+    .map((asset) => String(asset?.asset_id || "").trim())
+    .filter(Boolean);
+}
+
+function sameAssetLabel(asset, currentLabel) {
+  const assetLabel = normalizeAssetLabel(asset?.label || asset?.title || asset?.signature || "");
+  return Boolean(assetLabel && currentLabel && assetLabel === currentLabel);
+}
+
+function normalizeAssetLabel(value) {
+  return String(value || "")
+    .replace(/^@+/, "")
+    .replace(/^(角色|场景|道具)[资产]*[·:：\s-]*/u, "")
+    .trim()
+    .toLowerCase();
+}
 function showUnconnectedNamedAssetModal(assets, kind) {
   return new Promise((resolve) => {
     const modal = el("div", "modal compact generation-carry-modal");
