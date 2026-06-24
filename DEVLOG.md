@@ -26,8 +26,20 @@ Verification:
 
 ```text
 pytest tests/test_web_studio_prompt_script_static.py::test_keyframe_generation_carries_connected_asset_card_images_as_local_refs tests/test_web_studio_assets_generation_static.py::test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs tests/test_web_studio_assets_generation_static.py::test_asset_card_defaults_generalize_to_unrelated_script_assets -> 3 passed
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 33 passed
+pytest tests/test_api_runtime_creative_agent_keyframes.py tests/test_api_runtime_context_resolver.py tests/test_api_runtime_keyframe_reference_assets.py -> 37 passed, 1 existing warning
 npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+git diff --check -> passed
+server /health after deploy -> ready; provider gates image=true, video=true
+server keyframe provider smoke -> succeeded, output_count=1, PNG candidate_001.png present
 ```
+
+Residual risk:
+
+- The server smoke output was valid PNG data, but the returned dimensions did
+  not strictly match the requested `16:9` ratio. The keyframe path is now live
+  and not copyright-blocked, but provider aspect enforcement still needs a
+  follow-up adapter or post-processing decision.
 
 Boundary:
 

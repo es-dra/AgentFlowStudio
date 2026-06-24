@@ -26,11 +26,16 @@ low-drift route as panel field edits. A non-current-story regression
 (`林晚 / 雨夜码头 / 蓝色雨伞`) guards against overfitting defaults to the
 Sun Wukong / Wolverine test script, and generic prop signatures now summarize
 the prop itself instead of copying unrelated shot text. Verification so far:
-focused Studio regressions passed 3 and `npm.cmd run check:studio-js` passed
-for 119 files. Remaining validation: broader focused pytest, `git diff
---check`, commit/push, server `/home` and `/opt` fast-forward sync, Runtime
-restart/health, and a post-deploy keyframe retry or provider smoke if the
-remote image provider is responsive.
+focused Studio regressions passed 3, broader Studio static regressions passed
+33, Runtime keyframe/context regressions passed 37 with 1 existing warning,
+`npm.cmd run check:studio-js` passed for 119 files, and `git diff --check`
+passed. Local `master`, origin `master`, server `/home`, and server `/opt`
+were fast-forwarded to the same commit, then Runtime was restarted with
+`/health` ready and provider gates `image=true`, `video=true`. A server-side
+keyframe provider smoke using the current storyboard intent succeeded with one
+PNG output, confirming the current keyframe issue is not a copyright/safety
+block. Residual risk: the smoke output dimensions did not strictly match the
+requested `16:9`, so provider aspect enforcement remains a follow-up.
 
 Current scene asset prompt isolation addendum: 2026-06-24 pass fixes the path
 where a scene asset such as `山巅石台战场` could regenerate into a character
