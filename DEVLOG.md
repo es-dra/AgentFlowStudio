@@ -19,6 +19,15 @@
   shot metadata, and combat-summary text from the target asset signature and
   fields. The generated character prompt explicitly asks for one target
   character only, with no second character, handheld prop, or scene background.
+- Tightened the `金刚狼` defaults after live smoke showed the prompt could drift
+  into a silver-haired sci-fi armor sheet. The card now anchors a mature rugged
+  male, dark short hair, sideburns / stubble, stocky close-combat build, and
+  body-integrated metal claws while rejecting monkey traits, silver hair,
+  sci-fi armor, cyan glow lines, and mythic armor.
+- Server validation also found the local image relay was returning image URLs
+  from a safe relay cache host not present in `codex_image.allowed_artifact_hosts`.
+  The server-local provider config was updated to allow that host; no provider
+  key, signed URL, raw provider response, or media byte was written to Git.
 
 Verification:
 
@@ -28,6 +37,7 @@ pytest tests/test_web_studio_assets_generation_static.py::test_character_asset_c
 pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 31 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 119 files
 git diff --check -> passed
+Runtime provider control smoke after server allowlist update -> provider dispatch succeeded, output_count=1
 ```
 
 Boundary:

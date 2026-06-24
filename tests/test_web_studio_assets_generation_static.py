@@ -386,6 +386,9 @@ process.stdout.write(JSON.stringify({
     assert "金刚狼" in payload["signature"] + fields + prompt
     assert "硬派近身格斗角色" in fields + prompt
     assert "不是猴相" in fields + prompt
+    assert "指间金属利爪" in fields + prompt
+    assert "不是银发" in fields + prompt
+    assert "无科幻装甲" in fields + prompt
     assert "只生成名为 金刚狼 的单一角色资产" in prompt
 
 

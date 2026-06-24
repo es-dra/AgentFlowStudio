@@ -28,12 +28,19 @@ auto-contaminate the next asset-card generation. The follow-up pass applies the
 same isolation to target character cards: a `金刚狼` role card rejects unrelated
 story characters, props, scene labels, shot metadata, and combat-summary text,
 and the generated character prompt explicitly requests one target character
-only with no second character, handheld prop, or scene background.
+only with no second character, handheld prop, or scene background. A further
+live-smoke follow-up anchors `金刚狼` away from silver-haired sci-fi armor by
+specifying mature rugged male identity, dark short hair, sideburns / stubble,
+stocky close-combat build, and body-integrated metal claws while rejecting
+monkey traits, silver hair, sci-fi armor, cyan glow lines, and mythic armor.
+Server-local image relay validation found the relay cache host was missing from
+`codex_image.allowed_artifact_hosts`; the server config was updated without
+writing provider key, signed URL, raw provider response, or media bytes to Git.
 Verification: focused Studio regressions passed 3, broader Studio static set
-passed 31, and
-`npm.cmd run check:studio-js` passed for 119 files. Remaining validation:
-GitHub/server three-end sync, Runtime health after restart, live low-cost scene
-asset smoke, and browser visual acceptance.
+passed 31, `npm.cmd run check:studio-js` passed for 119 files, and provider
+control dispatch succeeded with one output after the allowlist update.
+Remaining validation: GitHub/server three-end sync, Runtime health after
+restart, live low-cost scene asset smoke, and browser visual acceptance.
 
 Current asset-card adjustment/recovery addendum: 2026-06-24 pass separates the
 asset-card system generation prompt from the editable prompt bar. Asset image

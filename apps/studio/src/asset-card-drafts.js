@@ -257,14 +257,14 @@ function stripAssetTags(text) {
 
 function characterIdentity(label, text) {
   if (/孙悟空/.test(label)) return "孙悟空，东方神话战士角色，身手敏捷，战斗姿态强";
-  if (/金刚狼/.test(label)) return "金刚狼，硬派近身格斗角色，强韧、压迫感强";
+  if (/金刚狼/.test(label)) return "金刚狼，成熟粗犷男性近身格斗角色，强韧、压迫感强，指间金属利爪是身体特征";
   if (/机器人|机械|金属机身/.test(text)) return label === "主角" ? "来自未来的机器人主角" : `${label}，未来科幻机器人角色`;
   return label;
 }
 
 function characterAppearance(label, text) {
   if (/孙悟空/.test(label)) return "猴相人形战士轮廓，面部毛发与锐利眼神清晰，保留神话战斗辨识度";
-  if (/金刚狼/.test(label)) return "强壮成人近战战士轮廓，肩背紧实，面部线条硬朗，动作姿态有压迫感；不是猴相、不是神话战士、不是金色竖毛";
+  if (/金刚狼/.test(label)) return "强壮紧凑的成熟男性近战战士轮廓，肩背紧实，面部线条硬朗，指间金属利爪可作为身体能力显露；不是猴相、不是神话战士、不是金色竖毛、不是银发科幻角色";
   if (/机器人|机械|金属机身/.test(text)) {
     return "金属机身，精密发光纹路，清晰头部轮廓、躯干比例和四肢结构";
   }
@@ -274,7 +274,7 @@ function characterAppearance(label, text) {
 
 function characterHair(label, text) {
   if (/孙悟空/.test(label)) return "棕金色竖立毛发，猴相鬓毛清晰，发冠或头饰不改变主体头部比例";
-  if (/金刚狼/.test(label)) return "深色短发或粗硬发型，夸张鬓角与胡须轮廓保持硬派辨识度；不使用金色猴毛、发冠或神话头饰";
+  if (/金刚狼/.test(label)) return "深色短发或粗硬发型，夸张鬓角与胡须轮廓保持硬派辨识度；不是银发，不使用金色猴毛、发冠或神话头饰";
   if (/黑发|黑色头发|黑色短发|黑色长发/.test(text)) return "黑色头发，长度和发型按分镜语境确定";
   if (/短发/.test(text)) return "短发，发型保持可复用辨识点";
   if (/长发/.test(text)) return "长发，发型保持可复用辨识点";
@@ -284,7 +284,7 @@ function characterHair(label, text) {
 
 function characterFace(label, text) {
   if (/孙悟空/.test(label)) return "猴相面部，眉眼锐利，脸部毛发自然，表情坚毅；面部新增标记需保持自然皮肤或毛发质感";
-  if (/金刚狼/.test(label)) return "硬朗面部线条，眉眼紧张，胡须或鬓角清楚，表情克制凶猛";
+  if (/金刚狼/.test(label)) return "成熟男性硬朗面部线条，眉眼紧张，胡茬、鬓角或络腮胡清楚，表情克制凶猛；不是少年感、中性脸或精致科幻偶像脸";
   if (/疤|伤疤|刀疤/.test(text)) return "面部标记按分镜描述保留，疤痕需细小自然，不符号化、不变成妆容";
   if (/脸|眼神|表情|五官/.test(text)) return "根据分镜保留脸部、五官、眼神与显著标记";
   return "保持面部/头部可识别特征，后续可人工补充";
@@ -292,13 +292,13 @@ function characterFace(label, text) {
 
 function characterSignatureHint(label, text) {
   if (/孙悟空/.test(label)) return "东方神话战士角色，猴相面部、棕金毛发和敏捷体态清晰";
-  if (/金刚狼/.test(label)) return "硬派近身格斗角色，深色短发鬓角、强韧成人体态和压迫感清晰";
+  if (/金刚狼/.test(label)) return "硬派近身格斗角色，深色短发鬓角、成熟男性体态、胡茬和指间金属利爪清晰";
   return phraseFromShot(cleanCharacterDraftField(label, text), "可复用角色，身份与外观待确认");
 }
 
 function characterBuild(label, text) {
   if (/孙悟空/.test(label)) return "敏捷精瘦的战士体态，四肢有爆发力，比例不变形";
-  if (/金刚狼/.test(label)) return "结实强韧的近战体态，肩背和手臂力量感明显";
+  if (/金刚狼/.test(label)) return "结实强韧、偏矮壮紧凑的近战体态，肩背和粗壮手臂力量感明显";
   if (/机器人|机械|金属机身/.test(text)) return "保持成年类人比例、头身比、躯干和四肢机械结构关系";
   if (/瘦|偏瘦|纤细/.test(text)) return "偏瘦体型，身形比例稳定";
   return "根据分镜保持体态、身高比例和动作能力设定";
@@ -306,14 +306,14 @@ function characterBuild(label, text) {
 
 function characterWardrobe(label, text) {
   if (/孙悟空/.test(label)) return "东方神话战斗服饰或护甲层，保持敏捷战士轮廓，不携带手持道具";
-  if (/金刚狼/.test(label)) return "硬派旧皮革或深色战斗服，贴合近身格斗体态；无东方神话盔甲、披帛、发冠或手持道具";
+  if (/金刚狼/.test(label)) return "硬派旧皮革或深色贴身战斗服，贴合近身格斗体态；无科幻装甲、无青色发光线、无东方神话盔甲、披帛、发冠或手持道具";
   if (/机器人|机械|金属机身/.test(text)) return "无传统服装，机械外壳与发光部件作为外观层";
   return "服装或外观按分镜语境确定，后续可人工补充";
 }
 
 function characterPalette(label, text) {
   if (/孙悟空/.test(label)) return "棕金毛发、赤褐战斗服和暗金护甲点缀";
-  if (/金刚狼/.test(label)) return "深棕、黑色、旧皮革和低饱和金属色，避免金色神话主色";
+  if (/金刚狼/.test(label)) return "深棕、黑色、旧皮革、低饱和黄色点缀和冷金属利爪，避免银发科幻灰、青色发光线或金色神话主色";
   if (/冷蓝|星光|星空|月光|青蓝|蓝/.test(text)) return "冷灰金属与青蓝发光纹路，低饱和城市反射";
   if (/霓虹/.test(text)) return "低饱和霓虹反射与主体主色调保持一致";
   return "主色调按分镜语境确定，后续可人工补充";
