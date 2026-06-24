@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-06-24 - Runtime Image Provider Timeout Boundary
+
+- Hardened Runtime image generation so provider read timeouts are retried once
+  and then converted into a safe `remote_image_provider_not_ready` blocked
+  manifest instead of surfacing as HTTP 500 with an empty run directory.
+- This explains the latest failed Wolverine asset-card smoke: the request
+  reached the remote image provider and timed out after the provider read
+  window. The safe manifest path is now preserved for Studio recovery and
+  diagnostics. The observed failure is not a copyright/safety block; no safety
+  block was returned, and the server log showed a provider read timeout.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_creative_agent_keyframes.py::test_keyframe_generation_provider_timeout_returns_safe_block -> 1 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo.
+
 ## 2026-06-24 - Scene Asset Prompt Isolation
 
 - Tightened scene asset-card defaults so story character names, handheld

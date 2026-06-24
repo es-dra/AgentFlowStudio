@@ -224,7 +224,7 @@ def build_keyframe_generation(
                 )
                 status = "succeeded"
                 provider_outputs = _provider_outputs(manifest)
-        except ModelGatewayError as exc:
+        except (ModelGatewayError, TimeoutError) as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
             blocks.append(

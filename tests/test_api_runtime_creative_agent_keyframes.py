@@ -418,6 +418,45 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
     assert manifest["retry_count"] == 1
 
 
+def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setattr("apps.api.runtime_provider_dispatch.time.sleep", lambda _seconds: None)
+    attempts = {"count": 0}
+
+    def fake_dispatch(capability, service_id, request):
+        attempts["count"] += 1
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_keyframe_timeout/keyframe-generations",
+        json={
+            "node_id": "image-node-timeout-001",
+            "prompt_text": "A controlled character reference sheet.",
+            "optimized_prompt": "A controlled character reference sheet.",
+            "aspect_ratio": "16:9",
+            "candidate_count": 1,
+            "generated_at": "2026-06-24T15:40:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    manifest = client.get(
+        f"/artifacts/{payload['artifacts']['keyframe_generation_safe_manifest']['artifact_id']}"
+    ).json()["payload"]
+
+    assert attempts["count"] == 2
+    assert payload["job"]["status"] == "blocked"
+    assert payload["provider_calls_started"] is True
+    assert manifest["status"] == "blocked"
+    assert manifest["retry_count"] == 1
+    assert manifest["blocks"][0]["block_id"] == "remote_image_provider_not_ready"
+    assert "timed out" in manifest["blocks"][0]["reason"]
+
+
 def test_keyframe_prompt_for_image_provider_removes_internal_runtime_terms() -> None:
     prompt = provider_keyframe_prompt(
         "\n".join(

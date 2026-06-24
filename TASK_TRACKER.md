@@ -59,6 +59,18 @@ static set passed 28, Runtime Studio state set passed 16 / 1 existing warning,
 passed. Remaining validation: GitHub/server three-end sync, Runtime health
 after restart, and browser visual acceptance.
 
+Current Runtime image timeout addendum: 2026-06-24 follow-up found the latest
+Wolverine live smoke was failing because the remote image provider read timed
+out and Runtime let the built-in `TimeoutError` escape as HTTP 500 before a
+safe manifest could be written. Runtime now retries one provider timeout and,
+if it still times out, returns a safe blocked image-generation manifest with
+`remote_image_provider_not_ready` instead of leaving an empty run directory.
+This failure evidence is provider timeout, not copyright/safety blocking.
+Verification: focused Runtime timeout regression passed 1 and
+`npm.cmd run check:studio-js` passed for 119 files. Remaining validation:
+commit/push, server sync, Runtime restart/health, and another live smoke after
+deploy.
+
 Current Studio asset scope addendum: 2026-06-24 pass tightens Studio asset
 reference scope and the material/history split. `@` suggestions now treat
 ordinary generated image candidates as history, not project-fixed assets:

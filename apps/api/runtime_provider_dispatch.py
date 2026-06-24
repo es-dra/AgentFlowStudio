@@ -16,19 +16,19 @@ def dispatch_provider_with_retry(
 ) -> tuple[dict[str, Any], int]:
     try:
         return registry.dispatch(capability, service_id, request), 0
-    except ModelGatewayError as exc:
+    except (ModelGatewayError, TimeoutError) as exc:
         if not retryable_provider_error(exc):
             raise
         time.sleep(retry_delay_sec)
         try:
             manifest = registry.dispatch(capability, service_id, request)
-        except ModelGatewayError as retry_exc:
+        except (ModelGatewayError, TimeoutError) as retry_exc:
             setattr(retry_exc, "retry_count", 1)
             raise
         return manifest, 1
 
 
-def retryable_provider_error(error: ModelGatewayError) -> bool:
+def retryable_provider_error(error: Exception) -> bool:
     if isinstance(error, ModelConfigError):
         return False
     lowered = str(error).lower()
