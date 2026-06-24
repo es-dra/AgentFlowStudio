@@ -258,6 +258,7 @@ def test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs() -> None:
     script = r'''
 import { assetImagePrompt, assetCardUserAdjustmentText } from "./apps/studio/src/asset-card-image-prompts.js";
 import { assetCardPromptText } from "./apps/studio/src/asset-card-generation-prompt.js";
+import { buildUserAssetCardRevisionState } from "./apps/studio/src/asset-revision-references.js";
 import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
 
 const draft = {
@@ -286,6 +287,7 @@ const node = {
     spec: { ratio: "16:9", count: 1 },
   },
 };
+node.params.assetCardRevision = buildUserAssetCardRevisionState(node, draft, node.prompt);
 const state = { nodes: { [node.id]: node }, edges: {} };
 const request = buildKeyframeGenerationRequest(state, node);
 process.stdout.write(JSON.stringify({
@@ -293,6 +295,7 @@ process.stdout.write(JSON.stringify({
   userAdjustment: assetCardUserAdjustmentText(node),
   promptText: assetCardPromptText(node),
   refs: request.asset_refs,
+  revisionField: request.node_parameters.asset_card_revision.changed_fields[0].field,
 }));
 '''
     completed = subprocess.run(
@@ -308,8 +311,10 @@ process.stdout.write(JSON.stringify({
     assert payload["userAdjustment"] == "只给左脸增加一道浅疤，保持四视图布局和服装不变"
     assert "Visual target: reusable 角色资产 reference image" in payload["promptText"]
     assert "User asset-card adjustment" in payload["promptText"]
+    assert "用户调整要求" in payload["promptText"]
     assert "只给左脸增加一道浅疤" in payload["promptText"]
     assert payload["refs"] == ["img_user_reference_001"]
+    assert payload["revisionField"] == "user_instruction"
 
 
 def test_scene_asset_card_keeps_story_characters_out_of_environment_prompt() -> None:
@@ -349,6 +354,49 @@ process.stdout.write(JSON.stringify({
         assert marker in fields + prompt
     assert "不得渲染任何角色主体" in prompt
     assert "上游剧情中的角色名只作为环境痕迹参考" in prompt
+
+
+def test_asset_card_defaults_generalize_to_unrelated_script_assets() -> None:
+    script = r'''
+import { assetCardDraftFromRef } from "./apps/studio/src/asset-card-drafts.js";
+import { assetImagePrompt } from "./apps/studio/src/asset-card-image-prompts.js";
+
+const shot = {
+  shot_id: "shot_07",
+  description: "镜号：07\n画面描述：@林晚 @蓝色雨伞 @雨夜码头。林晚穿米白风衣站在雨夜码头边，手持蓝色雨伞，港口灯光映在水面，远处船影缓慢经过。\n光影氛围：低照度雨夜，水面反光，冷暖灯光交错",
+};
+const character = assetCardDraftFromRef({ label: "林晚", asset_type: "character" }, shot);
+const scene = assetCardDraftFromRef({ label: "雨夜码头", asset_type: "scene" }, shot);
+const prop = assetCardDraftFromRef({ label: "蓝色雨伞", asset_type: "prop" }, shot);
+process.stdout.write(JSON.stringify({
+  character,
+  scene,
+  prop,
+  prompts: [
+    assetImagePrompt(character),
+    assetImagePrompt(scene),
+    assetImagePrompt(prop),
+  ].join("\n"),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    all_text = json.dumps(payload, ensure_ascii=False)
+
+    for project_specific in ("孙悟空", "金刚狼", "金箍棒", "山巅石台战场"):
+        assert project_specific not in all_text
+    assert payload["character"]["label"] == "林晚"
+    assert payload["scene"]["feature_card"]["location"] == "雨夜码头环境"
+    assert "码头" in payload["scene"]["feature_card"]["layout"]
+    assert payload["prop"]["feature_card"]["category"] == "蓝色雨伞"
+    assert "伞面" in payload["prop"]["feature_card"]["appearance"]
+    assert "林晚" not in payload["prop"]["signature"]
 
 
 def test_character_asset_card_keeps_other_story_assets_out_of_target_prompt() -> None:

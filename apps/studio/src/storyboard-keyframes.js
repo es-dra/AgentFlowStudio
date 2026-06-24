@@ -7,6 +7,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
   if (!scriptNode) return [];
   const assetNodes = downstreamAssetCardNodes(state, scriptNode.id);
   const fixedAssets = fixedVisualAssetsFromAssetNodes(assetNodes);
+  const candidateImageRefs = candidateAssetImageRefsFromAssetNodes(assetNodes);
   const missingIds = assetNodes
     .filter((asset) => !(asset.params?.visualAssets || []).some(isFixedVisualAsset))
     .map((asset) => asset.id);
@@ -33,6 +34,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
       source_script_node_id: scriptNode.id,
       source_asset_card_node_ids: assetNodes.map((asset) => asset.id),
       candidate_asset_card_node_ids: assetNodes.map((asset) => asset.id),
+      candidate_image_asset_refs: candidateImageRefs,
       fixed_visual_asset_ids: fixedAssets.map((asset) => asset.asset_id).filter(Boolean),
       missing_asset_card_node_ids: missingIds,
       unfixed_candidate_asset_card_node_ids: missingIds,
@@ -69,6 +71,23 @@ function fixedVisualAssetsFromAssetNodes(assetNodes) {
   return result;
 }
 
+function candidateAssetImageRefsFromAssetNodes(assetNodes) {
+  const seen = new Set();
+  const result = [];
+  for (const asset of assetNodes) {
+    const uploads = Array.isArray(asset.params?.uploads) ? asset.params.uploads : [];
+    for (const upload of uploads) {
+      const role = String(upload?.role || upload?.source_kind || upload?.sourceKind || "").toLowerCase();
+      if (!["character_reference", "scene_reference", "prop_reference", "asset_reference"].includes(role)) continue;
+      const assetId = String(upload?.asset_id || upload?.assetId || "").trim();
+      if (!assetId || seen.has(assetId)) continue;
+      seen.add(assetId);
+      result.push(assetId);
+    }
+  }
+  return result.slice(0, 4);
+}
+
 function existingKeyframeNode(state, scriptNodeId) {
   return Object.values(state.nodes || {})
     .find((node) => node?.params?.keyframeLayer?.source_script_node_id === scriptNodeId) || null;
@@ -80,7 +99,7 @@ function keyframePrompt(shot, fixedAssets, missingAssets) {
     const signature = asset.signature ? `：${asset.signature}` : "";
     return `- @${label}${signature}`;
   });
-  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（候选资产卡，未固定时仅供审查，不作为参考图注入）`);
+  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（候选资产卡；若已在当前分镜树生成图片，则作为局部参考，未固定不进入项目全局约束）`);
   return [
     `根据分镜生成关键帧：${shot.description || shot.source_text || ""}`,
     `镜头：${shot.shot_size || "中景"}；光影：${shot.light_atmosphere || "自然光影"}；运镜参考：${shot.camera_motion || "固定机位"}`,

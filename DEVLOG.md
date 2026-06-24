@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-25 - Keyframe Asset References and Generic Asset Defaults
+
+- Investigated the latest failed keyframe run for the current Studio project:
+  Runtime reached the remote image provider and then produced a safe blocked
+  manifest with `remote_image_provider_not_ready` after a read timeout. The
+  evidence points to provider timeout, not copyright or safety blocking.
+- Updated Studio keyframe request assembly so a keyframe generated from a
+  storyboard can carry image refs from connected asset-card nodes in the same
+  storyboard tree. Fixed visual assets remain project-wide strong references;
+  unfixed connected asset cards are local references only and do not become
+  global project constraints.
+- Wired asset-card prompt-bar edits into the same conservative revision
+  channel used by panel field edits. A typed adjustment now becomes a
+  `user_instruction` delta with prior generated/user reference images as the
+  anchor, and clearing the prompt-bar instruction clears that prompt-bar
+  revision state.
+- Added a non-current-story regression using `林晚 / 雨夜码头 / 蓝色雨伞` to
+  guard against overfitting asset-card defaults to the Sun Wukong / Wolverine
+  example. Also changed generic prop signatures so they summarize the prop
+  itself instead of copying the whole shot sentence with unrelated character
+  names.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_prompt_script_static.py::test_keyframe_generation_carries_connected_asset_card_images_as_local_refs tests/test_web_studio_assets_generation_static.py::test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs tests/test_web_studio_assets_generation_static.py::test_asset_card_defaults_generalize_to_unrelated_script_assets -> 3 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo.
+
 ## 2026-06-24 - Runtime Image Provider Timeout Boundary
 
 - Hardened Runtime image generation so provider read timeouts are retried once

@@ -170,7 +170,7 @@ function safeContextNode(node) {
     type: normalizeNodeType(node.type),
     title: String(node.title || "").slice(0, 80),
     prompt: String(node.prompt || node.content || "").replace(/\s+/g, " ").trim().slice(0, 240),
-    image_asset_refs: suppressDraftUploads ? draftRefs.slice(0, 4) : nodeImageAssetRefs(node).slice(0, 4),
+    image_asset_refs: suppressDraftUploads ? draftRefs.slice(0, 4) : nodeContextImageAssetRefs(node).slice(0, 4),
     visual_asset_ids: nodeVisualAssetIds(node).slice(0, 8),
     director_setup_summary: node.params?.directorSetup
       ? directorPromptSummary(normalizeDirectorSetup(node.params.directorSetup)).slice(0, 240)
@@ -209,6 +209,7 @@ function linkedDirectorSetup(state, node) {
 function safeAssetRefs(state, node) {
   const refs = [...assetCardRevisionImageRefs(node)];
   if (node.params?.nodeRole === "asset_card_draft") refs.push(...assetCardNodeUploadImageRefs(node));
+  if (node.params?.nodeRole === "keyframe_generation") refs.push(...collectConnectedAssetCardImageAssetRefs(state, node));
   if (!refs.length && shouldCollectConnectedUploads(node)) refs.push(...collectConnectedImageAssetRefs(state, node));
   if (node.params?.firstFrameImageAssetId) refs.push(String(node.params.firstFrameImageAssetId));
   if (node.params?.lastFrameImageAssetId) refs.push(String(node.params.lastFrameImageAssetId));
@@ -223,13 +224,30 @@ function safeAssetRefs(state, node) {
 }
 
 export function collectConnectedImageAssetRefs(state, node) {
-  const refs = [...nodeImageAssetRefs(node)];
+  const refs = [...nodeContextImageAssetRefs(node)];
   for (const edge of Object.values(state.edges)) {
     if (edge.to !== node.id) continue;
     const upstream = state.nodes[edge.from];
-    refs.push(...nodeImageAssetRefs(upstream));
+    refs.push(...nodeContextImageAssetRefs(upstream));
   }
   return refs;
+}
+
+export function collectConnectedAssetCardImageAssetRefs(state, node) {
+  const refs = [...visualAssetImageRefs(node)];
+  for (const edge of Object.values(state.edges || {})) {
+    if (edge.to !== node.id) continue;
+    const upstream = state.nodes?.[edge.from];
+    if (!isAssetCardNode(upstream)) continue;
+    refs.push(...visualAssetImageRefs(upstream));
+    refs.push(...assetCardGeneratedImageRefs(upstream));
+    refs.push(...assetCardNodeUploadImageRefs(upstream));
+  }
+  return refs;
+}
+
+function nodeContextImageAssetRefs(node) {
+  return dedupe([...nodeImageAssetRefs(node), ...visualAssetImageRefs(node)]);
 }
 
 function nodeImageAssetRefs(node) {
@@ -237,6 +255,40 @@ function nodeImageAssetRefs(node) {
   return node.params.uploads
     .map((item) => String(item?.asset_id || item?.assetId || "").trim())
     .filter(Boolean);
+}
+
+function assetCardGeneratedImageRefs(node) {
+  if (!node?.params?.uploads) return [];
+  return node.params.uploads
+    .filter((item) => isAssetCardImageReferenceRole(item?.role || item?.source_kind || item?.sourceKind))
+    .map((item) => String(item?.asset_id || item?.assetId || "").trim())
+    .filter(Boolean);
+}
+
+function visualAssetImageRefs(node) {
+  const refs = [];
+  for (const asset of Array.isArray(node?.params?.visualAssets) ? node.params.visualAssets : []) {
+    const values = Array.isArray(asset?.image_asset_refs)
+      ? asset.image_asset_refs
+      : Array.isArray(asset?.source_image_asset_refs)
+        ? asset.source_image_asset_refs
+        : [];
+    refs.push(...values);
+  }
+  return refs.map((value) => String(value || "").trim()).filter(Boolean);
+}
+
+function isAssetCardImageReferenceRole(value) {
+  const role = String(value || "").toLowerCase();
+  return ["character_reference", "scene_reference", "prop_reference", "asset_reference"].includes(role);
+}
+
+function isAssetCardNode(node) {
+  return Boolean(
+    node?.params?.assetCardDraft
+    || node?.params?.nodeRole === "asset_card_draft"
+    || node?.params?.asset_prep?.source_script_node_id
+  );
 }
 
 function uploadReferenceSummaries(node) {
@@ -258,6 +310,15 @@ function nodeVisualAssetIds(node) {
     .filter(Boolean)
     .filter((value, index, arr) => arr.indexOf(value) === index)
     .filter((value) => !/[\\/]/.test(value));
+}
+
+function dedupe(values) {
+  const result = [];
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text && !result.includes(text)) result.push(text);
+  }
+  return result;
 }
 
 function connectedReferenceNodeSummaries(state, node) {

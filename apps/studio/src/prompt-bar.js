@@ -14,6 +14,7 @@ import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
+import { buildUserAssetCardRevisionState } from "./asset-revision-references.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -88,6 +89,11 @@ function buildBar(store, runtime, node) {
       if (n.params?.assetCardDraft) {
         n.params.assetCardDraft.user_edited_text = textarea.value;
         n.params.assetCardDraft.updated_by_user = Boolean(textarea.value.trim());
+        if (textarea.value.trim()) {
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value);
+        } else if (usesPromptBarAssetCardRevision(n.params.assetCardRevision)) {
+          delete n.params.assetCardRevision;
+        }
       } else if (n.type === "text" || n.type === "script") {
         n.content = textarea.value;
       }
@@ -216,6 +222,11 @@ function syncPromptBarState(bar, node) {
     const label = optimizeBtn.querySelector("span");
     if (label) label.textContent = running ? "优化中" : "优化";
   }
+}
+
+function usesPromptBarAssetCardRevision(revision) {
+  return Array.isArray(revision?.changed_fields)
+    && revision.changed_fields.some((item) => item?.field === "user_instruction");
 }
 
 function runPromptBarGeneration(store, runtime, node) {

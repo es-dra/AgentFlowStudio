@@ -6,11 +6,31 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-24 by Codex
+Last updated: 2026-06-25 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Current keyframe asset-reference addendum: 2026-06-25 pass inspected the live
+Runtime manifests for the current Studio project and found the latest keyframe
+failure reached the remote image provider before timing out. The safe blocked
+manifest used `remote_image_provider_not_ready`; no copyright or safety block
+was returned. Studio now carries connected asset-card image refs into keyframe
+generation requests for the same storyboard tree, while fixed visual assets
+remain project-wide strong references and unfixed asset cards remain local
+candidate references only. Asset-card prompt-bar edits now create a conservative
+`user_instruction` revision delta anchored by the prior generated/user
+reference images, so typed image-adjustment instructions follow the same
+low-drift route as panel field edits. A non-current-story regression
+(`林晚 / 雨夜码头 / 蓝色雨伞`) guards against overfitting defaults to the
+Sun Wukong / Wolverine test script, and generic prop signatures now summarize
+the prop itself instead of copying unrelated shot text. Verification so far:
+focused Studio regressions passed 3 and `npm.cmd run check:studio-js` passed
+for 119 files. Remaining validation: broader focused pytest, `git diff
+--check`, commit/push, server `/home` and `/opt` fast-forward sync, Runtime
+restart/health, and a post-deploy keyframe retry or provider smoke if the
+remote image provider is responsive.
 
 Current scene asset prompt isolation addendum: 2026-06-24 pass fixes the path
 where a scene asset such as `山巅石台战场` could regenerate into a character

@@ -250,6 +250,83 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "connect(store, scriptNode.id, keyframeNode.id)" in keyframes
 
 
+def test_keyframe_generation_carries_connected_asset_card_images_as_local_refs() -> None:
+    script = r'''
+import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const keyframe = {
+  id: "keyframe_01",
+  type: "image",
+  title: "关键帧 · 分镜01",
+  prompt: "根据分镜生成关键帧：@孙悟空 @金刚狼 @金箍棒",
+  params: {
+    nodeRole: "keyframe_generation",
+    visualAssets: [{
+      asset_id: "vas_swk",
+      label: "孙悟空",
+      status: "fixed",
+      image_asset_refs: ["img_swk_fixed"],
+    }],
+    spec: { ratio: "16:9", count: 1 },
+  },
+};
+const wolverine = {
+  id: "asset_wolverine",
+  type: "image",
+  title: "角色资产 · @金刚狼",
+  params: {
+    nodeRole: "asset_card_draft",
+    assetCardDraft: { label: "金刚狼", asset_type: "character", status: "draft" },
+    uploads: [
+      { asset_id: "img_wolverine_candidate", role: "character_reference" },
+      { asset_id: "img_old_keyframe_history", role: "generated_keyframe_reference" },
+    ],
+  },
+};
+const scene = {
+  id: "asset_scene",
+  type: "image",
+  title: "场景资产 · @雨夜码头",
+  params: {
+    nodeRole: "asset_card_draft",
+    assetCardDraft: { label: "雨夜码头", asset_type: "scene", status: "draft" },
+    uploads: [{ asset_id: "img_scene_candidate", role: "scene_reference" }],
+  },
+};
+const unrelated = {
+  id: "unrelated_image",
+  type: "image",
+  params: { uploads: [{ asset_id: "img_unrelated_history", role: "generated_keyframe_reference" }] },
+};
+const state = {
+  nodes: { keyframe_01: keyframe, asset_wolverine: wolverine, asset_scene: scene, unrelated_image: unrelated },
+  edges: {
+    e1: { id: "e1", from: "asset_wolverine", to: "keyframe_01" },
+    e2: { id: "e2", from: "asset_scene", to: "keyframe_01" },
+    e3: { id: "e3", from: "unrelated_image", to: "keyframe_01" },
+  },
+};
+const request = buildKeyframeGenerationRequest(state, keyframe);
+process.stdout.write(JSON.stringify({
+  refs: request.asset_refs,
+  contextRefs: request.context_subgraph.nodes.find((node) => node.id === "keyframe_01").image_asset_refs,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["refs"] == ["img_swk_fixed", "img_wolverine_candidate", "img_scene_candidate"]
+    assert "img_old_keyframe_history" not in payload["refs"]
+    assert "img_unrelated_history" not in payload["refs"]
+    assert payload["contextRefs"] == ["img_swk_fixed"]
+
+
 def test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_asset_nodes() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     storyboard_actions = (STUDIO_ROOT / "src" / "storyboard-node-actions.js").read_text(encoding="utf-8")

@@ -23,6 +23,27 @@ export function buildAssetCardRevisionState(node, previousDraft, nextDraft) {
   };
 }
 
+export function buildUserAssetCardRevisionState(node, draft, instruction) {
+  const card = normalizeAssetCardDraft(draft || {});
+  const references = revisionReferenceAssets(node);
+  const text = cleanText(instruction).slice(0, 500);
+  return {
+    schema_version: "afs_asset_card_revision.v0.1",
+    mode: references.length ? "image_guided_partial_revision" : "text_only_revision",
+    asset_type: card.asset_type,
+    asset_label: card.label,
+    reference_assets: references,
+    changed_fields: text ? [{
+      field: "user_instruction",
+      label: "用户调整要求",
+      from: "",
+      to: text,
+    }] : [],
+    preserve_locks: (card.negative_locks || []).map(cleanText).filter(Boolean).slice(0, 12),
+    created_at: new Date().toISOString(),
+  };
+}
+
 export function assetCardRevisionImageRefs(node) {
   const revision = node?.params?.assetCardRevision;
   const refs = Array.isArray(revision?.reference_assets) ? revision.reference_assets : [];
@@ -150,6 +171,17 @@ function revisionEditPolicyLines(revision) {
   for (const item of revision.changed_fields || []) {
     const field = cleanText(item.field);
     const target = cleanText(item.to).toLowerCase();
+    if (field === "user_instruction") {
+      if (/cap|hat|baseball|鸭舌帽|帽/u.test(target)) {
+        lines.push("User-instruction clothing scope: add only the requested hat/headwear as an outer accessory; preserve face identity, hair silhouette where visible, body, outfit, view layout, palette family, and all non-edited details.");
+      }
+      if (/scar|疤|伤疤|刀疤|面部.*痕|脸.*痕|左边面部|左脸/u.test(target)) {
+        lines.push("User-instruction facial-mark scope: add exactly the requested scar/mark only where requested; preserve face identity, eyes, brow, hair, expression, costume, body, props, and all view positions.");
+      }
+      if (/plush|fur|furry|fabric|毛绒|绒|布料|织物/u.test(target)) {
+        lines.push("User-instruction material scope: change only the named surface/material treatment while preserving the same frame, proportions, silhouette, turnaround layout, and non-edited construction details.");
+      }
+    }
     if (field === "wardrobe") {
       lines.push("Wardrobe edit scope: add the requested clothing as an outer garment layer only; do not redesign the head, face screen, eye shape, ear side modules, neck, chest core, mechanical limbs, hands, feet, body scale, or turnaround-sheet layout.");
       lines.push("Keep the robot body visible at uncovered neck/chest/hands/legs unless the card explicitly asks to fully hide it; clothing must not convert the robot into a human, child, monk, mascot, or different character archetype.");

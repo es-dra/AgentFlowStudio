@@ -151,6 +151,9 @@ function signatureFor(assetType, label, shotText) {
   if (assetType === "character") {
     return `${label}：${characterSignatureHint(label, shotText)}`.slice(0, 120);
   }
+  if (assetType === "prop") {
+    return `${label}：${propSignatureHint(label, shotText)}`.slice(0, 120);
+  }
   const suffix = {
     character: "可复用角色，身份与外观待确认",
     scene: "可复用场景，空间与光影待确认",
@@ -327,8 +330,9 @@ function characterDemeanor(label, text) {
 }
 
 function sceneLocation(label, text) {
+  if (/码头|港口|海港|岸边|河岸|海岸/.test(text)) return `${label}环境`;
   if (/屋顶|楼顶|天台/.test(text)) return "夜晚城市屋顶/楼顶平台";
-  if (/街道|街区|路面|人行道|独自行走|街道氛围|雨夜/.test(text)) return "雨夜城市街道/街区外景";
+  if (/街道|街区|路面|人行道|独自行走|街道氛围/.test(text)) return /雨夜/.test(text) ? "雨夜城市街道/街区外景" : "城市街道/街区外景";
   if (/山巅|山脊|石台|云海|战场/.test(text)) return "山巅石台战场";
   if (/城市|天际线/.test(text)) return "城市外景与天际线环境";
   return label;
@@ -343,6 +347,9 @@ function sceneSignatureHint(label, text) {
 }
 
 function sceneLayout(text) {
+  if (/码头|港口|海港|岸边|河岸|海岸/.test(text)) {
+    return "码头或岸线作为空间中心，水面、栈桥/堤岸、远处灯光和可通行动线形成前中后景层次";
+  }
   if (/屋顶|楼顶|天台/.test(text)) {
     return "屋顶边缘与平台前景，远处城市天际线，广阔星空占据主要空间";
   }
@@ -359,6 +366,7 @@ function sceneLayout(text) {
 }
 
 function sceneProps(text) {
+  if (/码头|港口|海港|岸边|河岸|海岸/.test(text)) return "水面、栈桥/堤岸、系泊设施、湿润地面和远处灯光作为环境元素";
   if (/山巅|山脊|石台|云海|战场/.test(text)) return "山石平台、破碎石块、云雾层次和远处山脊作为环境元素";
   if (/金箍棒|钢爪|武器/.test(text)) return "角色手持道具应拆为道具资产，场景只保留环境元素";
   if (/灯火|霓虹|高楼|天际线/.test(text)) return "城市灯火、远处高楼、低饱和霓虹反射作为环境元素";
@@ -374,6 +382,7 @@ function sceneLightingMood(text) {
 }
 
 function scenePalette(text) {
+  if (/码头|港口|海港|岸边|河岸|海岸/.test(text)) return "冷灰水面、湿润暗部、远处暖色灯光和低饱和反射";
   if (/雨夜|街道|霓虹/.test(text)) return "冷蓝、黑灰和低饱和霓虹反射";
   if (/山巅|山脊|石台|云海|战场/.test(text)) return "冷灰山石、暗蓝云雾、雷光高亮和低饱和金属火花";
   if (/冷蓝|月光|星光|青蓝/.test(text)) return "冷蓝、青蓝和低饱和暗部";
@@ -391,6 +400,7 @@ function sceneTimeWeather(text) {
 function propAppearance(label, text) {
   if (/金箍棒/.test(label)) return "长棍类神话武器，金属质感，两端箍纹与棒身比例清楚，轮廓修长";
   if (/钢爪/.test(label)) return "三刃金属爪，锋利、对称、可从手部伸出，结构清楚";
+  if (/伞|雨伞/.test(label)) return "伞面、伞骨和手柄结构清楚，外轮廓完整，开合状态按分镜语境确定";
   if (/灯|路灯|灯具|灯柱/.test(label)) return "独立灯具/光源结构，外轮廓清楚，发光区域和支撑结构可辨认";
   return "根据分镜描述确定外观轮廓和辨识细节";
 }
@@ -398,6 +408,7 @@ function propAppearance(label, text) {
 function propMaterial(label, text) {
   if (/金箍棒/.test(label)) return "金属或鎏金材质，磨损边缘与雕刻纹路可见";
   if (/钢爪/.test(label)) return "冷色金属材质，边缘高光锐利";
+  if (/伞|雨伞/.test(label)) return "防水布面、金属或木质伞骨与手柄，湿润反光按天气确定";
   if (/灯|路灯|灯具|灯柱/.test(label) && /科幻|未来|金属/.test(text)) return "金属与半透明发光材料，冷色反射";
   return "材质待人工确认";
 }
@@ -405,6 +416,7 @@ function propMaterial(label, text) {
 function propUsage(label, text) {
   if (/金箍棒/.test(label)) return "由孙悟空持握、横扫、格挡或立在身侧使用";
   if (/钢爪/.test(label)) return "由金刚狼近身格斗、迎击和格挡使用";
+  if (/伞|雨伞/.test(label)) return /雨|雨夜/.test(text) ? "作为遮雨、遮挡或情绪动作道具使用" : "作为手持、遮挡或场景互动道具使用";
   if (/灯|路灯|灯具|灯柱/.test(label)) return "作为环境光源或局部照明使用";
   return "按分镜动作使用";
 }
@@ -412,8 +424,13 @@ function propUsage(label, text) {
 function propInteraction(label, text) {
   if (/金箍棒/.test(label)) return "与孙悟空手部动作绑定，不能变成独立场景装饰或其他武器";
   if (/钢爪/.test(label)) return "与金刚狼手部和近战动作绑定，数量、朝向和长度保持一致";
+  if (/伞|雨伞/.test(label)) return "与持握手部、遮挡角度和天气状态保持连续，不变成背景装饰";
   if (/手持|持握|拿着|挥|横扫|格挡|刺|砍/.test(text)) return "与角色手部动作和镜头连续性保持一致";
   return "与角色、场景的互动关系按分镜语境确定";
+}
+
+function propSignatureHint(label, text) {
+  return `${propAppearance(label, text)}，${propMaterial(label, text)}`.slice(0, 90);
 }
 
 function safeAssetType(value) { return ["character", "scene", "prop"].includes(String(value || "")) ? String(value) : "character"; }
