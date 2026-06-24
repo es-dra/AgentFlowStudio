@@ -3,7 +3,12 @@ import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
 import { providerServiceForImageModel } from "./presets/models.js";
 import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generation-prompt.js";
-import { assetCardRevisionImageRefs, safeAssetCardRevisionSnapshot } from "./asset-revision-references.js";
+import {
+  assetCardNodeUploadImageRefs,
+  assetCardReferenceImageRefs,
+  assetCardRevisionImageRefs,
+  safeAssetCardRevisionSnapshot,
+} from "./asset-revision-references.js";
 
 const GENERATION_TARGET = {
   text: "prompt",
@@ -159,12 +164,13 @@ export function buildContextSubgraph(state, node, runtimeWorkMode = "context_gen
 
 function safeContextNode(node) {
   const suppressDraftUploads = node.params?.nodeRole === "asset_card_draft" && !hasFixedVisualAssets(node);
+  const draftRefs = assetCardReferenceImageRefs(node);
   return {
     id: String(node.id || ""),
     type: normalizeNodeType(node.type),
     title: String(node.title || "").slice(0, 80),
     prompt: String(node.prompt || node.content || "").replace(/\s+/g, " ").trim().slice(0, 240),
-    image_asset_refs: suppressDraftUploads ? assetCardRevisionImageRefs(node).slice(0, 4) : nodeImageAssetRefs(node).slice(0, 4),
+    image_asset_refs: suppressDraftUploads ? draftRefs.slice(0, 4) : nodeImageAssetRefs(node).slice(0, 4),
     visual_asset_ids: nodeVisualAssetIds(node).slice(0, 8),
     director_setup_summary: node.params?.directorSetup
       ? directorPromptSummary(normalizeDirectorSetup(node.params.directorSetup)).slice(0, 240)
@@ -202,6 +208,7 @@ function linkedDirectorSetup(state, node) {
 
 function safeAssetRefs(state, node) {
   const refs = [...assetCardRevisionImageRefs(node)];
+  if (node.params?.nodeRole === "asset_card_draft") refs.push(...assetCardNodeUploadImageRefs(node));
   if (!refs.length && shouldCollectConnectedUploads(node)) refs.push(...collectConnectedImageAssetRefs(state, node));
   if (node.params?.firstFrameImageAssetId) refs.push(String(node.params.firstFrameImageAssetId));
   if (node.params?.lastFrameImageAssetId) refs.push(String(node.params.lastFrameImageAssetId));

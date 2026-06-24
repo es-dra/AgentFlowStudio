@@ -29,6 +29,17 @@ export function assetCardRevisionImageRefs(node) {
   return dedupe(refs.map((item) => cleanAssetId(item?.asset_id || item?.assetId))).slice(0, MAX_REVISION_REFERENCES);
 }
 
+export function assetCardNodeUploadImageRefs(node) {
+  return dedupe(nodeImageUploads(node).map((item) => cleanAssetId(item?.asset_id || item?.assetId))).slice(0, MAX_REVISION_REFERENCES);
+}
+
+export function assetCardReferenceImageRefs(node) {
+  return dedupe([
+    ...assetCardRevisionImageRefs(node),
+    ...assetCardNodeUploadImageRefs(node),
+  ]).slice(0, MAX_REVISION_REFERENCES);
+}
+
 export function safeAssetCardRevisionSnapshot(revision) {
   if (!revision || typeof revision !== "object") return null;
   const references = Array.isArray(revision.reference_assets) ? revision.reference_assets : [];

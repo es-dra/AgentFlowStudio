@@ -3,7 +3,7 @@ import { mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets
 import { updateNodeGenerationState } from "./node-generation-progress.js";
 import { sleep } from "./node-generation-restore.js";
 import { nodeGenerationKind } from "./node-keyframe-response.js";
-const MAX_ASSET_RECOVERY_ATTEMPTS = 18;
+const MAX_ASSET_RECOVERY_WINDOW_MS = 10 * 60 * 1000;
 export function markKeyframeRecovering(store, nodeId, kind) {
   store.set((s) => {
     const n = s.nodes[nodeId];
@@ -19,7 +19,8 @@ export function markKeyframeRecovering(store, nodeId, kind) {
   }, { history: false });
 }
 export async function recoverTimedOutKeyframeFromAssets(store, runtime, nodeId, kind, submittedAtMs, originalError) {
-  for (let attempt = 0; attempt < MAX_ASSET_RECOVERY_ATTEMPTS; attempt += 1) {
+  const deadline = Date.now() + MAX_ASSET_RECOVERY_WINDOW_MS;
+  for (let attempt = 0; Date.now() < deadline; attempt += 1) {
     if (nodeAlreadyRecovered(store, nodeId)) return;
     if (attempt > 0) await sleep(attempt < 4 ? 3000 : 5000);
     const recovered = await recoverNodeFromGeneratedAssets(store, runtime, nodeId, kind, submittedAtMs);

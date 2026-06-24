@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from apps.api.runtime_studio_state_safe_text import strip_media_filename_fragment
 from apps.api.runtime_store import safe_id
 
 
@@ -24,9 +25,9 @@ def sanitize_assets(
         asset = {
             "id": safe_id(str(item.get("id", f"asset_{len(result) + 1}"))),
             "kind": text(item.get("kind") or item.get("type"), "reference", 60),
-            "title": text(item.get("title"), "未命名资产", 120),
-            "safe_summary": text(item.get("safe_summary") or item.get("summary"), "", 1000),
-            "thumbnail_ref": text(item.get("thumbnail_ref"), "", 160),
+            "title": strip_media_filename_fragment(text(item.get("title"), "未命名资产", 120)) or "未命名资产",
+            "safe_summary": strip_media_filename_fragment(text(item.get("safe_summary") or item.get("summary"), "", 1000)),
+            "thumbnail_ref": strip_media_filename_fragment(text(item.get("thumbnail_ref"), "", 160)),
             "source_node_id": text(item.get("source_node_id") or item.get("nodeId"), "", 80) or None,
             "status": text(item.get("status"), "ready", 40),
         }

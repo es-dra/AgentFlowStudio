@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current asset-card adjustment/recovery addendum: 2026-06-24 pass separates the
+asset-card system generation prompt from the editable prompt bar. Asset image
+nodes now show only user revision instructions in the bottom input, while the
+full typed asset-card prompt is assembled at generation time. Users can upload
+reference images directly to an asset-card image node and those uploaded image
+asset refs now carry into that asset-card generation request. Timeout recovery
+now polls Runtime image assets for up to ten minutes so long provider runs that
+finish after a browser timeout can still recover the node preview. Studio state
+persistence prunes video media filenames such as `candidate_001.mp4` from safe
+display fields before global safety scanning, while preserving safe Runtime
+preview routes and asset ids. Verification: focused Studio regressions passed
+2, Runtime state regression passed 1 / 1 existing warning, broader Studio
+static set passed 28, Runtime Studio state set passed 16 / 1 existing warning,
+`npm.cmd run check:studio-js` passed for 119 files, and `git diff --check`
+passed. Remaining validation: GitHub/server three-end sync, Runtime health
+after restart, and browser visual acceptance.
+
 Current Studio asset scope addendum: 2026-06-24 pass tightens Studio asset
 reference scope and the material/history split. `@` suggestions now treat
 ordinary generated image candidates as history, not project-fixed assets:

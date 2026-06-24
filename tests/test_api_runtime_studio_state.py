@@ -289,6 +289,68 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
     assert "previewUrl" not in restored.json()["state"]["nodes"]["video_1"]
 
 
+def test_studio_state_prunes_media_filenames_before_global_safety_scan(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-media-filename-state"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio media filename pruning test"})
+    video_preview = (
+        "/projects/studio-media-filename-state/video-generations/"
+        "video_job_001/candidates/candidate_001/preview"
+    )
+    image_preview = "/projects/studio-media-filename-state/image-assets/img_ref_001/preview"
+    state = {
+        "nodes": {
+            "video_1": {
+                "id": "video_1",
+                "type": "video",
+                "title": "视频结果",
+                "params": {
+                    "uploads": [
+                        {
+                            "asset_id": "video_candidate_001",
+                            "filename": "candidate_001.mp4",
+                            "role": "generated_video_reference",
+                            "preview_url": video_preview,
+                        },
+                        {
+                            "asset_id": "img_ref_001",
+                            "filename": "reference.png",
+                            "role": "reference_image",
+                            "preview_url": image_preview,
+                        },
+                    ],
+                    "lastVideoPreviewUrl": video_preview,
+                },
+            }
+        },
+        "assets": [
+            {
+                "id": "asset_video_1",
+                "kind": "video_reference",
+                "title": "candidate_001.mp4",
+                "safe_summary": "candidate_001.mp4",
+                "thumbnail_ref": "candidate_001.mp4",
+                "asset_id": "video_candidate_001",
+                "preview_url": video_preview,
+                "status": "ready",
+            }
+        ],
+        "order": ["video_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+
+    assert saved.status_code == 200
+    saved_state = saved.json()["state"]
+    serialized = str(saved_state).lower()
+    assert ".mp4" not in serialized
+    assert saved_state["nodes"]["video_1"]["params"]["uploads"][0]["asset_id"] == "video_candidate_001"
+    assert "filename" not in saved_state["nodes"]["video_1"]["params"]["uploads"][0]
+    assert saved_state["nodes"]["video_1"]["params"]["uploads"][1]["filename"] == "reference.png"
+    assert saved_state["assets"][0]["asset_id"] == "video_candidate_001"
+    assert saved_state["assets"][0]["preview_url"] == video_preview
+
+
 def test_studio_state_preserves_safe_context_bundle_summary() -> None:
     sanitized = sanitize_studio_state(
         {

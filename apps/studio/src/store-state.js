@@ -1,6 +1,7 @@
 const HISTORY_LIMIT = 80;
 const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/([a-zA-Z0-9_.-]+)\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
 const HTML_ERROR_RE = /<\/?(html|head|body|center|title|h1|hr)\b/i;
+const MEDIA_FILENAME_FRAGMENT_RE = /\.(mp4|mov)\b/i;
 
 export function initialState(projectId = "studio-local-001") {
   return {
@@ -215,6 +216,7 @@ function sanitizeCandidatePreviews(value, projectId) {
 function sanitizePreviewObject(item, projectId) {
   if (!item || typeof item !== "object") return null;
   const next = { ...item };
+  sanitizeMediaRefDisplayFields(next);
   const previewUrl = safeRuntimePreviewUrl(next.preview_url || next.url, projectId);
   if (previewUrl) {
     next.preview_url = previewUrl;
@@ -224,6 +226,27 @@ function sanitizePreviewObject(item, projectId) {
     delete next.url;
   }
   return next;
+}
+
+function sanitizeMediaRefDisplayFields(item) {
+  for (const key of ["title", "safe_summary", "thumbnail_ref", "label"]) {
+    if (!(key in item)) continue;
+    item[key] = stripMediaFilenameFragment(item[key]);
+    if (!item[key]) delete item[key];
+  }
+  for (const key of ["filename", "download_filename"]) {
+    if (!(key in item)) continue;
+    if (hasMediaFilenameFragment(item[key])) delete item[key];
+    else item[key] = String(item[key] || "").replace(/[\\/]/g, "").trim();
+  }
+}
+
+function stripMediaFilenameFragment(value) {
+  return String(value || "").replace(MEDIA_FILENAME_FRAGMENT_RE, "").trim();
+}
+
+function hasMediaFilenameFragment(value) {
+  return MEDIA_FILENAME_FRAGMENT_RE.test(String(value || ""));
 }
 
 function safeRuntimePreviewUrl(value, projectId) {

@@ -254,6 +254,81 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "此前排队" in generation_progress
 
 
+def test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs() -> None:
+    script = r'''
+import { assetImagePrompt, assetCardUserAdjustmentText } from "./apps/studio/src/asset-card-image-prompts.js";
+import { assetCardPromptText } from "./apps/studio/src/asset-card-generation-prompt.js";
+import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const draft = {
+  asset_type: "character",
+  label: "金刚狼",
+  status: "draft",
+  signature: "粗犷战士，棕黄色毛发，强壮体格",
+  feature_card: {
+    identity: "山巅战场上的强壮兽性战士",
+    appearance: "棕黄色毛发覆盖脸部和手臂，强壮成人比例",
+    face: "浓眉、深眼窝、脸部有野性纹理",
+    wardrobe: "旧皮革战斗服",
+    reference_views: "正面半身特写 + 全身正面居中 + 左侧面全身 + 背面全身",
+  },
+};
+const generatedPrompt = assetImagePrompt(draft);
+const node = {
+  id: "asset_wolverine",
+  type: "image",
+  prompt: "只给左脸增加一道浅疤，保持四视图布局和服装不变",
+  content: "资产卡正文留在节点内容中，不进入底部输入框",
+  params: {
+    nodeRole: "asset_card_draft",
+    assetCardDraft: { ...draft, user_edited_text: "只给左脸增加一道浅疤，保持四视图布局和服装不变" },
+    uploads: [{ asset_id: "img_user_reference_001", filename: "face-reference.png", role: "reference_image" }],
+    spec: { ratio: "16:9", count: 1 },
+  },
+};
+const state = { nodes: { [node.id]: node }, edges: {} };
+const request = buildKeyframeGenerationRequest(state, node);
+process.stdout.write(JSON.stringify({
+  generatedIsHiddenFromEditBox: assetCardUserAdjustmentText({ ...node, prompt: generatedPrompt, params: { assetCardDraft: draft } }) === "",
+  userAdjustment: assetCardUserAdjustmentText(node),
+  promptText: assetCardPromptText(node),
+  refs: request.asset_refs,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["generatedIsHiddenFromEditBox"] is True
+    assert payload["userAdjustment"] == "只给左脸增加一道浅疤，保持四视图布局和服装不变"
+    assert "Visual target: reusable 角色资产 reference image" in payload["promptText"]
+    assert "User asset-card adjustment" in payload["promptText"]
+    assert "只给左脸增加一道浅疤" in payload["promptText"]
+    assert payload["refs"] == ["img_user_reference_001"]
+
+
+def test_asset_card_node_generation_prompt_is_not_written_into_prompt_box() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
+    asset_panel = (STUDIO_ROOT / "src" / "panels" / "asset-card-panel.js").read_text(encoding="utf-8")
+    optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    recovery = (STUDIO_ROOT / "src" / "node-keyframe-recovery.js").read_text(encoding="utf-8")
+
+    assert "assetCardUserAdjustmentText" in prompt_bar
+    assert "assetCardPromptPlaceholder" in prompt_bar
+    assert "textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node)" in prompt_bar
+    assert "n.params.assetCardDraft.user_edited_text = textarea.value" in prompt_bar
+    assert "node.prompt = assetImagePrompt(draft)" not in asset_nodes + asset_panel
+    assert "assetCardNodeUploadImageRefs(node)" in optimizer_contract
+    assert "MAX_ASSET_RECOVERY_WINDOW_MS" in recovery
+    assert "Date.now() < deadline" in recovery
+
+
 def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")

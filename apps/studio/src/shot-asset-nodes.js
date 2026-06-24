@@ -3,7 +3,7 @@ import {
   assetCardText,
   assetCardTypeLabel,
 } from "./asset-card-drafts.js";
-import { assetImagePrompt, assetImageRatio } from "./asset-card-image-prompts.js";
+import { assetImageRatio } from "./asset-card-image-prompts.js";
 import { createNode, connect } from "./nodes.js";
 import { refineStructuredShotAssets, structuredShotFromSegment } from "./structured-shot.js";
 
@@ -94,7 +94,7 @@ function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeI
     const node = s.nodes[nodeId];
     if (!node) return;
     node.title = `${assetCardTypeLabel(draft.asset_type)} · @${draft.label}`;
-    node.prompt = assetImagePrompt(draft);
+    node.prompt = "";
     node.content = assetCardText(draft);
     node.status = "complete";
     node.h = Math.max(300, Math.min(460, 210 + Object.keys(draft.feature_card || {}).length * 22));

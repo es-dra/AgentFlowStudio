@@ -23,9 +23,29 @@ export function assetImageRatio(assetType) {
 }
 
 export function assetPromptSupplementFromNode(node) {
-  const manual = String(node?.params?.assetCardDraft?.user_edited_text || "").trim();
-  if (manual && !looksLikeGeneratedAssetCardText(manual)) return `User asset-card adjustment:\n${manual}`;
+  const manual = assetCardUserAdjustmentText(node);
+  if (manual) return `User asset-card adjustment:\n${manual}`;
   return "";
+}
+
+export function assetCardUserAdjustmentText(node) {
+  const candidates = [
+    String(node?.params?.assetCardDraft?.user_edited_text || "").trim(),
+    String(node?.prompt || "").trim(),
+  ];
+  for (const manual of candidates) {
+    if (!manual) continue;
+    if (looksLikeGeneratedAssetCardText(manual) || looksLikeGeneratedAssetImagePrompt(manual)) continue;
+    return manual;
+  }
+  return "";
+}
+
+export function assetCardPromptPlaceholder(assetType) {
+  const type = safeAssetType(assetType);
+  if (type === "scene") return "上传场景参考图，再写调整要求，如：只把天气改为雪夜，保持空间结构和视角组不变";
+  if (type === "prop") return "上传道具参考图，再写调整要求，如：只把材质改为旧铜，保持形状、比例和四视图不变";
+  return "上传角色参考图，再写调整要求，如：只给左脸增加一道浅疤，保持身份、服装和四视图布局不变";
 }
 
 function assetImageLead(card) {
@@ -107,6 +127,15 @@ function looksLikeGeneratedAssetCardText(value) {
     || /状态：候选草稿/u.test(value)
     || /特征卡：/u.test(value)
     || /不可变锁定项：/u.test(value);
+}
+
+function looksLikeGeneratedAssetImagePrompt(value) {
+  return /^Visual target: reusable /u.test(value)
+    || /Asset facts:/u.test(value)
+    || /Forbidden: software dashboard/u.test(value)
+    || /Character reference sheet for asset named/u.test(value)
+    || /Environment reference for asset named/u.test(value)
+    || /Object reference for asset named/u.test(value);
 }
 
 function safeAssetType(value) {

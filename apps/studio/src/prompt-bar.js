@@ -13,6 +13,7 @@ import { barSignature, positionBar, structureSignature } from "./prompt-bar-posi
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
+import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -74,18 +75,21 @@ function buildBar(store, runtime, node) {
   }
 
   const textarea = document.createElement("textarea");
-  textarea.placeholder = promptPlaceholder(node.type, p.spec?.mode);
-  textarea.value = node.prompt || node.content || "";
+  textarea.placeholder = p.assetCardDraft
+    ? assetCardPromptPlaceholder(p.assetCardDraft.asset_type)
+    : promptPlaceholder(node.type, p.spec?.mode);
+  textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node) : node.prompt || node.content || "";
   textarea.addEventListener("input", () => {
     store.set((s) => {
       s.ui.promptBarNodeId = node.id;
       const n = s.nodes[node.id];
       if (!n) return;
       n.prompt = textarea.value;
-      if (n.type === "text" || n.type === "script" || n.params?.assetCardDraft) n.content = textarea.value;
       if (n.params?.assetCardDraft) {
         n.params.assetCardDraft.user_edited_text = textarea.value;
-        n.params.assetCardDraft.updated_by_user = true;
+        n.params.assetCardDraft.updated_by_user = Boolean(textarea.value.trim());
+      } else if (n.type === "text" || n.type === "script") {
+        n.content = textarea.value;
       }
       delete n.params.lastOptimizedPromptPlain;
     }, { history: false });

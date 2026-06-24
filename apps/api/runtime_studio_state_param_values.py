@@ -1,7 +1,7 @@
 from __future__ import annotations
-
 from typing import Any, Callable
 
+from apps.api.runtime_studio_state_safe_text import has_media_filename_fragment
 from apps.api.runtime_store import safe_id
 
 
@@ -183,6 +183,8 @@ def uploads(value: Any, *, project_id: str | None, preview_url: PreviewUrlSaniti
             continue
         asset_id = safe_id(text(item.get("asset_id") or item.get("assetId"), "", 120))
         filename = text(item.get("filename") or item.get("label"), "", 160)
+        if has_media_filename_fragment(filename):
+            filename = ""
         role = text(item.get("role"), "", 80)
         upload = {"asset_id": asset_id} if asset_id else {}
         if filename:

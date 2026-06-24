@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-24 - Asset Card Adjustment Prompt And Timeout Recovery
+
+- Separated asset-card generation prompts from the editable prompt bar. Asset
+  image nodes now keep the typed field for user revision instructions only,
+  while the full asset-card image prompt is assembled at generation time from
+  the card draft.
+- Let users upload reference images directly to an asset-card image node and
+  include those uploaded image asset refs in that asset-card generation request.
+  This supports "upload a reference + write a local adjustment prompt" without
+  requiring an asset-card field edit first.
+- Extended timeout recovery for image/asset generation to keep polling Runtime
+  image assets for up to ten minutes, so a long provider run that finishes after
+  the browser request times out can still recover the completed node preview.
+- Hardened Studio state persistence so video media filenames such as
+  `candidate_001.mp4` are pruned from safe display fields before global
+  repository-safety scanning, while safe Runtime preview routes and asset ids
+  remain available.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py::test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs tests/test_web_studio_assets_generation_static.py::test_asset_card_node_generation_prompt_is_not_written_into_prompt_box -> 2 passed
+pytest tests/test_api_runtime_studio_state.py::test_studio_state_prunes_media_filenames_before_global_safety_scan -> 1 passed / 1 existing warning
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 28 passed
+pytest tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py tests/test_api_runtime_studio_state_modules.py -> 16 passed / 1 existing warning
+npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo. The Wolverine failure observed in the browser was a timeout/recovery
+  and state-save issue, not a copyright/safety block based on the safe manifest.
+
 ## 2026-06-24 - Studio Asset Reference Scope And Asset Library History
 
 - Tightened Studio `@` asset suggestions so ordinary generated image

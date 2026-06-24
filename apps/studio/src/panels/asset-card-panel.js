@@ -4,7 +4,7 @@ import {
   assetCardTypeLabel,
   normalizeAssetCardDraft,
 } from "../asset-card-drafts.js";
-import { assetImagePrompt, assetImageRatio } from "../asset-card-image-prompts.js";
+import { assetCardUserAdjustmentText, assetImageRatio } from "../asset-card-image-prompts.js";
 import { buildAssetCardRevisionState } from "../asset-revision-references.js";
 import { startNodeGeneration } from "../node-actions.js";
 import { el, showModal } from "../overlay.js";
@@ -93,7 +93,11 @@ function saveAssetCard(store, nodeId, draft, previousDraft) {
       status: "card_ready",
       asset_ref: draft.source_asset_ref || node.params.asset_prep?.asset_ref || null,
     };
-    node.prompt = assetImagePrompt(draft);
+    node.prompt = assetCardUserAdjustmentText(node);
+    if (node.prompt) {
+      node.params.assetCardDraft.user_edited_text = node.prompt;
+      node.params.assetCardDraft.updated_by_user = true;
+    }
     node.content = assetCardText(draft);
     node.title = `${assetCardTypeLabel(draft.asset_type)} · @${draft.label}`;
     node.status = "complete";
