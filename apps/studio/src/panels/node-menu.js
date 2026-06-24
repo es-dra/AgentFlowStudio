@@ -13,6 +13,7 @@ import {
   startNodeGeneration,
   uploadNodeImage,
 } from "../node-actions.js";
+import { canContinueKeyframeToVideo, createVideoNodeFromKeyframe } from "../keyframe-video-continuation.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -73,6 +74,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     if (fixedAsset) {
       addItem("x", "取消固定资产", () => openRetireAssetModal(store, runtime, fixedAsset));
     }
+    if (canContinueKeyframeToVideo(node)) {
+      addItem("video", "接续视频节点", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) createVideoNodeFromKeyframe(store, fresh);
+      });
+    }
     if (node.status === "complete" && (node.previewUrl || node.result)) {
       addItem("sparkles", "反馈图片质量", () => {
         const fresh = store.get().nodes[nodeId];
@@ -93,6 +100,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) setNodeVideoFrame(store, fresh, "last");
     });
+    addItem("frames", "识别视频资产卡", () => requestVideoAssetCardDraft(store, nodeId));
     if (node.params?.lastVideoJobId) {
       addItem("pencil", "创建视频修改草稿", () => {
         void VIDEO_REVISION_DRAFT_MARKER;
@@ -151,6 +159,28 @@ function activeFixedVisualAsset(node) {
     const status = String(asset?.status || asset?.asset_status || "fixed");
     return status !== "retired" && status !== "excluded";
   }) || null;
+}
+
+function requestVideoAssetCardDraft(store, nodeId) {
+  const fresh = store.get().nodes[nodeId];
+  if (!fresh) return;
+  const sourceVideoArtifactId = String(
+    fresh.params?.lastVideoArtifactId || fresh.params?.lastVideoJobId || "",
+  ).trim();
+  if (!sourceVideoArtifactId) {
+    store.set((s) => {
+      const node = s.nodes[nodeId];
+      if (!node) return;
+      node.result = [
+        node.result || "",
+        "请先生成视频，再识别视频资产卡。",
+      ].filter(Boolean).join("\n");
+    });
+    return;
+  }
+  window.dispatchEvent(new CustomEvent("afs:video-asset-card-draft", {
+    detail: { node_id: fresh.id, node: fresh },
+  }));
 }
 
 export function openQualityFeedbackMenu(node, anchorOrPoint) {

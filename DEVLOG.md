@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-25 - Keyframe to Video Continuation and Video Asset Cards
+
+- Added a reusable Studio frontend path that turns any completed keyframe image
+  node into a connected video node. The new video node stores the keyframe image
+  asset as `firstFrameImageAssetId`, keeps the preview URL, and records the
+  source keyframe/asset IDs so image-to-video generation does not have to infer
+  the first frame from generated history.
+- Added a right-click video-node entry for video asset-card recognition. It
+  reuses the existing `afs:video-asset-card-draft` event and writes a local
+  "generate video first" message when the video node has no accepted video job.
+- Kept the implementation generic: the regression constructs a neutral
+  keyframe node and verifies first-frame binding, graph connection, selection,
+  video role metadata, and video-asset recognition state without depending on
+  the Sun Wukong / Wolverine project.
+- Keyframe quality review for the current screenshots: the generated keyframe
+  is visually usable but still shows asset drift. Wolverine moves toward a
+  yellow-suit/claw superhero look instead of the current asset sheet, Sun Wukong
+  gains heavier ornate armor than the sheet, the staff prop card is polluted by
+  character turnarounds, and output aspect ratio remains provider-controlled
+  rather than strictly `16:9`. The scene board is comparatively clean.
+
+Verification:
+
+```text
+red baseline: new focused tests failed before implementation because the module/menu entries were missing
+pytest tests/test_web_studio_assets_generation_static.py::test_keyframe_can_continue_to_explicit_first_frame_video_node tests/test_web_studio_assets_generation_static.py::test_keyframe_to_video_and_video_asset_card_menu_markers -> 2 passed
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 35 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 120 files
+```
+
+Boundary:
+
+- No live provider call, video submission, provider raw response, signed URL,
+  local private media byte, secret, or Company OS private source content was
+  written to the repo.
+
 ## 2026-06-25 - Keyframe Asset References and Generic Asset Defaults
 
 - Investigated the latest failed keyframe run for the current Studio project:

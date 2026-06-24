@@ -640,6 +640,101 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node-status.cancelled" in styles
 
 
+def test_keyframe_can_continue_to_explicit_first_frame_video_node() -> None:
+    script = r'''
+import { createVideoNodeFromKeyframe } from "./apps/studio/src/keyframe-video-continuation.js";
+
+const state = {
+  nodes: {
+    keyframe_01: {
+      id: "keyframe_01",
+      type: "image",
+      title: "Keyframe - shot 01",
+      x: 120,
+      y: 80,
+      w: 420,
+      h: 320,
+      prompt: "Generate a battle keyframe with two named characters and a fixed scene.",
+      status: "complete",
+      previewUrl: "/media/keyframe_01.png",
+      params: {
+        nodeRole: "keyframe_generation",
+        lastKeyframeJobId: "kf_job_001",
+        spec: { ratio: "16:9", duration: "5s", resolution: "720P" },
+        uploads: [{
+          asset_id: "img_keyframe_001",
+          filename: "keyframe_01.png",
+          preview_url: "/media/keyframe_01.png",
+          role: "generated_keyframe_reference",
+          width: 1402,
+          height: 1122,
+        }],
+      },
+    },
+  },
+  edges: {},
+  order: ["keyframe_01"],
+  selection: { nodeIds: ["keyframe_01"], edgeId: null },
+  ui: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: (prefix) => `${prefix}_${++seq}`,
+  set: (fn) => fn(state),
+};
+
+const video = createVideoNodeFromKeyframe(store, state.nodes.keyframe_01);
+const edges = Object.values(state.edges);
+
+process.stdout.write(JSON.stringify({
+  videoType: video?.type,
+  title: video?.title,
+  prompt: video?.prompt,
+  selected: state.selection.nodeIds,
+  edge: edges[0],
+  firstFrame: video?.params?.firstFrameImageAssetId,
+  firstFramePreview: video?.params?.firstFramePreviewUrl,
+  uploadRole: video?.params?.uploads?.[0]?.role,
+  sourceKeyframe: video?.params?.sourceKeyframeNodeId,
+  sourceAsset: video?.params?.sourceKeyframeAssetId,
+  recognitionStatus: video?.params?.videoAssetRecognition?.status,
+  nodeRole: video?.params?.nodeRole,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["videoType"] == "video"
+    assert payload["firstFrame"] == "img_keyframe_001"
+    assert payload["firstFramePreview"] == "/media/keyframe_01.png"
+    assert payload["uploadRole"] == "first_frame"
+    assert payload["sourceKeyframe"] == "keyframe_01"
+    assert payload["sourceAsset"] == "img_keyframe_001"
+    assert payload["edge"]["from"] == "keyframe_01"
+    assert payload["edge"]["to"].startswith("node_")
+    assert payload["selected"] == [payload["edge"]["to"]]
+    assert payload["recognitionStatus"] == "pending_video_generation"
+    assert payload["nodeRole"] == "video_generation"
+    assert "Maintain exact character identity" in payload["prompt"]
+    assert "Do not introduce new characters" in payload["prompt"]
+
+
+def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert "createVideoNodeFromKeyframe" in node_menu
+    assert "requestVideoAssetCardDraft" in node_menu
+    assert "接续视频节点" in node_menu
+    assert "识别视频资产卡" in node_menu
+
+
 def test_runtime_client_uses_runtime_port_when_studio_is_served_from_dev_port() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
 

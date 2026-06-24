@@ -12,6 +12,23 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current keyframe-to-video addendum: 2026-06-25 pass adds a generic Studio
+right-click continuation path from completed keyframe image nodes to video
+nodes. The created video node is connected downstream of the keyframe and
+stores the keyframe image asset as `firstFrameImageAssetId` with source
+keyframe/asset metadata, so image-to-video submission starts from an explicit
+first-frame contract instead of searching generated history. Video nodes now
+also expose a right-click video asset-card recognition entry that reuses the
+existing `afs:video-asset-card-draft` event and tells the user to generate the
+video first when no video job exists. The regression is project-neutral and
+does not special-case the Sun Wukong / Wolverine script. Verification so far:
+focused red/green tests passed 2, broader Studio static regressions passed 35,
+and `npm.cmd run check:studio-js` passed for 120 files. Residual risk:
+provider-side video smoke and human creative review remain separate claims;
+the latest keyframe screenshots still show asset drift from Wolverine wardrobe,
+Sun Wukong armor exaggeration, prop-card character pollution, and loose aspect
+ratio enforcement.
+
 Current keyframe asset-reference addendum: 2026-06-25 pass inspected the live
 Runtime manifests for the current Studio project and found the latest keyframe
 failure reached the remote image provider before timing out. The safe blocked
