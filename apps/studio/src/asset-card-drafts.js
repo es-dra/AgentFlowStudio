@@ -108,13 +108,14 @@ export function assetCardText(draft) {
 
 function defaultFeatureCard(assetType, label, shotText) {
   if (assetType === "scene") {
+    const sceneText = `${label} ${shotText}`.trim();
     return {
-      location: sceneLocation(label, shotText),
-      layout: sceneLayout(shotText),
-      props: sceneProps(shotText),
-      lighting_mood: sceneLightingMood(shotText),
-      palette: scenePalette(shotText),
-      time_weather: sceneTimeWeather(shotText),
+      location: sceneLocation(label, sceneText),
+      layout: sceneLayout(sceneText),
+      props: sceneProps(sceneText),
+      lighting_mood: sceneLightingMood(sceneText),
+      palette: scenePalette(sceneText),
+      time_weather: sceneTimeWeather(sceneText),
       view_set: "同一场景的俯瞰全景、正向广角、入口/边缘视角、光影或材质细节视角，空间关系保持一致",
     };
   }
@@ -144,6 +145,9 @@ function defaultFeatureCard(assetType, label, shotText) {
 }
 
 function signatureFor(assetType, label, shotText) {
+  if (assetType === "scene") {
+    return `${label}：${sceneSignatureHint(label, shotText)}`.slice(0, 120);
+  }
   const suffix = {
     character: "可复用角色，身份与外观待确认",
     scene: "可复用场景，空间与光影待确认",
@@ -172,7 +176,8 @@ function phraseFromShot(text, fallback) {
 }
 
 function normalizedSignature(assetType, label, evidenceText, value) {
-  const clean = cleanDraftField(value);
+  let clean = cleanDraftField(value);
+  if (assetType === "scene") clean = cleanSceneDraftField(clean);
   if (!signatureHasMeaning(clean, label)) return signatureFor(assetType, label, evidenceText);
   if (clean.includes("：") || clean.includes(":")) return clean.slice(0, 120);
   return `${label}：${clean}`.slice(0, 120);
@@ -183,7 +188,8 @@ function normalizedFeatureCard(assetType, label, evidenceText, card) {
   const source = card && typeof card === "object" ? card : {};
   const result = {};
   for (const [key] of assetCardFieldsForType(assetType)) {
-    const clean = cleanDraftField(source[key]);
+    let clean = cleanDraftField(source[key]);
+    if (assetType === "scene") clean = cleanSceneDraftField(clean);
     const text = clean && signatureHasMeaning(clean, label) ? clean : fallback[key];
     if (text) result[key] = String(text).slice(0, 260);
   }
@@ -203,6 +209,13 @@ function cleanDraftField(value) {
     .replace(/\s+/g, " ")
     .replace(/^[\s，。、；：:]+/u, "")
     .trim();
+}
+
+function cleanSceneDraftField(value) {
+  const clean = stripAssetTags(value);
+  if (!clean) return "";
+  if (/孙悟空|金刚狼|金箍棒|钢爪|双爪|角色手持|大战|角色主体|人物主体|画面绝对主体/u.test(clean)) return "";
+  return clean;
 }
 
 function shotDescription(structuredShot) { return String(structuredShot?.description || structuredShot?.source_text || "").trim(); }
@@ -278,6 +291,14 @@ function sceneLocation(label, text) {
   return label;
 }
 
+function sceneSignatureHint(label, text) {
+  const sceneText = `${label} ${text}`.trim();
+  if (/山巅|山脊|石台|云海|战场/.test(sceneText)) {
+    return "山巅石台、悬崖边缘、云海远山和破碎山石构成的可复用环境";
+  }
+  return phraseFromShot(cleanSceneDraftField(sceneText), "可复用场景，空间与光影待确认");
+}
+
 function sceneLayout(text) {
   if (/屋顶|楼顶|天台/.test(text)) {
     return "屋顶边缘与平台前景，远处城市天际线，广阔星空占据主要空间";
@@ -289,23 +310,24 @@ function sceneLayout(text) {
     return "城市街区或外景空间，前景可行走区域、中景建筑界面和远处天际线层次清晰";
   }
   if (/山巅|山脊|石台|云海|战场/.test(text)) {
-    return "破碎山巅石台作为战斗中心，周围云海、山脊和碎石形成远近层次";
+    return "破碎山巅石台作为空间中心，悬崖边缘、周围云海、远处山脊和碎石裂纹形成前中后景层次";
   }
   return "根据分镜画面确定空间结构、主体位置和远近层次";
 }
 
 function sceneProps(text) {
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "山石平台、破碎石块、云雾层次和远处山脊作为环境元素";
   if (/金箍棒|钢爪|武器/.test(text)) return "角色手持道具应拆为道具资产，场景只保留环境元素";
   if (/灯火|霓虹|高楼|天际线/.test(text)) return "城市灯火、远处高楼、低饱和霓虹反射作为环境元素";
-  if (/山巅|山脊|石台|云海|战场/.test(text)) return "山石平台、破碎石块、云雾层次和远处山脊作为环境元素";
   return "保留分镜中出现的关键环境元素，不额外新增无关道具";
 }
 
 function sceneLightingMood(text) {
   if (/雨夜|雨|潮湿|湿地|积水/.test(text) && /夜|低照度|深夜/.test(text)) return "低照度雨夜光线，冷色阴影压低环境，湿润路面保留城市反射";
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "高海拔自然天光与云雾逆光，岩石暗部压低，边缘轮廓清晰";
   if (/冷蓝|月光|星光|星空|霓虹|低饱和/.test(text)) return "冷蓝月光与星光主导，城市霓虹提供低饱和反射";
   if (/低照度|夜晚|深夜/.test(text)) return "低照度夜景光线，暗部压低，主体轮廓清晰";
-  return phraseFromShot(text, "自然光影，氛围服务剧情");
+  return phraseFromShot(cleanSceneDraftField(text), "自然光影，氛围服务剧情");
 }
 
 function scenePalette(text) {
@@ -317,6 +339,7 @@ function scenePalette(text) {
 
 function sceneTimeWeather(text) {
   if (/雨夜/.test(text)) return "雨夜，空气潮湿，路面有反光和轻微雨雾";
+  if (/山巅|山脊|石台|云海|战场/.test(text)) return "高山云海与强风薄雾，具体日夜按分镜语境确定";
   if (/雨|雾|风/.test(text)) return "按分镜天气与空气状态确定，保留雨/雾/风等已出现天气线索";
   if (/夜|星空|月光/.test(text)) return "晴朗夜晚，冷蓝月光与星光主导";
   return "按分镜语境确定";

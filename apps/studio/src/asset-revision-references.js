@@ -30,7 +30,10 @@ export function assetCardRevisionImageRefs(node) {
 }
 
 export function assetCardNodeUploadImageRefs(node) {
-  return dedupe(nodeImageUploads(node).map((item) => cleanAssetId(item?.asset_id || item?.assetId))).slice(0, MAX_REVISION_REFERENCES);
+  return dedupe(nodeImageUploads(node)
+    .filter(isUserUploadedReferenceImage)
+    .map((item) => cleanAssetId(item?.asset_id || item?.assetId)))
+    .slice(0, MAX_REVISION_REFERENCES);
 }
 
 export function assetCardReferenceImageRefs(node) {
@@ -173,6 +176,11 @@ function revisionEditPolicyLines(revision) {
 
 function nodeImageUploads(node) {
   return Array.isArray(node?.params?.uploads) ? node.params.uploads : [];
+}
+
+function isUserUploadedReferenceImage(item) {
+  const role = cleanText(item?.role || item?.source_kind || item?.sourceKind || item?.kind).toLowerCase();
+  return ["reference_image", "uploaded_reference", "user_reference_image"].includes(role);
 }
 
 function nodeVisualAssets(node) {

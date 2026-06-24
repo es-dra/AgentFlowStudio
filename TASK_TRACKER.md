@@ -12,6 +12,24 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current scene asset prompt isolation addendum: 2026-06-24 pass fixes the path
+where a scene asset such as `山巅石台战场` could regenerate into a character
+reference sheet. Scene asset-card defaults now strip story character names,
+handheld weapons, and combat-summary text from reusable scene signatures and
+feature-card fields; mountain stone-platform battlefields resolve to concrete
+environment facts such as stone platform, cliff edge, cloud sea, distant ridges,
+broken rocks, cracks, high-altitude light, and weather. Scene image prompts now
+state that upstream character names are environmental-trace context only, not
+permission to render characters, portraits, turnarounds, weapons, or
+silhouettes. Asset-card image nodes now carry only user-uploaded reference
+images into a new generation request; prior generated `scene_reference` /
+`generated_keyframe_reference` outputs stay in node/history state but do not
+auto-contaminate the next asset-card generation. Verification: focused Studio
+regressions passed 2, broader Studio static set passed 30, and
+`npm.cmd run check:studio-js` passed for 119 files. Remaining validation:
+GitHub/server three-end sync, Runtime health after restart, live low-cost scene
+asset smoke, and browser visual acceptance.
+
 Current asset-card adjustment/recovery addendum: 2026-06-24 pass separates the
 asset-card system generation prompt from the editable prompt bar. Asset image
 nodes now show only user revision instructions in the bottom input, while the

@@ -56,9 +56,11 @@ function assetImageModeInstruction(assetType, label) {
   const assetName = cleanAssetName(label);
   if (assetType === "scene") {
     return [
+      `环境参考图：只生成名为 ${assetName} 的场景资产，不生成角色资产或角色设定表。`,
       `Environment reference for asset named ${assetName}: show the same environment/location from multiple clear camera angles in one image.`,
       "Required layout: clean 2x2 grid of four independent 16:9 environment views: center-axis wide establishing view, reverse angle, overhead/spatial layout view, and lighting/material detail view.",
       "Keep the same architecture, skyline, horizon, props, lighting direction, time of day, and spatial relationship across all views.",
+      "上游剧情中的角色名只作为环境痕迹参考；不得渲染任何角色主体、头像、半身像、全身转面、手持武器或人物剪影。",
       "No people, character shadows, silhouettes, hands, vehicles as subjects, text, labels, border captions, UI, or unrelated story objects unless explicitly listed as environment elements.",
     ].join(" ");
   }

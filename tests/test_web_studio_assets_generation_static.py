@@ -312,6 +312,92 @@ process.stdout.write(JSON.stringify({
     assert payload["refs"] == ["img_user_reference_001"]
 
 
+def test_scene_asset_card_keeps_story_characters_out_of_environment_prompt() -> None:
+    script = r'''
+import { assetCardDraftFromRef } from "./apps/studio/src/asset-card-drafts.js";
+import { assetImagePrompt } from "./apps/studio/src/asset-card-image-prompts.js";
+
+const shot = {
+  shot_id: "shot_01",
+  description: "镜号：01\n画面描述：@孙悟空 @金刚狼 @山巅石台战场。以孙悟空大战金刚狼为核心，孙悟空手持金箍棒，山巅石台战场被云海包围，石台裂开，边缘是悬崖和远山。\n光影氛围：自然光影，气氛服务情绪推进",
+};
+const draft = assetCardDraftFromRef({ label: "山巅石台战场", asset_type: "scene" }, shot);
+const prompt = assetImagePrompt(draft);
+process.stdout.write(JSON.stringify({
+  signature: draft.signature,
+  featureCard: draft.feature_card,
+  locks: draft.negative_locks,
+  prompt,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    prompt = payload["prompt"]
+    fields = "\n".join(str(value) for value in payload["featureCard"].values())
+
+    for polluted in ("孙悟空", "金刚狼", "金箍棒"):
+        assert polluted not in payload["signature"]
+        assert polluted not in fields
+        assert polluted not in prompt
+    for marker in ("山巅石台", "云海", "悬崖", "环境参考图"):
+        assert marker in fields + prompt
+    assert "不得渲染任何角色主体" in prompt
+    assert "上游剧情中的角色名只作为环境痕迹参考" in prompt
+
+
+def test_asset_card_generation_only_carries_user_uploaded_reference_images() -> None:
+    script = r'''
+import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const node = {
+  id: "scene_asset_1",
+  type: "image",
+  title: "场景资产 · @山巅石台战场",
+  params: {
+    nodeRole: "asset_card_draft",
+    assetCardDraft: {
+      asset_type: "scene",
+      label: "山巅石台战场",
+      status: "draft",
+      signature: "山巅石台战场：山巅石台、云海、悬崖和破碎石块组成的可复用环境",
+      feature_card: {
+        location: "山巅石台战场",
+        layout: "破碎山巅石台、悬崖边缘、云海远山",
+        props: "碎石、断壁、裂纹地面",
+        lighting_mood: "高海拔自然天光与云雾逆光",
+        view_set: "广角、反向、俯瞰、材质细节",
+      },
+    },
+    uploads: [
+      { asset_id: "img_wrong_generated_scene", role: "scene_reference" },
+      { asset_id: "img_wrong_generated_keyframe", role: "generated_keyframe_reference" },
+      { asset_id: "img_user_uploaded_reference", role: "reference_image" },
+    ],
+    spec: { ratio: "16:9", count: 1 },
+  },
+};
+const state = { nodes: { [node.id]: node }, edges: {} };
+const request = buildKeyframeGenerationRequest(state, node);
+process.stdout.write(JSON.stringify({ refs: request.asset_refs }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["refs"] == ["img_user_uploaded_reference"]
+
+
 def test_asset_card_node_generation_prompt_is_not_written_into_prompt_box() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")

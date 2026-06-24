@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-24 - Scene Asset Prompt Isolation
+
+- Tightened scene asset-card defaults so story character names, handheld
+  weapons, and combat-summary text do not enter reusable scene signatures or
+  feature-card fields. Mountain / stone-platform battlefield scenes now resolve
+  to concrete environment facts: stone platform, cliff edge, cloud sea, distant
+  ridges, broken rocks, cracks, high-altitude light, and weather.
+- Strengthened the scene asset image prompt so upstream character names are
+  treated only as environmental-trace context, never as permission to render
+  characters, portraits, turnarounds, handheld weapons, or silhouettes.
+- Limited asset-card node upload refs to user-uploaded reference images. Prior
+  generated `scene_reference` / `generated_keyframe_reference` outputs remain
+  available as node/history assets but no longer auto-contaminate the next
+  asset-card generation request.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py::test_scene_asset_card_keeps_story_characters_out_of_environment_prompt tests/test_web_studio_assets_generation_static.py::test_asset_card_generation_only_carries_user_uploaded_reference_images -> 2 passed
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 30 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 119 files
+```
+
+Boundary:
+
+- No provider key, provider raw response, signed URL, local private path,
+  generated media byte, or Company OS private source content was written to the
+  repo.
+
 ## 2026-06-24 - Asset Card Adjustment Prompt And Timeout Recovery
 
 - Separated asset-card generation prompts from the editable prompt bar. Asset
