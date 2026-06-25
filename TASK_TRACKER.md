@@ -26,6 +26,14 @@ passed. Remaining work: deploy the cleanup to origin/server `/home` and `/opt`,
 restart Runtime, confirm `/health` video gate/service alignment, then run an
 authorized Seedance video smoke from a keyframe first frame.
 
+Seedance 404 follow-up: the deployed provider config uses a shared Crazyrouter
+account base URL with `/v1` plus a `seedance_i2v` service-level root base URL
+for the Volc endpoint. The Seedance adapter now correctly lets the service
+base URL override the account base URL, preventing `/v1/volc/v1/...` create
+URLs that returned provider HTTP 404. Focused regression:
+`tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py`
+passed 15 with 1 existing warning.
+
 Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
 the right-click `接续视频节点` path so historical completed keyframe image nodes
 whose title/prompt marks them as keyframes also get the same automation, even

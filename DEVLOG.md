@@ -2,6 +2,14 @@
 
 ## 2026-06-25 - Retire Kling Video Path and Default to Seedance Relay
 
+- Follow-up fix after deploy: the deployed config intentionally shares a
+  Crazyrouter account whose default image/LLM base URL includes `/v1`, while
+  Seedance video service `seedance_i2v` overrides the base URL to the root
+  host for `/volc/v1/contents/generations/tasks`. The Seedance adapter was
+  incorrectly preferring the shared account base URL over the service override,
+  producing a create URL shaped like `/v1/volc/v1/...` and a provider HTTP
+  404. The adapter now lets the service-level base URL override the account
+  base URL, and the regression mirrors that deployed config shape.
 - Investigated the deployed video failure behind the Studio screenshot. Runtime
   video gate was open, provider dispatch started, but the selected service was
   the retired `kling_i2v` path. The server provider config has Seedance relay
@@ -23,6 +31,7 @@
 Verification:
 
 ```text
+pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 15 passed, 1 warning
 pytest tests/test_web_studio_assets_generation_static.py tests/test_provider_adapter_registry.py tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py tests/test_cli_command_registry_boundaries.py tests/test_architecture_audit_gates.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_production_memory_provider_validation_gate.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py -q -> 105 passed, 5 deselected, 1 warning
 npm.cmd run check:studio-js -> JS syntax check passed: 120 files
 git diff --check -> passed

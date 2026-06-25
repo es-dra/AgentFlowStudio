@@ -317,7 +317,7 @@ def _base_url(account: dict[str, Any], service: dict[str, Any]) -> str:
     env_name = str(service.get("base_url_env") or account.get("base_url_env") or "").strip()
     if env_name and os.environ.get(env_name, "").strip():
         return os.environ[env_name].strip()
-    return str(account.get("base_url") or service.get("base_url") or "").strip()
+    return str(service.get("base_url") or account.get("base_url") or "").strip()
 
 def _join_url(base_url: str, endpoint: str) -> str:
     if not base_url:

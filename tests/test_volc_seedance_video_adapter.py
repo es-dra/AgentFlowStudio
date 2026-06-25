@@ -187,7 +187,7 @@ def _seedance_provider_config(tmp_path) -> str:
         "accounts": {
             "volc_seedance_relay": {
                 "auth_type": "api_key",
-                "base_url": "https://relay.test",
+                "base_url": "https://relay.test/v1",
                 "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
                 "default_models": {"video": "doubao-seedance-2-0-fast"},
             }
@@ -214,6 +214,7 @@ def _seedance_provider_config(tmp_path) -> str:
                 "provider": "volc_seedance",
                 "account_ref": "volc_seedance_relay",
                 "capability": "video",
+                "base_url": "https://relay.test",
                 "endpoint": "/volc/v1/contents/generations/tasks",
                 "model": "doubao-seedance-2-0-fast",
                 "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
