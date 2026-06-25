@@ -39,6 +39,16 @@ timed out waiting for the create response after the generic 120s request
 timeout. Seedance create requests now use the video descriptor async timeout
 unless the service explicitly overrides it.
 
+Seedance safe task-state follow-up: after the async timeout fix, a live server
+smoke reached the relay and got past create, but Runtime returned a generic
+422 because the async provider task state attempted to persist a credential
+environment variable name containing the forbidden `api_key` fragment. This is
+not a copyright or safety block. Seedance submit tasks now omit credential env
+names from persisted task state, and poll rehydrates auth details from provider
+config at runtime. Focused regression:
+`tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py`
+passed 16 with 1 existing warning.
+
 Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
 the right-click `接续视频节点` path so historical completed keyframe image nodes
 whose title/prompt marks them as keyframes also get the same automation, even

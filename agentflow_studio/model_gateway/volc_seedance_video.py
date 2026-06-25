@@ -93,7 +93,6 @@ class VolcSeedanceVideoAdapter:
             "query_url_template": _join_url(str(plan["base_url"]), str(plan["query_endpoint"])),
             "timeout_sec": float(plan.get("timeout_sec") or 120.0),
             "download_timeout_sec": float(plan.get("download_timeout_sec") or 180.0),
-            "credential_env": plan.get("credential_env"),
             "allowed_url_hosts": tuple(plan.get("allowed_url_hosts") or ()),
             "output_dir": str(plan["output_dir"]),
         }
@@ -107,9 +106,9 @@ class VolcSeedanceVideoAdapter:
             method="GET",
             payload=None,
             credential_value=None,
-            credential_env=task.get("credential_env"),
-            auth_header="Authorization",
-            auth_scheme="Bearer",
+            credential_env=str(task.get("credential_env") or _credential_env_for_service(self.store, self.service_id) or ""),
+            auth_header=str(task.get("auth_header") or _auth_header_for_service(self.store, self.service_id) or "Authorization"),
+            auth_scheme=str(task.get("auth_scheme") or _auth_scheme_for_service(self.store, self.service_id) or "Bearer"),
             timeout_sec=float(task.get("timeout_sec") or 120.0),
         )
         status = _task_status(response)
@@ -329,6 +328,24 @@ def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
     if not isinstance(value, list):
         return ()
     return tuple(str(item).lower().strip() for item in value if str(item).strip())
+
+def _service_account(store: CompanyProviderSecrets, service_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    service = store.service(service_id)
+    account_ref = str(service.get("account_ref") or "").strip()
+    account = store.account(account_ref) if account_ref else {}
+    return service, account
+
+def _credential_env_for_service(store: CompanyProviderSecrets, service_id: str) -> str:
+    service, account = _service_account(store, service_id)
+    return str(service.get("api_key_env") or account.get("api_key_env") or "").strip()
+
+def _auth_header_for_service(store: CompanyProviderSecrets, service_id: str) -> str:
+    service, account = _service_account(store, service_id)
+    return str(service.get("auth_header") or account.get("auth_header") or "Authorization")
+
+def _auth_scheme_for_service(store: CompanyProviderSecrets, service_id: str) -> str:
+    service, account = _service_account(store, service_id)
+    return str(service.get("auth_scheme") or account.get("auth_scheme") or "Bearer")
 
 def _require_gate(required_gate: str) -> None:
     if os.environ.get(required_gate, "").strip().lower() not in TRUE_VALUES:

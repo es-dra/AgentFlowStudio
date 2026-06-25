@@ -12,6 +12,8 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from apps.api import runtime_video_routes
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import reject_unsafe_payload
+from apps.api.runtime_video_task_state import provider_task_for_state
 
 
 PNG_BYTES = base64.b64decode(
@@ -98,6 +100,61 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert (tmp_path / "run" / "video_candidates" / "candidate_001.mp4").read_bytes() == b"fake-seedance-video"
     assert "secret-video-key" not in json.dumps(result, ensure_ascii=False)
     assert "media.seedance.test" not in json.dumps(result, ensure_ascii=False)
+
+
+def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_path, monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/volc/v1/contents/generations/tasks":
+            captured["create_auth"] = request.get_header("Authorization")
+            return _JsonResponse({"id": "cgt-seedance-safe-task", "status": "queued"})
+        if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-safe-task":
+            captured["poll_auth"] = request.get_header("Authorization")
+            return _JsonResponse(
+                {
+                    "id": "cgt-seedance-safe-task",
+                    "status": "succeeded",
+                    "content": {"video_url": "https://media.seedance.test/result.mp4"},
+                }
+            )
+        if url == "https://media.seedance.test/result.mp4":
+            return _BytesResponse(b"fake-seedance-video", "video/mp4")
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    task = registry.submit(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="A controlled cinematic move from the first frame.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=(first,),
+            subject_reference_image_path=first,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    persisted_task = provider_task_for_state(task)
+    serialized_persisted_task = json.dumps(persisted_task, ensure_ascii=False).lower()
+    assert "secret-video-key" not in serialized_persisted_task
+    assert "api_key" not in serialized_persisted_task
+    reject_unsafe_payload({"task": persisted_task})
+
+    result = registry.poll("video", "seedance_i2v", task)
+
+    assert captured["create_auth"] == "Bearer secret-video-key"
+    assert captured["poll_auth"] == "Bearer secret-video-key"
+    assert result["status"] == "succeeded"
 
 
 def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> None:

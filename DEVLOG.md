@@ -15,6 +15,12 @@
   response. The adapter now uses the video descriptor `async_timeout_sec`
   (900s in server config) for Seedance create requests unless explicitly
   overridden by the service.
+- A follow-up live smoke then confirmed Seedance create returned a task after
+  the longer timeout window, but Runtime converted the result into a generic
+  422 because the persisted async task state included the credential
+  environment variable name, which contains the forbidden `api_key` fragment.
+  Seedance submit tasks no longer persist credential env names; poll now
+  rehydrates auth header/scheme/env from provider config at runtime.
 - Investigated the deployed video failure behind the Studio screenshot. Runtime
   video gate was open, provider dispatch started, but the selected service was
   the retired `kling_i2v` path. The server provider config has Seedance relay
@@ -36,7 +42,7 @@
 Verification:
 
 ```text
-pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 15 passed, 1 warning
+pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 16 passed, 1 warning
 pytest tests/test_web_studio_assets_generation_static.py tests/test_provider_adapter_registry.py tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py tests/test_cli_command_registry_boundaries.py tests/test_architecture_audit_gates.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_production_memory_provider_validation_gate.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py -q -> 105 passed, 5 deselected, 1 warning
 npm.cmd run check:studio-js -> JS syntax check passed: 120 files
 git diff --check -> passed
