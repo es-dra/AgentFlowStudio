@@ -9,9 +9,6 @@ SOURCE_ROOTS = ("agentflow", "agentflow_studio", "apps")
 KNOWN_AGENTFLOW_STUDIO_IMPORT_DEBT: set[tuple[str, str]] = set()
 
 KNOWN_HIDDEN_COMMAND_DEBT = {
-    "kling-i2v-smoke",
-    "kling-t2v-smoke",
-    "kling-video-resume",
     "production-memory-loop-asset-profile-context-projection",
     "production-memory-loop-asset-profile-readiness",
     "production-memory-loop-capture-operator-feedback",

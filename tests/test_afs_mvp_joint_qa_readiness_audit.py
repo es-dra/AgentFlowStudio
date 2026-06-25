@@ -17,15 +17,15 @@ def test_joint_qa_readiness_audit_summarizes_open_provider_blockers(tmp_path: Pa
         },
     )
     _write_json(
-        tmp_path / "live_kling_i2v_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
+        tmp_path / "live_seedance_i2v_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
         {
             "status": "blocked",
             "provider_calls_started": False,
-            "blocks": [{"block_id": "remote_video_provider_not_ready", "reason": "Provider service not found: kling_i2v"}],
+            "blocks": [{"block_id": "remote_video_provider_not_ready", "reason": "Provider service not found: seedance_i2v"}],
         },
     )
     _write_json(
-        tmp_path / "kling_provider_preflight_after_blocker_hardening.json",
+        tmp_path / "seedance_provider_preflight_after_blocker_hardening.json",
         {
             "status": "blocked",
             "checks": {
@@ -44,8 +44,8 @@ def test_joint_qa_readiness_audit_summarizes_open_provider_blockers(tmp_path: Pa
     blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
     assert audit["status"] == "needs_fixes"
     assert audit["human_acceptance_claim"] == "not_claimed"
-    assert blockers["P1-KLING-CONFIG-MISSING"]["root_cause_block_id"] == "provider_service_missing"
-    assert blockers["P1-KLING-CONFIG-MISSING"]["provider_calls_started"] is False
+    assert blockers["P1-SEEDANCE-CONFIG-MISSING"]["root_cause_block_id"] == "provider_service_missing"
+    assert blockers["P1-SEEDANCE-CONFIG-MISSING"]["provider_calls_started"] is False
     assert blockers["P1-IMAGE-B-PROVIDER-READINESS"]["root_cause_block_id"] == "remote_image_provider_not_ready"
     assert blockers["P1-IMAGE-B-PROVIDER-READINESS"]["retry_count"] == 1
     serialized = json.dumps(audit, ensure_ascii=False)
@@ -59,35 +59,35 @@ def test_joint_qa_readiness_audit_reads_powershell_utf16_evidence(tmp_path: Path
         "checks": {"block_id": "provider_service_missing", "service_present": False},
         "secrets_printed": False,
     }
-    path = tmp_path / "kling_provider_preflight_after_blocker_hardening.json"
+    path = tmp_path / "seedance_provider_preflight_after_blocker_hardening.json"
     path.write_text(json.dumps(payload), encoding="utf-16")
 
     audit = build_readiness_audit(tmp_path)
 
     blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
-    assert blockers["P1-KLING-CONFIG-MISSING"]["root_cause_block_id"] == "provider_service_missing"
+    assert blockers["P1-SEEDANCE-CONFIG-MISSING"]["root_cause_block_id"] == "provider_service_missing"
 
 
-def test_joint_qa_readiness_audit_marks_missing_kling_evidence_as_missing(tmp_path: Path) -> None:
+def test_joint_qa_readiness_audit_marks_missing_seedance_evidence_as_missing(tmp_path: Path) -> None:
     audit = build_readiness_audit(tmp_path)
 
     blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
-    assert blockers["P1-KLING-CONFIG-MISSING"]["status"] == "missing_evidence"
-    assert blockers["P1-KLING-CONFIG-MISSING"]["root_cause_block_id"] == "missing_evidence"
+    assert blockers["P1-SEEDANCE-CONFIG-MISSING"]["status"] == "missing_evidence"
+    assert blockers["P1-SEEDANCE-CONFIG-MISSING"]["root_cause_block_id"] == "missing_evidence"
 
 
-def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(tmp_path: Path) -> None:
+def test_joint_qa_readiness_audit_accepts_startup_config_seedance_success_evidence(tmp_path: Path) -> None:
     _write_json(
         tmp_path / "live_image_runtime" / "runs" / "project" / "job" / "B" / "keyframe_generation_safe_manifest.json",
         {"status": "succeeded", "provider_calls_started": True},
     )
     _write_json(
-        tmp_path / "kling_provider_preflight_startup_secrets_config_gate_open.json",
+        tmp_path / "seedance_provider_preflight_startup_config_gate_open.json",
         {"status": "ready", "checks": {"service_present": True}, "secrets_printed": False},
     )
     _write_json(
         tmp_path
-        / "live_kling_i2v_startup_config_runtime"
+        / "live_seedance_i2v_startup_config_runtime"
         / "runs"
         / "project"
         / "job"
@@ -95,11 +95,11 @@ def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(
         {"status": "succeeded", "provider_calls_started": True, "outputs": [{"candidate_id": "candidate_001"}]},
     )
     _write_json(
-        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        tmp_path / "live_seedance_i2v_startup_config_recovery_poll_report.json",
         {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
     )
     _write_json(
-        tmp_path / "live_kling_i2v_video_inspection.json",
+        tmp_path / "live_seedance_i2v_video_inspection.json",
         {"format_duration_sec": 5.04, "video_stream": {"width": 1176, "height": 1764}},
     )
 
@@ -107,9 +107,9 @@ def test_joint_qa_readiness_audit_accepts_startup_config_kling_success_evidence(
 
     blockers = {item["blocker_id"]: item for item in audit["provider_blockers"]}
     roles = {item["role_id"]: item for item in audit["role_checks"]}
-    assert "P1-KLING-CONFIG-MISSING" not in blockers
+    assert "P1-SEEDANCE-CONFIG-MISSING" not in blockers
     assert roles["video_qa"]["status"] == "passed"
-    assert roles["video_qa"]["evidence_ref"] == "live_kling_i2v_startup_config_recovery_poll_report.json"
+    assert roles["video_qa"]["evidence_ref"] == "live_seedance_i2v_startup_config_recovery_poll_report.json"
 
 
 def test_joint_qa_readiness_audit_uses_image_ready_preflight_for_next_action(tmp_path: Path) -> None:
@@ -150,11 +150,11 @@ def test_joint_qa_readiness_audit_uses_image_ready_preflight_for_next_action(tmp
         },
     )
     _write_json(
-        tmp_path / "live_kling_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
+        tmp_path / "live_seedance_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
         {"status": "succeeded", "provider_calls_started": True},
     )
     _write_json(
-        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        tmp_path / "live_seedance_i2v_startup_config_recovery_poll_report.json",
         {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
     )
 
@@ -192,11 +192,11 @@ def test_joint_qa_readiness_audit_clears_image_blocker_after_b_only_retry_succes
         },
     )
     _write_json(
-        tmp_path / "live_kling_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
+        tmp_path / "live_seedance_i2v_startup_config_runtime" / "runs" / "project" / "job" / "video_generation_safe_manifest.json",
         {"status": "succeeded", "provider_calls_started": True},
     )
     _write_json(
-        tmp_path / "live_kling_i2v_startup_config_recovery_poll_report.json",
+        tmp_path / "live_seedance_i2v_startup_config_recovery_poll_report.json",
         {"status": "succeeded", "preview_check": {"content_type": "video/mp4"}},
     )
 

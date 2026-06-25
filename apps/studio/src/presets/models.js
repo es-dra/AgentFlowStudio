@@ -29,14 +29,14 @@ export const IMAGE_MODELS = [
 
 export const VIDEO_MODELS = [
   {
-    id: "kling-i2v",
-    name: "Kling I2V",
+    id: "seedance-i2v",
+    name: "Seedance 2.0 Fast",
     desc: "image to video",
     eta: "2m",
-    cost: 0,
-    provider: "kling",
+    cost: 1,
+    provider: "volc",
     capability: "video_i2v",
-    providerServiceId: "kling_i2v",
+    providerServiceId: "seedance_i2v",
   },
 ];
 
@@ -81,5 +81,5 @@ export function isRemoteVideoModel(modelId) {
 }
 
 export function providerServiceForVideoModel(modelId) {
-  return findModel("video", modelId).providerServiceId || "kling_i2v";
+  return findModel("video", modelId).providerServiceId || "seedance_i2v";
 }

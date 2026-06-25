@@ -20,7 +20,7 @@ def browser_drill_provider_blockers(evidence_root: Path) -> list[dict[str, Any]]
         blocker
         for blocker in (
             _image_blocker(evidence_root),
-            _kling_blocker(evidence_root),
+            _seedance_blocker(evidence_root),
         )
         if blocker is not None
     ]
@@ -66,7 +66,7 @@ def _image_blocker(evidence_root: Path) -> dict[str, Any] | None:
     )
 
 
-def _kling_blocker(evidence_root: Path) -> dict[str, Any] | None:
+def _seedance_blocker(evidence_root: Path) -> dict[str, Any] | None:
     manifests = sorted(evidence_root.glob("runtime_service/**/video_generation_safe_manifest.json"))
     for path in manifests:
         manifest = _read_json(path)
@@ -77,7 +77,7 @@ def _kling_blocker(evidence_root: Path) -> dict[str, Any] | None:
         ):
             return None
     return _missing_blocker(
-        "P1-KLING-BROWSER-SMOKE-MISSING",
+        "P1-SEEDANCE-BROWSER-SMOKE-MISSING",
         "runtime_service/**/video_generation_safe_manifest.json with succeeded provider output",
     )
 

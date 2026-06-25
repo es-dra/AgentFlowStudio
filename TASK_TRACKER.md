@@ -12,6 +12,20 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current video provider addendum: 2026-06-25 pass retires the active Kling video
+path and standardizes video generation/revision defaults on the Seedance relay
+service `seedance_i2v` (`doubao-seedance-2-0-fast`). Server-side evidence for
+the latest failed video node showed the video gate open and provider dispatch
+started, but the selected service was the retired `kling_i2v`; this points to a
+provider selection/config mismatch, not copyright/safety blocking. Active code,
+config templates, CLI support surface, readiness scripts, and focused tests no
+longer expose Kling provider entries. Verification: focused provider/Studio/API
+regressions passed 105 with 5 deselected and 1 existing warning,
+`npm.cmd run check:studio-js` passed for 120 files, and `git diff --check`
+passed. Remaining work: deploy the cleanup to origin/server `/home` and `/opt`,
+restart Runtime, confirm `/health` video gate/service alignment, then run an
+authorized Seedance video smoke from a keyframe first frame.
+
 Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
 the right-click `接续视频节点` path so historical completed keyframe image nodes
 whose title/prompt marks them as keyframes also get the same automation, even

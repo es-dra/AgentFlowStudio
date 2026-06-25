@@ -129,11 +129,59 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     assert 'llm_provider: "prompt_optimizer"' in optimizer_contract
     assert 'provider_service_id: "vision_image"' in visual_asset_panel
     assert 'provider_service_id: "vision_video"' in main
+    assert "Seedance 2.0 Fast" in source
+    assert 'providerServiceId: "seedance_i2v"' in source
     assert "MiniMax image-01" not in source
     assert "minimax_m3" not in optimizer_contract
     assert "fake_vision" not in main + visual_asset_panel
-    for retired in ("Midjourney", "Seedream", "Seedance", "Qwen 3", "Lib Video", "Lib Image"):
+    for retired in ("Midjourney", "Seedream", "Qwen 3", "Lib Video", "Lib Image"):
         assert retired not in source
+
+
+def test_video_model_default_uses_configured_seedance_provider() -> None:
+    script = r'''
+import {
+  VIDEO_MODELS,
+  defaultModel,
+  providerServiceForVideoModel,
+} from "./apps/studio/src/presets/models.js";
+
+process.stdout.write(JSON.stringify({
+  defaultModel: defaultModel("video"),
+  fallbackProvider: providerServiceForVideoModel(null),
+  videoProviders: VIDEO_MODELS.map((model) => model.providerServiceId),
+  videoModelIds: VIDEO_MODELS.map((model) => model.id),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["defaultModel"]["id"] == "seedance-i2v"
+    assert payload["defaultModel"]["providerServiceId"] == "seedance_i2v"
+    assert payload["fallbackProvider"] == "seedance_i2v"
+    assert payload["videoProviders"] == ["seedance_i2v"]
+    assert payload["videoModelIds"] == ["seedance-i2v"]
+
+
+def test_active_video_paths_do_not_reference_retired_video_provider() -> None:
+    active_paths = [
+        Path("apps/studio/src/presets/models.js"),
+        Path("apps/api/runtime_models.py"),
+        Path("agentflow_studio/model_gateway/provider_adapter.py"),
+        Path("agentflow_studio/model_gateway/provider_adapter_impl.py"),
+        Path("configs/providers.example.json"),
+        Path("apps/cli/support_command_registry.py"),
+    ]
+
+    for path in active_paths:
+        retired_provider = "kl" + "ing"
+        assert retired_provider not in path.read_text(encoding="utf-8").lower(), path.as_posix()
 
 
 def test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers() -> None:

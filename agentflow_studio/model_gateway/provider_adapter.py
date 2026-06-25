@@ -149,7 +149,6 @@ class ProviderAdapter(Protocol):
 
 from agentflow_studio.model_gateway.provider_adapter_impl import (  # noqa: E402
     FakeAsyncVideoAdapter,
-    KlingVideoAdapter,
     OpenAICompatibleLLMAdapter,
 )
 from agentflow_studio.model_gateway.provider_api_relay import ApiRelayAdapter  # noqa: E402
@@ -175,13 +174,12 @@ class ProviderRegistry:
         store = _fill_default_required_gates(store)
         adapters: dict[str, ProviderAdapter] = {}
         descriptors: dict[str, ProviderDescriptor] = {}
-        legacy_descriptorless = _is_legacy_descriptorless_kling_store(store)
         for service_id, service in sorted(store.services.items()):
             provider = str(service.get("provider") or "")
             capability = _service_capability(service)
             if not _is_adapter_service(provider, capability):
                 continue
-            descriptor = _descriptor_for_service(service_id, service, allow_legacy=legacy_descriptorless)
+            descriptor = _descriptor_for_service(service_id, service)
             descriptors[service_id] = descriptor
             capability = str(service.get("capability") or descriptor.modality)
             if capability == "image" and provider == "codex_handoff":
@@ -201,9 +199,6 @@ class ProviderRegistry:
                 continue
             if capability == "vision" and provider == "fake":
                 adapters[service_id] = FakeVisionAdapter(service_id, descriptor)
-                continue
-            if capability == "video" and provider == "kling":
-                adapters[service_id] = KlingVideoAdapter(store, service_id, descriptor)
                 continue
             if capability == "video" and provider in {"volc_seedance", "seedance"}:
                 adapters[service_id] = VolcSeedanceVideoAdapter(store, service_id, descriptor)
@@ -253,11 +248,9 @@ def load_provider_registry(path: str | Path | None = None) -> ProviderRegistry:
     return ProviderRegistry.from_store(load_company_provider_secrets(path))
 
 
-def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_legacy: bool = False) -> ProviderDescriptor:
+def _descriptor_for_service(service_id: str, service: dict[str, Any]) -> ProviderDescriptor:
     payload = service.get("descriptor")
     if not isinstance(payload, dict):
-        if allow_legacy:
-            return _legacy_descriptor_for_service(service_id, service)
         raise ModelConfigError(f"Provider service descriptor is required: {service_id}")
     capability = str(service.get("capability") or payload.get("modality") or "image")
     payload = _descriptor_with_default_required_gate(payload, capability)
@@ -269,9 +262,6 @@ def _descriptor_for_service(service_id: str, service: dict[str, Any], *, allow_l
         descriptor = descriptor.model_copy(update={"capabilities": [descriptor.modality]})
     if descriptor.modality not in descriptor.capabilities:
         raise ModelConfigError(f"Provider service descriptor capabilities must include modality: {service_id}")
-    provider = str(service.get("provider") or "")
-    if descriptor.min_reference_image_edge_px == 0 and provider == "kling" and descriptor.modality == "video":
-        descriptor = descriptor.model_copy(update={"min_reference_image_edge_px": 256})
     return descriptor
 
 
@@ -294,7 +284,6 @@ def _is_adapter_service(provider: str, capability: str) -> bool:
         "codex_local",
         "deepseek",
         "fake",
-        "kling",
         "openai_compatible",
         "seedance",
         "volc_seedance",
@@ -340,84 +329,6 @@ def _descriptor_with_default_required_gate(payload: dict[str, Any], capability: 
     return next_payload
 
 
-def _is_legacy_descriptorless_kling_store(store: CompanyProviderSecrets) -> bool:
-    if not store.services:
-        return False
-    if any(isinstance(service.get("descriptor"), dict) for service in store.services.values()):
-        return False
-    return any(str(service.get("provider") or "") == "kling" for service in store.services.values())
-
-
-def _legacy_descriptor_for_service(service_id: str, service: dict[str, Any]) -> ProviderDescriptor:
-    capability = str(service.get("capability") or "image")
-    provider = str(service.get("provider") or "")
-    api_family = str(service.get("api_family") or "")
-    required_gate = _required_gate_or_default(capability, str(service.get("required_gate") or ""))
-    if capability == "video":
-        is_kling_i2v = provider == "kling" and (api_family == "i2v" or "i2v" in service_id)
-        payload: dict[str, Any] = {
-            "schema_version": "provider_descriptor.v0.2" if is_kling_i2v else "provider_descriptor.v0.1",
-            "modality": "video",
-            "execution_mode": "async",
-            "capabilities": ["video"],
-            "reference_image_slots": 2 if is_kling_i2v else 0,
-            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
-            "prompt_char_limit": 1800,
-            "seed_supported": False,
-            "cost_hint": "legacy-local-config",
-            "rate_limit_hint": "legacy-local-config",
-            "required_gate": required_gate,
-            "min_reference_image_edge_px": 256,
-        }
-        if is_kling_i2v:
-            payload.update(
-                {
-                    "frame_slots": {"first_frame": "required", "last_frame": "optional"},
-                    "frame_modes": ["first_frame", "first_last_frame"],
-                    "supported_durations_sec": [5, 10],
-                    "supported_resolutions": ["720p", "1080p"],
-                    "async_poll_interval_sec": 10,
-                    "async_timeout_sec": 600,
-                    "async_max_polls": 60,
-                    "prompt_profile": "video_i2v_v1",
-                    "cost_estimate": {"unit": "video_submit", "source": "legacy-local-config"},
-                }
-            )
-        return ProviderDescriptor.model_validate(payload)
-    if capability == "llm":
-        return ProviderDescriptor.model_validate(
-            {
-                "schema_version": "provider_descriptor.v0.1",
-                "modality": "llm",
-                "execution_mode": "sync",
-                "capabilities": ["llm"],
-                "reference_image_slots": 0,
-                "supported_aspect_ratios": ["1:1"],
-                "prompt_char_limit": 12000,
-                "seed_supported": False,
-                "cost_hint": "legacy-local-config",
-                "rate_limit_hint": "legacy-local-config",
-                "required_gate": required_gate,
-            }
-        )
-    return ProviderDescriptor.model_validate(
-        {
-            "schema_version": "provider_descriptor.v0.1",
-            "modality": "image",
-            "execution_mode": "sync",
-            "capabilities": ["image"],
-            "reference_image_slots": 1,
-            "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
-            "prompt_char_limit": 1500,
-            "seed_supported": True,
-            "cost_hint": "legacy-local-config",
-            "rate_limit_hint": "legacy-local-config",
-            "required_gate": required_gate,
-            "min_reference_image_edge_px": 256,
-        }
-    )
-
-
 def _required_gate_or_default(capability: str, configured: str) -> str:
     if configured.startswith("AFS_ALLOW_REMOTE_"):
         return configured
@@ -439,7 +350,6 @@ __all__ = (
     "OpenAICompatibleLLMAdapter",
     "FakeAsyncVideoAdapter",
     "FakeVisionAdapter",
-    "KlingVideoAdapter",
     "CodexImageHandoffAdapter",
     "CodexLocalAdapter",
     "ApiRelayAdapter",

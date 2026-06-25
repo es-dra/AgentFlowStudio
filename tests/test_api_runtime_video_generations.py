@@ -7,12 +7,31 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from apps.api import runtime_video_routes
+from apps.api.runtime_models import VideoGenerationRequest, VideoRevisionRequest
 from apps.api.runtime_service import create_runtime_app
 
 
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
+
+
+def test_runtime_video_requests_default_to_seedance_provider() -> None:
+    generation = VideoGenerationRequest(
+        prompt_text="A controlled image-to-video move.",
+        first_frame_image_asset_id="img_first_frame",
+        generated_at="2026-06-25T20:00:00+08:00",
+    )
+    revision = VideoRevisionRequest(
+        base_video_job_id="video_generation_base",
+        revision_intent="Add a slow push-in while preserving identity.",
+        prompt_text="A controlled image-to-video revision.",
+        first_frame_image_asset_id="img_first_frame",
+        generated_at="2026-06-25T20:00:00+08:00",
+    )
+
+    assert generation.provider_service_id == "seedance_i2v"
+    assert revision.provider_service_id == "seedance_i2v"
 
 
 def _upload_image(client: TestClient, project_id: str) -> str:

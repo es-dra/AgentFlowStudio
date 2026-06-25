@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import os
-from pathlib import Path
 from typing import Any
 
 from agentflow_studio.model_gateway.company_secrets import CompanyProviderSecrets, resolve_ref
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
-from agentflow_studio.model_gateway.kling_video_smoke import poll_kling_i2v_task_once, submit_kling_i2v_task
 from agentflow_studio.model_gateway.openai_compatible import OpenAICompatibleProvider
 from agentflow_studio.model_gateway.provider_account_pool import ProviderAccountSelection
 from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, ProviderDispatchRequest
@@ -127,98 +125,6 @@ class FakeAsyncVideoAdapter:
         return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
 
 
-class KlingVideoAdapter:
-    def __init__(self, store: CompanyProviderSecrets, service_id: str, descriptor: ProviderDescriptor) -> None:
-        self.store = store
-        self.service_id = service_id
-        self.descriptor = descriptor
-
-    def validate(self, request: ProviderDispatchRequest) -> None:
-        _require_gate(self.descriptor.required_gate)
-        service = self.store.service(self.service_id)
-        if service.get("api_family") != "i2v":
-            raise ModelConfigError(f"Kling Studio adapter only supports i2v services: {self.service_id}")
-        if request.aspect_ratio not in self.descriptor.supported_aspect_ratios:
-            raise ModelConfigError(f"unsupported aspect ratio for {self.service_id}: {request.aspect_ratio}")
-        if len(request.prompt) > self.descriptor.prompt_char_limit:
-            raise ModelConfigError(f"prompt_char_limit exceeded for {self.service_id}")
-        if request.candidate_count != 1:
-            raise ModelConfigError("Kling I2V candidate_count must be 1")
-        if len(request.reference_image_paths) > self.descriptor.reference_image_slots:
-            raise ModelConfigError(f"reference_image_slots exceeded for {self.service_id}")
-        if request.subject_reference_image_path is None and not request.reference_image_paths:
-            raise ModelConfigError("Kling I2V requires an explicit first frame image")
-        duration = request.duration_sec or _first_or_default(self.descriptor.supported_durations_sec, 5)
-        if self.descriptor.supported_durations_sec and duration not in self.descriptor.supported_durations_sec:
-            raise ModelConfigError(f"unsupported duration for {self.service_id}: {duration}")
-        resolution = request.resolution or _first_or_default(self.descriptor.supported_resolutions, "")
-        if self.descriptor.supported_resolutions and resolution not in self.descriptor.supported_resolutions:
-            raise ModelConfigError(f"unsupported resolution for {self.service_id}: {resolution}")
-
-    def translate(
-        self,
-        request: ProviderDispatchRequest,
-        account_selection: ProviderAccountSelection,
-    ) -> dict[str, Any]:
-        first_frame = request.subject_reference_image_path or request.reference_image_paths[0]
-        service = self.store.service(self.service_id)
-        return {
-            "service_id": self.service_id,
-            "prompt": request.prompt,
-            "image_path": Path(first_frame),
-            "output_dir": request.output_dir,
-            "duration": str(request.duration_sec or _first_or_default(self.descriptor.supported_durations_sec, 5)),
-            "mode": str(service.get("mode") or "pro"),
-            "poll_interval_sec": float(self.descriptor.async_poll_interval_sec or 5.0),
-            "max_polls": int(self.descriptor.async_max_polls or 120),
-            "timeout_sec": float(request.timeout_sec or self.descriptor.async_timeout_sec or 120.0),
-            "transport": str(service.get("transport") or "httpx"),
-            "model_name_override": request.model_name_override,
-        }
-
-    def submit(self, plan: dict[str, Any]) -> dict[str, Any]:
-        state = submit_kling_i2v_task(
-            self.store,
-            service_id=str(plan["service_id"]),
-            prompt=str(plan["prompt"]),
-            image_path=plan["image_path"],
-            output_dir=plan["output_dir"],
-            duration=str(plan["duration"]),
-            mode=str(plan["mode"]),
-            timeout_sec=float(plan["timeout_sec"]),
-            transport=str(plan["transport"]),
-            model_name_override=plan.get("model_name_override"),
-        )
-        return {
-            "status": "submitted",
-            "state": state,
-            "output_dir": str(plan["output_dir"]),
-            "timeout_sec": float(plan["timeout_sec"]),
-            "transport": str(plan["transport"]),
-        }
-
-    def poll(self, task: dict[str, Any]) -> dict[str, Any]:
-        status = str(task.get("status") or "")
-        if status == "already_complete":
-            return task["raw"]
-        state = task.get("state")
-        if not isinstance(state, dict):
-            raise ModelGatewayError("Kling adapter task state is missing")
-        return poll_kling_i2v_task_once(
-            self.store,
-            output_dir=task.get("output_dir") or ".",
-            state=state,
-            timeout_sec=float(task.get("timeout_sec") or 120.0),
-            transport=str(task.get("transport") or "httpx"),
-        )
-
-    def normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
-        return raw
-
-    def safe_error(self, error: Exception) -> dict[str, str]:
-        return {"error": type(error).__name__, "reason": _safe_error(str(error)), "required_gate": self.descriptor.required_gate}
-
-
 def _require_gate(required_gate: str) -> None:
     gate = os.environ.get(required_gate, "").strip().lower()
     if gate not in {"1", "true", "yes", "on"}:
@@ -249,12 +155,7 @@ def _legacy_llm_default_model(service: dict[str, Any]) -> str:
     return ""
 
 
-def _first_or_default(values: list[Any], default: Any) -> Any:
-    return values[0] if values else default
-
-
 __all__ = (
     "FakeAsyncVideoAdapter",
-    "KlingVideoAdapter",
     "OpenAICompatibleLLMAdapter",
 )

@@ -122,7 +122,7 @@ def video_gate_step(client, steps: list[dict[str, Any]], alpha_headers: dict[str
         json={
             "node_id": "video_1",
             "prompt_text": "Create a short motion test from the confirmed first frame.",
-            "provider_service_id": "kling_i2v",
+            "provider_service_id": "seedance_i2v",
             "first_frame_image_asset_id": image_asset_id,
             "duration_sec": 5,
             "resolution": "720p",

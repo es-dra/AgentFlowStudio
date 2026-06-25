@@ -177,7 +177,7 @@ class VideoGenerationRequest(BaseModel):
     node_id: str | None = None
     prompt_text: str = Field(min_length=1)
     optimized_prompt: str | None = None
-    provider_service_id: str = "kling_i2v"
+    provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str = Field(min_length=1)
     last_frame_image_asset_id: str | None = None
     duration_sec: int = Field(default=5, gt=0)
@@ -207,7 +207,7 @@ class VideoRevisionRequest(BaseModel):
     provider_capability_mode: Literal["i2v_revision_attempt", "v2v_edit", "masked_edit", "unsupported"] = (
         "i2v_revision_attempt"
     )
-    provider_service_id: str = "kling_i2v"
+    provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str = Field(min_length=1)
     last_frame_image_asset_id: str | None = None
     duration_sec: int = Field(default=5, gt=0)

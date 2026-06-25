@@ -40,8 +40,8 @@ def build_readiness_audit(evidence_root: Path) -> dict[str, Any]:
         provider_blockers = browser_drill_provider_blockers(evidence_root)
     else:
         image_blocker = _image_provider_blocker(evidence_root)
-        kling_blocker = _kling_provider_blocker(evidence_root)
-        provider_blockers = [item for item in (kling_blocker, image_blocker) if item is not None]
+        seedance_blocker = _seedance_provider_blocker(evidence_root)
+        provider_blockers = [item for item in (seedance_blocker, image_blocker) if item is not None]
     role_checks = browser_drill_role_checks(browser_summary) if browser_summary else _role_checks(evidence_root, provider_blockers)
     role_gap = _has_browser_role_gap(role_checks) if browser_summary else _has_legacy_role_blocker(role_checks)
     status = "needs_fixes" if provider_blockers or role_gap else "recommended"
@@ -106,19 +106,19 @@ def _image_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
     }
 
 
-def _kling_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
+def _seedance_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
     preflight_path = _latest_existing(
         [
-            evidence_root / "kling_provider_preflight_after_blocker_hardening.json",
-            evidence_root / "kling_provider_preflight_startup_secrets_config.json",
-            evidence_root / "kling_provider_preflight_startup_secrets_config_gate_open.json",
+            evidence_root / "seedance_provider_preflight_after_blocker_hardening.json",
+            evidence_root / "seedance_provider_preflight_startup_config.json",
+            evidence_root / "seedance_provider_preflight_startup_config_gate_open.json",
         ]
     )
-    video_manifest_paths = sorted(evidence_root.glob("live_kling_i2v*runtime/**/video_generation_safe_manifest.json"))
+    video_manifest_paths = sorted(evidence_root.glob("live_seedance_i2v*runtime/**/video_generation_safe_manifest.json"))
     if not preflight_path.is_file() and not video_manifest_paths:
         return _missing_evidence_blocker(
-            "P1-KLING-CONFIG-MISSING",
-            "kling_provider_preflight*.json or live_kling_i2v*runtime/**/video_generation_safe_manifest.json",
+            "P1-SEEDANCE-CONFIG-MISSING",
+            "seedance_provider_preflight*.json or live_seedance_i2v*runtime/**/video_generation_safe_manifest.json",
         )
     preflight = _read_json(preflight_path) if preflight_path.is_file() else {}
     video_manifest = _read_json(video_manifest_paths[-1]) if video_manifest_paths else {}
@@ -135,12 +135,12 @@ def _kling_provider_blocker(evidence_root: Path) -> dict[str, Any] | None:
     if video_manifest_paths:
         refs.append(_relative_ref(evidence_root, video_manifest_paths[-1]))
     return {
-        "blocker_id": "P1-KLING-CONFIG-MISSING",
+        "blocker_id": "P1-SEEDANCE-CONFIG-MISSING",
         "status": "blocked",
-        "root_cause_block_id": root_block or "missing_kling_evidence",
+        "root_cause_block_id": root_block or "missing_seedance_evidence",
         "provider_calls_started": video_manifest.get("provider_calls_started") is True,
         "retry_count": int(video_manifest.get("retry_count") or 0),
-        "evidence_refs": refs or ["missing:kling_preflight_or_video_manifest"],
+        "evidence_refs": refs or ["missing:seedance_preflight_or_video_manifest"],
     }
 
 
@@ -169,29 +169,29 @@ def _video_qa_check(evidence_root: Path, provider_blockers: list[dict[str, Any]]
     evidence_ref = _first_existing_ref(
         evidence_root,
         [
-            "live_kling_i2v_startup_config_recovery_poll_report.json",
-            "live_kling_i2v_video_inspection.json",
-            "live_kling_i2v_report.json",
+            "live_seedance_i2v_startup_config_recovery_poll_report.json",
+            "live_seedance_i2v_video_inspection.json",
+            "live_seedance_i2v_report.json",
         ],
     )
-    if any(item["blocker_id"] == "P1-KLING-CONFIG-MISSING" for item in provider_blockers):
+    if any(item["blocker_id"] == "P1-SEEDANCE-CONFIG-MISSING" for item in provider_blockers):
         return {
             "role_id": "video_qa",
             "status": "blocked",
-            "evidence_ref": evidence_ref or "live_kling_i2v_report.json",
+            "evidence_ref": evidence_ref or "live_seedance_i2v_report.json",
         }
     return {
         "role_id": "video_qa",
         "status": "passed" if evidence_ref else "missing_evidence",
-        "evidence_ref": evidence_ref or "missing:kling_video_report",
+        "evidence_ref": evidence_ref or "missing:seedance_video_report",
     }
 
 
 def _next_actions(provider_blockers: list[dict[str, Any]]) -> list[str]:
     actions = []
     for blocker in provider_blockers:
-        if blocker["blocker_id"] == "P1-KLING-CONFIG-MISSING":
-            actions.append("Add an ignored local provider config containing kling_i2v plus valid Kling credential env vars before the next live video smoke.")
+        if blocker["blocker_id"] == "P1-SEEDANCE-CONFIG-MISSING":
+            actions.append("Add an ignored local provider config containing seedance_i2v plus valid relay credential env vars before the next live video smoke.")
         if blocker["blocker_id"] == "P1-IMAGE-B-PROVIDER-READINESS":
             if blocker.get("preflight_status") == "ready":
                 actions.append("Image provider preflight is ready; after explicit image retry approval, run one B-only live retry with candidate_count=1.")

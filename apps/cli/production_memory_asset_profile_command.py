@@ -116,7 +116,7 @@ def production_memory_loop_run_asset_test_package_command(
         help="Image service id for optional provider validation.",
     ),
     video_service: str = typer.Option(
-        "kling_i2v",
+        "seedance_i2v",
         "--video-service",
         help="Video service id for optional provider validation.",
     ),

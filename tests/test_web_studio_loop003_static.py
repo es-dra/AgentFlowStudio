@@ -70,7 +70,7 @@ def test_loop003_qal003_004_recent_or_current_projects_are_not_hidden_by_filter(
     assert "createProjectController" in main
 
 
-def test_loop003_qal003_005_kling_sound_control_stays_hidden_without_descriptor_support() -> None:
+def test_loop003_qal003_005_video_sound_control_stays_hidden_without_descriptor_support() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     specs = (STUDIO_ROOT / "src" / "presets" / "specs.js").read_text(encoding="utf-8")
 

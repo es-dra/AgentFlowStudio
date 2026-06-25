@@ -258,10 +258,10 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
             "video_1": {
                 "id": "video_1",
                 "type": "video",
-                "title": "Kling I2V",
+                "title": "Seedance I2V",
                 "previewUrl": "/projects/studio-video-state/image-assets/img_first_001/preview",
                 "params": {
-                    "model": "kling_i2v",
+                    "model": "seedance_i2v",
                     "firstFrameImageAssetId": "img_first_001",
                     "lastFrameImageAssetId": "img_last_001",
                     "lastVideoJobId": "video_job_001",

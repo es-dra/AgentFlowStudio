@@ -79,11 +79,11 @@ def test_provider_validation_gate_preserves_live_failure_blockers(tmp_path: Path
             "schema_version": "production-memory-loop/v1",
             "status": "failed",
             "provider_calls_started": True,
-            "safe_error": "Kling video request failed: ConnectError",
+            "safe_error": "Seedance video request failed: ConnectError",
             "blockers": [
                 {
                     "blocker_id": "provider_validation_failed",
-                    "message": "Kling video request failed: ConnectError",
+                    "message": "Seedance video request failed: ConnectError",
                 }
             ],
         },

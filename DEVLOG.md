@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-25 - Retire Kling Video Path and Default to Seedance Relay
+
+- Investigated the deployed video failure behind the Studio screenshot. Runtime
+  video gate was open, provider dispatch started, but the selected service was
+  the retired `kling_i2v` path. The server provider config has Seedance relay
+  service `seedance_i2v` for `doubao-seedance-2-0-fast`; the failure was a
+  provider selection/configuration mismatch, not a copyright or safety block.
+- Retired the active Kling video code path: removed the Kling adapter modules,
+  CLI smoke command, provider preflight tool, smoke helpers, and Kling-specific
+  tests. Provider registry no longer creates Kling adapters or infers legacy
+  descriptorless Kling config.
+- Switched Studio and Runtime video defaults to Seedance: the frontend video
+  model list exposes only `Seedance 2.0 Fast`, Runtime video generation and
+  video revision requests default to `seedance_i2v`, provider-validation hidden
+  defaults use `seedance_i2v`, and `configs/providers.example.json` no longer
+  includes Kling accounts, pools, or services.
+- Updated readiness/acceptance helper scripts and regressions to use Seedance
+  evidence naming and blocker IDs, while leaving historical DEVLOG/handoff
+  evidence as historical records.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py tests/test_provider_adapter_registry.py tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py tests/test_cli_command_registry_boundaries.py tests/test_architecture_audit_gates.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_production_memory_provider_validation_gate.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py -q -> 105 passed, 5 deselected, 1 warning
+npm.cmd run check:studio-js -> JS syntax check passed: 120 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live video provider submit was made in this cleanup pass. No provider raw
+  response, signed URL, generated media byte, secret, or private Company OS
+  source content was written to the repo.
+
 ## 2026-06-25 - Keyframe Menu Video Continuation for Legacy Nodes
 
 - Expanded Studio keyframe detection so historical completed image nodes titled

@@ -73,7 +73,7 @@ def _report(steps: list[dict[str, Any]], *, mode: str) -> dict[str, Any]:
         "next_actions": [
             "Run the same user journey against the deployed server with disposable invite codes.",
             "Open LLM/image/vision live checks only after explicit provider capability approval.",
-            "Keep video gate closed until Kling API is configured and explicitly authorized.",
+            "Keep video gate closed until the Seedance relay is configured and explicitly authorized.",
         ],
     }
 

@@ -53,7 +53,7 @@ def build_asset_profile_test_package(
     provider_config_path: Path | None = None,
     run_provider_validation: bool = False,
     image_service: str = "codex_image",
-    video_service: str = "kling_i2v",
+    video_service: str = "seedance_i2v",
     provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:
     validate_asset_profile_seed(asset_profile_seed)

@@ -28,7 +28,7 @@ def run_provider_validation_gate(
     project_materials_path: Path | None = None,
     character_reference_image_path: Path | None = None,
     image_service: str = "codex_image",
-    video_service: str = "kling_i2v",
+    video_service: str = "seedance_i2v",
     provider_validation_executor: ProviderValidationExecutor | None = None,
 ) -> dict[str, Any]:
     if not isinstance(generated_at, str) or not generated_at.strip():

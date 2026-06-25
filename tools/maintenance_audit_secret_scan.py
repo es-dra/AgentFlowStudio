@@ -22,8 +22,6 @@ def check_secret_like_fragments(root: Path, files: list[Path]) -> dict[str, Any]
     findings: list[dict[str, Any]] = []
     high_confidence = 0
     for path in files:
-        if path.as_posix().endswith("tests/provider_smoke_helpers.py"):
-            continue
         for line_no, line in _read_lines(path):
             if any(pattern.search(line) for pattern in HIGH_CONFIDENCE_SECRET_PATTERNS):
                 if _is_known_safe_high_confidence_fixture(line):
@@ -78,7 +76,7 @@ def _is_safe_secret_field_reference(line: str) -> bool:
         return True
     if value.startswith("<") and value.endswith(">"):
         return True
-    if value.startswith(("AFS_", "OPENAI_", "KLING_")):
+    if value.startswith(("AFS_", "OPENAI_")):
         return True
     if _is_symbolic_secret_reference(value):
         return True
@@ -122,7 +120,7 @@ def _is_symbolic_secret_reference(value: str) -> bool:
 def _is_safe_env_reference(line: str) -> bool:
     return bool(
         re.search(
-            r"(?:AFS|OPENAI|KLING)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*\s*=\s*(?:unset|\"?<[^>]+>\"?)",
+            r"(?:AFS|OPENAI)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*\s*=\s*(?:unset|\"?<[^>]+>\"?)",
             line,
             re.IGNORECASE,
         )
@@ -132,7 +130,7 @@ def _is_safe_env_reference(line: str) -> bool:
 def _is_safe_environment_lookup(value: str) -> bool:
     return bool(
         re.search(
-            r"os\.environ\.get\([\"'](?:AFS|OPENAI|KLING)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*[\"']\)",
+            r"os\.environ\.get\([\"'](?:AFS|OPENAI)_[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|COOKIE|SIGNED_URL)[A-Z0-9_]*[\"']\)",
             value,
             re.IGNORECASE,
         )

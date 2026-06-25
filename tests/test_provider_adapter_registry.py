@@ -11,7 +11,6 @@ from agentflow_studio.model_gateway.company_secrets import load_company_provider
 from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from agentflow_studio.model_gateway import openai_compatible
-from tests.provider_smoke_helpers import provider_config as legacy_kling_provider_config
 
 
 def _store(tmp_path, payload: dict):
@@ -439,19 +438,19 @@ def test_provider_registry_supports_fake_async_video_lifecycle(tmp_path, monkeyp
     ],
 )
 def test_provider_registry_rejects_invalid_video_descriptor_v02_fields(tmp_path, field, value, match) -> None:
-    payload = _kling_provider_config()
-    payload["services"]["kling_i2v"]["descriptor"][field] = value
+    payload = _seedance_provider_config()
+    payload["services"]["seedance_i2v"]["descriptor"][field] = value
     store = _store(tmp_path, payload)
 
     with pytest.raises(ModelConfigError, match=match):
         ProviderRegistry.from_store(store)
 
 
-def test_provider_registry_builds_kling_i2v_adapter_descriptor_v02(tmp_path) -> None:
-    store = _store(tmp_path, _kling_provider_config())
+def test_provider_registry_builds_seedance_i2v_adapter_descriptor_v02(tmp_path) -> None:
+    store = _store(tmp_path, _seedance_provider_config())
     registry = ProviderRegistry.from_store(store)
 
-    descriptor = registry.descriptor("kling_i2v")
+    descriptor = registry.descriptor("seedance_i2v")
 
     assert descriptor.schema_version == "provider_descriptor.v0.2"
     assert descriptor.modality == "video"
@@ -459,25 +458,12 @@ def test_provider_registry_builds_kling_i2v_adapter_descriptor_v02(tmp_path) -> 
     assert descriptor.frame_slots == {"first_frame": "required", "last_frame": "optional"}
     assert descriptor.frame_modes == ["first_frame", "first_last_frame"]
     assert descriptor.supported_durations_sec == [5, 10]
-    assert descriptor.supported_resolutions == ["720p", "1080p"]
-    assert descriptor.prompt_profile == "video_i2v_v1"
-
-
-def test_provider_registry_derives_legacy_kling_i2v_descriptor(tmp_path) -> None:
-    store = _store(tmp_path, legacy_kling_provider_config())
-    registry = ProviderRegistry.from_store(store)
-
-    descriptor = registry.descriptor("kling_i2v")
-
-    assert descriptor.schema_version == "provider_descriptor.v0.2"
-    assert descriptor.modality == "video"
-    assert descriptor.execution_mode == "async"
-    assert descriptor.frame_slots["first_frame"] == "required"
+    assert descriptor.supported_resolutions == ["480p", "720p"]
     assert descriptor.prompt_profile == "video_i2v_v1"
 
 
 def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, monkeypatch) -> None:
-    payload = legacy_kling_provider_config()
+    payload = _provider_gateway_config()
     payload["accounts"]["deepseek"] = {
         "auth_type": "bearer",
         "base_url": "https://api.deepseek.com",
@@ -490,6 +476,19 @@ def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, 
         "capability": "llm",
         "default_model_ref": "accounts.deepseek.default_models.llm",
         "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        "descriptor": {
+            "schema_version": "provider_descriptor.v0.1",
+            "modality": "llm",
+            "execution_mode": "sync",
+            "capabilities": ["llm"],
+            "reference_image_slots": 0,
+            "supported_aspect_ratios": ["1:1"],
+            "prompt_char_limit": 5000,
+            "seed_supported": False,
+            "cost_hint": "test-only",
+            "rate_limit_hint": "test-only",
+            "required_gate": "AFS_ALLOW_REMOTE_LLM",
+        },
     }
     captured: dict[str, object] = {}
 
@@ -516,7 +515,7 @@ def test_provider_registry_uses_deepseek_default_model_when_ref_blank(tmp_path, 
 
 
 def test_provider_registry_ignores_legacy_minimax_image_service(tmp_path) -> None:
-    payload = legacy_kling_provider_config()
+    payload = _codex_image_provider_config()
     payload["services"]["minimax_image"] = {
         "provider": "minimax",
         "account_ref": "minimax",
@@ -528,179 +527,6 @@ def test_provider_registry_ignores_legacy_minimax_image_service(tmp_path) -> Non
 
     with pytest.raises(ModelConfigError, match="Provider service not found: minimax_image"):
         registry.descriptor("minimax_image")
-
-
-def test_provider_registry_blocks_kling_before_network_when_gate_closed(tmp_path, monkeypatch) -> None:
-    called = {"count": 0}
-
-    def fake_submit_kling_i2v_task(*args, **kwargs):
-        called["count"] += 1
-        return {"status": "submitted"}
-
-    first_frame = tmp_path / "first.png"
-    first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
-    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
-        fake_submit_kling_i2v_task,
-    )
-    store = _store(tmp_path, _kling_provider_config())
-    registry = ProviderRegistry.from_store(store)
-
-    with pytest.raises(ModelGatewayError, match="AFS_ALLOW_REMOTE_VIDEO"):
-        registry.dispatch(
-            "video",
-            "kling_i2v",
-            ProviderDispatchRequest(
-                prompt="A slow camera push in.",
-                output_dir=tmp_path / "run",
-                aspect_ratio="9:16",
-                subject_reference_image_path=first_frame,
-                duration_sec=5,
-                resolution="720p",
-            ),
-        )
-
-    assert called["count"] == 0
-
-
-def test_provider_registry_dispatches_kling_i2v_through_adapter(tmp_path, monkeypatch) -> None:
-    captured: dict[str, object] = {}
-
-    def fake_submit_kling_i2v_task(
-        store,
-        *,
-        service_id,
-        prompt,
-        image_path,
-        output_dir,
-        duration,
-        mode,
-        timeout_sec,
-        transport,
-        model_name_override=None,
-    ):
-        kwargs = {
-            "service_id": service_id,
-            "prompt": prompt,
-            "image_path": image_path,
-            "output_dir": output_dir,
-            "duration": duration,
-            "mode": mode,
-            "timeout_sec": timeout_sec,
-            "transport": transport,
-            "model_name_override": model_name_override,
-        }
-        captured["kwargs"] = kwargs
-        return {
-            "status": "submitted",
-            "service_id": service_id,
-            "api_family": "i2v",
-            "task": {"task_id": "task_123", "task_status": "submitted"},
-        }
-
-    def fake_poll_kling_i2v_task_once(store, *, output_dir, state, timeout_sec, transport):
-        captured["poll"] = {"output_dir": output_dir, "state": state, "timeout_sec": timeout_sec, "transport": transport}
-        return {
-            "status": "succeeded",
-            "service_id": state["service_id"],
-            "provider": "kling",
-            "outputs": [{"video_path": "video_candidates/candidate_001.mp4"}],
-        }
-
-    first_frame = tmp_path / "first.png"
-    first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
-        fake_submit_kling_i2v_task,
-    )
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.poll_kling_i2v_task_once",
-        fake_poll_kling_i2v_task_once,
-    )
-    store = _store(tmp_path, _kling_provider_config())
-    registry = ProviderRegistry.from_store(store)
-
-    result = registry.dispatch(
-        "video",
-        "kling_i2v",
-        ProviderDispatchRequest(
-            prompt="A slow camera push in.",
-            output_dir=tmp_path / "run",
-            aspect_ratio="9:16",
-            subject_reference_image_path=first_frame,
-            duration_sec=5,
-            resolution="720p",
-            motion="slow push in",
-        ),
-    )
-
-    assert result["status"] == "succeeded"
-    assert result["service_id"] == "kling_i2v"
-    assert captured["kwargs"]["service_id"] == "kling_i2v"
-    assert captured["kwargs"]["prompt"] == "A slow camera push in."
-    assert captured["kwargs"]["image_path"] == first_frame
-    assert captured["kwargs"]["duration"] == "5"
-    assert captured["kwargs"]["model_name_override"] is None
-    assert captured["poll"]["state"]["task"]["task_id"] == "task_123"
-    assert "secret" not in json.dumps(result, ensure_ascii=False).lower()
-
-
-def test_provider_registry_submit_kling_i2v_returns_submitted_without_polling(tmp_path, monkeypatch) -> None:
-    captured: dict[str, object] = {}
-
-    def fake_submit_kling_i2v_task(store, *, service_id, prompt, image_path, output_dir, duration, mode, timeout_sec, transport, model_name_override=None):
-        captured["submit"] = {
-            "service_id": service_id,
-            "prompt": prompt,
-            "image_path": image_path,
-            "output_dir": output_dir,
-            "duration": duration,
-            "mode": mode,
-            "timeout_sec": timeout_sec,
-            "transport": transport,
-            "model_name_override": model_name_override,
-        }
-        return {
-            "status": "submitted",
-            "service_id": service_id,
-            "api_family": "i2v",
-            "task": {"task_id": "task_async", "task_status": "submitted"},
-        }
-
-    def fail_if_polled(*args, **kwargs):
-        raise AssertionError("Kling submit must not poll synchronously")
-
-    first_frame = tmp_path / "first.png"
-    first_frame.write_bytes(b"\x89PNG\r\n\x1a\nfake")
-    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.submit_kling_i2v_task",
-        fake_submit_kling_i2v_task,
-    )
-    monkeypatch.setattr(
-        "agentflow_studio.model_gateway.provider_adapter_impl.poll_kling_i2v_task_once",
-        fail_if_polled,
-    )
-    registry = ProviderRegistry.from_store(_store(tmp_path, _kling_provider_config()))
-
-    task = registry.submit(
-        "video",
-        "kling_i2v",
-        ProviderDispatchRequest(
-            prompt="A slow camera push in.",
-            output_dir=tmp_path / "run",
-            aspect_ratio="9:16",
-            subject_reference_image_path=first_frame,
-            duration_sec=5,
-            resolution="720p",
-        ),
-    )
-
-    assert task["task"]["status"] == "submitted"
-    assert task["task"]["state"]["task"]["task_id"] == "task_async"
-    assert captured["submit"]["image_path"] == first_frame
 
 
 def test_provider_registry_dispatches_api_relay_llm(tmp_path, monkeypatch) -> None:
@@ -933,7 +759,7 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
     assert store.services["vision_image"]["provider"] == "codex_local"
     assert registry.descriptor("vision_video").reference_image_slots == 8
     assert registry.descriptor("fake_video").execution_mode == "async"
-    assert registry.descriptor("kling_i2v").prompt_profile == "video_i2v_v1"
+    assert registry.descriptor("seedance_i2v").prompt_profile == "video_i2v_v1"
     assert "model_relay" not in serialized
     assert "afs_model_relay" not in serialized
     assert "api_relay" not in serialized
@@ -1203,29 +1029,24 @@ def _provider_gateway_config() -> dict:
     }
 
 
-def _kling_provider_config() -> dict:
+def _seedance_provider_config() -> dict:
     return {
         "schema_version": "company_provider_secrets.local.v2",
         "accounts": {
-            "kling": {
-                "auth_type": "jwt_hs256_from_ak_sk",
-                "base_url": "https://api-beijing.klingai.com",
-                "access_key": "fake-access-key",
-                "secret_key": "fake-secret-key",
-                "jwt": {"ttl_seconds": 1800, "nbf_skew_seconds": -5},
-                "default_models": {"i2v": "kling-v3"},
-                "endpoints": {
-                    "i2v_create": "/v1/videos/image2video",
-                    "i2v_query": "/v1/videos/image2video/{id}",
-                },
+            "volc_seedance_relay": {
+                "auth_type": "api_key",
+                "base_url": "https://relay.test",
+                "api_key_env": "AFS_VIDEO_RELAY_API_KEY",
+                "default_models": {"video": "doubao-seedance-2-0-fast"},
             }
         },
         "account_pools": {
-            "kling_video_pool": {
+            "seedance_video_pool": {
                 "accounts": [
                     {
-                        "account_id": "kling",
-                        "service_id": "kling_i2v",
+                        "account_id": "volc_seedance_relay",
+                        "service_id": "seedance_i2v",
+                        "credential_env": "AFS_VIDEO_RELAY_API_KEY",
                         "enabled_capabilities": ["video"],
                         "enabled": True,
                         "priority": 10,
@@ -1237,35 +1058,35 @@ def _kling_provider_config() -> dict:
             }
         },
         "services": {
-            "kling_i2v": {
-                "provider": "kling",
-                "account_ref": "kling",
+            "seedance_i2v": {
+                "provider": "volc_seedance",
+                "account_ref": "volc_seedance_relay",
                 "capability": "video",
-                "api_family": "i2v",
-                "default_model_ref": "accounts.kling.default_models.i2v",
-                "create_endpoint_ref": "accounts.kling.endpoints.i2v_create",
-                "query_endpoint_ref": "accounts.kling.endpoints.i2v_query",
+                "endpoint": "/volc/v1/contents/generations/tasks",
+                "model": "doubao-seedance-2-0-fast",
                 "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
+                "reference_roles": ["first_frame", "last_frame"],
+                "watermark": False,
                 "descriptor": {
                     "schema_version": "provider_descriptor.v0.2",
                     "modality": "video",
                     "execution_mode": "async",
                     "capabilities": ["video"],
-                    "account_pool_id": "kling_video_pool",
+                    "account_pool_id": "seedance_video_pool",
                     "reference_image_slots": 2,
                     "supported_aspect_ratios": ["16:9", "9:16"],
-                    "prompt_char_limit": 2500,
-                    "seed_supported": False,
-                    "cost_hint": "Kling I2V live usage is billed by selected duration and mode.",
-                    "rate_limit_hint": "Use one live Kling video task at a time during MVP validation.",
+                    "prompt_char_limit": 5000,
+                    "seed_supported": True,
+                    "cost_hint": "Seedance I2V live usage is billed by selected duration and model.",
+                    "rate_limit_hint": "Use one live Seedance video task at a time during MVP validation.",
                     "required_gate": "AFS_ALLOW_REMOTE_VIDEO",
                     "frame_slots": {"first_frame": "required", "last_frame": "optional"},
                     "frame_modes": ["first_frame", "first_last_frame"],
                     "supported_durations_sec": [5, 10],
-                    "supported_resolutions": ["720p", "1080p"],
+                    "supported_resolutions": ["480p", "720p"],
                     "async_poll_interval_sec": 5,
-                    "async_timeout_sec": 600,
-                    "async_max_polls": 120,
+                    "async_timeout_sec": 900,
+                    "async_max_polls": 180,
                     "prompt_profile": "video_i2v_v1",
                     "cost_estimate": {"unit": "task", "currency": "CNY", "disclaimer": "local estimate only"},
                 },
