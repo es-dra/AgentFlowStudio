@@ -68,7 +68,7 @@ class VolcSeedanceVideoAdapter:
             "credential_env": account_selection.credential_env or account.get("api_key_env") or service.get("api_key_env"),
             "auth_header": str(service.get("auth_header") or account.get("auth_header") or "Authorization"),
             "auth_scheme": str(service.get("auth_scheme") or account.get("auth_scheme") or "Bearer"),
-            "timeout_sec": float(request.timeout_sec or self.descriptor.async_timeout_sec or 120.0),
+            "timeout_sec": float(service.get("submit_timeout_sec") or self.descriptor.async_timeout_sec or request.timeout_sec or 120.0),
             "download_timeout_sec": float(service.get("download_timeout_sec") or 180.0),
             "allowed_url_hosts": _allowed_url_hosts(service),
             "output_dir": request.output_dir,

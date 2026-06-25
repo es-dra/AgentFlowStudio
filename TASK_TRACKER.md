@@ -34,6 +34,11 @@ URLs that returned provider HTTP 404. Focused regression:
 `tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py`
 passed 15 with 1 existing warning.
 
+Seedance timeout follow-up: the next server smoke no longer returned 404 but
+timed out waiting for the create response after the generic 120s request
+timeout. Seedance create requests now use the video descriptor async timeout
+unless the service explicitly overrides it.
+
 Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
 the right-click `接续视频节点` path so historical completed keyframe image nodes
 whose title/prompt marks them as keyframes also get the same automation, even

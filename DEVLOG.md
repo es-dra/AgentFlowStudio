@@ -10,6 +10,11 @@
   producing a create URL shaped like `/v1/volc/v1/...` and a provider HTTP
   404. The adapter now lets the service-level base URL override the account
   base URL, and the regression mirrors that deployed config shape.
+- A live server smoke then confirmed the 404 was gone: the request reached the
+  Seedance create endpoint but hit the generic 120s read timeout before a task
+  response. The adapter now uses the video descriptor `async_timeout_sec`
+  (900s in server config) for Seedance create requests unless explicitly
+  overridden by the service.
 - Investigated the deployed video failure behind the Studio screenshot. Runtime
   video gate was open, provider dispatch started, but the selected service was
   the retired `kling_i2v` path. The server provider config has Seedance relay

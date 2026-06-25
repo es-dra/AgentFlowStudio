@@ -82,7 +82,7 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     payload = captured["create_payload"]
     assert captured["create_auth"] == "Bearer secret-video-key"
     assert captured["poll_auth"] == "Bearer secret-video-key"
-    assert captured["create_timeout"] == 120.0
+    assert captured["create_timeout"] == 900.0
     assert captured["download_timeout"] == 180.0
     assert payload["model"] == "doubao-seedance-2-0-fast"
     assert payload["ratio"] == "16:9"
