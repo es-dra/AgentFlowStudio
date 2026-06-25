@@ -15,6 +15,7 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
     markMissingFirstFrame(store, source.id);
     return null;
   }
+  const videoAssetPlan = videoAssetPlanForKeyframe(state, source);
 
   const video = createNode(
     store,
@@ -26,10 +27,14 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
     const node = s.nodes[video.id];
     if (!node) return;
     node.title = videoTitle(source);
-    node.prompt = videoPrompt(source);
+    node.prompt = videoPrompt(source, videoAssetPlan);
     node.status = "empty";
     node.previewUrl = null;
-    node.result = "已从上游关键帧创建图生视频节点。关键帧图片已设为首帧。";
+    node.result = [
+      "已从上游关键帧创建图生视频节点。",
+      "关键帧图片已设为首帧；视频提示词和视频资产计划已自动生成。",
+      "可以直接生成，也可以先微调提示词/视频资产计划后再生成。",
+    ].join("");
     node.params = {
       ...node.params,
       nodeRole: "video_generation",
@@ -52,11 +57,13 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
         role: "first_frame",
         source_role: frameAsset.role || frameAsset.source_role || null,
       }).slice(-4),
+      videoAssetPlan,
       videoAssetRecognition: {
         status: "pending_video_generation",
         source: "generated_video",
         source_keyframe_node_id: source.id,
         source_first_frame_image_asset_id: frameAsset.asset_id,
+        assets: videoAssetPlan.assets,
       },
     };
   });
@@ -71,11 +78,14 @@ export function keyframeFirstFrameAsset(state, node) {
 }
 
 function isKeyframeLikeNode(node) {
-  return node?.type === "image" && (
-    node.params?.nodeRole === "keyframe_generation"
+  if (node?.type !== "image") return false;
+  if (node.params?.nodeRole === "asset_card_draft" || node.params?.assetCardDraft) return false;
+  const searchable = `${node.title || ""}\n${node.prompt || ""}\n${node.content || ""}`;
+  return node.params?.nodeRole === "keyframe_generation"
     || Boolean(node.params?.keyframeLayer)
     || Boolean(node.params?.lastKeyframeJobId)
-  );
+    || Boolean(node.params?.structuredShot)
+    || /关键帧|keyframe/i.test(searchable);
 }
 
 function latestReadyImageAssetFromNode(state, sourceNodeId) {
@@ -117,13 +127,152 @@ function videoTitle(source) {
   return `视频 · ${suffix}`;
 }
 
-function videoPrompt(source) {
+function videoAssetPlanForKeyframe(state, source) {
+  const seen = new Set();
+  const assets = [];
+
+  const addAsset = (asset, sourceLabel, sourceNode = null) => {
+    const normalized = normalizeVideoAsset(asset, sourceLabel, sourceNode);
+    if (!normalized) return;
+    const key = normalized.label.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    assets.push(normalized);
+  };
+
+  for (const asset of safeArray(source.params?.visualAssets)) {
+    addAsset(asset, "keyframe_visual_asset", source);
+  }
+  for (const asset of safeArray(source.params?.lastContextBundle?.included_assets)) {
+    addAsset(asset, "context_bundle", source);
+  }
+  for (const node of connectedAssetNodes(state, source.id)) {
+    if (node.params?.assetCardDraft) {
+      addAsset({
+        ...node.params.assetCardDraft,
+        image_asset_refs: referenceImageRefsFromNode(node),
+      }, "connected_asset_card", node);
+    }
+    for (const asset of safeArray(node.params?.visualAssets)) {
+      addAsset(asset, "connected_visual_asset", node);
+    }
+  }
+  for (const label of mentionedAssetLabels(source)) {
+    addAsset({ label, asset_type: "asset", signature: "来自关键帧提示词的资产引用" }, "keyframe_prompt", source);
+  }
+
+  return {
+    status: "draft",
+    source: "keyframe_to_video_auto_plan",
+    source_keyframe_node_id: source.id,
+    user_editable: true,
+    generation_ready: true,
+    assets: assets.slice(0, 12),
+  };
+}
+
+function connectedAssetNodes(state, sourceNodeId) {
+  return Object.values(state.edges || {})
+    .filter((edge) => edge?.to === sourceNodeId)
+    .map((edge) => state.nodes?.[edge.from])
+    .filter((node) => node?.params?.assetCardDraft || node?.params?.nodeRole === "asset_card_draft");
+}
+
+function normalizeVideoAsset(asset, sourceLabel, sourceNode) {
+  const label = cleanAssetLabel(asset?.label || asset?.name || asset?.title || asset?.asset_label);
+  if (!label) return null;
+  return {
+    label,
+    asset_type: normalizeAssetType(asset?.asset_type || asset?.type || asset?.category),
+    status: asset?.status || asset?.fix_status || "candidate",
+    signature: String(asset?.signature || asset?.one_line || asset?.description || "").trim(),
+    source: sourceLabel,
+    source_node_id: sourceNode?.id || null,
+    source_asset_id: asset?.asset_id || asset?.id || null,
+    image_asset_refs: imageRefsFromAsset(asset),
+  };
+}
+
+function mentionedAssetLabels(source) {
+  const text = `${source.prompt || ""}\n${source.result || ""}`;
+  const labels = [];
+  const re = /@([^\s@，。；;、,：:\)\]】]+)/gu;
+  let match = re.exec(text);
+  while (match) {
+    const label = cleanAssetLabel(match[1]);
+    if (label) labels.push(label);
+    match = re.exec(text);
+  }
+  return labels;
+}
+
+function imageRefsFromAsset(asset) {
+  const refs = [
+    ...safeArray(asset?.image_asset_refs),
+    ...safeArray(asset?.source_image_asset_refs),
+    ...safeArray(asset?.reference_image_assets),
+  ];
+  if (asset?.image_asset_id) refs.push({ asset_id: asset.image_asset_id });
+  if (asset?.reference_image_asset_id) refs.push({ asset_id: asset.reference_image_asset_id });
+  return refs
+    .map((ref) => typeof ref === "string" ? { asset_id: ref } : ref)
+    .filter((ref) => ref?.asset_id);
+}
+
+function referenceImageRefsFromNode(node) {
+  return safeArray(node.params?.uploads)
+    .filter((upload) => {
+      const role = String(upload?.role || "").toLowerCase();
+      return upload?.asset_id && [
+        "asset_reference",
+        "character_reference",
+        "scene_reference",
+        "prop_reference",
+        "fixed_asset_reference",
+      ].includes(role);
+    })
+    .map((upload) => normalizeImageAssetRef(upload, node))
+    .filter(Boolean);
+}
+
+function normalizeAssetType(type) {
+  const value = String(type || "").trim().toLowerCase();
+  if (["character", "role", "person", "角色"].includes(value)) return "character";
+  if (["scene", "location", "environment", "场景"].includes(value)) return "scene";
+  if (["prop", "object", "item", "道具"].includes(value)) return "prop";
+  return "asset";
+}
+
+function cleanAssetLabel(label) {
+  return String(label || "")
+    .replace(/^[@#]+/u, "")
+    .replace(/^[角色场景道具资产]\s*[·:：-]\s*/u, "")
+    .trim();
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function videoAssetTypeLabel(type) {
+  if (type === "character") return "角色";
+  if (type === "scene") return "场景";
+  if (type === "prop") return "道具";
+  return "资产";
+}
+
+function videoPrompt(source, videoAssetPlan) {
   const sourcePrompt = String(source.prompt || source.result || "").trim();
   const excerpt = sourcePrompt.length > 520 ? `${sourcePrompt.slice(0, 520)}...` : sourcePrompt;
+  const assetLines = safeArray(videoAssetPlan?.assets)
+    .map((asset) => `- @${asset.label}（${videoAssetTypeLabel(asset.asset_type)}）：${asset.signature || "保持该资产在首帧中的身份、外观和功能"}`);
   return [
     "基于上游关键帧生成 5 秒图生视频，保持关键帧画面连续。",
     "Maintain exact character identity, wardrobe, prop geometry, scene layout, camera composition, and lighting.",
     "Do not introduce new characters, extra props, text, watermark, UI, or borders.",
+    assetLines.length ? "视频资产（自动识别，可微调）：" : "",
+    ...assetLines,
+    assetLines.length ? "保持上述视频资产的身份、服装、道具、场景关系和首帧构图；只生成动作延续，不重写资产设定。" : "",
     "动作：延续当前对峙或动作关系，轻微推进或呼吸感镜头，避免大幅改变构图。",
     excerpt ? `上游关键帧提示：${excerpt}` : "",
   ].filter(Boolean).join("\n");

@@ -726,6 +726,122 @@ process.stdout.write(JSON.stringify({
     assert "Do not introduce new characters" in payload["prompt"]
 
 
+def test_legacy_keyframe_title_can_auto_plan_video_node_assets() -> None:
+    script = r'''
+import {
+  canContinueKeyframeToVideo,
+  createVideoNodeFromKeyframe,
+} from "./apps/studio/src/keyframe-video-continuation.js";
+
+const state = {
+  nodes: {
+    keyframe_legacy: {
+      id: "keyframe_legacy",
+      type: "image",
+      title: "关键帧 · 分镜 01",
+      x: 100,
+      y: 80,
+      w: 420,
+      h: 320,
+      prompt: "根据分镜生成关键帧：@孙悟空 @金刚狼 @金箍棒，在山巅石台战场对峙。",
+      status: "complete",
+      previewUrl: "/media/keyframe_legacy.png",
+      params: {
+        spec: { ratio: "16:9", duration: "5s", resolution: "720P" },
+        uploads: [{
+          asset_id: "img_keyframe_legacy",
+          filename: "keyframe_legacy.png",
+          preview_url: "/media/keyframe_legacy.png",
+          role: "generated_keyframe_reference",
+        }],
+        visualAssets: [{
+          asset_id: "visual_swk",
+          label: "孙悟空",
+          asset_type: "character",
+          status: "fixed",
+          signature: "猴王战士，手持金箍棒",
+        }],
+      },
+    },
+    wolverine_asset: {
+      id: "wolverine_asset",
+      type: "image",
+      title: "角色资产 · @金刚狼",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetCardDraft: { label: "金刚狼", asset_type: "character", signature: "近战野性战士" },
+        uploads: [{ asset_id: "img_wolverine_ref", role: "character_reference" }],
+      },
+    },
+    staff_asset: {
+      id: "staff_asset",
+      type: "image",
+      title: "道具资产 · @金箍棒",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetCardDraft: { label: "金箍棒", asset_type: "prop", signature: "长棍道具" },
+        uploads: [{ asset_id: "img_staff_ref", role: "prop_reference" }],
+      },
+    },
+    scene_asset: {
+      id: "scene_asset",
+      type: "image",
+      title: "场景资产 · @山巅石台战场",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetCardDraft: { label: "山巅石台战场", asset_type: "scene", signature: "云海中的圆形石台" },
+        uploads: [{ asset_id: "img_scene_ref", role: "scene_reference" }],
+      },
+    },
+  },
+  edges: {
+    e1: { id: "e1", from: "wolverine_asset", to: "keyframe_legacy" },
+    e2: { id: "e2", from: "staff_asset", to: "keyframe_legacy" },
+    e3: { id: "e3", from: "scene_asset", to: "keyframe_legacy" },
+  },
+  order: ["keyframe_legacy", "wolverine_asset", "staff_asset", "scene_asset"],
+  selection: { nodeIds: ["keyframe_legacy"], edgeId: null },
+  ui: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: (prefix) => `${prefix}_${++seq}`,
+  set: (fn) => fn(state),
+};
+
+const video = createVideoNodeFromKeyframe(store, state.nodes.keyframe_legacy);
+
+process.stdout.write(JSON.stringify({
+  canContinue: canContinueKeyframeToVideo(state.nodes.keyframe_legacy),
+  firstFrame: video?.params?.firstFrameImageAssetId,
+  planLabels: video?.params?.videoAssetPlan?.assets?.map((asset) => asset.label),
+  prompt: video?.prompt,
+  result: video?.result,
+  mode: video?.params?.spec?.mode,
+  selected: state.selection.nodeIds,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["canContinue"] is True
+    assert payload["firstFrame"] == "img_keyframe_legacy"
+    assert payload["planLabels"] == ["孙悟空", "金刚狼", "金箍棒", "山巅石台战场"]
+    assert payload["mode"] == "图生视频"
+    assert payload["selected"][0].startswith("node_")
+    for label in payload["planLabels"]:
+        assert f"@{label}" in payload["prompt"]
+    assert "可以直接生成" in payload["result"]
+    assert "先微调提示词" in payload["result"]
+
+
 def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
 

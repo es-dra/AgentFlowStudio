@@ -12,6 +12,19 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
+the right-click `接续视频节点` path so historical completed keyframe image nodes
+whose title/prompt marks them as keyframes also get the same automation, even
+when they lack newer `keyframe_generation` metadata. The created video node now
+gets the keyframe image as explicit first frame plus a draft `videoAssetPlan`
+assembled from keyframe visual assets, connected asset-card nodes, and any
+remaining `@` references in the keyframe prompt. Prompt-only references fill
+missing entries but do not duplicate connected asset cards. Verification:
+focused continuation regressions passed 3, broader Studio static regressions
+passed 36, `npm.cmd run check:studio-js` passed for 120 files, and
+`git diff --check` passed. Residual risk: live provider video smoke and human
+motion-quality acceptance remain separate claims.
+
 Current keyframe-to-video addendum: 2026-06-25 pass adds a generic Studio
 right-click continuation path from completed keyframe image nodes to video
 nodes. The created video node is connected downstream of the keyframe and

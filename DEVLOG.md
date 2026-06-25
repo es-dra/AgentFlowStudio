@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-06-25 - Keyframe Menu Video Continuation for Legacy Nodes
+
+- Expanded Studio keyframe detection so historical completed image nodes titled
+  like `关键帧 · 分镜 01` can expose the right-click `接续视频节点` action even
+  when they were created before explicit `keyframe_generation` metadata existed.
+- The right-click continuation now creates a downstream image-to-video node
+  with the keyframe image bound as `firstFrameImageAssetId`, a ready-to-edit
+  video prompt, and a `videoAssetPlan` drafted from keyframe visual assets,
+  connected asset-card nodes, and remaining `@` references in the keyframe
+  prompt. Prompt-only references fill gaps but no longer duplicate connected
+  asset-card entries.
+- The generated video node tells the user it can be generated directly or
+  edited first, matching the asset-card/keyframe workflow shape instead of
+  leaving a blank generic video node that asks for a manual first frame.
+
+Verification:
+
+```text
+red baseline: legacy keyframe title test failed before implementation because canContinueKeyframeToVideo returned false
+pytest tests/test_web_studio_assets_generation_static.py::test_legacy_keyframe_title_can_auto_plan_video_node_assets tests/test_web_studio_assets_generation_static.py::test_keyframe_can_continue_to_explicit_first_frame_video_node tests/test_web_studio_assets_generation_static.py::test_keyframe_to_video_and_video_asset_card_menu_markers -> 3 passed
+pytest tests/test_web_studio_assets_generation_static.py tests/test_web_studio_prompt_script_static.py -> 36 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 120 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live provider call, provider raw response, signed URL, local media byte,
+  secret, or private Company OS source content was written to the repo.
+
 ## 2026-06-25 - Keyframe to Video Continuation and Video Asset Cards
 
 - Added a reusable Studio frontend path that turns any completed keyframe image
