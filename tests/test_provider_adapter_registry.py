@@ -745,6 +745,34 @@ def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_i
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_provider_registry_projects_legacy_codex_image_api_relay_to_image_relay(tmp_path) -> None:
+    config = _api_relay_provider_config(include_image=True)
+    service = config["services"].pop("relay_image")
+    service["endpoint"] = "/images/generations"
+    service["request_format"] = "openai_images"
+    service["model"] = "gpt-image-2"
+    service["descriptor"]["account_pool_id"] = "codex_image_pool"
+    service["descriptor"]["reference_image_slots"] = 0
+    config["services"]["codex_image"] = service
+    pool = config["account_pools"].pop("image_pool")
+    pool["accounts"][0]["service_id"] = "codex_image"
+    config["account_pools"]["codex_image_pool"] = pool
+
+    store = _store(tmp_path, config)
+    registry = ProviderRegistry.from_store(store)
+
+    assert "codex_image" not in store.services
+    assert "codex_image_pool" not in store.account_pools
+    assert store.services["image_relay"]["provider"] == "api_relay"
+    assert store.services["image_relay"]["edit_endpoint"] == "/images/edits"
+    assert store.account_pools["image_relay_pool"]["accounts"][0]["service_id"] == "image_relay"
+    descriptor = registry.descriptor("image_relay")
+    assert descriptor.account_pool_id == "image_relay_pool"
+    assert descriptor.reference_image_slots == 1
+    with pytest.raises(ModelConfigError, match="Provider service not found: codex_image"):
+        registry.descriptor("codex_image")
+
+
 def test_provider_example_config_builds_registry_without_secret_values() -> None:
     store = load_company_provider_secrets("configs/providers.example.json")
     registry = ProviderRegistry.from_store(store)

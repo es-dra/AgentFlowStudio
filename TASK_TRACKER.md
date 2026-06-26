@@ -48,6 +48,18 @@ passed, maintenance audit failed=0, `git diff --check` passed. Full pytest had
 pre-existing state (`D:/Learning materials/...` source KB absent on Linux and
 untracked `ops/sub2api/*` retention review items). Maintenance ledger:
 `docs/maintenance/AFS-STUDIO-GENERATION-REFERENCE-BUGFIX-20260626.md`.
+Addendum: the same-day Runtime deployment guard now projects an ignored local
+`codex_image` API relay service in `AFS_PROVIDER_CONFIG` into product-facing
+`image_relay` in memory, including an `image_relay_pool`, `/images/edits`
+default, and `reference_image_slots >= 1` for asset-reference image edits. This
+lets server Runtime use current `image_relay` model plans even before a
+privileged operator rewrites root-owned `/etc/afs/providers.local.json`.
+Verification: focused provider/Runtime/Studio regression set passed 61,
+`git diff --check` passed, and a read-only loader probe against
+`/etc/afs/providers.local.json` exposed `image_relay` plus `seedance_i2v` while
+rejecting `codex_image`. Remaining privileged ops cleanup: physically remove
+old `codex_image` keys from `/etc/afs/providers.local.json` and disable
+`afs-codex-image-worker.service`; current shell lacks passwordless sudo.
 
 AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
 GitHub, server `/home`, and server `/opt`. The intended clean branch state is

@@ -12,6 +12,10 @@ from agentflow_studio.model_gateway.errors import ModelConfigError
 
 COMPANY_PROVIDER_CONFIG_ENV = "AFS_PROVIDER_CONFIG"
 DEFAULT_COMPANY_PROVIDER_SECRETS: Path | None = None
+IMAGE_RELAY_SERVICE_ID = "image_relay"
+IMAGE_RELAY_POOL_ID = "image_relay_pool"
+LEGACY_CODEX_IMAGE_SERVICE_ID = "codex_image"
+LEGACY_CODEX_IMAGE_POOL_ID = "codex_image_pool"
 
 
 class CompanyProviderSecrets(BaseModel):
@@ -51,6 +55,7 @@ def load_company_provider_secrets(
         raise ModelConfigError(f"Company provider secret JSON is invalid: {config_path}") from exc
     if not isinstance(payload, dict):
         raise ModelConfigError(f"Company provider secret JSON must be an object: {config_path}")
+    payload = _with_image_relay_service(payload)
     try:
         return CompanyProviderSecrets.model_validate(payload)
     except ValidationError as exc:
@@ -78,3 +83,66 @@ def resolve_ref(root: dict[str, Any], ref: str) -> Any:
             raise ModelConfigError(f"Provider config reference not found: {ref}")
         current = current[part]
     return current
+
+
+def _with_image_relay_service(payload: dict[str, Any]) -> dict[str, Any]:
+    services = payload.get("services")
+    if not isinstance(services, dict):
+        return payload
+    if IMAGE_RELAY_SERVICE_ID in services:
+        return payload
+    legacy_service = services.get(LEGACY_CODEX_IMAGE_SERVICE_ID)
+    if not _is_legacy_api_relay_image_service(legacy_service):
+        return payload
+
+    next_payload = dict(payload)
+    next_services = dict(services)
+    next_services.pop(LEGACY_CODEX_IMAGE_SERVICE_ID, None)
+    next_services[IMAGE_RELAY_SERVICE_ID] = _image_relay_service_from_legacy(legacy_service)
+    next_payload["services"] = next_services
+
+    account_pools = payload.get("account_pools")
+    if isinstance(account_pools, dict):
+        next_pools = dict(account_pools)
+        legacy_pool = next_pools.pop(LEGACY_CODEX_IMAGE_POOL_ID, None)
+        if isinstance(legacy_pool, dict):
+            next_pools[IMAGE_RELAY_POOL_ID] = _image_relay_pool_from_legacy(legacy_pool)
+        next_payload["account_pools"] = next_pools
+    return next_payload
+
+
+def _is_legacy_api_relay_image_service(value: Any) -> bool:
+    return (
+        isinstance(value, dict)
+        and str(value.get("provider") or "") == "api_relay"
+        and str(value.get("capability") or "") == "image"
+    )
+
+
+def _image_relay_service_from_legacy(service: dict[str, Any]) -> dict[str, Any]:
+    next_service = dict(service)
+    next_service.setdefault("edit_endpoint", "/images/edits")
+    descriptor = next_service.get("descriptor")
+    if isinstance(descriptor, dict):
+        next_descriptor = dict(descriptor)
+        next_descriptor["account_pool_id"] = IMAGE_RELAY_POOL_ID
+        next_descriptor["reference_image_slots"] = max(1, int(next_descriptor.get("reference_image_slots") or 0))
+        next_service["descriptor"] = next_descriptor
+    return next_service
+
+
+def _image_relay_pool_from_legacy(pool: dict[str, Any]) -> dict[str, Any]:
+    next_pool = dict(pool)
+    accounts = next_pool.get("accounts")
+    if isinstance(accounts, list):
+        next_accounts = []
+        for item in accounts:
+            if isinstance(item, dict):
+                next_item = dict(item)
+                if next_item.get("service_id") == LEGACY_CODEX_IMAGE_SERVICE_ID:
+                    next_item["service_id"] = IMAGE_RELAY_SERVICE_ID
+                next_accounts.append(next_item)
+            else:
+                next_accounts.append(item)
+        next_pool["accounts"] = next_accounts
+    return next_pool

@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-26 - Runtime Image Relay Deployment Guard
+
+- Added Runtime-side provider config migration for server environments that
+  still have an ignored local `codex_image` API relay service in
+  `AFS_PROVIDER_CONFIG`. The loader now projects that service and its account
+  pool into `image_relay` in memory, removes the legacy service/pool from the
+  validated Runtime store, adds the image edit endpoint default, and raises the
+  reference image slot floor to 1 for asset-reference image edits.
+- This keeps product-facing Studio requests, model plans, and safe manifests
+  on `image_relay` even when the root-owned server config has not yet been
+  manually rewritten.
+
+Verification:
+
+```text
+python -m pytest tests/test_provider_adapter_registry.py tests/test_web_studio_assets_generation_static.py -q -> 55 passed
+AFS_PROVIDER_CONFIG=/etc/afs/providers.local.json python - <<loader probe>> -> services ['image_relay', 'seedance_i2v']; codex_image lookup rejected
+python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_generation_manifest_safety.py tests/test_model_call_context_runtime_routes.py tests/test_web_studio_assets_generation_static.py -q -> 61 passed
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live image, video, LLM, ASR, vision, or external download provider call
+  was started during this code change.
+- No provider secret, signed URL, raw provider response, media byte, or local
+  private material was written to Git.
+- Root-owned `/etc/afs/providers.local.json` and systemd unit state still need
+  a privileged cleanup to physically remove old local names and disable the
+  legacy image worker unit.
+
 ## 2026-06-26 - Studio Generation Reference And Relay Fixes
 
 - Added local script import support for `.docx`, `.pptx`, `.doc`, and `.ppt`
