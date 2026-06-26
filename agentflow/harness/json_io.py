@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 from typing import Any
 
 from pydantic import BaseModel
@@ -10,11 +14,37 @@ from pydantic import BaseModel
 def write_json(path: str | Path, data: Any) -> Path:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(_to_jsonable(data), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    text = json.dumps(_to_jsonable(data), ensure_ascii=False, indent=2)
+    with exclusive_file_lock(_lock_path(output_path)):
+        fd, temp_name = tempfile.mkstemp(
+            prefix=f".{output_path.name}.",
+            suffix=".tmp",
+            dir=str(output_path.parent),
+            text=True,
+        )
+        temp_path = Path(temp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, output_path)
+            _fsync_dir(output_path.parent)
+        finally:
+            temp_path.unlink(missing_ok=True)
     return output_path
+
+
+@contextmanager
+def exclusive_file_lock(path: str | Path) -> Iterator[None]:
+    lock_path = Path(path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as handle:
+        _lock_handle(handle)
+        try:
+            yield
+        finally:
+            _unlock_handle(handle)
 
 
 def _to_jsonable(data: Any) -> Any:
@@ -27,3 +57,44 @@ def _to_jsonable(data: Any) -> Any:
     if isinstance(data, dict):
         return {key: _to_jsonable(value) for key, value in data.items()}
     return data
+
+
+def _lock_path(path: Path) -> Path:
+    return path.with_name(f"{path.name}.lock")
+
+
+def _lock_handle(handle: Any) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        return
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_handle(handle: Any) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    import fcntl
+
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _fsync_dir(path: Path) -> None:
+    if os.name == "nt":
+        return
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)

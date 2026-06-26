@@ -21,6 +21,11 @@ safe metadata only. Plaintext invite codes are admin-local distribution
 material and must not be copied into GitHub issues, PRs, handoffs, DEVLOG, or
 TASK_TRACKER. This is an internal beta access mechanism, not a public admin UI,
 SaaS role/org system, password reset system, or billing/accounting layer.
+Addendum: the 2026-06-26 hardening pass adds auth failure rate limiting, safe
+auth/request audit logs, weak static env invite-code skipping, atomic JSON
+writes with file locks, an auth-level read-modify-write lock, and the
+`runtime-backup create` administrator backup command. Maintenance ledger:
+`docs/maintenance/AFS-INTERNAL-BETA-HARDENING-20260626.md`.
 
 AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
 GitHub, server `/home`, and server `/opt`. The intended clean branch state is

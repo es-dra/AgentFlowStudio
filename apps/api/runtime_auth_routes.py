@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from apps.api.runtime_auth import AuthLoginRequest, AuthRegisterRequest, RuntimeAuthStore, public_user
+from apps.api.runtime_logging import client_ip_from_request, request_id_from_request
 from apps.api.runtime_store import safe_id
 
 
@@ -30,12 +31,12 @@ def register_runtime_auth_routes(app: FastAPI, auth: RuntimeAuthStore) -> None:
         return {"user": public_user(auth.require_user(request))}
 
     @app.post("/auth/register")
-    def auth_register(request: AuthRegisterRequest) -> dict[str, Any]:
-        return auth.register(request)
+    def auth_register(body: AuthRegisterRequest, request: Request) -> dict[str, Any]:
+        return auth.register(body, client_ip=client_ip_from_request(request), request_id=request_id_from_request(request))
 
     @app.post("/auth/login")
-    def auth_login(request: AuthLoginRequest) -> dict[str, Any]:
-        return auth.login(request)
+    def auth_login(body: AuthLoginRequest, request: Request) -> dict[str, Any]:
+        return auth.login(body, client_ip=client_ip_from_request(request), request_id=request_id_from_request(request))
 
     @app.post("/auth/logout")
     def auth_logout(request: Request) -> dict[str, Any]:

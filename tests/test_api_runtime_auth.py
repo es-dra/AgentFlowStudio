@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 
 from fastapi.testclient import TestClient
 
@@ -97,6 +98,40 @@ def test_admin_invites_are_hash_only_listable_and_revocable(tmp_path, monkeypatc
         },
     )
     assert response.status_code == 400
+
+
+def test_unsafe_static_env_invites_are_skipped(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "123456,valid-alpha-code")
+
+    auth = RuntimeAuthStore(RuntimeStore(tmp_path))
+    invites = auth.list_invites()
+
+    assert len(invites) == 1
+    assert invites[0]["source"] == "env"
+    assert "123456" not in (tmp_path / "auth" / "invites.json").read_text(encoding="utf-8")
+
+
+def test_login_failures_are_rate_limited_and_audited(tmp_path, monkeypatch, caplog) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AFS_INVITE_CODES", "alpha-invite")
+    monkeypatch.setenv("AFS_AUTH_RATE_LIMIT_MAX_FAILURES", "2")
+    caplog.set_level(logging.INFO, logger="afs.runtime.audit")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    _register(client, invite_code="alpha-invite", email="alpha@example.com")
+
+    bad_login = {"email": "alpha@example.com", "password": "wrong-password"}
+    assert client.post("/auth/login", json=bad_login).status_code == 401
+    assert client.post("/auth/login", json=bad_login).status_code == 401
+    limited = client.post("/auth/login", json=bad_login)
+
+    assert limited.status_code == 429
+    rate_limits = json.loads((tmp_path / "auth" / "rate_limits.json").read_text(encoding="utf-8"))
+    assert rate_limits["buckets"]
+    audit_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert "auth.login.failed" in audit_text
+    assert "wrong-password" not in audit_text
+    assert "alpha@example.com" not in audit_text
 
 
 def test_expired_session_is_rejected_and_removed(tmp_path, monkeypatch) -> None:

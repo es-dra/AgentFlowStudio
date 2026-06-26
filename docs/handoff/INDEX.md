@@ -87,6 +87,7 @@ not a claim that human acceptance or business validation has happened.
 - `../maintenance/AFS-MODEL-GATEWAY-CYCLE-001.zh-CN.md`
 - `../maintenance/AFS-DEEP-UX-RUNTIME-HARDENING-20260619.md`
 - `../maintenance/AFS-BRANCH-MERGE-CLEANUP-20260622.md`
+- `../maintenance/AFS-INTERNAL-BETA-HARDENING-20260626.md`
 
 ## Routing Rule
 

@@ -8,6 +8,8 @@ from agentflow.harness.json_io import write_json
 from apps.api.runtime_auth_security import hash_text, normalize_invite_code, now
 from apps.api.runtime_store import safe_id
 
+UNSAFE_STATIC_INVITE_CODES = {"123456", "12345678", "password", "admin", "invite", "test", "afs"}
+
 
 def create_invite_record(
     *,
@@ -39,6 +41,30 @@ def create_invite_record(
     invites["invites"][code_hash] = record
     write_json(invites_path, invites)
     return public_invite(record)
+
+
+def seed_invites_from_env_records(invites: dict[str, Any], raw_codes: str) -> tuple[dict[str, Any], int, int]:
+    changed = 0
+    skipped = 0
+    for raw in str(raw_codes or "").split(","):
+        code = raw.strip()
+        if not code:
+            continue
+        if invite_code_is_unsafe(code):
+            skipped += 1
+            continue
+        code_hash = hash_text(normalize_invite_code(code))
+        if code_hash in invites["invites"]:
+            continue
+        invites["invites"][code_hash] = {
+            "invite_id": f"inv_{code_hash[:12]}",
+            "source": "env",
+            "created_at": now(),
+            "consumed_by_user_id": "",
+            "consumed_at": "",
+        }
+        changed += 1
+    return invites, changed, skipped
 
 
 def list_public_invites(invites: dict[str, Any]) -> list[dict[str, Any]]:
@@ -96,10 +122,18 @@ def invite_expired(invite: dict[str, Any]) -> bool:
     return datetime.now(timezone.utc) > parsed.astimezone(timezone.utc)
 
 
+def invite_code_is_unsafe(value: str) -> bool:
+    normalized = normalize_invite_code(value)
+    folded = normalized.lower()
+    return len(normalized) < 8 or folded in UNSAFE_STATIC_INVITE_CODES
+
+
 __all__ = (
     "create_invite_record",
+    "invite_code_is_unsafe",
     "invite_expired",
     "list_public_invites",
     "public_invite",
     "revoke_invite_record",
+    "seed_invites_from_env_records",
 )

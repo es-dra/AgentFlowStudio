@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tarfile
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -27,6 +28,7 @@ VISIBLE_PRODUCT_COMMANDS = (
     "memory-evidence-reuse-review",
     "runtime-service",
     "runtime-service-openapi-export",
+    "runtime-backup",
     "auth-invites",
 )
 
@@ -43,6 +45,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "register_production_memory_commands" in source
     assert "runtime-service" in source
     assert "runtime-service-openapi-export" in source
+    assert "runtime_backup_app" in source
     assert "auth_invites_app" in source
     assert "production-memory-loop-next-operator-start-packet" not in source
     assert "production-memory-loop-record-next-operator-start" not in source
@@ -183,6 +186,36 @@ def test_auth_invites_cli_issues_lists_and_revokes_without_storing_plaintext(tmp
     revoked = runner.invoke(app, ["auth-invites", "revoke", first_invite_id, "--runtime-root", str(runtime_root)])
     assert revoked.exit_code == 0, revoked.output
     assert "revoked" in revoked.output
+
+
+def test_runtime_backup_cli_excludes_codex_home_by_default(tmp_path) -> None:
+    runtime_root = tmp_path / "runtime"
+    (runtime_root / "auth").mkdir(parents=True)
+    (runtime_root / "auth" / "users.json").write_text('{"users": {}}', encoding="utf-8")
+    (runtime_root / "codex-home").mkdir()
+    (runtime_root / "codex-home" / "auth.json").write_text('{"token": "secret"}', encoding="utf-8")
+    output_dir = tmp_path / "backups"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "runtime-backup",
+            "create",
+            "--runtime-root",
+            str(runtime_root),
+            "--output-dir",
+            str(output_dir),
+            "--label",
+            "wave1",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    [archive_path] = list(output_dir.glob("afs-runtime-backup-*.tar.gz"))
+    with tarfile.open(archive_path, "r:gz") as archive:
+        names = archive.getnames()
+    assert "runtime_root/auth/users.json" in names
+    assert "runtime_root/codex-home/auth.json" not in names
 
 
 def test_hidden_production_memory_support_commands_remain_callable() -> None:

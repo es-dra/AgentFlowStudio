@@ -43,6 +43,7 @@ from apps.api.runtime_store import RuntimeStore, read_json, safe_id
 from apps.api.runtime_threadpool_compat import configure_runtime_threadpool_compat
 from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_auth_routes import configure_runtime_auth_middleware, register_runtime_auth_routes
+from apps.api.runtime_logging import configure_runtime_logging, configure_runtime_request_logging
 from apps.api.runtime_v02 import register_runtime_v02_routes
 from apps.api.runtime_studio_static import (
     DEFAULT_SITE_ROOT,
@@ -85,6 +86,7 @@ def create_runtime_app(
     studio_root: Path = DEFAULT_STUDIO_ROOT,
     site_root: Path = DEFAULT_SITE_ROOT,
 ) -> FastAPI:
+    configure_runtime_logging()
     configure_runtime_threadpool_compat()
     store = RuntimeStore(runtime_root)
     auth = RuntimeAuthStore(store)
@@ -93,6 +95,7 @@ def create_runtime_app(
         version="0.2.0",
         summary="Local AFS API adapter for AFS Studio canvas integration.",
     )
+    configure_runtime_request_logging(app)
     configure_runtime_cors(app)
     configure_runtime_auth_middleware(app, auth)
     register_runtime_auth_routes(app, auth)

@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-06-26 - Internal Beta Operational Hardening
+
+- Added auth failure rate limiting for login and invite registration. The
+  default policy is 5 failed attempts per source/account key in 15 minutes,
+  followed by a 15 minute lockout.
+- Added safe auth audit events for login/register success and failure, weak
+  environment invite-code skips, and rate limiting. Audit logs include request
+  id, client IP, user id where available, and email hash, but not passwords,
+  session tokens, invite plaintext, or provider raw responses.
+- Added request id middleware and slow/error request logging. Responses now get
+  `X-Request-ID`; slow requests and 5xx exceptions are visible in the
+  `afs-runtime` journal.
+- Hardened `write_json` with same-directory temp files, `fsync`, atomic
+  replace, and cross-platform file locks. Auth read-modify-write operations now
+  use an `auth.lock` file to reduce lost-update risk during internal beta.
+- Added `runtime-backup create` for administrator Runtime backups. The command
+  writes `tar.gz` archives, defaults to excluding `codex-home`, removes
+  transient lock/temp files, and applies owner-only permissions on POSIX.
+- Updated `docs/handoff/AFS-INTERNAL-BETA-ADMIN-20260626.md` and added
+  `docs/maintenance/AFS-INTERNAL-BETA-HARDENING-20260626.md`.
+
+Boundary:
+
+- This pass keeps the JSON-file Runtime store; it does not introduce a
+  database, OAuth, email verification, password reset, public admin UI, or SaaS
+  role/org/billing system.
+- No provider call, real invite code plaintext, session token, provider secret,
+  signed URL, media byte, or private Company OS source content was written to
+  Git.
+
 ## 2026-06-26 - Internal Beta Invite Admin CLI
 
 - Added an admin-only `auth-invites` CLI for the existing Runtime auth store.
