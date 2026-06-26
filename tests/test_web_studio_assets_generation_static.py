@@ -254,6 +254,7 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     generation_progress = (STUDIO_ROOT / "src" / "node-generation-progress.js").read_text(encoding="utf-8")
     visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
     visual_defaults = (STUDIO_ROOT / "src" / "panels" / "visual-asset-defaults.js").read_text(encoding="utf-8")
+    storyboard_keyframes = (STUDIO_ROOT / "src" / "storyboard-keyframes.js").read_text(encoding="utf-8")
 
     for marker in ("assetCardPromptText", "safeAssetCardSnapshot", "node_role", "asset_card_draft"):
         assert marker in optimizer_contract
@@ -300,6 +301,10 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "资产素材" in generation_results
     assert 'asset: "资产图生成"' in generation_progress
     assert "此前排队" in generation_progress
+    assert "keyframeAssetPlan" in storyboard_keyframes
+    assert "ready_with_candidate_assets" in storyboard_keyframes
+    assert "局部候选资产卡" in storyboard_keyframes
+    assert "不要新增椅子、凳子、篮子" in storyboard_keyframes
 
 
 def test_asset_card_prompt_box_is_for_user_revision_and_uploaded_refs() -> None:
@@ -535,6 +540,104 @@ process.stdout.write(JSON.stringify({ refs: request.asset_refs }));
     assert payload["refs"] == ["img_user_uploaded_reference"]
 
 
+def test_keyframe_prompt_uses_editable_candidate_asset_plan_details() -> None:
+    script = r'''
+import { createKeyframeNodesForStoryboard } from "./apps/studio/src/storyboard-keyframes.js";
+
+const state = {
+  nodes: {
+    shot_01: {
+      id: "shot_01",
+      type: "script",
+      title: "分镜 01",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 280,
+      prompt: "分镜 01：一个来自未来的机器人，在农村屋顶上看星星",
+      content: "分镜 01：一个来自未来的机器人，在农村屋顶上看星星",
+      params: {
+        structuredShot: {
+          shot_id: "shot_01",
+          description: "一个来自未来的机器人，在农村屋顶上看星星",
+          shot_size: "中景",
+          light_atmosphere: "夜晚星光",
+          camera_motion: "固定机位，轻微呼吸感",
+        },
+      },
+    },
+    robot_asset: {
+      id: "robot_asset",
+      type: "image",
+      title: "角色资产 · @未来机器人",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetCardDraft: {
+          label: "未来机器人",
+          asset_type: "character",
+          signature: "白色机身，毛绒头部外壳，蓝色发光眼睛",
+          feature_card: { appearance: "毛绒头部外壳，白色机械身体，柔和蓝光" },
+        },
+        uploads: [{ asset_id: "img_robot_candidate", role: "character_reference" }],
+      },
+    },
+    roof_asset: {
+      id: "roof_asset",
+      type: "image",
+      title: "场景资产 · @屋顶平台",
+      params: {
+        nodeRole: "asset_card_draft",
+        assetCardDraft: {
+          label: "屋顶平台",
+          asset_type: "scene",
+          signature: "平整水泥屋顶平台，没有外凸屋檐，没有椅子",
+          feature_card: { location: "乡村平屋顶平台，开阔星空，低矮围墙" },
+        },
+        uploads: [{ asset_id: "img_roof_candidate", role: "scene_reference" }],
+      },
+    },
+  },
+  edges: {
+    e1: { id: "e1", from: "shot_01", to: "robot_asset" },
+    e2: { id: "e2", from: "shot_01", to: "roof_asset" },
+  },
+  order: ["shot_01", "robot_asset", "roof_asset"],
+  selection: { nodeIds: [], edgeId: null },
+  ui: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: () => `node_${++seq}`,
+  set: (mutator) => mutator(state),
+};
+const [keyframeId] = createKeyframeNodesForStoryboard(store, state.nodes.shot_01);
+const keyframe = state.nodes[keyframeId];
+process.stdout.write(JSON.stringify({
+  prompt: keyframe.prompt,
+  plan: keyframe.params.keyframeAssetPlan,
+  layer: keyframe.params.keyframeLayer,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert "毛绒头部外壳" in payload["prompt"]
+    assert "没有外凸屋檐" in payload["prompt"]
+    assert "局部候选资产卡" in payload["prompt"]
+    assert "不要新增椅子、凳子、篮子" in payload["prompt"]
+    assert payload["plan"]["user_editable"] is True
+    assert payload["plan"]["assets"][0]["image_asset_refs"] == ["img_robot_candidate"]
+    assert payload["layer"]["status"] == "ready_with_candidate_assets"
+    assert payload["layer"]["candidate_image_asset_refs"] == ["img_robot_candidate", "img_roof_candidate"]
+
+
 def test_asset_card_node_generation_prompt_is_not_written_into_prompt_box() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
@@ -622,6 +725,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     result_view = (STUDIO_ROOT / "src" / "node-result-view.js").read_text(encoding="utf-8")
     main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
+    generation_results = (STUDIO_ROOT / "src" / "node-generation-results.js").read_text(encoding="utf-8")
     styles = _styles()
 
     assert feedback.is_file()
@@ -668,6 +773,12 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "反馈视频质量" in node_menu
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
+    assert 'action === "content-card" || action === "video-asset-card-draft"' in action_handler
+    assert "resolveEventNode(event) || event.detail?.node" in main
+    assert "正在识别视频资产卡" in main
+    assert "视频资产卡草稿" in main
+    assert "videoTimingLine" in generation_results
+    assert "耗时：" in generation_results
     assert "cancelNodeVideoGeneration" in node_actions
     assert "cancelVideo(jobId)" in video_actions
     assert "cancelled_local_only" in video_actions

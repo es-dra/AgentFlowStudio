@@ -12,6 +12,29 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Video node full-chain hardening follow-up: 2026-06-26 pass fixed four issues
+from the robot/rooftop full-chain experiment. `扩写剧本` now requests and
+falls back to formal short-video script prose before storyboard breakdown,
+instead of emitting placeholder `分镜 01/02/03/04` lines. Keyframe generation
+now builds an editable `keyframeAssetPlan` from connected asset cards and
+writes candidate signatures/features/reference-image counts into the keyframe
+prompt, with explicit constraints against unrequested stools, chairs, eaves,
+extra props, new characters, text, watermarks, UI, or borders. The video
+asset-card button now handles the `video-asset-card-draft` action and gives
+visible no-video/running/success/failure feedback. Runtime video jobs now expose
+safe timing fields (`provider_phase`, `elapsed_sec`, `queued_sec`,
+`running_sec`) so slow 5s generation can be distinguished between provider
+queue/wait and generation runtime where observable. Verification: Studio
+script/assets static set 40 passed, Runtime video generation tests 12 passed
+with 1 existing warning, and `npm.cmd run check:studio-js` passed for 121
+files. The current robot/rooftop server job
+`studio-1782460097617-ynsp23-video_generation-d5b554ffabf1` was inspected via
+safe/task artifacts only and had succeeded with one MP4; old code lacked
+granular timing, but safe file times indicate about 58 seconds before provider
+task-state persistence and about 3 minutes 32 seconds until final candidate
+write. Boundary: no new live provider call in this pass; timing is
+Runtime/provider evidence, not creative quality or human acceptance.
+
 Video timeline prompt follow-up: 2026-06-26 screenshot investigation found
 Studio job `studio-1782194320739-0phdgx-video_generation-ed77c226b864` reached
 the deployed `seedance_i2v` provider with first-frame image asset

@@ -3,6 +3,7 @@ import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-con
 import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
+const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保留下一步生成关键帧所需的信息)/;
 
 export function importScriptFileIntoTextNode(store, node, textarea = null) {
   const input = document.createElement("input");
@@ -28,12 +29,22 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
   setScriptExpansionState(store, fresh.id, "running", idea);
   textarea?.classList?.add("prompt-shimmer");
   try {
-    const request = buildOptimizationRequest(store.get(), { ...fresh, type: "script", prompt: idea });
+    const request = buildOptimizationRequest(store.get(), {
+      ...fresh,
+      type: "script",
+      prompt: formalScriptExpansionPrompt(idea),
+    });
     request.node_type = "script";
     request.generation_target = "script";
+    request.node_parameters = {
+      ...(request.node_parameters || {}),
+      script_expansion_contract: "formal_script_before_storyboard_breakdown",
+      source_idea: idea.slice(0, 600),
+      forbidden_output: "storyboard_placeholder_outline",
+    };
     const response = runtime?.optimizePrompt ? await runtime.optimizePrompt(request) : null;
     const outcome = response ? normalizeOptimization(response, request) : null;
-    const script = outcome?.plain || outcome?.optimized || draftScriptFromIdea(idea);
+    const script = normalizeExpandedScript(outcome?.plain || outcome?.optimized, idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script",
       scriptExpansionState: { status: "complete", completed_at: new Date().toISOString() },
@@ -151,14 +162,48 @@ function balancedSentenceChunks(sentences, targetCount) {
   return chunks;
 }
 
+function normalizeExpandedScript(value, idea) {
+  const text = String(value || "").trim();
+  if (!text || looksLikeStoryboardPlaceholder(text)) return draftScriptFromIdea(idea);
+  return text;
+}
+
+function looksLikeStoryboardPlaceholder(text) {
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const markerCount = lines.filter((line) => SHOT_MARKER_RE.test(line)).length;
+  return markerCount >= 3 && STORYBOARD_PLACEHOLDER_RE.test(text);
+}
+
 function draftScriptFromIdea(idea) {
   const clean = cleanSegment(idea);
+  const title = fallbackScriptTitle(clean);
   return [
-    `分镜 01：建立画面。${clean}`,
-    `分镜 02：推进主体。围绕核心角色或物体补足动作、情绪和画面重点。`,
-    `分镜 03：展示变化。突出冲突、转折或最有传播力的视觉瞬间。`,
-    `分镜 04：收束结果。给出清晰结尾，并保留下一步生成关键帧所需的信息。`,
-  ].join("\n\n");
+    `片名：《${title}》`,
+    "",
+    `故事从一个清晰的核心画面展开：${clean}。开场先交代主要人物或核心物体所处的环境，让观众立刻理解它为什么出现在这里，以及这个瞬间带来的情绪基调。`,
+    "",
+    "随着时间推进，主角或核心物体开始产生细微动作和情绪变化。周围的光线、声音、空间细节共同推动气氛，让画面从静态设定进入一个可被感知的故事时刻，而不是只停留在概念展示。",
+    "",
+    "结尾给出一个明确但不过度解释的动作或结果：主角完成一次选择、凝视、触碰、离开或停留。这个收束要保留下一步拆分分镜所需的人物、场景、动作、情绪和视觉重点。",
+  ].join("\n");
+}
+
+function fallbackScriptTitle(clean) {
+  const compact = clean.replace(/[，。！？；、,.!?;:：\s]+/g, "");
+  return (compact || "短片").slice(0, 12);
+}
+
+function formalScriptExpansionPrompt(idea) {
+  return [
+    "请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。",
+    "输出要求：",
+    "- 先给片名，再给连续叙事正文。",
+    "- 明确角色、场景、情绪、动作变化和结尾。",
+    "- 不要输出“分镜 01/02/03/04”，不要写占位句，不要写“推进主体/展示变化/收束结果”。",
+    "- 文字要能在下一步再拆分成分镜。",
+    "",
+    `原始想法：${cleanSegment(idea)}`,
+  ].join("\n");
 }
 
 async function loadStoryboardBreakdown(store, runtime, node, source) {

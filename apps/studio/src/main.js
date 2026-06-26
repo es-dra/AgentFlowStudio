@@ -132,13 +132,26 @@ function selectedNode() {
 }
 
 async function handleVideoAssetCardDraft(event) {
-  const node = event.detail?.node;
-  const nodeId = String(node?.id || "");
+  const node = resolveEventNode(event) || event.detail?.node;
+  const nodeId = String(node?.id || event.detail?.node_id || "");
   if (!nodeId || !runtime?.draftAssetCard) return;
   const sourceVideoArtifactId = String(
     node?.params?.lastVideoArtifactId || node?.params?.lastVideoJobId || "",
   ).trim();
-  if (!sourceVideoArtifactId) return;
+  if (!sourceVideoArtifactId) {
+    store.set((s) => {
+      const current = s.nodes[nodeId];
+      if (!current) return;
+      current.result = `${current.result || ""}\n请先生成视频，再识别视频资产卡。`.trim();
+    });
+    return;
+  }
+  store.set((s) => {
+    const current = s.nodes[nodeId];
+    if (!current) return;
+    current.params.lastVideoAssetCardDraftStatus = "running";
+    current.result = `${current.result || ""}\n正在识别视频资产卡...`.trim();
+  }, { history: false, persist: false });
   try {
     const response = await runtime.draftAssetCard({
       asset_type: "video",
@@ -154,13 +167,14 @@ async function handleVideoAssetCardDraft(event) {
       if (!current) return;
       current.params.lastVideoAssetCardDraft = response?.draft || null;
       current.params.lastVideoAssetCardDraftStatus = response?.job?.status || "unknown";
-      current.result = `${current.result || ""}\nVideo asset draft: ${response?.job?.status || "unknown"}`.trim();
+      current.result = `${current.result || ""}\n视频资产卡草稿：${response?.job?.status || "unknown"}`.trim();
     });
   } catch (error) {
     store.set((s) => {
       const current = s.nodes[nodeId];
       if (!current) return;
-      current.result = `${current.result || ""}\nVideo asset draft failed: ${safeError(error)}`.trim();
+      current.params.lastVideoAssetCardDraftStatus = "failed";
+      current.result = `${current.result || ""}\n视频资产卡识别失败：${safeError(error)}`.trim();
     });
   }
 }

@@ -8,13 +8,10 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
   const assetNodes = downstreamAssetCardNodes(state, scriptNode.id);
   const fixedAssets = fixedVisualAssetsFromAssetNodes(assetNodes);
   const candidateImageRefs = candidateAssetImageRefsFromAssetNodes(assetNodes);
+  const candidateAssets = candidateAssetPlansFromAssetNodes(assetNodes);
   const missingIds = assetNodes
     .filter((asset) => !(asset.params?.visualAssets || []).some(isFixedVisualAsset))
     .map((asset) => asset.id);
-  const missingAssets = assetNodes
-    .filter((asset) => missingIds.includes(asset.id))
-    .map((asset) => asset.params?.assetCardDraft || asset.params?.asset_prep?.asset_ref || null)
-    .filter(Boolean);
   const structuredShot = scriptNode.params?.structuredShot
     || structuredShotFromSegment(scriptNode.content || scriptNode.prompt || "", Number(scriptNode.params?.scriptSegmentIndex || 1));
   let keyframeNode = existingKeyframeNode(state, scriptNode.id);
@@ -23,14 +20,22 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
     const node = s.nodes[keyframeNode.id];
     if (!node) return;
     node.title = `关键帧 · ${scriptNode.title || structuredShot.shot_id || "分镜"}`;
-    node.prompt = keyframePrompt(structuredShot, fixedAssets, missingAssets);
+    node.prompt = keyframePrompt(structuredShot, fixedAssets, candidateAssets);
     node.content = "";
     node.status = "empty";
     node.params.nodeRole = "keyframe_generation";
     node.params.structuredShot = structuredShot;
     node.params.visualAssets = fixedAssets;
+    node.params.keyframeAssetPlan = {
+      status: "draft",
+      user_editable: true,
+      source: "storyboard_keyframe_asset_plan",
+      instruction: "可在生成前手动修订这些资产约束；未固定资产只作为本次关键帧局部参考。",
+      assets: candidateAssets,
+      updated_at: new Date().toISOString(),
+    };
     node.params.keyframeLayer = {
-      status: fixedAssets.length ? "ready_with_fixed_assets" : "ready_without_fixed_assets",
+      status: fixedAssets.length ? "ready_with_fixed_assets" : candidateAssets.length ? "ready_with_candidate_assets" : "ready_without_fixed_assets",
       source_script_node_id: scriptNode.id,
       source_asset_card_node_ids: assetNodes.map((asset) => asset.id),
       candidate_asset_card_node_ids: assetNodes.map((asset) => asset.id),
@@ -88,28 +93,86 @@ function candidateAssetImageRefsFromAssetNodes(assetNodes) {
   return result.slice(0, 4);
 }
 
+function candidateAssetPlansFromAssetNodes(assetNodes) {
+  return assetNodes.map((node) => {
+    const draft = node.params?.assetCardDraft || node.params?.asset_prep?.asset_ref || {};
+    const visuals = Array.isArray(node.params?.visualAssets) ? node.params.visualAssets : [];
+    const imageRefs = candidateAssetImageRefsFromAssetNodes([node]);
+    return {
+      source_node_id: node.id,
+      label: cleanText(draft.label || draft.name || draft.asset_id || node.title || "未命名资产", 40),
+      asset_type: normalizeAssetType(draft.asset_type || draft.type),
+      status: visuals.some(isFixedVisualAsset) ? "fixed" : "candidate",
+      signature: cleanText(draft.signature || "", 180),
+      feature_summary: featureCardSummary(draft.feature_card),
+      evidence_text: cleanText(draft.evidence_text || "", 220),
+      image_asset_refs: imageRefs,
+    };
+  }).filter((asset) => asset.label);
+}
+
 function existingKeyframeNode(state, scriptNodeId) {
   return Object.values(state.nodes || {})
     .find((node) => node?.params?.keyframeLayer?.source_script_node_id === scriptNodeId) || null;
 }
 
-function keyframePrompt(shot, fixedAssets, missingAssets) {
+function keyframePrompt(shot, fixedAssets, candidateAssets) {
   const fixedLines = fixedAssets.map((asset) => {
     const label = asset.label || asset.asset_id;
     const signature = asset.signature ? `：${asset.signature}` : "";
     return `- @${label}${signature}`;
   });
-  const missingLines = missingAssets.map((asset) => `- @${asset.label || asset.asset_id || "未命名资产"}（候选资产卡；若已在当前分镜树生成图片，则作为局部参考，未固定不进入项目全局约束）`);
+  const candidateLines = candidateAssets.map((asset) => {
+    const type = assetTypeLabel(asset.asset_type);
+    const refText = asset.image_asset_refs?.length ? `；参考图：已连接 ${asset.image_asset_refs.length} 张` : "";
+    const signature = asset.signature ? `：${asset.signature}` : "";
+    const features = asset.feature_summary ? `；关键特征：${asset.feature_summary}` : "";
+    const evidence = !asset.signature && !asset.feature_summary && asset.evidence_text ? `；依据：${asset.evidence_text}` : "";
+    return `- @${asset.label}（${type}，${asset.status === "fixed" ? "已固定" : "候选资产卡"}）${signature}${features}${evidence}${refText}`;
+  });
+  const assetModeLine = fixedLines.length
+    ? "已固定资产（必须保持）："
+    : candidateLines.length
+      ? "已固定资产：暂无；以下候选资产作为本次关键帧局部参考，不晋升为全局固定资产。"
+      : "已固定资产：暂无；将仅根据分镜文本生成。";
   return [
     `根据分镜生成关键帧：${shot.description || shot.source_text || ""}`,
     `镜头：${shot.shot_size || "中景"}；光影：${shot.light_atmosphere || "自然光影"}；运镜参考：${shot.camera_motion || "固定机位"}`,
-    fixedLines.length ? "已固定资产（必须保持）：" : "",
+    assetModeLine,
     ...fixedLines,
-    fixedLines.length ? "" : "已固定资产：暂无；将仅根据分镜文本生成。",
-    missingLines.length ? "候选资产卡（可稍后固定；未固定不阻断关键帧生成）：" : "",
-    ...missingLines,
+    candidateLines.length ? "局部候选资产卡（本次必须参考；生成前可手动修订，未固定不阻断生成）：" : "",
+    ...candidateLines,
+    "资产一致性：严格保持上述资产的身份、材质/外壳、服装或结构、道具几何、场景布局和参考图关系；只生成当前分镜需要的画面。",
+    "禁止新增：除非分镜或资产卡明确要求，不要新增椅子、凳子、篮子、额外家具、突出的屋檐/飞檐、无关道具或新角色。",
     "画面要求：单张关键帧，主体清晰，延续分镜剧情，不添加文字、水印、UI 或边框。",
   ].filter(Boolean).join("\n");
+}
+
+function featureCardSummary(featureCard) {
+  if (!featureCard || typeof featureCard !== "object") return "";
+  const values = [];
+  for (const value of Object.values(featureCard)) {
+    if (typeof value === "string") values.push(value);
+    else if (Array.isArray(value)) values.push(value.filter((item) => typeof item === "string").join("、"));
+  }
+  return cleanText(values.filter(Boolean).join("；"), 260);
+}
+
+function normalizeAssetType(type) {
+  const value = String(type || "asset").toLowerCase();
+  return ["character", "scene", "prop", "video", "asset"].includes(value) ? value : "asset";
+}
+
+function assetTypeLabel(type) {
+  if (type === "character") return "角色";
+  if (type === "scene") return "场景";
+  if (type === "prop") return "道具";
+  if (type === "video") return "视频";
+  return "资产";
+}
+
+function cleanText(value, limit) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
 }
 
 function isFixedVisualAsset(asset) {

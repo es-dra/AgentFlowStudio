@@ -1,5 +1,51 @@
 # Devlog
 
+## 2026-06-26 - Script, Keyframe Asset, and Video Progress Hardening
+
+- Fixed Studio idea expansion so `扩写剧本` asks the optimizer for a formal
+  short-video script first, not a storyboard placeholder. Local fallback now
+  writes a reusable script body with title, setup, development, and ending
+  paragraphs; placeholder outputs like `推进主体/展示变化/收束结果` are rejected
+  and replaced.
+- Strengthened keyframe layer creation from storyboard asset cards. Candidate
+  asset cards now become an editable `keyframeAssetPlan`, and the keyframe
+  prompt explicitly carries candidate signatures, feature summaries, connected
+  reference image counts, local-reference policy, and negative constraints
+  against unrequested chairs, stools, eaves, extra props, new characters, text,
+  watermarks, UI, or borders.
+- Fixed the video node asset-card action path: `video-asset-card-draft` clicks
+  now dispatch to the same Runtime draft flow as the menu action, resolve the
+  freshest node by `node_id`, and show visible running/success/failure messages
+  instead of silently doing nothing.
+- Added safe video task timing into Runtime job progress. Submitted/running/
+  succeeded video jobs now expose `provider_phase`, `elapsed_sec`,
+  `queued_sec`, and `running_sec` where observable; Studio video result text
+  renders the timing summary for user inspection.
+- Inspected the user's current robot/rooftop safe video job on the server
+  without reading provider raw responses. The job
+  `studio-1782460097617-ynsp23-video_generation-d5b554ffabf1` succeeded with
+  one MP4 candidate; pre-existing code lacked granular timing, but safe file
+  timestamps indicate roughly 58 seconds before provider task state was
+  persisted and about 3 minutes 32 seconds until final candidate/manifest
+  write.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_prompt_script_static.py tests/test_web_studio_assets_generation_static.py -q -> 40 passed
+pytest tests/test_api_runtime_video_generations.py -q -> 12 passed, 1 existing warning
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+```
+
+Boundary:
+
+- No live video provider call was triggered in this pass. The timing fields are
+  Runtime/provider queue evidence and do not claim creative quality acceptance,
+  human acceptance, or business validation. The server job inspection read only
+  Runtime safe/task artifacts and file metadata. No provider raw response,
+  signed URL, media byte, secret, token, or private Company OS source content
+  was written to the repo.
+
 ## 2026-06-26 - Keyframe Video Timeline Prompt
 
 - Investigated the Studio screenshot video job on the deployed Runtime using

@@ -116,18 +116,23 @@ def poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path
     if state.get("status") in {"succeeded", "cancelled_local_only"}:
         return result_from_manifest(status=str(state["status"]), safe_manifest=read_json(output_dir / "video_generation_safe_manifest.json"), task_state=state)
     provider_service_id = str(state.get("provider_service_id") or "")
+    poll_time = _utc_now()
     try:
         raw = load_registry().poll("video", provider_service_id, provider_task_for_poll(state.get("task"), output_dir))
     except (ModelGatewayError, Exception) as exc:
         manifest = safe_manifest(project_id, status="poll_failed", provider_calls_started=True, blocks=[provider_not_ready_block(str(exc))], context_bundle=_context_bundle(state))
         write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "poll_failed"
+        state["last_poll_at"] = poll_time
+        state["completed_at"] = poll_time
         write_task_state(output_dir, state)
         return result_from_manifest(status="poll_failed", safe_manifest=manifest, task_state=state)
     if str(raw.get("status") or "").lower() == "running":
         manifest = safe_manifest(project_id, status="running", provider_calls_started=True, blocks=[], context_bundle=_context_bundle(state))
         write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "running"
+        state.setdefault("running_started_at", poll_time)
+        state["last_poll_at"] = poll_time
         state["last_provider_poll"] = {"status": "running", "task": raw.get("task") or {}, "provider_raw_persisted": False}
         write_task_state(output_dir, state)
         return result_from_manifest(status="running", safe_manifest=manifest, task_state=state)
@@ -147,7 +152,11 @@ def complete_video_result(
 ) -> dict[str, Any]:
     outputs = safe_outputs(output_dir, raw)
     context_bundle = _context_bundle(task_state)
+    completed_at = _utc_now()
     task_state["status"] = "succeeded"
+    task_state.setdefault("running_started_at", task_state.get("created_at") or completed_at)
+    task_state["last_poll_at"] = completed_at
+    task_state["completed_at"] = completed_at
     write_task_state(output_dir, task_state)
     manifest = safe_manifest(project_id, status="succeeded", provider_calls_started=True, provider_gate=provider_gate, outputs=outputs, context_bundle=context_bundle, model_call_context_id=str(task_state.get("model_call_context_id") or ""))
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
@@ -184,6 +193,7 @@ def _poll_failed_result(project_id: str, output_dir: Path, context_bundle: dict[
 
 
 def _task_state(request: VideoGenerationRequest, provider_task: dict[str, Any], context_bundle: dict[str, Any] | None, model_call_context: dict[str, Any]) -> dict[str, Any]:
+    now = _utc_now()
     return {
         "schema_version": "afs_video_generation_task_state.v0.1",
         "status": str((provider_task.get("task") or {}).get("status") or "submitted"),
@@ -192,7 +202,8 @@ def _task_state(request: VideoGenerationRequest, provider_task: dict[str, Any], 
         "task": provider_task_for_state(provider_task),
         "first_frame_image_asset_id": request.first_frame_image_asset_id,
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now,
+        "submitted_at": now,
         "provider_raw_persisted": False,
         "context_bundle": context_bundle,
         "model_call_context_id": model_call_context["context_id"],
@@ -202,3 +213,7 @@ def _task_state(request: VideoGenerationRequest, provider_task: dict[str, Any], 
 
 def _context_bundle(state: dict[str, Any]) -> dict[str, Any] | None:
     return state.get("context_bundle") if isinstance(state.get("context_bundle"), dict) else None
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()

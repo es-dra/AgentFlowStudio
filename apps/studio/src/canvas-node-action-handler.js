@@ -26,7 +26,7 @@ export function handleCanvasNodeClick(store, runtime, e) {
     window.dispatchEvent(new CustomEvent("afs:studio-open-generation-panel", { detail: { node_id: node.id, node } }));
   } else if (action === "open-creation-process") {
     window.dispatchEvent(new CustomEvent("afs:studio-open-creation-process", { detail: { node_id: node.id, node } }));
-  } else if (action === "content-card") {
+  } else if (action === "content-card" || action === "video-asset-card-draft") {
     window.dispatchEvent(new CustomEvent("afs:video-asset-card-draft", { detail: { node_id: node.id, node } }));
   } else if (action === "run") startNodeGeneration(store, runtime, node);
   else if (action === "video-poll") pollNodeVideoGeneration(store, runtime, node);

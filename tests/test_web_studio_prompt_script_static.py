@@ -33,9 +33,60 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     assert "扩写剧本" in prompt_bar
     assert "拆分分镜" in prompt_bar
     assert "export function splitScriptIntoShots" in script_breakdown
+    assert "formal_script_before_storyboard_breakdown" in script_breakdown
+    assert "storyboard_placeholder_outline" in script_breakdown
+    assert "looksLikeStoryboardPlaceholder" in script_breakdown
     assert 'createNode(store, "script"' in script_breakdown
     assert "connect(store, fresh.id, shotNode.id)" in script_breakdown
     assert "剧本拆分分镜" in nodes
+
+
+def test_idea_expansion_fallback_outputs_formal_script_not_storyboard_template() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "一个来自未来的机器人，在农村屋顶上看星星",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+await expandTextIdeaToScript(store, null, state.nodes.text_1);
+process.stdout.write(JSON.stringify(state.nodes.text_1));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+
+    assert node["params"]["scriptInputMode"] == "idea_expanded_script"
+    assert "片名：《" in node["prompt"]
+    assert "故事从一个清晰的核心画面展开" in node["prompt"]
+    assert "正式短视频剧本" not in node["prompt"]
+    assert "分镜 01" not in node["prompt"]
+    assert "推进主体" not in node["prompt"]
+    assert "展示变化" not in node["prompt"]
+    assert "收束结果" not in node["prompt"]
 
 
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:

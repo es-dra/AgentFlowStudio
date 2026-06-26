@@ -252,11 +252,17 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert submitted.status_code == 200
     job = submitted.json()["job"]
     assert job["status"] == "submitted"
+    assert job["progress"]["provider_phase"] == "submitted"
+    assert "elapsed_sec" in job["progress"]
+    assert "queued_sec" in job["progress"]
 
     polled = client.post(f"/projects/{project_id}/video-generations/{job['job_id']}/poll")
     assert polled.status_code == 200
     payload = polled.json()
     assert payload["job"]["status"] == "succeeded"
+    assert payload["job"]["progress"]["provider_phase"] == "succeeded"
+    assert "elapsed_sec" in payload["job"]["progress"]
+    assert "running_sec" in payload["job"]["progress"]
     assert payload["candidate_previews"][0]["preview_url"].startswith(
         f"/projects/{project_id}/video-generations/{job['job_id']}/candidates/"
     )
@@ -375,6 +381,10 @@ def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tm
 
     assert polled.status_code == 200
     assert polled.json()["job"]["status"] == "running"
+    assert polled.json()["job"]["progress"]["provider_phase"] == "running"
+    assert "elapsed_sec" in polled.json()["job"]["progress"]
+    assert "queued_sec" in polled.json()["job"]["progress"]
+    assert "running_sec" in polled.json()["job"]["progress"]
 
 
 def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path, monkeypatch) -> None:

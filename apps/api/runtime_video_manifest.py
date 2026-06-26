@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,7 @@ def write_video_job(store: RuntimeStore, project_id: str, job_id: str, result: d
         except KeyError:
             artifacts = {}
     job = runtime_job(job_id, project_id, "video_generation", str(result["status"]), artifacts=artifacts)
+    job["progress"].update(video_progress(result.get("task_state")))
     job["ui_summary"] = {
         "video_generation": {
             "status": result["status"],
@@ -45,6 +47,44 @@ def write_video_job(store: RuntimeStore, project_id: str, job_id: str, result: d
         }
     }
     return store.write_job(job)
+
+
+def video_progress(task_state: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(task_state, dict):
+        return {}
+    status = str(task_state.get("status") or "")
+    created_at = _parse_time(task_state.get("created_at"))
+    submitted_at = _parse_time(task_state.get("submitted_at")) or created_at
+    running_started_at = _parse_time(task_state.get("running_started_at"))
+    completed_at = _parse_time(task_state.get("completed_at"))
+    last_poll_at = _parse_time(task_state.get("last_poll_at"))
+    observed_at = completed_at or last_poll_at or datetime.now(timezone.utc)
+    progress: dict[str, Any] = {"provider_phase": status}
+    if created_at:
+        progress["elapsed_sec"] = _seconds(observed_at, created_at)
+    if submitted_at and running_started_at:
+        progress["queued_sec"] = _seconds(running_started_at, submitted_at)
+    elif submitted_at and status in {"submitted", "pending"}:
+        progress["queued_sec"] = _seconds(observed_at, submitted_at)
+    if running_started_at:
+        progress["running_sec"] = _seconds(observed_at, running_started_at)
+    return progress
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _seconds(later: datetime, earlier: datetime) -> int:
+    return max(0, int(round((later - earlier).total_seconds())))
 
 
 def result_from_manifest(
