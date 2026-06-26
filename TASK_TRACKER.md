@@ -6,11 +6,28 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-25 by Codex
+Last updated: 2026-06-26 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Seedance live video-node success follow-up: 2026-06-26 authorized Runtime smoke
+used the deployed `/video-generations` route with `seedance_i2v`, a neutral
+non-IP uploaded first frame, and a temporary authenticated server-local session.
+The async task reached `succeeded` and wrote one MP4 candidate:
+project `codex-video-node-smoke-189aa485`, job
+`codex-video-node-smoke-189aa485-video_generation-ac869ed4d54e`,
+`candidate_001.mp4`, 2,125,543 bytes, SHA-256
+`a3616dccd6eae36689412f5c3525461cfeb612b03c543b4dced1ab8c95a39b27`.
+Authenticated preview route returned HTTP 200 `video/mp4` after Runtime
+restart. Local `master`, `origin/master`, server `/home`, and server `/opt`
+are aligned at `420d32b`; `/health` is ready and video gate is true. Local
+media QA from a temp copy: H.264, 1280x720, 24 fps, 5.041667 seconds, 121
+frames; black/freeze events both 0. Boundary: runtime/provider/media
+verification only, not human creative acceptance of the current IP storyboard;
+no provider raw response, signed URL, secret, token, or media byte was written
+to Git.
 
 Current video provider addendum: 2026-06-25 pass retires the active Kling video
 path and standardizes video generation/revision defaults on the Seedance relay

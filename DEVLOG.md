@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-06-26 - Seedance Video Node Live Smoke
+
+- Completed an authorized live Runtime video-node smoke through the deployed
+  `/projects/{project_id}/video-generations` route using `seedance_i2v`.
+  The smoke created a temporary authenticated server-local session, uploaded a
+  neutral non-IP first-frame image asset, submitted a 5-second `16:9` video
+  node, polled the async task, and received a succeeded safe manifest with one
+  MP4 candidate.
+- Evidence: project `codex-video-node-smoke-189aa485`, job
+  `codex-video-node-smoke-189aa485-video_generation-ac869ed4d54e`, candidate
+  `candidate_001.mp4`, 2,125,543 bytes,
+  SHA-256 `a3616dccd6eae36689412f5c3525461cfeb612b03c543b4dced1ab8c95a39b27`.
+  The authenticated preview route returned HTTP 200 with `video/mp4` after
+  Runtime restart.
+- Media QA was performed from a temporary local copy outside the repository:
+  `ffprobe` reported H.264 video, 1280x720, 24 fps, 5.041667 seconds, 121
+  frames. `blackdetect` and `freezedetect` completed with zero detected events.
+- Local `master`, `origin/master`, server `/home/afs-ops/AgentFlowStudio`, and
+  server `/opt/afs/AgentFlowStudio` are aligned at `420d32b`; `afs-runtime`
+  was restarted from `/opt` and `/health` remained ready with video gate true.
+
+Boundary:
+
+- This is runtime/provider/media verification for a neutral smoke prompt, not
+  human creative acceptance of the Wolverine/Sun Wukong storyboard. No provider
+  raw response, signed URL, generated media byte, auth token, sudo secret,
+  provider credential, or private Company OS source content was written to Git.
+
 ## 2026-06-25 - Retire Kling Video Path and Default to Seedance Relay
 
 - Follow-up fix after deploy: the deployed config intentionally shares a
