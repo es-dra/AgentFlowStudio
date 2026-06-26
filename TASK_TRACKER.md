@@ -61,6 +61,9 @@ URLs in Git or safe manifests. A live host probe showed Crazyrouter image
 artifacts coming from `vod2.myqcloud.com`, so the code adds `.myqcloud.com` as
 a Crazyrouter image relay default artifact host while keeping the allowlist
 requirement.
+Video relay polling also treats Seedance `not_start` as a queued/running state
+instead of a terminal failure; this was found by a live 5s/480p smoke where task
+submission succeeded but first poll returned `not_start`.
 Verification: focused provider/Runtime/Studio regression set passed 61,
 `git diff --check` passed, and a read-only loader probe against
 `/etc/afs/providers.local.json` exposed `image_relay` plus `seedance_i2v` while

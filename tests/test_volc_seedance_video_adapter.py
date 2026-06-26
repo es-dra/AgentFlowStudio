@@ -102,6 +102,42 @@ def test_seedance_video_dispatch_builds_task_payload_and_downloads_safe_output(t
     assert "media.seedance.test" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_seedance_poll_treats_not_start_as_running(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/volc/v1/contents/generations/tasks":
+            return _JsonResponse({"id": "cgt-seedance-not-start", "status": "queued"})
+        if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-not-start":
+            return _JsonResponse({"id": "cgt-seedance-not-start", "status": "not_start"})
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    task = registry.submit(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="A controlled cinematic move from the first frame.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=(first,),
+            subject_reference_image_path=first,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    result = registry.poll("video", "seedance_i2v", task)
+
+    assert result == {"status": "running", "task": {"task_id": "cgt-seedance-not-start"}}
+
+
 def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_path, monkeypatch) -> None:
     captured: dict[str, object] = {}
     first = tmp_path / "first.png"

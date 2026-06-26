@@ -112,7 +112,7 @@ class VolcSeedanceVideoAdapter:
             timeout_sec=float(task.get("timeout_sec") or 120.0),
         )
         status = _task_status(response)
-        if status in {"queued", "pending", "running", "processing", "submitted", "in_progress"}:
+        if status in {"not_start", "queued", "pending", "running", "processing", "submitted", "in_progress"}:
             return {"status": "running", "task": {"task_id": task_id}}
         if status not in {"succeeded", "success", "completed", "done"}:
             raise ModelProviderError(_task_failure_reason(response, status))

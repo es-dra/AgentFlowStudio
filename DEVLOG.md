@@ -17,6 +17,8 @@
   URL persistence in safe manifests. Crazyrouter image relay now also gets
   `.myqcloud.com` as a code-side default artifact host because the live relay
   returned temporary image artifacts from `vod2.myqcloud.com`.
+- Fixed Seedance polling so the provider's initial `not_start` task state is
+  treated as queued/running instead of a terminal failure.
 
 Verification:
 
@@ -26,6 +28,7 @@ AFS_PROVIDER_CONFIG=/etc/afs/providers.local.json python - <<loader probe>> -> s
 python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_generation_manifest_safety.py tests/test_model_call_context_runtime_routes.py tests/test_web_studio_assets_generation_static.py -q -> 61 passed
 python -m pytest tests/test_provider_adapter_registry.py -q -> 28 passed
 python -m pytest tests/test_provider_adapter_registry.py -q -> 28 passed after Crazyrouter artifact host default
+python -m pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 19 passed
 git diff --check -> passed
 ```
 
