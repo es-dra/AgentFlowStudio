@@ -25,10 +25,12 @@ filters image-only `单张关键帧` language, and normalizes candidate asset-ca
 mentions so prompt-only references do not create duplicate malformed video
 asset entries. Verification: Studio static set 24 passed, `npm.cmd run
 check:studio-js` passed for 121 files, Runtime video generation tests 12 passed
-with 1 existing warning, and `git diff --check` passed. Remaining work: deploy
-this prompt-contract update to origin/server `/home` and `/opt`, then browser
-confirm the new node prompt; any live provider smoke should use non-IP content
-unless the goal is explicitly to observe provider policy blocking.
+with 1 existing warning, and `git diff --check` passed. Deployment: local
+`master`, origin `master`, server `/home`, and server `/opt` were aligned at
+`08dcf90`; Runtime `/health` stayed ready with video gate true, and
+`/studio/src/keyframe-video-prompt.js` returned HTTP 200 from Runtime. Any live
+provider smoke should use non-IP content unless the goal is explicitly to
+observe provider policy blocking.
 
 Seedance live video-node success follow-up: 2026-06-26 authorized Runtime smoke
 used the deployed `/video-generations` route with `seedance_i2v`, a neutral

@@ -23,6 +23,10 @@
 - Adjusted the auto video asset plan to normalize prompt-only candidate-card
   mentions like `@金箍棒（候选资产卡...` back to the real asset label, avoid
   duplicates, and mark video asset entries with continuity/reference policy.
+- Deployed commit `08dcf90` to origin, server `/home/afs-ops/AgentFlowStudio`,
+  and server `/opt/afs/AgentFlowStudio`. Runtime `/health` remained ready with
+  video gate true, and the new Studio static module
+  `/studio/src/keyframe-video-prompt.js` returned HTTP 200 from Runtime.
 
 Verification:
 
