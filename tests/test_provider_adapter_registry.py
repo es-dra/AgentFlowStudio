@@ -635,8 +635,8 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
             captured["authorization"] = request.get_header("Authorization")
             captured["payload"] = json.loads(request.data.decode("utf-8"))
             captured["timeout"] = timeout
-            return _JsonResponse({"data": [{"url": "https://media.crazyrouter.com/task-artifacts/result.png"}]})
-        if request.full_url == "https://media.crazyrouter.com/task-artifacts/result.png":
+            return _JsonResponse({"data": [{"url": "http://media.crazyrouter.com/task-artifacts/result.png"}]})
+        if request.full_url == "http://media.crazyrouter.com/task-artifacts/result.png":
             captured["downloaded"] = True
             return _BytesResponse(_png_bytes())
         raise AssertionError(f"unexpected URL: {request.full_url}")

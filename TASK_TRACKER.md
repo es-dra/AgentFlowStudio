@@ -54,6 +54,10 @@ Addendum: the same-day Runtime deployment guard now projects an ignored local
 default, and `reference_image_slots >= 1` for asset-reference image edits. This
 lets server Runtime use current `image_relay` model plans even before a
 privileged operator rewrites root-owned `/etc/afs/providers.local.json`.
+The same guard pass also allows image relay artifact downloads over HTTP only
+when the response host matches configured `allowed_artifact_hosts`, matching
+the current relay's temporary artifact URL shape without persisting returned
+URLs in Git or safe manifests.
 Verification: focused provider/Runtime/Studio regression set passed 61,
 `git diff --check` passed, and a read-only loader probe against
 `/etc/afs/providers.local.json` exposed `image_relay` plus `seedance_i2v` while

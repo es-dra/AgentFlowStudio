@@ -196,8 +196,8 @@ def _decode_image_item(item: Any, *, allowed_url_hosts: tuple[str, ...], downloa
 def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout_sec: float) -> bytes:
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" or not host:
-        raise ModelGatewayError("API relay image URL must use HTTPS")
+    if parsed.scheme not in {"https", "http"} or not host:
+        raise ModelGatewayError("API relay image URL must use HTTP(S)")
     if not allowed_url_hosts or not _host_allowed(host, allowed_url_hosts):
         raise ModelGatewayError("API relay image URL host is not allowed")
     request = urllib.request.Request(url, headers={"Accept": "image/png,image/jpeg,image/webp,*/*"})
