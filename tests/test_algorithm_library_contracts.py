@@ -175,3 +175,50 @@ def test_context_resolver_reference_algorithm_merges_bundle_and_request_refs() -
     )
 
     assert refs == ["img_context_ref", "img_uploaded_ref"]
+
+
+def test_video_generation_plan_algorithm_returns_second_level_motion_beats() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    assert plan["motion_plan"]["time_beats"][0]["time"] == "0.0s-1.0s"
+    assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
+    assert plan["motion_plan"]["time_beats"][2]["time"] == "3.5s-5.0s"
+    assert "rooftop platform and sky relationship" in plan["editing_plan"]["continuity_locks"]
+    assert "unrequested chair" in plan["editing_plan"]["forbidden_changes"]
+
+
+def test_video_generation_plan_includes_professional_reference_and_prompt_guidance() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    reference = plan["professional_reference"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert "0-1s" in reference["pacing"]["must_include"][0]
+    assert "Professional video reference:" in prompt
+    assert "motivated night exterior" in prompt

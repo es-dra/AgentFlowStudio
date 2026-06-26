@@ -23,7 +23,7 @@ from apps.api.runtime_video_manifest import (
     write_json_checked,
     write_model_call_artifacts,
 )
-from apps.api.runtime_video_prompt import video_provider_prompt
+from apps.api.runtime_video_prompt import video_generation_plan, video_provider_prompt
 from apps.api.runtime_video_task_state import (
     daily_submit_count,
     daily_submit_limit,
@@ -55,12 +55,14 @@ def submit_video_generation(
     preflight = video_generation_preflight(store, project_id, request)
     context_bundle = preflight.get("context_bundle")
     provider_prompt = video_provider_prompt(request, context_bundle)
+    generation_plan = video_generation_plan(request, context_bundle)
     model_call_context = _model_call_context(project_id, request, context_bundle)
     model_request_plan = build_request_plan(
         model_call_context=model_call_context,
         canonical_brief={"canonical_prompt": provider_prompt},
         provider_service_id=request.provider_service_id,
     )
+    model_request_plan["generation_plan"] = generation_plan
     artifacts = write_model_call_artifacts(store, output_dir, model_call_context, model_request_plan)
     try:
         registry = load_registry()
@@ -93,7 +95,7 @@ def submit_video_generation(
     except (ModelGatewayError, Exception) as exc:
         return _poll_failed_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, gate, str(exc))
     increment_daily_submit_count(store, project_id)
-    task_state = _task_state(request, provider_task, context_bundle, model_call_context)
+    task_state = _task_state(request, provider_task, context_bundle, model_call_context, generation_plan)
     write_task_state(output_dir, task_state)
     if task_state["status"] == "already_complete":
         return complete_video_result(
@@ -192,7 +194,13 @@ def _poll_failed_result(project_id: str, output_dir: Path, context_bundle: dict[
     return result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
 
 
-def _task_state(request: VideoGenerationRequest, provider_task: dict[str, Any], context_bundle: dict[str, Any] | None, model_call_context: dict[str, Any]) -> dict[str, Any]:
+def _task_state(
+    request: VideoGenerationRequest,
+    provider_task: dict[str, Any],
+    context_bundle: dict[str, Any] | None,
+    model_call_context: dict[str, Any],
+    generation_plan: dict[str, Any],
+) -> dict[str, Any]:
     now = _utc_now()
     return {
         "schema_version": "afs_video_generation_task_state.v0.1",
@@ -208,6 +216,7 @@ def _task_state(request: VideoGenerationRequest, provider_task: dict[str, Any], 
         "context_bundle": context_bundle,
         "model_call_context_id": model_call_context["context_id"],
         "model_request_plan_ref": "model_request_plan.json",
+        "video_generation_plan": generation_plan,
     }
 
 

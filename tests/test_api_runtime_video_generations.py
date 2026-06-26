@@ -538,3 +538,70 @@ def _fake_video_provider_config(tmp_path) -> str:
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return str(path)
+
+
+def test_video_generation_response_exposes_structured_generation_plan_when_gate_closed(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-plan-gate-closed"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video plan without provider"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_plan_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "generated_at": "2026-06-27T10:15:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "blocked"
+    plan = payload["video_generation_plan"]
+    assert plan["motion_plan"]["time_beats"][1]["time"] == "1.0s-3.5s"
+    assert "unrequested eaves" in plan["editing_plan"]["forbidden_changes"]
+
+    request_plan = client.get(f"/artifacts/{payload['artifacts']['model_request_plan']['artifact_id']}").json()["payload"]
+    assert request_plan["generation_plan"] == plan
+
+
+def test_video_generation_response_exposes_professional_reference(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-prof-ref"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video professional reference"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_prof_ref_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "generated_at": "2026-06-27T10:30:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    plan = response.json()["video_generation_plan"]
+    reference = plan["professional_reference"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert reference["writes_company_kb"] is False

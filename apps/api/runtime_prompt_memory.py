@@ -24,6 +24,7 @@ from apps.api.runtime_prompt_memory_state import (
     write_creative_memory_state,
 )
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
+from apps.api.runtime_script_plan import build_script_plan
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -52,17 +53,25 @@ def build_prompt_optimization(
         or strip_user_prompt_section_headers(user_prompt)
     )
     user_prompt_sections = llm_enhancement.get("user_prompt_sections") or assembly["user_prompt_sections"]
+    script_plan = build_script_plan(request)
     if context_bundle:
         signature_segment = str(context_bundle.get("text_channel", {}).get("asset_signature_segment") or "")
         if signature_segment:
             assembled_prompt = f"{assembled_prompt}\nAsset Signatures:\n{signature_segment}"
-            user_prompt = f"{user_prompt}\n资产签名：\n{signature_segment}"
+            user_prompt = f"{user_prompt}\n璧勪骇绛惧悕锛歕n{signature_segment}"
             user_prompt_plain = "\n".join(part for part in (user_prompt_plain, signature_segment) if part)
     brief = _creative_brief(request, project_id, assembled_prompt, llm_enhancement)
+    if script_plan:
+        brief["script_plan"] = script_plan
     if context_bundle:
         brief["context_bundle"] = context_bundle
     trace = _prompt_trace(request, project_id, assembly, background_refs, extracted, llm_enhancement, context_bundle)
+    if script_plan:
+        trace["script_plan"] = script_plan
     safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement, context_bundle)
+    if script_plan:
+        safe_manifest["script_plan_ref"] = "script_plan.json"
+        safe_manifest["safe_artifacts"] = [*safe_manifest["safe_artifacts"], "script_plan.json"]
     model_call_context = prompt_optimization_model_call_context(
         project_id=project_id,
         request=request,
@@ -76,6 +85,8 @@ def build_prompt_optimization(
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(output_dir / "model_call_context.json", model_call_context)
     write_json(output_dir / "creative_brief.json", brief)
+    if script_plan:
+        write_json(output_dir / "script_plan.json", script_plan)
     write_json(output_dir / "prompt_assembly_trace.json", trace)
     write_json(output_dir / "prompt_optimization_safe_manifest.json", safe_manifest)
     return {
@@ -92,6 +103,7 @@ def build_prompt_optimization(
         "user_prompt_sections": user_prompt_sections,
         "context_bundle": context_bundle,
         "model_call_context": model_call_context,
+        "script_plan": script_plan,
     }
 
 
@@ -183,6 +195,7 @@ def _prompt_trace(
         "selected_slots": assembly["selected_slots"],
         "conflict_resolution": assembly["conflict_resolution"],
         "suppressed_context": assembly["suppressed_context"],
+        "professional_reference": assembly["professional_reference"],
         "background_context_refs": background_refs,
         "extracted_context_refs": extracted_context_refs(extracted),
         "asset_refs": list(request.asset_refs),

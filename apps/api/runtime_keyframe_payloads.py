@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from apps.api.runtime_keyframe_plan import build_keyframe_plan
 from apps.api.runtime_models import KeyframeGenerationRequest
 
 
@@ -21,6 +22,12 @@ def keyframe_request_plan(
         if context_bundle
         else (public_refs[0]["asset_id"] if public_refs else None)
     )
+    keyframe_plan = build_keyframe_plan(
+        request,
+        provider_prompt=provider_prompt,
+        reference_images=reference_images,
+        context_bundle=context_bundle,
+    )
     payload = {
         "artifact_type": "agentflow_keyframe_request_plan",
         "schema_version": "0.1.0",
@@ -39,6 +46,7 @@ def keyframe_request_plan(
         "reference_image_count": len(public_refs),
         "reference_images": public_refs,
         "subject_reference_asset_id": subject_reference_asset_id,
+        "keyframe_plan": keyframe_plan,
         "provider_prompt": provider_prompt,
         "creative_agent": assembly["creative_agent"],
         "claim_boundary": "gate_closed_request_plan_only" if provider_gate["status"] == "blocked" else "provider_smoke_request_plan",

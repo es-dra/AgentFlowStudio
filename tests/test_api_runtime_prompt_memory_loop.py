@@ -1074,3 +1074,68 @@ def test_i2i_prompt_optimizer_guardrail_uses_uploaded_image_filename_hint(tmp_pa
     assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
     assert "校服周彤" in payload["optimized_prompt"]
     assert "不要染发变浅" in payload["optimized_prompt"]
+
+
+def test_script_prompt_optimization_returns_structured_script_plan(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_plan", "goal": "Script plan contract"})
+
+    response = client.post(
+        "/projects/proj_script_plan/prompt-optimizations",
+        json={
+            "node_id": "script-node-plan",
+            "node_type": "script",
+            "prompt_text": "Expand this idea into a formal short video script, not a shot list.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "source_idea": "A future robot watches stars on a rural rooftop.",
+                "forbidden_output": "storyboard_placeholder_outline",
+            },
+            "generated_at": "2026-06-27T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["script_plan"]["script_type"] == "formal_short_video_script"
+    assert payload["script_plan"]["asset_seed_policy"]["candidate_assets_are_editable"] is True
+    assert "script_plan" in payload["artifacts"]
+    assert "storyboard_placeholder_outline" in payload["script_plan"]["forbidden_outputs"]
+    assert "storyboard_placeholder_outline" not in payload["user_prompt"]
+
+    artifact = client.get(f"/artifacts/{payload['artifacts']['script_plan']['artifact_id']}").json()["payload"]
+    assert artifact["detected_subject_hints"] == ["future robot"]
+    assert "rooftop platform" in artifact["detected_scene_hints"]
+
+
+def test_prompt_optimizer_trace_includes_professional_reference_for_rooftop_video(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_prof_ref_prompt", "goal": "Professional reference trace"})
+
+    response = client.post(
+        "/projects/proj_prof_ref_prompt/prompt-optimizations",
+        json={
+            "node_id": "video-node-prof-ref",
+            "node_type": "video",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "generation_target": "video",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-06-27T10:20:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    reference = trace["professional_reference"]
+
+    assert "Professional reference:" in payload["optimized_prompt"]
+    assert "moderate-to-deep" in payload["optimized_prompt"]
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "motivated night exterior" in reference["lighting"]["decision"]
+    assert reference["writes_long_term_memory"] is False
+    assert reference["writes_company_kb"] is False

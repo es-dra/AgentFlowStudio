@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from apps.api.runtime_storyboard_planning import storyboard_plan_fields
+
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
 SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
@@ -22,6 +24,7 @@ def local_storyboard_shots(script_text: str, shot_count_hint: int | None = None)
 def structured_shot(text: str, index: int, global_refs: list[dict[str, str]] | None = None) -> dict[str, Any]:
     source = _clean(text)
     refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
+    plan_fields = storyboard_plan_fields(source, index)
     return {
         "shot_id": f"shot_{index:02d}",
         "index": index,
@@ -34,6 +37,7 @@ def structured_shot(text: str, index: int, global_refs: list[dict[str, str]] | N
         "sound": _sound(source),
         "asset_refs": refs,
         "source_text": source,
+        **plan_fields,
     }
 
 

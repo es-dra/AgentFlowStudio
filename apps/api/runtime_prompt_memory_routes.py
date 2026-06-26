@@ -22,7 +22,11 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
         output_dir = store.run_dir(project_id, job_id)
         try:
             result = build_prompt_optimization(store, project_id, request, output_dir)
-            artifacts = prompt_memory_artifacts(store, output_dir)
+            artifacts = prompt_memory_artifacts(
+                store,
+                output_dir,
+                include_script_plan=bool(result.get("script_plan")),
+            )
             trace_path = write_run_trace(
                 output_dir,
                 project_id=project_id,
@@ -67,6 +71,7 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "provider_calls_started": result["provider_calls_started"],
             "context_bundle": result.get("context_bundle"),
             "model_call_context_id": result["model_call_context"]["context_id"],
+            "script_plan": result.get("script_plan"),
             "writes_long_term_memory": False,
             "writes_company_kb": False,
             "safe_manifest": result["safe_manifest"],

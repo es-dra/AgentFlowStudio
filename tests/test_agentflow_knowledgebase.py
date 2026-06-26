@@ -98,3 +98,21 @@ def test_knowledgebase_paths_do_not_overlap_unrelated_learning_notes_state() -> 
         "D:/Learning materials/Learning_notes/10-Startup/70-Projects/AgentFlow-Studio/knowledgebase"
     )
     assert REPO_KNOWLEDGE_ROOT == Path("agentflow/knowledge")
+
+
+def test_professional_reference_context_selects_rooftop_night_video_guidance() -> None:
+    from agentflow.knowledge.professional_reference import format_professional_reference, professional_reference_from_text
+
+    context = professional_reference_from_text(
+        "A future robot watches stars on a rural rooftop platform.",
+        node_type="video",
+        generation_target="video",
+    )
+
+    assert {"night", "observational", "robot", "rooftop", "rural", "video"} <= set(context["tags"])
+    assert "moon/stars" in context["lighting"]["decision"]
+    assert "moderate-to-deep" in context["depth_of_field"]["decision"]
+    assert context["pacing"]["must_include"][0].startswith("0-1s")
+    assert "unapproved chair or stool" in context["scene_continuity"]["avoid"]
+    assert context["writes_company_kb"] is False
+    assert "Professional reference:" in format_professional_reference(context, "Camera/Framing")

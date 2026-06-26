@@ -1,5 +1,18 @@
 # Devlog
 
+## 2026-06-27 - Creative Algorithm Planning Layer
+
+- Added safe structured planning artifacts for the Studio generation chain: formal script plan, storyboard shot function/keyframe/video requirements, editable asset profile seeds, keyframe plan, and video motion/editing plan.
+- Kept provider gates unchanged; no live LLM, image, video, ASR, or external download was triggered. New plans are deterministic request/context projections and are not durable memory or Company OS feedback promotion.
+- Verification: focused algorithm/runtime pytest `67 passed`; broader regression excluding environment-conflicting full-repo scan/home-permission tests `637 passed`; CLI `--help` and `version` passed; `git diff --check` passed.
+
+## 2026-06-27 - Professional Creative Reference Layer
+
+- Added a deterministic professional reference context for camera/framing, motivated lighting, depth of field, temporal pacing, and scene-continuity constraints. It currently detects production tags such as night, rooftop, rural, robot, observational action, single-frame, and video.
+- Wired the reference context into prompt assembly sections and trace artifacts, storyboard shot planning, keyframe request planning, and video generation/provider prompts so downstream nodes receive explicit professional guidance instead of only generic cinematic phrasing.
+- Kept the source knowledgebase sync boundary intact: this pass adds an execution-projection algorithm layer and tests, but does not write to the external Company OS source KB, durable memory, provider raw responses, or media bytes.
+- Verification: focused knowledge/runtime/storyboard/keyframe/video regression set `77 passed, 1 existing warning`; Python compile for changed algorithm/runtime/test files passed.
+
 ## 2026-06-26 - Studio Script Upload and Asset Video Reference Fix
 
 - Fixed the canvas floating upload action so both `text` and `script` nodes

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.knowledge.professional_reference import (
+    format_professional_reference,
+    professional_reference_context,
+)
 from agentflow.knowledge.creative_prompt_rules import (
     REPO_KNOWLEDGE_ROOT,
     load_creative_prompt_rules,
@@ -41,7 +45,12 @@ def assemble_prompt_context(request: PromptOptimizationRequest, state: dict[str,
     )
     background = _background_context(state)
     suppressed = _suppressed_preferences(slots, selected_rules)
-    sections = _prompt_sections(request, slots, selected_rules, background, suppressed)
+    professional_reference = professional_reference_context(
+        slots=slots,
+        node_type=request.node_type,
+        generation_target=request.generation_target,
+    )
+    sections = _prompt_sections(request, slots, selected_rules, background, suppressed, professional_reference)
     user_prompt = build_user_prompt(request, slots)
     creative_agent = build_creative_agent_decision(
         request,
@@ -61,6 +70,7 @@ def assemble_prompt_context(request: PromptOptimizationRequest, state: dict[str,
         "selected_slots": slots,
         "background_context": background,
         "suppressed_context": suppressed,
+        "professional_reference": professional_reference,
         "conflict_resolution": {
             "policy": "professional_knowledge_over_user_preference",
             "professional_rules_applied": len(selected_rules),
@@ -78,12 +88,17 @@ def _prompt_sections(
     rules: list[dict[str, Any]],
     background: list[dict[str, Any]],
     suppressed: list[dict[str, str]],
+    professional_reference: dict[str, Any],
 ) -> list[dict[str, str]]:
     rule_guidance = _guidance_by_section(rules)
     background_text = _background_text(background)
     camera_controls = _node_parameter_text(request, ("aspect_ratio", "panorama", "shot_scale", "camera"))
     lighting_controls = _node_parameter_text(request, ("lighting",))
     motion_controls = _node_parameter_text(request, ("motion",))
+    reference_by_section = {
+        section: format_professional_reference(professional_reference, section)
+        for section in SECTION_ORDER
+    }
     text_by_section = {
         "Intent": (
             f"Optimize this {request.node_type} node for {request.generation_target} on {request.target_platform}. "
@@ -95,12 +110,12 @@ def _prompt_sections(
         ),
         "Scene/Production Design": (
             f"{slots['scene']}; preserve reusable scene geography, props, and atmosphere. "
-            f"{_scene_background(background)} {rule_guidance.get('Scene/Production Design', '')}"
+            f"{_scene_background(background)} {reference_by_section.get('Scene/Production Design', '')} {rule_guidance.get('Scene/Production Design', '')}"
         ),
         "Action/Beat": f"{slots['action']}; visible emotional cue: {slots['emotion']}. {rule_guidance.get('Action/Beat', '')}",
-        "Camera/Framing": f"{slots['camera']}; choose shot scale and angle for the beat. {camera_controls} {rule_guidance.get('Camera/Framing', '')}",
-        "Lighting": f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {lighting_controls} {rule_guidance.get('Lighting', '')}",
-        "Motion/Temporal Progression": f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {motion_controls} {rule_guidance.get('Motion/Temporal Progression', '')}",
+        "Camera/Framing": f"{slots['camera']}; choose shot scale and angle for the beat. {camera_controls} {reference_by_section.get('Camera/Framing', '')} {rule_guidance.get('Camera/Framing', '')}",
+        "Lighting": f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {lighting_controls} {reference_by_section.get('Lighting', '')} {rule_guidance.get('Lighting', '')}",
+        "Motion/Temporal Progression": f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {motion_controls} {reference_by_section.get('Motion/Temporal Progression', '')} {rule_guidance.get('Motion/Temporal Progression', '')}",
         "Continuity": (
             f"Reuse safe background context only: {background_text}. Asset refs: {_asset_refs(request)}. "
             f"Durable memory remains false. {rule_guidance.get('Continuity', '')}"
@@ -138,7 +153,7 @@ def _suppressed_preferences(slots: dict[str, str], rules: list[dict[str, Any]]) 
     preference = slots.get("preference", "")
     if not preference:
         return []
-    risky_terms = ("高饱和", "夸张炫光", "快速甩镜", "whip", "oversaturated", "flashy")
+    risky_terms = ("\u9ad8\u9971\u548c", "\u5938\u5f20\u70ab\u5149", "\u5feb\u901f\u7529\u955c", "whip", "oversaturated", "flashy")
     if any(term.lower() in preference.lower() for term in risky_terms):
         return [
             {

@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from apps.api.runtime_asset_profile_plan import attach_asset_profiles, build_asset_profile_plan
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_models import ShotAssetPlanRequest
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -47,6 +48,8 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
     refs = _remove_generic_when_specific(refs)
     refs = _dedupe_refs(refs)
     refs = [_with_evidence(ref, text) for ref in refs]
+    asset_profile_plan = build_asset_profile_plan(refs, text)
+    refs = attach_asset_profiles(refs, text)
     safe_manifest = {
         "artifact_type": "agentflow_shot_asset_plan_safe_manifest",
         "schema_version": "0.1.0",
@@ -58,6 +61,7 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
         "generated_media_bytes_stored": False,
         "asset_nodes_created": False,
         "asset_ref_count": len(refs),
+        "asset_profile_count": len(asset_profile_plan),
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": ASSET_PLAN_NON_CLAIMS,
@@ -66,6 +70,7 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
         "project_id": project_id,
         "node_id": request.node_id,
         "asset_refs": refs,
+        "asset_profile_plan": asset_profile_plan,
         "asset_nodes_created": False,
         "safe_manifest": safe_manifest,
         "writes_long_term_memory": False,

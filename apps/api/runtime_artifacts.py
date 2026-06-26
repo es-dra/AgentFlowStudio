@@ -23,8 +23,13 @@ def script_provider_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str
     }
 
 
-def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
-    return {
+def prompt_memory_artifacts(
+    store: RuntimeStore,
+    output_dir: Path,
+    *,
+    include_script_plan: bool = False,
+) -> dict[str, Any]:
+    artifacts = {
         "model_call_context": store.register_artifact(
             output_dir / "model_call_context.json",
             role="model_call_context",
@@ -42,6 +47,12 @@ def prompt_memory_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, 
             role="prompt_optimization_safe_manifest",
         ),
     }
+    if include_script_plan:
+        artifacts["script_plan"] = store.register_artifact(
+            output_dir / "script_plan.json",
+            role="script_plan",
+        )
+    return artifacts
 
 
 def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:

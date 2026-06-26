@@ -513,3 +513,66 @@ def _upload_reference(client: TestClient, project_id: str, filename: str) -> str
     )
     assert upload.status_code == 200
     return upload.json()["asset"]["asset_id"]
+
+
+def test_keyframe_request_plan_includes_structured_keyframe_plan(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_keyframe_plan"
+    client.post("/projects", json={"project_id": project_id, "goal": "Keyframe plan"})
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "keyframe_robot_rooftop",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "optimized_prompt": "Medium keyframe of a future robot on a rooftop under stars; no chairs or eaves.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-27T10:10:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    keyframe_plan = plan["keyframe_plan"]
+
+    assert keyframe_plan["frame_role"] == "story_continuity_keyframe"
+    assert "unrequested chair" in keyframe_plan["forbidden_changes"]
+    assert "unrequested eaves" in keyframe_plan["forbidden_changes"]
+    assert "rooftop platform geometry" in keyframe_plan["scene_locks"]
+    assert keyframe_plan["candidate_assets_are_editable"] is True
+
+
+def test_keyframe_plan_includes_professional_reference(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_keyframe_prof_ref"
+    client.post("/projects", json={"project_id": project_id, "goal": "Keyframe professional reference"})
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "keyframe_prof_ref",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "optimized_prompt": "Medium keyframe of a future robot on a rooftop under stars; no chairs or eaves.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "generated_at": "2026-06-27T10:25:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    reference = plan["keyframe_plan"]["professional_reference"]
+
+    assert {"night", "rooftop", "single_frame"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert "unapproved chair or stool" in reference["scene_continuity"]["avoid"]
+    assert reference["writes_company_kb"] is False

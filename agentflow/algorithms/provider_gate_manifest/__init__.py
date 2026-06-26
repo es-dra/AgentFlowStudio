@@ -4,7 +4,13 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from agentflow.algorithms.provider_gate_manifest.video_prompt import strip_image_edit_language, video_provider_prompt
+from agentflow.algorithms.provider_gate_manifest.video_prompt import (
+    strip_image_edit_language,
+    video_editing_plan,
+    video_generation_plan,
+    video_motion_plan,
+    video_provider_prompt,
+)
 
 
 ALGORITHM_ID = "afs.provider_gate_manifest.v0.1"
@@ -127,5 +133,8 @@ __all__ = (
     "required_gate_for",
     "strip_image_edit_language",
     "succeeded_manifest",
+    "video_editing_plan",
+    "video_generation_plan",
+    "video_motion_plan",
     "video_provider_prompt",
 )

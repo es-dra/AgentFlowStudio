@@ -399,3 +399,62 @@ def test_storyboard_breakdown_is_exported_without_secret_surface(tmp_path) -> No
     assert "storyboardbreakdownrequest" in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+def test_storyboard_shots_include_keyframe_and_video_plan_fields() -> None:
+    shots = local_storyboard_shots("A future robot stands on a rural rooftop and watches stars before turning its glowing face toward the sky.")
+
+    first = shots[0]
+    assert first["shot_function"] == "establish"
+    assert first["keyframe_requirement"]["frame_role"] == "establish_keyframe"
+    assert first["video_motion_requirement"]["time_beats"][0]["time"] == "0.0s-1.0s"
+    assert "robot head shell and mechanical body proportions" in first["continuity_locks"]
+    assert "no unrequested chair" in first["negative_scene_locks"]
+
+
+def test_shot_asset_plan_returns_editable_asset_profiles(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_asset_profile_plan"
+    client.post("/projects", json={"project_id": project_id, "goal": "Asset profile plan"})
+
+    response = client.post(
+        f"/projects/{project_id}/shot-asset-plans",
+        json={
+            "node_id": "shot_robot_rooftop",
+            "shot": {
+                "shot_id": "shot_01",
+                "index": 1,
+                "description": "A future robot watches stars on a rural rooftop platform.",
+                "asset_refs": [
+                    {"label": "Future Robot", "asset_type": "character", "status": "candidate", "source": "explicit"},
+                    {"label": "Rooftop Platform", "asset_type": "scene", "status": "candidate", "source": "explicit"},
+                ],
+            },
+            "script_text": "A future robot watches stars on a rural rooftop platform.",
+            "generated_at": "2026-06-27T10:05:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["safe_manifest"]["asset_profile_count"] >= 2
+    assert len(payload["asset_profile_plan"]) >= 2
+    robot = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "character")
+    scene = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "scene")
+    assert robot["profile_stage"] == "candidate_profile_seed"
+    assert "robot head shell" in robot["identity_locks"]
+    assert "forbidden geometry" in scene["editable_fields"]
+    assert "do not add chairs or stools unless approved" in scene["negative_locks"]
+    assert all("profile_plan" in ref for ref in payload["asset_refs"])
+
+
+def test_storyboard_plan_includes_professional_reference_for_rooftop_video() -> None:
+    shots = local_storyboard_shots("A future robot stands on a rural rooftop and watches stars before turning its glowing face toward the sky.")
+
+    reference = shots[0]["professional_reference"]
+
+    assert {"night", "rooftop", "video"} <= set(reference["tags"])
+    assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
+    assert reference["pacing"]["must_include"][0].startswith("0-1s")
+    assert reference["writes_company_kb"] is False

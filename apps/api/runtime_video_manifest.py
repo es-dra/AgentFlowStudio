@@ -17,13 +17,15 @@ def video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], re
     outputs = result.get("outputs") or []
     model_call_context = result.get("model_call_context") if isinstance(result.get("model_call_context"), dict) else {}
     model_call_context_id = str(model_call_context.get("context_id") or (result.get("safe_manifest") or {}).get("model_call_context_id") or "")
+    safe = result.get("safe_manifest") or {}
     return {
         "job": job,
-        "provider_gate": (result.get("safe_manifest") or {}).get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
-        "provider_calls_started": bool((result.get("safe_manifest") or {}).get("provider_calls_started")),
+        "provider_gate": safe.get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
+        "provider_calls_started": bool(safe.get("provider_calls_started")),
         "safe_manifest": result.get("safe_manifest"),
         "context_bundle": result.get("context_bundle"),
         "model_call_context_id": model_call_context_id or None,
+        "video_generation_plan": result.get("video_generation_plan") or safe.get("video_generation_plan"),
         "artifacts": job.get("artifacts") or result.get("artifacts") or {},
         "candidate_previews": candidate_previews(project_id, job_id, outputs),
         "flow": {"project_id": project_id},
@@ -101,12 +103,20 @@ def result_from_manifest(
     bundle = context_bundle
     if bundle is None and isinstance(task_state, dict) and isinstance(task_state.get("context_bundle"), dict):
         bundle = task_state.get("context_bundle")
+    generation_plan = None
+    if isinstance(model_request_plan, dict):
+        generation_plan = model_request_plan.get("generation_plan")
+    if generation_plan is None and isinstance(task_state, dict):
+        generation_plan = task_state.get("video_generation_plan")
+    if generation_plan is None:
+        generation_plan = safe_manifest.get("video_generation_plan")
     return {
         "status": status,
         "safe_manifest": safe_manifest,
         "task_state": task_state,
         "outputs": outputs or safe_manifest.get("outputs") or [],
         "context_bundle": bundle,
+        "video_generation_plan": generation_plan,
         "artifacts": artifacts or {},
         "model_call_context": model_call_context,
         "model_request_plan": model_request_plan,
