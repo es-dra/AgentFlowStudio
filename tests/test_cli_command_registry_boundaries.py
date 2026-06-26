@@ -27,6 +27,7 @@ VISIBLE_PRODUCT_COMMANDS = (
     "memory-evidence-reuse-review",
     "runtime-service",
     "runtime-service-openapi-export",
+    "auth-invites",
 )
 
 
@@ -42,6 +43,7 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "register_production_memory_commands" in source
     assert "runtime-service" in source
     assert "runtime-service-openapi-export" in source
+    assert "auth_invites_app" in source
     assert "production-memory-loop-next-operator-start-packet" not in source
     assert "production-memory-loop-record-next-operator-start" not in source
     assert "production-memory-loop-record-next-operator-action-result" not in source
@@ -138,6 +140,49 @@ def test_runtime_service_openapi_export_command_writes_frontend_schema(tmp_path)
     assert "/provider/validation-plan" not in schema["paths"]
     assert "/provider/script-draft-plan" in schema["paths"]
     assert "api_key" not in json.dumps(schema, ensure_ascii=False).lower()
+
+
+def test_auth_invites_cli_issues_lists_and_revokes_without_storing_plaintext(tmp_path) -> None:
+    runtime_root = tmp_path / "runtime"
+    output = tmp_path / "admin-local" / "wave1.csv"
+    runner = CliRunner()
+
+    issued = runner.invoke(
+        app,
+        [
+            "auth-invites",
+            "issue",
+            "--runtime-root",
+            str(runtime_root),
+            "--count",
+            "2",
+            "--batch",
+            "wave-1",
+            "--note",
+            "first internal beta",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert issued.exit_code == 0, issued.output
+    rows = output.read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 3
+    first_code = rows[1].split(",", 1)[0]
+    assert first_code.startswith("AFS-")
+    assert first_code not in issued.output
+    invites_text = (runtime_root / "auth" / "invites.json").read_text(encoding="utf-8")
+    assert first_code not in invites_text
+
+    listed = runner.invoke(app, ["auth-invites", "list", "--runtime-root", str(runtime_root)])
+    assert listed.exit_code == 0, listed.output
+    assert "wave-1" in listed.output
+    assert first_code not in listed.output
+
+    first_invite_id = rows[1].split(",")[1]
+    revoked = runner.invoke(app, ["auth-invites", "revoke", first_invite_id, "--runtime-root", str(runtime_root)])
+    assert revoked.exit_code == 0, revoked.output
+    assert "revoked" in revoked.output
 
 
 def test_hidden_production_memory_support_commands_remain_callable() -> None:

@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-26 - Internal Beta Invite Admin CLI
+
+- Added an admin-only `auth-invites` CLI for the existing Runtime auth store.
+  Maintainers can issue, list, and revoke one-time invite codes without adding
+  a public HTTP admin surface.
+- Invite code plaintext is never stored in Runtime auth state. The store keeps
+  only hashes plus safe metadata (`invite_id`, status, batch, note, timestamps);
+  plaintext is written only to an admin-local CSV when `--output` is provided.
+  With `--output`, the CLI no longer prints plaintext codes to the terminal.
+- Runtime registration now rejects revoked and expired invites in addition to
+  consumed invites. The public invite listing returns safe status fields only.
+- Invite admin helpers live in `apps/api/runtime_auth_invites.py` so
+  `runtime_auth.py` stays under the project file-size boundary.
+- Added `docs/handoff/AFS-INTERNAL-BETA-ADMIN-20260626.md` as the current
+  operating runbook for internal beta account distribution and feedback intake.
+
+Verification:
+
+```text
+pytest tests/test_api_runtime_auth.py tests/test_cli_command_registry_boundaries.py -q -> 16 passed, 1 warning
+python -m apps.cli.main auth-invites --help -> passed
+```
+
+Boundary:
+
+- This is an internal beta access mechanism, not a SaaS roles/orgs/billing
+  system and not a public admin dashboard.
+- No real invite codes, user passwords, session tokens, provider secrets,
+  signed URLs, media bytes, or private Company OS source content were written
+  to Git.
+
 ## 2026-06-26 - Branch Cleanup And AFS+COS Takeover Handoff
 
 - Audited branch state across local `D:\Projects\AgentFlowStudio`, GitHub

@@ -8,6 +8,12 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agentflow.harness.json_io import write_json
+from apps.api.runtime_auth_invites import (
+    create_invite_record,
+    invite_expired,
+    list_public_invites,
+    revoke_invite_record,
+)
 from apps.api.runtime_auth_security import (
     bearer_token,
     enabled,
@@ -90,6 +96,31 @@ class RuntimeAuthStore:
             changed = True
         if changed:
             write_json(self.invites_path, invites)
+
+    def create_invite_code(
+        self,
+        code: str,
+        *,
+        source: str = "admin_cli",
+        batch_id: str = "",
+        note: str = "",
+        expires_at: str = "",
+    ) -> dict[str, Any]:
+        return create_invite_record(
+            invites_path=self.invites_path,
+            invites=self._invites(),
+            code=code,
+            source=source,
+            batch_id=batch_id,
+            note=note,
+            expires_at=expires_at,
+        )
+
+    def list_invites(self) -> list[dict[str, Any]]:
+        return list_public_invites(self._invites())
+
+    def revoke_invite(self, invite_id: str) -> dict[str, Any]:
+        return revoke_invite_record(invites_path=self.invites_path, invites=self._invites(), invite_id=invite_id)
 
     def register(self, request: AuthRegisterRequest) -> dict[str, Any]:
         if not self.enabled():
@@ -198,7 +229,7 @@ class RuntimeAuthStore:
         code_hash = hash_text(normalize_invite_code(invite_code))
         invites = self._invites()
         invite = invites["invites"].get(code_hash)
-        if not invite or invite.get("consumed_by_user_id"):
+        if not invite or invite.get("consumed_by_user_id") or invite.get("revoked_at") or invite_expired(invite):
             raise HTTPException(status_code=400, detail="invite code is invalid or already used")
         invite["consumed_by_user_id"] = "pending"
         invite["consumed_at"] = now()

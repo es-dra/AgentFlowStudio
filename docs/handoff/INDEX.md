@@ -70,6 +70,7 @@ responses, or media bytes.
 
 ## Internal Beta Acceptance
 
+- `AFS-INTERNAL-BETA-ADMIN-20260626.md`
 - `AFS-INTERNAL-BETA-ACCEPTANCE-OPERATING-INDEX-20260619.md`
 
 This index routes three-end readiness, deployed preflight, deterministic

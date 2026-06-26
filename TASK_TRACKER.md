@@ -12,6 +12,16 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Internal beta account/admin baseline: 2026-06-26 added the admin-only
+`auth-invites` CLI on top of the existing Runtime auth store. Current
+administrator entrypoint:
+`docs/handoff/AFS-INTERNAL-BETA-ADMIN-20260626.md`. The CLI supports issuing,
+listing, and revoking one-time invite codes; Runtime persists invite hashes and
+safe metadata only. Plaintext invite codes are admin-local distribution
+material and must not be copied into GitHub issues, PRs, handoffs, DEVLOG, or
+TASK_TRACKER. This is an internal beta access mechanism, not a public admin UI,
+SaaS role/org system, password reset system, or billing/accounting layer.
+
 AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
 GitHub, server `/home`, and server `/opt`. The intended clean branch state is
 `master` only on all four surfaces. Merged server-local `codex/*` branches were

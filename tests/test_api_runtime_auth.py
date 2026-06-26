@@ -5,7 +5,9 @@ import json
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_auth import RuntimeAuthStore
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_store import RuntimeStore
 
 PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
@@ -68,6 +70,33 @@ def test_invite_registration_creates_session_and_consumes_code(tmp_path, monkeyp
     )
     assert reused.status_code == 400
     assert "invite" in reused.text.lower()
+
+
+def test_admin_invites_are_hash_only_listable_and_revocable(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_AUTH_ENABLED", "true")
+    auth = RuntimeAuthStore(RuntimeStore(tmp_path))
+    invite = auth.create_invite_code("private-alpha-code", batch_id="wave-1", note="Alice")
+
+    invites_text = (tmp_path / "auth" / "invites.json").read_text(encoding="utf-8")
+    assert "private-alpha-code" not in invites_text
+    assert invite["status"] == "available"
+    assert invite["batch_id"] == "wave-1"
+    assert auth.list_invites()[0]["invite_id"] == invite["invite_id"]
+
+    revoked = auth.revoke_invite(invite["invite_id"])
+    assert revoked["status"] == "revoked"
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": "alpha@example.com",
+            "password": "strong-password-123",
+            "display_name": "Alpha",
+            "invite_code": "private-alpha-code",
+        },
+    )
+    assert response.status_code == 400
 
 
 def test_expired_session_is_rejected_and_removed(tmp_path, monkeypatch) -> None:
