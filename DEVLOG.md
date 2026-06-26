@@ -14,7 +14,9 @@
 - Allowed image relay artifact downloads over HTTP when, and only when, the
   artifact host matches the configured `allowed_artifact_hosts` allowlist. This
   matches the current relay's temporary artifact URL shape while still avoiding
-  URL persistence in safe manifests.
+  URL persistence in safe manifests. Crazyrouter image relay now also gets
+  `.myqcloud.com` as a code-side default artifact host because the live relay
+  returned temporary image artifacts from `vod2.myqcloud.com`.
 
 Verification:
 
@@ -23,6 +25,7 @@ python -m pytest tests/test_provider_adapter_registry.py tests/test_web_studio_a
 AFS_PROVIDER_CONFIG=/etc/afs/providers.local.json python - <<loader probe>> -> services ['image_relay', 'seedance_i2v']; codex_image lookup rejected
 python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_generation_manifest_safety.py tests/test_model_call_context_runtime_routes.py tests/test_web_studio_assets_generation_static.py -q -> 61 passed
 python -m pytest tests/test_provider_adapter_registry.py -q -> 28 passed
+python -m pytest tests/test_provider_adapter_registry.py -q -> 28 passed after Crazyrouter artifact host default
 git diff --check -> passed
 ```
 

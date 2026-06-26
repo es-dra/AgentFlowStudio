@@ -18,6 +18,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
+CRAZYROUTER_IMAGE_ARTIFACT_HOSTS = (".myqcloud.com",)
 
 
 class ApiRelayAdapter:
@@ -208,9 +209,20 @@ def _payload_format(service: dict[str, Any]) -> str:
 
 def _allowed_url_hosts(service: dict[str, Any]) -> tuple[str, ...]:
     value = service.get("allowed_artifact_hosts")
-    if not isinstance(value, list):
-        return ()
-    return tuple(str(item).lower().strip() for item in value if str(item).strip())
+    hosts = []
+    if isinstance(value, list):
+        hosts.extend(str(item).lower().strip() for item in value if str(item).strip())
+    if _is_crazyrouter_image_service(service):
+        hosts.extend(item for item in CRAZYROUTER_IMAGE_ARTIFACT_HOSTS if item not in hosts)
+    return tuple(hosts)
+
+
+def _is_crazyrouter_image_service(service: dict[str, Any]) -> bool:
+    if str(service.get("capability") or "") != "image":
+        return False
+    account_ref = str(service.get("account_ref") or "").lower()
+    base_url = str(service.get("base_url") or "").lower()
+    return "crazyrouter" in account_ref or "crazyrouter" in base_url
 
 
 def _reference_images_payload(paths: tuple[Path | str, ...]) -> list[dict[str, Any]]:

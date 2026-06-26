@@ -57,7 +57,10 @@ privileged operator rewrites root-owned `/etc/afs/providers.local.json`.
 The same guard pass also allows image relay artifact downloads over HTTP only
 when the response host matches configured `allowed_artifact_hosts`, matching
 the current relay's temporary artifact URL shape without persisting returned
-URLs in Git or safe manifests.
+URLs in Git or safe manifests. A live host probe showed Crazyrouter image
+artifacts coming from `vod2.myqcloud.com`, so the code adds `.myqcloud.com` as
+a Crazyrouter image relay default artifact host while keeping the allowlist
+requirement.
 Verification: focused provider/Runtime/Studio regression set passed 61,
 `git diff --check` passed, and a read-only loader probe against
 `/etc/afs/providers.local.json` exposed `image_relay` plus `seedance_i2v` while
