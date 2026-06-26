@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-26 - Branch Cleanup And AFS+COS Takeover Handoff
+
+- Audited branch state across local `D:\Projects\AgentFlowStudio`, GitHub
+  `origin`, server `/home/afs-ops/AgentFlowStudio`, and server
+  `/opt/afs/AgentFlowStudio`.
+- Deleted merged server-local branches:
+  `codex/align-codex-routing-upstream`,
+  `codex/frontend-b14-sync-20260619`, and
+  `codex/studio-prompt-script-image-diagnostics` from `/home`; deleted
+  `codex/align-codex-routing-upstream` and
+  `codex/studio-prompt-script-image-diagnostics` from `/opt`.
+- Inspected stale branch `codex/open-source-handoff-governance`; it contained
+  useful onboarding/governance direction but was based behind current video
+  chain work and would have reverted active Studio/Runtime changes if merged.
+  The stale worktree, local branch, and GitHub remote branch were removed after
+  the current handoff was recreated on `master`.
+- Added `docs/handoff/AFS-COS-TAKEOVER-20260626.md` as the current takeover
+  entry for AFS + COS collaborators, covering read order, product chain,
+  evidence, branch baseline, server checks, provider gates, and claim
+  boundaries.
+
+Verification:
+
+```text
+Local branches: master only
+GitHub heads: master only
+Server /home branches: master only
+Server /opt branches: master only
+git worktree list: only D:\Projects\AgentFlowStudio
+git worktree prune --dry-run: no stale entries
+```
+
+Boundary:
+
+- The server `/home` checkout still has an untracked `ops/` directory; it was
+  treated as an ops-local artifact and not removed.
+- No provider call, secret read, media byte write, or private Company OS source
+  copy occurred in this cleanup.
+
 ## 2026-06-26 - Script, Keyframe Asset, and Video Progress Hardening
 
 - Fixed Studio idea expansion so `扩写剧本` asks the optimizer for a formal

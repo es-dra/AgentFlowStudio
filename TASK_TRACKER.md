@@ -12,6 +12,18 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
+GitHub, server `/home`, and server `/opt`. The intended clean branch state is
+`master` only on all four surfaces. Merged server-local `codex/*` branches were
+deleted. Stale `codex/open-source-handoff-governance` was inspected, not merged
+because it was behind current video-chain work, then removed from local
+worktree/local branch/GitHub after the current takeover handoff was recreated
+on `master`. Current takeover entry:
+`docs/handoff/AFS-COS-TAKEOVER-20260626.md`. Server `/home` still has an
+untracked `ops/` directory and it remains intentionally untouched as an
+ops-local artifact. Boundary: no provider call, secret read, media byte write,
+or private Company OS source copy occurred.
+
 Video node full-chain hardening follow-up: 2026-06-26 pass fixed four issues
 from the robot/rooftop full-chain experiment. `扩写剧本` now requests and
 falls back to formal short-video script prose before storyboard breakdown,
