@@ -19,9 +19,16 @@ def gate_closed_block(required_gate: str) -> dict[str, str]:
 
 
 def provider_not_ready_block(reason: str) -> dict[str, str]:
+    safe_reason = safe_video_error(reason)
+    if _is_policy_block(safe_reason):
+        return {
+            "block_id": "remote_video_policy_block",
+            "reason": _policy_reason(safe_reason),
+            "required_gate": REMOTE_VIDEO_ENV,
+        }
     return {
         "block_id": "remote_video_provider_not_ready",
-        "reason": safe_video_error(reason),
+        "reason": safe_reason,
         "required_gate": REMOTE_VIDEO_ENV,
     }
 
@@ -30,4 +37,19 @@ def safe_video_error(value: str) -> str:
     lowered = value.lower()
     if "api" in lowered or "key" in lowered or "secret" in lowered or "token" in lowered:
         return "Video provider configuration is not ready."
-    return value[:160]
+    return _strip_provider_request_id(value)[:160]
+
+
+def _is_policy_block(value: str) -> bool:
+    lowered = value.lower()
+    return "policy block" in lowered or "policyviolation" in lowered or "copyright" in lowered
+
+
+def _policy_reason(value: str) -> str:
+    if "copyright" in value.lower():
+        return "Video provider policy block: output video may be related to copyright restrictions."
+    return "Video provider policy block."
+
+
+def _strip_provider_request_id(value: str) -> str:
+    return value.split("Request id:", 1)[0].split("request id:", 1)[0].strip()

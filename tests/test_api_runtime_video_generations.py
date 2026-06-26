@@ -420,6 +420,53 @@ def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path,
     assert "token" not in serialized
 
 
+def test_video_generation_policy_failure_writes_policy_block(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class PolicyFailingRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO")
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            return {"task": {"status": "submitted", "task_id": "policy-task"}}
+
+        def poll(self, capability: str, service_id: str, task):
+            raise RuntimeError(
+                "Seedance video policy block: output video may be related to copyright restrictions. "
+                "Request id: raw-provider-id"
+            )
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: PolicyFailingRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-policy-block"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video policy block"})
+    asset_id = _upload_image(client, project_id)
+
+    submitted = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "prompt_text": "A slow camera push in.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "generated_at": "2026-06-13T10:00:00+08:00",
+        },
+    )
+    job_id = submitted.json()["job"]["job_id"]
+    polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
+
+    assert polled.status_code == 200
+    payload = polled.json()
+    block = payload["safe_manifest"]["blocks"][0]
+    assert block["block_id"] == "remote_video_policy_block"
+    assert "copyright restrictions" in block["reason"]
+    assert "raw-provider-id" not in json.dumps(payload, ensure_ascii=False)
+
+
 def _fake_video_provider_config(tmp_path) -> str:
     payload = {
         "schema_version": "company_provider_secrets.local.v2",

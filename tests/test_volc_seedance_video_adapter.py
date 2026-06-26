@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.company_secrets import load_company_provider_secrets
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelGatewayError, ModelProviderError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, ProviderRegistry
 from apps.api import runtime_video_routes
 from apps.api.runtime_service import create_runtime_app
@@ -155,6 +155,63 @@ def test_seedance_submit_task_state_is_safe_and_poll_rehydrates_credential(tmp_p
     assert captured["create_auth"] == "Bearer secret-video-key"
     assert captured["poll_auth"] == "Bearer secret-video-key"
     assert result["status"] == "succeeded"
+
+
+def test_seedance_poll_reports_policy_failure_safely(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        url = request.full_url if hasattr(request, "full_url") else str(request)
+        if url == "https://relay.test/volc/v1/contents/generations/tasks":
+            return _JsonResponse({"id": "cgt-seedance-policy-task", "status": "queued"})
+        if url == "https://relay.test/volc/v1/contents/generations/tasks/cgt-seedance-policy-task":
+            return _JsonResponse(
+                {
+                    "code": "success",
+                    "data": {
+                        "status": "FAILURE",
+                        "fail_reason": "task failed",
+                        "data": {
+                            "error": {
+                                "code": "OutputVideoSensitiveContentDetected.PolicyViolation",
+                                "message": (
+                                    "The request failed because the output video may be related "
+                                    "to copyright restrictions. Request id: raw-provider-id"
+                                ),
+                            }
+                        },
+                    },
+                }
+            )
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    task = registry.submit(
+        "video",
+        "seedance_i2v",
+        ProviderDispatchRequest(
+            prompt="A controlled cinematic move from the first frame.",
+            output_dir=tmp_path / "run",
+            aspect_ratio="16:9",
+            reference_image_paths=(first,),
+            subject_reference_image_path=first,
+            duration_sec=5,
+            resolution="720p",
+        ),
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        registry.poll("video", "seedance_i2v", task)
+
+    message = str(exc_info.value)
+    assert "copyright restrictions" in message
+    assert "raw-provider-id" not in message
+    assert "secret-video-key" not in message
 
 
 def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> None:

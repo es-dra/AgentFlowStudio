@@ -21,6 +21,12 @@
   environment variable name, which contains the forbidden `api_key` fragment.
   Seedance submit tasks no longer persist credential env names; poll now
   rehydrates auth header/scheme/env from provider config at runtime.
+- A deployed smoke after the task-state fix submitted successfully and polled
+  the Seedance task, then the upstream provider failed the specific
+  Wolverine/Sun Wukong keyframe with a copyright policy violation. The adapter
+  now maps that provider failure into a safe policy-block reason and strips raw
+  provider request ids from surfaced errors. Runtime safe manifests now report
+  this as `remote_video_policy_block` instead of provider-not-ready.
 - Investigated the deployed video failure behind the Studio screenshot. Runtime
   video gate was open, provider dispatch started, but the selected service was
   the retired `kling_i2v` path. The server provider config has Seedance relay
@@ -42,17 +48,17 @@
 Verification:
 
 ```text
-pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 16 passed, 1 warning
-pytest tests/test_web_studio_assets_generation_static.py tests/test_provider_adapter_registry.py tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py tests/test_cli_command_registry_boundaries.py tests/test_architecture_audit_gates.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_production_memory_provider_validation_gate.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py -q -> 105 passed, 5 deselected, 1 warning
+pytest tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py -q -> 18 passed, 1 warning
+pytest tests/test_web_studio_assets_generation_static.py tests/test_provider_adapter_registry.py tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py tests/test_cli_command_registry_boundaries.py tests/test_architecture_audit_gates.py tests/test_afs_mvp_joint_qa_readiness_audit.py tests/test_production_memory_provider_validation_gate.py tests/test_api_runtime_studio_state.py tests/test_api_runtime_studio_state_persistence.py -q -> 108 passed, 5 deselected, 1 warning
 npm.cmd run check:studio-js -> JS syntax check passed: 120 files
 git diff --check -> passed
 ```
 
 Boundary:
 
-- No live video provider submit was made in this cleanup pass. No provider raw
-  response, signed URL, generated media byte, secret, or private Company OS
-  source content was written to the repo.
+- Authorized live video smokes were run on the server to verify the deployed
+  Runtime path. No provider raw response, signed URL, generated media byte,
+  secret, or private Company OS source content was written to the repo.
 
 ## 2026-06-25 - Keyframe Menu Video Continuation for Legacy Nodes
 

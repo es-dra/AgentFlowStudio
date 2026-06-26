@@ -115,7 +115,7 @@ class VolcSeedanceVideoAdapter:
         if status in {"queued", "pending", "running", "processing", "submitted", "in_progress"}:
             return {"status": "running", "task": {"task_id": task_id}}
         if status not in {"succeeded", "success", "completed", "done"}:
-            raise ModelProviderError(f"Seedance video task failed with status: {status or 'unknown'}")
+            raise ModelProviderError(_task_failure_reason(response, status))
         video_url = _video_url(response)
         video_bytes, content_type = _download_video(
             video_url,
@@ -245,6 +245,40 @@ def _task_status(response: dict[str, Any]) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip().lower()
     return ""
+
+def _task_failure_reason(response: dict[str, Any], status: str) -> str:
+    strings = _collect_failure_strings(response)
+    combined = " ".join(strings).lower()
+    if (
+        "policyviolation" in combined
+        or "sensitivecontent" in combined
+        or "copyright restrictions" in combined
+        or "copyright" in combined
+    ):
+        return "Seedance video policy block: output video may be related to copyright restrictions."
+    for value in strings:
+        if value.strip().lower() in {"success", "failure", "failed", "task failed"}:
+            continue
+        safe = _safe_error(_strip_provider_request_id(value))
+        if safe and safe != "Seedance video provider configuration is not ready.":
+            return f"Seedance video task failed: {safe}"
+    return f"Seedance video task failed with status: {status or 'unknown'}"
+
+def _collect_failure_strings(value: Any) -> list[str]:
+    keys = {"code", "error", "message", "msg", "reason", "detail", "fail_reason", "fail_message"}
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in keys and isinstance(item, str) and item.strip():
+                found.append(item.strip())
+            found.extend(_collect_failure_strings(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(_collect_failure_strings(item))
+    return found
+
+def _strip_provider_request_id(value: str) -> str:
+    return value.split("Request id:", 1)[0].split("request id:", 1)[0].strip()
 
 
 def _video_url(response: dict[str, Any]) -> str:

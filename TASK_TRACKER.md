@@ -49,6 +49,15 @@ config at runtime. Focused regression:
 `tests/test_volc_seedance_video_adapter.py tests/test_api_runtime_video_generations.py`
 passed 16 with 1 existing warning.
 
+Seedance policy-block follow-up: after the task-state fix, a deployed smoke
+submitted successfully and polled the remote task, then the current
+Wolverine/Sun Wukong keyframe was rejected by the upstream provider as a
+copyright policy violation. The adapter now maps that provider response to a
+safe policy-block reason and strips raw provider request ids before surfacing
+the error. Runtime safe manifests now use `remote_video_policy_block` for this
+case. This confirms the latest failure is content-policy related, not a Kling
+fallback, 404, video gate, credential, or task-state persistence issue.
+
 Current keyframe-to-video legacy-node addendum: 2026-06-25 follow-up expands
 the right-click `接续视频节点` path so historical completed keyframe image nodes
 whose title/prompt marks them as keyframes also get the same automation, even
