@@ -10,6 +10,7 @@ retired Web/Workbench handoffs or old smoke logs.
 
 ## Current Required Reading
 
+- [Contributor onboarding](CONTRIBUTOR_ONBOARDING.md)
 - [Company operating projection](company_operating_model.md)
 - [Current architecture](current_architecture.md)
 - [Project Manifest contract](project_manifest_contract.md)
