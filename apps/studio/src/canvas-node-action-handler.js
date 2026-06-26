@@ -19,7 +19,7 @@ export function handleCanvasNodeClick(store, runtime, e) {
   if (action === "intent") handleNodeIntent(store, node, actionEl.dataset.intent);
   else if (action === "open-director") openDirectorShell(store, node);
   else if (action === "asset-detail") openAssetDetailPopover(store, runtime, assetRefForAction(node, actionEl.dataset.assetId), actionEl);
-  else if (node.type === "text" && action === "upload") importScriptFileIntoTextNode(store, node);
+  else if (["text", "script"].includes(node.type) && action === "upload") importScriptFileIntoTextNode(store, node);
   else if (action === "upload") uploadNodeImage(store, runtime, node);
   else if (action === "fix-visual-asset") fixNodeVisualAsset(store, runtime, node);
   else if (action === "open-generation-panel" || action === "continue-generate") {

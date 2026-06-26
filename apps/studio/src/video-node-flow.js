@@ -1,4 +1,4 @@
-import { lastImageAsset, mergeImageAssets } from "./node-image-assets.js";
+import { imageAssetFromVisualAsset, lastImageAsset, mergeImageAssets } from "./node-image-assets.js";
 
 const VIDEO_AUTO_POLL_INTERVAL_MS = 12000;
 const VIDEO_AUTO_POLL_MAX_ATTEMPTS = 80;
@@ -7,8 +7,18 @@ const videoAutoPollTimers = new Map();
 export function ensureVideoFirstFrameAsset(store, node) {
   const explicit = String(node?.params?.firstFrameImageAssetId || "").trim();
   if (explicit) return { asset_id: explicit };
+  const directVisual = firstFrameAssetFromVisualAssets(node);
+  if (directVisual?.asset_id) {
+    persistInferredFirstFrame(store, node, directVisual, `已自动使用参考资产作为首帧: ${directVisual.asset_id}`);
+    return directVisual;
+  }
   const inferred = inferConnectedFirstFrameAsset(store, node);
   if (!inferred?.asset_id) return null;
+  persistInferredFirstFrame(store, node, inferred, `已自动使用上游关键帧作为首帧: ${inferred.asset_id}`);
+  return inferred;
+}
+
+function persistInferredFirstFrame(store, node, inferred, result) {
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
@@ -16,11 +26,10 @@ export function ensureVideoFirstFrameAsset(store, node) {
     if (inferred.preview_url) n.params.firstFramePreviewUrl = inferred.preview_url;
     n.params.uploads = mergeImageAssets(n.params.uploads || [], {
       ...inferred,
-      role: inferred.role || "first_frame",
+      role: "first_frame",
     }).slice(-4);
-    n.result = `已自动使用上游关键帧作为首帧: ${inferred.asset_id}`;
+    n.result = result;
   });
-  return inferred;
 }
 
 export function scheduleVideoAutoPoll({
@@ -79,8 +88,22 @@ function inferConnectedFirstFrameAsset(store, node) {
     if (asset?.asset_id) return normalizeImageAssetRef(asset, "generated_keyframe_reference");
   }
   for (const edge of incoming) {
+    const upstream = state.nodes?.[edge.from];
+    const asset = firstFrameAssetFromVisualAssets(upstream);
+    if (asset?.asset_id) return normalizeImageAssetRef(asset, "visual_asset_reference");
+  }
+  for (const edge of incoming) {
     const asset = latestReadyImageAssetFromNode(state, edge.from);
     if (asset?.asset_id) return normalizeImageAssetRef(asset, asset.kind === "keyframe" ? "generated_keyframe_reference" : "reference_image");
+  }
+  return null;
+}
+
+function firstFrameAssetFromVisualAssets(node) {
+  const assets = Array.isArray(node?.params?.visualAssets) ? [...node.params.visualAssets].reverse() : [];
+  for (const visualAsset of assets) {
+    const imageAsset = imageAssetFromVisualAsset(visualAsset);
+    if (imageAsset?.asset_id) return normalizeImageAssetRef(imageAsset, "visual_asset_reference");
   }
   return null;
 }

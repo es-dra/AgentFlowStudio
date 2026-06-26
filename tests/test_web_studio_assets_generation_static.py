@@ -114,7 +114,7 @@ process.stdout.write(JSON.stringify({
 
 def test_asset_drawer_reference_action_sets_video_first_frame_and_keyframe_upload() -> None:
     script = r'''
-import { markAssetReference } from "./apps/studio/src/panels/drawer-asset-actions.js";
+import { markAssetReference, setVideoFrameFromAsset } from "./apps/studio/src/panels/drawer-asset-actions.js";
 
 const asset = {
   id: "drawer_img_1",
@@ -122,6 +122,16 @@ const asset = {
   kind: "image_reference",
   title: "资产库参考图",
   preview_url: "/projects/p/image-assets/img_asset_1/preview",
+};
+const fixedAsset = {
+  id: "visual_linwan",
+  asset_id: "vas_linwan",
+  visual_asset_id: "vas_linwan",
+  kind: "visual_asset",
+  asset_type: "character",
+  label: "林晚",
+  image_asset_refs: ["img_fixed_linwan"],
+  preview_url: "/projects/p/image-assets/img_fixed_linwan/preview",
 };
 const videoState = {
   nodes: {
@@ -135,6 +145,18 @@ const keyframeState = {
   },
   selection: { nodeIds: ["image_1"], edgeId: null },
 };
+const fixedVideoState = {
+  nodes: {
+    video_2: { id: "video_2", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_2"], edgeId: null },
+};
+const fixedFrameState = {
+  nodes: {
+    video_3: { id: "video_3", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_3"], edgeId: null },
+};
 const storeFor = (state) => ({
   get: () => state,
   set: (mutator) => mutator(state),
@@ -142,10 +164,14 @@ const storeFor = (state) => ({
 
 markAssetReference(videoState, storeFor(videoState), asset);
 markAssetReference(keyframeState, storeFor(keyframeState), asset);
+markAssetReference(fixedVideoState, storeFor(fixedVideoState), fixedAsset);
+setVideoFrameFromAsset(fixedFrameState, storeFor(fixedFrameState), fixedAsset, "last");
 
 process.stdout.write(JSON.stringify({
   video: videoState.nodes.video_1,
   keyframe: keyframeState.nodes.image_1,
+  fixedVideo: fixedVideoState.nodes.video_2,
+  fixedFrame: fixedFrameState.nodes.video_3,
 }));
 '''
     completed = subprocess.run(
@@ -162,6 +188,62 @@ process.stdout.write(JSON.stringify({
     assert "首帧参考" in payload["video"]["result"]
     assert payload["keyframe"]["params"]["uploads"][0]["role"] == "reference_image"
     assert "视觉参考" in payload["keyframe"]["prompt"]
+    assert payload["fixedVideo"]["params"]["firstFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["fixedVideo"]["params"]["visualAssets"][0]["asset_id"] == "vas_linwan"
+    assert payload["fixedVideo"]["params"]["visualAssets"][0]["image_asset_refs"] == ["img_fixed_linwan"]
+    assert payload["fixedVideo"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "林晚 / img_fixed_linwan" in payload["fixedVideo"]["result"]
+    assert payload["fixedFrame"]["params"]["lastFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["fixedFrame"]["params"]["uploads"][0]["role"] == "last_frame"
+
+
+def test_video_generation_fallback_uses_fixed_visual_asset_as_first_frame() -> None:
+    script = r'''
+import { ensureVideoFirstFrameAsset } from "./apps/studio/src/video-node-flow.js";
+
+const state = {
+  nodes: {
+    video_1: {
+      id: "video_1",
+      type: "video",
+      params: {
+        visualAssets: [{
+          asset_id: "vas_linwan",
+          label: "林晚",
+          asset_type: "character",
+          image_asset_refs: ["img_fixed_linwan"],
+          preview_url: "/projects/p/image-assets/img_fixed_linwan/preview",
+        }],
+      },
+      result: "",
+    },
+  },
+  edges: {},
+  assets: [],
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const inferred = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+process.stdout.write(JSON.stringify({
+  inferred,
+  video: state.nodes.video_1,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["inferred"]["asset_id"] == "img_fixed_linwan"
+    assert payload["video"]["params"]["firstFrameImageAssetId"] == "img_fixed_linwan"
+    assert payload["video"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "参考资产作为首帧" in payload["video"]["result"]
 
 
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
@@ -745,9 +827,12 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
+    video_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     inspector = (STUDIO_ROOT / "src" / "asset-reference-inspector.js").read_text(encoding="utf-8")
+    drawer_assets = (STUDIO_ROOT / "src" / "panels" / "drawer-assets.js").read_text(encoding="utf-8")
+    drawer_actions = (STUDIO_ROOT / "src" / "panels" / "drawer-asset-actions.js").read_text(encoding="utf-8")
 
     assert "preflightVideoRevision" in runtime_client
     assert "generateVideoRevision" in runtime_client
@@ -766,6 +851,11 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in video_actions
     assert "enableVideoRevisionDraft" in source
     assert "video-revision-draft" in node_menu
+    assert "imageAssetFromVisualAsset" in video_flow
+    assert "已自动使用参考资产作为首帧" in video_flow
+    assert "firstFrameAssetFromVisualAssets" in video_flow
+    assert "canProvideVideoFrame" in drawer_assets + drawer_actions
+    assert "videoFrameImageAssetRef" in drawer_actions
 
 
 def test_mvp_experience_hardening_carry_chain_and_asset_inspector_markers() -> None:

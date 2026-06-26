@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-06-26 - Studio Script Upload and Asset Video Reference Fix
+
+- Fixed the canvas floating upload action so both `text` and `script` nodes
+  route to local script import instead of sending script-node uploads through
+  image asset upload.
+- Fixed asset-library fixed visual assets used on video nodes: the selected
+  visual asset now remains attached as context and its first public
+  `image_asset_refs` entry is synchronized into `firstFrameImageAssetId` and
+  the node upload list as a `first_frame` reference.
+- Extended the same fixed-asset image resolution to drawer `设为首帧/设为尾帧`
+  actions and to generation-time fallback for existing video nodes that already
+  have `visualAssets` but no explicit first-frame image id.
+
+Verification:
+
+```text
+npm run check:studio-js -> JS syntax check passed for 122 files
+python -m pytest tests/test_web_studio_prompt_script_static.py tests/test_web_studio_assets_generation_static.py tests/test_api_runtime_context_resolver.py tests/test_api_runtime_video_generations.py tests/test_api_runtime_video_revisions.py tests/test_api_runtime_auth.py -q -> 84 passed
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live image, video, LLM, ASR, vision, or external download provider call
+  was started during this code change.
+- No provider secret, signed URL, raw provider response, media byte, invite
+  code, session token, or private Company OS source content was written to Git.
+
 ## 2026-06-26 - Runtime Image Relay Deployment Guard
 
 - Added Runtime-side provider config migration for server environments that

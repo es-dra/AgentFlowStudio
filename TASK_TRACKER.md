@@ -71,6 +71,19 @@ rejecting `codex_image`. Remaining privileged ops cleanup: physically remove
 old `codex_image` keys from `/etc/afs/providers.local.json` and disable
 `afs-codex-image-worker.service`; current shell lacks passwordless sudo.
 
+Addendum: the same-day Studio front-end patch fixed two QA-found residual
+entrypoint bugs. Canvas floating upload now routes both `text` and `script`
+nodes to script import, preserving Word/PPT/text support instead of sending
+script-node uploads through image upload. Asset-library fixed visual assets
+used on video nodes now keep their visual context and synchronize the first
+public `image_asset_refs` entry into `firstFrameImageAssetId` plus a
+`first_frame` upload ref; drawer `设为首帧/设为尾帧` and generation-time fallback
+use the same fixed-asset image resolution for already-saved projects. Handoff:
+`docs/handoff/AFS-STUDIO-ASSET-VIDEO-SCRIPT-UPLOAD-FIX-20260626.md`.
+Verification: Studio JS syntax 122 files passed, focused Studio/Runtime
+regression set 84 passed, and `git diff --check` passed. No live provider call
+or provider/config contract change occurred.
+
 AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
 GitHub, server `/home`, and server `/opt`. The intended clean branch state is
 `master` only on all four surfaces. Merged server-local `codex/*` branches were

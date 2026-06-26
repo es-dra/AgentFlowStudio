@@ -24,6 +24,7 @@ def test_prompt_optimization_is_inline_and_selection_safe() -> None:
 
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     script_file_import = (STUDIO_ROOT / "src" / "script-file-import.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
@@ -39,6 +40,9 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     assert "storyboard_placeholder_outline" in script_breakdown
     assert "looksLikeStoryboardPlaceholder" in script_breakdown
     assert "SCRIPT_UPLOAD_ACCEPT" in script_breakdown
+    assert '["text", "script"].includes(node.type) && action === "upload"' in canvas_action_handler
+    assert 'node.type === "text" && action === "upload"' not in canvas_action_handler
+    assert canvas_action_handler.index('["text", "script"].includes(node.type) && action === "upload"') < canvas_action_handler.index('else if (action === "upload") uploadNodeImage')
     for marker in (".docx", ".pptx", ".doc", ".ppt", "readScriptFileText", "extractLegacyOfficeBinaryText"):
         assert marker in script_file_import
     assert 'createNode(store, "script"' in script_breakdown
@@ -116,7 +120,7 @@ def test_text_script_body_receives_generated_content_and_keeps_editable_surface(
     assert ".text-content-view.content-shimmer" in styles
     assert "node-context-toolbar" not in canvas_view
     assert "node-context-toolbar" not in styles
-    assert 'node.type === "text" && action === "upload"' in action_handler
+    assert '["text", "script"].includes(node.type) && action === "upload"' in action_handler
 
 
 def test_storyboard_breakdown_creates_reviewable_structured_shots_without_asset_prep_nodes() -> None:

@@ -13,6 +13,7 @@ import {
 import { openAssetDetailPopover } from "./asset-detail-popover.js";
 import {
   attachAssetToSelection,
+  canProvideVideoFrame,
   deleteImageAssetFromDrawer,
   focusAssetSource,
   iconForAsset,
@@ -137,7 +138,7 @@ function assetActions(state, store, runtime, asset, retired) {
   const actions = el("div", "asset-actions");
   actions.appendChild(assetAction("用作参考", () => markAssetReference(state, store, asset)));
   const selectedNode = state.nodes[state.selection.nodeIds[0]];
-  if (selectedNode?.type === "video" && isImageAsset(asset)) {
+  if (selectedNode?.type === "video" && canProvideVideoFrame(asset)) {
     actions.appendChild(assetAction("设为首帧", () => setVideoFrameFromAsset(state, store, asset, "first")));
     actions.appendChild(assetAction("设为尾帧", () => setVideoFrameFromAsset(state, store, asset, "last")));
   } else {
@@ -198,7 +199,7 @@ function openAssetContextMenu(event, state, store, runtime, asset, retired) {
 
 function appendContextAttachAction(appendItem, state, store, asset) {
   const selectedNode = state.nodes[state.selection.nodeIds[0]];
-  if (selectedNode?.type === "video" && isImageAsset(asset)) {
+  if (selectedNode?.type === "video" && canProvideVideoFrame(asset)) {
     appendItem("设为首帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "first"));
     appendItem("设为尾帧", "image", "给当前视频节点使用", () => setVideoFrameFromAsset(state, store, asset, "last"));
     return;
