@@ -13,7 +13,11 @@ const STATUS_PROGRESS = {
   cancelled: 100,
   cancelled_local_only: 100,
 };
-const INDETERMINATE_ACTIVE_STATUSES = new Set(["pending", "running"]);
+const ACTIVE_STATUS_PROGRESS = {
+  submitted: 8,
+  pending: 18,
+  running: 58,
+};
 const ACTIVE_STATUSES = new Set(["submitted", "pending", "running"]);
 
 export function setSubmittingGenerationState(node, kind, options = {}) {
@@ -81,16 +85,22 @@ function normalizeCandidatePreview(item) {
 }
 
 function progressPercent(response, status, override) {
-  if (override === null || ACTIVE_STATUSES.has(status)) return null;
+  if (override === null) return null;
   const explicit = override
     ?? response?.job?.progress?.percent
     ?? response?.job?.progress_percent
     ?? response?.progress?.percent
     ?? response?.progress_percent;
-  if (explicit == null || explicit === "") return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
+  if (explicit == null || explicit === "") {
+    return STATUS_PROGRESS[status]
+      ?? ACTIVE_STATUS_PROGRESS[status]
+      ?? (isTerminalStatus(status) ? 100 : null);
+  }
   const explicitPercent = Number(explicit);
   if (Number.isFinite(explicitPercent)) return clampPercent(explicitPercent);
-  return STATUS_PROGRESS[status] ?? (isTerminalStatus(status) ? 100 : null);
+  return STATUS_PROGRESS[status]
+    ?? ACTIVE_STATUS_PROGRESS[status]
+    ?? (isTerminalStatus(status) ? 100 : null);
 }
 
 function progressMode(response, status) {

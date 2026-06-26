@@ -209,9 +209,8 @@ function textAction(iconName, label, onClick) {
 }
 
 function syncPromptBarState(bar, node) {
-  const running =
-    node.params?.promptOptimizationState?.status === "running" ||
-    node.params?.scriptExpansionState?.status === "running";
+  const task = activePromptTaskProgress(node);
+  const running = Boolean(task);
   bar.classList.toggle("optimizing", running);
   const textarea = bar.querySelector("textarea");
   textarea?.classList.toggle("prompt-shimmer", running);
@@ -220,8 +219,23 @@ function syncPromptBarState(bar, node) {
     optimizeBtn.classList.toggle("busy", running);
     optimizeBtn.disabled = running;
     const label = optimizeBtn.querySelector("span");
-    if (label) label.textContent = running ? "优化中" : "优化";
+    if (label) label.textContent = running ? promptTaskLabel(task) : "优化";
   }
+}
+
+function activePromptTaskProgress(node) {
+  const tasks = [
+    { label: "优化", state: node.params?.promptOptimizationState },
+    { label: "扩写", state: node.params?.scriptExpansionState },
+    { label: "拆分", state: node.params?.storyboardBreakdownState },
+  ];
+  return tasks.find((item) => item.state?.status === "running") || null;
+}
+
+function promptTaskLabel(task) {
+  const percent = Number(task?.state?.percent);
+  if (Number.isFinite(percent)) return `${task.label} ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
+  return `${task?.label || "处理"}中`;
 }
 
 function usesPromptBarAssetCardRevision(revision) {

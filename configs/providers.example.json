@@ -12,6 +12,14 @@
         "image": "image2"
       }
     },
+    "image_relay": {
+      "auth_type": "api_key",
+      "base_url_env": "AFS_IMAGE_RELAY_BASE_URL",
+      "api_key_env": "AFS_IMAGE_RELAY_API_KEY",
+      "default_models": {
+        "image": "gpt-image-2"
+      }
+    },
     "fake_video": {
       "auth_type": "none",
       "base_url": "https://video.example.invalid",
@@ -43,11 +51,12 @@
         }
       ]
     },
-    "codex_image_pool": {
+    "image_relay_pool": {
       "accounts": [
         {
-          "account_id": "local_codex",
-          "service_id": "codex_image",
+          "account_id": "image_relay",
+          "service_id": "image_relay",
+          "credential_env": "AFS_IMAGE_RELAY_API_KEY",
           "enabled_capabilities": ["image"],
           "enabled": true,
           "priority": 20,
@@ -132,27 +141,33 @@
         "required_gate": "AFS_ALLOW_REMOTE_LLM"
       }
     },
-    "codex_image": {
-      "provider": "codex_handoff",
-      "account_ref": "local_codex",
+    "image_relay": {
+      "provider": "api_relay",
+      "account_ref": "image_relay",
       "capability": "image",
+      "endpoint": "/images/generations",
+      "edit_endpoint": "/images/edits",
+      "request_format": "openai_images",
+      "model": "gpt-image-2",
+      "quality": "low",
+      "output_format": "png",
       "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+      "allowed_artifact_hosts": [
+        ".example.invalid"
+      ],
       "descriptor": {
         "schema_version": "provider_descriptor.v0.1",
         "modality": "image",
-        "execution_mode": "async",
+        "execution_mode": "sync",
         "capabilities": ["image"],
-        "account_pool_id": "codex_image_pool",
-        "reference_image_slots": 4,
+        "account_pool_id": "image_relay_pool",
+        "reference_image_slots": 1,
         "supported_aspect_ratios": ["1:1", "4:3", "3:4", "16:9", "9:16"],
-        "prompt_char_limit": 4000,
-        "seed_supported": true,
-        "cost_hint": "Server-local Codex worker. Downstream Image2/API usage is controlled by server setup.",
-        "rate_limit_hint": "Use one worker process per Runtime root during MVP validation.",
-        "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
-        "async_poll_interval_sec": 2,
-        "async_timeout_sec": 900,
-        "async_max_polls": 450
+        "prompt_char_limit": 6000,
+        "seed_supported": false,
+        "cost_hint": "External image relay. Usage and billing are controlled by the configured relay account.",
+        "rate_limit_hint": "Keep one live image/keyframe smoke at a time during MVP validation.",
+        "required_gate": "AFS_ALLOW_REMOTE_IMAGE"
       }
     },
     "vision_image": {

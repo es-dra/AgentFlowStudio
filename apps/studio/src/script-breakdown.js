@@ -1,5 +1,6 @@
 import { createNode, connect } from "./nodes.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
+import { SCRIPT_UPLOAD_ACCEPT, readScriptFileText, safeFileName, scriptFileExtension } from "./script-file-import.js";
 import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
@@ -8,16 +9,26 @@ const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保�
 export function importScriptFileIntoTextNode(store, node, textarea = null) {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".txt,.md,.markdown,text/plain,text/markdown";
+  input.accept = SCRIPT_UPLOAD_ACCEPT;
   input.addEventListener("change", async () => {
     const file = input.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    updateTextNode(store, node.id, text, {
-      title: trimFileTitle(file.name),
-      scriptInputMode: "full_script_upload",
-    });
-    if (textarea) textarea.value = text;
+    try {
+      const text = await readScriptFileText(file);
+      updateTextNode(store, node.id, text, {
+        title: trimFileTitle(file.name),
+        scriptInputMode: "full_script_upload",
+        scriptImportState: {
+          status: "complete",
+          file_name: safeFileName(file.name),
+          file_type: scriptFileExtension(file.name),
+          completed_at: new Date().toISOString(),
+        },
+      });
+      if (textarea) textarea.value = text;
+    } catch (error) {
+      setScriptImportError(store, node.id, safeScriptImportError(error));
+    }
   }, { once: true });
   input.click();
 }
@@ -47,14 +58,14 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     const script = normalizeExpandedScript(outcome?.plain || outcome?.optimized, idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script",
-      scriptExpansionState: { status: "complete", completed_at: new Date().toISOString() },
+      scriptExpansionState: { status: "complete", percent: 100, completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
   } catch {
     const script = draftScriptFromIdea(idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script_fallback",
-      scriptExpansionState: { status: "fallback", completed_at: new Date().toISOString() },
+      scriptExpansionState: { status: "fallback", percent: 100, completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
   } finally {
@@ -110,7 +121,7 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
       provider_calls_started: Boolean(breakdown.provider_calls_started),
       updated_at: new Date().toISOString(),
     };
-    sourceNode.params.storyboardBreakdownState = { status: "complete", completed_at: new Date().toISOString() };
+    sourceNode.params.storyboardBreakdownState = { status: "complete", percent: 100, completed_at: new Date().toISOString() };
     sourceNode.status = "complete";
   });
   return createdIds;
@@ -296,7 +307,12 @@ function setScriptExpansionState(store, nodeId, status, visibleText = "") {
   store.set((s) => {
     const node = s.nodes[nodeId];
     if (!node) return;
-    node.params.scriptExpansionState = { status, started_at: new Date().toISOString() };
+    node.params.scriptExpansionState = {
+      status,
+      percent: status === "running" ? 18 : 100,
+      label: "剧本扩写",
+      started_at: new Date().toISOString(),
+    };
     if (status === "running" && visibleText) {
       node.content = node.content || visibleText;
       node.prompt = visibleText;
@@ -309,9 +325,29 @@ function setStoryboardBreakdownState(store, nodeId, status, message = "") {
   store.set((s) => {
     const node = s.nodes[nodeId];
     if (!node) return;
-    node.params.storyboardBreakdownState = { status, message, updated_at: new Date().toISOString() };
+    node.params.storyboardBreakdownState = {
+      status,
+      message,
+      percent: status === "running" ? 22 : 100,
+      label: "分镜拆解",
+      updated_at: new Date().toISOString(),
+    };
     if (status === "running") node.status = "generating";
   }, { history: false, persist: false });
+}
+
+function setScriptImportError(store, nodeId, message) {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.status = "error";
+    node.result = `剧本导入失败：${message}`;
+    node.params.scriptImportState = {
+      status: "error",
+      message,
+      completed_at: new Date().toISOString(),
+    };
+  }, { history: false });
 }
 
 function safeBreakdownError(error) {
@@ -324,6 +360,11 @@ function cleanSegment(value) {
 }
 
 function trimFileTitle(name) {
-  const value = String(name || "").replace(/\.(txt|md|markdown)$/i, "").trim();
+  const value = String(name || "").replace(/\.(txt|md|markdown|docx?|pptx?)$/i, "").trim();
   return value ? `剧本：${value.slice(0, 24)}` : "剧本文本";
+}
+
+function safeScriptImportError(error) {
+  const message = error instanceof Error ? error.message : String(error || "无法读取文件");
+  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
 }

@@ -112,6 +112,58 @@ process.stdout.write(JSON.stringify({
     assert "candidate_fixed_source.png" not in payload["current"]
 
 
+def test_asset_drawer_reference_action_sets_video_first_frame_and_keyframe_upload() -> None:
+    script = r'''
+import { markAssetReference } from "./apps/studio/src/panels/drawer-asset-actions.js";
+
+const asset = {
+  id: "drawer_img_1",
+  asset_id: "img_asset_1",
+  kind: "image_reference",
+  title: "资产库参考图",
+  preview_url: "/projects/p/image-assets/img_asset_1/preview",
+};
+const videoState = {
+  nodes: {
+    video_1: { id: "video_1", type: "video", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["video_1"], edgeId: null },
+};
+const keyframeState = {
+  nodes: {
+    image_1: { id: "image_1", type: "image", params: {}, status: "empty", prompt: "" },
+  },
+  selection: { nodeIds: ["image_1"], edgeId: null },
+};
+const storeFor = (state) => ({
+  get: () => state,
+  set: (mutator) => mutator(state),
+});
+
+markAssetReference(videoState, storeFor(videoState), asset);
+markAssetReference(keyframeState, storeFor(keyframeState), asset);
+
+process.stdout.write(JSON.stringify({
+  video: videoState.nodes.video_1,
+  keyframe: keyframeState.nodes.image_1,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["video"]["params"]["firstFrameImageAssetId"] == "img_asset_1"
+    assert payload["video"]["params"]["uploads"][0]["role"] == "first_frame"
+    assert "首帧参考" in payload["video"]["result"]
+    assert payload["keyframe"]["params"]["uploads"][0]["role"] == "reference_image"
+    assert "视觉参考" in payload["keyframe"]["prompt"]
+
+
 def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     source = (STUDIO_ROOT / "src" / "presets" / "models.js").read_text(encoding="utf-8")
     optimizer_contract = (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
@@ -124,13 +176,15 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     assert 'return Boolean(findModel("video", modelId).providerServiceId);' in source
     assert "local-creative-agent" not in source
     assert "remote_optimizer_required" in _source()
-    assert 'providerServiceId: "codex_image"' in source
+    assert 'IMAGE_RELAY_SERVICE_ID = "image_relay"' in source
+    assert "providerServiceId: IMAGE_RELAY_SERVICE_ID" in source
     assert 'llmProvider: "prompt_optimizer"' in source
     assert 'llm_provider: "prompt_optimizer"' in optimizer_contract
     assert 'provider_service_id: "vision_image"' in visual_asset_panel
     assert 'provider_service_id: "vision_video"' in main
     assert "Seedance 2.0 Fast" in source
-    assert 'providerServiceId: "seedance_i2v"' in source
+    assert 'VIDEO_RELAY_SERVICE_ID = "seedance_i2v"' in source
+    assert "providerServiceId: VIDEO_RELAY_SERVICE_ID" in source
     assert "MiniMax image-01" not in source
     assert "minimax_m3" not in optimizer_contract
     assert "fake_vision" not in main + visual_asset_panel
@@ -167,6 +221,37 @@ process.stdout.write(JSON.stringify({
     assert payload["fallbackProvider"] == "seedance_i2v"
     assert payload["videoProviders"] == ["seedance_i2v"]
     assert payload["videoModelIds"] == ["seedance-i2v"]
+
+
+def test_image_model_default_uses_external_image_relay_provider() -> None:
+    script = r'''
+import {
+  IMAGE_MODELS,
+  defaultModel,
+  providerServiceForImageModel,
+} from "./apps/studio/src/presets/models.js";
+
+process.stdout.write(JSON.stringify({
+  defaultModel: defaultModel("image"),
+  fallbackProvider: providerServiceForImageModel(null),
+  imageProviders: IMAGE_MODELS.map((model) => model.providerServiceId),
+  imageModelIds: IMAGE_MODELS.map((model) => model.id),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["defaultModel"]["id"] == "image2-keyframe"
+    assert payload["defaultModel"]["providerServiceId"] == "image_relay"
+    assert payload["fallbackProvider"] == "image_relay"
+    assert payload["imageProviders"] == ["image_relay"]
+    assert payload["imageModelIds"] == ["image2-keyframe"]
 
 
 def test_active_video_paths_do_not_reference_retired_video_provider() -> None:

@@ -33,7 +33,8 @@ export function candidatePreviews(node) {
 export function generationProgress(node) {
   const value = node.params?.progressPercent ?? node.params?.jobProgress?.percent ?? node.params?.terminalProgress?.percent;
   const mode = String(node.params?.jobProgress?.mode || "");
-  if (mode === "indeterminate" || mode === "queued") {
+  const percent = Number(value);
+  if (!Number.isFinite(percent)) {
     return {
       percent: null,
       mode,
@@ -42,8 +43,6 @@ export function generationProgress(node) {
       hint: node.params?.jobProgress?.hint || "请保持页面打开，完成后会显示预览",
     };
   }
-  const percent = Number(value);
-  if (!Number.isFinite(percent)) return null;
   return {
     percent: Math.max(0, Math.min(100, Math.round(percent))),
     mode,
@@ -210,7 +209,7 @@ function emptyBody(node, def) {
 function generationProgressView(node) {
   const progress = generationProgress(node);
   const status = document.createElement("div");
-  const isIndeterminate = !progress || progress?.mode === "indeterminate" || progress?.mode === "queued" || progress?.percent == null;
+  const isIndeterminate = !progress || progress?.percent == null;
   status.className = `node-status generation-progress-layer${isIndeterminate ? " indeterminate" : ""}`;
   const percentLabel = isIndeterminate ? (progress?.mode === "queued" ? "排队中" : "生成中") : `${progress.percent}%`;
   status.innerHTML = [

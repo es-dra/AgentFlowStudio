@@ -11,7 +11,12 @@ export async function openOptimizer(store, runtime, nodeId, _anchorEl = null, te
   const node = store.get().nodes[nodeId];
   if (!node || !runtime?.optimizePrompt) return;
   const request = buildOptimizationRequest(store.get(), node);
-  setPromptOptimizationState(store, nodeId, { status: "running", started_at: new Date().toISOString() });
+  setPromptOptimizationState(store, nodeId, {
+    status: "running",
+    percent: 12,
+    label: "提示词优化",
+    started_at: new Date().toISOString(),
+  });
   textarea?.classList?.add("prompt-shimmer");
   try {
     const result = await runtime.optimizePrompt(request);
@@ -19,12 +24,14 @@ export async function openOptimizer(store, runtime, nodeId, _anchorEl = null, te
     applyPrompt(store, nodeId, outcome.optimized, outcome.plain || outcome.optimized, textarea);
     setPromptOptimizationState(store, nodeId, {
       status: "complete",
+      percent: 100,
       completed_at: new Date().toISOString(),
       summary: optimizationSummary(request, outcome),
     });
   } catch (error) {
     setPromptOptimizationState(store, nodeId, {
       status: "error",
+      percent: 100,
       completed_at: new Date().toISOString(),
       message: safeError(error),
     });

@@ -230,14 +230,16 @@ def test_generation_projection_is_split_from_node_actions() -> None:
     assert "function showCarryConfirmModal" not in node_actions
 
 
-def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failure() -> None:
+def test_keyframe_progress_uses_percentage_long_polling_without_timeout_failure() -> None:
     main = _read("src/main.js")
     progress = _read("src/node-generation-progress.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")
     project_controller = _read("src/studio-project-controller.js")
     body = _read("src/canvas-node-body.js")
 
-    assert "INDETERMINATE_ACTIVE_STATUSES" in progress
+    assert "ACTIVE_STATUS_PROGRESS" in progress
+    assert "submitted: 8" in progress
+    assert "running: 58" in progress
     assert "mode: progressMode(response, status)" in progress
     assert "MAX_KEYFRAME_POLL_ATTEMPTS" in keyframe_actions
     assert "markKeyframeStillProcessing" in keyframe_actions
@@ -249,7 +251,8 @@ def test_keyframe_progress_uses_indeterminate_long_polling_without_timeout_failu
     assert "refreshPendingKeyframeGenerations(store, runtime)" in main
     assert "onProjectReady?.(runtimeClient)" in project_controller
     assert "throw new Error(`图片生成仍在处理中" not in keyframe_actions
-    assert "progress?.mode === \"indeterminate\"" in body
+    assert "const isIndeterminate = !progress || progress?.percent == null" in body
+    assert "`${progress.percent}%`" in body
     assert "生成中" in body
 
 

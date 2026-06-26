@@ -13,6 +13,7 @@ def test_prompt_optimization_is_inline_and_selection_safe() -> None:
     assert "optimizer-pop" not in optimizer
     assert "promptOptimizationState" in optimizer
     assert 'status: "running"' in optimizer
+    assert 'percent: 12' in optimizer
     assert 'store.get().nodes[nodeId]' in optimizer
     assert "connectNamedAssetToTarget" in optimizer
     assert "buildAssetReferenceActions" in optimizer
@@ -24,6 +25,7 @@ def test_prompt_optimization_is_inline_and_selection_safe() -> None:
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
+    script_file_import = (STUDIO_ROOT / "src" / "script-file-import.js").read_text(encoding="utf-8")
     nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
 
     assert "importScriptFileIntoTextNode" in prompt_bar
@@ -36,6 +38,9 @@ def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     assert "formal_script_before_storyboard_breakdown" in script_breakdown
     assert "storyboard_placeholder_outline" in script_breakdown
     assert "looksLikeStoryboardPlaceholder" in script_breakdown
+    assert "SCRIPT_UPLOAD_ACCEPT" in script_breakdown
+    for marker in (".docx", ".pptx", ".doc", ".ppt", "readScriptFileText", "extractLegacyOfficeBinaryText"):
+        assert marker in script_file_import
     assert 'createNode(store, "script"' in script_breakdown
     assert "connect(store, fresh.id, shotNode.id)" in script_breakdown
     assert "剧本拆分分镜" in nodes
@@ -101,6 +106,8 @@ def test_text_script_body_receives_generated_content_and_keeps_editable_surface(
     assert "node.content = prompt" in script_breakdown
     assert "visibleText" in script_breakdown
     assert "scriptExpansionState?.status === \"running\"" in canvas_view
+    assert "promptTaskLabel(task)" in prompt_bar
+    assert "storyboardBreakdownState" in prompt_bar
     assert "node-content-editor" in canvas_body
     assert "text-content-view" in canvas_body
     assert "openNodePromptEditor" in canvas_input

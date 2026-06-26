@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-26 - Studio Generation Reference And Relay Fixes
+
+- Added local script import support for `.docx`, `.pptx`, `.doc`, and `.ppt`
+  alongside text/markdown uploads. OOXML files are parsed client-side; legacy
+  binary Word/PPT use a conservative text-extraction fallback. The OOXML
+  parser also has a Node-side `zlib` fallback so local regression tests can
+  exercise real compressed Word/PPT fixtures under Node 18.
+- Changed generation progress rendering so queued/running image and video jobs
+  show available percentages instead of always showing an indeterminate label.
+  Prompt optimization, script expansion, and storyboard breakdown now also
+  write percentage state for the prompt bar.
+- Fixed asset-library reference behavior. Selecting an image asset as
+  reference on a video node now sets `firstFrameImageAssetId` and a first-frame
+  upload ref; selecting it on an image/keyframe node writes a reusable
+  `reference_image` upload ref instead of only marking the source node.
+- Moved the current image product route from `codex_image` to `image_relay`.
+  The Runtime keeps a legacy alias for existing ignored configs, but current
+  Studio defaults, request models, provider example config, CLI smoke defaults,
+  and prompt trace labels now use external relay terminology.
+- Improved image/keyframe relay diagnostics so reference-slot overflow,
+  reference-image unsupported routes, missing provider service, auth readiness,
+  and relay HTTP errors have separate safe block ids.
+
+Verification:
+
+```text
+npm run check:studio-js -> passed for 122 files
+python -m json.tool configs/providers.example.json -> passed
+python -m py_compile runtime/provider touched files -> passed
+role-based local user simulation -> script import, asset reuse, progress, provider route passed
+focused pytest set -> 104 passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+python tools/maintenance_audit.py -> failed=0, warnings only
+git diff --check -> passed
+python -m pytest -> 637 passed / 3 failed / 520 deselected / 1 warning
+```
+
+Full pytest residual failures were environmental or pre-existing in this
+checkout: two knowledgebase tests require the Windows `D:/Learning materials/...`
+source path, and repository retention review reports 27 manual-review items from
+the existing untracked `ops/sub2api/*` tree.
+
+Boundary:
+
+- No live LLM, image, video, ASR, or external download provider call was
+  started.
+- No provider secret, signed URL, raw provider response, media bytes, local
+  private material, or Company OS private source content was written to Git.
+- Browser/runtime verification remains separate from human acceptance, creative
+  quality acceptance, business validation, and durable memory promotion.
+
 ## 2026-06-26 - Internal Beta Operational Hardening
 
 - Added auth failure rate limiting for login and invite registration. The

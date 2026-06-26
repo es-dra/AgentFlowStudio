@@ -8,7 +8,7 @@ from typing import Any
 from agentflow.algorithms.context_resolver import merged_reference_image_refs
 from agentflow.algorithms.request_projection import build_request_plan
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     load_provider_registry,
@@ -35,6 +35,8 @@ REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_IMAGE_PROMPT_LIMIT = 1500
 DEFAULT_REFERENCE_IMAGE_SLOTS = 1
+DEFAULT_IMAGE_RELAY_SERVICE_ID = "image_relay"
+LEGACY_IMAGE_SERVICE_ALIASES = {"image_relay": ("codex_image",)}
 KEYFRAME_NON_CLAIMS = [
     "runtime verification only",
     "not human acceptance",
@@ -59,13 +61,22 @@ def build_keyframe_generation(
     assembly = assemble_prompt_context(prompt_request, assembly_state)
     registry = None
     descriptor = _default_descriptor()
+    service_request_format = ""
     try:
         registry = load_provider_registry()
+        service_id = _resolve_image_service_id(registry, request.provider_service_id)
+        if service_id != request.provider_service_id:
+            request = request.model_copy(update={"provider_service_id": service_id})
+        service_request_format = _service_request_format(registry, request.provider_service_id)
         descriptor = registry.descriptor(request.provider_service_id)
     except (ModelGatewayError, OSError, ValueError):
         registry = None
     configured_reference_slots = int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS))
-    effective_reference_slots = _effective_reference_image_slots(request, configured_reference_slots)
+    effective_reference_slots = _effective_reference_image_slots(
+        request,
+        configured_reference_slots,
+        request_format=service_request_format,
+    )
     context_bundle = _context_bundle(
         store,
         project_id,
@@ -96,7 +107,11 @@ def build_keyframe_generation(
             asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
-    image_operation = "edit" if _uses_asset_card_image_edit(request, reference_images) else "generate"
+    image_operation = _image_operation_for_request(
+        request,
+        reference_images,
+        request_format=service_request_format,
+    )
     if reference_images:
         reference_instruction = _reference_prompt_instruction(request, len(reference_images))
         prompt_with_references = (
@@ -151,6 +166,10 @@ def build_keyframe_generation(
         try:
             if registry is None:
                 registry = load_provider_registry()
+                service_id = _resolve_image_service_id(registry, request.provider_service_id)
+                if service_id != request.provider_service_id:
+                    request = request.model_copy(update={"provider_service_id": service_id})
+                service_request_format = _service_request_format(registry, request.provider_service_id)
                 descriptor = registry.descriptor(request.provider_service_id)
             provider_calls_started = True
             dispatch_request = ProviderDispatchRequest(
@@ -193,13 +212,7 @@ def build_keyframe_generation(
                         )
                     else:
                         status = "blocked"
-                        blocks.append(
-                            {
-                                "block_id": "remote_image_provider_not_ready",
-                                "reason": _safe_error(str(raw.get("error") or raw_status or "image provider did not complete")),
-                                "required_gate": required_gate,
-                            }
-                        )
+                        blocks.append(_provider_failure_block(str(raw.get("error") or raw_status or "image provider did not complete"), required_gate))
                 else:
                     status = task_status
                     _write_task_state(
@@ -227,13 +240,7 @@ def build_keyframe_generation(
         except (ModelGatewayError, TimeoutError) as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
-            blocks.append(
-                {
-                    "block_id": "remote_image_provider_not_ready",
-                    "reason": _safe_error(str(exc)),
-                    "required_gate": required_gate,
-                }
-            )
+            blocks.append(_provider_failure_block(str(exc), required_gate))
 
     request_plan = keyframe_request_plan(
         request,
@@ -294,10 +301,58 @@ def _uses_asset_card_image_edit(request: KeyframeGenerationRequest, reference_im
     return _has_asset_card_revision(request) and bool(reference_images)
 
 
-def _effective_reference_image_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+def _image_operation_for_request(
+    request: KeyframeGenerationRequest,
+    reference_images: list[dict[str, Any]],
+    *,
+    request_format: str = "",
+) -> str:
+    if _uses_asset_card_image_edit(request, reference_images):
+        return "edit"
+    if reference_images and _uses_openai_images_relay(request_format):
+        return "edit"
+    return "generate"
+
+
+def _effective_reference_image_slots(
+    request: KeyframeGenerationRequest,
+    configured_slots: int,
+    *,
+    request_format: str = "",
+) -> int:
     if _has_asset_card_revision(request) and configured_slots <= 0:
         return 1
+    if _uses_openai_images_relay(request_format) and configured_slots <= 0 and request.asset_refs:
+        return 1
     return configured_slots
+
+
+def _resolve_image_service_id(registry: Any, service_id: str) -> str:
+    requested = str(service_id or DEFAULT_IMAGE_RELAY_SERVICE_ID)
+    try:
+        registry.descriptor(requested)
+        return requested
+    except ModelConfigError:
+        pass
+    for alias in LEGACY_IMAGE_SERVICE_ALIASES.get(requested, ()):
+        try:
+            registry.descriptor(alias)
+            return alias
+        except ModelConfigError:
+            continue
+    return requested
+
+
+def _service_request_format(registry: Any, service_id: str) -> str:
+    services = getattr(getattr(registry, "store", None), "services", {})
+    service = services.get(service_id) if isinstance(services, dict) else None
+    if not isinstance(service, dict):
+        return ""
+    return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
+
+
+def _uses_openai_images_relay(request_format: str) -> bool:
+    return str(request_format or "").strip() == "openai_images"
 
 
 def _context_bundle(
@@ -502,13 +557,44 @@ def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
     }
 
 
+def _provider_failure_block(value: str, required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
+    lowered = value.lower()
+    if "reference_image_slots exceeded" in lowered:
+        block_id = "image_reference_slots_exceeded"
+    elif "does not accept reference images" in lowered:
+        block_id = "image_relay_reference_unsupported"
+    elif "provider service not found" in lowered:
+        block_id = "image_provider_service_not_found"
+    elif "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
+        block_id = "image_relay_auth_not_ready"
+    elif "api relay http error" in lowered:
+        block_id = "image_relay_http_error"
+    else:
+        block_id = "remote_image_provider_not_ready"
+    return {
+        "block_id": block_id,
+        "reason": _safe_error(value),
+        "required_gate": required_gate,
+    }
+
+
 def _safe_error(value: str) -> str:
     lowered = value.lower()
     if "status_code 2049" in lowered and "invalid api key" in lowered:
-        return "Image provider rejected the configured credential."
-    if "api" in lowered or "key" in lowered or "secret" in lowered:
-        return "Image provider configuration is not ready."
-    return value[:160]
+        return "Image relay rejected the configured credential."
+    if "reference_image_slots exceeded" in lowered:
+        return "Image relay reference image limit was exceeded; check provider descriptor reference_image_slots."
+    if "does not accept reference images" in lowered:
+        return "Image relay route does not accept reference images for generation; use an edit-capable relay route for reference-guided image generation."
+    if "provider service not found" in lowered:
+        return "Image relay service is not configured in the Runtime provider registry."
+    if "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
+        return "Image relay credential is not ready."
+    if "api relay http error" in lowered:
+        return " ".join(value.split())[:160]
+    if any(term in lowered for term in ("api key", "secret", "token", "authorization", "cookie", "bearer ")):
+        return "Image relay configuration is not ready."
+    return " ".join(value.split())[:160]
 
 
 def provider_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:

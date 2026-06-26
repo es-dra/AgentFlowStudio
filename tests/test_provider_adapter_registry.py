@@ -753,8 +753,10 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
     assert registry.descriptor("prompt_optimizer").modality == "llm"
     assert registry.descriptor("prompt_optimizer").account_pool_id == "prompt_optimizer_pool"
     assert store.services["prompt_optimizer"]["provider"] == "codex_local"
-    assert registry.descriptor("codex_image").execution_mode == "async"
-    assert registry.descriptor("codex_image").account_pool_id == "codex_image_pool"
+    assert registry.descriptor("image_relay").execution_mode == "sync"
+    assert registry.descriptor("image_relay").account_pool_id == "image_relay_pool"
+    assert store.services["image_relay"]["provider"] == "api_relay"
+    assert "codex_image" not in store.services
     assert registry.descriptor("vision_image").modality == "vision"
     assert store.services["vision_image"]["provider"] == "codex_local"
     assert registry.descriptor("vision_video").reference_image_slots == 8
@@ -762,7 +764,6 @@ def test_provider_example_config_builds_registry_without_secret_values() -> None
     assert registry.descriptor("seedance_i2v").prompt_profile == "video_i2v_v1"
     assert "model_relay" not in serialized
     assert "afs_model_relay" not in serialized
-    assert "api_relay" not in serialized
     assert "minimax_image" not in serialized
     assert "minimax_m3" not in serialized
     assert "image-01" not in serialized

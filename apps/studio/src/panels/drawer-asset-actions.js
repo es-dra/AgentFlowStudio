@@ -3,13 +3,16 @@ import { icon } from "../icons.js";
 import { el, showModal } from "../overlay.js";
 import { openVisualAssetPanel } from "./visual-asset-panel.js";
 
-export function markAssetReference(store, asset) {
+export function markAssetReference(state, store, asset) {
+  const selectedId = state?.selection?.nodeIds?.[0];
   store.set((s) => {
-    const sourceId = asset.source_node_id;
-    const selectedId = s.selection.nodeIds[0];
-    const target = sourceId && s.nodes[sourceId] ? s.nodes[sourceId] : s.nodes[selectedId];
+    const target = selectedId && s.nodes[selectedId]
+      ? s.nodes[selectedId]
+      : asset.source_node_id && s.nodes[asset.source_node_id]
+        ? s.nodes[asset.source_node_id]
+        : null;
     if (!target) return;
-    target.params.isReference = true;
+    applyAssetReferenceToNode(target, asset);
     target.status = "complete";
   });
 }
@@ -26,6 +29,10 @@ export function attachAssetToSelection(state, store, asset) {
       if (!current.some((item) => String(item?.asset_id || "") === visual.asset_id)) {
         node.params.visualAssets = [visual, ...current].slice(0, 8);
       }
+      return;
+    }
+    if (isImageAsset(asset)) {
+      attachImageAssetToNode(node, asset, "reference_image");
       return;
     }
     const list = Array.isArray(node.params.attachments) ? node.params.attachments : [];
@@ -45,7 +52,10 @@ export function setVideoFrameFromAsset(state, store, asset, slot) {
     else node.params.firstFrameImageAssetId = asset.asset_id;
     const uploads = Array.isArray(node.params.uploads) ? node.params.uploads : [];
     const ref = imageAssetUploadRef(asset, slot === "last" ? "last_frame" : "first_frame");
-    node.params.uploads = [ref, ...uploads.filter((item) => item?.asset_id !== asset.asset_id)].slice(0, 4);
+    node.params.uploads = [
+      ref,
+      ...uploads.filter((item) => item?.asset_id !== asset.asset_id && String(item?.role || "") !== ref.role),
+    ].slice(0, 4);
     node.status = "complete";
     node.result = slot === "last" ? `已设为尾帧：${asset.asset_id}` : `已设为首帧：${asset.asset_id}`;
   });
@@ -167,6 +177,71 @@ export function iconForAsset(asset) {
   if (asset.kind === "audio_clip") return "audio";
   if (asset.kind === "storyboard") return "script";
   return "image";
+}
+
+function applyAssetReferenceToNode(node, asset) {
+  if (!node.params || typeof node.params !== "object") node.params = {};
+  node.params.isReference = true;
+  if (isFixedVisualAsset(asset)) {
+    const visual = visualAssetRef(asset);
+    const current = Array.isArray(node.params.visualAssets) ? node.params.visualAssets : [];
+    if (!current.some((item) => String(item?.asset_id || "") === visual.asset_id)) {
+      node.params.visualAssets = [visual, ...current].slice(0, 8);
+    }
+    node.result = `已加入参考资产：${visual.label || visual.asset_id}`;
+    return;
+  }
+  if (!isImageAsset(asset)) {
+    const list = Array.isArray(node.params.attachments) ? node.params.attachments : [];
+    if (!list.some((item) => String(item.id || item.asset_id || "") === String(asset.id || asset.asset_id || ""))) {
+      node.params.attachments = [attachmentRef(asset), ...list].slice(0, 8);
+    }
+    node.result = `已加入参考：${asset.title || asset.asset_id || asset.id || "素材"}`;
+    return;
+  }
+  if (node.type === "video") {
+    node.params.firstFrameImageAssetId = asset.asset_id;
+    attachImageAssetToNode(node, asset, "first_frame", { replaceRole: true });
+    if (!String(node.prompt || "").trim()) {
+      node.prompt = `以“${asset.title || asset.asset_id}”作为首帧参考，生成自然连贯的短视频镜头。`;
+    }
+    node.result = `已用作视频首帧参考：${asset.asset_id}`;
+    return;
+  }
+  attachImageAssetToNode(node, asset, "reference_image");
+  if (!String(node.prompt || node.content || "").trim()) {
+    node.prompt = `以“${asset.title || asset.asset_id}”作为视觉参考，生成新的关键帧画面。`;
+    if (node.type === "text" || node.type === "script") node.content = node.prompt;
+  }
+  node.result = `已加入参考图：${asset.asset_id}`;
+}
+
+function attachImageAssetToNode(node, asset, role, options = {}) {
+  if (!node.params || typeof node.params !== "object") node.params = {};
+  const ref = imageAssetUploadRef(asset, role);
+  const uploads = Array.isArray(node.params.uploads) ? node.params.uploads : [];
+  node.params.uploads = [
+    ref,
+    ...uploads.filter((item) => {
+      if (String(item?.asset_id || item?.assetId || "") === ref.asset_id) return false;
+      if (options.replaceRole && String(item?.role || "") === ref.role) return false;
+      return true;
+    }),
+  ].slice(0, 4);
+  const attachments = Array.isArray(node.params.attachments) ? node.params.attachments : [];
+  const attachment = attachmentRef(asset);
+  if (!attachments.some((item) => String(item.asset_id || item.assetId || item.id || "") === ref.asset_id)) {
+    node.params.attachments = [attachment, ...attachments].slice(0, 8);
+  }
+}
+
+function attachmentRef(asset) {
+  return {
+    id: asset.id || asset.asset_id || "",
+    asset_id: asset.asset_id || asset.visual_asset_id || asset.id || "",
+    label: asset.title || asset.label || asset.asset_id || "素材",
+    kind: asset.kind || "reference",
+  };
 }
 
 export function kindLabel(assetOrKind) {

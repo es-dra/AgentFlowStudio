@@ -29,6 +29,8 @@ def keyframe_generation_preflight(
         prompt_default=DEFAULT_IMAGE_PROMPT_LIMIT,
         reference_default=DEFAULT_IMAGE_REFERENCE_SLOTS,
     )
+    if reference_slots <= 0 and request.asset_refs:
+        reference_slots = 1
     bundle = None
     if request.context_subgraph:
         bundle = resolve_context_bundle(

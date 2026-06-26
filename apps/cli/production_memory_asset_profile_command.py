@@ -111,7 +111,7 @@ def production_memory_loop_run_asset_test_package_command(
         help="Attempt optional gated provider validation after the deterministic package is built.",
     ),
     image_service: str = typer.Option(
-        "codex_image",
+        "image_relay",
         "--image-service",
         help="Image service id for optional provider validation.",
     ),

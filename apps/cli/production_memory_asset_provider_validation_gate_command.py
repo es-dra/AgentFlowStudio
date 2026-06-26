@@ -47,7 +47,7 @@ def asset_provider_validation_gate_command(
         "--character-reference-image",
         help="Explicit local ignored character reference image path. The path is not persisted.",
     ),
-    image_service: str = typer.Option("codex_image", "--image-service", help="Image service id for provider smoke."),
+    image_service: str = typer.Option("image_relay", "--image-service", help="Image service id for provider smoke."),
     video_service: str = typer.Option("seedance_i2v", "--video-service", help="Video service id for provider smoke."),
     output_dir: Path = typer.Option(
         Path("data/processed/runs/local_internal_test/provider_validation_gate"),

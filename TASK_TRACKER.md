@@ -27,6 +27,28 @@ writes with file locks, an auth-level read-modify-write lock, and the
 `runtime-backup create` administrator backup command. Maintenance ledger:
 `docs/maintenance/AFS-INTERNAL-BETA-HARDENING-20260626.md`.
 
+Studio generation/reference bugfix baseline: 2026-06-26 pass fixed the current
+internal-test blockers around script import, progress percentages, asset-library
+reference binding, and image relay provider naming/diagnostics. Script import
+now accepts text/markdown plus Word/PPT (`.docx/.pptx` with OOXML extraction
+and `.doc/.ppt` best-effort text extraction). Active image/video generation
+shows percentages when available; prompt optimization, script expansion, and
+storyboard breakdown write percentage state. Asset-library "用作参考" now binds
+image assets to the selected node: video nodes get `firstFrameImageAssetId` and
+a first-frame upload ref, image/keyframe nodes get a `reference_image` upload
+ref. Current image service defaults moved from `codex_image` to external
+`image_relay`; Runtime keeps a legacy alias for old ignored configs and splits
+safe relay errors into reference-slot, unsupported-reference-route,
+missing-service, auth, and HTTP block ids. Verification: JS syntax 122 files
+passed, role-based local user simulation passed for script import, asset reuse,
+progress, and provider route; focused generation/reference pytest 104 passed,
+CLI help/version
+passed, maintenance audit failed=0, `git diff --check` passed. Full pytest had
+637 passed / 3 failed / 520 deselected / 1 warning; failures are environment or
+pre-existing state (`D:/Learning materials/...` source KB absent on Linux and
+untracked `ops/sub2api/*` retention review items). Maintenance ledger:
+`docs/maintenance/AFS-STUDIO-GENERATION-REFERENCE-BUGFIX-20260626.md`.
+
 AFS+COS takeover baseline: 2026-06-26 branch cleanup completed across local,
 GitHub, server `/home`, and server `/opt`. The intended clean branch state is
 `master` only on all four surfaces. Merged server-local `codex/*` branches were

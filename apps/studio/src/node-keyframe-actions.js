@@ -36,7 +36,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     n.status = "generating";
     n.result = null;
     n.previewUrl = null;
-    setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: null });
+    setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: 8 });
   });
   let submitAttempted = false;
   let submittedAtMs = 0;
