@@ -771,6 +771,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "openQualityFeedbackMenu" in node_menu
     assert "反馈图片质量" in node_menu
     assert "反馈视频质量" in node_menu
+    assert "编辑关键帧资产约束" in node_menu
+    assert "s.ui.promptBarNodeId = fresh.id" in node_menu
     assert "handleQualityFeedback" in main
     assert "runtime.recordFeedback" in main
     assert 'action === "content-card" || action === "video-asset-card-draft"' in action_handler

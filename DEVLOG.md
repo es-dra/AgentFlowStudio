@@ -13,6 +13,9 @@
   reference image counts, local-reference policy, and negative constraints
   against unrequested chairs, stools, eaves, extra props, new characters, text,
   watermarks, UI, or borders.
+- Added a keyframe node menu action, `编辑关键帧资产约束`, which selects the
+  keyframe, opens the generation panel, and keeps the editable prompt surface
+  focused on the generated asset constraints before regeneration.
 - Fixed the video node asset-card action path: `video-asset-card-draft` clicks
   now dispatch to the same Runtime draft flow as the menu action, resolve the
   freshest node by `node_id`, and show visible running/success/failure messages

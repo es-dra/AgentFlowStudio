@@ -62,6 +62,17 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
         if (fresh) startNodeGeneration(store, runtime, fresh);
       });
     }
+    if (node.params?.nodeRole === "keyframe_generation" && node.params?.keyframeAssetPlan) {
+      addItem("pencil", "编辑关键帧资产约束", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (!fresh) return;
+        store.set((s) => {
+          s.selection = { nodeIds: [fresh.id], edgeId: null };
+          s.ui.promptBarNodeId = fresh.id;
+        }, { history: false, persist: false });
+        window.dispatchEvent(new CustomEvent("afs:studio-open-generation-panel", { detail: { node_id: fresh.id, node: fresh } }));
+      });
+    }
     addItem("upload", "上传/替换参考图", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);

@@ -19,7 +19,9 @@ instead of emitting placeholder `分镜 01/02/03/04` lines. Keyframe generation
 now builds an editable `keyframeAssetPlan` from connected asset cards and
 writes candidate signatures/features/reference-image counts into the keyframe
 prompt, with explicit constraints against unrequested stools, chairs, eaves,
-extra props, new characters, text, watermarks, UI, or borders. The video
+extra props, new characters, text, watermarks, UI, or borders; keyframe image
+nodes also expose `编辑关键帧资产约束` to open the editable generation prompt for
+manual constraint revision before regeneration. The video
 asset-card button now handles the `video-asset-card-draft` action and gives
 visible no-video/running/success/failure feedback. Runtime video jobs now expose
 safe timing fields (`provider_phase`, `elapsed_sec`, `queued_sec`,
