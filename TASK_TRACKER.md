@@ -12,6 +12,24 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Video timeline prompt follow-up: 2026-06-26 screenshot investigation found
+Studio job `studio-1782194320739-0phdgx-video_generation-ed77c226b864` reached
+the deployed `seedance_i2v` provider with first-frame image asset
+`img_gen_0e4d7d2f6bbafbd2`, 5s, 720p, 16:9. The safe manifest ended
+`poll_failed` with `remote_video_policy_block`, so the failure was an upstream
+policy/copyright block after async provider queue/render/review, not a closed
+video gate, missing first frame, Kling fallback, local timeout, credential
+issue, or provider 404. Studio now generates a timeline-style keyframe-to-video
+prompt with explicit 0.0s / 0.0-1.0s / 1.0-2.5s / 2.5-4.0s / 4.0-5.0s phases,
+filters image-only `单张关键帧` language, and normalizes candidate asset-card
+mentions so prompt-only references do not create duplicate malformed video
+asset entries. Verification: Studio static set 24 passed, `npm.cmd run
+check:studio-js` passed for 121 files, Runtime video generation tests 12 passed
+with 1 existing warning, and `git diff --check` passed. Remaining work: deploy
+this prompt-contract update to origin/server `/home` and `/opt`, then browser
+confirm the new node prompt; any live provider smoke should use non-IP content
+unless the goal is explicitly to observe provider policy blocking.
+
 Seedance live video-node success follow-up: 2026-06-26 authorized Runtime smoke
 used the deployed `/video-generations` route with `seedance_i2v`, a neutral
 non-IP uploaded first frame, and a temporary authenticated server-local session.
@@ -22,7 +40,7 @@ project `codex-video-node-smoke-189aa485`, job
 `a3616dccd6eae36689412f5c3525461cfeb612b03c543b4dced1ab8c95a39b27`.
 Authenticated preview route returned HTTP 200 `video/mp4` after Runtime
 restart. Local `master`, `origin/master`, server `/home`, and server `/opt`
-are aligned at `420d32b`; `/health` is ready and video gate is true. Local
+are aligned at `4381b39`; `/health` is ready and video gate is true. Local
 media QA from a temp copy: H.264, 1280x720, 24 fps, 5.041667 seconds, 121
 frames; black/freeze events both 0. Boundary: runtime/provider/media
 verification only, not human creative acceptance of the current IP storyboard;

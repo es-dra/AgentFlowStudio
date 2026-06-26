@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-26 - Keyframe Video Timeline Prompt
+
+- Investigated the Studio screenshot video job on the deployed Runtime using
+  safe artifacts only. Job
+  `studio-1782194320739-0phdgx-video_generation-ed77c226b864` used
+  `seedance_i2v`, `duration_sec=5`, `resolution=720p`, `aspect_ratio=16:9`,
+  and first-frame image asset `img_gen_0e4d7d2f6bbafbd2`. Provider dispatch
+  started, the task state persisted no provider raw response, and the safe
+  manifest ended as `poll_failed` with block id `remote_video_policy_block`.
+- Root cause for that run: upstream video provider policy/copyright block for
+  the requested IP-like subject matter, not a closed video gate, missing first
+  frame, Kling fallback, local poll timeout, credential issue, or provider 404.
+  The roughly two-minute wait was async remote video queue/render/review time
+  before the provider returned the policy result.
+- Reworked the Studio right-click `接续视频节点` prompt from a keyframe-style
+  paragraph into a 5-second image-to-video timeline contract. The generated
+  prompt now locks 0.0s to the upstream keyframe, gives explicit
+  `0.0-1.0s`, `1.0-2.5s`, `2.5-4.0s`, and `4.0-5.0s` motion phases, keeps a
+  first-frame continuity lock, and filters image-only text such as
+  `单张关键帧`.
+- Adjusted the auto video asset plan to normalize prompt-only candidate-card
+  mentions like `@金箍棒（候选资产卡...` back to the real asset label, avoid
+  duplicates, and mark video asset entries with continuity/reference policy.
+
+Verification:
+
+```text
+pytest tests/test_web_studio_assets_generation_static.py -q -> 24 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+pytest tests/test_api_runtime_video_generations.py -q -> 12 passed, 1 existing warning
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider raw response, signed URL, generated media byte, secret, token, or
+  private Company OS source content was written to the repo. This is prompt
+  contract/runtime evidence, not human creative acceptance of any IP storyboard.
+
 ## 2026-06-26 - Seedance Video Node Live Smoke
 
 - Completed an authorized live Runtime video-node smoke through the deployed
@@ -18,7 +57,7 @@
   `ffprobe` reported H.264 video, 1280x720, 24 fps, 5.041667 seconds, 121
   frames. `blackdetect` and `freezedetect` completed with zero detected events.
 - Local `master`, `origin/master`, server `/home/afs-ops/AgentFlowStudio`, and
-  server `/opt/afs/AgentFlowStudio` are aligned at `420d32b`; `afs-runtime`
+  server `/opt/afs/AgentFlowStudio` are aligned at `4381b39`; `afs-runtime`
   was restarted from `/opt` and `/health` remained ready with video gate true.
 
 Boundary:

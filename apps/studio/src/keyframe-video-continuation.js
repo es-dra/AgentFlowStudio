@@ -1,6 +1,7 @@
 import { createNode, connect } from "./nodes.js";
 import { lastImageAsset, mergeImageAssets } from "./node-image-assets.js";
 import { VIDEO_RATIOS } from "./presets/specs.js";
+import { DEFAULT_KEYFRAME_VIDEO_MOTION, buildKeyframeVideoPrompt } from "./keyframe-video-prompt.js";
 
 export function canContinueKeyframeToVideo(node) {
   return Boolean(isKeyframeLikeNode(node));
@@ -27,7 +28,10 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
     const node = s.nodes[video.id];
     if (!node) return;
     node.title = videoTitle(source);
-    node.prompt = videoPrompt(source, videoAssetPlan);
+    node.prompt = buildKeyframeVideoPrompt(source, videoAssetPlan, {
+      motion: DEFAULT_KEYFRAME_VIDEO_MOTION,
+      duration: source.params?.spec?.duration || "5s",
+    });
     node.status = "empty";
     node.previewUrl = null;
     node.result = [
@@ -43,7 +47,7 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
       sourceKeyframeAssetId: frameAsset.asset_id,
       firstFrameImageAssetId: frameAsset.asset_id,
       firstFramePreviewUrl: frameAsset.preview_url || source.previewUrl || "",
-      motion: node.params?.motion || "轻微推进，保留对峙张力和呼吸感镜头。",
+      motion: node.params?.motion || DEFAULT_KEYFRAME_VIDEO_MOTION,
       spec: {
         ...(node.params?.spec || {}),
         ratio: supportedVideoRatio(source.params?.spec?.ratio || node.params?.spec?.ratio),
@@ -181,15 +185,18 @@ function connectedAssetNodes(state, sourceNodeId) {
 function normalizeVideoAsset(asset, sourceLabel, sourceNode) {
   const label = cleanAssetLabel(asset?.label || asset?.name || asset?.title || asset?.asset_label);
   if (!label) return null;
+  const imageRefs = imageRefsFromAsset(asset);
   return {
     label,
     asset_type: normalizeAssetType(asset?.asset_type || asset?.type || asset?.category),
-    status: asset?.status || asset?.fix_status || "candidate",
+    status: asset?.status || asset?.fix_status || asset?.review_decision || "candidate",
     signature: String(asset?.signature || asset?.one_line || asset?.description || "").trim(),
     source: sourceLabel,
     source_node_id: sourceNode?.id || null,
     source_asset_id: asset?.asset_id || asset?.id || null,
-    image_asset_refs: imageRefsFromAsset(asset),
+    image_asset_refs: imageRefs,
+    video_role: "continuity_lock",
+    reference_policy: imageRefs.length ? "reference_images_available" : "prompt_only",
   };
 }
 
@@ -246,36 +253,13 @@ function normalizeAssetType(type) {
 function cleanAssetLabel(label) {
   return String(label || "")
     .replace(/^[@#]+/u, "")
+    .replace(/[（(【\[].*$/u, "")
     .replace(/^[角色场景道具资产]\s*[·:：-]\s*/u, "")
     .trim();
 }
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function videoAssetTypeLabel(type) {
-  if (type === "character") return "角色";
-  if (type === "scene") return "场景";
-  if (type === "prop") return "道具";
-  return "资产";
-}
-
-function videoPrompt(source, videoAssetPlan) {
-  const sourcePrompt = String(source.prompt || source.result || "").trim();
-  const excerpt = sourcePrompt.length > 520 ? `${sourcePrompt.slice(0, 520)}...` : sourcePrompt;
-  const assetLines = safeArray(videoAssetPlan?.assets)
-    .map((asset) => `- @${asset.label}（${videoAssetTypeLabel(asset.asset_type)}）：${asset.signature || "保持该资产在首帧中的身份、外观和功能"}`);
-  return [
-    "基于上游关键帧生成 5 秒图生视频，保持关键帧画面连续。",
-    "Maintain exact character identity, wardrobe, prop geometry, scene layout, camera composition, and lighting.",
-    "Do not introduce new characters, extra props, text, watermark, UI, or borders.",
-    assetLines.length ? "视频资产（自动识别，可微调）：" : "",
-    ...assetLines,
-    assetLines.length ? "保持上述视频资产的身份、服装、道具、场景关系和首帧构图；只生成动作延续，不重写资产设定。" : "",
-    "动作：延续当前对峙或动作关系，轻微推进或呼吸感镜头，避免大幅改变构图。",
-    excerpt ? `上游关键帧提示：${excerpt}` : "",
-  ].filter(Boolean).join("\n");
 }
 
 function markMissingFirstFrame(store, nodeId) {

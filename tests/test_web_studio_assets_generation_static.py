@@ -770,8 +770,11 @@ process.stdout.write(JSON.stringify({
     assert payload["selected"] == [payload["edge"]["to"]]
     assert payload["recognitionStatus"] == "pending_video_generation"
     assert payload["nodeRole"] == "video_generation"
-    assert "Maintain exact character identity" in payload["prompt"]
-    assert "Do not introduce new characters" in payload["prompt"]
+    assert "图生视频时间轴" in payload["prompt"]
+    assert "0.0s" in payload["prompt"]
+    assert "0.0-1.0s" in payload["prompt"]
+    assert "4.0-5.0s" in payload["prompt"]
+    assert "首帧锁定" in payload["prompt"]
 
 
 def test_legacy_keyframe_title_can_auto_plan_video_node_assets() -> None:
@@ -791,7 +794,14 @@ const state = {
       y: 80,
       w: 420,
       h: 320,
-      prompt: "根据分镜生成关键帧：@孙悟空 @金刚狼 @金箍棒，在山巅石台战场对峙。",
+      prompt: [
+        "根据分镜生成关键帧：@孙悟空 @金刚狼 @金箍棒，在山巅石台战场对峙。",
+        "候选资产卡（可稍后固定；未固定不阻断关键帧生成）：",
+        "- @金箍棒（候选资产卡，未固定时仅供审查，不作为参考图注入）",
+        "- @山巅石台战场（候选资产卡，未固定时仅供审查，不作为参考图注入）",
+        "- @金刚狼（候选资产卡，未固定时仅供审查，不作为参考图注入）",
+        "画面要求：单张关键帧，主体清晰，不添加文字、水印、UI 或边框。",
+      ].join("\n"),
       status: "complete",
       previewUrl: "/media/keyframe_legacy.png",
       params: {
@@ -863,6 +873,7 @@ const video = createVideoNodeFromKeyframe(store, state.nodes.keyframe_legacy);
 process.stdout.write(JSON.stringify({
   canContinue: canContinueKeyframeToVideo(state.nodes.keyframe_legacy),
   firstFrame: video?.params?.firstFrameImageAssetId,
+  planAssets: video?.params?.videoAssetPlan?.assets,
   planLabels: video?.params?.videoAssetPlan?.assets?.map((asset) => asset.label),
   prompt: video?.prompt,
   result: video?.result,
@@ -886,6 +897,19 @@ process.stdout.write(JSON.stringify({
     assert payload["selected"][0].startswith("node_")
     for label in payload["planLabels"]:
         assert f"@{label}" in payload["prompt"]
+    assert payload["planLabels"].count("金箍棒") == 1
+    assert "金箍棒（候选资产卡" not in payload["planLabels"]
+    assert all(asset["video_role"] == "continuity_lock" for asset in payload["planAssets"])
+    assert {asset["reference_policy"] for asset in payload["planAssets"]} == {
+        "prompt_only",
+        "reference_images_available",
+    }
+    assert "图生视频时间轴" in payload["prompt"]
+    assert "0.0s" in payload["prompt"]
+    assert "1.0-2.5s" in payload["prompt"]
+    assert "4.0-5.0s" in payload["prompt"]
+    assert "单张关键帧" not in payload["prompt"]
+    assert "候选资产卡（资产）" not in payload["prompt"]
     assert "可以直接生成" in payload["result"]
     assert "先微调提示词" in payload["result"]
 
