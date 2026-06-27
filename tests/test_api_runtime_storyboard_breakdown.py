@@ -458,3 +458,13 @@ def test_storyboard_plan_includes_professional_reference_for_rooftop_video() -> 
     assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
     assert reference["pacing"]["must_include"][0].startswith("0-1s")
     assert reference["writes_company_kb"] is False
+
+
+def test_storyboard_plan_includes_director_scenario_for_saas_demo() -> None:
+    shots = local_storyboard_shots("A SaaS product launch demo shows a dashboard workflow and the final saved-time result.")
+
+    scenario = shots[0]["director_scenario"]
+
+    assert scenario["primary_scenario"] == "saas_launch"
+    assert "screen geometry remains readable" in scenario["quality_checks"]
+    assert scenario["writes_company_kb"] is False

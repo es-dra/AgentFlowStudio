@@ -3,6 +3,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.knowledge.director_scenarios import (
+    director_scenario_from_text,
+    format_director_scenario_reference,
+)
 from agentflow.knowledge.professional_reference import format_professional_reference, professional_reference_from_text
 
 
@@ -47,6 +51,7 @@ def video_provider_prompt(
         "Use the first frame as a strict visual anchor for identity, clothing, hairstyle silhouette, body proportions, scene layout, lighting, color palette, and composition.",
         _format_motion_plan_for_prompt(plan["motion_plan"]),
         _format_professional_reference_for_video(plan.get("professional_reference", {})),
+        _format_director_scenario_for_video(plan.get("director_scenario", {})),
     ]
     if motion:
         parts.append(f"Motion: {strip_image_edit_language(motion)}")
@@ -91,10 +96,12 @@ def video_generation_plan(
         "motion_plan": motion_plan,
         "editing_plan": video_editing_plan(source_text=source, last_frame_image_asset_id=last_frame_image_asset_id),
         "professional_reference": professional_reference_from_text(source, node_type="video", generation_target="video"),
+        "director_scenario": director_scenario_from_text(source, node_type="video", generation_target="video"),
         "prompt_contract": {
             "first_frame_is_strict_anchor": True,
             "time_beats_are_required": True,
             "candidate_assets_are_editable": True,
+            "director_scenario_selected": True,
             "provider_prompt_uses_image_edit_language": False,
         },
     }
@@ -150,6 +157,18 @@ def _format_professional_reference_for_video(context: dict[str, Any]) -> str:
     ]
     text = " ".join(section for section in sections if section)
     return f"Professional video reference: {text}" if text else ""
+
+
+def _format_director_scenario_for_video(context: dict[str, Any]) -> str:
+    sections = [
+        format_director_scenario_reference(context, "Intent"),
+        format_director_scenario_reference(context, "Camera/Framing"),
+        format_director_scenario_reference(context, "Lighting"),
+        format_director_scenario_reference(context, "Motion/Temporal Progression"),
+        format_director_scenario_reference(context, "Continuity"),
+    ]
+    text = " ".join(section for section in sections if section)
+    return f"Director scenario video guidance: {text}" if text else ""
 
 
 def _format_motion_plan_for_prompt(motion_plan: dict[str, Any]) -> str:

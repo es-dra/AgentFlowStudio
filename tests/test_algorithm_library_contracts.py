@@ -222,3 +222,31 @@ def test_video_generation_plan_includes_professional_reference_and_prompt_guidan
     assert "0-1s" in reference["pacing"]["must_include"][0]
     assert "Professional video reference:" in prompt
     assert "motivated night exterior" in prompt
+
+
+def test_video_generation_plan_includes_director_scenario_and_prompt_guidance() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    plan = video_generation_plan(
+        prompt_text="A podcast interview quote becomes a short visual clip with a warm studio microphone.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The speaker subtly reacts while the microphone light glows.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A podcast interview quote becomes a short visual clip with a warm studio microphone.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The speaker subtly reacts while the microphone light glows.",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+
+    scenario = plan["director_scenario"]
+    assert scenario["primary_scenario"] == "podcast_visual"
+    assert "quote focus is clear" in scenario["quality_checks"]
+    assert plan["prompt_contract"]["director_scenario_selected"] is True
+    assert "Director scenario video guidance:" in prompt
+    assert "Podcast Visual" in prompt

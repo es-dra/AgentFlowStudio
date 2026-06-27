@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.knowledge.director_scenarios import director_scenario_from_text
 from agentflow.knowledge.professional_reference import professional_reference_from_text
 from apps.api.runtime_models import KeyframeGenerationRequest
 
@@ -29,6 +30,14 @@ def build_keyframe_plan(
         "lighting_plan": _lighting_plan(source),
         "camera_plan": _camera_plan(source),
         "professional_reference": professional_reference_from_text(source, node_type="image", generation_target="keyframe"),
+        "director_scenario": director_scenario_from_text(
+            source,
+            node_type="image",
+            generation_target="keyframe",
+            target_platform=request.target_platform,
+            style=request.style,
+            node_parameters=request.node_parameters,
+        ),
         "reference_asset_ids": ref_ids,
         "candidate_assets_are_editable": True,
         "forbidden_changes": _forbidden_changes(source),

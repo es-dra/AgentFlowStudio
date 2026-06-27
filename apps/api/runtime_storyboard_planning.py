@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.knowledge.director_scenarios import director_scenario_from_text
 from agentflow.knowledge.professional_reference import professional_reference_from_text
 
 SHOT_FUNCTIONS = ("establish", "develop", "reveal", "turn", "resolve")
@@ -14,6 +15,7 @@ def storyboard_plan_fields(source_text: str, index: int) -> dict[str, Any]:
     return {
         "shot_function": shot_function,
         "professional_reference": professional_reference_from_text(source, node_type="script", generation_target="video"),
+        "director_scenario": director_scenario_from_text(source, node_type="script", generation_target="video"),
         "editing_rhythm": _editing_rhythm(source, shot_function),
         "transition_in": "cut_in" if index <= 1 else "match_continuity_cut",
         "transition_out": "hold_for_next_keyframe" if shot_function == "resolve" else "continuity_cut",

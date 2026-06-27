@@ -196,6 +196,7 @@ def _prompt_trace(
         "conflict_resolution": assembly["conflict_resolution"],
         "suppressed_context": assembly["suppressed_context"],
         "professional_reference": assembly["professional_reference"],
+        "director_scenario": assembly["director_scenario"],
         "background_context_refs": background_refs,
         "extracted_context_refs": extracted_context_refs(extracted),
         "asset_refs": list(request.asset_refs),

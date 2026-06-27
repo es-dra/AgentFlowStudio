@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-27 - Director Scenario Packs
+
+- Added AFS-native director scenario packs for faceless channel, SaaS launch,
+  podcast visual, and a short-video hook auxiliary layer. The packs are
+  structured execution-projection knowledge, not copied Claude Skill text and
+  not durable Company OS memory.
+- Wired `director_scenario` through prompt optimization traces, script plans,
+  storyboard shot plans, keyframe request plans, video generation plans, and
+  video provider prompts. Prompt optimization model-call context now records
+  `director_scenario:<id>` references for provider-bound evidence.
+- Video provider prompt assembly now respects the selected provider
+  `prompt_char_limit` before adapter validation, preventing richer director
+  guidance from turning fake/real provider dispatch into prompt-length failure.
+
+Verification:
+
+```text
+python -m py_compile changed algorithm/runtime modules -> passed
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -q -> 83 passed, 1 existing warning
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+git diff --check -> passed with CRLF/LF warning on agentflow/knowledge/__init__.py
+```
+
+Boundary:
+
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- No provider secret, signed URL, raw provider response, media byte, private
+  Company OS source content, or external repository prose was written to Git.
+
 ## 2026-06-27 - Creative Algorithm Planning Layer
 
 - Added safe structured planning artifacts for the Studio generation chain: formal script plan, storyboard shot function/keyframe/video requirements, editable asset profile seeds, keyframe plan, and video motion/editing plan.

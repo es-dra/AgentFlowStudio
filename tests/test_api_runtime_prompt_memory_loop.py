@@ -1102,6 +1102,7 @@ def test_script_prompt_optimization_returns_structured_script_plan(tmp_path) -> 
     payload = response.json()
     assert payload["script_plan"]["script_type"] == "formal_short_video_script"
     assert payload["script_plan"]["asset_seed_policy"]["candidate_assets_are_editable"] is True
+    assert payload["script_plan"]["director_scenario"]["primary_scenario"] == "general_short_video"
     assert "script_plan" in payload["artifacts"]
     assert "storyboard_placeholder_outline" in payload["script_plan"]["forbidden_outputs"]
     assert "storyboard_placeholder_outline" not in payload["user_prompt"]
@@ -1139,3 +1140,33 @@ def test_prompt_optimizer_trace_includes_professional_reference_for_rooftop_vide
     assert "motivated night exterior" in reference["lighting"]["decision"]
     assert reference["writes_long_term_memory"] is False
     assert reference["writes_company_kb"] is False
+
+
+def test_prompt_optimizer_trace_includes_director_scenario_for_saas_launch(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_director_scenario_prompt", "goal": "Director scenario trace"})
+
+    response = client.post(
+        "/projects/proj_director_scenario_prompt/prompt-optimizations",
+        json={
+            "node_id": "video-node-director-scenario",
+            "node_type": "video",
+            "prompt_text": "A SaaS launch demo shows a dashboard workflow turning a messy task into a clear result.",
+            "generation_target": "video",
+            "target_platform": "short_video",
+            "style": "clean product demo",
+            "generated_at": "2026-06-27T10:35:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
+    scenario = trace["director_scenario"]
+
+    assert scenario["primary_scenario"] == "saas_launch"
+    assert scenario["writes_company_kb"] is False
+    assert "Director scenario:" in payload["optimized_prompt"]
+    assert "SaaS Launch" in payload["optimized_prompt"]
+    model_context = client.get(f"/artifacts/{payload['artifacts']['model_call_context']['artifact_id']}").json()["payload"]
+    assert "director_scenario:saas_launch" in model_context["preference_context"]["expert_rule_ids"]

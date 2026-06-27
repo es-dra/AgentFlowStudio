@@ -54,7 +54,16 @@ def submit_video_generation(
         frame_metadata.append(image_asset_metadata(store, project_id, request.last_frame_image_asset_id))
     preflight = video_generation_preflight(store, project_id, request)
     context_bundle = preflight.get("context_bundle")
-    provider_prompt = video_provider_prompt(request, context_bundle)
+    registry = None
+    descriptor = None
+    descriptor_error = None
+    try:
+        registry = load_registry()
+        descriptor = registry.descriptor(request.provider_service_id)
+    except ModelGatewayError as exc:
+        descriptor_error = exc
+    prompt_limit = int(getattr(descriptor, "prompt_char_limit", 4000) or 4000)
+    provider_prompt = video_provider_prompt(request, context_bundle, limit=prompt_limit)
     generation_plan = video_generation_plan(request, context_bundle)
     model_call_context = _model_call_context(project_id, request, context_bundle)
     model_request_plan = build_request_plan(
@@ -64,11 +73,9 @@ def submit_video_generation(
     )
     model_request_plan["generation_plan"] = generation_plan
     artifacts = write_model_call_artifacts(store, output_dir, model_call_context, model_request_plan)
-    try:
-        registry = load_registry()
-        descriptor = registry.descriptor(request.provider_service_id)
-    except ModelGatewayError as exc:
-        return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, provider_not_ready_block(str(exc)))
+    if descriptor_error is not None or registry is None or descriptor is None:
+        reason = str(descriptor_error or "provider descriptor unavailable")
+        return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, provider_not_ready_block(reason))
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_VIDEO_ENV) or REMOTE_VIDEO_ENV)
     gate = video_gate(required_gate)
     if gate["status"] == "blocked":

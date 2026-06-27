@@ -602,6 +602,9 @@ def test_video_generation_response_exposes_professional_reference(tmp_path, monk
     assert response.status_code == 200
     plan = response.json()["video_generation_plan"]
     reference = plan["professional_reference"]
+    scenario = plan["director_scenario"]
     assert {"night", "rooftop", "video"} <= set(reference["tags"])
     assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
     assert reference["writes_company_kb"] is False
+    assert scenario["primary_scenario"] == "general_short_video"
+    assert scenario["writes_company_kb"] is False

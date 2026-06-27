@@ -22,7 +22,10 @@ def prompt_optimization_model_call_context(
         fixed_assets=_included_assets(context_bundle),
         reference_image_refs=list(getattr(request, "asset_refs", []) or []),
         user_preferences={"style": request.style, "target_platform": request.target_platform},
-        expert_rule_ids=_rule_ids(assembly.get("knowledge_rules") or []),
+        expert_rule_ids=[
+            *_rule_ids(assembly.get("knowledge_rules") or []),
+            *_director_scenario_ids(assembly.get("director_scenario") or {}),
+        ],
         provider_constraints={"capability": "llm", "provider_gate": "AFS_ALLOW_REMOTE_LLM"},
     )
 
@@ -156,6 +159,15 @@ def _image_refs(*values: Any) -> list[str]:
 
 def _rule_ids(rules: list[dict[str, Any]]) -> list[str]:
     return [str(rule.get("rule_id") or "").strip() for rule in rules if rule.get("rule_id")]
+
+
+def _director_scenario_ids(context: dict[str, Any]) -> list[str]:
+    packs = context.get("selected_packs") if isinstance(context, dict) else []
+    return [
+        "director_scenario:" + str(pack.get("scenario_id") or "").strip()
+        for pack in (packs if isinstance(packs, list) else [])
+        if isinstance(pack, dict) and pack.get("scenario_id")
+    ]
 
 
 __all__ = (

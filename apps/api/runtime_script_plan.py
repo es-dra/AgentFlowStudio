@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.knowledge.director_scenarios import director_scenario_context
 from apps.api.runtime_models import PromptOptimizationRequest
 
 
@@ -27,6 +28,14 @@ def build_script_plan(request: PromptOptimizationRequest) -> dict[str, Any] | No
     source = source_idea or prompt_text
     subject_hints = _subject_hints(source)
     scene_hints = _scene_hints(source)
+    director_scenario = director_scenario_context(
+        text=source,
+        node_type=request.node_type,
+        generation_target="script",
+        target_platform=request.target_platform,
+        style=request.style,
+        node_parameters=params,
+    )
     return {
         "artifact_type": "agentflow_script_plan",
         "schema_version": "0.1.0",
@@ -34,6 +43,7 @@ def build_script_plan(request: PromptOptimizationRequest) -> dict[str, Any] | No
         "script_type": "formal_short_video_script",
         "source_idea": source_idea[:600],
         "story_title_seed": _title_seed(source),
+        "director_scenario": director_scenario,
         "detected_subject_hints": subject_hints,
         "detected_scene_hints": scene_hints,
         "narrative_sections": [

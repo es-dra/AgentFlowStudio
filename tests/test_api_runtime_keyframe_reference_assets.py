@@ -571,8 +571,11 @@ def test_keyframe_plan_includes_professional_reference(tmp_path, monkeypatch) ->
     payload = response.json()
     plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
     reference = plan["keyframe_plan"]["professional_reference"]
+    scenario = plan["keyframe_plan"]["director_scenario"]
 
     assert {"night", "rooftop", "single_frame"} <= set(reference["tags"])
     assert "moderate-to-deep" in reference["depth_of_field"]["decision"]
     assert "unapproved chair or stool" in reference["scene_continuity"]["avoid"]
     assert reference["writes_company_kb"] is False
+    assert scenario["primary_scenario"] == "general_short_video"
+    assert scenario["writes_company_kb"] is False

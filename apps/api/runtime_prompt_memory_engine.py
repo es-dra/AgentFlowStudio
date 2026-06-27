@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.knowledge.director_scenarios import (
+    director_scenario_context,
+    format_director_scenario_reference,
+)
 from agentflow.knowledge.professional_reference import (
     format_professional_reference,
     professional_reference_context,
@@ -50,7 +54,23 @@ def assemble_prompt_context(request: PromptOptimizationRequest, state: dict[str,
         node_type=request.node_type,
         generation_target=request.generation_target,
     )
-    sections = _prompt_sections(request, slots, selected_rules, background, suppressed, professional_reference)
+    director_scenario = director_scenario_context(
+        slots=slots,
+        node_type=request.node_type,
+        generation_target=request.generation_target,
+        target_platform=request.target_platform,
+        style=request.style,
+        node_parameters=request.node_parameters,
+    )
+    sections = _prompt_sections(
+        request,
+        slots,
+        selected_rules,
+        background,
+        suppressed,
+        professional_reference,
+        director_scenario,
+    )
     user_prompt = build_user_prompt(request, slots)
     creative_agent = build_creative_agent_decision(
         request,
@@ -71,9 +91,11 @@ def assemble_prompt_context(request: PromptOptimizationRequest, state: dict[str,
         "background_context": background,
         "suppressed_context": suppressed,
         "professional_reference": professional_reference,
+        "director_scenario": director_scenario,
         "conflict_resolution": {
             "policy": "professional_knowledge_over_user_preference",
             "professional_rules_applied": len(selected_rules),
+            "director_scenario_packs_applied": len(director_scenario["selected_packs"]),
             "suppressed_count": len(suppressed),
         },
         "knowledgebase_version": str(registry["version"]),
@@ -89,6 +111,7 @@ def _prompt_sections(
     background: list[dict[str, Any]],
     suppressed: list[dict[str, str]],
     professional_reference: dict[str, Any],
+    director_scenario: dict[str, Any],
 ) -> list[dict[str, str]]:
     rule_guidance = _guidance_by_section(rules)
     background_text = _background_text(background)
@@ -99,10 +122,14 @@ def _prompt_sections(
         section: format_professional_reference(professional_reference, section)
         for section in SECTION_ORDER
     }
+    scenario_by_section = {
+        section: format_director_scenario_reference(director_scenario, section)
+        for section in SECTION_ORDER
+    }
     text_by_section = {
         "Intent": (
             f"Optimize this {request.node_type} node for {request.generation_target} on {request.target_platform}. "
-            f"Original request: {request.prompt_text}. {rule_guidance.get('Intent', '')}"
+            f"Original request: {request.prompt_text}. {scenario_by_section.get('Intent', '')} {rule_guidance.get('Intent', '')}"
         ),
         "Subject/Character": (
             f"{slots['subject']}; keep identity separate from one-off action. "
@@ -110,20 +137,35 @@ def _prompt_sections(
         ),
         "Scene/Production Design": (
             f"{slots['scene']}; preserve reusable scene geography, props, and atmosphere. "
-            f"{_scene_background(background)} {reference_by_section.get('Scene/Production Design', '')} {rule_guidance.get('Scene/Production Design', '')}"
+            f"{_scene_background(background)} {reference_by_section.get('Scene/Production Design', '')} "
+            f"{scenario_by_section.get('Scene/Production Design', '')} {rule_guidance.get('Scene/Production Design', '')}"
         ),
-        "Action/Beat": f"{slots['action']}; visible emotional cue: {slots['emotion']}. {rule_guidance.get('Action/Beat', '')}",
-        "Camera/Framing": f"{slots['camera']}; choose shot scale and angle for the beat. {camera_controls} {reference_by_section.get('Camera/Framing', '')} {rule_guidance.get('Camera/Framing', '')}",
-        "Lighting": f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {lighting_controls} {reference_by_section.get('Lighting', '')} {rule_guidance.get('Lighting', '')}",
-        "Motion/Temporal Progression": f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {motion_controls} {reference_by_section.get('Motion/Temporal Progression', '')} {rule_guidance.get('Motion/Temporal Progression', '')}",
+        "Action/Beat": (
+            f"{slots['action']}; visible emotional cue: {slots['emotion']}. "
+            f"{scenario_by_section.get('Action/Beat', '')} {rule_guidance.get('Action/Beat', '')}"
+        ),
+        "Camera/Framing": (
+            f"{slots['camera']}; choose shot scale and angle for the beat. {camera_controls} "
+            f"{reference_by_section.get('Camera/Framing', '')} {scenario_by_section.get('Camera/Framing', '')} "
+            f"{rule_guidance.get('Camera/Framing', '')}"
+        ),
+        "Lighting": (
+            f"{slots['lighting']}; specify motivated source, direction, contrast, color temperature, and atmosphere. {lighting_controls} "
+            f"{reference_by_section.get('Lighting', '')} {scenario_by_section.get('Lighting', '')} {rule_guidance.get('Lighting', '')}"
+        ),
+        "Motion/Temporal Progression": (
+            f"{slots['motion']}; describe temporal change, direction, speed, and camera relation. {motion_controls} "
+            f"{reference_by_section.get('Motion/Temporal Progression', '')} "
+            f"{scenario_by_section.get('Motion/Temporal Progression', '')} {rule_guidance.get('Motion/Temporal Progression', '')}"
+        ),
         "Continuity": (
             f"Reuse safe background context only: {background_text}. Asset refs: {_asset_refs(request)}. "
-            f"Durable memory remains false. {rule_guidance.get('Continuity', '')}"
+            f"Durable memory remains false. {scenario_by_section.get('Continuity', '')} {rule_guidance.get('Continuity', '')}"
         ),
         "Negative Constraints": (
             "Provider calls remain off; do not claim generation, upload, download, or provider execution. "
             "No private paths, signed URLs, tokens, provider raw payloads, media bytes, identity drift, unwanted text, or continuity breaks. "
-            f"{_suppressed_text(suppressed)} {rule_guidance.get('Negative Constraints', '')}"
+            f"{scenario_by_section.get('Negative Constraints', '')} {_suppressed_text(suppressed)} {rule_guidance.get('Negative Constraints', '')}"
         ),
     }
     return [{"title": section, "text": text_by_section[section].strip()} for section in SECTION_ORDER]
