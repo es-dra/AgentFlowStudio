@@ -118,6 +118,25 @@ def test_professional_reference_context_selects_rooftop_night_video_guidance() -
     assert "Professional reference:" in format_professional_reference(context, "Camera/Framing")
 
 
+def test_expert_knowledge_context_covers_video_director_dimensions() -> None:
+    from agentflow.knowledge.expert_knowledge import EXPERT_DOMAINS, expert_knowledge_from_text, format_expert_knowledge_reference
+
+    context = expert_knowledge_from_text(
+        "A future robot watches stars on a rural rooftop platform.",
+        node_type="video",
+        generation_target="video",
+    )
+
+    assert set(EXPERT_DOMAINS) <= set(context["domains"])
+    assert {"night", "observational", "robot", "rooftop", "video"} <= set(context["tags"])
+    assert "rooftop boundary" in context["domains"]["camera"]["decision"]
+    assert "moon/star" in context["domains"]["lighting"]["decision"]
+    assert "moderate-to-deep" in context["domains"]["depth_of_field"]["decision"]
+    assert "mechanical micro motion" in context["domains"]["motion_design"]["decision"]
+    assert context["writes_company_kb"] is False
+    assert "Expert knowledge reference:" in format_expert_knowledge_reference(context)
+
+
 def test_director_scenario_context_selects_saas_launch_pack_and_auxiliary_hook() -> None:
     from agentflow.knowledge.director_scenarios import (
         director_scenario_from_text,

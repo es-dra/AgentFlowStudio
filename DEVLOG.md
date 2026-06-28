@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-06-28 - Expert Timeline and Asset Feedback Slice
+
+- Added a structured expert-knowledge runtime layer covering camera, lighting,
+  depth of field, editing pacing, art direction, motion design, and continuity.
+  Video plans now carry this context separately from provider prompt text so
+  downstream logic can inspect professional decisions instead of parsing prose.
+- Added `temporal_director_plan` to video generation plans. A 5s video now has
+  second-level beats with character state, action, camera state, lighting state,
+  depth of field, composition guard, asset continuity, forbidden changes, and
+  edit intent. Provider prompts include a compact second-level director timeline
+  while preserving existing asset identity, professional reference, and director
+  scenario sections within provider prompt limits.
+- Added asset-graph feedback overlay support. Runtime plans can now consume
+  user decisions to confirm, lock, revise, or reject graph assets. Rejected
+  graph assets are excluded from locked asset context and converted into
+  forbidden changes; locked/revised assets add continuity and negative locks.
+  The overlay remains raw runtime evidence and does not write long-term memory
+  or Company OS source knowledge.
+- `/feedback` sanitization now preserves safe asset-graph feedback decisions
+  rather than flattening them into a generic note.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 94 passed, 1 existing warning
+python -m py_compile changed knowledge/algorithm/runtime modules -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- The new expert layer and feedback overlay are execution-projection logic, not
+  durable Company OS rule promotion.
+
 ## 2026-06-28 - Asset Graph Keyframe/Video Continuity Slice
 
 - Added a reusable asset-graph context summarizer for downstream generation

@@ -621,6 +621,91 @@ def test_keyframe_plan_uses_context_subgraph_asset_graph(tmp_path, monkeypatch) 
     assert "do not add unapproved eaves" in keyframe_plan["forbidden_changes"]
 
 
+def test_keyframe_plan_applies_asset_graph_feedback_overlay(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_keyframe_asset_graph_feedback"
+    client.post("/projects", json={"project_id": project_id, "goal": "Keyframe asset graph feedback"})
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "continuity_locks": ["robot head shell"],
+                "negative_locks": ["do not change identity"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "asset_id": "asset_eaves",
+                "asset_type": "scene",
+                "label": "wrong eaves",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "continuity_locks": ["eaves geometry"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "keyframe_robot_feedback",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "optimized_prompt": "Medium keyframe of a future robot on a rooftop under stars.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "context_subgraph": {
+                "target_node_id": "keyframe_robot_feedback",
+                "nodes": [
+                    {
+                        "id": "storyboard_01",
+                        "type": "storyboard",
+                        "node_parameters": {
+                            "asset_graph": asset_graph,
+                            "asset_graph_feedback_overlay": {
+                                "artifact_type": "agentflow_asset_graph_feedback_overlay",
+                                "decisions": [
+                                    {
+                                        "graph_asset_id": "graph:character:future_robot",
+                                        "decision": "lock",
+                                        "continuity_locks": ["plush robot head shell must remain"],
+                                    },
+                                    {
+                                        "graph_asset_id": "graph:scene:wrong_eaves",
+                                        "decision": "reject",
+                                    },
+                                ],
+                            },
+                        },
+                    }
+                ],
+                "edges": [],
+            },
+            "generated_at": "2026-06-28T10:20:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()["payload"]
+    keyframe_plan = plan["keyframe_plan"]
+    graph_context = keyframe_plan["asset_graph_context"]
+
+    assert "graph:scene:wrong_eaves" in graph_context["blocked_graph_asset_ids"]
+    assert "graph:scene:wrong_eaves" not in graph_context["graph_asset_ids"]
+    assert "plush robot head shell must remain" in str(keyframe_plan["asset_locks"])
+    assert "do not use rejected asset wrong eaves" in keyframe_plan["forbidden_changes"]
+
+
 def test_keyframe_plan_includes_professional_reference(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))

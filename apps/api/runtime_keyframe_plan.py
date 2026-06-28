@@ -7,6 +7,8 @@ from agentflow.knowledge.director_scenarios import director_scenario_from_text
 from agentflow.knowledge.professional_reference import professional_reference_from_text
 from agentflow.algorithms.provider_gate_manifest.asset_graph_context import (
     asset_graph_from_context_bundle,
+    asset_graph_feedback_overlay_from_context_bundle,
+    asset_graph_feedback_overlay_from_context_subgraph,
     asset_graph_from_context_subgraph,
     summarize_asset_graph_for_plan,
 )
@@ -24,7 +26,8 @@ def build_keyframe_plan(
     refs = [item.get("public") or {} for item in reference_images]
     ref_ids = [str(item.get("asset_id")) for item in refs if item.get("asset_id")]
     asset_graph = asset_graph_from_context_subgraph(request.context_subgraph) or asset_graph_from_context_bundle(context_bundle)
-    asset_graph_context = summarize_asset_graph_for_plan(asset_graph)
+    feedback_overlay = asset_graph_feedback_overlay_from_context_subgraph(request.context_subgraph) or asset_graph_feedback_overlay_from_context_bundle(context_bundle)
+    asset_graph_context = summarize_asset_graph_for_plan(asset_graph, feedback_overlay=feedback_overlay)
     return {
         "artifact_type": "agentflow_keyframe_plan",
         "schema_version": "0.1.0",
@@ -169,6 +172,7 @@ def _forbidden_changes(source: str, asset_graph_context: dict[str, Any] | None) 
         changes.extend(["humanizing the robot beyond approved design", "changing robot head shell"])
     for asset in _graph_locked_assets(asset_graph_context):
         changes.extend(_dedupe(asset.get("negative_locks") or []))
+    changes.extend(_feedback_forbidden_changes(asset_graph_context))
     return _dedupe(changes)
 
 
@@ -184,6 +188,21 @@ def _graph_locked_assets(asset_graph_context: dict[str, Any] | None) -> list[dic
         return []
     assets = asset_graph_context.get("locked_assets")
     return [asset for asset in assets if isinstance(asset, dict)] if isinstance(assets, list) else []
+
+
+def _feedback_forbidden_changes(asset_graph_context: dict[str, Any] | None) -> list[str]:
+    if not isinstance(asset_graph_context, dict):
+        return []
+    result: list[str] = []
+    decisions = asset_graph_context.get("feedback_decisions")
+    if not isinstance(decisions, list):
+        return result
+    for decision in decisions:
+        if not isinstance(decision, dict) or decision.get("decision") != "reject":
+            continue
+        label = str(decision.get("label") or decision.get("graph_asset_id") or "asset").strip()
+        result.append(f"do not use rejected asset {label}")
+    return result
 
 
 def _dedupe(values: list[Any]) -> list[str]:
