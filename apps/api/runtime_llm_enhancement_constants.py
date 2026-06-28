@@ -52,6 +52,9 @@ BANNED_GENERIC_PHRASES = (
 TOOL_FAILURE_MARKERS = (
     "i couldn't read the files",
     "i could not read the files",
+    "unable to read the files",
+    "command execution is failing in the sandbox",
+    "execution is failing in the sandbox",
     "local command execution failed",
     "bwrap:",
     "failed rtm_newaddr",

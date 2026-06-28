@@ -797,24 +797,32 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
 
 
 def test_studio_prompt_optimizer_discards_tool_failure_text_from_llm(tmp_path, monkeypatch) -> None:
-    polluted = "\n".join(
-        [
-            "意图：围绕“白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
-            "人物/主体：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
-            "场景/美术：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
-            "动作/情节：白雪公主穿越到现代",
-            "镜头/构图：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
-            "灯光：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
-            "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
-            "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
-            "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
-        ]
-    )
+    polluted_variants = [
+        "I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
+        "Unable to read the files because command execution is failing in the sandbox.",
+    ]
 
     class FakeRegistry:
+        calls = 0
+
         def dispatch(self, capability, service_id, request):
             assert capability == "llm"
             assert service_id == "prompt_optimizer"
+            fragment = polluted_variants[self.calls]
+            self.calls += 1
+            polluted = "\n".join(
+                [
+                    "意图：围绕“白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
+                    f"人物/主体：{fragment}",
+                    f"场景/美术：{fragment}",
+                    "动作/情节：白雪公主穿越到现代",
+                    f"镜头/构图：{fragment}",
+                    f"灯光：{fragment}",
+                    "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
+                    "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
+                    "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
+                ]
+            )
             return {"text": polluted}
 
     monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
@@ -846,6 +854,8 @@ def test_studio_prompt_optimizer_discards_tool_failure_text_from_llm(tmp_path, m
     assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "provider_output_tool_failure_text"
     assert "白雪公主穿越到现代" in payload["optimized_prompt"]
     assert "local command execution failed" not in serialized
+    assert "unable to read the files" not in serialized
+    assert "command execution is failing in the sandbox" not in serialized
     assert "bwrap" not in serialized
     assert "operation not permitted" not in serialized
 
