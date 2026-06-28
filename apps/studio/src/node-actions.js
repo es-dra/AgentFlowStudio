@@ -122,6 +122,6 @@ export async function startNodeGeneration(store, runtime, node, resultText) {
   setNodeError(
     store,
     fresh.id,
-    resultText || "当前版本仅图片节点支持真实生成；视频、音频、脚本和合成通道仍在开发中。",
+    resultText || "当前节点不支持直接生成，请使用该节点的专用操作。",
   );
 }

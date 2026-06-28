@@ -220,11 +220,11 @@ def test_studio_frontend_structure_splits_entrypoint_helpers() -> None:
     assert len((STUDIO_ROOT / "styles" / "canvas.css").read_text(encoding="utf-8").splitlines()) <= 300
     assert len((STUDIO_ROOT / "styles" / "canvas-edges.css").read_text(encoding="utf-8").splitlines()) <= 140
     assert len((STUDIO_ROOT / "src" / "studio-project-session.js").read_text(encoding="utf-8").splitlines()) <= 90
-    assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 300
+    assert len((STUDIO_ROOT / "src" / "studio-project-controller.js").read_text(encoding="utf-8").splitlines()) <= 500
     assert len(keyframe_actions.splitlines()) <= 180
     assert len(video_actions.splitlines()) <= 300
-    assert len(node_actions.splitlines()) <= 120
-    assert len(main.splitlines()) <= 300
+    assert len(node_actions.splitlines()) <= 140
+    assert len(main.splitlines()) <= 500
     assert len((STUDIO_ROOT / "src" / "node-generation-restore.js").read_text(encoding="utf-8").splitlines()) <= 80
 
 

@@ -12,6 +12,14 @@ from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
 
 
+def _runtime_error_raw_detail(result) -> str:
+    detail = result.json()["detail"]
+    if isinstance(detail, dict):
+        details = detail.get("details") if isinstance(detail.get("details"), dict) else {}
+        return str(details.get("raw_detail") or detail.get("message") or detail.get("error") or "")
+    return str(detail)
+
+
 def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post(
@@ -645,7 +653,7 @@ def test_studio_prompt_optimizer_requires_remote_llm_when_requested(tmp_path, mo
     )
 
     assert result.status_code == 422
-    assert "remote LLM prompt optimization unavailable" in result.json()["detail"]
+    assert "remote LLM prompt optimization unavailable" in _runtime_error_raw_detail(result)
 
 
 def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rejected(tmp_path, monkeypatch) -> None:
@@ -678,7 +686,7 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
     )
 
     assert result.status_code == 422
-    assert "enhancement missing required sections" in result.json()["detail"]
+    assert "enhancement missing required sections" in _runtime_error_raw_detail(result)
 
 
 def test_studio_prompt_optimizer_rejects_provider_infrastructure_error_text(tmp_path, monkeypatch) -> None:
@@ -716,7 +724,7 @@ def test_studio_prompt_optimizer_rejects_provider_infrastructure_error_text(tmp_
     )
 
     assert result.status_code == 422
-    detail = result.json()["detail"]
+    detail = _runtime_error_raw_detail(result)
     assert "provider returned infrastructure error" in detail
     assert "Unable to read" not in detail
     assert "request.json" not in detail
@@ -768,13 +776,13 @@ def test_studio_prompt_optimizer_rejects_local_file_access_error_inside_sections
     )
 
     assert result.status_code == 422
-    detail = result.json()["detail"]
+    detail = _runtime_error_raw_detail(result)
     assert "provider returned infrastructure error" in detail
     assert "local files" not in detail.lower()
     assert "requested local files" not in detail.lower()
 
 
-def test_studio_prompt_optimizer_does_not_salvage_after_retry_infrastructure_error(tmp_path, monkeypatch) -> None:
+def test_studio_prompt_optimizer_does_not_retry_or_salvage_infrastructure_error(tmp_path, monkeypatch) -> None:
     first_provider_text = (
         "I'm unable to read the files because the local command sandbox is failing "
         "before any command runs."
@@ -815,8 +823,8 @@ def test_studio_prompt_optimizer_does_not_salvage_after_retry_infrastructure_err
     )
 
     assert result.status_code == 422
-    assert fake_registry.calls == 2
-    detail = result.json()["detail"]
+    assert fake_registry.calls == 1
+    detail = _runtime_error_raw_detail(result)
     assert "provider returned infrastructure error" in detail
     assert "sandbox" not in detail.lower()
     assert "request.json" not in detail

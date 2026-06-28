@@ -404,7 +404,8 @@ def test_canvas_fit_uses_visible_safe_area_not_full_root_bounds() -> None:
     assert "fitVisibleCanvasViewport(s.nodes)" in context_menu
     assert "fitVisibleCanvasViewport(s.nodes)" in dock
     assert "visibleCanvasCenter()" in dock
-    assert "fitVisibleCanvasViewport({ [node.id]: node }, 220)" in navigator
+    assert "visibleCanvasCenter()" in navigator
+    assert "panViewportToNode(s.viewport, node)" in navigator
     assert "fitVisibleCanvasViewport({ [node.id]: node }, 220)" in drawer_actions
 
 

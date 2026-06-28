@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-28 - Branch Reconciliation and Diagnostics Merge
+
+- Merged the remote Studio generation diagnostics branch into `master`,
+  preserving the Runtime file logging, structured exception handling, frontend
+  client error reporting, generation panel controls, and video/keyframe timing
+  diagnostics.
+- Merged `codex/algorithm-agent-foundation` into the same line so the expert
+  timeline, asset graph continuity, asset feedback overlay, grounded storyboard
+  planning, and related runtime plan contracts are now combined with the latest
+  Studio diagnostics work.
+- Reconciled merge-time test contracts for structured Runtime error payloads,
+  current video generation prompt guidance, visible-area project navigation,
+  and Studio file-size thresholds. Also replaced one stale fallback message
+  that still claimed only image nodes support real generation.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py tests/test_runtime_generation_logging_static.py tests/test_volc_seedance_video_adapter.py tests/test_web_studio_frontend_wave.py tests/test_web_studio_mature_shell_static.py tests/test_web_studio_prompt_script_static.py tests/test_web_studio_static.py -> 167 passed, 1 existing warning
+npm.cmd run check:studio-js -> JS syntax check passed: 125 files
+.\.venv\Scripts\python.exe -m apps.cli.main --help -> passed
+.\.venv\Scripts\python.exe -m apps.cli.main version -> 0.1.0
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider call was started during the merge verification.
+- Server synchronization and branch cleanup are operational follow-up steps for
+  the same three-end reconciliation pass.
+
 ## 2026-06-28 - Expert Timeline and Asset Feedback Slice
 
 - Added a structured expert-knowledge runtime layer covering camera, lighting,

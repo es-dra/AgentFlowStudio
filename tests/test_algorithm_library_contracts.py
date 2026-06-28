@@ -435,7 +435,15 @@ def test_video_generation_plan_includes_professional_reference_and_prompt_guidan
     )
     assert "conflicting" not in neutral_prompt.lower()
     assert "conflict" not in neutral_prompt.lower()
-    assert "inconsistent motion directions" in neutral_prompt
+    neutral_plan = video_generation_plan(
+        prompt_text="Generate a continuous video from the first frame.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="fixed camera",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    assert "inconsistent motion directions" in neutral_plan["professional_reference"]["pacing"]["avoid"]
 
 
 def test_video_generation_plan_includes_director_scenario_and_prompt_guidance() -> None:

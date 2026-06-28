@@ -244,7 +244,8 @@ def test_image_node_prompt_bar_keeps_only_model_optimize_and_generate_controls()
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     assert '!["image", "video"].includes(node.type)' in canvas_body
     assert "bar-cost" not in prompt_bar
-    assert "当前版本仅图片节点支持真实生成" in prompt_bar
+    assert "当前视频模型不支持直接生成" in prompt_bar
+    assert "当前版本仅图片节点支持真实生成" not in prompt_bar
     assert "uploadNodeImage" in node_menu
     assert "setNodeVideoFrame" in node_menu
     assert "pollNodeVideoGeneration" in node_menu
