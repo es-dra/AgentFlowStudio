@@ -16,6 +16,7 @@ from apps.api.runtime_llm_enhancement_gate import (
 )
 from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction, strict_format_retry_instruction
 from apps.api.runtime_llm_enhancement_safety import (
+    contains_tool_failure_text,
     safe_reason,
     sanitize_enhanced_prompt,
     sections_from_canonical,
@@ -69,8 +70,31 @@ def maybe_enhance_prompt_with_llm(
                 base["format_salvage_used"] = bool(retry_result.get("format_salvage_used"))
             else:
                 return retry_result
+        elif str(exc) == "enhancement contains tool failure text":
+            fallback = deterministic_chinese_fallback_prompt(request, assembly)
+            return {
+                **base,
+                "status": "applied",
+                "provider_calls_started": True,
+                "discard_reason": "provider_output_tool_failure_text",
+                "guardrail_fallback_used": True,
+                "format_retry_count": retry_count,
+                **_prompt_payload(fallback),
+            }
         else:
             return _discard_with_fallback(base, request, assembly, str(exc), retry_count=retry_count)
+    if contains_tool_failure_text(prompt):
+        fallback = deterministic_chinese_fallback_prompt(request, assembly)
+        return {
+            **base,
+            "status": "applied",
+            "provider_calls_started": True,
+            "discard_reason": "provider_output_tool_failure_text",
+            "guardrail_fallback_used": True,
+            "format_retry_count": retry_count,
+            "format_salvage_used": bool(base.get("format_salvage_used")),
+            **_prompt_payload(fallback),
+        }
     try:
         validate_enhanced_prompt_specificity(prompt, request)
     except ValueError as exc:

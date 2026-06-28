@@ -24,6 +24,18 @@ signatures so equal-length content edits still repaint. Verification:
 video generation, ASR, external download, secret read, media byte, signed URL,
 or private Company OS source content was used or written.
 
+Runtime LLM optimizer pollution follow-up: 2026-06-28 isolated server
+verification found the next failure mode after content writeback: a provider
+optimizer response embedded tool execution failure text such as `local command
+execution failed`, `bwrap: loopback`, and `Operation not permitted` into
+user-facing prompt sections. Runtime now rejects those fragments as polluted
+enhancement output and returns deterministic Chinese fallback prompt content
+with `guardrail_fallback_used=true`, instead of writing execution-error text
+back into Studio. Verification: focused Runtime LLM pollution/regression set
+passed 3, LLM enhancement module boundary test passed 1, and Studio JS check
+passed for 121 files. Boundary: no raw provider response, secret, media byte,
+signed URL, or private Company OS source content was written.
+
 Internal beta account/admin baseline: 2026-06-26 added the admin-only
 `auth-invites` CLI on top of the existing Runtime auth store. Current
 administrator entrypoint:

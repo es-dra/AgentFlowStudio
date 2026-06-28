@@ -796,6 +796,60 @@ def test_studio_prompt_optimizer_retries_once_when_llm_returns_chatty_article(tm
     assert trace["llm_enhancement"]["format_retry_count"] == 1
 
 
+def test_studio_prompt_optimizer_discards_tool_failure_text_from_llm(tmp_path, monkeypatch) -> None:
+    polluted = "\n".join(
+        [
+            "意图：围绕“白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
+            "人物/主体：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
+            "场景/美术：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
+            "动作/情节：白雪公主穿越到现代",
+            "镜头/构图：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
+            "灯光：I couldn’t read the files because local command execution failed with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`.",
+            "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
+            "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
+            "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
+        ]
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": polluted}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_tool_failure/prompt-optimizations",
+        json={
+            "node_id": "text-node-tool-failure",
+            "node_type": "text",
+            "prompt_text": "白雪公主穿越到现代",
+            "generation_target": "prompt",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T12:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "provider_output_tool_failure_text"
+    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
+    assert "local command execution failed" not in serialized
+    assert "bwrap" not in serialized
+    assert "operation not permitted" not in serialized
+
+
 def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
     from apps.api.runtime_llm_enhancement_instructions import strict_format_retry_instruction
 

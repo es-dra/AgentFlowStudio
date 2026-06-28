@@ -7,6 +7,7 @@ from apps.api.runtime_llm_enhancement_constants import (
     BANNED_GENERIC_PHRASES,
     REQUIRED_SECTION_LABELS,
     SECTION_LABEL_ALIASES,
+    TOOL_FAILURE_MARKERS,
 )
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_models import PromptOptimizationRequest
@@ -19,6 +20,8 @@ def sanitize_enhanced_prompt(value: str) -> str:
         raise ValueError("empty enhancement")
     text = normalize_enhancement_sections(text)
     lowered = text.lower()
+    if contains_tool_failure_text(text):
+        raise ValueError("enhancement contains tool failure text")
     if "<think" in lowered or "reasoning_content" in lowered or "\nthinking:" in lowered:
         raise ValueError("reasoning content is not allowed")
     if len(text) > 5000:
@@ -30,6 +33,11 @@ def sanitize_enhanced_prompt(value: str) -> str:
         raise ValueError("enhancement includes generic placeholder")
     reject_unsafe_text(text)
     return text
+
+
+def contains_tool_failure_text(value: str) -> bool:
+    lowered = str(value or "").lower()
+    return any(marker in lowered for marker in TOOL_FAILURE_MARKERS)
 
 
 def validate_enhanced_prompt_specificity(prompt: str, request: PromptOptimizationRequest) -> None:
@@ -277,6 +285,7 @@ def safe_reason(value: str) -> str:
 __all__ = (
     "compact",
     "contains_cjk",
+    "contains_tool_failure_text",
     "reference_role",
     "safe_reason",
     "sanitize_enhanced_prompt",

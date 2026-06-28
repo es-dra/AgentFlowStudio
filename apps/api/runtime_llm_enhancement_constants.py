@@ -49,6 +49,16 @@ BANNED_GENERIC_PHRASES = (
     "主体角色",
     "主要场景",
 )
+TOOL_FAILURE_MARKERS = (
+    "i couldn't read the files",
+    "i could not read the files",
+    "local command execution failed",
+    "bwrap:",
+    "failed rtm_newaddr",
+    "operation not permitted",
+    "no such file or directory",
+    "permission denied",
+)
 
 
 __all__ = (
@@ -59,4 +69,5 @@ __all__ = (
     "REQUIRED_SECTION_LABELS",
     "SECTION_LABEL_ALIASES",
     "SECTION_ORDER",
+    "TOOL_FAILURE_MARKERS",
 )

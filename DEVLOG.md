@@ -13,11 +13,19 @@
 - Added a regression that simulates an uploaded script node with only
   `content`, verifies the Runtime optimization request uses that body, and
   confirms the optimized result updates the visible content.
+- Follow-up from isolated server verification: a live LLM optimizer response
+  returned tool execution failure text such as `local command execution failed`
+  and `bwrap: loopback` inside user-facing prompt sections. Runtime now treats
+  those provider/tool failure fragments as polluted enhancement output and
+  falls back to the deterministic Chinese prompt instead of writing the error
+  text into Studio content.
 
 Verification:
 
 ```text
 python -m pytest tests/test_web_studio_prompt_script_static.py -> 16 passed
+python -m pytest tests/test_api_runtime_prompt_memory_loop.py -k "tool_failure or retries_once_when_llm_returns_chatty_article or can_apply_gated_prompt_optimizer_enhancement" -> 3 passed / 23 deselected
+python -m pytest tests/test_api_runtime_llm_enhancement_modules.py -> 1 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 121 files
 ```
 
