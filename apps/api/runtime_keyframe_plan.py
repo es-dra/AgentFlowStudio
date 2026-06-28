@@ -5,6 +5,11 @@ from typing import Any
 
 from agentflow.knowledge.director_scenarios import director_scenario_from_text
 from agentflow.knowledge.professional_reference import professional_reference_from_text
+from agentflow.algorithms.provider_gate_manifest.asset_graph_context import (
+    asset_graph_from_context_bundle,
+    asset_graph_from_context_subgraph,
+    summarize_asset_graph_for_plan,
+)
 from apps.api.runtime_models import KeyframeGenerationRequest
 
 
@@ -18,6 +23,8 @@ def build_keyframe_plan(
     source = _plan_source(request, provider_prompt, context_bundle)
     refs = [item.get("public") or {} for item in reference_images]
     ref_ids = [str(item.get("asset_id")) for item in refs if item.get("asset_id")]
+    asset_graph = asset_graph_from_context_subgraph(request.context_subgraph) or asset_graph_from_context_bundle(context_bundle)
+    asset_graph_context = summarize_asset_graph_for_plan(asset_graph)
     return {
         "artifact_type": "agentflow_keyframe_plan",
         "schema_version": "0.1.0",
@@ -25,8 +32,8 @@ def build_keyframe_plan(
         "frame_role": "story_continuity_keyframe",
         "composition": _composition_plan(source, request.aspect_ratio),
         "subject_pose": _subject_pose_plan(source),
-        "asset_locks": _asset_locks(source, refs, context_bundle),
-        "scene_locks": _scene_locks(source, context_bundle),
+        "asset_locks": _asset_locks(source, refs, context_bundle, asset_graph_context),
+        "scene_locks": _scene_locks(source, context_bundle, asset_graph_context),
         "lighting_plan": _lighting_plan(source),
         "camera_plan": _camera_plan(source),
         "professional_reference": professional_reference_from_text(source, node_type="image", generation_target="keyframe"),
@@ -39,8 +46,9 @@ def build_keyframe_plan(
             node_parameters=request.node_parameters,
         ),
         "reference_asset_ids": ref_ids,
+        "asset_graph_context": asset_graph_context,
         "candidate_assets_are_editable": True,
-        "forbidden_changes": _forbidden_changes(source),
+        "forbidden_changes": _forbidden_changes(source, asset_graph_context),
     }
 
 
@@ -73,7 +81,12 @@ def _subject_pose_plan(source: str) -> str:
     return "neutral readable pose; do not add chair, stool, or extra furniture to justify the pose"
 
 
-def _asset_locks(source: str, refs: list[dict[str, Any]], context_bundle: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _asset_locks(
+    source: str,
+    refs: list[dict[str, Any]],
+    context_bundle: dict[str, Any] | None,
+    asset_graph_context: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
     locks: list[dict[str, Any]] = []
     for ref in refs:
         locks.append(
@@ -93,18 +106,45 @@ def _asset_locks(source: str, refs: list[dict[str, Any]], context_bundle: dict[s
                     "lock_fields": ["identity", "approved signature", "relationship to scene"],
                 }
             )
+    for asset in _graph_locked_assets(asset_graph_context):
+        graph_asset_id = str(asset.get("graph_asset_id") or "")
+        asset_id = str(asset.get("asset_id") or graph_asset_id)
+        known_ids = {item.get("asset_id") for item in locks} | {item.get("graph_asset_id") for item in locks}
+        if asset_id in known_ids or graph_asset_id in known_ids:
+            continue
+        lock_fields = _dedupe(asset.get("continuity_locks") or [])
+        if not lock_fields:
+            lock_fields = ["identity", "approved signature", "relationship to scene"]
+        locks.append(
+            {
+                "asset_id": asset_id,
+                "graph_asset_id": graph_asset_id,
+                "label": str(asset.get("label") or ""),
+                "asset_type": str(asset.get("asset_type") or "asset"),
+                "role": str(asset.get("role") or asset.get("asset_type") or "asset"),
+                "status": str(asset.get("status") or "candidate"),
+                "lock_fields": lock_fields[:8],
+            }
+        )
     if _has_robot(source) and not locks:
         locks.append({"asset_id": "candidate:future_robot", "role": "character", "lock_fields": ["robot head shell", "body proportions", "material finish"]})
     return locks[:16]
 
 
-def _scene_locks(source: str, context_bundle: dict[str, Any] | None) -> list[str]:
+def _scene_locks(
+    source: str,
+    context_bundle: dict[str, Any] | None,
+    asset_graph_context: dict[str, Any] | None,
+) -> list[str]:
     locks = ["scene layout", "main spatial relationship", "lighting direction"]
     if _has_rooftop(source):
         locks.extend(["rooftop platform geometry", "sky/background relationship"])
     if _included_assets(context_bundle):
         locks.append("approved context bundle scene assets")
-    return locks
+    for asset in _graph_locked_assets(asset_graph_context):
+        if str(asset.get("asset_type") or "") == "scene":
+            locks.extend(_dedupe(asset.get("continuity_locks") or []))
+    return _dedupe(locks)
 
 
 def _lighting_plan(source: str) -> str:
@@ -121,13 +161,15 @@ def _camera_plan(source: str) -> str:
     return "medium composition, stable lens, no abrupt reframing"
 
 
-def _forbidden_changes(source: str) -> list[str]:
+def _forbidden_changes(source: str, asset_graph_context: dict[str, Any] | None) -> list[str]:
     changes = ["text", "watermark", "UI", "borders", "new characters", "identity drift", "unrequested props"]
     if _has_rooftop(source):
         changes.extend(["unrequested eaves", "unrequested chair", "unrequested stool"])
     if _has_robot(source):
         changes.extend(["humanizing the robot beyond approved design", "changing robot head shell"])
-    return changes
+    for asset in _graph_locked_assets(asset_graph_context):
+        changes.extend(_dedupe(asset.get("negative_locks") or []))
+    return _dedupe(changes)
 
 
 def _included_assets(context_bundle: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -135,6 +177,22 @@ def _included_assets(context_bundle: dict[str, Any] | None) -> list[dict[str, An
         return []
     assets = context_bundle.get("included_assets")
     return assets if isinstance(assets, list) else []
+
+
+def _graph_locked_assets(asset_graph_context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(asset_graph_context, dict):
+        return []
+    assets = asset_graph_context.get("locked_assets")
+    return [asset for asset in assets if isinstance(asset, dict)] if isinstance(assets, list) else []
+
+
+def _dedupe(values: list[Any]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in result:
+            result.append(text)
+    return result
 
 
 def _wide_scene(source: str) -> bool:

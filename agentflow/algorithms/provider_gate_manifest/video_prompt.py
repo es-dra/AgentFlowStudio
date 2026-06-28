@@ -3,6 +3,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.algorithms.provider_gate_manifest.asset_graph_context import (
+    asset_graph_from_context_bundle,
+    format_asset_graph_prompt_lines,
+    summarize_asset_graph_for_plan,
+)
 from agentflow.knowledge.director_scenarios import (
     director_scenario_from_text,
     format_director_scenario_reference,
@@ -52,6 +57,7 @@ def video_provider_prompt(
         _format_motion_plan_for_prompt(plan["motion_plan"]),
         _format_professional_reference_for_video(plan.get("professional_reference", {})),
         _format_director_scenario_for_video(plan.get("director_scenario", {})),
+        format_asset_graph_prompt_lines(plan.get("asset_graph_context")),
     ]
     if motion:
         parts.append(f"Motion: {strip_image_edit_language(motion)}")
@@ -84,6 +90,7 @@ def video_generation_plan(
     context_bundle: dict[str, Any] | None,
 ) -> dict[str, Any]:
     source = _combined_source(prompt_text, optimized_prompt, motion, context_bundle)
+    asset_graph_context = summarize_asset_graph_for_plan(asset_graph_from_context_bundle(context_bundle))
     motion_plan = video_motion_plan(
         duration_sec=duration_sec,
         motion=motion,
@@ -94,13 +101,19 @@ def video_generation_plan(
         "artifact_type": "agentflow_video_generation_plan",
         "schema_version": "0.1.0",
         "motion_plan": motion_plan,
-        "editing_plan": video_editing_plan(source_text=source, last_frame_image_asset_id=last_frame_image_asset_id),
+        "editing_plan": video_editing_plan(
+            source_text=source,
+            last_frame_image_asset_id=last_frame_image_asset_id,
+            asset_graph_context=asset_graph_context,
+        ),
+        "asset_graph_context": asset_graph_context,
         "professional_reference": professional_reference_from_text(source, node_type="video", generation_target="video"),
         "director_scenario": director_scenario_from_text(source, node_type="video", generation_target="video"),
         "prompt_contract": {
             "first_frame_is_strict_anchor": True,
             "time_beats_are_required": True,
             "candidate_assets_are_editable": True,
+            "asset_graph_context_used": bool(asset_graph_context.get("locked_assets")),
             "director_scenario_selected": True,
             "provider_prompt_uses_image_edit_language": False,
         },
@@ -137,14 +150,19 @@ def video_motion_plan(
     }
 
 
-def video_editing_plan(*, source_text: str, last_frame_image_asset_id: str | None) -> dict[str, Any]:
+def video_editing_plan(
+    *,
+    source_text: str,
+    last_frame_image_asset_id: str | None,
+    asset_graph_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "clip_role": "single_continuity_clip",
         "transition_in": "start_from_first_frame",
         "transition_out": "match_last_frame_anchor" if last_frame_image_asset_id else "hold_readable_end_state",
         "pacing": "slow_observational" if _has_stars(source_text) else "medium_continuous",
-        "continuity_locks": _continuity_locks(source_text),
-        "forbidden_changes": _forbidden_video_changes(source_text),
+        "continuity_locks": _continuity_locks(source_text, asset_graph_context),
+        "forbidden_changes": _forbidden_video_changes(source_text, asset_graph_context),
     }
 
 
@@ -212,20 +230,53 @@ def _camera_policy(source_text: str) -> str:
     return "locked-off or subtle breathing camera"
 
 
-def _continuity_locks(source_text: str) -> list[str]:
+def _continuity_locks(source_text: str, asset_graph_context: dict[str, Any] | None = None) -> list[str]:
     locks = ["identity", "wardrobe/material", "scene layout", "lighting direction", "camera composition"]
     if _has_robot(source_text):
         locks.append("robot shell and mechanical proportions")
     if _has_rooftop(source_text):
         locks.append("rooftop platform and sky relationship")
-    return locks
+    for asset in _graph_locked_assets(asset_graph_context):
+        locks.extend(_strings(asset.get("continuity_locks"), limit=8))
+    return _dedupe(locks)
 
 
-def _forbidden_video_changes(source_text: str) -> list[str]:
+def _forbidden_video_changes(source_text: str, asset_graph_context: dict[str, Any] | None = None) -> list[str]:
     changes = ["new characters", "new props", "text", "watermark", "UI", "borders", "identity drift", "abrupt scene transition"]
     if _has_rooftop(source_text):
         changes.extend(["unrequested eaves", "unrequested chair", "unrequested stool"])
-    return changes
+    for asset in _graph_locked_assets(asset_graph_context):
+        changes.extend(_strings(asset.get("negative_locks"), limit=8))
+    return _dedupe(changes)
+
+
+def _graph_locked_assets(asset_graph_context: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(asset_graph_context, dict):
+        return []
+    assets = asset_graph_context.get("locked_assets")
+    return [asset for asset in assets if isinstance(asset, dict)] if isinstance(assets, list) else []
+
+
+def _strings(value: Any, *, limit: int) -> list[str]:
+    result: list[str] = []
+    if not isinstance(value, list):
+        return result
+    for item in value:
+        text = str(item or "").strip()
+        if text and text not in result:
+            result.append(text)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in result:
+            result.append(text)
+    return result
 
 
 def _has_robot(source_text: str) -> bool:

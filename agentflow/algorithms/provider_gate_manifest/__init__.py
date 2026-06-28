@@ -4,6 +4,12 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from agentflow.algorithms.provider_gate_manifest.asset_graph_context import (
+    asset_graph_from_context_bundle,
+    asset_graph_from_context_subgraph,
+    format_asset_graph_prompt_lines,
+    summarize_asset_graph_for_plan,
+)
 from agentflow.algorithms.provider_gate_manifest.video_prompt import (
     strip_image_edit_language,
     video_editing_plan,
@@ -128,11 +134,15 @@ __all__ = (
     "GateStatus",
     "INPUT_CONTRACT",
     "OUTPUT_CONTRACT",
+    "asset_graph_from_context_bundle",
+    "asset_graph_from_context_subgraph",
     "blocked_manifest",
+    "format_asset_graph_prompt_lines",
     "provider_gate_status",
     "required_gate_for",
     "strip_image_edit_language",
     "succeeded_manifest",
+    "summarize_asset_graph_for_plan",
     "video_editing_plan",
     "video_generation_plan",
     "video_motion_plan",

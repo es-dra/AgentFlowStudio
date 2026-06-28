@@ -196,6 +196,65 @@ def test_video_generation_plan_algorithm_returns_second_level_motion_beats() -> 
     assert "unrequested chair" in plan["editing_plan"]["forbidden_changes"]
 
 
+def test_video_generation_plan_uses_asset_graph_context() -> None:
+    from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
+
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "confidence": 0.91,
+                "continuity_locks": ["plush robot head shell", "white mechanical body proportions"],
+                "negative_locks": ["do not replace plush shell with metal skull"],
+            },
+            {
+                "graph_asset_id": "graph:scene:rooftop_platform",
+                "asset_id": "asset_rooftop",
+                "asset_type": "scene",
+                "label": "rural rooftop platform",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "confidence": 0.87,
+                "continuity_locks": ["flat rural rooftop boundary", "open sky relationship"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+        "unsupported_additions": [{"shot_id": "shot_01", "addition": "chair"}],
+    }
+
+    plan = video_generation_plan(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph},
+    )
+    prompt = video_provider_prompt(
+        prompt_text="A future robot watches stars on a rural rooftop platform.",
+        optimized_prompt="Generate a continuous 5s video from the first frame.",
+        duration_sec=5,
+        motion="The robot slowly raises its glowing face toward the sky.",
+        last_frame_image_asset_id=None,
+        context_bundle={"asset_graph": asset_graph},
+    )
+
+    assert plan["asset_graph_context"]["asset_count"] == 2
+    assert "graph:character:future_robot" in plan["asset_graph_context"]["graph_asset_ids"]
+    assert plan["prompt_contract"]["asset_graph_context_used"] is True
+    assert "plush robot head shell" in plan["editing_plan"]["continuity_locks"]
+    assert "do not add unapproved eaves" in plan["editing_plan"]["forbidden_changes"]
+    assert "Asset graph continuity:" in prompt
+    assert "graph:scene:rooftop_platform" in prompt
+
+
 def test_video_generation_plan_includes_professional_reference_and_prompt_guidance() -> None:
     from agentflow.algorithms.provider_gate_manifest import video_generation_plan, video_provider_prompt
 

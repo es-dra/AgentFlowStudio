@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-28 - Asset Graph Keyframe/Video Continuity Slice
+
+- Added a reusable asset-graph context summarizer for downstream generation
+  plans. It extracts `asset_graph` from context bundles or context subgraphs,
+  normalizes locked assets, continuity locks, negative locks, evidence, review
+  state, and unsupported additions without promoting anything to durable memory.
+- Keyframe plans now include `asset_graph_context` and merge graph-derived
+  locks into `asset_locks`, `scene_locks`, and `forbidden_changes`. This gives
+  keyframe generation a concrete way to preserve assets such as a plush robot
+  head shell or a flat rooftop platform instead of relying only on prompt text.
+- Video generation plans and video provider prompts now consume the same graph
+  context. The plan records whether graph context was used, editing locks inherit
+  graph continuity and negative constraints, and the provider prompt includes an
+  `Asset graph continuity` section for first-frame image-to-video continuity.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 88 passed, 1 existing warning
+python -m py_compile changed asset graph/keyframe/video modules -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- The new graph context remains candidate/runtime evidence and does not write
+  long-term memory or Company OS source knowledge.
+
 ## 2026-06-28 - Asset Graph Contract Slice
 
 - Added a Runtime `AssetGraph` contract for storyboard and shot asset planning.
