@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
+from apps.api.runtime_asset_graph import attach_graph_asset_ids_to_shots, build_asset_graph
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
@@ -65,6 +66,7 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
         return {
             "job": public_job,
             "shots": result["shots"],
+            "asset_graph": result["asset_graph"],
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
             "writes_long_term_memory": False,
@@ -106,6 +108,8 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
             status = "local_fallback"
     if not shots:
         shots = local_storyboard_shots(request.script_text, request.shot_count_hint)
+    asset_graph = build_asset_graph(shots, source_text=request.script_text, graph_source=f"storyboard_{status}")
+    shots = attach_graph_asset_ids_to_shots(shots, asset_graph)
     safe_manifest = {
         "artifact_type": "agentflow_storyboard_breakdown_safe_manifest",
         "schema_version": "0.1.0",
@@ -118,6 +122,8 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "generated_media_bytes_stored": False,
         "asset_nodes_created": False,
         "shot_count": len(shots),
+        "asset_graph_asset_count": int(asset_graph.get("asset_count") or 0),
+        "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
         "discard_reason": discard_reason,
         "writes_long_term_memory": False,
         "writes_company_kb": False,
@@ -130,6 +136,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "node_id": request.node_id,
         "provider_output": provider_calls_started,
         "shots": shots,
+        "asset_graph": asset_graph,
         "asset_nodes_created": False,
         "review_state": "needs_human_review_before_asset_identification",
         "writes_long_term_memory": False,
@@ -146,8 +153,9 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "provider_gate": gate,
         "provider_calls_started": provider_calls_started,
         "raw_provider_response_stored": False,
+        "asset_graph_contract": "candidate_asset_graph",
     }
-    for payload in (safe_manifest, artifact, request_plan):
+    for payload in (safe_manifest, artifact, request_plan, asset_graph):
         reject_unsafe_payload(payload)
     return {
         "shots": shots,
@@ -155,6 +163,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "provider_calls_started": provider_calls_started,
         "safe_manifest": safe_manifest,
         "safe_artifact": artifact,
+        "asset_graph": asset_graph,
         "request_plan": request_plan,
     }
 
@@ -164,6 +173,7 @@ def _write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: d
     write_json(output_dir / "storyboard_breakdown_request_plan.json", result["request_plan"])
     write_json(output_dir / "storyboard_breakdown_safe_artifact.json", result["safe_artifact"])
     write_json(output_dir / "storyboard_breakdown_safe_manifest.json", result["safe_manifest"])
+    write_json(output_dir / "asset_graph.json", result["asset_graph"])
     return {
         "storyboard_breakdown_request_plan": store.register_artifact(
             output_dir / "storyboard_breakdown_request_plan.json",
@@ -176,6 +186,10 @@ def _write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: d
         "storyboard_breakdown_safe_manifest": store.register_artifact(
             output_dir / "storyboard_breakdown_safe_manifest.json",
             role="storyboard_breakdown_safe_manifest",
+        ),
+        "asset_graph": store.register_artifact(
+            output_dir / "asset_graph.json",
+            role="asset_graph",
         ),
     }
 
@@ -201,8 +215,10 @@ def _storyboard_instruction(request: StoryboardBreakdownRequest) -> str:
         [
             "你是影视分镜导演。请把输入剧本拆成专业分镜脚本，输出严格 JSON，不要 Markdown。",
             count_line,
-            "JSON 格式：{\"shots\":[{shot_id,index,duration,description,shot_size,light_atmosphere,camera_motion,dialogue,sound,asset_refs}]}",
-            "asset_refs 每项必须包含 label, asset_type(character|scene|prop), status, source。描述中涉及角色、场景、道具时必须用 @名称 显式标注。",
+            "JSON 格式：{\"shots\":[{shot_id,index,duration,description,shot_size,light_atmosphere,camera_motion,dialogue,sound,source_span,unsupported_additions,asset_refs}]}",
+            "source_span 必须包含 span_id 与 text，text 必须逐字来自剧本原文；不能为镜头效果擅自新增人物、道具、家具、屋檐或场景结构。",
+            "unsupported_additions 必须列出所有剧本未提供但你认为需要补入的内容；正常情况下应为空数组，不能静默添加。",
+            "asset_refs 每项必须包含 label, asset_type(character|scene|prop), status, source, evidence_text, confidence。描述中涉及角色、场景、道具时必须用 @名称 显式标注。",
             "不要用泛化的“主角”“主要场景”替代剧本里的真实名称；例如孙悟空、金刚狼必须分别作为 character，金箍棒、武器、信件、地图等必须作为 prop。",
             "每个镜头要包含时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效。",
             f"平台：{request.target_platform}；风格：{request.style}",

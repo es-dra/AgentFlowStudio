@@ -630,6 +630,96 @@ def test_video_generation_response_exposes_structured_generation_plan_when_gate_
     assert request_plan["generation_plan"] == plan
 
 
+def test_video_generation_plan_uses_context_subgraph_asset_graph_feedback(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-generation-asset-graph-feedback"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video asset graph feedback"})
+    asset_id = _upload_image(client, project_id)
+    asset_graph = {
+        "artifact_type": "agentflow_asset_graph",
+        "asset_count": 2,
+        "assets": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "asset_id": "asset_robot",
+                "asset_type": "character",
+                "label": "future robot",
+                "role": "story_character",
+                "status": "candidate",
+                "continuity_locks": ["robot head shell"],
+                "negative_locks": ["do not change identity"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "asset_id": "asset_eaves",
+                "asset_type": "scene",
+                "label": "wrong eaves",
+                "role": "scene_anchor",
+                "status": "candidate",
+                "continuity_locks": ["eaves geometry"],
+                "negative_locks": ["do not add unapproved eaves"],
+            },
+        ],
+    }
+    overlay = {
+        "artifact_type": "agentflow_asset_graph_feedback_overlay",
+        "decisions": [
+            {
+                "graph_asset_id": "graph:character:future_robot",
+                "decision": "lock",
+                "continuity_locks": ["plush robot head shell must remain"],
+            },
+            {
+                "graph_asset_id": "graph:scene:wrong_eaves",
+                "decision": "reject",
+                "note": "Wrong roof structure.",
+            },
+        ],
+    }
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "node_id": "video_asset_graph_feedback_1",
+            "prompt_text": "A future robot watches stars on a rural rooftop platform.",
+            "optimized_prompt": "Generate a continuous 5s video from the keyframe.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "motion": "The robot slowly raises its glowing face toward the sky.",
+            "context_subgraph": {
+                "target_node_id": "video_asset_graph_feedback_1",
+                "nodes": [
+                    {
+                        "id": "storyboard_01",
+                        "type": "storyboard",
+                        "node_parameters": {
+                            "asset_graph": asset_graph,
+                            "asset_graph_feedback_overlay": overlay,
+                        },
+                    }
+                ],
+                "edges": [],
+            },
+            "generated_at": "2026-06-28T10:35:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["status"] == "blocked"
+    plan = payload["video_generation_plan"]
+    assert plan["temporal_director_plan"]["beat_count"] == 5
+    assert "plush robot head shell must remain" in plan["editing_plan"]["continuity_locks"]
+    assert "graph:scene:wrong_eaves" in plan["asset_graph_context"]["blocked_graph_asset_ids"]
+    assert "graph:scene:wrong_eaves" not in plan["asset_graph_context"]["graph_asset_ids"]
+    assert plan["prompt_contract"]["asset_graph_feedback_used"] is True
+
+
 def test_video_generation_response_exposes_professional_reference(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))

@@ -23,6 +23,7 @@ def video_provider_prompt(
         motion=request.motion,
         last_frame_image_asset_id=request.last_frame_image_asset_id,
         context_bundle=context_bundle,
+        context_subgraph=request.context_subgraph,
         limit=limit,
     )
 
@@ -35,6 +36,7 @@ def video_generation_plan(request: VideoGenerationRequest, context_bundle: dict[
         motion=request.motion,
         last_frame_image_asset_id=request.last_frame_image_asset_id,
         context_bundle=context_bundle,
+        context_subgraph=request.context_subgraph,
     )
 
 

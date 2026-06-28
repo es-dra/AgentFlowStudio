@@ -1306,10 +1306,14 @@ def test_script_prompt_optimization_returns_structured_script_plan(tmp_path) -> 
     assert "script_plan" in payload["artifacts"]
     assert "storyboard_placeholder_outline" in payload["script_plan"]["forbidden_outputs"]
     assert "storyboard_placeholder_outline" not in payload["user_prompt"]
+    assert payload["script_plan"]["script_expansion_strategy"]["section_count_policy"] == "llm_decides_from_idea_density"
+    assert payload["script_plan"]["script_expansion_strategy"]["storyboard_split_deferred"] is True
 
     artifact = client.get(f"/artifacts/{payload['artifacts']['script_plan']['artifact_id']}").json()["payload"]
     assert artifact["detected_subject_hints"] == ["future robot"]
     assert "rooftop platform" in artifact["detected_scene_hints"]
+    assert len(artifact["narrative_sections"]) == 3
+    assert artifact["narrative_sections"][0]["section_id"] == "premise"
 
 
 def test_prompt_optimizer_trace_includes_professional_reference_for_rooftop_video(tmp_path) -> None:

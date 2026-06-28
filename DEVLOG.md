@@ -1,5 +1,142 @@
 # Devlog
 
+## 2026-06-28 - Expert Timeline and Asset Feedback Slice
+
+- Added a structured expert-knowledge runtime layer covering camera, lighting,
+  depth of field, editing pacing, art direction, motion design, and continuity.
+  Video plans now carry this context separately from provider prompt text so
+  downstream logic can inspect professional decisions instead of parsing prose.
+- Added `temporal_director_plan` to video generation plans. A 5s video now has
+  second-level beats with character state, action, camera state, lighting state,
+  depth of field, composition guard, asset continuity, forbidden changes, and
+  edit intent. Provider prompts include a compact second-level director timeline
+  while preserving existing asset identity, professional reference, and director
+  scenario sections within provider prompt limits.
+- Added asset-graph feedback overlay support. Runtime plans can now consume
+  user decisions to confirm, lock, revise, or reject graph assets. Rejected
+  graph assets are excluded from locked asset context and converted into
+  forbidden changes; locked/revised assets add continuity and negative locks.
+  The overlay remains raw runtime evidence and does not write long-term memory
+  or Company OS source knowledge.
+- `/feedback` sanitization now preserves safe asset-graph feedback decisions
+  rather than flattening them into a generic note.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 94 passed, 1 existing warning
+python -m py_compile changed knowledge/algorithm/runtime modules -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- The new expert layer and feedback overlay are execution-projection logic, not
+  durable Company OS rule promotion.
+
+## 2026-06-28 - Asset Graph Keyframe/Video Continuity Slice
+
+- Added a reusable asset-graph context summarizer for downstream generation
+  plans. It extracts `asset_graph` from context bundles or context subgraphs,
+  normalizes locked assets, continuity locks, negative locks, evidence, review
+  state, and unsupported additions without promoting anything to durable memory.
+- Keyframe plans now include `asset_graph_context` and merge graph-derived
+  locks into `asset_locks`, `scene_locks`, and `forbidden_changes`. This gives
+  keyframe generation a concrete way to preserve assets such as a plush robot
+  head shell or a flat rooftop platform instead of relying only on prompt text.
+- Video generation plans and video provider prompts now consume the same graph
+  context. The plan records whether graph context was used, editing locks inherit
+  graph continuity and negative constraints, and the provider prompt includes an
+  `Asset graph continuity` section for first-frame image-to-video continuity.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 88 passed, 1 existing warning
+python -m py_compile changed asset graph/keyframe/video modules -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- The new graph context remains candidate/runtime evidence and does not write
+  long-term memory or Company OS source knowledge.
+
+## 2026-06-28 - Asset Graph Contract Slice
+
+- Added a Runtime `AssetGraph` contract for storyboard and shot asset planning.
+  The graph aggregates candidate characters, scenes, and props across shots
+  with `graph_asset_id`, role, confidence, shot refs, evidence spans,
+  continuity locks, negative locks, and review state.
+- Storyboard breakdown responses and safe artifacts now include `asset_graph`,
+  plus safe manifest counts for graph assets and unsupported additions. The
+  graph also records unsupported provider additions such as unrequested chairs,
+  stools, or eaves for human review.
+- Shot asset planning now returns the same graph shape and attaches
+  `graph_asset_id` to each returned asset ref before building editable profile
+  plans. This gives downstream asset cards, keyframes, video nodes, and future
+  asset feedback a stable merge handle.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 86 passed, 1 existing warning
+python -m py_compile changed Runtime asset graph modules -> passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+git diff --check -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- No provider secret, signed URL, raw provider response, media byte, private
+  Company OS source content, or durable memory promotion was written to Git.
+
+## 2026-06-28 - Grounded Algorithm Agent Contract Slice
+
+- Added source-grounding fields to storyboard outputs from both local fallback
+  and LLM/provider JSON parsing: `source_span`, `grounding_status`,
+  `unsupported_additions`, and a small `planning_agent` trace.
+- Added asset evidence and confidence metadata to storyboard asset refs so
+  downstream asset cards, keyframe plans, and video nodes can distinguish
+  source-backed candidates from unsupported additions.
+- Updated storyboard LLM instructions to require source spans,
+  `unsupported_additions`, and asset evidence instead of accepting free-form
+  shot lists. Unrequested chairs, stools, eaves, and similar set pieces are now
+  surfaced for review instead of silently entering the chain.
+- Replaced the fixed four-section script plan with a density-aware formal
+  script expansion strategy. Short ideas now use a compact prose strategy, and
+  storyboard splitting remains explicitly deferred.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 85 passed, 1 existing warning
+python -m py_compile changed Runtime algorithm modules -> passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+git diff --check -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- No provider secret, signed URL, raw provider response, media byte, private
+  Company OS source content, or durable memory promotion was written to Git.
+
 ## 2026-06-27 - Director Scenario Packs
 
 - Added AFS-native director scenario packs for faceless channel, SaaS launch,
