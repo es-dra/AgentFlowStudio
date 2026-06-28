@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api import runtime_video_routes
 from apps.api.runtime_models import VideoGenerationRequest, VideoRevisionRequest
 from apps.api.runtime_service import create_runtime_app
@@ -426,6 +427,60 @@ def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path,
     assert payload["safe_manifest"]["status"] == "poll_failed"
     assert payload["provider_calls_started"] is True
     serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "secret" not in serialized
+    assert "token" not in serialized
+
+
+def test_video_generation_seedance_400_summary_writes_safe_manifest(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class Seedance400Registry:
+        def descriptor(self, service_id: str):
+            assert service_id == "fake_video"
+            return SimpleNamespace(required_gate="AFS_ALLOW_REMOTE_VIDEO")
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "fake_video"
+            error = ModelGatewayError("Seedance video HTTP error 400: reference image format is unsupported.")
+            error.provider_error_summary = {
+                "provider_error_stage": "submit_http_error",
+                "provider_http_status": 400,
+                "provider_error_code": "InvalidParameter",
+                "provider_error_message": "reference image format is unsupported.",
+                "provider_raw_response_stored": False,
+            }
+            raise error
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: Seedance400Registry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-seedance-400-summary"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video Seedance 400 summary"})
+    asset_id = _upload_image(client, project_id)
+
+    response = client.post(
+        f"/projects/{project_id}/video-generations",
+        json={
+            "prompt_text": "A slow camera push in.",
+            "provider_service_id": "fake_video",
+            "first_frame_image_asset_id": asset_id,
+            "duration_sec": 5,
+            "resolution": "720p",
+            "generated_at": "2026-06-13T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    block = payload["safe_manifest"]["blocks"][0]
+    assert payload["job"]["status"] == "poll_failed"
+    assert block["provider_http_status"] == 400
+    assert block["provider_error_code"] == "InvalidParameter"
+    assert block["provider_error_message"] == "reference image format is unsupported."
+    assert block["provider_error_stage"] == "submit_http_error"
+    assert block["provider_raw_response_stored"] is False
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert "raw-provider-id" not in serialized
     assert "secret" not in serialized
     assert "token" not in serialized
 

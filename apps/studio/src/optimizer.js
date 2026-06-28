@@ -2,6 +2,7 @@ import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-con
 import { connect } from "./nodes.js";
 import { humanWarning } from "./node-result-view.js";
 import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
 
 const CONNECT_NAMED_ASSET_ACTION = "connect-named-asset";
 const TEMPORARY_UNLOCK_ACTION = "temporary-unlock";
@@ -128,10 +129,5 @@ function stripSectionHeaders(value) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/provider service not found|remote LLM prompt optimization unavailable|AFS_ALLOW_REMOTE_LLM/i.test(clean)) {
-    return "提示词优化服务未就绪，请检查 LLM provider 配置与 Runtime 启动环境后重试。";
-  }
-  return clean.slice(0, 180);
+  return formatRuntimeError(error, "提示词优化失败，请稍后重试。");
 }

@@ -1,5 +1,6 @@
 import { icon } from "./icons.js";
 import { el, showModal } from "./overlay.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
 
 export async function ensureAuthSession(runtime, options = {}) {
   let status;
@@ -126,6 +127,5 @@ function field(label, type, placeholder) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "登录失败");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+  return formatRuntimeError(error, "????");
 }

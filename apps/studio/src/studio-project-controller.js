@@ -9,6 +9,10 @@ import {
 } from "./studio-project-session.js";
 import { el, showModal } from "./overlay.js";
 import { icon } from "./icons.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
+import { reportClientError } from "./client-error-reporter.js";
+
+const EMPTY_PROJECT_ID = "studio-empty";
 
 export function createProjectController({ store, getRuntime, setRuntime, render, onProjectReady }) {
   let projectSummaries = [];
@@ -21,7 +25,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     rememberProject(safe);
     syncProjectUrl(safe);
     setRuntime(runtimeClient);
-    await store.switchProject(projectId, runtimeClient);
+    await store.switchProject(safe, runtimeClient);
     if (projectName) {
       store.set((s) => {
         s.meta.projectName = projectName;
@@ -57,14 +61,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       await switchProject(projectSummaries[0].project_id);
       return;
     }
-    if (!currentAuthUser?.user_id) {
-      return;
-    }
-    const projectId = safeProjectId(`studio-${currentAuthUser.user_id}-home`) || "studio-local-001";
-    const projectName = `${currentAuthUser.display_name || "AFS"} 的项目`;
-    const nextRuntime = createRuntimeClient(projectId);
-    await nextRuntime.createProject({ project_id: projectId, goal: projectName });
-    await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
+    await showEmptyProjectState();
   }
 
   async function switchProject(projectId) {
@@ -77,17 +74,45 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
   }
 
   async function createNewProject() {
-    const name = await requestProjectName();
-    if (name === null) return;
-    const suffix = Math.random().toString(36).slice(2, 8);
-    const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
-    const projectName = name.trim() || "AFS Studio project";
-    const nextRuntime = createRuntimeClient(projectId);
     try {
+      const name = await requestProjectName(projectSummaries);
+      if (name === null) return false;
+      const suffix = Math.random().toString(36).slice(2, 8);
+      const projectId = safeProjectId(`studio-${Date.now()}-${suffix}`);
+      const projectName = name.trim() || "AFS Studio project";
+      const nextRuntime = createRuntimeClient(projectId);
       await createProjectWithRetry(nextRuntime, { project_id: projectId, goal: projectName });
       await applyProject(projectId, nextRuntime, { projectName, syncAssets: false });
+      return true;
     } catch (error) {
+      reportProjectCreateClientError(getRuntime(), error);
       showProjectCreateError(error);
+      return false;
+    }
+  }
+
+  async function deleteProject(project) {
+    const projectId = safeProjectId(project?.project_id || project);
+    if (!projectId) return;
+    const label = projectDisplayName(resolveProjectSummary(projectId, project)) || projectId;
+    const confirmed = await requestProjectDeleteConfirmation(label);
+    if (!confirmed) return;
+    try {
+      await getRuntime().deleteProject(projectId);
+      const currentId = getRuntime().projectId || store.get().meta.projectId;
+      await refreshProjectSummaries();
+      if (projectId === currentId) {
+        const next = projectSummaries.find((item) => item.project_id && item.project_id !== projectId);
+        if (next?.project_id) {
+          await switchProject(next.project_id);
+        } else {
+          await showEmptyProjectState();
+        }
+      }
+      showProjectDeleteSuccess(label, projectSummaries.length);
+    } catch (error) {
+      reportProjectDeleteClientError(getRuntime(), error, projectId);
+      showProjectDeleteError(error);
     }
   }
 
@@ -102,13 +127,14 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       },
     };
     const known = projectSummaries.length ? [...projectSummaries] : [];
-    if (currentId && !known.some((item) => item.project_id === currentId)) known.unshift(current);
+    if (currentId && currentId !== EMPTY_PROJECT_ID && !known.some((item) => item.project_id === currentId)) {
+      known.unshift(current);
+    }
     const recent = recentProjectIds();
     const normal = known.filter((item) => !isTestProject(item)).slice(0, 5);
     const normalIds = new Set(normal.map((item) => item.project_id));
-    const visible = showAllProjects ? known : known.filter((item) =>
+    return showAllProjects ? known : known.filter((item) =>
       item.project_id === currentId || recent.includes(item.project_id) || normalIds.has(item.project_id));
-    return visible.length ? visible : [current];
   }
 
   function hiddenProjectCount(state) {
@@ -143,6 +169,7 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
     ensureAccessibleStartupProject,
     switchProject,
     createNewProject,
+    deleteProject,
     projectOptions,
     hiddenProjectCount,
   };
@@ -160,9 +187,43 @@ export function createProjectController({ store, getRuntime, setRuntime, render,
       if (canvasName) s.meta.canvasName = canvasName;
     }, { history: false, persist: false });
   }
+
+  function resolveProjectSummary(projectId, project) {
+    if (project && typeof project === "object") return project;
+    return projectSummaries.find((item) => item.project_id === projectId) || { project_id: projectId };
+  }
+
+  async function showEmptyProjectState() {
+    const nextRuntime = emptyProjectRuntimeClient();
+    persistActiveProject(EMPTY_PROJECT_ID);
+    syncProjectUrl(EMPTY_PROJECT_ID);
+    setRuntime(nextRuntime);
+    await store.switchProject(EMPTY_PROJECT_ID, nextRuntime);
+    store.set((s) => {
+      s.meta.projectName = "暂无项目";
+      s.meta.canvasName = "请新建项目";
+      s.nodes = {};
+      s.edges = {};
+      s.order = [];
+      s.assets = [];
+      s.selection = { nodeIds: [], edgeId: null };
+      s.ui.saveState = "本地暂存";
+      s.ui.saveMessage = "当前没有项目，请新建项目后开始创作。";
+    }, { history: false, persist: false });
+    render();
+  }
 }
 
-function requestProjectName() {
+function emptyProjectRuntimeClient() {
+  const runtime = createRuntimeClient(EMPTY_PROJECT_ID);
+  return {
+    ...runtime,
+    loadStudioState: null,
+    saveStudioState: null,
+  };
+}
+
+function requestProjectName(existingProjects = []) {
   return new Promise((resolve) => {
     const modal = el("div", "modal compact project-create-modal");
     const head = el("div", "modal-head");
@@ -177,7 +238,7 @@ function requestProjectName() {
     field.appendChild(el("span", "", "项目名称"));
     const input = document.createElement("input");
     input.type = "text";
-    input.value = "AFS 内测项目";
+    input.value = uniqueProjectName("AFS 内测项目", existingProjects);
     input.maxLength = 80;
     field.appendChild(input);
     const error = el("div", "modal-error");
@@ -199,6 +260,13 @@ function requestProjectName() {
         error.textContent = "请先填写项目名称。";
         error.hidden = false;
         input.focus();
+        return;
+      }
+      if (isDuplicateProjectName(name, existingProjects)) {
+        error.textContent = `项目名称“${name}”已存在，请换一个名称。`;
+        error.hidden = false;
+        input.focus();
+        input.select();
         return;
       }
       settled = true;
@@ -234,6 +302,56 @@ function requestProjectName() {
       input.focus();
       input.select();
     });
+  });
+}
+
+function isDuplicateProjectName(name, projects) {
+  const normalized = normalizeProjectName(name);
+  if (!normalized) return false;
+  return (Array.isArray(projects) ? projects : []).some((project) => normalizeProjectName(projectDisplayName(project)) === normalized);
+}
+
+function uniqueProjectName(baseName, projects) {
+  const base = String(baseName || "AFS 内测项目").trim() || "AFS 内测项目";
+  if (!isDuplicateProjectName(base, projects)) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = `${base} ${index}`;
+    if (!isDuplicateProjectName(candidate, projects)) return candidate;
+  }
+  return `${base} ${Date.now()}`;
+}
+
+function normalizeProjectName(name) {
+  return String(name || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function projectDisplayName(project) {
+  return project?.studio_state_meta?.projectName || project?.goal || project?.project_id || "";
+}
+
+function reportProjectCreateClientError(runtime, error) {
+  const message = safeError(error);
+  reportClientError({
+    event_type: "project_create_failed",
+    severity: "error",
+    message,
+    action: "create_project",
+    runtime,
+    error,
+  });
+}
+
+function reportProjectDeleteClientError(runtime, error, projectId) {
+  const message = safeError(error);
+  reportClientError({
+    event_type: "project_delete_failed",
+    severity: "error",
+    message,
+    action: "delete_project",
+    project_id: projectId,
+    runtime,
+    error,
+    details: { project_id: projectId },
   });
 }
 
@@ -277,13 +395,89 @@ function showProjectCreateError(error) {
   ok.addEventListener("click", close);
 }
 
+function requestProjectDeleteConfirmation(projectName) {
+  return new Promise((resolve) => {
+    const modal = el("div", "modal compact project-delete-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "删除项目"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.innerHTML = icon("x", 15);
+    head.appendChild(el("span", "head-spacer"));
+    head.appendChild(closeBtn);
+
+    const body = el("div", "modal-body project-delete-body");
+    body.appendChild(el("p", "", `确定要删除项目“${projectName}”吗？`));
+    body.appendChild(el("p", "", "删除后该项目将从项目列表中移除。"));
+    body.appendChild(el("p", "modal-error", "此操作可能会删除该项目的画布状态、素材引用、任务记录和生成历史。"));
+
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const confirm = el("button", "primary-btn danger", "确认删除");
+    actions.append(cancel, confirm);
+    modal.append(head, body, actions);
+
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve(false); } });
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      close();
+      resolve(value);
+    };
+    cancel.addEventListener("click", () => finish(false));
+    closeBtn.addEventListener("click", () => finish(false));
+    confirm.addEventListener("click", () => finish(true));
+  });
+}
+
+function showProjectDeleteError(error) {
+  const message = safeError(error);
+  const modal = el("div", "modal compact project-delete-modal");
+  const head = el("div", "modal-head");
+  head.appendChild(el("strong", "", "项目删除失败"));
+  const closeBtn = el("button", "modal-close");
+  closeBtn.innerHTML = icon("x", 15);
+  head.appendChild(el("span", "head-spacer"));
+  head.appendChild(closeBtn);
+  const body = el("div", "modal-body project-delete-body");
+  body.appendChild(el("div", "modal-error", `Runtime 没有完成项目删除：${message}`));
+  const actions = el("div", "modal-actions");
+  const ok = el("button", "primary-btn", "知道了");
+  actions.appendChild(ok);
+  modal.append(head, body, actions);
+  const close = showModal(modal);
+  closeBtn.addEventListener("click", close);
+  ok.addEventListener("click", close);
+}
+
+function showProjectDeleteSuccess(projectName, remainingCount = 0) {
+  const modal = el("div", "modal compact project-delete-modal");
+  const head = el("div", "modal-head");
+  head.appendChild(el("strong", "", "项目删除成功"));
+  const closeBtn = el("button", "modal-close");
+  closeBtn.innerHTML = icon("x", 15);
+  head.appendChild(el("span", "head-spacer"));
+  head.appendChild(closeBtn);
+  const body = el("div", "modal-body project-delete-body");
+  body.appendChild(el("p", "", `项目“${projectName}”已从项目列表中移除。`));
+  body.appendChild(el("p", "", remainingCount > 0
+    ? "如果删除的是当前项目，系统已自动切换到其他可用项目。"
+    : "当前已经没有项目，请点击“新建项目”后继续创作。"));
+  const actions = el("div", "modal-actions");
+  const ok = el("button", "primary-btn", "知道了");
+  actions.appendChild(ok);
+  modal.append(head, body, actions);
+  const close = showModal(modal);
+  closeBtn.addEventListener("click", close);
+  ok.addEventListener("click", close);
+}
+
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
-  if (/network connection interrupted|Failed to fetch|Gateway timeout/i.test(clean)) {
-    return "Runtime 连接短暂中断。项目可能已经创建，请刷新项目列表后再重试。";
+  const formatted = formatRuntimeError(error, "未知错误");
+  if (/network connection interrupted|Failed to fetch|Gateway timeout/i.test(formatted)) {
+    return "Runtime 连接短暂中断，请刷新项目列表后再重试。";
   }
-  return clean.slice(0, 180);
+  return formatted;
 }
 
 function isTestProject(item) {

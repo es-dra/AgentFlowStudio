@@ -2,6 +2,7 @@ import { assetsFromNode, carryChainItems, assetCarryLabel, assetCarryState, asse
 import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { icon } from "./icons.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
+import { canRunNodeGeneration } from "./node-actions.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 
 export function buildNodeBody(node, def, store = null) {
@@ -178,7 +179,10 @@ function isEditableContentNode(node) {
 function errorBody(node) {
   const err = document.createElement("div");
   err.className = "node-status error";
-  err.innerHTML = `${icon("x", 13)}<span>生成失败，可在节点菜单重试</span>`;
+  const message = canRunNodeGeneration(node)
+    ? "生成失败，可在节点菜单重试"
+    : "处理失败，请检查该节点的专用操作或错误详情";
+  err.innerHTML = `${icon("x", 13)}<span>${escapeHtml(message)}</span>`;
   const out = [];
   const bundle = bundleSummary(node);
   if (bundle) out.push(err, bundle);

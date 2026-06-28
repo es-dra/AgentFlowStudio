@@ -14,6 +14,7 @@ export async function openProjectHub({
   hiddenProjectCount = 0,
   onSwitchProject,
   onCreateProject,
+  onDeleteProject,
   onStartWorkflow,
   onOpenAssets,
   onOpenHistory,
@@ -59,6 +60,9 @@ export async function openProjectHub({
   modal.appendChild(recentProjects(projects, hiddenProjectCount, (projectId) => {
     closeProjectMenu();
     onSwitchProject?.(projectId);
+  }, (project) => {
+    closeProjectMenu();
+    onDeleteProject?.(project);
   }));
 
   closeProjectMenu = showModal(modal);
@@ -106,7 +110,7 @@ function projectEntrypoints(onStartWorkflow) {
     item.innerHTML = [
       `<span class="project-menu-icon">${icon(starter.icon, 15)}</span>`,
       `<span><strong>${escapeHtml(starter.label)}</strong><small>${escapeHtml(starter.tag || starter.summary)}</small></span>`,
-      `<em>创建</em>`,
+      "<em>创建</em>",
     ].join("");
     item.addEventListener("click", () => onStartWorkflow?.(starter.id));
     list.appendChild(item);
@@ -134,7 +138,7 @@ function menuLink(label, iconName, onClick) {
   return button;
 }
 
-function recentProjects(projects, hiddenProjectCount, onSwitchProject) {
+function recentProjects(projects, hiddenProjectCount, onSwitchProject, onDeleteProject) {
   const section = el("section", "project-menu-section");
   section.appendChild(sectionHead("最近项目", "只显示摘要，不暴露本地路径或原始素材。"));
   const list = el("div", "project-menu-list");
@@ -143,17 +147,34 @@ function recentProjects(projects, hiddenProjectCount, onSwitchProject) {
     list.appendChild(el("div", "project-menu-empty", "暂无其他项目。"));
   }
   for (const project of recent) {
-    const item = el("button", "project-menu-row project-menu-project");
-    item.type = "button";
-    item.innerHTML = [
-      "<span class=\"project-menu-icon\">",
-      icon("grid", 15),
+    const row = el("div", "project-menu-row project-menu-project");
+    const open = el("button", "project-menu-project-open");
+    const label = projectLabel(project);
+    const projectId = project.project_id || "local state";
+    const updatedAt = project.updated_at || project.created_at || "打开";
+    open.type = "button";
+    open.innerHTML = [
+      `<span class="project-menu-icon">${icon("grid", 15)}</span>`,
+      "<span class=\"project-menu-project-copy\">",
+      `<strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong>`,
+      `<small title="${escapeHtml(projectId)}">${escapeHtml(projectId)}</small>`,
+      `<em>${escapeHtml(updatedAt)}</em>`,
       "</span>",
-      `<span><strong>${escapeHtml(projectLabel(project))}</strong><small>${escapeHtml(project.project_id || "local state")}</small></span>`,
-      `<em>${escapeHtml(project.updated_at || project.created_at || "打开")}</em>`,
     ].join("");
-    item.addEventListener("click", () => onSwitchProject?.(project.project_id));
-    list.appendChild(item);
+    open.addEventListener("click", () => onSwitchProject?.(project.project_id));
+    row.appendChild(open);
+    if (typeof onDeleteProject === "function" && project.project_id) {
+      const remove = el("button", "project-menu-delete");
+      remove.type = "button";
+      remove.title = `删除项目“${label}”`;
+      remove.innerHTML = `${icon("trash", 14)}<span>删除</span>`;
+      remove.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onDeleteProject(project);
+      });
+      row.appendChild(remove);
+    }
+    list.appendChild(row);
   }
   section.appendChild(list);
   if (hiddenProjectCount) {

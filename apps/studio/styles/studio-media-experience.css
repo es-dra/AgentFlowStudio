@@ -71,10 +71,16 @@ button.creation-action:hover {
   max-height: calc(100vh - 140px);
 }
 
-.generation-panel .generation-setting-grid {
-  grid-template-columns: 1fr 82px;
+.generation-panel .generation-setting-image {
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: end;
 }
 
-.generation-panel .generation-setting-grid .generation-field:last-child {
+.generation-panel .generation-setting-video {
+  grid-template-columns: minmax(0, 1fr) 112px;
+  align-items: end;
+}
+
+.generation-panel .generation-setting-video .generation-field:first-child {
   grid-column: 1 / -1;
 }

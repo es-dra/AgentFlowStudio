@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -34,6 +35,13 @@ class RuntimeStore:
         safe = safe_id(project_id)
         return self.projects_dir / safe / "project_manifest.json"
 
+    def project_deleted_marker_path(self, project_id: str) -> Path:
+        safe = safe_id(project_id)
+        return self.projects_dir / safe / "project_deleted.json"
+
+    def is_project_deleted(self, project_id: str) -> bool:
+        return self.project_deleted_marker_path(project_id).is_file()
+
     def create_project_manifest(
         self,
         *,
@@ -62,6 +70,9 @@ class RuntimeStore:
         validate_project_manifest(payload)
         path = self.project_manifest_path(project_id)
         path.parent.mkdir(parents=True, exist_ok=True)
+        marker = self.project_deleted_marker_path(project_id)
+        if marker.exists():
+            marker.unlink()
         write_json(path, payload)
         return payload
 
@@ -91,11 +102,34 @@ class RuntimeStore:
     def list_project_summaries(self) -> list[dict[str, Any]]:
         summaries: list[dict[str, Any]] = []
         for path in sorted(self.projects_dir.glob("*/project_manifest.json")):
+            if (path.parent / "project_deleted.json").is_file():
+                continue
             manifest = read_json(path)
             validate_project_manifest(manifest)
             artifact = self.register_artifact(path, role="project_manifest")
             summaries.append(project_summary(manifest, artifact))
         return summaries
+
+    def soft_delete_project(self, project_id: str, *, deleted_by: str = "", reason: str = "user_requested") -> dict[str, Any]:
+        path = self.project_manifest_path(project_id)
+        if not path.exists():
+            raise KeyError(project_id)
+        manifest = read_json(path)
+        validate_project_manifest(manifest)
+        marker = {
+            "schema_version": "0.1.0",
+            "project_id": str(manifest.get("project_id") or project_id),
+            "deleted": True,
+            "delete_mode": "soft_delete",
+            "deleted_at": datetime.now(timezone.utc).isoformat(),
+            "deleted_by": str(deleted_by or ""),
+            "reason": str(reason or "user_requested"),
+            "does_not_delete_project_bytes": True,
+        }
+        marker_path = self.project_deleted_marker_path(project_id)
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(marker_path, marker)
+        return marker
 
     def update_project_manifest(self, project_id: str, updates: dict[str, list[dict[str, Any]]], status: str) -> dict[str, Any]:
         manifest = self.ensure_project_manifest(project_id)

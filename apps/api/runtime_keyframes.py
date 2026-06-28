@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     load_provider_registry,
 )
+from apps.api.runtime_file_logging import runtime_file_event
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_context_resolver import provider_prompt_from_bundle, resolve_context_bundle
 from apps.api.runtime_model_call_context import keyframe_model_call_context
@@ -53,8 +55,23 @@ def build_keyframe_generation(
     output_dir: Path,
     *,
     include_fixed_assets: bool = True,
+    request_id: str = "",
+    client_request_id: str = "",
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     output_dir.mkdir(parents=True, exist_ok=True)
+    runtime_file_event(
+        "keyframe",
+        "submit_start",
+        request_id=request_id,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        node_id=request.node_id,
+        provider_service_id=request.provider_service_id,
+        aspect_ratio=request.aspect_ratio,
+        candidate_count=request.candidate_count,
+        asset_ref_count=len(request.asset_refs or []),
+    )
     prompt_request = _prompt_request(request)
     state = load_creative_memory_state(store, project_id)
     assembly_state = _resolver_safe_state(state) if request.context_subgraph else state
@@ -91,6 +108,17 @@ def build_keyframe_generation(
         request,
         context_bundle,
         limit=effective_reference_slots,
+    )
+    runtime_file_event(
+        "keyframe",
+        "references_resolved",
+        request_id=request_id,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        node_id=request.node_id,
+        provider_service_id=request.provider_service_id,
+        reference_image_count=len(reference_images),
+        image_reference_slots=effective_reference_slots,
     )
     is_asset_card_revision = _has_asset_card_revision(request)
     if context_bundle:
@@ -155,6 +183,19 @@ def build_keyframe_generation(
     retry_count = 0
     if provider_gate["status"] == "blocked":
         blocks.append(_gate_closed_block(required_gate))
+        runtime_file_event(
+            "keyframe",
+            "blocked",
+            level="WARNING",
+            request_id=request_id,
+            client_request_id=client_request_id,
+            project_id=project_id,
+            node_id=request.node_id,
+            provider_service_id=request.provider_service_id,
+            reason="provider_gate_closed",
+            required_gate=required_gate,
+            elapsed_ms=_elapsed_ms(started),
+        )
     elif size_blocks := reference_image_size_blocks(
         reference_images,
         min_edge_px=min_reference_edge,
@@ -162,15 +203,39 @@ def build_keyframe_generation(
         required_gate=required_gate,
     ):
         blocks.extend(size_blocks)
+        runtime_file_event(
+            "keyframe",
+            "blocked",
+            level="WARNING",
+            request_id=request_id,
+            client_request_id=client_request_id,
+            project_id=project_id,
+            node_id=request.node_id,
+            provider_service_id=request.provider_service_id,
+            reason=str(size_blocks[0].get("reason") or "reference_image_size"),
+            block_count=len(size_blocks),
+            elapsed_ms=_elapsed_ms(started),
+        )
     else:
         try:
             if registry is None:
+                registry_load_started = time.perf_counter()
                 registry = load_provider_registry()
                 service_id = _resolve_image_service_id(registry, request.provider_service_id)
                 if service_id != request.provider_service_id:
                     request = request.model_copy(update={"provider_service_id": service_id})
                 service_request_format = _service_request_format(registry, request.provider_service_id)
                 descriptor = registry.descriptor(request.provider_service_id)
+                runtime_file_event(
+                    "keyframe",
+                    "provider_registry_loaded",
+                    request_id=request_id,
+                    client_request_id=client_request_id,
+                    project_id=project_id,
+                    node_id=request.node_id,
+                    provider_service_id=request.provider_service_id,
+                    elapsed_ms=_elapsed_ms(registry_load_started),
+                )
             provider_calls_started = True
             dispatch_request = ProviderDispatchRequest(
                 prompt=provider_prompt,
@@ -186,15 +251,46 @@ def build_keyframe_generation(
                 edit_reference_image_paths=tuple(item["path"] for item in reference_images) if image_operation == "edit" else (),
                 image_input_fidelity="high" if image_operation == "edit" else None,
             )
+            runtime_file_event(
+                "keyframe",
+                "provider_call",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=request.node_id,
+                provider_service_id=request.provider_service_id,
+                model=_provider_model(registry, request.provider_service_id),
+                image_operation=image_operation,
+                reference_image_count=len(reference_images),
+                execution_mode=str(getattr(descriptor, "execution_mode", "sync") or "sync"),
+            )
+            provider_started = time.perf_counter()
             if str(getattr(descriptor, "execution_mode", "sync") or "sync") == "async":
                 provider_task = registry.submit("image", request.provider_service_id, dispatch_request)
+                provider_elapsed_ms = _elapsed_ms(provider_started)
                 task_status = str((provider_task.get("task") or {}).get("status") or "submitted")
                 if task_status == "already_complete":
+                    poll_started = time.perf_counter()
                     raw = registry.poll("image", request.provider_service_id, provider_task)
+                    poll_elapsed_ms = _elapsed_ms(poll_started)
                     raw_status = str(raw.get("status") or "succeeded").lower()
                     if raw_status == "succeeded":
                         status = "succeeded"
                         provider_outputs = _provider_outputs(raw)
+                        runtime_file_event(
+                            "keyframe",
+                            "succeeded",
+                            request_id=request_id,
+                            client_request_id=client_request_id,
+                            project_id=project_id,
+                            node_id=request.node_id,
+                            provider_service_id=request.provider_service_id,
+                            provider_task_id=_provider_task_id(provider_task),
+                            output_count=len(provider_outputs),
+                            provider_elapsed_ms=provider_elapsed_ms,
+                            poll_elapsed_ms=poll_elapsed_ms,
+                            elapsed_ms=_elapsed_ms(started),
+                        )
                     elif raw_status in {"running", "submitted", "pending"}:
                         status = raw_status
                         _write_task_state(
@@ -208,11 +304,43 @@ def build_keyframe_generation(
                                 reference_image_count=len(reference_images),
                                 image_operation=image_operation,
                                 context_bundle=context_bundle,
+                                request_id=request_id,
+                                client_request_id=client_request_id,
                             ),
+                        )
+                        runtime_file_event(
+                            "keyframe",
+                            "submitted",
+                            request_id=request_id,
+                            client_request_id=client_request_id,
+                            project_id=project_id,
+                            node_id=request.node_id,
+                            provider_service_id=request.provider_service_id,
+                            provider_task_id=_provider_task_id(provider_task),
+                            status=status,
+                            provider_elapsed_ms=provider_elapsed_ms,
+                            poll_elapsed_ms=poll_elapsed_ms,
+                            elapsed_ms=_elapsed_ms(started),
                         )
                     else:
                         status = "blocked"
                         blocks.append(_provider_failure_block(str(raw.get("error") or raw_status or "image provider did not complete"), required_gate))
+                        runtime_file_event(
+                            "keyframe",
+                            "provider_failed",
+                            level="ERROR",
+                            request_id=request_id,
+                            client_request_id=client_request_id,
+                            project_id=project_id,
+                            node_id=request.node_id,
+                            provider_service_id=request.provider_service_id,
+                            provider_task_id=_provider_task_id(provider_task),
+                            status=raw_status,
+                            reason=str(raw.get("error") or raw_status or "image provider did not complete"),
+                            provider_elapsed_ms=provider_elapsed_ms,
+                            poll_elapsed_ms=poll_elapsed_ms,
+                            elapsed_ms=_elapsed_ms(started),
+                        )
                 else:
                     status = task_status
                     _write_task_state(
@@ -226,7 +354,22 @@ def build_keyframe_generation(
                             reference_image_count=len(reference_images),
                             image_operation=image_operation,
                             context_bundle=context_bundle,
+                            request_id=request_id,
+                            client_request_id=client_request_id,
                         ),
+                    )
+                    runtime_file_event(
+                        "keyframe",
+                        "submitted",
+                        request_id=request_id,
+                        client_request_id=client_request_id,
+                        project_id=project_id,
+                        node_id=request.node_id,
+                        provider_service_id=request.provider_service_id,
+                        provider_task_id=_provider_task_id(provider_task),
+                        status=status,
+                        provider_elapsed_ms=provider_elapsed_ms,
+                        elapsed_ms=_elapsed_ms(started),
                     )
             else:
                 manifest, retry_count = dispatch_provider_with_retry(
@@ -235,12 +378,42 @@ def build_keyframe_generation(
                     request.provider_service_id,
                     dispatch_request,
                 )
+                provider_elapsed_ms = _elapsed_ms(provider_started)
                 status = "succeeded"
                 provider_outputs = _provider_outputs(manifest)
+                runtime_file_event(
+                    "keyframe",
+                    "succeeded",
+                    request_id=request_id,
+                    client_request_id=client_request_id,
+                    project_id=project_id,
+                    node_id=request.node_id,
+                    provider_service_id=request.provider_service_id,
+                    output_count=len(provider_outputs),
+                    retry_count=retry_count,
+                    provider_elapsed_ms=provider_elapsed_ms,
+                    elapsed_ms=_elapsed_ms(started),
+                )
         except (ModelGatewayError, TimeoutError) as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
             blocks.append(_provider_failure_block(str(exc), required_gate))
+            provider_elapsed_ms = _elapsed_ms(provider_started) if "provider_started" in locals() else ""
+            runtime_file_event(
+                "keyframe",
+                "provider_failed",
+                level="ERROR",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=request.node_id,
+                provider_service_id=request.provider_service_id,
+                error=type(exc).__name__,
+                reason=_safe_error(str(exc)),
+                retry_count=retry_count,
+                provider_elapsed_ms=provider_elapsed_ms,
+                elapsed_ms=_elapsed_ms(started),
+            )
 
     request_plan = keyframe_request_plan(
         request,
@@ -279,6 +452,21 @@ def build_keyframe_generation(
     write_json(output_dir / "keyframe_request_plan.json", request_plan)
     write_json(output_dir / "keyframe_candidates_summary.json", candidates)
     write_json(output_dir / "keyframe_generation_safe_manifest.json", safe_manifest)
+    runtime_file_event(
+        "keyframe",
+        "response",
+        request_id=request_id,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        node_id=request.node_id,
+        provider_service_id=request.provider_service_id,
+        status=status,
+        provider_calls_started=provider_calls_started,
+        output_count=len(provider_outputs),
+        block_count=len(blocks),
+        retry_count=retry_count,
+        elapsed_ms=_elapsed_ms(started),
+    )
     return {
         "status": status,
         "provider_gate": provider_gate,
@@ -458,6 +646,8 @@ def _task_state(
     reference_image_count: int,
     image_operation: str,
     context_bundle: dict[str, Any] | None,
+    request_id: str = "",
+    client_request_id: str = "",
 ) -> dict[str, Any]:
     return {
         "schema_version": "afs_keyframe_generation_task_state.v0.1",
@@ -473,6 +663,8 @@ def _task_state(
         "context_bundle": context_bundle,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "provider_raw_persisted": False,
+        "request_id": request_id,
+        "client_request_id": client_request_id,
     }
 
 
@@ -485,6 +677,19 @@ def _provider_task_for_state(provider_task: dict[str, Any]) -> dict[str, Any]:
         task["task"] = safe_inner
     task.pop("output_dir", None)
     return task
+
+
+def _provider_task_id(provider_task: dict[str, Any]) -> str:
+    task = provider_task.get("task") if isinstance(provider_task.get("task"), dict) else {}
+    return str(task.get("task_id") or task.get("id") or "")
+
+
+def _provider_model(registry: Any, service_id: str) -> str:
+    try:
+        service = registry.store.service(service_id)
+    except Exception:
+        return ""
+    return str(service.get("model") or "")
 
 
 def _write_task_state(output_dir: Path, state: dict[str, Any]) -> None:
@@ -595,6 +800,10 @@ def _safe_error(value: str) -> str:
     if any(term in lowered for term in ("api key", "secret", "token", "authorization", "cookie", "bearer ")):
         return "Image relay configuration is not ready."
     return " ".join(value.split())[:160]
+
+
+def _elapsed_ms(started: float) -> float:
+    return round((time.perf_counter() - started) * 1000, 2)
 
 
 def provider_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:

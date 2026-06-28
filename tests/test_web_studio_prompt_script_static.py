@@ -312,6 +312,116 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
     assert "connect(store, scriptNode.id, keyframeNode.id)" in keyframes
 
 
+def test_script_node_menu_hides_generic_retry_generation() -> None:
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
+    canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    keyboard = (STUDIO_ROOT / "src" / "studio-keyboard.js").read_text(encoding="utf-8")
+
+    assert "canRetryGeneration(node)" in node_menu
+    assert "function canRetryGeneration(node)" in node_menu
+    assert "return canRunNodeGeneration(node);" in node_menu
+    assert "export function canRunNodeGeneration(node)" in node_actions
+    assert "return [\"image\", \"video\"].includes(node?.type);" in node_actions
+    assert "if (!canRunNodeGeneration(node))" in canvas_view
+    assert 'runBtn.dataset.action = "run-disabled";' in canvas_view
+    assert "if (node && canRunNodeGeneration(node)) startNodeGeneration" in keyboard
+    assert "if (!canRunNodeGeneration(fresh)) return;" in prompt_bar
+    assert "当前节点不支持直接生成，请使用该节点的专用操作" in prompt_bar
+    assert "处理失败，请检查该节点的专用操作或错误详情" in canvas_body
+    assert 'if (node.type === "script")' in node_menu
+    assert "identifyScriptAssets(store, runtime, fresh)" in node_menu
+    assert "createStoryboardKeyframeLayer(store, fresh)" in node_menu
+
+
+def test_script_asset_recognition_replaces_stale_structured_shot_cards() -> None:
+    script = r'''
+import { identifyScriptAssets } from "./apps/studio/src/storyboard-node-actions.js";
+
+const state = {
+  nodes: {
+    script_1: {
+      id: "script_1",
+      type: "script",
+      title: "故事脚本",
+      x: 0,
+      y: 0,
+      w: 320,
+      h: 240,
+      prompt: "黑色小狗在吃狗粮",
+      content: "黑色小狗在吃狗粮",
+      status: "complete",
+      params: {
+        scriptSegmentIndex: 1,
+        structuredShot: {
+          shot_id: "shot_01",
+          index: 1,
+          description: "@机器人 @夜晚城市屋顶。白色圆头机器人站在夜晚城市屋顶，手里拿着发光芯片",
+          source_text: "白色圆头机器人站在夜晚城市屋顶，手里拿着发光芯片",
+          asset_refs: [
+            { label: "机器人", asset_type: "character", status: "candidate" },
+            { label: "夜晚城市屋顶", asset_type: "scene", status: "candidate" },
+          ],
+        },
+      },
+    },
+    stale_asset: {
+      id: "stale_asset",
+      type: "image",
+      title: "角色资产 · @机器人",
+      content: "资产名称：@机器人",
+      params: {
+        assetCardDraft: {
+          source_script_node_id: "script_1",
+          label: "机器人",
+          asset_type: "character",
+        },
+      },
+    },
+  },
+  edges: { edge_1: { id: "edge_1", from: "script_1", to: "stale_asset" } },
+  order: ["script_1", "stale_asset"],
+  groups: {},
+  selection: { nodeIds: ["script_1"], edgeId: null },
+  ui: {},
+};
+
+let nextId = 0;
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+  nextId: (prefix) => `${prefix}_${++nextId}`,
+};
+
+await identifyScriptAssets(store, null, state.nodes.script_1);
+
+process.stdout.write(JSON.stringify({
+  nodes: state.nodes,
+  order: state.order,
+  edges: state.edges,
+  structuredShot: state.nodes.script_1.params.structuredShot,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    visible_text = json.dumps(payload, ensure_ascii=False)
+
+    assert "stale_asset" not in payload["nodes"]
+    assert "stale_asset" not in payload["order"]
+    assert "edge_1" not in payload["edges"]
+    assert payload["structuredShot"]["source_text"] == "黑色小狗在吃狗粮"
+    assert "机器人" not in visible_text
+    assert "夜晚城市屋顶" not in visible_text
+
+
 def test_keyframe_generation_carries_connected_asset_card_images_as_local_refs() -> None:
     script = r'''
 import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";

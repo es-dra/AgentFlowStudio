@@ -187,6 +187,53 @@ def test_frontend_maturity_wave_has_canvas_generation_and_work_actions() -> None
     assert "provider raw" not in combined.lower()
 
 
+def test_generation_panel_uses_node_specific_settings_profiles() -> None:
+    panel = _read("src/panels/generation-panel.js")
+    profile = _read("src/panels/generation-panel-profile.js")
+    specs = _read("src/presets/specs.js")
+
+    assert "generationProfile(current)" in panel
+    assert "applyGenerationProfileSettings(target, profile, controls)" in panel
+    assert "profile.runsGeneration !== false" in panel
+    assert "generation-setting-${profile.kind}" in panel
+    assert "generation-setting-count-${profile.fields.length}" in panel
+    assert "保存设置" in panel
+    assert "target.params.spec = { ...(target.params.spec || {}), ratio: controls.ratio?.value || \"9:16\", count }" in profile
+    assert "target.params.candidateCount = count" in profile
+    assert "const VIDEO_MOTIONS = [" in profile
+    assert "{ key: \"motion\", label: \"镜头运动 / 运镜\", kind: \"select\", options: VIDEO_MOTIONS" in profile
+    assert "target.params.motion = controls.motion?.value || \"固定机位\"" in profile
+    assert "缓慢推进" in profile
+    assert "轻微环绕主体" in profile
+    assert "target.params.candidateCount = 1" not in profile
+    assert "videoCandidateCount" not in profile
+    assert "当前视频模型仅支持生成 1 个候选视频" not in profile
+    assert "镜头 / 构图" not in profile
+    assert "视图 / 构图要求" not in profile
+    assert "文本规划节点当前不直接使用生成设置" in profile
+    assert "导演台请使用专门的导演台面板编辑" in profile
+    assert "当前视频片段复用还没有接入真实生成设置" in profile
+    for unused_setting in (
+        "scriptPlanning",
+        "directorGenerationSettings",
+        "videoReuseSettings",
+        "scriptStyle",
+        "cameraLanguage",
+        "reuseSource",
+    ):
+        assert unused_setting not in profile
+    assert "VIDEO_DURATIONS = [\"5s\", \"10s\"]" in specs
+    assert "VIDEO_RESOLUTIONS = [\"480P\", \"720P\"]" in specs
+    assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"3:4\"]" in specs
+    assert "15s" not in specs
+    assert "1080P" not in specs
+    assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"21:9\"]" not in specs
+    styles = _read("styles/studio-media-experience.css")
+    assert ".generation-panel .generation-setting-image" in styles
+    assert "grid-template-columns: minmax(0, 1fr) 112px" in styles
+    assert ".generation-setting-grid .generation-field:last-child" not in styles
+
+
 def test_generation_projection_is_split_from_node_actions() -> None:
     for path in (
         "src/node-generation-progress.js",

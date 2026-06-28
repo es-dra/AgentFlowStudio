@@ -7,7 +7,7 @@ import {
 import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
-import { pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
+import { canRunNodeGeneration, pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
 import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
@@ -27,7 +27,7 @@ export function renderPromptBar(state, store, runtime) {
   const layer = document.getElementById("prompt-bar-layer");
   const selectedId = state.selection.nodeIds.length === 1 ? state.selection.nodeIds[0] : null;
   const node = selectedId ? state.nodes[selectedId] : null;
-  const show = node && PROMPT_NODE_TYPES.has(node.type) && (!node.content || state.ui?.promptBarNodeId === node.id);
+  const show = node && PROMPT_NODE_TYPES.has(node.type) && (node.type === "script" || !node.content || state.ui?.promptBarNodeId === node.id);
 
   let bar = layer.querySelector(".prompt-bar");
   if (!show) {
@@ -103,8 +103,8 @@ function buildBar(store, runtime, node) {
   textarea.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      if (node.type !== "image" && !(node.type === "video" && isRemoteVideoModel(node.params?.model))) {
-        flashTooltip(textarea, "当前版本仅图片节点支持真实生成");
+      if (!canRunNodeGeneration(node) || (node.type === "video" && !isRemoteVideoModel(node.params?.model))) {
+        flashTooltip(textarea, "当前节点不支持直接生成，请使用该节点的专用操作。");
         return;
       }
       runPromptBarGeneration(store, runtime, node);
@@ -190,8 +190,9 @@ function buildBottomRow(store, runtime, node, textarea) {
   const shouldPollVideo = canVideo && node.status === "generating" && Boolean(node.params?.lastVideoJobId);
   send.innerHTML = shouldPollVideo ? icon("retry", 15) : icon("arrowUp", 15);
   const canSend = node.type === "image" || canVideo;
-  send.title = node.type === "image" ? "生成" : "视频/音频通道开发中，当前版本仅图片节点支持真实生成";
   if (canSend) send.title = "生成";
+  else if (node.type === "video") send.title = "当前视频模型不支持直接生成";
+  else send.title = "当前节点不支持直接生成，请使用该节点的专用操作";
   if (shouldPollVideo) send.title = "继续轮询";
   send.disabled = !canSend;
   send.addEventListener("click", () => runPromptBarGeneration(store, runtime, node));
@@ -249,6 +250,7 @@ function runPromptBarGeneration(store, runtime, node) {
     pollNodeVideoGeneration(store, runtime, fresh);
     return;
   }
+  if (!canRunNodeGeneration(fresh)) return;
   startNodeGeneration(store, runtime, fresh);
 }
 

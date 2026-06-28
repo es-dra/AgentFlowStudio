@@ -1,14 +1,20 @@
 import { icon } from "../icons.js";
 import { el, showModal } from "../overlay.js";
+import {
+  applyGenerationProfileSettings,
+  generationProfile,
+  valueForGenerationField,
+} from "./generation-panel-profile.js";
 
 export function openGenerationPanel({ store, node, onRun }) {
   const current = store.get().nodes[node?.id] || node;
   if (!current) return null;
+  const profile = generationProfile(current);
 
   const modal = el("div", "modal compact generation-panel");
   const head = el("div", "modal-head generation-panel-head");
   head.appendChild(el("strong", "", "生成设置"));
-  head.appendChild(el("small", "", typeLabel(current)));
+  head.appendChild(el("small", "", profile.label));
   const closeBtn = el("button", "modal-close");
   closeBtn.innerHTML = icon("x", 15);
   head.appendChild(el("span", "head-spacer"));
@@ -21,23 +27,18 @@ export function openGenerationPanel({ store, node, onRun }) {
   promptField.input.rows = 5;
 
   const settings = el("div", "generation-setting-grid");
-  const ratio = field("画幅", "select", ["9:16", "16:9", "1:1", "4:3", "3:4"]);
-  ratio.input.value = current.params?.spec?.ratio || current.params?.previewAspectRatio || "9:16";
-  const candidates = field("张数", "number");
-  candidates.input.min = "1";
-  candidates.input.max = "4";
-  candidates.input.step = "1";
-  candidates.input.value = String(current.params?.candidateCount || 1);
-  const motion = field("镜头", "input");
-  motion.input.value = current.params?.motion || "";
-  settings.append(ratio.wrap, candidates.wrap, motion.wrap);
+  settings.classList.add(`generation-setting-${profile.kind}`);
+  settings.classList.add(`generation-setting-count-${profile.fields.length}`);
+  const controls = renderProfileSettings(settings, current, profile);
 
-  body.append(promptField.wrap, settings, safeNote(current));
+  body.append(promptField.wrap, settings, safeNote(profile));
 
   const actions = el("div", "modal-actions generation-panel-actions");
   const cancel = el("button", "ghost-btn", "取消");
-  const confirm = el("button", "primary-btn", "开始生成");
-  confirm.innerHTML = `${icon("play", 13)}<span>开始生成</span>`;
+  const confirm = el("button", "primary-btn", profile.runsGeneration === false ? "保存设置" : "开始生成");
+  confirm.innerHTML = profile.runsGeneration === false
+    ? `${icon("check", 13)}<span>保存设置</span>`
+    : `${icon("play", 13)}<span>开始生成</span>`;
   actions.append(cancel, confirm);
   modal.append(head, body, actions);
 
@@ -50,19 +51,42 @@ export function openGenerationPanel({ store, node, onRun }) {
     store.set((s) => {
       const target = s.nodes[current.id];
       if (!target) return;
+      target.params = target.params || {};
       target.prompt = promptField.input.value.trim();
-      target.params.spec = { ...(target.params.spec || {}), ratio: ratio.input.value };
-      target.params.candidateCount = clamp(Number(candidates.input.value || 1), 1, 4);
-      target.params.motion = motion.input.value.trim();
+      applyGenerationProfileSettings(target, profile, controls);
       target.params.generationPanelTouchedAt = new Date().toISOString();
       s.selection = { nodeIds: [target.id], edgeId: null };
     });
     close();
     const fresh = store.get().nodes[current.id];
-    onRun?.(fresh);
+    if (profile.runsGeneration !== false) onRun?.(fresh);
   });
   setTimeout(() => promptField.input.focus(), 20);
   return close;
+}
+
+function renderProfileSettings(settings, node, profile) {
+  const controls = {};
+  for (const item of profile.fields) {
+    if (item.kind === "note") {
+      settings.appendChild(inlineNote(item.text));
+      continue;
+    }
+    const control = field(item.label, item.kind, item.options || []);
+    if (item.kind === "number") {
+      control.input.min = String(item.min ?? 1);
+      control.input.max = String(item.max ?? 999);
+      control.input.step = String(item.step ?? 1);
+    }
+    if (item.readonly) {
+      control.input.disabled = true;
+      control.input.title = item.readonlyReason || "";
+    }
+    control.input.value = String(valueForGenerationField(node, item));
+    settings.appendChild(control.wrap);
+    controls[item.key] = control.input;
+  }
+  return controls;
 }
 
 function positionGenerationPanel(modal, nodeId) {
@@ -95,13 +119,19 @@ function nodeSummary(node) {
   return box;
 }
 
-function safeNote(node) {
+function safeNote(profile) {
   const note = el("div", "generation-safe-note");
   const parts = [
-    "点击开始后才会进入真实生成流程。",
-    node.type === "video" ? "视频任务可能产生费用，请确认首帧和运动描述。" : "候选数量越多，等待时间和费用可能越高。",
+    profile.runsGeneration === false ? "保存设置不会直接触发真实生成流程。" : "点击开始后才会进入真实生成流程。",
+    profile.note,
   ];
   note.textContent = parts.join(" ");
+  return note;
+}
+
+function inlineNote(text) {
+  const note = el("div", "generation-safe-note");
+  note.textContent = text;
   return note;
 }
 
@@ -124,13 +154,6 @@ function field(label, kind, options = []) {
   }
   wrap.appendChild(input);
   return { wrap, input };
-}
-
-function typeLabel(node) {
-  if (node.type === "video") return "视频生成";
-  if (node.type === "image") return "图片生成";
-  if (node.type === "script") return "脚本生成";
-  return "创作节点";
 }
 
 function summaryText(node) {

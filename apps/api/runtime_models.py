@@ -293,6 +293,16 @@ class FeedbackRecordRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class StudioClientEventRequest(BaseModel):
+    event_type: str = Field(min_length=1, max_length=80)
+    severity: Literal["info", "warning", "error"] = "info"
+    message: str = Field(default="", max_length=240)
+    project_id: str = Field(default="", max_length=160)
+    action: str = Field(default="", max_length=120)
+    details: dict[str, Any] = Field(default_factory=dict)
+    generated_at: str = Field(min_length=1)
+
+
 class SpriteChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1200)
     node_id: str | None = None
@@ -324,6 +334,7 @@ __all__ = (
     "ShotAssetPlanRequest",
     "SourceAssetRegisterRequest",
     "StoryboardBreakdownRequest",
+    "StudioClientEventRequest",
     "SpriteChatRequest",
     "TemporaryLockOverride",
     "VisualAssetPromoteRequest",

@@ -681,6 +681,206 @@ def test_studio_prompt_optimizer_does_not_fallback_when_remote_llm_output_is_rej
     assert "enhancement missing required sections" in result.json()["detail"]
 
 
+def test_studio_prompt_optimizer_rejects_provider_infrastructure_error_text(tmp_path, monkeypatch) -> None:
+    provider_error = (
+        "Unable to read `request.json` or `prompt.md`: the local command sandbox fails "
+        "with `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`."
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_error}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_provider_error/prompt-optimizations",
+        json={
+            "node_id": "image-node-studio-provider-error",
+            "node_type": "image",
+            "prompt_text": "老师，在办公室，批评玩手机的学生",
+            "generation_target": "keyframe",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "image2-keyframe",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T12:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    detail = result.json()["detail"]
+    assert "provider returned infrastructure error" in detail
+    assert "Unable to read" not in detail
+    assert "request.json" not in detail
+    assert "bwrap" not in detail
+
+
+def test_studio_prompt_optimizer_rejects_local_file_access_error_inside_sections(tmp_path, monkeypatch) -> None:
+    provider_error = "I can't access the requested local files in this session."
+    provider_text = "\n".join(
+        [
+            "Intent: create a usable visual prompt for a teacher scolding a student in an office.",
+            f"Subject/Character: {provider_error}",
+            f"Scene/Art Direction: {provider_error}",
+            "Action/Story: a teacher scolds a student for playing with a phone in an office.",
+            f"Camera/Composition: {provider_error}",
+            f"Lighting: {provider_error}",
+            "Motion/Time Progression: keep the single keyframe readable and stable.",
+            "Continuity: keep the teacher, student, clothing, and office consistent.",
+            "Negative Constraints: no watermark, no gibberish text, no identity drift.",
+        ]
+    )
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_text}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_local_file_error/prompt-optimizations",
+        json={
+            "node_id": "script-node-local-file-error",
+            "node_type": "script",
+            "prompt_text": "A teacher scolds a student for playing with a phone in an office.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T15:10:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    detail = result.json()["detail"]
+    assert "provider returned infrastructure error" in detail
+    assert "local files" not in detail.lower()
+    assert "requested local files" not in detail.lower()
+
+
+def test_studio_prompt_optimizer_does_not_salvage_after_retry_infrastructure_error(tmp_path, monkeypatch) -> None:
+    first_provider_text = (
+        "I'm unable to read the files because the local command sandbox is failing "
+        "before any command runs."
+    )
+    retry_provider_text = "Unable to read `request.json`: bwrap: Failed RTM_NEWADDR: Operation not permitted"
+
+    class FakeRegistry:
+        def __init__(self):
+            self.calls = 0
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            self.calls += 1
+            return {"text": first_provider_text if self.calls == 1 else retry_provider_text}
+
+    fake_registry = FakeRegistry()
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: fake_registry)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_studio_remote_optimizer_retry_infra_error/prompt-optimizations",
+        json={
+            "node_id": "script-node-retry-infra-error",
+            "node_type": "script",
+            "prompt_text": "A teacher scolds a student for playing with a phone in an office.",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T15:30:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    assert fake_registry.calls == 2
+    detail = result.json()["detail"]
+    assert "provider returned infrastructure error" in detail
+    assert "sandbox" not in detail.lower()
+    assert "request.json" not in detail
+
+
+def test_prompt_optimizer_failure_file_log_includes_timings(tmp_path, monkeypatch) -> None:
+    provider_error = "Unable to read `request.json`: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted"
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {"text": provider_error}
+
+    log_dir = tmp_path / "logs"
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setenv("AFS_FILE_LOG_ENABLED", "true")
+    monkeypatch.setenv("AFS_FILE_LOG_DIR", str(log_dir))
+    monkeypatch.setenv("AFS_FILE_LOG_NAME", "afs-test")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+
+    result = client.post(
+        "/projects/proj_studio_prompt_log/prompt-optimizations",
+        headers={
+            "x-client-request-id": "cli_prompt_log",
+            "x-user-action": "click_optimize_prompt",
+            "x-studio-node-id": "node_prompt_log",
+            "x-studio-node-type": "script",
+        },
+        json={
+            "node_id": "node_prompt_log",
+            "node_type": "script",
+            "prompt_text": "老师，在办公室，批评玩手机的学生",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "model": "text",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-06-28T14:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 422
+    lines = "\n".join(path.read_text(encoding="utf-8") for path in log_dir.glob("afs-test-*.log"))
+    assert "prompt optimize_start" in lines
+    assert "prompt optimize_failed" in lines
+    assert "provider=prompt_optimizer" in lines
+    assert "llm_status=discarded" in lines
+    assert "discard_reason=\"provider returned infrastructure error\"" in lines
+    assert "elapsed_ms=" in lines
+    assert "llm_elapsed_ms=" in lines
+    assert "provider_elapsed_ms=" in lines
+    assert "provider_output_length=" in lines
+    assert "provider_error_markers=" in lines
+    assert "missing_sections=" in lines
+    assert "provider_output_preview=" in lines
+    assert "request.json" in lines
+    assert "bwrap" in lines
+
+
 def test_studio_prompt_optimizer_accepts_common_llm_section_format_variants(tmp_path, monkeypatch) -> None:
     class FakeRegistry:
         def dispatch(self, capability, service_id, request):

@@ -2,6 +2,7 @@
 import { icon } from "../icons.js";
 import { el, showModal } from "../overlay.js";
 import { openVisualAssetPanel } from "./visual-asset-panel.js";
+import { formatRuntimeError } from "../runtime-error-utils.js";
 
 export function markAssetReference(state, store, asset) {
   const selectedId = state?.selection?.nodeIds?.[0];
@@ -391,9 +392,7 @@ function focusAssetSource(store, asset) {
 }
 
 function safeError(error) {
-  return String(error instanceof Error ? error.message : error || "停用失败")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .slice(0, 180);
+  return formatRuntimeError(error, "??????");
 }
 
 export { focusAssetSource };

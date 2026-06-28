@@ -1,5 +1,5 @@
 import { NODE_TYPES, deleteNodes } from "../nodes.js";
-import { fitVisibleCanvasViewport } from "../canvas-safe-area.js";
+import { visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 
@@ -73,8 +73,21 @@ function navigatorItem(state, store, node) {
 function focusNode(store, node) {
   store.set((s) => {
     s.selection = { nodeIds: [node.id], edgeId: null };
-    s.viewport = fitVisibleCanvasViewport({ [node.id]: node }, 220);
+    s.viewport = panViewportToNode(s.viewport, node);
   }, { history: false, persist: false });
+}
+
+function panViewportToNode(viewport, node) {
+  const scale = Number(viewport?.scale || 1);
+  const center = visibleCanvasCenter();
+  const nodeCenterX = Number(node.x || 0) + Number(node.w || 0) / 2;
+  const nodeCenterY = Number(node.y || 0) + Number(node.h || 0) / 2;
+  return {
+    ...viewport,
+    scale,
+    x: center.x - nodeCenterX * scale,
+    y: center.y - nodeCenterY * scale,
+  };
 }
 
 function statusText(status) {

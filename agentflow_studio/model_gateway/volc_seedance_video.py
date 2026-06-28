@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -18,6 +19,7 @@ from agentflow_studio.model_gateway.provider_adapter import ProviderDescriptor, 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_CREATE_ENDPOINT = "/volc/v1/contents/generations/tasks"
+MAX_ERROR_BODY_BYTES = 8192
 
 
 class VolcSeedanceVideoAdapter:
@@ -201,7 +203,11 @@ def _request_json(
         with urllib.request.urlopen(request, timeout=timeout_sec) as response:
             body = response.read()
     except urllib.error.HTTPError as exc:
-        raise ModelGatewayError(f"Seedance video HTTP error {exc.code}") from exc
+        summary = _http_error_summary(exc)
+        suffix = f": {summary['provider_error_message']}" if summary.get("provider_error_message") else ""
+        error = ModelGatewayError(f"Seedance video HTTP error {exc.code}{suffix}")
+        error.provider_error_summary = summary  # type: ignore[attr-defined]
+        raise error from exc
     except urllib.error.URLError as exc:
         raise ModelGatewayError(f"Seedance video request failed: {_safe_error(str(exc.reason))}") from exc
     try:
@@ -276,6 +282,69 @@ def _collect_failure_strings(value: Any) -> list[str]:
         for item in value:
             found.extend(_collect_failure_strings(item))
     return found
+
+
+def _http_error_summary(error: urllib.error.HTTPError) -> dict[str, Any]:
+    body = _read_http_error_body(error)
+    decoded = _decode_error_body(body)
+    strings = _collect_failure_strings(decoded) if decoded is not None else []
+    code = _first_error_value(decoded, ("code", "error_code", "err_code")) if decoded is not None else ""
+    message = (
+        _first_error_value(decoded, ("message", "msg", "reason", "detail", "fail_reason", "fail_message"))
+        if decoded is not None
+        else ""
+    )
+    message = message or _first_useful_error_message(strings) or str(getattr(error, "reason", "") or getattr(error, "msg", "") or "")
+    return {
+        "provider_error_stage": "submit_http_error",
+        "provider_http_status": int(getattr(error, "code", 0) or 0),
+        "provider_error_code": _safe_error_value(code, limit=80),
+        "provider_error_message": _safe_error_value(message, limit=180),
+        "provider_raw_response_stored": False,
+    }
+
+
+def _read_http_error_body(error: urllib.error.HTTPError) -> bytes:
+    try:
+        return error.read(MAX_ERROR_BODY_BYTES) or b""
+    except Exception:
+        return b""
+
+
+def _decode_error_body(body: bytes) -> Any:
+    if not body:
+        return None
+    try:
+        return json.loads(body.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError:
+        text = body.decode("utf-8", errors="replace")
+        return {"message": text}
+
+
+def _first_error_value(value: Any, keys: tuple[str, ...]) -> str:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in keys and isinstance(item, (str, int, float)) and str(item).strip():
+                return str(item).strip()
+        for item in value.values():
+            found = _first_error_value(item, keys)
+            if found:
+                return found
+    if isinstance(value, list):
+        for item in value:
+            found = _first_error_value(item, keys)
+            if found:
+                return found
+    return ""
+
+
+def _first_useful_error_message(strings: list[str]) -> str:
+    for value in strings:
+        text = value.strip()
+        if text and text.lower() not in {"error", "failed", "failure", "bad request"}:
+            return text
+    return ""
+
 
 def _strip_provider_request_id(value: str) -> str:
     return value.split("Request id:", 1)[0].split("request id:", 1)[0].strip()
@@ -386,10 +455,19 @@ def _require_gate(required_gate: str) -> None:
         raise ModelGatewayError(f"Remote provider gate is closed: {required_gate}")
 
 def _safe_error(value: str) -> str:
-    lowered = value.lower()
-    if any(term in lowered for term in ("api", "key", "secret", "token", "authorization", "cookie")):
+    return _safe_error_value(value, limit=160) or "Seedance video request failed."
+
+
+def _safe_error_value(value: Any, *, limit: int) -> str:
+    text = _strip_provider_request_id(" ".join(str(value or "").split()))
+    text = re.sub(r"https?://\S+", "[url omitted]", text)
+    text = re.sub(r"(?i)\b[a-z]:\\\S+|/(?:home|users|tmp|var)/\S+", "[path omitted]", text)
+    lowered = text.lower()
+    if any(term in lowered for term in ("api key", "apikey", "secret", "token", "authorization", "cookie", "bearer ")):
         return "Seedance video provider configuration is not ready."
-    return " ".join(value.split())[:160] or "Seedance video request failed."
+    if any(term in lowered for term in ("data:", ".mp4", ".mov", "signed_url", "access_token", "refresh_token")):
+        return "Seedance video provider returned an unsafe error detail."
+    return text[:limit]
 
 
 __all__ = ("VolcSeedanceVideoAdapter",)

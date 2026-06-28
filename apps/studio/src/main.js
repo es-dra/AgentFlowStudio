@@ -9,7 +9,7 @@ import { renderInspectorPanel } from "./panels/inspector-panel.js";
 import { openGenerationPanel } from "./panels/generation-panel.js";
 import { openCreationProcessPanel } from "./panels/creation-process-panel.js";
 import { renderDock } from "./panels/dock.js";
-import { el } from "./overlay.js";
+import { el, showModal } from "./overlay.js";
 import { fixNodeVisualAsset, startNodeGeneration } from "./node-actions.js";
 import { refreshPendingKeyframeGenerations } from "./node-keyframe-actions.js";
 import { WORKFLOW_STARTERS, createWorkflowStarter } from "./workflow-starters.js";
@@ -23,6 +23,8 @@ import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { initialProjectId } from "./studio-project-session.js";
 import { createProjectController } from "./studio-project-controller.js";
 import { renderSpriteWidget } from "./sprite-widget.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
+import { installClientErrorReporter, reportClientError } from "./client-error-reporter.js";
 
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
@@ -30,6 +32,10 @@ let runtime = createRuntimeClient(initialProjectId());
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
+installClientErrorReporter({
+  getRuntime: () => runtime,
+  getProjectId: () => runtime?.projectId || store.get().meta?.projectId || "",
+});
 
 const projectController = createProjectController({
   store,
@@ -43,7 +49,14 @@ const projectController = createProjectController({
 });
 
 bootstrap().catch((error) => {
-  console.error("AFS Studio bootstrap failed", safeError(error));
+  reportClientError({
+    event_type: "bootstrap_failed",
+    action: "studio_bootstrap",
+    message: safeError(error),
+    error,
+    getRuntime: () => runtime,
+    getProjectId: () => runtime?.projectId || store.get().meta?.projectId || "",
+  });
   renderAll(store.get());
 });
 
@@ -235,6 +248,7 @@ function openStudioHome(state = store.get()) {
     hiddenProjectCount: projectController.hiddenProjectCount(state),
     onSwitchProject: projectController.switchProject,
     onCreateProject: projectController.createNewProject,
+    onDeleteProject: projectController.deleteProject,
     onStartWorkflow: launchStarter,
     onOpenAssets: () => store.set((s) => {
       s.ui.drawerOpen = true;
@@ -263,14 +277,60 @@ function renderStarters() {
   }
 }
 
-function launchStarter(id) {
+async function launchStarter(id) {
+  if (!hasActiveProject()) {
+    const created = await promptCreateProjectBeforeStarter();
+    if (!created) return;
+  }
   const root = document.getElementById("canvas-root").getBoundingClientRect();
   const cx = (root.width / 2 - store.get().viewport.x) / store.get().viewport.scale;
   const cy = (root.height / 2 - store.get().viewport.y) / store.get().viewport.scale;
   createWorkflowStarter(store, id, { x: cx - 570, y: cy - 160 });
 }
 
+function hasActiveProject() {
+  const projectId = runtime?.projectId || store.get().meta?.projectId || "";
+  return Boolean(projectId && projectId !== "studio-empty" && projectController.summaries.some((item) => item.project_id === projectId));
+}
+
+function promptCreateProjectBeforeStarter() {
+  return new Promise((resolve) => {
+    const modal = el("div", "modal compact project-create-required-modal");
+    const head = el("div", "modal-head");
+    head.appendChild(el("strong", "", "请先新建项目"));
+    const closeBtn = el("button", "modal-close");
+    closeBtn.innerHTML = icon("x", 15);
+    head.appendChild(el("span", "head-spacer"));
+    head.appendChild(closeBtn);
+
+    const body = el("div", "modal-body project-create-required-body");
+    body.appendChild(el("p", "", "当前没有项目，不能直接使用模板。"));
+    body.appendChild(el("p", "", "请先新建项目，然后系统会在新项目里创建模板节点。"));
+
+    const actions = el("div", "modal-actions");
+    const cancel = el("button", "ghost-btn", "取消");
+    const create = el("button", "primary-btn", "新建项目");
+    actions.append(cancel, create);
+    modal.append(head, body, actions);
+
+    let settled = false;
+    const close = showModal(modal, { onClose: () => { if (!settled) resolve(false); } });
+    const finish = async (value) => {
+      if (settled) return;
+      settled = true;
+      close();
+      if (!value) {
+        resolve(false);
+        return;
+      }
+      resolve(Boolean(await projectController.createNewProject()));
+    };
+    cancel.addEventListener("click", () => finish(false));
+    closeBtn.addEventListener("click", () => finish(false));
+    create.addEventListener("click", () => finish(true));
+  });
+}
+
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 180);
+  return formatRuntimeError(error, "unknown error");
 }

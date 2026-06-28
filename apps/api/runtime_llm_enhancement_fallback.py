@@ -11,6 +11,7 @@ from apps.api.runtime_llm_enhancement_safety import (
     contains_cjk,
     reference_role,
     reference_hint_terms,
+    reject_provider_error_text,
     slot,
     visual_reference_hint,
 )
@@ -230,6 +231,7 @@ def deterministic_video_fallback_prompt(request: PromptOptimizationRequest, asse
 
 
 def salvage_prompt_from_llm_article(value: str, request: PromptOptimizationRequest) -> str:
+    reject_provider_error_text(value)
     candidate = extract_article_prompt_candidate(value)
     if not candidate:
         raise ValueError("enhancement missing required sections")

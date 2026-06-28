@@ -137,7 +137,7 @@ def _camera_reference(tags: list[str]) -> dict[str, Any]:
     return {
         "decision": "shot scale chosen from narrative priority: place, relationship, action, or face",
         "must_include": ["shot scale", "camera height", "frame intent"],
-        "avoid": ["generic cinematic camera language", "conflicting angles in one shot"],
+        "avoid": ["generic cinematic camera language", "inconsistent angles in one shot"],
         "quality_checks": ["camera purpose is explicit", "composition supports the beat"],
     }
 
@@ -202,7 +202,7 @@ def _pacing_reference(tags: list[str], generation_target: str) -> dict[str, Any]
         else:
             decision = "single continuity clip with one primary motion idea"
             must = ["start anchor", "one motion direction", "settled end state"]
-            avoid = ["rewritten story", "conflicting motion directions"]
+            avoid = ["rewritten story", "inconsistent motion directions"]
     else:
         decision = "single frame or script beat should preserve later video continuity"
         must = ["clear beat priority", "next-stage continuity", "no overloaded action list"]

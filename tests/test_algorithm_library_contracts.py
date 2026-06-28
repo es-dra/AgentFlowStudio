@@ -222,6 +222,20 @@ def test_video_generation_plan_includes_professional_reference_and_prompt_guidan
     assert "0-1s" in reference["pacing"]["must_include"][0]
     assert "Professional video reference:" in prompt
     assert "motivated night exterior" in prompt
+    assert "conflicting" not in prompt.lower()
+    assert "conflict" not in prompt.lower()
+
+    neutral_prompt = video_provider_prompt(
+        prompt_text="Generate a continuous video from the first frame.",
+        optimized_prompt=None,
+        duration_sec=5,
+        motion="fixed camera",
+        last_frame_image_asset_id=None,
+        context_bundle=None,
+    )
+    assert "conflicting" not in neutral_prompt.lower()
+    assert "conflict" not in neutral_prompt.lower()
+    assert "inconsistent motion directions" in neutral_prompt
 
 
 def test_video_generation_plan_includes_director_scenario_and_prompt_guidance() -> None:

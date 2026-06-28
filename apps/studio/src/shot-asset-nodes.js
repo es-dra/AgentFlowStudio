@@ -27,6 +27,9 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode, options
   if (!fresh) return [];
   const existing = existingShotAssetCardNodeIds(store.get(), fresh.id);
   if (existing.length && !options.replaceExisting) return existing;
+  if (existing.length && options.replaceExisting) {
+    removeShotAssetCardNodes(store, existing);
+  }
   const context = fresh.content || fresh.prompt || "";
   const structuredShot = options.structuredShot
     ? refineStructuredShotAssets(options.structuredShot, context)
@@ -87,6 +90,23 @@ export function existingShotAssetCardNodeIds(state, scriptNodeId) {
   return Object.values(state.nodes || {})
     .filter((node) => node?.params?.assetCardDraft?.source_script_node_id === scriptNodeId)
     .map((node) => node.id);
+}
+
+function removeShotAssetCardNodes(store, nodeIds) {
+  const removal = new Set(nodeIds);
+  store.set((s) => {
+    for (const id of removal) delete s.nodes[id];
+    s.order = s.order.filter((id) => !removal.has(id));
+    for (const [edgeId, edge] of Object.entries(s.edges || {})) {
+      if (removal.has(edge.from) || removal.has(edge.to)) delete s.edges[edgeId];
+    }
+    for (const group of Object.values(s.groups || {})) {
+      group.nodeIds = group.nodeIds.filter((id) => !removal.has(id));
+    }
+    for (const groupId of Object.keys(s.groups || {})) {
+      if (!s.groups[groupId].nodeIds.length) delete s.groups[groupId];
+    }
+  });
 }
 
 function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeId, asset) {

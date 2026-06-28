@@ -3,6 +3,7 @@ import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { renderEdges } from "./canvas-edges.js";
 import { icon } from "./icons.js";
+import { canRunNodeGeneration } from "./node-actions.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
 export function renderCanvas(state, store) {
@@ -194,6 +195,13 @@ function syncRunAction(elNode, node) {
     }
     return;
   }
+  if (!canRunNodeGeneration(node)) {
+    runBtn.hidden = true;
+    runBtn.disabled = true;
+    runBtn.dataset.action = "run-disabled";
+    return;
+  }
+  runBtn.hidden = false;
   runBtn.dataset.action = "run";
   runBtn.title = "生成";
   runBtn.innerHTML = icon("play", 13);

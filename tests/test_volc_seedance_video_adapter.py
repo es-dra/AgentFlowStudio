@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 from types import SimpleNamespace
+import urllib.error
 
 import pytest
 from fastapi.testclient import TestClient
@@ -248,6 +250,61 @@ def test_seedance_poll_reports_policy_failure_safely(tmp_path, monkeypatch) -> N
     assert "copyright restrictions" in message
     assert "raw-provider-id" not in message
     assert "secret-video-key" not in message
+
+
+def test_seedance_submit_http_error_attaches_safe_provider_summary(tmp_path, monkeypatch) -> None:
+    first = tmp_path / "first.png"
+    first.write_bytes(PNG_BYTES)
+
+    def fake_urlopen(request, timeout):
+        body = json.dumps(
+            {
+                "error": {
+                    "code": "InvalidParameter",
+                    "message": "reference image format is unsupported. Request id: raw-provider-id",
+                },
+                "request_id": "raw-provider-id",
+            }
+        ).encode("utf-8")
+        raise urllib.error.HTTPError(
+            request.full_url,
+            400,
+            "Bad Request",
+            hdrs=None,
+            fp=io.BytesIO(body),
+        )
+
+    monkeypatch.setattr("agentflow_studio.model_gateway.volc_seedance_video.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+    monkeypatch.setenv("AFS_VIDEO_RELAY_API_KEY", "secret-video-key")
+    registry = ProviderRegistry.from_store(load_company_provider_secrets(_seedance_provider_config(tmp_path)))
+
+    with pytest.raises(ModelGatewayError) as exc_info:
+        registry.submit(
+            "video",
+            "seedance_i2v",
+            ProviderDispatchRequest(
+                prompt="A controlled cinematic move from the first frame.",
+                output_dir=tmp_path / "run",
+                aspect_ratio="16:9",
+                reference_image_paths=(first,),
+                subject_reference_image_path=first,
+                duration_sec=5,
+                resolution="720p",
+            ),
+        )
+
+    message = str(exc_info.value)
+    summary = exc_info.value.provider_error_summary
+    assert "Seedance video HTTP error 400" in message
+    assert "reference image format is unsupported" in message
+    assert summary["provider_http_status"] == 400
+    assert summary["provider_error_code"] == "InvalidParameter"
+    assert summary["provider_error_message"] == "reference image format is unsupported."
+    assert summary["provider_raw_response_stored"] is False
+    serialized = json.dumps({"message": message, "summary": summary}, ensure_ascii=False)
+    assert "raw-provider-id" not in serialized
+    assert "secret-video-key" not in serialized
 
 
 def test_seedance_video_gate_blocks_before_network(tmp_path, monkeypatch) -> None:

@@ -168,6 +168,24 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
         assert marker in source
 
 
+def test_prompt_optimizer_provider_errors_use_user_facing_message() -> None:
+    runtime_errors = (STUDIO_ROOT / "src" / "runtime-error-utils.js").read_text(encoding="utf-8")
+    optimizer = (STUDIO_ROOT / "src" / "optimizer.js").read_text(encoding="utf-8")
+
+    assert "提示词优化失败，请检查 LLM provider 配置或稍后重试。" in runtime_errors
+    assert "provider returned infrastructure error" in runtime_errors
+    assert "unable to read `request.json`" in runtime_errors
+    assert "bwrap:" in runtime_errors
+    assert "提示词优化失败，请稍后重试。" in optimizer
+    assert 'formatRuntimeError(error, "???????")' not in optimizer
+
+
+def test_script_nodes_keep_prompt_bar_visible_with_content() -> None:
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+
+    assert 'node.type === "script" || !node.content' in prompt_bar
+
+
 def test_studio_asset_context_workflow_is_single_canvas() -> None:
     source = _source()
     styles = _styles()

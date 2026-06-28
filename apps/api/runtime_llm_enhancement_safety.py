@@ -5,6 +5,7 @@ from typing import Any
 
 from apps.api.runtime_llm_enhancement_constants import (
     BANNED_GENERIC_PHRASES,
+    PROVIDER_ERROR_PHRASES,
     REQUIRED_SECTION_LABELS,
     SECTION_LABEL_ALIASES,
 )
@@ -17,6 +18,7 @@ def sanitize_enhanced_prompt(value: str) -> str:
     text = strip_code_fence(value).strip()
     if not text:
         raise ValueError("empty enhancement")
+    reject_provider_error_text(text)
     text = normalize_enhancement_sections(text)
     lowered = text.lower()
     if "<think" in lowered or "reasoning_content" in lowered or "\nthinking:" in lowered:
@@ -32,6 +34,36 @@ def sanitize_enhanced_prompt(value: str) -> str:
     return text
 
 
+def reject_provider_error_text(value: str) -> None:
+    lowered = str(value or "").lower()
+    if any(phrase in lowered for phrase in PROVIDER_ERROR_PHRASES):
+        raise ValueError("provider returned infrastructure error")
+
+
+def provider_output_diagnostics(value: str) -> dict[str, Any]:
+    text = str(value or "")
+    lowered = text.lower()
+    matched_errors = [phrase for phrase in PROVIDER_ERROR_PHRASES if phrase in lowered]
+    return {
+        "provider_output_length": len(text),
+        "provider_output_preview": safe_provider_output_preview(text) if matched_errors else "",
+        "provider_error_markers": matched_errors[:6],
+        "missing_sections": _missing_sections(text),
+    }
+
+
+def safe_provider_output_preview(value: str, limit: int = 180) -> str:
+    text = " ".join(str(value or "").split())
+    text = re.sub(r"Bearer\s+\S+", "Bearer <redacted>", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"(?i)(api[_-]?key|token|secret|password|authorization)\s*[:=]\s*\S+",
+        r"\1=<redacted>",
+        text,
+    )
+    text = re.sub(r"(?i)([a-z]:\\|/home/|/users/|/tmp/|/var/lib/afs-runtime)[^\s`'\"]*", "<path>", text)
+    return text[:limit]
+
+
 def validate_enhanced_prompt_specificity(prompt: str, request: PromptOptimizationRequest) -> None:
     if prompt_optimization_mode(request) != "i2i":
         return
@@ -44,6 +76,14 @@ def validate_enhanced_prompt_specificity(prompt: str, request: PromptOptimizatio
         raise ValueError("i2i short-hair enhancement missed hair color lock")
     if require_reference_terms and any("校服" in term for term in terms) and not any(term in prompt for term in ("保持校服", "不改变校服", "校服款式", "校服配色")):
         raise ValueError("i2i school-uniform enhancement missed wardrobe lock")
+
+
+def _missing_sections(text: str) -> list[str]:
+    try:
+        normalized = normalize_enhancement_sections(str(text or ""))
+    except Exception:
+        normalized = str(text or "")
+    return [label for label in REQUIRED_SECTION_LABELS if not has_section(normalized, label)]
 
 
 def sections_from_canonical(prompt: str) -> list[dict[str, str]]:
@@ -278,7 +318,10 @@ __all__ = (
     "compact",
     "contains_cjk",
     "reference_role",
+    "reject_provider_error_text",
+    "provider_output_diagnostics",
     "safe_reason",
+    "safe_provider_output_preview",
     "sanitize_enhanced_prompt",
     "sections_from_canonical",
     "should_require_reference_hint_terms",

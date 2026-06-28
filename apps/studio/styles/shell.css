@@ -265,17 +265,19 @@
   position: absolute;
   left: 50%; top: 52%;
   transform: translateX(-50%);
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
   z-index: var(--z-promptbar);
+  width: min(1080px, 86vw);
   max-width: 86vw;
-  overflow-x: auto;
+  overflow: hidden;
   padding: 6px;
 }
 .starter-card {
-  flex: none;
+  min-width: 0;
   display: flex; align-items: center; gap: 10px;
-  width: 188px; min-height: 56px;
+  width: auto; min-height: 56px;
   background: linear-gradient(100deg, #232529 55%, #2c3036);
   border: 1px solid var(--border-soft);
   border-radius: 10px;
@@ -323,7 +325,7 @@
     top: 50%;
     width: calc(100vw - var(--drawer-w) - 24px);
     max-width: calc(100vw - var(--drawer-w) - 24px);
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 8px;
     overflow-x: visible;
     overflow-y: auto;

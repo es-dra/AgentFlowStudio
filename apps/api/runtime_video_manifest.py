@@ -129,7 +129,7 @@ def safe_manifest(
     status: str,
     provider_calls_started: bool,
     provider_gate: dict[str, str] | None = None,
-    blocks: list[dict[str, str]] | None = None,
+    blocks: list[dict[str, Any]] | None = None,
     outputs: list[dict[str, Any]] | None = None,
     context_bundle: dict[str, Any] | None = None,
     model_call_context_id: str | None = None,

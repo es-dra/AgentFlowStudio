@@ -1,6 +1,7 @@
 import { showModal, el } from "../overlay.js";
 import { visualAssetDefaults } from "./visual-asset-defaults.js";
 import { lockChipsForAssetType, renderVisualAssetPanel } from "./visual-asset-panel-render.js";
+import { formatRuntimeError } from "../runtime-error-utils.js";
 
 export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character", existingAsset = null }) {
   if (!runtime?.promoteVisualAsset) {
@@ -293,6 +294,5 @@ function markNodeError(store, nodeId, message) {
 }
 
 function safeError(error) {
-  const message = error instanceof Error ? error.message : String(error || "未知错误");
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 160);
+  return formatRuntimeError(error, "??????");
 }

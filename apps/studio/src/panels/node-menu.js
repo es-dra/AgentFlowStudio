@@ -11,6 +11,7 @@ import {
   identifyScriptAssets,
   setNodeVideoFrame,
   startNodeGeneration,
+  canRunNodeGeneration,
   uploadNodeImage,
 } from "../node-actions.js";
 import { canContinueKeyframeToVideo, createVideoNodeFromKeyframe } from "../keyframe-video-continuation.js";
@@ -36,10 +37,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   addItem("copy", "复制节点", () => duplicateNode(store, nodeId));
   addItem(node.collapsed ? "chevronDown" : "chevronUp", node.collapsed ? "展开" : "折叠", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
-  addItem("retry", "重试生成", () => {
-    const fresh = store.get().nodes[nodeId];
-    if (fresh) startNodeGeneration(store, runtime, fresh);
-  });
+  if (canRetryGeneration(node)) {
+    addItem("retry", "重试生成", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) startNodeGeneration(store, runtime, fresh);
+    });
+  }
   if (node.type === "text") {
     addItem("upload", "导入/替换剧本", () => {
       const fresh = store.get().nodes[nodeId];
@@ -170,6 +173,10 @@ function activeFixedVisualAsset(node) {
     const status = String(asset?.status || asset?.asset_status || "fixed");
     return status !== "retired" && status !== "excluded";
   }) || null;
+}
+
+function canRetryGeneration(node) {
+  return canRunNodeGeneration(node);
 }
 
 function requestVideoAssetCardDraft(store, nodeId) {

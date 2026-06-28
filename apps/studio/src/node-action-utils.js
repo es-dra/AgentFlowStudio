@@ -1,4 +1,8 @@
+import { formatStructuredRuntimeError } from "./runtime-error-utils.js";
+
 export function safeError(error) {
+  const structured = formatStructuredRuntimeError(error);
+  if (structured) return structured;
   const message = error instanceof Error ? error.message : String(error || "unknown error");
   const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
   if (/Gateway timeout|504|network connection interrupted|Failed to fetch/i.test(clean)) {

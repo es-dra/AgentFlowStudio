@@ -15,6 +15,10 @@ export { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboar
 export { pollNodeKeyframeGeneration } from "./node-keyframe-actions.js";
 export { cancelNodeVideoGeneration, enableVideoRevisionDraft, pollNodeVideoGeneration, setNodeVideoFrame } from "./node-video-actions.js";
 
+export function canRunNodeGeneration(node) {
+  return ["image", "video"].includes(node?.type);
+}
+
 // Empty-state intent: script starter lays out a safe local upstream example flow.
 export function handleNodeIntent(store, node, intent) {
   if (node.type === "text" && intent === "上传完整剧本") {
@@ -92,9 +96,17 @@ export function lastFixedVisualAsset(node) {
   return [...assets].reverse().find((asset) => ["fixed", "ready", ""].includes(String(asset?.status || ""))) || null;
 }
 
-// 发送（Ctrl+Enter / 发送按钮）：当前 MVP 只允许图片节点触发真实 keyframe。
+// 发送（Ctrl+Enter / 发送按钮）：当前只允许图片/视频节点触发真实生成。
 export async function startNodeGeneration(store, runtime, node, resultText) {
   const fresh = store.get().nodes[node.id] || node;
+  if (!canRunNodeGeneration(fresh)) {
+    setNodeError(
+      store,
+      fresh.id,
+      resultText || "当前节点不支持直接生成。请使用该节点菜单里的专用操作，或连接到图片/视频节点后生成。",
+    );
+    return;
+  }
   if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
     await startRemoteKeyframeGeneration(store, runtime, fresh);
     return;

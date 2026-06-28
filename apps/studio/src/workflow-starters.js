@@ -64,7 +64,7 @@ function storyToKeyframeFlow(store, x, y, gapX) {
       title: "故事脚本",
       prompt: "写出 3 幕短剧脚本，包含角色目标、场景变化和关键情绪转折。",
       content: "从这里输入故事设定，或粘贴已有脚本。确认后继续生成分镜与关键帧。",
-      status: "complete",
+      status: "empty",
     });
     Object.assign(s.nodes[director.id], { title: "导演台参数" });
     Object.assign(s.nodes[keyframe.id], {

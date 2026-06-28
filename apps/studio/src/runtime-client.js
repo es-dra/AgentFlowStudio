@@ -79,11 +79,18 @@ function isLocalHost(hostname) {
   return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
 }
 
-async function requestJson(route, { method = "GET", payload = null } = {}) {
+async function requestJson(route, { method = "GET", payload = null, meta = null } = {}) {
+  const requestMeta = buildRequestMeta(route, method, payload, meta);
   const headers = { "Content-Type": "application/json", Accept: "application/json" };
+  headers["X-Client-Request-ID"] = requestMeta.client_request_id;
+  if (requestMeta.user_action) headers["X-User-Action"] = requestMeta.user_action;
+  if (requestMeta.node_id) headers["X-Studio-Node-ID"] = requestMeta.node_id;
+  if (requestMeta.node_type) headers["X-Studio-Node-Type"] = requestMeta.node_type;
   const token = authToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   let response;
+  logStudioRequestStarted(requestMeta);
+  const started = Date.now();
   try {
     response = await fetch(`${runtimeBaseUrl()}${route}`, {
       method,
@@ -94,38 +101,97 @@ async function requestJson(route, { method = "GET", payload = null } = {}) {
     const error = new Error("Runtime request failed: network connection interrupted");
     error.status = 0;
     error.route = route;
+    error.clientRequestId = requestMeta.client_request_id;
     error.cause = fetchError;
+    logStudioRequestFinished(requestMeta, { status: "network_error", status_code: 0, elapsed_ms: Date.now() - started });
     throw error;
   }
   const body = await response.text();
   if (!response.ok) {
-    const error = new Error(staleRuntimeRouteMessage(response, route, body) || runtimeErrorMessage(response, body));
+    const parsed = parseRuntimeErrorPayload(response, body);
+    const error = new Error(staleRuntimeRouteMessage(response, route, body, parsed) || runtimeErrorMessage(response, body, parsed));
     error.status = response.status;
     error.route = route;
+    error.payload = parsed?.payload || null;
+    error.errorCode = parsed?.error || "";
+    error.requestId = parsed?.request_id || response.headers.get("X-Request-ID") || "";
+    error.clientRequestId = parsed?.client_request_id || response.headers.get("X-Client-Request-ID") || requestMeta.client_request_id;
+    logStudioRequestFinished(requestMeta, {
+      status: "failed",
+      status_code: response.status,
+      request_id: error.requestId,
+      error: error.errorCode,
+      stage: parsed?.stage || "",
+      elapsed_ms: Date.now() - started,
+    });
     throw error;
   }
-  return body ? JSON.parse(body) : {};
+  const result = body ? JSON.parse(body) : {};
+  logStudioRequestFinished(requestMeta, {
+    status: "succeeded",
+    status_code: response.status,
+    request_id: response.headers.get("X-Request-ID") || result?.request_id || "",
+    elapsed_ms: Date.now() - started,
+  });
+  return result;
 }
 
-function staleRuntimeRouteMessage(response, route, body) {
+function staleRuntimeRouteMessage(response, route, body, parsed = null) {
   if (response.status !== 404) return "";
   const missingPreflight = /\/(keyframe-generations|video-generations|video-revisions)\/preflight$/.test(route);
   const missingRevisionRoute = /\/video-revisions$/.test(route);
   if (!missingPreflight && !missingRevisionRoute) return "";
-  const detail = runtimeErrorMessage(response, body);
+  const detail = runtimeErrorMessage(response, body, parsed);
   return `${detail}. Runtime Service route is missing for ${route}. Restart the 8790 Runtime Service from the current branch and retry.`;
 }
 
-function runtimeErrorMessage(response, body) {
+function runtimeErrorMessage(response, body, parsed = null) {
   let detail = "";
-  try {
-    const payload = body ? JSON.parse(body) : {};
-    detail = String(payload?.detail || payload?.message || "").trim();
-  } catch {
+  if (parsed?.message || parsed?.error) {
+    detail = [parsed.message, parsed.user_action ? `建议：${parsed.user_action}` : "", parsed.request_id ? `请求编号：${parsed.request_id}` : ""]
+      .filter(Boolean)
+      .join(" ");
+  } else {
     detail = cleanTextResponseError(body, response);
   }
   const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
+}
+
+function parseRuntimeErrorPayload(response, body) {
+  try {
+    const payload = body ? JSON.parse(body) : {};
+    const detail = payload?.detail && typeof payload.detail === "object" ? payload.detail : payload;
+    if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
+      return {
+        payload,
+        message: Array.isArray(detail) ? validationErrorMessage(detail) : String(payload?.detail || payload?.message || response.statusText || "").trim(),
+        error: "",
+      };
+    }
+    return {
+      payload,
+      error: String(detail.error || detail.detail_code || payload.error || "").trim(),
+      message: String(detail.message || payload.message || "").trim(),
+      user_action: String(detail.user_action || "").trim(),
+      request_id: String(detail.request_id || payload.request_id || "").trim(),
+      client_request_id: String(detail.client_request_id || payload.client_request_id || "").trim(),
+      project_id: String(detail.project_id || payload.project_id || "").trim(),
+      node_id: String(detail.node_id || payload.node_id || "").trim(),
+      action: String(detail.action || "").trim(),
+      stage: String(detail.stage || "").trim(),
+      details: detail.details && typeof detail.details === "object" ? detail.details : {},
+    };
+  } catch {
+    return { payload: null, message: cleanTextResponseError(body, response), error: "" };
+  }
+}
+
+function validationErrorMessage(items) {
+  if (!Array.isArray(items) || !items.length) return "";
+  const first = items[0] || {};
+  const field = Array.isArray(first.loc) ? first.loc.join(".") : "";
+  return [first.msg || "请求参数校验失败", field ? `字段：${field}` : ""].filter(Boolean).join(" ");
 }
 
 function cleanTextResponseError(body, response) {
@@ -137,6 +203,97 @@ function cleanTextResponseError(body, response) {
       : (response.statusText || "HTTP response was not JSON");
   }
   return raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function buildRequestMeta(route, method, payload, meta) {
+  const inferred = inferRequestMeta(route, method, payload);
+  return {
+    ...inferred,
+    ...(meta || {}),
+    route,
+    method,
+    client_request_id: String(meta?.client_request_id || inferred.client_request_id || newClientRequestId()),
+    started_at: new Date().toISOString(),
+  };
+}
+
+function inferRequestMeta(route, method, payload) {
+  const nodeParameters = payload?.node_parameters && typeof payload.node_parameters === "object" ? payload.node_parameters : {};
+  const contextTarget = payload?.context_subgraph?.target_node_id || "";
+  return {
+    client_request_id: "",
+    user_action: inferUserAction(route, method),
+    project_id: projectIdFromRoute(route),
+    node_id: String(payload?.node_id || contextTarget || nodeParameters.node_id || "").slice(0, 120),
+    node_type: String(payload?.node_type || nodeParameters.node_type || "").slice(0, 80),
+    generation_kind: inferGenerationKind(route),
+    provider_service_id: String(payload?.provider_service_id || "").slice(0, 120),
+    has_first_frame: Boolean(payload?.first_frame_image_asset_id),
+    first_frame_image_asset_id: String(payload?.first_frame_image_asset_id || "").slice(0, 120),
+    duration_sec: payload?.duration_sec,
+    resolution: payload?.resolution,
+    aspect_ratio: payload?.aspect_ratio,
+    candidate_count: payload?.candidate_count,
+  };
+}
+
+function inferUserAction(route, method) {
+  if (/\/video-generations\/preflight$/.test(route)) return "preflight_video_generation";
+  if (/\/video-generations\/[^/]+\/poll$/.test(route)) return "poll_video_generation";
+  if (/\/video-generations$/.test(route) && method === "POST") return "click_generate_video";
+  if (/^\/projects\/[^/]+$/.test(route) && method === "DELETE") return "delete_project";
+  if (/\/keyframe-generations\/preflight$/.test(route)) return "preflight_keyframe_generation";
+  if (/\/keyframe-generations$/.test(route) && method === "POST") return "click_generate_keyframe";
+  if (/\/prompt-optimizations$/.test(route)) return "click_optimize_prompt";
+  if (/\/image-assets$/.test(route) && method === "POST") return "upload_image_asset";
+  if (/\/studio-state$/.test(route) && method === "PUT") return "save_studio_state";
+  return "";
+}
+
+function inferGenerationKind(route) {
+  if (route.includes("/video-generations")) return "video";
+  if (route.includes("/video-revisions")) return "video_revision";
+  if (route.includes("/keyframe-generations")) return "keyframe";
+  if (route.includes("/prompt-optimizations")) return "prompt_optimization";
+  return "";
+}
+
+function projectIdFromRoute(route) {
+  const match = String(route || "").match(/^\/projects\/([^/]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function newClientRequestId() {
+  const random = typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+    : Math.random().toString(16).slice(2, 14);
+  return `cli_${random}`;
+}
+
+function logStudioRequestStarted(meta) {
+  safeConsoleInfo("studio_request_started", safeRequestLogPayload(meta));
+}
+
+function logStudioRequestFinished(meta, patch) {
+  safeConsoleInfo("studio_request_finished", safeRequestLogPayload({ ...meta, ...patch }));
+}
+
+function safeRequestLogPayload(value) {
+  const payload = {};
+  for (const [key, item] of Object.entries(value || {})) {
+    if (item == null || item === "") continue;
+    if (/token|authorization|prompt|secret|base64|data/i.test(key)) continue;
+    payload[key] = typeof item === "string" ? item.slice(0, 180) : item;
+  }
+  return payload;
+}
+
+function safeConsoleInfo(label, payload) {
+  try {
+    console.info(label, payload);
+  } catch {
+    // Console may be unavailable in embedded test contexts.
+  }
 }
 
 export function authToken() {
@@ -188,6 +345,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     createProject(payload) {
       return requestJson("/projects", { method: "POST", payload });
+    },
+    deleteProject(projectId) {
+      return requestJson(`/projects/${encodeURIComponent(projectId || this.projectId)}`, { method: "DELETE" });
+    },
+    recordClientEvent(payload) {
+      return requestJson("/studio/client-events", { method: "POST", payload });
     },
     optimizePrompt(payload) {
       return requestJson(`/projects/${encoded}/prompt-optimizations`, { method: "POST", payload });
