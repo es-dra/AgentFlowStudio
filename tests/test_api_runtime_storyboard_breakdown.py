@@ -109,6 +109,42 @@ def test_storyboard_local_fallback_adds_source_grounding_and_asset_evidence() ->
     assert all(isinstance(ref["confidence"], float) for ref in first_refs)
 
 
+def test_storyboard_breakdown_returns_asset_graph_with_cross_shot_evidence(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_storyboard_asset_graph"
+    client.post("/projects", json={"project_id": project_id, "goal": "Build asset graph"})
+
+    response = client.post(
+        f"/projects/{project_id}/storyboard-breakdowns",
+        json={
+            "node_id": "text_001",
+            "script_text": "未来机器人站在农村屋顶仰望星空。未来机器人抬起毛绒头部外壳。屋顶平台边缘映着远处村庄灯火。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-06-28T11:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    graph = payload["asset_graph"]
+    assets = {(item["label"], item["asset_type"]): item for item in graph["assets"]}
+
+    assert graph["artifact_type"] == "agentflow_asset_graph"
+    assert payload["safe_manifest"]["asset_graph_asset_count"] == len(graph["assets"])
+    assert ("未来机器人", "character") in assets
+    assert any(asset_type == "scene" for _label, asset_type in assets)
+    robot = assets[("未来机器人", "character")]
+    assert robot["graph_asset_id"].startswith("graph:character:")
+    assert len(robot["shot_refs"]) >= 1
+    assert all(item["text"] for item in robot["evidence_spans"])
+    assert robot["review_state"] == "candidate_review_required"
+    assert any(rel["relationship_type"] == "shot_contains_asset" for rel in graph["relationships"])
+    assert graph["writes_long_term_memory"] is False
+    assert graph["writes_company_kb"] is False
+
+
 def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_count() -> None:
     script = (
         "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。"
@@ -422,6 +458,10 @@ def test_storyboard_provider_parser_marks_unrequested_set_pieces_for_review(tmp_
     assert "木椅" in shot["unsupported_additions"]
     assert "屋檐" in shot["unsupported_additions"]
     assert shot["source_span"]["text"] == "未来机器人站在农村屋顶仰望星空。"
+    graph = response.json()["asset_graph"]
+    assert {"shot_id": "shot_01", "addition": "木椅"} in [
+        {"shot_id": item["shot_id"], "addition": item["addition"]} for item in graph["unsupported_additions"]
+    ]
 
 
 def test_storyboard_breakdown_keeps_provider_started_when_llm_json_is_discarded(tmp_path, monkeypatch) -> None:
@@ -520,7 +560,9 @@ def test_shot_asset_plan_returns_editable_asset_profiles(tmp_path, monkeypatch) 
     assert response.status_code == 200
     payload = response.json()
     assert payload["safe_manifest"]["asset_profile_count"] >= 2
+    assert payload["safe_manifest"]["asset_graph_asset_count"] >= 2
     assert len(payload["asset_profile_plan"]) >= 2
+    assert payload["asset_graph"]["artifact_type"] == "agentflow_asset_graph"
     robot = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "character")
     scene = next(item for item in payload["asset_profile_plan"] if item["asset_type"] == "scene")
     assert robot["profile_stage"] == "candidate_profile_seed"
@@ -528,6 +570,7 @@ def test_shot_asset_plan_returns_editable_asset_profiles(tmp_path, monkeypatch) 
     assert "forbidden geometry" in scene["editable_fields"]
     assert "do not add chairs or stools unless approved" in scene["negative_locks"]
     assert all("profile_plan" in ref for ref in payload["asset_refs"])
+    assert all("graph_asset_id" in ref for ref in payload["asset_refs"])
 
 
 def test_storyboard_plan_includes_professional_reference_for_rooftop_video() -> None:

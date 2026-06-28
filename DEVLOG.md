@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-28 - Asset Graph Contract Slice
+
+- Added a Runtime `AssetGraph` contract for storyboard and shot asset planning.
+  The graph aggregates candidate characters, scenes, and props across shots
+  with `graph_asset_id`, role, confidence, shot refs, evidence spans,
+  continuity locks, negative locks, and review state.
+- Storyboard breakdown responses and safe artifacts now include `asset_graph`,
+  plus safe manifest counts for graph assets and unsupported additions. The
+  graph also records unsupported provider additions such as unrequested chairs,
+  stools, or eaves for human review.
+- Shot asset planning now returns the same graph shape and attaches
+  `graph_asset_id` to each returned asset ref before building editable profile
+  plans. This gives downstream asset cards, keyframes, video nodes, and future
+  asset feedback a stable merge handle.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 86 passed, 1 existing warning
+python -m py_compile changed Runtime asset graph modules -> passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+git diff --check -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- No provider secret, signed URL, raw provider response, media byte, private
+  Company OS source content, or durable memory promotion was written to Git.
+
 ## 2026-06-28 - Grounded Algorithm Agent Contract Slice
 
 - Added source-grounding fields to storyboard outputs from both local fallback
