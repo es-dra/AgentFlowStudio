@@ -94,6 +94,21 @@ def test_storyboard_local_fallback_uses_adaptive_shot_count_not_three_sentence_c
     assert shots[-1]["shot_id"] == "shot_05"
 
 
+def test_storyboard_local_fallback_adds_source_grounding_and_asset_evidence() -> None:
+    script = "未来机器人站在农村屋顶仰望星空。毛绒头部外壳被月光照亮。远处村庄灯火慢慢熄灭。"
+
+    shots = local_storyboard_shots(script)
+
+    assert shots
+    assert all(shot["source_span"]["text"] for shot in shots)
+    assert all(shot["source_span"]["grounding_status"] == "source_grounded" for shot in shots)
+    assert all(shot["unsupported_additions"] == [] for shot in shots)
+    assert all(shot["planning_agent"]["dynamic_shot_count"] is True for shot in shots)
+    first_refs = shots[0]["asset_refs"]
+    assert all(ref["evidence_text"] for ref in first_refs)
+    assert all(isinstance(ref["confidence"], float) for ref in first_refs)
+
+
 def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_count() -> None:
     script = (
         "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。"
@@ -341,6 +356,72 @@ def test_storyboard_breakdown_accepts_llm_json_with_markdown_and_trailing_text(t
     assert payload["safe_manifest"]["status"] == "provider_structured"
     assert payload["safe_manifest"]["discard_reason"] is None
     assert payload["shots"][0]["asset_refs"][1]["asset_type"] == "scene"
+
+
+def test_storyboard_provider_parser_marks_unrequested_set_pieces_for_review(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+
+    class Descriptor:
+        modality = "llm"
+
+    class FakeRegistry:
+        _descriptors = {"prompt_optimizer": Descriptor()}
+
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            return {
+                "text": json.dumps(
+                    {
+                        "shots": [
+                            {
+                                "shot_id": "shot_01",
+                                "index": 1,
+                                "duration": "5s",
+                                "description": "@未来机器人 坐在木椅上仰望星空，屋檐从画面右侧压下来。",
+                                "shot_size": "中景",
+                                "light_atmosphere": "冷月光",
+                                "camera_motion": "固定机位",
+                                "dialogue": "无明确对白",
+                                "sound": "夜晚环境声",
+                                "source_span": {
+                                    "span_id": "script_span_01",
+                                    "text": "未来机器人站在农村屋顶仰望星空。",
+                                },
+                                "asset_refs": [
+                                    {"label": "未来机器人", "asset_type": "character", "status": "mentioned", "source": "explicit"},
+                                    {"label": "农村屋顶", "asset_type": "scene", "status": "mentioned", "source": "explicit"},
+                                ],
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                "provider_calls_started": True,
+            }
+
+    monkeypatch.setattr("apps.api.runtime_storyboard_breakdown.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_storyboard_grounding", "goal": "Ground storyboard output"})
+
+    response = client.post(
+        "/projects/proj_storyboard_grounding/storyboard-breakdowns",
+        json={
+            "node_id": "text_001",
+            "script_text": "未来机器人站在农村屋顶仰望星空。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {"llm_provider": "prompt_optimizer"},
+            "generated_at": "2026-06-28T10:06:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    shot = response.json()["shots"][0]
+    assert shot["grounding_status"] == "needs_review_unsupported_addition"
+    assert "木椅" in shot["unsupported_additions"]
+    assert "屋檐" in shot["unsupported_additions"]
+    assert shot["source_span"]["text"] == "未来机器人站在农村屋顶仰望星空。"
 
 
 def test_storyboard_breakdown_keeps_provider_started_when_llm_json_is_discarded(tmp_path, monkeypatch) -> None:

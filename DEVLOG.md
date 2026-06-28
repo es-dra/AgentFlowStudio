@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-28 - Grounded Algorithm Agent Contract Slice
+
+- Added source-grounding fields to storyboard outputs from both local fallback
+  and LLM/provider JSON parsing: `source_span`, `grounding_status`,
+  `unsupported_additions`, and a small `planning_agent` trace.
+- Added asset evidence and confidence metadata to storyboard asset refs so
+  downstream asset cards, keyframe plans, and video nodes can distinguish
+  source-backed candidates from unsupported additions.
+- Updated storyboard LLM instructions to require source spans,
+  `unsupported_additions`, and asset evidence instead of accepting free-form
+  shot lists. Unrequested chairs, stools, eaves, and similar set pieces are now
+  surfaced for review instead of silently entering the chain.
+- Replaced the fixed four-section script plan with a density-aware formal
+  script expansion strategy. Short ideas now use a compact prose strategy, and
+  storyboard splitting remains explicitly deferred.
+
+Verification:
+
+```text
+python -m pytest tests/test_agentflow_knowledgebase.py tests/test_algorithm_library_contracts.py tests/test_api_runtime_prompt_memory_loop.py tests/test_api_runtime_storyboard_breakdown.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_api_runtime_video_generations.py -> 85 passed, 1 existing warning
+python -m py_compile changed Runtime algorithm modules -> passed
+python -m apps.cli.main --help -> passed
+python -m apps.cli.main version -> 0.1.0
+git diff --check -> passed
+```
+
+Boundary:
+
+- No server checkout, `/test` checkout, runtime service, provider config, or
+  deployed process was modified.
+- No live LLM, image, video, ASR, vision, or external download provider call
+  was started.
+- No provider secret, signed URL, raw provider response, media byte, private
+  Company OS source content, or durable memory promotion was written to Git.
+
 ## 2026-06-27 - Director Scenario Packs
 
 - Added AFS-native director scenario packs for faceless channel, SaaS launch,
