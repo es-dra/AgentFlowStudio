@@ -38,9 +38,17 @@ function applyPrompt(store, nodeId, text, plainText, textarea) {
     const node = s.nodes[nodeId];
     if (!node) return;
     node.prompt = text;
+    if (isTextContentNode(node)) {
+      node.content = text;
+      node.status = node.status === "empty" ? "complete" : node.status;
+    }
     node.params.lastOptimizedPromptPlain = plainText || stripSectionHeaders(text);
   });
   if (textarea && store.get().nodes[nodeId]) textarea.value = text;
+}
+
+function isTextContentNode(node) {
+  return node.type === "text" || node.type === "script";
 }
 
 function setPromptOptimizationState(store, nodeId, patch) {

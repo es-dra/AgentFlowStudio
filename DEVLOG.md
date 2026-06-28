@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-28 - Studio Text Optimizer Content Writeback
+
+- Fixed the Studio text/script optimizer path for uploaded scripts whose visible
+  body lives in `node.content` while `node.prompt` may be empty.
+- Prompt optimization now accepts `content || prompt` for text/script nodes and
+  writes successful optimized text back to both the prompt and the visible
+  content surface.
+- The expanded editor mirrors text/script edits into `content`, and node body
+  render signatures now include the actual content text so equal-length edits
+  still refresh the canvas body.
+- Added a regression that simulates an uploaded script node with only
+  `content`, verifies the Runtime optimization request uses that body, and
+  confirms the optimized result updates the visible content.
+
+Verification:
+
+```text
+python -m pytest tests/test_web_studio_prompt_script_static.py -> 16 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+```
+
+Boundary:
+
+- No provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- Local static/unit verification does not claim human acceptance or creative
+  quality acceptance.
+
 ## 2026-06-26 - Internal Beta Invite Admin CLI
 
 - Added an admin-only `auth-invites` CLI for the existing Runtime auth store.

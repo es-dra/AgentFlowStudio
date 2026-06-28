@@ -6,11 +6,23 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-26 by Codex
+Last updated: 2026-06-28 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Studio text optimizer content writeback follow-up: 2026-06-28 pass fixed the
+uploaded-script optimization bug where the visible script body was stored in
+`node.content` but optimization only updated `node.prompt`. Text/script prompt
+optimization now accepts `content || prompt`, writes successful optimized text
+back to both prompt and content, keeps the expanded editor synchronized with
+visible content, and includes actual content text in node body render
+signatures so equal-length content edits still repaint. Verification:
+`python -m pytest tests/test_web_studio_prompt_script_static.py` passed 16 and
+`npm.cmd run check:studio-js` passed for 121 files. Boundary: no provider call,
+video generation, ASR, external download, secret read, media byte, signed URL,
+or private Company OS source content was used or written.
 
 Internal beta account/admin baseline: 2026-06-26 added the admin-only
 `auth-invites` CLI on top of the existing Runtime auth store. Current

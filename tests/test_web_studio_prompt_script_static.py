@@ -21,6 +21,76 @@ def test_prompt_optimization_is_inline_and_selection_safe() -> None:
     assert "promptTextShimmer" in styles
 
 
+def test_text_prompt_optimization_uses_and_updates_visible_content() -> None:
+    script = r'''
+import { openOptimizer } from "./apps/studio/src/optimizer.js";
+import { buildOptimizationRequest } from "./apps/studio/src/optimizer-contract.js";
+import { nodeBodySignature } from "./apps/studio/src/canvas-node-body.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "",
+      content: "原始上传剧本正文",
+      params: {},
+      status: "complete",
+    },
+  },
+  edges: {},
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const beforeSignature = nodeBodySignature(state.nodes.text_1);
+const request = buildOptimizationRequest(state, state.nodes.text_1);
+const textarea = { value: "", classList: { add() {}, remove() {} } };
+await openOptimizer(store, {
+  async optimizePrompt(payload) {
+    if (payload.prompt_text !== "原始上传剧本正文") {
+      throw new Error(`unexpected prompt_text: ${payload.prompt_text}`);
+    }
+    return {
+      user_prompt: "优化后的剧本正文",
+      user_prompt_plain: "优化后的剧本正文",
+      optimization_mode: "text",
+      context_bundle: { warnings: [] },
+    };
+  },
+}, "text_1", null, textarea);
+const afterSignature = nodeBodySignature(state.nodes.text_1);
+process.stdout.write(JSON.stringify({
+  requestPrompt: request.prompt_text,
+  prompt: state.nodes.text_1.prompt,
+  content: state.nodes.text_1.content,
+  textarea: textarea.value,
+  status: state.nodes.text_1.params.promptOptimizationState.status,
+  signatureChanged: beforeSignature !== afterSignature,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["requestPrompt"] == "原始上传剧本正文"
+    assert payload["prompt"] == "优化后的剧本正文"
+    assert payload["content"] == "优化后的剧本正文"
+    assert payload["textarea"] == "优化后的剧本正文"
+    assert payload["status"] == "complete"
+    assert payload["signatureChanged"] is True
+
+
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")

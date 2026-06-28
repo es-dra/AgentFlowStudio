@@ -7,9 +7,12 @@ import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 export function openExpandEditor(store, runtime, node) {
   const wrap = el("div", "prompt-expand");
   const textarea = document.createElement("textarea");
-  textarea.value = store.get().nodes[node.id]?.prompt || "";
+  textarea.value = editablePromptText(store.get().nodes[node.id] || node);
   textarea.placeholder = promptPlaceholder(node.type, node.params.spec?.mode);
-  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => { n.prompt = textarea.value; }, { history: false }));
+  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => {
+    n.prompt = textarea.value;
+    if (isTextContentNode(n)) n.content = textarea.value;
+  }, { history: false }));
 
   const row = el("div", "bar-row");
   const optimizeBtn = el("button", "bar-tool optimize-btn");
@@ -30,4 +33,12 @@ export function openExpandEditor(store, runtime, node) {
   const close = showModal(wrap);
   closeBtn.addEventListener("click", close);
   textarea.focus();
+}
+
+function editablePromptText(node) {
+  return String(node?.content || node?.prompt || "");
+}
+
+function isTextContentNode(node) {
+  return node.type === "text" || node.type === "script";
 }
