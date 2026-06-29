@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-29 - Image Relay CDN Artifact Compatibility
+
+- Fixed the next live asset-card image failure class after restoring
+  `image_relay`: Crazyrouter image responses may return temporary CDN artifact
+  URLs on `*.myqcloud.com`, while the `zhaowei` branch only trusted the
+  explicitly configured artifact hosts.
+- Restored the known-good Crazyrouter image artifact host compatibility from
+  `origin/master` without allowing arbitrary artifact hosts. The relay still
+  downloads only URL hosts that are either configured on the service or added
+  by the Crazyrouter image-service compatibility rule.
+- Restored HTTP(S) artifact URL compatibility for the relay download path,
+  matching the working branch behavior.
+- Runtime keyframe generation now preserves a precise safe manifest blocker
+  for this class: `image_relay_artifact_host_not_allowed`, instead of
+  collapsing it into a generic provider-not-ready message.
+
+Verification:
+
+```text
+python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_web_studio_assets_generation_static.py -q -> 62 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live provider call, video generation, ASR, external download beyond local
+  mocked test URLs, secret read, signed URL, media byte, provider raw response,
+  or private Company OS source content was used or written to the repo.
+- If live generation still fails after deployment, inspect the latest
+  `keyframe_generation_safe_manifest.json` first; the expected blocker should
+  now distinguish host allowlist, auth, HTTP, service missing, and reference
+  mode failures.
+
 ## 2026-06-29 - Image Relay Restore for Asset Card Generation
 
 - Restored the known-good `image_relay` image generation path from

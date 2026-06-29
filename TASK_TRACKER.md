@@ -12,6 +12,24 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Asset-card image relay CDN follow-up: 2026-06-29 pass fixed the next likely
+live failure after `image_relay` restore. The deployed Runtime returned HTTP
+200 for `/keyframe-generations`, so the failure was expected to live in the
+safe manifest/job artifact path rather than systemd access logs. Local diff
+against the known-good `origin/master` showed that Crazyrouter image responses
+may return temporary CDN artifact URLs on `*.myqcloud.com`, while this branch
+only trusted explicitly configured artifact hosts. The relay now restores the
+Crazyrouter image-service host compatibility and HTTP(S) artifact download
+behavior from the working path, while still requiring host allowlisting. Runtime
+keyframe failures now preserve `image_relay_artifact_host_not_allowed` when a
+provider artifact URL host is not trusted, instead of flattening the condition
+into a generic provider-not-ready message. Verification: provider/keyframe
+reference/Studio asset-generation static tests passed 62, Studio JS syntax
+check passed 121 files, and `git diff --check` passed. Boundary: no live
+provider call, secret read, media byte, signed URL, video generation, ASR,
+external download beyond mocked local test URLs, provider raw response, or
+private Company OS source content was used or written.
+
 Asset-card image relay restore follow-up: 2026-06-29 pass compared local
 `zhaowei` against `origin/master`, whose image generation path is known to work,
 and restored the `image_relay` default for Studio image/keyframe and asset-card

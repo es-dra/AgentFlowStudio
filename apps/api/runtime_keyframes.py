@@ -212,13 +212,7 @@ def build_keyframe_generation(
                         )
                     else:
                         status = "blocked"
-                        blocks.append(
-                            {
-                                "block_id": "remote_image_provider_not_ready",
-                                "reason": _safe_error(str(raw.get("error") or raw_status or "image provider did not complete")),
-                                "required_gate": required_gate,
-                            }
-                        )
+                        blocks.append(_provider_failure_block(str(raw.get("error") or raw_status or "image provider did not complete"), required_gate))
                 else:
                     status = task_status
                     _write_task_state(
@@ -246,13 +240,7 @@ def build_keyframe_generation(
         except (ModelGatewayError, TimeoutError) as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
-            blocks.append(
-                {
-                    "block_id": "remote_image_provider_not_ready",
-                    "reason": _safe_error(str(exc)),
-                    "required_gate": required_gate,
-                }
-            )
+            blocks.append(_provider_failure_block(str(exc), required_gate))
 
     request_plan = keyframe_request_plan(
         request,
@@ -576,15 +564,48 @@ def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
     }
 
 
+def _provider_failure_block(value: str, required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
+    lowered = value.lower()
+    if "reference_image_slots exceeded" in lowered:
+        block_id = "image_reference_slots_exceeded"
+    elif "does not accept reference images" in lowered:
+        block_id = "image_relay_reference_unsupported"
+    elif "provider service not found" in lowered:
+        block_id = "image_provider_service_not_found"
+    elif "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
+        block_id = "image_relay_auth_not_ready"
+    elif "api relay image url host is not allowed" in lowered:
+        block_id = "image_relay_artifact_host_not_allowed"
+    elif "api relay http error" in lowered:
+        block_id = "image_relay_http_error"
+    else:
+        block_id = "remote_image_provider_not_ready"
+    return {
+        "block_id": block_id,
+        "reason": _safe_error(value),
+        "required_gate": required_gate,
+    }
+
+
 def _safe_error(value: str) -> str:
     lowered = value.lower()
-    if "does not accept reference images" in lowered:
-        return "Image provider does not accept reference images for this generation mode."
     if "status_code 2049" in lowered and "invalid api key" in lowered:
-        return "Image provider rejected the configured credential."
-    if "api" in lowered or "key" in lowered or "secret" in lowered:
-        return "Image provider configuration is not ready."
-    return value[:160]
+        return "Image relay rejected the configured credential."
+    if "reference_image_slots exceeded" in lowered:
+        return "Image relay reference image limit was exceeded; check provider descriptor reference_image_slots."
+    if "does not accept reference images" in lowered:
+        return "Image relay route does not accept reference images for generation; use an edit-capable relay route for reference-guided image generation."
+    if "provider service not found" in lowered:
+        return "Image relay service is not configured in the Runtime provider registry."
+    if "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
+        return "Image relay credential is not ready."
+    if "api relay image url host is not allowed" in lowered:
+        return "Image relay returned an artifact URL from a host that is not on the safe download allowlist."
+    if "api relay http error" in lowered:
+        return " ".join(value.split())[:160]
+    if any(term in lowered for term in ("api key", "secret", "token", "authorization", "cookie", "bearer ")):
+        return "Image relay configuration is not ready."
+    return " ".join(value.split())[:160]
 
 
 def provider_keyframe_prompt(value: str, *, limit: int = DEFAULT_IMAGE_PROMPT_LIMIT) -> str:

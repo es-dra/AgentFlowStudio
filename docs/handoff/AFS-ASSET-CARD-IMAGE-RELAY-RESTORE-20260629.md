@@ -59,6 +59,34 @@ Results:
 git diff --check passed
 ```
 
+## CDN Artifact Follow-Up
+
+The server retest still failed even though `/keyframe-generations` returned
+HTTP 200 and the deployed provider registry exposed `image_relay`. The likely
+failure surface moved from service selection to safe artifact handling: the
+known-good `origin/master` path allows Crazyrouter image artifact URLs on
+`*.myqcloud.com`, but the `zhaowei` branch only allowed hosts explicitly listed
+in provider config.
+
+Follow-up changes:
+
+- `agentflow_studio/model_gateway/provider_api_relay.py`
+  - Restored Crazyrouter image-service compatibility for `*.myqcloud.com`
+    artifact URLs.
+- `agentflow_studio/model_gateway/provider_api_relay_images.py`
+  - Restored HTTP(S) artifact URL download compatibility from the working path.
+- `apps/api/runtime_keyframes.py`
+  - Preserves precise safe blocker IDs, including
+    `image_relay_artifact_host_not_allowed`.
+
+Follow-up verification:
+
+```text
+python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py tests/test_web_studio_assets_generation_static.py -q -> 62 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+git diff --check -> passed
+```
+
 ## Deployment Notes
 
 Server Runtime still needs the image gate and relay env:

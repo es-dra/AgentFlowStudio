@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
+from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.runtime_keyframes import _reference_images
 from apps.api.runtime_image_assets import resolve_reference_images
 from apps.api.runtime_models import KeyframeGenerationRequest
@@ -603,6 +604,43 @@ def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path
     assert payload["provider_calls_started"] is False
     assert payload["safe_manifest"]["provider_calls_started"] is False
     assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_image_reference_image_too_small"
+
+
+def test_image_relay_artifact_host_block_is_preserved_in_safe_manifest(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
+    def fake_dispatch(capability, service_id, request):
+        raise ModelGatewayError("API relay image URL host is not allowed")
+
+    monkeypatch.setattr(
+        "apps.api.runtime_keyframes.load_provider_registry",
+        lambda: _FakeRegistry(fake_dispatch, _FakeDescriptor(reference_image_slots=0), services={"image_relay": {"request_format": "openai_images"}}),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_artifact_host_block/keyframe-generations",
+        json={
+            "node_id": "asset-card-image-node",
+            "prompt_text": "Create a clean character asset reference sheet.",
+            "optimized_prompt": "Create a clean character asset reference sheet.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "9:16",
+            "candidate_count": 1,
+            "provider_service_id": "image_relay",
+            "node_parameters": {"node_role": "asset_card_draft"},
+            "generated_at": "2026-06-29T12:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    block = payload["safe_manifest"]["blocks"][0]
+    assert payload["job"]["status"] == "blocked"
+    assert payload["provider_calls_started"] is True
+    assert block["block_id"] == "image_relay_artifact_host_not_allowed"
+    assert block["reason"] == "Image relay returned an artifact URL from a host that is not on the safe download allowlist."
 
 
 class _FakeDescriptor:

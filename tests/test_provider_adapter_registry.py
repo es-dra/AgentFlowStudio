@@ -635,8 +635,8 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
             captured["authorization"] = request.get_header("Authorization")
             captured["payload"] = json.loads(request.data.decode("utf-8"))
             captured["timeout"] = timeout
-            return _JsonResponse({"data": [{"url": "https://media.crazyrouter.com/task-artifacts/result.png"}]})
-        if request.full_url == "https://media.crazyrouter.com/task-artifacts/result.png":
+            return _JsonResponse({"data": [{"url": "http://251000800.vod2.myqcloud.com/task-artifacts/result.png"}]})
+        if request.full_url == "http://251000800.vod2.myqcloud.com/task-artifacts/result.png":
             captured["downloaded"] = True
             return _BytesResponse(_png_bytes())
         raise AssertionError(f"unexpected URL: {request.full_url}")
@@ -651,8 +651,9 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     service["request_format"] = "openai_images"
     service["quality"] = "low"
     service["output_format"] = "png"
+    service["account_ref"] = "crazyrouter"
     service["descriptor"]["reference_image_slots"] = 16
-    service["allowed_artifact_hosts"] = [".crazyrouter.com"]
+    service["allowed_artifact_hosts"] = []
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
@@ -680,7 +681,7 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert result["outputs"][0]["image_path"] == "image_candidates/candidate_001.png"
     assert result["outputs"][0]["provider_url_persisted"] is False
     assert (tmp_path / "run" / "image_candidates" / "candidate_001.png").is_file()
-    assert "media.crazyrouter.com" not in json.dumps(result, ensure_ascii=False)
+    assert "myqcloud.com" not in json.dumps(result, ensure_ascii=False)
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
