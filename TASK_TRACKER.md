@@ -12,14 +12,22 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
-Studio script expansion source guard follow-up: 2026-06-29 pass fixed the
+Studio script expansion contract follow-up: 2026-06-29 pass fixed the
 `扩写剧本` behavior where fallback output looked like framework-filled final
-content and repeated clicks nested expansion over the already-generated script.
-Studio now preserves the original source idea on first expansion and reuses it
-for retry/regeneration, marks empty/placeholder/framework-like Runtime results
-as `idea_expanded_script_fallback` local drafts, and clears stale expansion
-source state when the user manually edits text/script content. Verification:
-`python -m pytest tests/test_web_studio_prompt_script_static.py` passed 17,
+content, repeated clicks nested expansion over the already-generated script,
+and Runtime could treat the frontend expansion instruction itself as user text.
+Studio now preserves the original source idea on first expansion, sends only
+that idea as `prompt_text`, reuses it for retry/regeneration, marks
+empty/placeholder/framework-like Runtime results as
+`idea_expanded_script_fallback` local drafts, and clears stale expansion source
+state when the user manually edits text/script content. Runtime now recognizes
+the `formal_script_before_storyboard_breakdown` contract, uses a dedicated
+script-prose instruction/cleaning path instead of the generic nine-section
+visual prompt, and rejects provider output that copies expansion instructions
+or includes tool/file failure fragments such as `request.json` and `prompt.md`.
+Verification: `python -m pytest tests/test_web_studio_prompt_script_static.py`
+passed 18, focused Runtime tool-failure/script-contract tests passed 2,
+`python -m pytest tests/test_api_runtime_llm_enhancement_modules.py` passed 1,
 `npm.cmd run check:studio-js` passed for 121 files, and `git diff --check`
 passed. Boundary: no provider call, video generation, ASR, external download,
 secret read, media byte, signed URL, or private Company OS source content was

@@ -61,6 +61,9 @@ TOOL_FAILURE_MARKERS = (
     "operation not permitted",
     "no such file or directory",
     "permission denied",
+    "request.json",
+    "prompt.md",
+    "filesystem sandbox fails",
 )
 
 

@@ -11,6 +11,8 @@ from apps.api.runtime_models import PromptOptimizationRequest
 
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
+    if is_script_expansion_request(request):
+        return script_expansion_instruction(request)
     if request.node_type in {"text", "script"}:
         return text_enhancement_instruction(request)
     mode = prompt_optimization_mode(request)
@@ -19,6 +21,31 @@ def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[s
     if mode == "t2i":
         return t2i_visual_enhancement_instruction(request)
     return visual_enhancement_instruction(request)
+
+
+def is_script_expansion_request(request: PromptOptimizationRequest) -> bool:
+    params = request.node_parameters or {}
+    return (
+        request.generation_target == "script"
+        and params.get("script_expansion_contract") == "formal_script_before_storyboard_breakdown"
+    )
+
+
+def script_expansion_instruction(request: PromptOptimizationRequest) -> str:
+    params = request.node_parameters or {}
+    source = str(params.get("source_idea") or request.prompt_text).strip()
+    return "\n".join(
+        [
+            "你正在为 AFS Studio 扩写短视频剧本正文。",
+            f"原始想法：{source}",
+            "硬性要求：只输出剧本正文，不解释、不输出思考过程、不输出九段画面提示词。",
+            "格式要求：先输出一行片名，格式为“片名：《标题》”；然后输出 2 到 4 段连续叙事正文。",
+            "内容要求：明确角色、场景、情绪、动作变化和结尾；所有细节必须服务原始想法。",
+            "禁止输出：意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
+            "禁止输出：分镜 01/02/03/04、推进主体、展示变化、收束结果、占位句、模板说明、request.json、prompt.md、沙盒或文件读取错误。",
+            "如果原始想法很短，可以合理补足剧情，但不要把系统指令或输出要求写进正文。",
+        ]
+    )
 
 
 def video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:
@@ -139,4 +166,4 @@ def text_enhancement_instruction(request: PromptOptimizationRequest) -> str:
     )
 
 
-__all__ = ("enhancement_instruction", "strict_format_retry_instruction")
+__all__ = ("enhancement_instruction", "is_script_expansion_request", "strict_format_retry_instruction")

@@ -860,6 +860,66 @@ def test_studio_prompt_optimizer_discards_tool_failure_text_from_llm(tmp_path, m
     assert "operation not permitted" not in serialized
 
 
+def test_script_expansion_contract_returns_script_not_visual_sections_on_tool_failure(tmp_path, monkeypatch) -> None:
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            assert "原始想法：白雪公主穿越到现代" in request.prompt
+            assert "九段画面提示词" in request.prompt
+            return {"text": "\n".join(
+                [
+                    "意图：围绕“请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。 输出要求： 原始想法：白雪公主穿越到现代”生成可直接用于本节点的画面提示词。",
+                    "角色/主体：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+                    "场景/美术：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+                    "动作/情节：请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。 原始想法：白雪公主穿越到现代",
+                    "镜头/构图：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+                    "灯光：Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+                    "运动/时间推进：以当前节点目标为准，关键帧保持单帧可读。",
+                    "连续性：保持上文主体、场景、服装、身份和项目风格一致。",
+                    "负面约束：不要水印、文字乱码、畸形肢体、身份漂移。",
+                ]
+            )}
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_script_expansion_tool_failure/prompt-optimizations",
+        json={
+            "node_id": "text-node-script-expansion",
+            "node_type": "script",
+            "prompt_text": "白雪公主穿越到现代",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "source_idea": "白雪公主穿越到现代",
+            },
+            "generated_at": "2026-06-29T16:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "script expansion contains tool failure text"
+    assert payload["optimized_prompt"].startswith("片名：《白雪公主穿越到现代》")
+    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
+    assert "意图：" not in payload["optimized_prompt"]
+    assert "角色/主体：" not in payload["optimized_prompt"]
+    assert "输出要求" not in serialized
+    assert "request.json" not in serialized
+    assert "prompt.md" not in serialized
+    assert "unable to read" not in serialized
+
+
 def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
     from apps.api.runtime_llm_enhancement_instructions import strict_format_retry_instruction
 

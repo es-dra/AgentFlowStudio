@@ -33,7 +33,7 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     const request = buildOptimizationRequest(store.get(), {
       ...fresh,
       type: "script",
-      prompt: formalScriptExpansionPrompt(idea),
+      prompt: idea,
     });
     request.node_type = "script";
     request.generation_target = "script";
@@ -41,6 +41,7 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
       ...(request.node_parameters || {}),
       script_expansion_contract: "formal_script_before_storyboard_breakdown",
       source_idea: idea.slice(0, 600),
+      script_expansion_instruction: formalScriptExpansionPrompt(idea),
       forbidden_output: "storyboard_placeholder_outline",
     };
     const response = runtime?.optimizePrompt ? await runtime.optimizePrompt(request) : null;
@@ -181,7 +182,7 @@ function normalizeExpandedScript(value, idea) {
   if (!text) {
     return { script: draftScriptFromIdea(idea), fallback: true, reason: "empty_runtime_response" };
   }
-  if (looksLikeStoryboardPlaceholder(text) || looksLikeFrameworkFill(text)) {
+  if (looksLikeStoryboardPlaceholder(text) || looksLikeFrameworkFill(text) || looksLikeToolFailurePollution(text)) {
     return { script: draftScriptFromIdea(idea), fallback: true, reason: "placeholder_or_framework_output" };
   }
   return { script: text, fallback: false, reason: "" };
@@ -202,6 +203,20 @@ function looksLikeFrameworkFill(text) {
     "收束要保留下一步拆分分镜所需",
   ];
   return markers.filter((marker) => value.includes(marker)).length >= 2;
+}
+
+function looksLikeToolFailurePollution(text) {
+  const value = String(text || "").toLowerCase();
+  return [
+    "unable to read",
+    "request.json",
+    "prompt.md",
+    "filesystem sandbox",
+    "command execution is failing",
+    "local command execution failed",
+    "bwrap:",
+    "operation not permitted",
+  ].some((marker) => value.includes(marker));
 }
 
 function draftScriptFromIdea(idea) {

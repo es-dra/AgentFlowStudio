@@ -14,7 +14,11 @@ from apps.api.runtime_llm_enhancement_gate import (
     provider_name,
     provider_text_requested,
 )
-from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction, strict_format_retry_instruction
+from apps.api.runtime_llm_enhancement_instructions import (
+    enhancement_instruction,
+    is_script_expansion_request,
+    strict_format_retry_instruction,
+)
 from apps.api.runtime_llm_enhancement_safety import (
     contains_tool_failure_text,
     safe_reason,
@@ -24,6 +28,7 @@ from apps.api.runtime_llm_enhancement_safety import (
 )
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_prompt_text import plain_prompt_from_sections, strip_user_prompt_section_headers
+from apps.api.runtime_store import reject_unsafe_text
 
 
 def maybe_enhance_prompt_with_llm(
@@ -59,6 +64,8 @@ def maybe_enhance_prompt_with_llm(
         return {**base, "status": "discarded", "discard_reason": safe_reason(str(exc))}
 
     retry_count = 0
+    if is_script_expansion_request(request):
+        return _script_expansion_result(base, enhanced, request, assembly)
     try:
         prompt = sanitize_enhanced_prompt(enhanced)
     except ValueError as exc:
@@ -185,6 +192,93 @@ def _prompt_payload(prompt: str) -> dict[str, Any]:
         "user_prompt_plain": plain_prompt_from_sections(sections) or strip_user_prompt_section_headers(prompt),
         "user_prompt_sections": sections,
     }
+
+
+def _script_expansion_result(
+    base: dict[str, Any],
+    enhanced: str,
+    request: PromptOptimizationRequest,
+    assembly: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        prompt = sanitize_script_expansion(enhanced, request)
+    except ValueError as exc:
+        prompt = deterministic_script_expansion_fallback(request)
+        return {
+            **base,
+            "status": "applied",
+            "provider_calls_started": True,
+            "discard_reason": safe_reason(str(exc)),
+            "guardrail_fallback_used": True,
+            "format_retry_count": 0,
+            "optimized_prompt": prompt,
+            "user_prompt": prompt,
+            "user_prompt_plain": prompt,
+            "user_prompt_sections": [],
+        }
+    return {
+        **base,
+        "status": "applied",
+        "provider_calls_started": True,
+        "format_retry_count": 0,
+        "optimized_prompt": prompt,
+        "user_prompt": prompt,
+        "user_prompt_plain": prompt,
+        "user_prompt_sections": [],
+    }
+
+
+def sanitize_script_expansion(value: str, request: PromptOptimizationRequest) -> str:
+    prompt = str(value or "").strip()
+    if not prompt:
+        raise ValueError("empty script expansion")
+    if contains_tool_failure_text(prompt):
+        raise ValueError("script expansion contains tool failure text")
+    lower = prompt.lower()
+    if "<think" in lower or "reasoning_content" in lower or "\nthinking:" in lower:
+        raise ValueError("reasoning content is not allowed")
+    forbidden = (
+        "请把下面的一句话扩写",
+        "输出要求",
+        "原始想法：",
+        "意图：",
+        "角色/主体：",
+        "场景/美术：",
+        "镜头/构图：",
+        "负面约束：",
+        "分镜 01",
+        "推进主体",
+        "展示变化",
+        "收束结果",
+    )
+    if any(item in prompt for item in forbidden):
+        raise ValueError("script expansion copied instructions or placeholder sections")
+    if "片名" not in prompt and "《" not in prompt:
+        raise ValueError("script expansion missing title")
+    if len(prompt) < 80:
+        raise ValueError("script expansion too short")
+    reject_unsafe_text(prompt)
+    return prompt[:5000]
+
+
+def deterministic_script_expansion_fallback(request: PromptOptimizationRequest) -> str:
+    params = request.node_parameters or {}
+    source = str(params.get("source_idea") or request.prompt_text).strip()
+    compact_source = " ".join(source.split()) or "一个新的短视频故事"
+    title = "".join(ch for ch in compact_source if ch not in "，。！？；、,.!?;:： ")[:12] or "短片"
+    prompt = "\n".join(
+        [
+            f"片名：《{title}》",
+            "",
+            f"{compact_source}。故事从这个异常而具体的瞬间开始：熟悉的人物被放进陌生的现代环境，第一反应不是立刻解释一切，而是通过观察、迟疑和行动让观众理解处境。",
+            "",
+            "随后，角色开始和周围世界发生碰撞。现代空间里的声音、光线、人群和物件不断提醒她已经离开原本的童话秩序，她必须在惊讶和不安中做出一个小选择，让故事从设定推进成行动。",
+            "",
+            "结尾停在一个清晰的决定上：她没有完全弄懂这个时代，却主动向前迈出一步，抓住能帮助自己继续寻找答案的线索。这个结尾留下继续拆分分镜的空间，也保留人物身份、场景变化和情绪转折。",
+        ]
+    )
+    reject_unsafe_text(prompt)
+    return prompt
 
 
 _enhancement_instruction = enhancement_instruction

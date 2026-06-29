@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-29 - Runtime Script Expansion Contract
+
+- Fixed the Studio script expansion request so `prompt_text` carries only the
+  user's source idea, while the expansion instructions are passed as structured
+  node parameters instead of being embedded into the user text.
+- Runtime now recognizes the `formal_script_before_storyboard_breakdown`
+  contract and uses a dedicated script-expansion instruction/cleaning path,
+  returning script prose instead of the generic nine-section visual prompt.
+- Provider output that copies expansion instructions or includes tool/file
+  failure fragments such as `request.json`, `prompt.md`, or filesystem sandbox
+  errors is rejected and replaced with a deterministic script fallback.
+- Studio also rejects those tool-failure fragments before writing expansion
+  output into the visible text node.
+
+Verification:
+
+```text
+python -m pytest tests/test_web_studio_prompt_script_static.py -> 18 passed
+python -m pytest tests/test_api_runtime_prompt_memory_loop.py -k "script_expansion_contract_returns_script_not_visual_sections_on_tool_failure or tool_failure" -> 2 passed / 25 deselected
+python -m pytest tests/test_api_runtime_llm_enhancement_modules.py -> 1 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- Local static/unit verification does not claim human acceptance or creative
+  quality acceptance.
+
 ## 2026-06-29 - Studio Script Expansion Source Guard
 
 - Fixed the Studio `扩写剧本` path so repeated clicks reuse the original source

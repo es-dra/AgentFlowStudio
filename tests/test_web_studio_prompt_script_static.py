@@ -193,6 +193,9 @@ const prompts = [];
 const runtime = {
   async optimizePrompt(payload) {
     prompts.push(payload.node_parameters.source_idea);
+    if (payload.prompt_text !== "白雪公主穿越到现代") {
+      throw new Error(`unexpected prompt_text: ${payload.prompt_text}`);
+    }
     return {
       user_prompt: `片名：《现代白雪》\n\n成稿来自：${payload.node_parameters.source_idea}`,
       user_prompt_plain: `片名：《现代白雪》\n\n成稿来自：${payload.node_parameters.source_idea}`,
@@ -227,6 +230,64 @@ process.stdout.write(JSON.stringify({
     assert payload["source"] == "白雪公主穿越到现代"
     assert payload["mode"] == "idea_expanded_script"
     assert payload["status"] == "complete"
+
+
+def test_idea_expansion_rejects_tool_failure_pollution_from_runtime() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "白雪公主穿越到现代",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const runtime = {
+  async optimizePrompt() {
+    return {
+      user_prompt: "Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+      user_prompt_plain: "Unable to read `request.json` or `prompt.md`: the filesystem sandbox fails before commands run.",
+      optimization_mode: "script",
+      context_bundle: { warnings: [] },
+    };
+  },
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify(state.nodes.text_1));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+    serialized = json.dumps(node, ensure_ascii=False).lower()
+
+    assert node["params"]["scriptInputMode"] == "idea_expanded_script_fallback"
+    assert node["params"]["scriptExpansionState"]["status"] == "fallback"
+    assert "本地草稿" in node["prompt"]
+    assert "白雪公主穿越到现代" in node["prompt"]
+    assert "request.json" not in serialized
+    assert "prompt.md" not in serialized
+    assert "unable to read" not in serialized
 
 
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
