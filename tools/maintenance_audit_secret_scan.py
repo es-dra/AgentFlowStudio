@@ -18,7 +18,8 @@ except ModuleNotFoundError:
     )
 
 
-def check_secret_like_fragments(root: Path, files: list[Path]) -> dict[str, Any]:
+def check_secret_like_fragments(root: Path, files: list[Path], file_states: dict[str, str] | None = None) -> dict[str, Any]:
+    file_states = file_states or {}
     findings: list[dict[str, Any]] = []
     high_confidence = 0
     for path in files:
@@ -27,13 +28,13 @@ def check_secret_like_fragments(root: Path, files: list[Path]) -> dict[str, Any]
                 if _is_known_safe_high_confidence_fixture(line):
                     continue
                 high_confidence += 1
-                findings.append(_finding(root, path, "high-confidence secret-like fragment", line_no))
+                findings.append(_finding(root, path, "high-confidence secret-like fragment", line_no, file_states))
             elif (
                 any(pattern.search(line) for pattern in SECRET_FIELD_PATTERNS)
                 and not _is_known_safe_secret_fixture(line)
                 and not _is_safe_secret_field_reference(line)
             ):
-                findings.append(_finding(root, path, "secret-like or signed-url-like fragment", line_no))
+                findings.append(_finding(root, path, "secret-like or signed-url-like fragment", line_no, file_states))
     return {
         "check_id": "secret_like_fragments",
         "status": "warning" if findings else "passed",
@@ -149,9 +150,11 @@ def _read_lines(path: Path) -> Iterable[tuple[int, str]]:
     return enumerate(lines, start=1)
 
 
-def _finding(root: Path, path: Path, detail: str, line: int) -> dict[str, Any]:
+def _finding(root: Path, path: Path, detail: str, line: int, file_states: dict[str, str]) -> dict[str, Any]:
+    relative = path.resolve().relative_to(root).as_posix()
     return {
-        "path": path.resolve().relative_to(root).as_posix(),
+        "path": relative,
         "detail": detail,
         "line": line,
+        "git_state": file_states.get(relative, "unknown"),
     }

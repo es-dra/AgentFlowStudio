@@ -197,3 +197,43 @@ def test_historical_docs_are_exempt_only_when_summary_exists(tmp_path) -> None:
     coverage = checks_with_summary["human_doc_chinese_coverage"]
     assert coverage["status"] == "passed"
     assert coverage["historical_docs_exempted_count"] == 1
+
+
+def test_maintenance_audit_classifies_git_state_and_excludes_ignored_oversized_files(tmp_path) -> None:
+    subprocess.run(
+        ["git", "init"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
+    (tmp_path / ".gitignore").write_text("runs/\n", encoding="utf-8")
+    (tmp_path / "tracked_big.py").write_text("\n".join("value = 1" for _ in range(301)), encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "demo.md").write_text("\n".join("English only." for _ in range(302)), encoding="utf-8")
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "generated.json").write_text("\n".join("{}" for _ in range(450)), encoding="utf-8")
+    subprocess.run(
+        ["git", "add", ".gitignore", "tracked_big.py"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
+
+    report = build_maintenance_audit(tmp_path)
+    checks = {check["check_id"]: check for check in report["checks"]}
+    oversized = checks["oversized_files"]
+    findings = {finding["path"]: finding for finding in oversized["findings"]}
+
+    assert "runs/generated.json" not in findings
+    assert findings["tracked_big.py"]["git_state"] == "tracked"
+    assert findings["docs/demo.md"]["git_state"] == "untracked"
+    assert oversized["source_summary"]["tracked"] == 1
+    assert oversized["source_summary"]["untracked"] == 1
+    assert oversized["source_summary"].get("ignored", 0) == 0
+    assert report["workspace_files"]["ignored_text_files"] == 1

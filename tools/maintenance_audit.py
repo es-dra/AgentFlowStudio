@@ -4,12 +4,12 @@ import argparse
 import fnmatch
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 try:
+    from tools.maintenance_audit_git import git_file_states, git_ls_files, workspace_file_summary
     from tools.maintenance_audit_policy import (
         ARTIFACT_TYPE,
         DEFAULT_EXCLUDE_DIRS,
@@ -23,6 +23,7 @@ try:
     )
     from tools.maintenance_audit_secret_scan import check_secret_like_fragments
 except ModuleNotFoundError:
+    from maintenance_audit_git import git_file_states, git_ls_files, workspace_file_summary  # type: ignore[no-redef]
     from maintenance_audit_policy import (  # type: ignore[no-redef]
         ARTIFACT_TYPE,
         DEFAULT_EXCLUDE_DIRS,
@@ -42,25 +43,34 @@ class Finding:
     path: str
     detail: str
     line: int | None = None
+    git_state: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {"path": self.path, "detail": self.detail}
         if self.line is not None:
             payload["line"] = self.line
+        if self.git_state is not None:
+            payload["git_state"] = self.git_state
         return payload
 
 
 def build_maintenance_audit(root: Path) -> dict[str, Any]:
     root = root.resolve()
     files = list(_iter_text_files(root))
-    active_files = [path for path in files if not _is_legacy_frozen_path(root, path)]
+    file_states = git_file_states(root, [_rel(root, path) for path in files])
+    active_files = [
+        path
+        for path in files
+        if not _is_legacy_frozen_path(root, path)
+        and _git_state(root, path, file_states) != "ignored"
+    ]
     checks = [
         _check_contract_shape(),
-        _check_legacy_company_paths(root, files),
+        _check_legacy_company_paths(root, files, file_states),
         _check_legacy_frozen_surface(root, files),
-        _check_chinese_doc_coverage(root, active_files),
-        check_secret_like_fragments(root, files),
-        _check_oversized_files(root, active_files),
+        _check_chinese_doc_coverage(root, active_files, file_states),
+        check_secret_like_fragments(root, files, file_states),
+        _check_oversized_files(root, active_files, file_states),
         _check_tracked_runtime_artifacts(root),
     ]
     summary = _summarize_checks(checks)
@@ -73,6 +83,7 @@ def build_maintenance_audit(root: Path) -> dict[str, Any]:
         "status": status,
         "checks": checks,
         "summary": summary,
+        "workspace_files": workspace_file_summary(file_states),
         "non_claims": [
             "not human acceptance",
             "not business validation",
@@ -112,12 +123,12 @@ def _iter_text_files(root: Path) -> Iterable[Path]:
         yield path
 
 
-def _check_legacy_company_paths(root: Path, files: list[Path]) -> dict[str, Any]:
+def _check_legacy_company_paths(root: Path, files: list[Path], file_states: dict[str, str]) -> dict[str, Any]:
     findings: list[Finding] = []
     for path in files:
         for line_no, line in _read_lines(path):
             if any(pattern in line for pattern in LEGACY_COMPANY_PATTERNS):
-                findings.append(Finding(_rel(root, path), "legacy Company source path wording", line_no))
+                findings.append(_finding(root, path, "legacy Company source path wording", file_states, line_no))
     return _check("legacy_company_path", "warning" if findings else "passed", findings)
 
 
@@ -146,7 +157,7 @@ def _is_legacy_frozen_path(root: Path, path: Path) -> bool:
     return any(relative.startswith(prefix) for prefix in LEGACY_FROZEN_PREFIXES)
 
 
-def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]:
+def _check_chinese_doc_coverage(root: Path, files: list[Path], file_states: dict[str, str]) -> dict[str, Any]:
     findings: list[Finding] = []
     exempted_historical = 0
     doc_files = [path for path in files if path.suffix.lower() == ".md"]
@@ -158,7 +169,7 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]
             exempted_historical += 1
             continue
         if _chinese_ratio(text) < 0.08:
-            findings.append(Finding(_rel(root, path), "human-facing Markdown is not substantially Chinese"))
+            findings.append(_finding(root, path, "human-facing Markdown is not substantially Chinese", file_states))
     status = "warning" if findings else "passed"
     return {
         **_check("human_doc_chinese_coverage", status, findings[:80]),
@@ -169,19 +180,19 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path]) -> dict[str, Any]
     }
 
 
-def _check_oversized_files(root: Path, files: list[Path]) -> dict[str, Any]:
+def _check_oversized_files(root: Path, files: list[Path], file_states: dict[str, str]) -> dict[str, Any]:
     findings = []
     for path in files:
         if _is_machine_or_archive_doc(path) or _is_historical_doc_with_summary(root, path):
             continue
         line_count = sum(1 for _ in _read_lines(path))
         if line_count > 300:
-            findings.append(Finding(_rel(root, path), f"{line_count} lines; review split or archive"))
+            findings.append(_finding(root, path, f"{line_count} lines; review split or archive", file_states))
     return _check("oversized_files", "warning" if findings else "passed", findings)
 
 
 def _check_tracked_runtime_artifacts(root: Path) -> dict[str, Any]:
-    tracked = _git_ls_files(root)
+    tracked = git_ls_files(root)
     runtime_prefixes = ("data/processed/", "data/raw/", "data/reports/")
     findings = [
         Finding(path, "runtime artifact appears tracked by git")
@@ -193,12 +204,25 @@ def _check_tracked_runtime_artifacts(root: Path) -> dict[str, Any]:
 
 
 def _check(check_id: str, status: str, findings: list[Finding]) -> dict[str, Any]:
-    return {
+    payload = {
         "check_id": check_id,
         "status": status,
         "count": len(findings),
         "findings": [finding.as_dict() for finding in findings],
     }
+    source_summary = _source_summary(findings)
+    if source_summary:
+        payload["source_summary"] = source_summary
+    return payload
+
+
+def _source_summary(findings: list[Finding]) -> dict[str, int]:
+    summary: dict[str, int] = {}
+    for finding in findings:
+        if finding.git_state is None:
+            continue
+        summary[finding.git_state] = summary.get(finding.git_state, 0) + 1
+    return summary
 
 
 def _summarize_checks(checks: list[dict[str, Any]]) -> dict[str, int]:
@@ -259,19 +283,12 @@ def _is_historical_doc_with_summary(root: Path, path: Path) -> bool:
     return any(fnmatch.fnmatch(relative, pattern) for pattern in HISTORICAL_DOC_GLOBS)
 
 
-def _git_ls_files(root: Path) -> list[str]:
-    try:
-        result = subprocess.run(
-            ["git", "ls-files"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-    except (OSError, subprocess.CalledProcessError):
-        return []
-    return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+def _git_state(root: Path, path: Path, file_states: dict[str, str]) -> str:
+    return file_states.get(_rel(root, path), "unknown")
+
+
+def _finding(root: Path, path: Path, detail: str, file_states: dict[str, str], line: int | None = None) -> Finding:
+    return Finding(_rel(root, path), detail, line, _git_state(root, path, file_states))
 
 
 def _rel(root: Path, path: Path) -> str:

@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-29 - Test Maintenance Audit Classification
+
+- Added Git state classification to the maintenance audit so findings can now
+  distinguish tracked, untracked, ignored, and unknown text files. This keeps
+  local demo files and ignored runtime evidence from being flattened into the
+  same active maintenance-debt bucket.
+- Split the Git status helpers into `tools/maintenance_audit_git.py` so
+  `tools/maintenance_audit.py` stays under the 300-line maintenance threshold.
+- Kept secret-like scanning over the full text-file set, including ignored
+  files, while excluding ignored files from active oversized and Chinese-doc
+  coverage checks.
+- Inspected `origin/zhaowei` in an isolated worktree. A no-commit trial merge
+  conflicted across current Runtime/Studio generation files and would reintroduce
+  a large stale branch surface; current `master` already carries the equivalent
+  image relay, Crazyrouter artifact host, Codex home, script expansion, and
+  optimizer-pollution protections.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_maintenance_audit.py -q -> 11 passed
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help -> passed
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version -> 0.1.0
+npm.cmd run check:studio-js -> JS syntax check passed: 125 files
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py -> failed=0, warnings only; oversized findings now tracked=57 in the isolated worktree
+```
+
+Boundary:
+
+- No provider call was started.
+- No Runtime product contract or provider gate changed.
+- No main-worktree untracked demo document, server `/home` untracked artifact,
+  provider secret, signed URL, invite code, raw provider response, or generated
+  media byte was written to Git.
+
 ## 2026-06-28 - Branch Reconciliation and Diagnostics Merge
 
 - Merged the remote Studio generation diagnostics branch into `master`,
