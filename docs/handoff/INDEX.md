@@ -11,8 +11,15 @@ MVP. Retired Workbench, static memory-workbench, old LibTV canvas iterations,
 release-candidate Web docs, and old browser-QA handoffs were deleted instead of
 archived.
 
+## Goal / Release Gates
+
+- `AFS-BASELINE-FREEZE-TASKRUN-20260630.md`
+- `AFS-TEST-CONTRACT-CALIBRATION-TASKRUN-20260630.md`
+- `AFS-GOAL-MODE-READINESS-GATE-20260630.md`
+
 ## AFS Studio
 
+- `AFS-FIRST-WAVE-TASKRUN-PACKET-20260630.md`
 - `AFS-COS-TAKEOVER-20260626.md`
 - `AFS-STUDIO-V02-DELIVERY-POLISH-001.md`
 - `AFS-STUDIO-MVP-M1-001.md`
@@ -51,6 +58,8 @@ knowledgebase rules, and hidden background context policy.
 
 ## Runtime Service
 
+- `AFS-RUNTIME-MEDIA-CONTRACT-TASKRUN-20260630.md`
+- `AFS-RUNTIME-CONTRACT-TASKRUN-20260630.md`
 - `AFS-MINIMAX-TEXT-IMAGE-INTEGRATION-001.md`
 - `AFS-PROVIDER-ADAPTER-V0-1.md`
 - `AFS-PROVIDER-GATEWAY-V0-1.md`

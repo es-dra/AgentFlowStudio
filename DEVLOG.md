@@ -1,5 +1,304 @@
 # Devlog
 
+## 2026-06-30 - Baseline Freeze Commit/Push Prep
+
+- Executed `AFS-T4 Baseline Freeze Commit/Push + Three-End Sync Prep` to turn
+  the first-to-fifth-wave green baseline candidate into a Git-traceable local
+  baseline.
+- Re-ran the full local gate before staging:
+  - full pytest: `690 passed, 520 deselected, 2 warnings`;
+  - CLI help: passed;
+  - CLI version: `0.1.0`;
+  - Studio JS check: `125 files passed`;
+  - maintenance audit: `failed=0`, `passed=3`, `warning=4`;
+  - `git diff --check`: passed.
+- Chose a two-commit freeze:
+  - `test(runtime): freeze runtime contract baseline` for OpenAPI snapshot and
+    Runtime/media/error/module contract tests;
+  - `docs(handoff): record AFS baseline freeze gates` for DEVLOG, handoff index,
+    and first-to-sixth wave handoff records.
+- `docs/demo-docs-20260629/` remains intentionally untracked and unstaged.
+- No product behavior change, OpenAPI public-surface change, provider gate,
+  provider call, deployment, server mutation, Runtime restart, human acceptance,
+  business validation, secret, signed URL, provider raw response, or generated
+  media byte was produced.
+
+## 2026-06-30 - Test Contract Calibration + Baseline Freeze Prep
+
+- Executed `AFS-T3a Test Contract Calibration + Baseline Freeze Prep` to remove
+  the 4 full-pytest blockers found by the goal-mode readiness gate.
+- Reproduced the red baseline first: the two module-split tests failed on hard
+  `<=300` line thresholds, and the two Runtime error tests failed on stale
+  assertions that expected pre-structured error payloads.
+- Calibrated module split tests to assert real maintenance contracts:
+  extracted helper modules still exist, route files do not redefine extracted
+  helpers, and active files over 300 lines must remain visible in
+  `maintenance_audit` `oversized_files` warnings.
+- Calibrated structured-error tests to assert the current safe Runtime error
+  payload and verify unsafe exception text, local paths, provider raw markers,
+  signed URL markers, token markers, and API-key markers are not leaked.
+- No Runtime behavior, Studio behavior, OpenAPI snapshot, public API, provider
+  adapter, provider gate, commit, push, deploy, server health check, human
+  acceptance, business validation, secret, signed URL, provider raw response, or
+  generated media byte was produced.
+- Remaining maintenance debt is still explicit: `runtime_video_dispatch.py`
+  remains a >500-line split candidate and should be handled in a dedicated
+  follow-up, not hidden as solved.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_llm_enhancement_modules.py::test_llm_enhancement_keeps_runtime_helpers_split tests\test_api_runtime_video_routes_modules.py::test_video_routes_keep_runtime_helpers_split tests\test_api_runtime_service.py::test_runtime_service_current_error_projection_does_not_leak_unsafe_exception_text tests\test_api_runtime_studio_state.py::test_studio_state_uses_expected_version_to_prevent_stale_overwrite -q
+# red baseline reproduced: 4 failed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_llm_enhancement_modules.py tests\test_api_runtime_video_routes_modules.py tests\test_api_runtime_service.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_media_contract.py -q
+# 27 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 690 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
+## 2026-06-30 - Goal-Mode Readiness Gate
+
+- Executed `AFS-T3 Goal-Mode Readiness Gate` after the first three local waves.
+- Judgment: not ready for unbounded full Codex goal mode. The wave outputs are
+  explainable and focused-contract tests are in place, but full `pytest` is red
+  and should not be treated as a clean freeze baseline.
+- Classified current dirty state as attributable:
+  - first/second/third/fourth wave records in `DEVLOG.md` and `docs/handoff/`;
+  - second-wave OpenAPI snapshot and parity test;
+  - third-wave Runtime media contract test and structured Studio-state assertion;
+  - pre-existing `docs/demo-docs-20260629/` remains do-not-touch.
+- Recommended next task: `AFS-T3a Test Contract Calibration + Baseline Freeze Prep`.
+  It should resolve the 4 full-pytest blockers, rerun full verification, then
+  decide commit/push/server-sync.
+- No commit, push, deploy, server health check, provider call, COS active-rule
+  promotion, human acceptance, business validation, secret, signed URL,
+  provider raw response, or generated media byte was produced.
+
+Verification:
+
+```text
+git status --short --branch
+# master...origin/master with first/second/third/fourth wave dirty files and pre-existing docs/demo-docs-20260629/
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe -m pytest
+# failed: 686 passed, 4 failed, 520 deselected, 2 warnings
+# failing tests:
+# - tests/test_api_runtime_llm_enhancement_modules.py::test_llm_enhancement_keeps_runtime_helpers_split
+# - tests/test_api_runtime_service.py::test_runtime_service_current_error_projection_does_not_leak_unsafe_exception_text
+# - tests/test_api_runtime_studio_state.py::test_studio_state_uses_expected_version_to_prevent_stale_overwrite
+# - tests/test_api_runtime_video_routes_modules.py::test_video_routes_keep_runtime_helpers_split
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# failed=0; warnings remain classified
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
+## 2026-06-30 - Runtime Media Contract Baseline
+
+- Executed the third-wave `AFS-T2b Runtime Media Contract` pass for the
+  `image-assets*` boundary between Runtime Service and `/studio/`.
+- Classified `image-assets*` as an existing Studio-facing private Runtime media
+  contract, not a public OpenAPI contract at this stage. The routes remain
+  intentionally absent from `docs/openapi/afs-runtime-service.openapi.json`
+  because they carry browser upload `data_base64` and byte-returning preview
+  behavior that needs a dedicated public media API decision before exposure.
+- Added `tests/test_api_runtime_media_contract.py` to pin the private contract:
+  OpenAPI exclusion, upload/list/delete safe JSON fields, no local paths or
+  base64 echo, preview `content-type`, preview `Cache-Control: no-store`, and
+  byte return only through the preview `FileResponse`.
+- Repaired one stale Studio-state test assertion so it checks the current
+  structured Runtime error payload for unsafe preview URL rejection.
+- Left Runtime behavior, Studio behavior, provider adapters, provider gates, and
+  the OpenAPI snapshot unchanged.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_media_contract.py tests\test_api_runtime_auth.py::test_auth_enabled_projects_are_owner_scoped tests\test_api_runtime_studio_state_persistence.py::test_image_asset_list_returns_public_metadata_only tests\test_api_runtime_studio_state_persistence.py::test_studio_state_rejects_unsafe_preview_url tests\test_api_runtime_creative_agent_keyframes.py::test_uploaded_image_asset_can_be_deleted_from_project_runtime tests\test_web_studio_frontend_wave.py::test_runtime_media_urls_are_normalized_only_at_render_boundaries tests\test_web_studio_frontend_wave.py::test_runtime_media_source_caches_authorized_project_media_between_rerenders tests\test_web_studio_static.py::test_studio_keeps_flow_native_canvas_controls -q
+# 9 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_media_contract.py -q
+# 3 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# failed=0; warnings remain classified as maintenance debt
+# legacy_frozen_surface=10, human_doc_chinese_coverage=22, secret_like_fragments=9 high_confidence_count=0, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
+Boundary:
+
+- No provider gate was opened and no live provider call, external download,
+  ASR, video generation, generated media byte, provider raw response, signed
+  URL, secret, invite code, customer material, real cost, human acceptance,
+  business validation, durable memory promotion, commit, push, deploy, or
+  server sync claim was made.
+
+## 2026-06-30 - Runtime Contract Snapshot Alignment
+
+- Executed the second-wave `AFS-T2 Runtime Contract` pass against the current
+  Runtime Service, committed OpenAPI snapshot, and Studio Runtime client
+  boundary.
+- Found a real OpenAPI maintenance drift: the default live Runtime app exposed
+  49 OpenAPI paths while the committed snapshot had 34. The missing paths were
+  current Runtime surfaces such as client events, project delete,
+  storyboard/shot asset planning, sprite routes, and community requests.
+- Regenerated `docs/openapi/afs-runtime-service.openapi.json` with the existing
+  `runtime-service-openapi-export` command, bringing the snapshot back to
+  parity with the default Runtime app.
+- Added `tests/test_api_runtime_openapi_snapshot.py` so future Runtime route
+  changes cannot silently leave the committed OpenAPI snapshot stale.
+- Audited Studio fetch boundaries. Studio source fetches remain centralized in
+  `runtime-client.js` and authorized Runtime media preview loading; no Studio
+  source bypass to CLI internals, provider secrets, signed URLs, provider raw
+  responses, local private paths, or provider internals was found.
+- Classified the `image-assets` Runtime endpoints as a deferred media contract
+  decision: they are used by Studio but intentionally hidden from OpenAPI today,
+  so this pass did not expand the public API surface without a dedicated
+  media-contract slice.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_service_v02.py::test_runtime_service_v02_routes_are_hidden_by_default tests\test_api_runtime_storyboard_breakdown.py::test_storyboard_breakdown_is_exported_without_secret_surface tests\test_api_runtime_sprite.py::test_sprite_chat_falls_back_to_local_rules_when_llm_gate_closed tests\test_web_studio_prompt_script_static.py::test_storyboard_asset_identification_uses_runtime_plan_and_allows_manual_asset_nodes tests\test_web_studio_sprite_static.py::test_studio_sprite_widget_is_wired_to_runtime_chat -q
+# 6 passed, 1 existing warning
+
+OpenAPI parity check after export:
+# live_paths=49; snap_paths=49; schema_equal=True; missing_paths=0; stale_paths=0
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# failed=0; status=warning; passed=3; warning=4
+# legacy_frozen_surface=10
+# human_doc_chinese_coverage=22, all tracked
+# secret_like_fragments=9, high_confidence_count=0
+# oversized_files=59, tracked=57, untracked=2
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# current_task_id=AFS-T2
+# cleanup_status=completed_for_second_wave_runtime_contract_records
+# feedback_status=none_needed_for_second_wave
+```
+
+Boundary:
+
+- No provider gate was opened and no live provider call, external download,
+  ASR, video generation, generated media byte, provider raw response, signed
+  URL, secret, invite code, customer material, real cost, human acceptance,
+  business validation, durable memory promotion, commit, push, deploy, or
+  server sync claim was made.
+
+## 2026-06-30 - First-Wave Startup Scan Packet
+
+- Completed the first-wave AFS startup scan against the current `master`
+  checkout, the linked `Learning_notes` source-KB repo, the AFS repo rules, and
+  the 2026-06-30 project-book package.
+- Recorded the true dirty ownership boundary: AFS still has pre-existing
+  untracked `docs/demo-docs-20260629/`; `Learning_notes` is on
+  `codex/cos-evidence-promotion-v03` ahead of `origin/master` with pre-existing
+  `.obsidian`, Week Planner, Company OS, workflow-adapter, and project-package
+  changes.
+- Confirmed the current key entrypoints: Runtime Service
+  `apps/api/runtime_service.py`, OpenAPI
+  `docs/openapi/afs-runtime-service.openapi.json` version `0.2.0` with 34
+  paths, Studio `/studio/` under `apps/studio/`, algorithm modules under
+  `agentflow/algorithms/`, and Python/package commands in `pyproject.toml`.
+- Added the first-wave TaskRun/Handoff packet at
+  `docs/handoff/AFS-FIRST-WAVE-TASKRUN-PACKET-20260630.md` and updated the
+  private project-package execution state with the verified repo state and next
+  valid action.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# failed=0; status=warning; existing warning classes only
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# evidence_state=structure_verified
+# cleanup_status=completed_for_first_wave_startup_records
+# feedback_status=none_needed_for_first_wave
+```
+
+Boundary:
+
+- No Runtime, Studio, schema, provider, or product feature code was changed.
+- No provider gate was opened and no live provider call was started.
+- No commit, push, deploy, secret, signed URL, provider raw response, generated
+  media byte, invite code, customer material, real cost, human acceptance, or
+  business validation claim was made.
+
 ## 2026-06-29 - Test Maintenance Audit Classification
 
 - Added Git state classification to the maintenance audit so findings can now
