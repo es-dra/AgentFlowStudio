@@ -48,6 +48,14 @@ by `AFS_ALLOW_REMOTE_VISION`. Existing `/asset-card-drafts` remains the
 vision-gated enrichment route and was not expanded. Handoff:
 `docs/handoff/AFS-ASSET-CARD-CANDIDATES-TASKRUN-20260630.md`.
 
+Context-resolver candidate-boundary addendum: the next slice verifies that
+`asset_card_candidate:*` refs produced by storyboard breakdown stay out of
+keyframe preflight `included_assets`, `reference_image_channel`, and
+`subject_reference_asset_id`. Their excluded reason is now
+`asset_card_candidate_unconfirmed` instead of generic missing asset, while
+fixed visual asset selection remains unchanged. Handoff:
+`docs/handoff/AFS-CONTEXT-RESOLVER-CANDIDATE-BOUNDARY-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

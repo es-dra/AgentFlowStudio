@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-30 - Context Resolver Candidate Boundary
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `a2016bc4bfeb0a2fb696cba32434df12e008e852`.
+- Added a focused Runtime regression proving `asset_card_candidate:*` ids
+  produced by storyboard breakdown do not enter keyframe preflight context,
+  reference image channel, or subject reference selection.
+- Narrowed the excluded-asset reason for `asset_card_candidate:*` and
+  `asset_card:*` refs from generic `retired_or_missing_visual_asset` to
+  `asset_card_candidate_unconfirmed`, while preserving
+  `trace_summary.draft_assets_rejected=true`.
+- Mirrored the helper change in `apps/api/runtime_context_assets.py` to avoid
+  drift from the algorithm-library context resolver helper.
+- No provider gate, provider call, Studio UI change, public OpenAPI path change,
+  fixed asset promotion, deploy, server sync, human creative acceptance,
+  business validation, or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_context_resolver_asset_card_candidates.py -q
+# red baseline: candidate excluded as retired_or_missing_visual_asset
+# green: 1 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_context_resolver.py -q
+# 18 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_production_graph_contract.py -q
+# 4 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 697 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Asset Card Candidate Runtime Contract
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
