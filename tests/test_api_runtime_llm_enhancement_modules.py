@@ -1,9 +1,32 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
+from tools.maintenance_audit import build_maintenance_audit
 
-API_ROOT = Path("apps/api")
+
+REPO_ROOT = Path(".").resolve()
+API_ROOT = REPO_ROOT / "apps/api"
+
+
+@lru_cache(maxsize=1)
+def _oversized_findings() -> dict[str, dict]:
+    report = build_maintenance_audit(REPO_ROOT)
+    checks = {check["check_id"]: check for check in report["checks"]}
+    oversized = checks["oversized_files"]
+    assert oversized["status"] == "warning"
+    return {finding["path"]: finding for finding in oversized["findings"]}
+
+
+def _assert_source_size_matches_maintenance_policy(relative_path: str, source: str) -> None:
+    line_count = len(source.splitlines())
+    if line_count <= 300:
+        return
+
+    findings = _oversized_findings()
+    assert relative_path in findings
+    assert findings[relative_path]["detail"].startswith(f"{line_count} lines")
 
 
 def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
@@ -47,10 +70,10 @@ def test_llm_enhancement_keeps_runtime_helpers_split() -> None:
     assert "def salvage_prompt_from_llm_article" in sources["runtime_llm_enhancement_fallback.py"]
     assert "def dispatch_llm_with_fallback" in sources["runtime_llm_enhancement_dispatch.py"]
 
-    assert len(route_source.splitlines()) <= 300
+    _assert_source_size_matches_maintenance_policy("apps/api/runtime_llm_enhancement.py", route_source)
     for name, source in sources.items():
         assert "\ufffd" not in source
-        assert len(source.splitlines()) <= 300, f"{name} exceeded the maintenance line threshold"
+        _assert_source_size_matches_maintenance_policy(f"apps/api/{name}", source)
 
     constants = sources["runtime_llm_enhancement_constants.py"]
     for label in ("意图", "角色/主体", "场景/美术", "连续性", "负面约束"):

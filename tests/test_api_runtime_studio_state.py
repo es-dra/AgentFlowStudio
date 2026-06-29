@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_studio_state import sanitize_studio_state
 
@@ -108,7 +109,16 @@ def test_studio_state_uses_expected_version_to_prevent_stale_overwrite(tmp_path)
         },
     )
     assert stale.status_code == 409
-    assert "version conflict" in stale.json()["detail"]
+    detail = stale.json()["detail"]
+    assert detail["error"] == "studio_state_conflict"
+    assert detail["detail_code"] == "invalid_request"
+    assert detail["status"] == "failed"
+    assert detail["retryable"] is True
+    assert detail["project_id"] == project_id
+    assert detail["action"] == "studio_state"
+    assert detail["stage"] == "state_conflict"
+    assert detail["details"]["raw_detail"] == "studio state version conflict"
+    assert response_contains_unsafe_marker(stale.json()) is False
 
 
 def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path) -> None:

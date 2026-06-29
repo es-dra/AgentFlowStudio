@@ -246,7 +246,9 @@ def test_studio_state_rejects_unsafe_preview_url(tmp_path) -> None:
     )
 
     assert response.status_code == 400
-    assert "preview" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert detail["action"] == "studio_state"
+    assert "preview" in detail["details"]["raw_detail"]
 
 
 def test_image_asset_list_returns_public_metadata_only(tmp_path) -> None:

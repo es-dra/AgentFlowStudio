@@ -279,10 +279,15 @@ def test_runtime_service_current_error_projection_does_not_leak_unsafe_exception
     response = client.get("/projects/proj_runtime_demo/manifest")
 
     assert response.status_code == 422
-    assert response.json()["detail"] == {
-        "error": "invalid_project_manifest",
-        "detail_code": "invalid_request",
-    }
+    detail = response.json()["detail"]
+    assert detail["error"] == "invalid_project_manifest"
+    assert detail["detail_code"] == "invalid_request"
+    assert detail["status"] == "failed"
+    assert detail["retryable"] is False
+    assert detail["project_id"] == "proj_runtime_demo"
+    assert detail["request_id"].startswith("req_")
+    assert detail["message"]
+    assert "details" not in detail
     assert response_contains_unsafe_marker(response.json()) is False
 
 
