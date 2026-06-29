@@ -195,6 +195,32 @@ Not allowed in this TaskRun:
 - No deploy.
 - No Nginx/provider config change.
 
+## Three-End Sync Addendum
+
+中文说明：用户随后明确授权继续执行三端同步与核验。同步方式保持保守，只在服务器
+两处 checkout 执行 `git fetch origin master` 和 `git merge --ff-only
+origin/master`，不执行 reset、clean、删除分支、部署脚本、Nginx 修改、provider
+配置修改或 Runtime 产物清理。服务器 `/home` 的既有未跟踪本地文件继续保留：
+`docs/demo/` 和 `docs/maintenance/AFS-DEMO-DOCS-CHINESE-20260629.md`。
+
+同步到基线提交 `2c7d31f8e6611267cc77cdc8a8cce99adef54df3` 后的只读核验结果：
+
+```text
+Local HEAD:  2c7d31f8e6611267cc77cdc8a8cce99adef54df3
+origin/master / GitHub: 2c7d31f8e6611267cc77cdc8a8cce99adef54df3
+server /home/afs-ops/AgentFlowStudio HEAD: 2c7d31f8e6611267cc77cdc8a8cce99adef54df3
+server /opt/afs/AgentFlowStudio HEAD: 2c7d31f8e6611267cc77cdc8a8cce99adef54df3
+afs-runtime.service: active/running, User=afs-ops, WorkingDirectory=/opt/afs/AgentFlowStudio
+Runtime /health: status=ready, studio_static.status=ready, auth_required=true
+Observed provider gates: llm=true, image=true, video=true, vision=true, asr=false, external_download=false
+```
+
+Runtime service was not restarted in this addendum because the synchronized
+baseline contains tests, docs, and OpenAPI snapshot records, not Runtime
+product-code changes. The `/health` result is runtime health evidence only; it
+is not provider smoke, human acceptance, business validation, or creative
+quality validation.
+
 ## Provider Gate State
 
 No provider gate was opened in this task. No live LLM, image, video, ASR, or

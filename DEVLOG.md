@@ -1,5 +1,27 @@
 # Devlog
 
+## 2026-06-30 - Three-End Sync + Runtime Health Verification
+
+- Continued after the AFS-T4 baseline freeze and synchronized the pushed
+  baseline across local, GitHub, server `/home/afs-ops/AgentFlowStudio`, and
+  server `/opt/afs/AgentFlowStudio`.
+- Server sync method: read current state, then `git fetch origin master` and
+  `git merge --ff-only origin/master` in each server checkout. No reset, clean,
+  branch deletion, provider config edit, deploy script, Nginx edit, or runtime
+  artifact cleanup was performed.
+- Server `/home` preserved its existing untracked local files:
+  `docs/demo/` and `docs/maintenance/AFS-DEMO-DOCS-CHINESE-20260629.md`.
+- Runtime service was not restarted because the synced baseline contains tests,
+  docs, and OpenAPI snapshot records, not Runtime product-code changes. Service
+  status was checked read-only.
+- Runtime `/health` returned `status=ready`, `studio_static.status=ready`,
+  `auth_required=true`, and observed provider gates:
+  `llm=true`, `image=true`, `video=true`, `vision=true`, `asr=false`,
+  `external_download=false`.
+- This is three-end sync and runtime-health verification only. It is not
+  provider smoke, human acceptance, business validation, creative quality
+  validation, or durable memory promotion.
+
 ## 2026-06-30 - Baseline Freeze Commit/Push Prep
 
 - Executed `AFS-T4 Baseline Freeze Commit/Push + Three-End Sync Prep` to turn
