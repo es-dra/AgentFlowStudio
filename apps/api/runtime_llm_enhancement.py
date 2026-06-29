@@ -292,6 +292,7 @@ _sections_from_canonical = sections_from_canonical
 __all__ = (
     "PROMPT_OPTIMIZER_PROVIDER",
     "deterministic_chinese_fallback_prompt",
+    "deterministic_script_expansion_fallback",
     "llm_provider_gate",
     "maybe_enhance_prompt_with_llm",
     "provider_text_requested",

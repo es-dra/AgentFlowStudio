@@ -6,7 +6,8 @@ from typing import Any
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_context_resolver import resolve_context_bundle
-from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
+from apps.api.runtime_llm_enhancement import deterministic_script_expansion_fallback, maybe_enhance_prompt_with_llm
+from apps.api.runtime_llm_enhancement_instructions import is_script_expansion_request
 from apps.api.runtime_model_call_context import prompt_optimization_model_call_context
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_assembly import (
@@ -38,6 +39,19 @@ def build_prompt_optimization(
     assembly = assemble_prompt_context(request, assembly_state)
     context_bundle = _context_bundle(store, project_id, request)
     llm_enhancement = maybe_enhance_prompt_with_llm(request, assembly)
+    if is_script_expansion_request(request) and llm_enhancement.get("status") != "applied":
+        script = deterministic_script_expansion_fallback(request)
+        llm_enhancement = {
+            **llm_enhancement,
+            "status": "applied",
+            "discard_reason": str(llm_enhancement.get("discard_reason") or llm_enhancement.get("status") or "not_available"),
+            "guardrail_fallback_used": True,
+            "provider_calls_started": bool(llm_enhancement.get("provider_calls_started")),
+            "optimized_prompt": script,
+            "user_prompt": script,
+            "user_prompt_plain": script,
+            "user_prompt_sections": [],
+        }
     if _remote_optimizer_required(request) and llm_enhancement.get("status") != "applied":
         reason = str(llm_enhancement.get("discard_reason") or llm_enhancement.get("status") or "not_available")
         raise ValueError(f"remote LLM prompt optimization unavailable: {reason}")
@@ -51,7 +65,11 @@ def build_prompt_optimization(
         or assembly.get("user_prompt_plain")
         or strip_user_prompt_section_headers(user_prompt)
     )
-    user_prompt_sections = llm_enhancement.get("user_prompt_sections") or assembly["user_prompt_sections"]
+    user_prompt_sections = (
+        llm_enhancement["user_prompt_sections"]
+        if "user_prompt_sections" in llm_enhancement
+        else assembly["user_prompt_sections"]
+    )
     if context_bundle:
         signature_segment = str(context_bundle.get("text_channel", {}).get("asset_signature_segment") or "")
         if signature_segment:

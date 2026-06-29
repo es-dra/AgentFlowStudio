@@ -290,6 +290,62 @@ process.stdout.write(JSON.stringify(state.nodes.text_1));
     assert "unable to read" not in serialized
 
 
+def test_idea_expansion_rejects_generic_prompt_assembly_plain_text() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "白雪公主穿越到现代",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const runtime = {
+  async optimizePrompt() {
+    return {
+      user_prompt: "角色：以原始描述中的主体为核心，保持角色身份、外观与神态在多镜头间一致。\n场景：依据原始描述补全场景：交代地点、时间与氛围。\n镜头：中景为主，主体置于视觉优先位。\n灯光：光源有明确动机。\n运动：一个主导镜头运动贯穿始终。\n负面约束：避免角色畸形、五官扭曲。",
+      user_prompt_plain: "以原始描述中的主体为核心，保持角色身份、外观与神态在多镜头间一致。\n依据原始描述补全场景：交代地点、时间与氛围。\n中景为主，主体置于视觉优先位。\n光源有明确动机。\n一个主导镜头运动贯穿始终。\n避免角色畸形、五官扭曲。",
+      optimization_mode: "script",
+      context_bundle: { warnings: [] },
+    };
+  },
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify(state.nodes.text_1));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+
+    assert node["params"]["scriptInputMode"] == "idea_expanded_script_fallback"
+    assert node["params"]["scriptExpansionState"]["status"] == "fallback"
+    assert "本地草稿" in node["prompt"]
+    assert "白雪公主穿越到现代" in node["prompt"]
+    assert "以原始描述中的主体为核心" not in node["prompt"]
+    assert "一个主导镜头运动贯穿始终" not in node["prompt"]
+
+
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")

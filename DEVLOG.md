@@ -13,12 +13,17 @@
   errors is rejected and replaced with a deterministic script fallback.
 - Studio also rejects those tool-failure fragments before writing expansion
   output into the visible text node.
+- Follow-up from retest: Runtime kept the script body in `user_prompt` but an
+  empty `user_prompt_sections` list was treated as falsy and replaced with the
+  local visual prompt assembly sections. The response now preserves explicit
+  empty sections for script prose, and Studio rejects that generic visual
+  assembly text if returned by an older server.
 
 Verification:
 
 ```text
-python -m pytest tests/test_web_studio_prompt_script_static.py -> 18 passed
-python -m pytest tests/test_api_runtime_prompt_memory_loop.py -k "script_expansion_contract_returns_script_not_visual_sections_on_tool_failure or tool_failure" -> 2 passed / 25 deselected
+python -m pytest tests/test_web_studio_prompt_script_static.py -> 19 passed
+python -m pytest tests/test_api_runtime_prompt_memory_loop.py -k "script_expansion_contract or tool_failure" -> 3 passed / 25 deselected
 python -m pytest tests/test_api_runtime_llm_enhancement_modules.py -> 1 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 121 files
 git diff --check -> passed

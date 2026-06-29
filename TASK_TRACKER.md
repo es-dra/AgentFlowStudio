@@ -25,8 +25,12 @@ the `formal_script_before_storyboard_breakdown` contract, uses a dedicated
 script-prose instruction/cleaning path instead of the generic nine-section
 visual prompt, and rejects provider output that copies expansion instructions
 or includes tool/file failure fragments such as `request.json` and `prompt.md`.
+Retest follow-up fixed the final leakage path where explicit empty script
+`user_prompt_sections` were treated as falsy and replaced by local visual prompt
+assembly sections, producing unlabeled lines such as `以原始描述中的主体为核心` and
+`一个主导镜头运动贯穿始终`.
 Verification: `python -m pytest tests/test_web_studio_prompt_script_static.py`
-passed 18, focused Runtime tool-failure/script-contract tests passed 2,
+passed 19, focused Runtime tool-failure/script-contract tests passed 3,
 `python -m pytest tests/test_api_runtime_llm_enhancement_modules.py` passed 1,
 `npm.cmd run check:studio-js` passed for 121 files, and `git diff --check`
 passed. Boundary: no provider call, video generation, ASR, external download,

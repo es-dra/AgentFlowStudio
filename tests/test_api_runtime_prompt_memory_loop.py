@@ -920,6 +920,42 @@ def test_script_expansion_contract_returns_script_not_visual_sections_on_tool_fa
     assert "unable to read" not in serialized
 
 
+def test_script_expansion_contract_never_returns_local_visual_prompt_when_llm_blocked(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    result = client.post(
+        "/projects/proj_script_expansion_llm_blocked/prompt-optimizations",
+        json={
+            "node_id": "text-node-script-expansion-blocked",
+            "node_type": "script",
+            "prompt_text": "白雪公主穿越到现代",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "source_idea": "白雪公主穿越到现代",
+            },
+            "generated_at": "2026-06-29T17:00:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["provider_calls_started"] is False
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert payload["optimized_prompt"].startswith("片名：《白雪公主穿越到现代》")
+    assert payload["user_prompt"] == payload["optimized_prompt"]
+    assert payload["user_prompt_sections"] == []
+    assert "白雪公主穿越到现代" in payload["optimized_prompt"]
+    assert "以原始描述中的主体为核心" not in payload["user_prompt"]
+    assert "依据原始描述补全场景" not in payload["user_prompt"]
+    assert "一个主导镜头运动贯穿始终" not in payload["user_prompt"]
+
+
 def test_prompt_optimizer_retry_instruction_is_readable_chinese() -> None:
     from apps.api.runtime_llm_enhancement_instructions import strict_format_retry_instruction
 

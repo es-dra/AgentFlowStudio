@@ -182,7 +182,7 @@ function normalizeExpandedScript(value, idea) {
   if (!text) {
     return { script: draftScriptFromIdea(idea), fallback: true, reason: "empty_runtime_response" };
   }
-  if (looksLikeStoryboardPlaceholder(text) || looksLikeFrameworkFill(text) || looksLikeToolFailurePollution(text)) {
+  if (looksLikeStoryboardPlaceholder(text) || looksLikeFrameworkFill(text) || looksLikeGenericPromptAssembly(text) || looksLikeToolFailurePollution(text)) {
     return { script: draftScriptFromIdea(idea), fallback: true, reason: "placeholder_or_framework_output" };
   }
   return { script: text, fallback: false, reason: "" };
@@ -217,6 +217,19 @@ function looksLikeToolFailurePollution(text) {
     "bwrap:",
     "operation not permitted",
   ].some((marker) => value.includes(marker));
+}
+
+function looksLikeGenericPromptAssembly(text) {
+  const value = String(text || "");
+  const markers = [
+    "以原始描述中的主体为核心",
+    "依据原始描述补全场景",
+    "中景为主，主体置于视觉优先位",
+    "光源有明确动机",
+    "一个主导镜头运动贯穿始终",
+    "避免角色畸形",
+  ];
+  return markers.filter((marker) => value.includes(marker)).length >= 3;
 }
 
 function draftScriptFromIdea(idea) {
