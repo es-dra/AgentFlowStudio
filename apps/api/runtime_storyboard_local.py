@@ -357,6 +357,10 @@ def _infer_scene_label(text: str) -> str:
         return "室内空间"
     if re.search(r"街道|街区|路面", source):
         return "街道空间"
+    if re.search(r"海边|海面|沙滩|灯塔", source):
+        return "海边"
+    if "餐厅" in source:
+        return "餐厅"
     if re.search(r"山巅|山脊|石台|云海|战场", source):
         return "山巅石台战场"
     return ""

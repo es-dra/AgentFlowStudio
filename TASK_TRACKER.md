@@ -19,6 +19,15 @@ quality gates, not provider smoke, human creative acceptance, business
 validation, or durable memory promotion. Handoff:
 `docs/handoff/AFS-CONTENT-QUALITY-REPORT-TASKRUN-20260630.md`.
 
+Content-quality benchmark addendum: the next slice adds
+`examples/agentflow/content_quality_benchmark_scripts.example.json` plus
+`tests/test_storyboard_content_quality_benchmarks.py` as the first T13/T14
+regression pack. It covers dialogue, action, emotion turn, multi-scene,
+line-based steps, and multi-character cases. The red/green loop fixed two
+local fallback scene-label gaps (`海边`, `餐厅`) without provider calls or UI
+changes. Handoff:
+`docs/handoff/AFS-CONTENT-QUALITY-BENCHMARKS-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

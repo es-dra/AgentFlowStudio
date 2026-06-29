@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Content Quality Benchmark Script Regression
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `8c20e4da098afc7b0f21ed3599c3d7783a64a723`.
+- Added the first repo-safe benchmark script fixture:
+  `examples/agentflow/content_quality_benchmark_scripts.example.json`.
+  It covers dialogue/investigation, action, emotion turn, multi-scene chase,
+  line-based device steps, and multi-character restaurant handoff cases.
+- Added `tests/test_storyboard_content_quality_benchmarks.py` so benchmark
+  cases exercise `local_storyboard_shots`, `build_asset_graph`, and
+  `evaluate_storyboard_content_quality` together.
+- The benchmark red/green loop exposed two real local fallback gaps: `海边`
+  and `餐厅` were scene hints but were not normalized by `_infer_scene_label`,
+  so they fell back to `主要场景`. Added minimal scene normalization for those
+  two cases in `apps/api/runtime_storyboard_local.py`.
+- No provider gate, provider call, Studio UI change, OpenAPI public surface
+  change, deploy, server sync, human creative acceptance, business validation,
+  or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_storyboard_content_quality_benchmarks.py -q
+# red baseline: fixture missing
+# red after fixture: missing ('海边', 'scene')
+# red after first fix: missing ('餐厅', 'scene')
+# green after minimal scene normalization: 1 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_storyboard_content_quality_benchmarks.py tests\test_api_runtime_storyboard_content_quality.py tests\test_api_runtime_storyboard_breakdown.py tests\test_api_runtime_storyboard_modules.py -q
+# 20 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 692 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Project-Book Goal Mode Content Quality Contract
 
 - Started the formal `AFS Project-Book Full Goal-Mode Execution` line on

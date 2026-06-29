@@ -1,0 +1,190 @@
+{
+  "artifact_type": "agentflow_content_quality_benchmark_scripts",
+  "schema_version": "0.1.0",
+  "created_at": "2026-06-30",
+  "purpose": "Deterministic local benchmark scripts for storyboard content-quality regression. These examples verify narrative-driven shot splitting, asset evidence, and candidate-only review boundaries without provider calls.",
+  "non_claims": [
+    "not provider smoke",
+    "not human creative acceptance",
+    "not business validation",
+    "not durable memory promotion"
+  ],
+  "cases": [
+    {
+      "id": "dialogue_office_photo",
+      "purpose": "双人对话前的调查铺垫，检查角色、室内场景和关键照片道具。",
+      "script_text": "沈昭昭在暗办公室翻看旧照片，台灯只照亮桌面一角。沈昭昭低声读出照片背面的日期，电话里传来陈默压低的声音。陈默提醒她不要打开抽屉，门外脚步声突然靠近。沈昭昭把照片夹进笔记本，抬头看向半开的门。",
+      "expected_shot_range": [
+        2,
+        4
+      ],
+      "expected_assets": [
+        {
+          "label": "沈昭昭",
+          "asset_type": "character"
+        },
+        {
+          "label": "暗办公室",
+          "asset_type": "scene"
+        },
+        {
+          "label": "照片",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "dialogue_context",
+        "prop_continuity",
+        "source_grounding"
+      ]
+    },
+    {
+      "id": "action_mountain_duel",
+      "purpose": "动作戏，检查动态分镜数量、双角色、场景和两个道具。",
+      "script_text": "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。孙悟空手持金箍棒向前压低身形。金刚狼伸出钢爪迎面冲来。两人短兵相接，火花从金箍棒和钢爪之间迸出。孙悟空侧身跃起，金箍棒横扫。金刚狼后撤，脚下碎石飞溅。远处雷光照亮山脊。两人再次对峙，气氛压迫。镜头拉远，山巅战场被云海包围。最后两人同时冲向对方。",
+      "expected_shot_range": [
+        5,
+        10
+      ],
+      "expected_assets": [
+        {
+          "label": "孙悟空",
+          "asset_type": "character"
+        },
+        {
+          "label": "金刚狼",
+          "asset_type": "character"
+        },
+        {
+          "label": "山巅石台战场",
+          "asset_type": "scene"
+        },
+        {
+          "label": "金箍棒",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "action_continuity",
+        "dynamic_shot_count",
+        "asset_reuse"
+      ]
+    },
+    {
+      "id": "emotion_beach_letter",
+      "purpose": "情绪转折戏，检查角色、海边场景和信件道具。",
+      "script_text": "女孩在海边攥着一封信件，海风把信纸边缘吹得发抖。女孩读到最后一行时停住，眼神从愤怒慢慢变成释然。她把信件折好放进口袋，转身走向退潮后的湿沙。远处灯塔亮起，海面反光变得柔和。",
+      "expected_shot_range": [
+        2,
+        4
+      ],
+      "expected_assets": [
+        {
+          "label": "女孩",
+          "asset_type": "character"
+        },
+        {
+          "label": "海边",
+          "asset_type": "scene"
+        },
+        {
+          "label": "信件",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "emotion_turn",
+        "key_prop",
+        "keyframe_purpose"
+      ]
+    },
+    {
+      "id": "multi_scene_map_chase",
+      "purpose": "多场景切换，检查办公室、街道和地图道具不会被漏掉。",
+      "script_text": "林晚在办公室收到一张旧地图，地图上用红线标出废弃街道。林晚从办公室冲出，穿过街道时反复确认地图方向。雨水打湿地图边缘，她把地图按在墙上，对照远处闪烁的路灯。林晚沿着街道尽头的楼梯向下走，身后的办公室灯光完全熄灭。",
+      "expected_shot_range": [
+        2,
+        4
+      ],
+      "expected_assets": [
+        {
+          "label": "林晚",
+          "asset_type": "character"
+        },
+        {
+          "label": "办公室",
+          "asset_type": "scene"
+        },
+        {
+          "label": "地图",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "multi_scene",
+        "prop_state_change",
+        "scene_transition"
+      ]
+    },
+    {
+      "id": "line_based_device_steps",
+      "purpose": "逐行步骤脚本，检查系统不会强行压成固定五镜。",
+      "script_text": "1. 少年在室内空间打开旧手机，屏幕显示断裂的信号。\n2. 少年低头检查手机背面的裂痕。\n3. 少年把手机接到电脑旁边的线缆。\n4. 屏幕突然闪烁，房间灯光变暗。\n5. 少年听见门外有人靠近。\n6. 少年拔下手机，把它藏进书里。\n7. 门把手轻轻转动。\n8. 少年关掉台灯，躲到窗帘后。\n9. 手机再次震动，屏幕照亮他的脸。\n10. 少年屏住呼吸，等待脚步声远离。",
+      "expected_shot_range": [
+        8,
+        10
+      ],
+      "expected_assets": [
+        {
+          "label": "少年",
+          "asset_type": "character"
+        },
+        {
+          "label": "室内空间",
+          "asset_type": "scene"
+        },
+        {
+          "label": "手机",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "line_based_script",
+        "anti_fixed_template",
+        "device_prop_continuity"
+      ]
+    },
+    {
+      "id": "multi_character_restaurant_note",
+      "purpose": "多角色群戏，检查两个角色、餐厅场景和信件道具。",
+      "script_text": "周岚在餐厅角落等待，桌上的信件被杯子压住。陈默走进餐厅，没有立刻坐下，只看着那封信件。周岚把信件推向陈默，要求他当面读完。陈默读到一半停住，餐厅里的背景音乐被厨房声盖过。周岚起身离开，陈默握着信件追到门口。",
+      "expected_shot_range": [
+        2,
+        4
+      ],
+      "expected_assets": [
+        {
+          "label": "周岚",
+          "asset_type": "character"
+        },
+        {
+          "label": "陈默",
+          "asset_type": "character"
+        },
+        {
+          "label": "餐厅",
+          "asset_type": "scene"
+        },
+        {
+          "label": "信件",
+          "asset_type": "prop"
+        }
+      ],
+      "quality_focus": [
+        "multi_character",
+        "dialogue_staging",
+        "prop_handoff"
+      ]
+    }
+  ]
+}
