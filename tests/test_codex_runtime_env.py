@@ -36,6 +36,18 @@ def test_codex_subprocess_env_honors_explicit_afs_codex_home(tmp_path, monkeypat
     assert codex_home.is_dir()
 
 
+def test_codex_subprocess_env_honors_existing_codex_home(tmp_path, monkeypatch) -> None:
+    codex_home = tmp_path / "existing-codex-home"
+    monkeypatch.delenv("AFS_CODEX_HOME", raising=False)
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
+
+    env = codex_subprocess_env()
+
+    assert Path(env["CODEX_HOME"]) == codex_home
+    assert codex_home.is_dir()
+
+
 def test_bootstrap_codex_home_copies_only_minimal_runtime_files(tmp_path) -> None:
     source = tmp_path / "source"
     target = tmp_path / "target"

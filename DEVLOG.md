@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-06-29 - Asset Card Image Worker Codex Home
+
+- Fixed the `codex_image` worker so an explicitly configured `AFS_CODEX_HOME`
+  or `CODEX_HOME` is preserved instead of being overwritten with an empty
+  job-scoped `.codex-home` directory.
+- `codex_runtime_env.resolve_codex_home` now honors standard `CODEX_HOME` after
+  `AFS_CODEX_HOME`, then falls back to runtime-scoped or local AFS homes.
+- Runtime keyframe polling now preserves safe worker failure blocks instead of
+  flattening every worker failure into a generic provider-not-ready reason.
+- Worker safe errors now distinguish command unavailable, timeout, and missing
+  candidate image without exposing raw provider output or secret-bearing text.
+
+Verification:
+
+```text
+python -m pytest tests/test_codex_image_handoff.py -q -> 18 passed
+python -m pytest tests/test_codex_runtime_env.py -q -> 5 passed
+python -m pytest tests/test_provider_adapter_registry.py -q -> 27 passed
+```
+
+Boundary:
+
+- No live provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- This improves worker authentication-state reuse and safe diagnostics; live
+  image completion still depends on the deployed worker service and server
+  Codex authentication being valid.
+
 ## 2026-06-29 - Asset Card Image Handoff Credential Preflight
 
 - Fixed the `codex_image` asset/keyframe handoff path so local Codex accounts

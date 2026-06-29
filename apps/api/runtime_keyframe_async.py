@@ -75,8 +75,15 @@ def poll_keyframe_generation(store: RuntimeStore, project_id: str, output_dir: P
             progress=progress,
         )
     if status in {"failed", "blocked", "poll_failed"}:
-        reason = _safe_error(_json_dumps_safe(raw.get("blocks") or raw))
-        return _keyframe_poll_failed_result(output_dir, project_id, request, state, provider_gate, context_bundle, reason)
+        return _keyframe_poll_failed_result(
+            output_dir,
+            project_id,
+            request,
+            state,
+            provider_gate,
+            context_bundle,
+            _safe_failed_blocks(raw, provider_gate),
+        )
     return _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
 
 
@@ -189,22 +196,30 @@ def _keyframe_poll_failed_result(
     state: dict[str, Any],
     provider_gate: dict[str, str],
     context_bundle: dict[str, Any] | None,
-    reason: str,
+    reason_or_blocks: str | list[dict[str, str]],
 ) -> dict[str, Any]:
     state["status"] = "failed"
     _write_task_state(output_dir, state)
+    blocks = (
+        _safe_blocks(reason_or_blocks, provider_gate)
+        if isinstance(reason_or_blocks, list)
+        else _safe_blocks(
+            [
+                {
+                    "block_id": "remote_image_provider_not_ready",
+                    "reason": _safe_error(reason_or_blocks),
+                    "required_gate": str(provider_gate.get("env") or REMOTE_IMAGE_ENV),
+                }
+            ],
+            provider_gate,
+        )
+    )
     manifest = keyframe_safe_manifest(
         project_id,
         request,
         status="failed",
         provider_gate=provider_gate,
-        blocks=[
-            {
-                "block_id": "remote_image_provider_not_ready",
-                "reason": _safe_error(reason),
-                "required_gate": str(provider_gate.get("env") or REMOTE_IMAGE_ENV),
-            }
-        ],
+        blocks=blocks,
         provider_calls_started=True,
         output_count=0,
         reference_image_count=int(state.get("reference_image_count") or 0),
@@ -221,6 +236,36 @@ def _keyframe_poll_failed_result(
         safe_manifest=manifest,
         context_bundle=context_bundle,
     )
+
+
+def _safe_failed_blocks(raw: dict[str, Any], provider_gate: dict[str, str]) -> list[dict[str, str]]:
+    raw_blocks = raw.get("blocks")
+    if isinstance(raw_blocks, list) and raw_blocks:
+        return _safe_blocks(raw_blocks, provider_gate)
+    return _safe_blocks(
+        [
+            {
+                "block_id": "remote_image_provider_not_ready",
+                "reason": _safe_error(_json_dumps_safe(raw)),
+                "required_gate": str(provider_gate.get("env") or REMOTE_IMAGE_ENV),
+            }
+        ],
+        provider_gate,
+    )
+
+
+def _safe_blocks(values: list[Any], provider_gate: dict[str, str]) -> list[dict[str, str]]:
+    blocks: list[dict[str, str]] = []
+    required_gate = str(provider_gate.get("env") or REMOTE_IMAGE_ENV)
+    for value in values:
+        if not isinstance(value, dict):
+            reason = _safe_error(str(value))
+            block_id = "remote_image_provider_not_ready"
+        else:
+            block_id = str(value.get("block_id") or "remote_image_provider_not_ready")[:80]
+            reason = _safe_error(str(value.get("reason") or value.get("error") or "image provider did not complete"))
+        blocks.append({"block_id": block_id, "reason": reason, "required_gate": required_gate})
+    return blocks or [{"block_id": "remote_image_provider_not_ready", "reason": "Image provider did not complete.", "required_gate": required_gate}]
 
 
 def _provider_task_for_poll(task: Any, output_dir: Path) -> dict[str, Any]:

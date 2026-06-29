@@ -345,6 +345,46 @@ def test_codex_image_handoff_worker_trims_failed_job_payload_after_result(tmp_pa
     assert "references/" not in serialized
 
 
+def test_codex_image_handoff_runtime_poll_preserves_worker_safe_failure_reason(tmp_path, monkeypatch) -> None:
+    class MissingCliExecutor:
+        def execute(self, request, work_dir):  # noqa: ANN001 - test protocol double.
+            raise RuntimeError("Codex image worker command is not available")
+
+    provider_path = tmp_path / "providers.local.json"
+    provider_path.write_text(json.dumps(_codex_provider_config()), encoding="utf-8")
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(provider_path))
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_codex_worker_safe_reason"
+
+    submit = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "asset-card-node",
+            "prompt_text": "Generate a reusable prop reference sheet.",
+            "optimized_prompt": "Generate a reusable prop reference sheet.",
+            "provider_service_id": "codex_image",
+            "node_parameters": {"node_role": "asset_card_draft"},
+            "generated_at": "2026-06-29T20:26:00+08:00",
+        },
+    )
+    assert submit.status_code == 200
+    job_id = submit.json()["job"]["job_id"]
+    output_dir = tmp_path / "runs" / project_id / job_id
+    processed = process_one(output_dir, executor=MissingCliExecutor())
+    assert processed is not None
+    assert processed.status == "failed"
+
+    poll = client.post(f"/projects/{project_id}/keyframe-generations/{job_id}/poll")
+
+    assert poll.status_code == 200
+    payload = poll.json()
+    assert payload["job"]["status"] == "failed"
+    block = payload["safe_manifest"]["blocks"][0]
+    assert block["block_id"] == "remote_image_provider_not_ready"
+    assert block["reason"] == "Image generation worker command is not available."
+
+
 def test_codex_image_worker_resolves_user_local_codex_when_path_is_missing(tmp_path, monkeypatch) -> None:
     home = tmp_path / "home"
     codex = home / ".local" / "bin" / "codex"
@@ -593,6 +633,29 @@ def test_codex_image_executor_uses_job_scoped_codex_home(tmp_path, monkeypatch) 
     codex_home = Path(captured["env"]["CODEX_HOME"])
     assert codex_home.parent == work_dir
     assert codex_home.name == ".codex-home"
+
+
+def test_codex_image_executor_preserves_configured_codex_home(tmp_path, monkeypatch) -> None:
+    configured_home = tmp_path / "configured-codex-home"
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_popen(command, *, cwd, env, **kwargs):  # noqa: ANN001, ANN202
+        captured["env"] = dict(env)
+        (Path(cwd) / "candidate_001.png").write_bytes(FakeCodexImageExecutor.PNG_BYTES)
+        return FakeCodexProcess(returncode=0)
+
+    monkeypatch.setenv("AFS_CODEX_HOME", str(configured_home))
+    monkeypatch.setenv("AFS_CODEX_BOOTSTRAP", "false")
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.shutil.which", lambda command: command)
+    monkeypatch.setattr("agentflow_studio.model_gateway.codex_image_worker.subprocess.Popen", fake_popen)
+
+    CodexExecImageExecutor(timeout_sec=1).execute(_image_worker_request(), work_dir)
+
+    assert Path(captured["env"]["CODEX_HOME"]) == configured_home
+    assert configured_home.is_dir()
+    assert not (work_dir / ".codex-home").exists()
 
 
 def _store(tmp_path: Path, payload: dict):

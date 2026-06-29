@@ -37,6 +37,9 @@ def resolve_codex_home(env: dict[str, str] | None = None) -> Path:
     configured = str(resolved.get(AFS_CODEX_HOME_ENV) or "").strip()
     if configured:
         return Path(configured).expanduser().resolve()
+    configured = str(resolved.get(CODEX_HOME_ENV) or "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
     runtime_root = str(resolved.get(AFS_RUNTIME_ROOT_ENV) or "").strip()
     if runtime_root:
         return (Path(runtime_root).expanduser().resolve() / "codex-home").resolve()

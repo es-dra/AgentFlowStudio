@@ -12,6 +12,19 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Asset-card image worker Codex-home follow-up: 2026-06-29 pass fixed the next
+likely live failure after handoff submission: the `codex_image` worker always
+overrode Codex runtime state with an empty job-scoped `.codex-home`, which could
+discard a server-configured `AFS_CODEX_HOME` or `CODEX_HOME` login state before
+`codex exec` started. The worker now preserves explicit Codex home settings,
+`codex_runtime_env` also honors standard `CODEX_HOME`, and Runtime keyframe
+polling preserves safe worker failure blocks instead of flattening every worker
+failure into a generic provider-not-ready reason. Verification: codex image
+handoff tests passed 18, codex runtime env tests passed 5, and provider adapter
+registry tests passed 27. Boundary: no live provider call, secret read, media
+byte, signed URL, video generation, ASR, external download, or private Company
+OS source content was used or written.
+
 Asset-card image handoff credential preflight follow-up: 2026-06-29 pass fixed
 the asset-card image generation blocker where local `codex_image` handoff
 accounts with `auth_type: none` could still be stopped by a stale or placeholder
