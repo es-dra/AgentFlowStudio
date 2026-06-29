@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 
 from agentflow.harness.json_io import write_json
 from agentflow.algorithms.content_quality_evaluation import evaluate_storyboard_content_quality
+from agentflow.algorithms.production_graph import build_storyboard_production_graph
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_asset_graph import attach_graph_asset_ids_to_shots, build_asset_graph
@@ -69,6 +70,7 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
             "shots": result["shots"],
             "asset_graph": result["asset_graph"],
             "content_quality_report": result["content_quality_report"],
+            "production_graph": result["production_graph"],
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
             "writes_long_term_memory": False,
@@ -121,6 +123,14 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         provider_calls_started=provider_calls_started,
         shot_count_hint=request.shot_count_hint,
     )
+    production_graph = build_storyboard_production_graph(
+        project_id=project_id,
+        script_node_id=request.node_id,
+        script_text=request.script_text,
+        shots=shots,
+        asset_graph=asset_graph,
+        content_quality_report=content_quality_report,
+    )
     safe_manifest = {
         "artifact_type": "agentflow_storyboard_breakdown_safe_manifest",
         "schema_version": "0.1.0",
@@ -135,6 +145,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "shot_count": len(shots),
         "asset_graph_asset_count": int(asset_graph.get("asset_count") or 0),
         "content_quality_report_status": content_quality_report["summary"]["status"],
+        "production_graph_node_count": production_graph["summary"]["node_count"],
         "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
         "discard_reason": discard_reason,
         "writes_long_term_memory": False,
@@ -170,6 +181,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
     for payload in (safe_manifest, artifact, request_plan, asset_graph):
         reject_unsafe_payload(payload)
     reject_unsafe_payload(content_quality_report)
+    reject_unsafe_payload(production_graph)
     return {
         "shots": shots,
         "provider_gate": gate,
@@ -178,6 +190,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "safe_artifact": artifact,
         "asset_graph": asset_graph,
         "content_quality_report": content_quality_report,
+        "production_graph": production_graph,
         "request_plan": request_plan,
     }
 
@@ -189,6 +202,7 @@ def _write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: d
     write_json(output_dir / "storyboard_breakdown_safe_manifest.json", result["safe_manifest"])
     write_json(output_dir / "asset_graph.json", result["asset_graph"])
     write_json(output_dir / "content_quality_report.json", result["content_quality_report"])
+    write_json(output_dir / "production_graph_snapshot.json", result["production_graph"])
     return {
         "storyboard_breakdown_request_plan": store.register_artifact(
             output_dir / "storyboard_breakdown_request_plan.json",
@@ -209,6 +223,10 @@ def _write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: d
         "content_quality_report": store.register_artifact(
             output_dir / "content_quality_report.json",
             role="content_quality_report",
+        ),
+        "production_graph_snapshot": store.register_artifact(
+            output_dir / "production_graph_snapshot.json",
+            role="production_graph_snapshot",
         ),
     }
 

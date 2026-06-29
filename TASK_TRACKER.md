@@ -28,6 +28,17 @@ local fallback scene-label gaps (`海边`, `餐厅`) without provider calls or U
 changes. Handoff:
 `docs/handoff/AFS-CONTENT-QUALITY-BENCHMARKS-TASKRUN-20260630.md`.
 
+Production-graph addendum: the next verified slice adds
+`agentflow.algorithms.production_graph` and Runtime storyboard breakdown now
+returns and persists a safe `production_graph` snapshot. The graph links script,
+shot, candidate asset, and content-quality-report nodes with explicit
+relationships, records node count in the safe manifest, and writes a
+`production_graph_snapshot` artifact. This is a candidate production data-model
+contract for later asset cards and keyframes; it is not fixed asset memory,
+provider smoke, human creative acceptance, business validation, or durable
+memory promotion. Handoff:
+`docs/handoff/AFS-PRODUCTION-GRAPH-CONTRACT-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

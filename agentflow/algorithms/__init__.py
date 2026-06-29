@@ -19,6 +19,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "request_projection",
     "quality_feedback_scoring",
     "content_quality_evaluation",
+    "production_graph",
     "revision_drift_control",
 )
 
