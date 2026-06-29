@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_context_resolver import resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, VideoGenerationRequest
@@ -14,6 +14,8 @@ from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 DEFAULT_IMAGE_PROMPT_LIMIT = 1500
 DEFAULT_IMAGE_REFERENCE_SLOTS = 1
+DEFAULT_IMAGE_RELAY_SERVICE_ID = "image_relay"
+LEGACY_IMAGE_SERVICE_ALIASES = {"image_relay": ("codex_image",)}
 DEFAULT_VIDEO_PROMPT_LIMIT = 2000
 
 
@@ -29,7 +31,8 @@ def keyframe_generation_preflight(
         prompt_default=DEFAULT_IMAGE_PROMPT_LIMIT,
         reference_default=DEFAULT_IMAGE_REFERENCE_SLOTS,
     )
-    reference_slots = _effective_keyframe_reference_slots(request, reference_slots)
+    request_format = _service_request_format(request.provider_service_id)
+    reference_slots = _effective_keyframe_reference_slots(request, reference_slots, request_format=request_format)
     bundle = None
     if request.context_subgraph:
         bundle = resolve_context_bundle(
@@ -49,13 +52,22 @@ def keyframe_generation_preflight(
     return _preflight_response("keyframe", request, bundle)
 
 
-def _effective_keyframe_reference_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+def _effective_keyframe_reference_slots(
+    request: KeyframeGenerationRequest,
+    configured_slots: int,
+    *,
+    request_format: str = "",
+) -> int:
     params = request.node_parameters if isinstance(request.node_parameters, dict) else {}
     is_initial_asset_card = params.get("node_role") == "asset_card_draft" and not isinstance(
         params.get("asset_card_revision"),
         dict,
     )
-    return 0 if is_initial_asset_card else configured_slots
+    if is_initial_asset_card:
+        return 0
+    if _uses_openai_images_relay(request_format) and configured_slots <= 0 and request.asset_refs:
+        return 1
+    return configured_slots
 
 
 def video_generation_preflight(
@@ -168,13 +180,46 @@ def _bundle_digest(bundle: dict[str, Any] | None) -> dict[str, Any] | None:
 def _descriptor_limits(service_id: str, *, prompt_default: int, reference_default: int) -> tuple[int, int]:
     try:
         registry = load_provider_registry()
-        descriptor = registry.descriptor(service_id)
+        descriptor = registry.descriptor(_resolve_image_service_id(registry, service_id))
     except (ModelGatewayError, ValueError, OSError):
         return prompt_default, reference_default
     return (
         int(getattr(descriptor, "prompt_char_limit", prompt_default) or prompt_default),
         int(getattr(descriptor, "reference_image_slots", reference_default) or reference_default),
     )
+
+
+def _service_request_format(service_id: str) -> str:
+    try:
+        registry = load_provider_registry()
+        resolved_service_id = _resolve_image_service_id(registry, service_id)
+    except (ModelGatewayError, ValueError, OSError):
+        return ""
+    services = getattr(getattr(registry, "store", None), "services", {})
+    service = services.get(resolved_service_id) if isinstance(services, dict) else None
+    if not isinstance(service, dict):
+        return ""
+    return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
+
+
+def _resolve_image_service_id(registry: Any, service_id: str) -> str:
+    requested = str(service_id or DEFAULT_IMAGE_RELAY_SERVICE_ID)
+    try:
+        registry.descriptor(requested)
+        return requested
+    except ModelConfigError:
+        pass
+    for alias in LEGACY_IMAGE_SERVICE_ALIASES.get(requested, ()):
+        try:
+            registry.descriptor(alias)
+            return alias
+        except ModelConfigError:
+            continue
+    return requested
+
+
+def _uses_openai_images_relay(request_format: str) -> bool:
+    return str(request_format or "").strip() == "openai_images"
 
 
 __all__ = (

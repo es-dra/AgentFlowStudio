@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-29 - Image Relay Restore for Asset Card Generation
+
+- Restored the known-good `image_relay` image generation path from
+  `origin/master` for Studio image/keyframe and asset-card image generation.
+- Studio now sends image jobs to `image_relay` by default instead of the
+  server-local `codex_image` handoff worker.
+- Runtime keyframe generation now resolves `image_relay` with a compatibility
+  alias to legacy `codex_image` only when the provider registry has no
+  `image_relay` service, and OpenAI Images relay requests with reference images
+  are routed through edit mode.
+- Provider config loading again projects legacy API-relay `codex_image`
+  entries into `image_relay`, so older server-local config can keep working
+  while the deploy config is renamed.
+- `configs/providers.example.json` now documents the `image_relay` account,
+  pool, service, and `AFS_IMAGE_RELAY_BASE_URL` /
+  `AFS_IMAGE_RELAY_API_KEY` env names.
+
+Verification:
+
+```text
+python -m pytest tests/test_provider_adapter_registry.py tests/test_api_runtime_keyframe_reference_assets.py -q -> 36 passed
+python -m pytest tests/test_web_studio_assets_generation_static.py -q -> 25 passed
+python -m pytest tests/test_codex_image_handoff.py tests/test_codex_runtime_env.py -q -> 23 passed
+git diff --check -> passed
+```
+
+Boundary:
+
+- No live provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- Live generation still requires the deployed server provider config and
+  environment to provide `AFS_ALLOW_REMOTE_IMAGE=true`,
+  `AFS_IMAGE_RELAY_BASE_URL`, and `AFS_IMAGE_RELAY_API_KEY` or an equivalent
+  legacy API-relay `codex_image` config that can be projected to `image_relay`.
+
 ## 2026-06-29 - Asset Card Image Worker Codex Home
 
 - Fixed the `codex_image` worker so an explicitly configured `AFS_CODEX_HOME`

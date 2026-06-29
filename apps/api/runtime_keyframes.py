@@ -8,7 +8,7 @@ from typing import Any
 from agentflow.algorithms.context_resolver import merged_reference_image_refs
 from agentflow.algorithms.request_projection import build_request_plan
 from agentflow.harness.json_io import write_json
-from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.errors import ModelConfigError, ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import (
     ProviderDispatchRequest,
     load_provider_registry,
@@ -35,6 +35,8 @@ REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_IMAGE_PROMPT_LIMIT = 1500
 DEFAULT_REFERENCE_IMAGE_SLOTS = 1
+DEFAULT_IMAGE_RELAY_SERVICE_ID = "image_relay"
+LEGACY_IMAGE_SERVICE_ALIASES = {"image_relay": ("codex_image",)}
 KEYFRAME_NON_CLAIMS = [
     "runtime verification only",
     "not human acceptance",
@@ -61,11 +63,20 @@ def build_keyframe_generation(
     descriptor = _default_descriptor()
     try:
         registry = load_provider_registry()
+        service_id = _resolve_image_service_id(registry, request.provider_service_id)
+        if service_id != request.provider_service_id:
+            request = request.model_copy(update={"provider_service_id": service_id})
+        service_request_format = _service_request_format(registry, request.provider_service_id)
         descriptor = registry.descriptor(request.provider_service_id)
     except (ModelGatewayError, OSError, ValueError):
         registry = None
+        service_request_format = ""
     configured_reference_slots = int(getattr(descriptor, "reference_image_slots", DEFAULT_REFERENCE_IMAGE_SLOTS))
-    effective_reference_slots = _effective_reference_image_slots(request, configured_reference_slots)
+    effective_reference_slots = _effective_reference_image_slots(
+        request,
+        configured_reference_slots,
+        request_format=service_request_format,
+    )
     context_bundle = _context_bundle(
         store,
         project_id,
@@ -96,7 +107,11 @@ def build_keyframe_generation(
             asset_card_revision=is_asset_card_revision,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
-    image_operation = "edit" if _uses_asset_card_image_edit(request, reference_images) else "generate"
+    image_operation = _image_operation_for_request(
+        request,
+        reference_images,
+        request_format=service_request_format,
+    )
     if reference_images:
         reference_instruction = _reference_prompt_instruction(request, len(reference_images))
         prompt_with_references = (
@@ -151,6 +166,10 @@ def build_keyframe_generation(
         try:
             if registry is None:
                 registry = load_provider_registry()
+                service_id = _resolve_image_service_id(registry, request.provider_service_id)
+                if service_id != request.provider_service_id:
+                    request = request.model_copy(update={"provider_service_id": service_id})
+                service_request_format = _service_request_format(registry, request.provider_service_id)
                 descriptor = registry.descriptor(request.provider_service_id)
             provider_calls_started = True
             dispatch_request = ProviderDispatchRequest(
@@ -294,12 +313,60 @@ def _uses_asset_card_image_edit(request: KeyframeGenerationRequest, reference_im
     return _has_asset_card_revision(request) and bool(reference_images)
 
 
-def _effective_reference_image_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+def _image_operation_for_request(
+    request: KeyframeGenerationRequest,
+    reference_images: list[dict[str, Any]],
+    *,
+    request_format: str = "",
+) -> str:
+    if _uses_asset_card_image_edit(request, reference_images):
+        return "edit"
+    if reference_images and _uses_openai_images_relay(request_format):
+        return "edit"
+    return "generate"
+
+
+def _effective_reference_image_slots(
+    request: KeyframeGenerationRequest,
+    configured_slots: int,
+    *,
+    request_format: str = "",
+) -> int:
     if _is_initial_asset_card_generation(request):
         return 0
     if _has_asset_card_revision(request) and configured_slots <= 0:
         return 1
+    if _uses_openai_images_relay(request_format) and configured_slots <= 0 and request.asset_refs:
+        return 1
     return configured_slots
+
+
+def _resolve_image_service_id(registry: Any, service_id: str) -> str:
+    requested = str(service_id or DEFAULT_IMAGE_RELAY_SERVICE_ID)
+    try:
+        registry.descriptor(requested)
+        return requested
+    except ModelConfigError:
+        pass
+    for alias in LEGACY_IMAGE_SERVICE_ALIASES.get(requested, ()):
+        try:
+            registry.descriptor(alias)
+            return alias
+        except ModelConfigError:
+            continue
+    return requested
+
+
+def _service_request_format(registry: Any, service_id: str) -> str:
+    services = getattr(getattr(registry, "store", None), "services", {})
+    service = services.get(service_id) if isinstance(services, dict) else None
+    if not isinstance(service, dict):
+        return ""
+    return str(service.get("request_format") or service.get("payload_format") or service.get("api_family") or "").strip()
+
+
+def _uses_openai_images_relay(request_format: str) -> bool:
+    return str(request_format or "").strip() == "openai_images"
 
 
 def _is_initial_asset_card_generation(request: KeyframeGenerationRequest) -> bool:

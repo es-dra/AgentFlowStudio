@@ -1,6 +1,9 @@
 // Studio model presets describe the current MVP execution surface.
 // User-facing prompt optimization is always remote-gated; local assembly remains backend-internal.
 
+export const IMAGE_RELAY_SERVICE_ID = "image_relay";
+export const VIDEO_RELAY_SERVICE_ID = "seedance_i2v";
+
 export const TEXT_MODELS = [
   {
     id: "prompt-optimizer",
@@ -18,12 +21,12 @@ export const IMAGE_MODELS = [
   {
     id: "image2-keyframe",
     name: "Image2",
-    desc: "keyframe image generation",
+    desc: "external relay image generation",
     eta: "60s",
     cost: 1,
-    provider: "codex",
+    provider: "relay",
     capability: "image_keyframe",
-    providerServiceId: "codex_image",
+    providerServiceId: IMAGE_RELAY_SERVICE_ID,
   },
 ];
 
@@ -34,9 +37,9 @@ export const VIDEO_MODELS = [
     desc: "image to video",
     eta: "2m",
     cost: 1,
-    provider: "volc",
+    provider: "relay",
     capability: "video_i2v",
-    providerServiceId: "seedance_i2v",
+    providerServiceId: VIDEO_RELAY_SERVICE_ID,
   },
 ];
 
@@ -73,7 +76,7 @@ export function isRemoteImageModel(modelId) {
 }
 
 export function providerServiceForImageModel(modelId) {
-  return findModel("image", modelId).providerServiceId || "codex_image";
+  return findModel("image", modelId).providerServiceId || IMAGE_RELAY_SERVICE_ID;
 }
 
 export function isRemoteVideoModel(modelId) {
@@ -81,5 +84,5 @@ export function isRemoteVideoModel(modelId) {
 }
 
 export function providerServiceForVideoModel(modelId) {
-  return findModel("video", modelId).providerServiceId || "seedance_i2v";
+  return findModel("video", modelId).providerServiceId || VIDEO_RELAY_SERVICE_ID;
 }

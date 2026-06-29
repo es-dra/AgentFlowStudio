@@ -124,13 +124,15 @@ def test_studio_model_picker_only_exposes_current_mvp_models() -> None:
     assert 'return Boolean(findModel("video", modelId).providerServiceId);' in source
     assert "local-creative-agent" not in source
     assert "remote_optimizer_required" in _source()
-    assert 'providerServiceId: "codex_image"' in source
+    assert 'IMAGE_RELAY_SERVICE_ID = "image_relay"' in source
+    assert "providerServiceId: IMAGE_RELAY_SERVICE_ID" in source
     assert 'llmProvider: "prompt_optimizer"' in source
     assert 'llm_provider: "prompt_optimizer"' in optimizer_contract
     assert 'provider_service_id: "vision_image"' in visual_asset_panel
     assert 'provider_service_id: "vision_video"' in main
     assert "Seedance 2.0 Fast" in source
-    assert 'providerServiceId: "seedance_i2v"' in source
+    assert 'VIDEO_RELAY_SERVICE_ID = "seedance_i2v"' in source
+    assert "providerServiceId: VIDEO_RELAY_SERVICE_ID" in source
     assert "MiniMax image-01" not in source
     assert "minimax_m3" not in optimizer_contract
     assert "fake_vision" not in main + visual_asset_panel

@@ -12,6 +12,22 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Asset-card image relay restore follow-up: 2026-06-29 pass compared local
+`zhaowei` against `origin/master`, whose image generation path is known to work,
+and restored the `image_relay` default for Studio image/keyframe and asset-card
+image generation. Runtime now resolves `image_relay` with a legacy
+`codex_image` alias only when needed, routes OpenAI Images relay requests with
+reference images through edit mode, and projects legacy API-relay
+`codex_image` provider config into `image_relay`. Example provider config now
+documents `AFS_IMAGE_RELAY_BASE_URL` and `AFS_IMAGE_RELAY_API_KEY`. Verification:
+provider/keyframe reference tests passed 36, Studio asset-generation static
+tests passed 25, codex image handoff/runtime env tests passed 23, and
+`git diff --check` passed. Boundary: no live provider call, secret read, media
+byte, signed URL, video generation, ASR, external download, or private Company
+OS source content was used or written. Deployment must ensure the server
+provider config exposes `image_relay` or a legacy API-relay `codex_image` entry
+and has the image gate plus relay env configured.
+
 Asset-card image worker Codex-home follow-up: 2026-06-29 pass fixed the next
 likely live failure after handoff submission: the `codex_image` worker always
 overrode Codex runtime state with an empty job-scoped `.codex-home`, which could

@@ -162,7 +162,7 @@ class KeyframeGenerationRequest(BaseModel):
     aspect_ratio: str = "9:16"
     candidate_count: int = Field(default=1, ge=1, le=4)
     seed: int | None = Field(default=None, ge=0)
-    provider_service_id: str = "codex_image"
+    provider_service_id: str = "image_relay"
     asset_refs: list[str] = Field(default_factory=list)
     director_setup: DirectorSetup2D | None = None
     node_parameters: dict[str, Any] | None = None
@@ -232,7 +232,7 @@ class GenerationComparisonRequest(BaseModel):
     aspect_ratio: str = "9:16"
     candidate_count: int = Field(default=1, ge=1, le=4)
     seed: int | None = Field(default=None, ge=0)
-    provider_service_id: str = "codex_image"
+    provider_service_id: str = "image_relay"
     context_subgraph: ContextSubgraph | None = None
     manual_scores: dict[str, Any] = Field(default_factory=dict)
     generated_at: str = Field(min_length=1)
