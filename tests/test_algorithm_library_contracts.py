@@ -7,6 +7,7 @@ def test_algorithm_library_exports_runtime_algorithm_contracts() -> None:
     from agentflow import algorithms
     from agentflow.algorithms import (
         asset_card_drafting,
+        content_quality_evaluation,
         context_resolver,
         creative_intent_control,
         fixed_asset_memory,
@@ -19,6 +20,7 @@ def test_algorithm_library_exports_runtime_algorithm_contracts() -> None:
     assert algorithms.ALGORITHM_LIBRARY_VERSION.startswith("afs_algorithm_library_")
     for module in (
         asset_card_drafting,
+        content_quality_evaluation,
         context_resolver,
         creative_intent_control,
         fixed_asset_memory,

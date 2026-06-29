@@ -8,6 +8,17 @@
 
 Last updated: 2026-06-26 by Codex
 
+Current goal-mode addendum: 2026-06-30 started the project-book full goal-mode
+branch `codex/afs-project-book-full-goal-20260630` from the synced baseline
+`6071ef1aa665930df2b9fa383260fc68ed4e4e64`. First verified slice targets
+`AFS-T14 Content Quality Evaluation`: Runtime storyboard breakdown now emits a
+deterministic `content_quality_report` artifact that checks source grounding,
+dynamic shot-count policy, asset evidence, keyframe/video intent fields, and
+safe non-claim boundaries. This is structure verification for content-production
+quality gates, not provider smoke, human creative acceptance, business
+validation, or durable memory promotion. Handoff:
+`docs/handoff/AFS-CONTENT-QUALITY-REPORT-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

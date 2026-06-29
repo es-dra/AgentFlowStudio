@@ -18,6 +18,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "fixed_asset_memory",
     "request_projection",
     "quality_feedback_scoring",
+    "content_quality_evaluation",
     "revision_drift_control",
 )
 

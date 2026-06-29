@@ -1,5 +1,61 @@
 # Devlog
 
+## 2026-06-30 - Project-Book Goal Mode Content Quality Contract
+
+- Started the formal `AFS Project-Book Full Goal-Mode Execution` line on
+  `codex/afs-project-book-full-goal-20260630` from frozen baseline
+  `6071ef1aa665930df2b9fa383260fc68ed4e4e64`.
+- Selected the first verified slice from the project-book task ledger:
+  `AFS-T14 Content Quality Evaluation`, supporting later `AFS-T3/T4/T5`
+  work on data model, production graph, and asset cards.
+- Added deterministic `agentflow.algorithms.content_quality_evaluation` and
+  attached `content_quality_report` to Runtime storyboard breakdown output.
+  The report checks script source grounding, dynamic shot-count policy, asset
+  evidence, keyframe/video intent fields, and safe non-claim boundaries.
+- Runtime now writes `content_quality_report.json`, registers it as a
+  `content_quality_report` artifact, and records the report status in the
+  storyboard safe manifest.
+- Kept the slice additive: no provider gate change, no live provider call, no
+  Studio UI change, no OpenAPI public-surface expansion, no deployment, and no
+  human creative acceptance/business validation claim.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_storyboard_content_quality.py -q
+# red baseline reproduced: missing content_quality_report
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_storyboard_content_quality.py tests\test_api_runtime_storyboard_breakdown.py tests\test_algorithm_library_contracts.py -q
+# 33 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_storyboard_content_quality.py -q
+# 2 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 691 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# initial run flagged the new handoff for Chinese coverage; handoff was rewritten
+# as a Chinese-first document and the warning count returned to the existing 22
+# human_doc_chinese_coverage findings
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Three-End Sync + Runtime Health Verification
 
 - Continued after the AFS-T4 baseline freeze and synchronized the pushed
