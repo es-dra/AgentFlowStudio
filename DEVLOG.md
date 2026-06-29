@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-06-29 - Asset Card Image Handoff Credential Preflight
+
+- Fixed the `codex_image` asset/keyframe handoff path so local Codex accounts
+  with `auth_type: none` are not blocked by a stale or placeholder
+  `credential_env` on the image account-pool entry.
+- API-key based provider accounts still require their configured credential
+  environment variable before dispatch, so remote provider gates remain strict.
+- Added regression coverage for the asset-card image handoff case where
+  `AFS_ALLOW_REMOTE_IMAGE=true` is set but the local handoff account should
+  queue a worker job without reading or requiring an API key.
+
+Verification:
+
+```text
+python -m pytest tests/test_codex_image_handoff.py -q -> 16 passed
+python -m pytest tests/test_provider_adapter_registry.py -q -> 27 passed
+```
+
+Boundary:
+
+- No live provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- This fixes Runtime handoff submission; an actually running image worker is
+  still required for live image completion.
+
 ## 2026-06-29 - Runtime Script Expansion Contract
 
 - Fixed the Studio script expansion request so `prompt_text` carries only the

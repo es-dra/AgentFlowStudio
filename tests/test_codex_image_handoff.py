@@ -113,6 +113,36 @@ def test_codex_image_handoff_provider_lifecycle_is_file_based_and_safe(tmp_path,
     assert "d:\\" not in serialized
 
 
+def test_codex_image_handoff_ignores_pool_credential_env_for_local_none_auth(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    payload = _codex_provider_config()
+    payload["account_pools"]["codex_image_pool"]["accounts"][0]["credential_env"] = "AFS_MODEL_RELAY_API_KEY"
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.delenv("AFS_MODEL_RELAY_API_KEY", raising=False)
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+    output_dir = tmp_path / "run"
+
+    task = registry.submit(
+        "image",
+        "codex_image",
+        ProviderDispatchRequest(
+            prompt="Generate a reusable prop reference sheet.",
+            output_dir=output_dir,
+            aspect_ratio="1:1",
+            candidate_count=1,
+        ),
+    )
+
+    assert task["task"]["status"] == "submitted"
+    request_path = next((output_dir / "codex_image_job" / "pending").glob("*/request.json"))
+    serialized = request_path.read_text(encoding="utf-8").lower()
+    assert "afs_model_relay_api_key" not in serialized
+    assert "api_key" not in serialized
+
+
 def test_codex_image_worker_prompt_has_non_visual_job_nonce() -> None:
     prompt = codex_image_worker._worker_prompt(  # noqa: SLF001 - guard regression for the worker prompt contract.
         {

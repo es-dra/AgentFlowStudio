@@ -12,6 +12,18 @@ This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
 
+Asset-card image handoff credential preflight follow-up: 2026-06-29 pass fixed
+the asset-card image generation blocker where local `codex_image` handoff
+accounts with `auth_type: none` could still be stopped by a stale or placeholder
+`credential_env` on the account-pool entry, producing a safe but misleading
+`Image provider configuration is not ready` failure before a worker job was
+queued. Provider account selection now ignores credential env checks only for
+explicit no-auth local accounts; API-key based providers still require their
+credential env. Verification: codex image handoff tests passed 16 and provider
+adapter registry tests passed 27. Boundary: no live provider call, secret read,
+media byte, signed URL, video generation, ASR, external download, or private
+Company OS source content was used or written.
+
 Studio script expansion contract follow-up: 2026-06-29 pass fixed the
 `扩写剧本` behavior where fallback output looked like framework-filled final
 content, repeated clicks nested expansion over the already-generated script,
