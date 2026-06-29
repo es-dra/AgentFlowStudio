@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-06-29 - Studio Script Expansion Source Guard
+
+- Fixed the Studio `扩写剧本` path so repeated clicks reuse the original source
+  idea stored on the text node instead of expanding the already-generated
+  script body again.
+- Runtime-empty, placeholder storyboard, or framework-like script expansion
+  output now lands in an explicit `idea_expanded_script_fallback` local draft
+  state, with the original source idea preserved for retry/regeneration.
+- The local fallback draft now labels itself as editable local draft content and
+  avoids the previous fixed three-paragraph framework wording that looked like
+  template-filled final output.
+- Manual text/script edits in the prompt bar clear the saved expansion source
+  when the user changes the content, so a new idea is not accidentally expanded
+  from a stale source snapshot.
+
+Verification:
+
+```text
+python -m pytest tests/test_web_studio_prompt_script_static.py -> 17 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No provider call, video generation, ASR, external download, secret read,
+  signed URL, media byte, or private Company OS source content was used or
+  written to the repo.
+- Local static/unit verification does not claim human acceptance or creative
+  quality acceptance.
+
 ## 2026-06-28 - Studio Text Optimizer Content Writeback
 
 - Fixed the Studio text/script optimizer path for uploaded scripts whose visible

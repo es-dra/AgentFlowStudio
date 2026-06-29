@@ -149,14 +149,84 @@ process.stdout.write(JSON.stringify(state.nodes.text_1));
     )
     node = json.loads(completed.stdout)
 
-    assert node["params"]["scriptInputMode"] == "idea_expanded_script"
+    assert node["params"]["scriptInputMode"] == "idea_expanded_script_fallback"
+    assert node["params"]["scriptExpansionState"]["status"] == "fallback"
+    assert node["params"]["scriptExpansionSourceIdea"] == "一个来自未来的机器人，在农村屋顶上看星星"
+    assert "本地草稿" in node["prompt"]
     assert "片名：《" in node["prompt"]
-    assert "故事从一个清晰的核心画面展开" in node["prompt"]
+    assert "一个来自未来的机器人，在农村屋顶上看星星" in node["prompt"]
+    assert "故事从一个清晰的核心画面展开" not in node["prompt"]
     assert "正式短视频剧本" not in node["prompt"]
     assert "分镜 01" not in node["prompt"]
     assert "推进主体" not in node["prompt"]
     assert "展示变化" not in node["prompt"]
     assert "收束结果" not in node["prompt"]
+
+
+def test_idea_expansion_reuses_original_source_and_does_not_nest_generated_script() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "白雪公主穿越到现代",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const prompts = [];
+const runtime = {
+  async optimizePrompt(payload) {
+    prompts.push(payload.node_parameters.source_idea);
+    return {
+      user_prompt: `片名：《现代白雪》\n\n成稿来自：${payload.node_parameters.source_idea}`,
+      user_prompt_plain: `片名：《现代白雪》\n\n成稿来自：${payload.node_parameters.source_idea}`,
+      optimization_mode: "script",
+      context_bundle: { warnings: [] },
+    };
+  },
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+const first = state.nodes.text_1.prompt;
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify({
+  prompts,
+  first,
+  second: state.nodes.text_1.prompt,
+  source: state.nodes.text_1.params.scriptExpansionSourceIdea,
+  mode: state.nodes.text_1.params.scriptInputMode,
+  status: state.nodes.text_1.params.scriptExpansionState.status,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["prompts"] == ["白雪公主穿越到现代", "白雪公主穿越到现代"]
+    assert payload["first"] == payload["second"]
+    assert payload["source"] == "白雪公主穿越到现代"
+    assert payload["mode"] == "idea_expanded_script"
+    assert payload["status"] == "complete"
 
 
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
@@ -175,6 +245,7 @@ def test_text_script_body_receives_generated_content_and_keeps_editable_surface(
     assert "text-content-view" in canvas_body
     assert "openNodePromptEditor" in canvas_input
     assert "promptBarNodeId" in prompt_bar
+    assert "scriptExpansionSourceIdea" in prompt_bar
     assert "content-shimmer" in canvas_body
     assert ".text-content-view.content-shimmer" in styles
     assert "node-context-toolbar" not in canvas_view

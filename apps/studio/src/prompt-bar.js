@@ -96,6 +96,13 @@ function buildBar(store, runtime, node) {
         }
       } else if (n.type === "text" || n.type === "script") {
         n.content = textarea.value;
+        if (String(n.params?.scriptExpansionSourceIdea || "").trim() !== textarea.value.trim()) {
+          delete n.params.scriptExpansionSourceIdea;
+          delete n.params.scriptExpansionState;
+          if (n.params.scriptInputMode === "idea_expanded_script" || n.params.scriptInputMode === "idea_expanded_script_fallback") {
+            delete n.params.scriptInputMode;
+          }
+        }
       }
       delete n.params.lastOptimizedPromptPlain;
     }, { history: false });

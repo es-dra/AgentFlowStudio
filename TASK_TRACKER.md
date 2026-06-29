@@ -6,11 +6,24 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-28 by Codex
+Last updated: 2026-06-29 by Codex
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
+
+Studio script expansion source guard follow-up: 2026-06-29 pass fixed the
+`扩写剧本` behavior where fallback output looked like framework-filled final
+content and repeated clicks nested expansion over the already-generated script.
+Studio now preserves the original source idea on first expansion and reuses it
+for retry/regeneration, marks empty/placeholder/framework-like Runtime results
+as `idea_expanded_script_fallback` local drafts, and clears stale expansion
+source state when the user manually edits text/script content. Verification:
+`python -m pytest tests/test_web_studio_prompt_script_static.py` passed 17,
+`npm.cmd run check:studio-js` passed for 121 files, and `git diff --check`
+passed. Boundary: no provider call, video generation, ASR, external download,
+secret read, media byte, signed URL, or private Company OS source content was
+used or written.
 
 Studio text optimizer content writeback follow-up: 2026-06-28 pass fixed the
 uploaded-script optimization bug where the visible script body was stored in

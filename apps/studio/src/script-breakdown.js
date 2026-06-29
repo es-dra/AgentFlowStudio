@@ -4,6 +4,7 @@ import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotTe
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
 const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保留下一步生成关键帧所需的信息)/;
+const EXPANDED_SCRIPT_MODES = new Set(["idea_expanded_script", "idea_expanded_script_fallback"]);
 
 export function importScriptFileIntoTextNode(store, node, textarea = null) {
   const input = document.createElement("input");
@@ -24,7 +25,7 @@ export function importScriptFileIntoTextNode(store, node, textarea = null) {
 
 export async function expandTextIdeaToScript(store, runtime, node, textarea = null) {
   const fresh = store.get().nodes[node.id] || node;
-  const idea = String(fresh.prompt || fresh.content || "").trim();
+  const idea = scriptExpansionSourceIdea(fresh);
   if (!idea) return;
   setScriptExpansionState(store, fresh.id, "running", idea);
   textarea?.classList?.add("prompt-shimmer");
@@ -44,17 +45,23 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     };
     const response = runtime?.optimizePrompt ? await runtime.optimizePrompt(request) : null;
     const outcome = response ? normalizeOptimization(response, request) : null;
-    const script = normalizeExpandedScript(outcome?.plain || outcome?.optimized, idea);
-    updateTextNode(store, fresh.id, script, {
-      scriptInputMode: "idea_expanded_script",
-      scriptExpansionState: { status: "complete", completed_at: new Date().toISOString() },
+    const result = normalizeExpandedScript(outcome?.plain || outcome?.optimized, idea);
+    updateTextNode(store, fresh.id, result.script, {
+      scriptInputMode: result.fallback ? "idea_expanded_script_fallback" : "idea_expanded_script",
+      scriptExpansionSourceIdea: idea.slice(0, 600),
+      scriptExpansionState: {
+        status: result.fallback ? "fallback" : "complete",
+        reason: result.reason || "",
+        completed_at: new Date().toISOString(),
+      },
     });
-    if (textarea) textarea.value = script;
+    if (textarea) textarea.value = result.script;
   } catch {
     const script = draftScriptFromIdea(idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script_fallback",
-      scriptExpansionState: { status: "fallback", completed_at: new Date().toISOString() },
+      scriptExpansionSourceIdea: idea.slice(0, 600),
+      scriptExpansionState: { status: "fallback", reason: "runtime_error", completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
   } finally {
@@ -162,10 +169,22 @@ function balancedSentenceChunks(sentences, targetCount) {
   return chunks;
 }
 
+function scriptExpansionSourceIdea(node) {
+  const current = String(node?.prompt || node?.content || "").trim();
+  const stored = String(node?.params?.scriptExpansionSourceIdea || "").trim();
+  if (stored && EXPANDED_SCRIPT_MODES.has(node?.params?.scriptInputMode)) return stored;
+  return current;
+}
+
 function normalizeExpandedScript(value, idea) {
   const text = String(value || "").trim();
-  if (!text || looksLikeStoryboardPlaceholder(text)) return draftScriptFromIdea(idea);
-  return text;
+  if (!text) {
+    return { script: draftScriptFromIdea(idea), fallback: true, reason: "empty_runtime_response" };
+  }
+  if (looksLikeStoryboardPlaceholder(text) || looksLikeFrameworkFill(text)) {
+    return { script: draftScriptFromIdea(idea), fallback: true, reason: "placeholder_or_framework_output" };
+  }
+  return { script: text, fallback: false, reason: "" };
 }
 
 function looksLikeStoryboardPlaceholder(text) {
@@ -174,18 +193,38 @@ function looksLikeStoryboardPlaceholder(text) {
   return markerCount >= 3 && STORYBOARD_PLACEHOLDER_RE.test(text);
 }
 
+function looksLikeFrameworkFill(text) {
+  const value = String(text || "");
+  const markers = [
+    "故事从一个清晰的核心画面展开",
+    "主角或核心物体",
+    "而不是只停留在概念展示",
+    "收束要保留下一步拆分分镜所需",
+  ];
+  return markers.filter((marker) => value.includes(marker)).length >= 2;
+}
+
 function draftScriptFromIdea(idea) {
   const clean = cleanSegment(idea);
   const title = fallbackScriptTitle(clean);
+  const lead = fallbackLead(clean);
   return [
+    "本地草稿：远程剧本扩写未返回可用正文，以下内容仅作为可编辑初稿。",
+    "",
     `片名：《${title}》`,
     "",
-    `故事从一个清晰的核心画面展开：${clean}。开场先交代主要人物或核心物体所处的环境，让观众立刻理解它为什么出现在这里，以及这个瞬间带来的情绪基调。`,
+    `${lead}，这个突兀的转折先被当作一个真实发生的瞬间呈现出来。画面不用急着解释来龙去脉，而是让人物、地点和周围细节一起说明处境：熟悉的身份被放进新的环境里，第一反应带出惊讶、迟疑和一点点必须向前走的紧张。`,
     "",
-    "随着时间推进，主角或核心物体开始产生细微动作和情绪变化。周围的光线、声音、空间细节共同推动气氛，让画面从静态设定进入一个可被感知的故事时刻，而不是只停留在概念展示。",
+    `随后，${clean}不再只是一个设定，而变成连续动作：人物观察眼前的变化，尝试理解新的规则，并因为一次小小的选择和现代环境产生碰撞。场景中的声音、光线和路人的反应逐步放大这种错位感，让故事从“来到这里”推进到“必须在这里做决定”。`,
     "",
-    "结尾给出一个明确但不过度解释的动作或结果：主角完成一次选择、凝视、触碰、离开或停留。这个收束要保留下一步拆分分镜所需的人物、场景、动作、情绪和视觉重点。",
+    "结尾停在一个明确动作上：人物没有立刻得到答案，但已经做出回应，或迈出第一步，或抓住某个能证明自己处境的物件。这个收束保留继续拆分分镜所需的人物、场景、动作和情绪，同时避免把后续剧情一次性讲完。",
   ].join("\n");
+}
+
+function fallbackLead(clean) {
+  if (!clean) return "故事开场从一个陌生又具体的时刻切入";
+  if (/[。！？!?]$/.test(clean)) return clean;
+  return `${clean}`;
 }
 
 function fallbackScriptTitle(clean) {
