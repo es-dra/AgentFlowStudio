@@ -21,6 +21,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "content_quality_evaluation",
     "asset_card_candidates",
     "production_graph",
+    "evidence_ledger",
     "revision_drift_control",
 )
 

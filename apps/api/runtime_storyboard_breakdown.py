@@ -4,9 +4,9 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
-from agentflow.harness.json_io import write_json
 from agentflow.algorithms.asset_card_candidates import build_asset_card_candidates
 from agentflow.algorithms.content_quality_evaluation import evaluate_storyboard_content_quality
+from agentflow.algorithms.evidence_ledger import build_storyboard_evidence_ledger
 from agentflow.algorithms.production_graph import build_storyboard_production_graph
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
@@ -17,6 +17,7 @@ from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement_dispatch import dispatch_llm_with_fallback
 from apps.api.runtime_llm_enhancement_gate import llm_provider_gate
 from apps.api.runtime_models import PromptOptimizationRequest, StoryboardBreakdownRequest
+from apps.api.runtime_storyboard_artifacts import write_storyboard_artifacts
 from apps.api.runtime_storyboard_local import local_storyboard_shots
 from apps.api.runtime_storyboard_provider_parse import shots_from_provider_text
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -41,7 +42,7 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_storyboard_breakdown")) from exc
 
-        artifacts = _write_storyboard_artifacts(store, output_dir, result)
+        artifacts = write_storyboard_artifacts(store, output_dir, result)
         trace_path = write_run_trace(
             output_dir,
             project_id=project_id,
@@ -73,6 +74,7 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
             "content_quality_report": result["content_quality_report"],
             "production_graph": result["production_graph"],
             "asset_card_candidates": result["asset_card_candidates"],
+            "evidence_ledger": result["evidence_ledger"],
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
             "writes_long_term_memory": False,
@@ -156,6 +158,19 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "writes_company_kb": False,
         "non_claims": STORYBOARD_NON_CLAIMS,
     }
+    evidence_ledger = build_storyboard_evidence_ledger(
+        project_id=project_id,
+        script_node_id=request.node_id,
+        provider_gate=gate,
+        provider_calls_started=provider_calls_started,
+        safe_manifest=safe_manifest,
+        asset_graph=asset_graph,
+        content_quality_report=content_quality_report,
+        production_graph=production_graph,
+        asset_card_candidates=asset_card_candidates,
+    )
+    safe_manifest["evidence_ledger_entry_count"] = len(evidence_ledger["evidence_items"])
+    safe_manifest["evidence_ledger_stage"] = evidence_ledger["ledger_stage"]
     artifact = {
         "artifact_type": "agentflow_storyboard_breakdown_safe_artifact",
         "schema_version": "0.1.0",
@@ -187,6 +202,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
     reject_unsafe_payload(content_quality_report)
     reject_unsafe_payload(production_graph)
     reject_unsafe_payload(asset_card_candidates)
+    reject_unsafe_payload(evidence_ledger)
     return {
         "shots": shots,
         "provider_gate": gate,
@@ -197,48 +213,8 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "content_quality_report": content_quality_report,
         "production_graph": production_graph,
         "asset_card_candidates": asset_card_candidates,
+        "evidence_ledger": evidence_ledger,
         "request_plan": request_plan,
-    }
-
-
-def _write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: dict[str, Any]) -> dict[str, Any]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    write_json(output_dir / "storyboard_breakdown_request_plan.json", result["request_plan"])
-    write_json(output_dir / "storyboard_breakdown_safe_artifact.json", result["safe_artifact"])
-    write_json(output_dir / "storyboard_breakdown_safe_manifest.json", result["safe_manifest"])
-    write_json(output_dir / "asset_graph.json", result["asset_graph"])
-    write_json(output_dir / "content_quality_report.json", result["content_quality_report"])
-    write_json(output_dir / "production_graph_snapshot.json", result["production_graph"])
-    write_json(output_dir / "asset_card_candidates.json", result["asset_card_candidates"])
-    return {
-        "storyboard_breakdown_request_plan": store.register_artifact(
-            output_dir / "storyboard_breakdown_request_plan.json",
-            role="storyboard_breakdown_request_plan",
-        ),
-        "storyboard_breakdown_safe_artifact": store.register_artifact(
-            output_dir / "storyboard_breakdown_safe_artifact.json",
-            role="storyboard_breakdown_safe_artifact",
-        ),
-        "storyboard_breakdown_safe_manifest": store.register_artifact(
-            output_dir / "storyboard_breakdown_safe_manifest.json",
-            role="storyboard_breakdown_safe_manifest",
-        ),
-        "asset_graph": store.register_artifact(
-            output_dir / "asset_graph.json",
-            role="asset_graph",
-        ),
-        "content_quality_report": store.register_artifact(
-            output_dir / "content_quality_report.json",
-            role="content_quality_report",
-        ),
-        "production_graph_snapshot": store.register_artifact(
-            output_dir / "production_graph_snapshot.json",
-            role="production_graph_snapshot",
-        ),
-        "asset_card_candidates": store.register_artifact(
-            output_dir / "asset_card_candidates.json",
-            role="asset_card_candidates",
-        ),
     }
 
 

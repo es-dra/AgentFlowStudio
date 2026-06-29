@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Storyboard-to-Asset Evidence Ledger
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `0121a9956b232086d5720b96d795d442ff3c523c`.
+- Added deterministic `agentflow.algorithms.evidence_ledger` and wired Runtime
+  storyboard breakdown to return and persist a safe `evidence_ledger` artifact.
+- The ledger connects storyboard request plan, safe artifact, safe manifest,
+  asset graph, content quality report, production graph snapshot, and asset
+  card candidates with explicit evidence states and non-claim boundaries.
+- Split storyboard artifact writeout into `apps/api/runtime_storyboard_artifacts.py`
+  after full pytest caught `runtime_storyboard_breakdown.py` crossing the
+  focused 300-line route threshold; the route file is back to 267 lines.
+- Kept this as structure/runtime evidence only: provider smoke, human
+  acceptance, business validation, fixed asset memory, provider raw responses,
+  private links, local paths, and media bytes remain outside the ledger.
+- No provider gate, provider call, Studio UI change, public OpenAPI path change,
+  fixed asset promotion, deploy, server sync, business validation, or durable
+  memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_storyboard_evidence_ledger.py
+# red baseline: missing evidence_ledger module and Runtime payload
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_storyboard_evidence_ledger.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_context_resolver_asset_card_candidates.py
+# 7 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_storyboard_modules.py tests\test_api_runtime_storyboard_evidence_ledger.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_context_resolver_asset_card_candidates.py
+# 8 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 699 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T9
+```
+
 ## 2026-06-30 - Context Resolver Candidate Boundary
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

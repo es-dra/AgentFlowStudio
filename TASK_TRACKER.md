@@ -56,6 +56,16 @@ keyframe preflight `included_assets`, `reference_image_channel`, and
 fixed visual asset selection remains unchanged. Handoff:
 `docs/handoff/AFS-CONTEXT-RESOLVER-CANDIDATE-BOUNDARY-TASKRUN-20260630.md`.
 
+Evidence-ledger addendum: the next slice adds
+`agentflow.algorithms.evidence_ledger` and Runtime storyboard breakdown now
+returns and persists a safe `evidence_ledger` artifact. The ledger binds the
+storyboard request plan, safe artifact, safe manifest, asset graph, content
+quality report, production graph snapshot, and asset card candidates into one
+structure/runtime evidence record with explicit non-claims. This is not provider
+smoke, human creative acceptance, business validation, fixed asset memory, or
+durable memory promotion. Handoff:
+`docs/handoff/AFS-EVIDENCE-LEDGER-STORYBOARD-ASSET-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
