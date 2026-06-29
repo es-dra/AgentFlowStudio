@@ -39,6 +39,15 @@ provider smoke, human creative acceptance, business validation, or durable
 memory promotion. Handoff:
 `docs/handoff/AFS-PRODUCTION-GRAPH-CONTRACT-TASKRUN-20260630.md`.
 
+Asset-card-candidate addendum: the next slice adds
+`agentflow.algorithms.asset_card_candidates` and Runtime storyboard breakdown
+now returns and persists safe `asset_card_candidates` derived from
+`asset_graph`. Each candidate remains unconfirmed, blocks fixed asset memory
+writes, carries safe shot/evidence refs, and marks provider enrichment as gated
+by `AFS_ALLOW_REMOTE_VISION`. Existing `/asset-card-drafts` remains the
+vision-gated enrichment route and was not expanded. Handoff:
+`docs/handoff/AFS-ASSET-CARD-CANDIDATES-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-30 - Asset Card Candidate Runtime Contract
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `72f818c37f031524dd3f163acd61e7c7acc92f79`.
+- Added deterministic `agentflow.algorithms.asset_card_candidates` and wired
+  Runtime storyboard breakdown to return and persist safe
+  `asset_card_candidates` derived from the candidate asset graph.
+- Each candidate stays `status=candidate` and
+  `confirmation_state=needs_human_confirmation`, records safe shot/evidence
+  refs, blocks fixed asset memory writes, and marks provider enrichment as
+  gated by `AFS_ALLOW_REMOTE_VISION`.
+- Kept the existing `/asset-card-drafts` vision route unchanged; this slice is
+  a pre-provider candidate contract, not provider-backed card generation.
+- No provider gate, provider call, Studio UI change, public OpenAPI path change,
+  deploy, server sync, human creative acceptance, business validation, or
+  durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_candidates_contract.py -q
+# red baseline: missing asset_card_candidates module and Runtime payload
+# green: 2 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_storyboard_content_quality.py tests\test_api_runtime_storyboard_breakdown.py -q
+# 22 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_drafts.py tests\test_api_runtime_asset_card_modules.py tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_asset_card_candidates_contract.py -q
+# 8 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 696 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Production Graph Runtime Contract
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
