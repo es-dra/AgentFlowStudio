@@ -29,6 +29,7 @@ def keyframe_generation_preflight(
         prompt_default=DEFAULT_IMAGE_PROMPT_LIMIT,
         reference_default=DEFAULT_IMAGE_REFERENCE_SLOTS,
     )
+    reference_slots = _effective_keyframe_reference_slots(request, reference_slots)
     bundle = None
     if request.context_subgraph:
         bundle = resolve_context_bundle(
@@ -46,6 +47,15 @@ def keyframe_generation_preflight(
             director_setup=request.director_setup,
         )
     return _preflight_response("keyframe", request, bundle)
+
+
+def _effective_keyframe_reference_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+    params = request.node_parameters if isinstance(request.node_parameters, dict) else {}
+    is_initial_asset_card = params.get("node_role") == "asset_card_draft" and not isinstance(
+        params.get("asset_card_revision"),
+        dict,
+    )
+    return 0 if is_initial_asset_card else configured_slots
 
 
 def video_generation_preflight(

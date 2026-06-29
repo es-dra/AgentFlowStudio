@@ -295,9 +295,16 @@ def _uses_asset_card_image_edit(request: KeyframeGenerationRequest, reference_im
 
 
 def _effective_reference_image_slots(request: KeyframeGenerationRequest, configured_slots: int) -> int:
+    if _is_initial_asset_card_generation(request):
+        return 0
     if _has_asset_card_revision(request) and configured_slots <= 0:
         return 1
     return configured_slots
+
+
+def _is_initial_asset_card_generation(request: KeyframeGenerationRequest) -> bool:
+    params = request.node_parameters if isinstance(request.node_parameters, dict) else {}
+    return params.get("node_role") == "asset_card_draft" and not isinstance(params.get("asset_card_revision"), dict)
 
 
 def _context_bundle(
@@ -504,6 +511,8 @@ def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
 
 def _safe_error(value: str) -> str:
     lowered = value.lower()
+    if "does not accept reference images" in lowered:
+        return "Image provider does not accept reference images for this generation mode."
     if "status_code 2049" in lowered and "invalid api key" in lowered:
         return "Image provider rejected the configured credential."
     if "api" in lowered or "key" in lowered or "secret" in lowered:
