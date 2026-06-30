@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio production-graph fixed-asset reuse addendum: the next provider-closed
+product slice persists Runtime `production_graph` into Studio storyboard
+breakdown state and surfaces fixed-asset reuse evidence as human-gate metadata
+such as `Fixed reuse / 1 asset`. This keeps the graph visible in the operator
+review path without adding a new Runtime `target_type`, route, request field,
+OpenAPI path, provider call, generated media, deploy, server sync, human
+creative acceptance, or business validation. Handoff:
+`docs/handoff/AFS-STUDIO-PRODUCTION-GRAPH-FIXED-ASSET-REUSE-SURFACE-20260630.md`.
+
 Studio preflight source-evidence surface addendum: the next provider-closed
 product slice surfaces Runtime `included_asset_source_evidence_refs` in the
 existing fixed-asset carry confirmation modal. Operators can now see the human

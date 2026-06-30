@@ -121,6 +121,8 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
       provider_calls_started: Boolean(breakdown.provider_calls_started),
       assetCardCandidates: breakdown.asset_card_candidates || null,
       assetCardCandidateArtifactId: breakdown.artifacts?.asset_card_candidates?.artifact_id || "",
+      productionGraph: breakdown.production_graph || null,
+      productionGraphArtifactId: breakdown.artifacts?.production_graph_snapshot?.artifact_id || "",
       updated_at: new Date().toISOString(),
     };
     sourceNode.params.storyboardBreakdownState = { status: "complete", percent: 100, completed_at: new Date().toISOString() };
@@ -239,6 +241,7 @@ async function loadStoryboardBreakdown(store, runtime, node, source) {
           mode: payload?.safe_manifest?.status || "runtime_storyboard_breakdown",
           provider_calls_started: Boolean(payload?.provider_calls_started),
           asset_card_candidates: payload?.asset_card_candidates || null,
+          production_graph: payload?.production_graph || null,
           artifacts: payload?.artifacts || {},
         };
       }

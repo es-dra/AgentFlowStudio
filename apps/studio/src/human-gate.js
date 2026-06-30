@@ -32,6 +32,7 @@ function humanGateView(node, targets) {
     const targetInfo = el("div", "human-gate-target-info");
     targetInfo.appendChild(el("span", "human-gate-target", target.label));
     if (target.reuse_label) targetInfo.appendChild(el("span", "human-gate-target-meta", target.reuse_label));
+    if (target.graph_reuse_label) targetInfo.appendChild(el("span", "human-gate-target-meta", target.graph_reuse_label));
     row.appendChild(targetInfo);
     const actions = el("div", "human-gate-actions");
     actions.appendChild(decisionButton(node, target, "accepted_for_next_step", "下一步"));
@@ -88,6 +89,8 @@ function assetCardCandidateTargets(node) {
   const candidateSet = breakdown.assetCardCandidates || node?.params?.assetCardCandidates || null;
   const candidates = Array.isArray(candidateSet?.candidates) ? candidateSet.candidates : [];
   const artifactId = breakdown.assetCardCandidateArtifactId || node?.params?.assetCardCandidateArtifactId || "";
+  const productionGraph = productionGraphFromBreakdown(breakdown);
+  const graphReuseCount = productionGraphFixedAssetCount(productionGraph);
   return candidates.map((candidate, index) => ({
     target_type: "asset_card_candidate",
     target_id: safeToken(candidate?.candidate_id || `asset_card_candidate:${index + 1}`),
@@ -95,7 +98,8 @@ function assetCardCandidateTargets(node) {
     scope: "asset_card_candidate_review",
     reuse_policy: assetCandidateReusePolicy(candidate),
     reuse_label: assetCandidateReuseLabel(assetCandidateReusePolicy(candidate)),
-    note: assetCandidateReuseNote(candidate),
+    graph_reuse_label: productionGraphReuseLabel(productionGraph),
+    note: `${assetCandidateReuseNote(candidate)}; fixed_asset_reuse_count=${graphReuseCount}`,
     label: `${assetTypeLabel(candidate?.asset_type)} · ${safeText(candidate?.draft_fields?.display_name || candidate?.source_asset_id || `候选 ${index + 1}`)}`,
   }));
 }
@@ -145,6 +149,23 @@ function assetCandidateReuseLabel(policy) {
   if (!policy) return "";
   const scopeLabel = policy.suggested_reuse_scope === "project_reuse_candidate" ? "Project reuse" : "Shot local";
   return `${scopeLabel} / ${policy.shot_ref_count} shots`;
+}
+
+function productionGraphFromBreakdown(breakdown) {
+  return breakdown?.productionGraph || breakdown?.production_graph || null;
+}
+
+function productionGraphFixedAssetCount(graph) {
+  const summaryCount = Number(graph?.summary?.fixed_visual_asset_count);
+  if (Number.isFinite(summaryCount) && summaryCount > 0) return Math.min(summaryCount, 99);
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  return Math.min(nodes.filter((node) => node?.node_type === "fixed_visual_asset").length, 99);
+}
+
+function productionGraphReuseLabel(graph) {
+  const count = productionGraphFixedAssetCount(graph);
+  if (!count) return "";
+  return `Fixed reuse / ${count} ${count === 1 ? "asset" : "assets"}`;
 }
 
 function safeText(value) {
