@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
+from agentflow.algorithms.model_call_context.feedback_context import bundle_feedback_context_overlays
 from agentflow.algorithms.quality_feedback_scoring import sanitize_quality_feedback
 
 
@@ -61,7 +62,11 @@ def build_model_call_context(
     retired_ids = _asset_ids(retired_assets)
     refs = _dedupe([*_bundle_reference_refs(bundle), *(reference_image_refs or [])])
     events = [sanitize_quality_feedback(item) for item in (feedback_events or []) if isinstance(item, dict)]
-    overlays = _bundle_feedback_context_overlays(bundle)
+    overlays = bundle_feedback_context_overlays(
+        bundle,
+        sanitize_text=_sanitize_text,
+        safe_ref_list=_safe_ref_list,
+    )
     overlay_prompt_policy = feedback_overlay_prompt_policy(
         context_bundle=bundle,
         context_overlays=overlays,
@@ -149,77 +154,6 @@ def _bundle_asset_ids(bundle: dict[str, Any], key: str) -> list[str]:
 def _bundle_reference_refs(bundle: dict[str, Any]) -> list[str]:
     values = bundle.get("reference_image_channel") if isinstance(bundle, dict) else []
     return [str(item.get("asset_id") or "") for item in (values or []) if isinstance(item, dict)]
-
-
-def _bundle_feedback_context_overlays(bundle: dict[str, Any]) -> list[dict[str, Any]]:
-    values = bundle.get("feedback_context_overlays") if isinstance(bundle, dict) else []
-    overlays: list[dict[str, Any]] = []
-    for item in (values if isinstance(values, list) else []):
-        if not isinstance(item, dict):
-            continue
-        overlay = {
-            "overlay_id": _sanitize_text(item.get("overlay_id")).strip(),
-            "candidate_id": _sanitize_text(item.get("candidate_id")).strip(),
-            "candidate_scope": _sanitize_text(item.get("candidate_scope")).strip(),
-            "feedback_taxonomy": _safe_ref_list(
-                [_sanitize_text(taxonomy_id).strip() for taxonomy_id in _safe_list(item.get("feedback_taxonomy"))]
-            ),
-            "target_binding": _safe_payload(item.get("target_binding")),
-            "scope_policy": _safe_payload(item.get("scope_policy")),
-            "conflict_summary": _safe_payload(item.get("conflict_summary")),
-            "safe_evidence_summary": _safe_evidence_summary(item.get("safe_evidence_summary")),
-            "overlay_scope": _sanitize_text(item.get("overlay_scope")).strip(),
-            "decision_effect": _sanitize_text(item.get("decision_effect")).strip(),
-            "context_overlay_consumed": bool(item.get("context_overlay_consumed")),
-            "provider_calls_started": False,
-            "writes_long_term_memory": False,
-            "writes_company_kb": False,
-        }
-        if overlay["overlay_id"]:
-            overlays.append(overlay)
-    return overlays
-
-
-def _safe_list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _safe_evidence_summary(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        return {}
-    summary = {
-        "rating_count": _bounded_int(value.get("rating_count")),
-        "decision_count": _bounded_int(value.get("decision_count")),
-        "has_note": bool(value.get("has_note")),
-        "raw_evidence_policy": _sanitize_text(value.get("raw_evidence_policy")).strip() or "raw_evidence_not_memory",
-    }
-    if "taxonomy_count" in value:
-        summary["taxonomy_count"] = _bounded_int(value.get("taxonomy_count"))
-    return summary
-
-
-def _safe_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            _sanitize_text(key).strip()[:80]: _safe_payload(item)
-            for key, item in list(value.items())[:24]
-            if _sanitize_text(key).strip()
-        }
-    if isinstance(value, list):
-        return [_safe_payload(item) for item in value[:24]]
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return _bounded_int(value)
-    return _sanitize_text(value).strip()[:180]
-
-
-def _bounded_int(value: Any) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, min(number, 1000))
 
 
 def _warning_ids(bundle: dict[str, Any]) -> list[str]:

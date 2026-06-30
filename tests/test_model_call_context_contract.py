@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import base64
+from pathlib import Path
 
 
 PNG_B64 = base64.b64encode(
@@ -9,6 +10,20 @@ PNG_B64 = base64.b64encode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     )
 ).decode("ascii")
+
+
+def test_model_call_context_feedback_overlay_sanitizer_is_split() -> None:
+    root = Path(__file__).resolve().parents[1]
+    main_source = root / "agentflow" / "algorithms" / "model_call_context" / "__init__.py"
+    helper_source = root / "agentflow" / "algorithms" / "model_call_context" / "feedback_context.py"
+    main_text = main_source.read_text(encoding="utf-8")
+    helper_text = helper_source.read_text(encoding="utf-8")
+
+    assert len(main_text.splitlines()) <= 240
+    assert len(helper_text.splitlines()) <= 120
+    assert "from agentflow.algorithms.model_call_context.feedback_context import" in main_text
+    assert "def _bundle_feedback_context_overlays" not in main_text
+    assert "def bundle_feedback_context_overlays" in helper_text
 
 
 def test_model_call_context_maps_operations_and_blocks_unsafe_boundaries() -> None:

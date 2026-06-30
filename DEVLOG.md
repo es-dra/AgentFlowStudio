@@ -1,5 +1,52 @@
 # Devlog
 
+## 2026-06-30 - Model Call Feedback Overlay Sanitizer Split
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `e865237bc3d6f297e220a26138563ed501f20c90`.
+- Added `AFS-T18e Model Call Feedback Overlay Sanitizer Split` as a
+  provider-closed maintenance/contract slice.
+- Moved model-call feedback overlay summary sanitization from
+  `agentflow/algorithms/model_call_context/__init__.py` into
+  `agentflow/algorithms/model_call_context/feedback_context.py`.
+- Reduced `model_call_context/__init__.py` from 294 lines to 228 lines; the new
+  helper is 91 lines.
+- Kept behavior unchanged by injecting the existing `_sanitize_text` and
+  `_safe_ref_list` functions into the helper instead of duplicating URL,
+  credential, local-path, and safe-ref normalization.
+- Added a module-boundary regression so future feedback overlay fields do not
+  get reintroduced into the model-call context main module.
+- No Runtime route, OpenAPI path, Studio fetch, provider call, generated media,
+  durable memory, Company KB promotion, master merge, deploy, server sync,
+  Runtime health verification, or human/business acceptance occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_model_call_context_contract.py tests\test_model_call_context_runtime_routes.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_openapi_snapshot.py -q
+# 19 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 739 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Feedback Candidate Scope Conflict Contract
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

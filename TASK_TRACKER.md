@@ -360,6 +360,20 @@ server sync, Runtime health verification, or human/business acceptance.
 Handoff:
 `docs/handoff/AFS-FEEDBACK-CANDIDATE-SCOPE-CONFLICT-CONTRACT-20260630.md`.
 
+Model-call feedback overlay sanitizer split addendum: because T15g pushed
+`agentflow/algorithms/model_call_context/__init__.py` to 294 lines, the next
+provider-closed maintenance slice adds `AFS-T18e Model Call Feedback Overlay
+Sanitizer Split`. Feedback overlay summary sanitization now lives in
+`agentflow/algorithms/model_call_context/feedback_context.py`, while
+`model_call_context/__init__.py` returns to 228 lines. The helper receives the
+existing `_sanitize_text` and `_safe_ref_list` boundaries by dependency
+injection, so URL, credential, local-path, provider-raw, and safe-ref behavior
+remains unchanged. This is a maintenance/contract split only: no Runtime route,
+OpenAPI path, Studio fetch, provider call, generated media, durable memory,
+Company KB promotion, master merge, deploy, server sync, Runtime health
+verification, or human/business acceptance. Handoff:
+`docs/handoff/AFS-MODEL-CALL-FEEDBACK-OVERLAY-SANITIZER-SPLIT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
