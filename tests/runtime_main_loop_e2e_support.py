@@ -78,12 +78,18 @@ def candidate_for_label(payload: dict, label: str) -> dict:
     )
 
 
-def upload_image(client: TestClient, project_id: str) -> str:
+def upload_image(
+    client: TestClient,
+    project_id: str,
+    *,
+    node_id: str = "node-ref-lin-wan",
+    filename: str = "lin-wan-reference.png",
+) -> str:
     response = client.post(
         f"/projects/{project_id}/image-assets",
         json={
-            "node_id": "node-ref-lin-wan",
-            "filename": "lin-wan-reference.png",
+            "node_id": node_id,
+            "filename": filename,
             "mime_type": "image/png",
             "data_base64": PNG_B64,
             "role": "character_reference",
@@ -94,19 +100,30 @@ def upload_image(client: TestClient, project_id: str) -> str:
     return response.json()["asset"]["asset_id"]
 
 
-def promote_fixed_asset(client: TestClient, project_id: str, image_asset_id: str) -> dict:
+def promote_fixed_asset(
+    client: TestClient,
+    project_id: str,
+    image_asset_id: str,
+    *,
+    label: str = "林晚",
+    signature: str = "short black hair, red trench coat, alert investigator posture",
+    appearance: str = "young investigator with short black hair and red trench coat",
+    source_node_id: str = "node-ref-lin-wan",
+    source_human_gate_id: str = "runtime-human-gate:baseline:accepted",
+    source_asset_card_candidate_id: str = "asset_card_candidate:graph_character_林晚",
+) -> dict:
     response = client.post(
         f"/projects/{project_id}/visual-assets/promote",
         json={
             "source_image_asset_refs": [image_asset_id],
             "asset_type": "character",
-            "label": "林晚",
-            "signature": "short black hair, red trench coat, alert investigator posture",
-            "feature_card": {"appearance": "young investigator with short black hair and red trench coat"},
+            "label": label,
+            "signature": signature,
+            "feature_card": {"appearance": appearance},
             "negative_locks": ["do not change face identity", "keep red trench coat"],
-            "source_node_id": "node-ref-lin-wan",
-            "source_human_gate_id": "runtime-human-gate:baseline:accepted",
-            "source_asset_card_candidate_id": "asset_card_candidate:graph_character_林晚",
+            "source_node_id": source_node_id,
+            "source_human_gate_id": source_human_gate_id,
+            "source_asset_card_candidate_id": source_asset_card_candidate_id,
             "review_decision": "fixed",
             "reviewed_at": "2026-06-30T23:55:00+08:00",
         },

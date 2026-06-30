@@ -8,6 +8,21 @@
 
 Last updated: 2026-06-30 by Codex
 
+Multi-character bridge regression addendum: the next provider-closed slice adds
+a second real benchmark regression using `multi_character_restaurant_note`. It
+promotes two fixed character assets (`周岚` and `陈默`), runs the real
+storyboard/content-quality path, records a local feedback overlay, and submits a
+keyframe request that carries both fixed assets into blocked keyframe bridge
+evidence. The bridge now proves two source-evidence refs reach
+`context_evidence` while `provider_calls_started=false`, the image gate remains
+blocked, no candidate previews or reusable generated image assets are returned,
+and feedback overlay prompt inclusion remains blocked by default. Full pytest
+passed (`773 passed, 520 deselected, 2 warnings`). No Runtime route, OpenAPI
+path, Studio UI, provider call, generated media, human creative acceptance,
+business validation, public claim, patent/legal decision, or COS active-rule
+promotion occurred. Handoff:
+`docs/handoff/AFS-MULTI-CHARACTER-KEYFRAME-BRIDGE-REGRESSION-20260630.md`.
+
 Main-loop keyframe bridge evidence addendum: the next provider-closed slice
 extends the real `multi_scene_map_chase` Runtime E2E harness from keyframe
 preflight into blocked local keyframe generation bridge evidence. The bridge now
