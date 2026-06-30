@@ -37,13 +37,22 @@ OPTIONAL_LIVE_GATES = {"video": "AFS_ALLOW_REMOTE_VIDEO", "vision": "AFS_ALLOW_R
 
 def main() -> int:
     args = parse_args()
-    report = build_readiness_report(repo_root=Path(args.repo_root), kb_root=Path(args.kb_root))
+    report = build_readiness_report(
+        repo_root=Path(args.repo_root),
+        kb_root=Path(args.kb_root),
+        live_smoke_authorized=bool(args.live_smoke_authorized),
+    )
     if args.report:
         report_path = Path(args.report)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if report["status"] in {"ready_for_authorization", "ready_for_provider_smoke"} else 2
+    passing_statuses = {
+        "ready_for_authorization",
+        "ready_for_human_authorization",
+        "ready_for_provider_smoke",
+    }
+    return 0 if report["status"] in passing_statuses else 2
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,10 +60,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", default=str(ROOT))
     parser.add_argument("--kb-root", default=str(DEFAULT_KB_ROOT))
     parser.add_argument("--report", default="")
+    parser.add_argument(
+        "--live-smoke-authorized",
+        action="store_true",
+        help="Mark that a human explicitly authorized the next live provider smoke scope. "
+        "This tool still performs no provider calls.",
+    )
     return parser.parse_args()
 
 
-def build_readiness_report(*, repo_root: Path, kb_root: Path) -> dict[str, Any]:
+def build_readiness_report(
+    *,
+    repo_root: Path,
+    kb_root: Path,
+    live_smoke_authorized: bool = False,
+) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     kb_root = kb_root.resolve()
     runtime = _runtime_surface()
@@ -68,7 +88,8 @@ def build_readiness_report(*, repo_root: Path, kb_root: Path) -> dict[str, Any]:
         missing_actions=missing_actions,
         provider_config=provider_config,
     )
-    status = _status(readiness_blocks, provider_config, gates)
+    authorization = _authorization_state(live_smoke_authorized)
+    status = _status(readiness_blocks, provider_config, gates, authorization)
     return {
         "artifact_type": "afs_provider_connected_validation_readiness",
         "schema_version": "0.1.0",
@@ -82,7 +103,8 @@ def build_readiness_report(*, repo_root: Path, kb_root: Path) -> dict[str, Any]:
             "provider_gates": gates,
         },
         "provider_config": provider_config,
-        "required_authorizations": _required_authorizations(gates),
+        "authorization_state": authorization,
+        "required_authorizations": _required_authorizations(gates, authorization),
         "readiness_blocks": readiness_blocks,
         "next_actions": _next_actions(status, readiness_blocks, gates),
         "secrets_printed": False,
@@ -169,17 +191,33 @@ def _readiness_blocks(
     return blocks
 
 
-def _status(readiness_blocks: list[dict[str, Any]], provider_config: dict[str, Any], gates: dict[str, dict[str, Any]]) -> str:
+def _authorization_state(live_smoke_authorized: bool) -> dict[str, Any]:
+    return {
+        "human_live_provider_smoke_authorized": bool(live_smoke_authorized),
+        "current_session_approval_inferred_from_env": False,
+        "env_gates_are_not_authorization": True,
+        "provider_calls_allowed_by_this_tool": False,
+    }
+
+
+def _status(
+    readiness_blocks: list[dict[str, Any]],
+    provider_config: dict[str, Any],
+    gates: dict[str, dict[str, Any]],
+    authorization: dict[str, Any],
+) -> str:
     if readiness_blocks:
         return "blocked"
     if provider_config["example_only"]:
         return "needs_local_provider_config"
     if any(not gates[name]["enabled"] for name in REQUIRED_LIVE_GATES):
         return "ready_for_authorization"
+    if not authorization["human_live_provider_smoke_authorized"]:
+        return "ready_for_human_authorization"
     return "ready_for_provider_smoke"
 
 
-def _required_authorizations(gates: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def _required_authorizations(gates: dict[str, dict[str, Any]], authorization: dict[str, Any]) -> dict[str, Any]:
     return {
         "required_before_live_provider_smoke": [
             gate["env"] for name, gate in gates.items() if name in REQUIRED_LIVE_GATES and not gate["enabled"]
@@ -188,7 +226,8 @@ def _required_authorizations(gates: dict[str, dict[str, Any]]) -> dict[str, Any]
             gate["env"] for name, gate in gates.items() if name in OPTIONAL_LIVE_GATES and not gate["enabled"]
         ],
         "human_approval_required": True,
-        "current_session_approval_inferred_from_env": False,
+        "human_provider_smoke_authorization_required": not authorization["human_live_provider_smoke_authorized"],
+        "current_session_approval_inferred_from_env": authorization["current_session_approval_inferred_from_env"],
         "minimum_live_scope": "one LLM + image/keyframe provider smoke with candidate_count=1",
     }
 
@@ -203,6 +242,12 @@ def _next_actions(status: str, readiness_blocks: list[dict[str, Any]], gates: di
             "Ask the human to authorize exactly the needed provider gates.",
             "For minimum image/keyframe smoke, open AFS_ALLOW_REMOTE_LLM and AFS_ALLOW_REMOTE_IMAGE only.",
             "Keep AFS_ALLOW_REMOTE_VIDEO and external download closed unless video smoke is explicitly in scope.",
+        ]
+    if status == "ready_for_human_authorization":
+        return [
+            "Ask the human to authorize the exact live provider smoke scope before spending provider calls.",
+            "Do not treat enabled environment gates as current-session authorization.",
+            "If authorized, rerun this no-cost readiness tool with --live-smoke-authorized before live smoke.",
         ]
     if status == "ready_for_provider_smoke":
         return [

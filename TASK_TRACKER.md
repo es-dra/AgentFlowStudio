@@ -144,6 +144,19 @@ provider smoke, generated media, human creative acceptance, business
 validation, deploy, or server sync. Handoff:
 `docs/handoff/AFS-DETERMINISTIC-PROMOTION-BROWSER-HARNESS-20260630.md`.
 
+Provider-smoke readiness gate addendum: the next slice calibrates
+`tools/afs_provider_connected_validation_readiness.py` so local or server
+environment gates are no longer treated as current-session authorization. The
+tool now distinguishes `ready_for_authorization`,
+`ready_for_human_authorization`, and `ready_for_provider_smoke`, with
+`ready_for_provider_smoke` requiring an explicit no-cost readiness flag after
+human authorization. Current local report is `ready_for_human_authorization`:
+Runtime readiness and LLM/image gate projection are technically ready, but this
+TaskRun did not authorize live provider smoke. No provider call, generated
+media, human creative acceptance, business validation, deploy, or server sync
+occurred. Handoff:
+`docs/handoff/AFS-PROVIDER-SMOKE-READINESS-GATE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

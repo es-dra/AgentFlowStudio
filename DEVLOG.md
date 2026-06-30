@@ -1,5 +1,65 @@
 # Devlog
 
+## 2026-06-30 - Provider Smoke Readiness Gate
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `abea0d15edd5c7274ecb1be955baec055b669889`.
+- Calibrated `tools/afs_provider_connected_validation_readiness.py` so enabled
+  `AFS_ALLOW_REMOTE_LLM` / `AFS_ALLOW_REMOTE_IMAGE` environment gates no longer
+  imply current-session live provider smoke authorization.
+- Added explicit `authorization_state` fields:
+  `human_live_provider_smoke_authorized`,
+  `current_session_approval_inferred_from_env`,
+  `env_gates_are_not_authorization`, and
+  `provider_calls_allowed_by_this_tool`.
+- Added `ready_for_human_authorization` as the no-cost state when Runtime,
+  provider config presence, and required gates are technically ready but the
+  current TaskRun has not been authorized to spend provider calls.
+- Added `--live-smoke-authorized` for a future no-cost preflight rerun after
+  human authorization. The readiness tool still does not call providers.
+- Extended `tests/test_afs_provider_connected_validation_readiness.py` to prove
+  env gates are not authorization, explicit readiness authorization is required
+  for `ready_for_provider_smoke`, and provider config paths/secrets stay out of
+  the report.
+- Current local readiness report is `ready_for_human_authorization` with
+  `provider_calls_started=false`, `secrets_printed=false`, and
+  `path_disclosed=false`.
+- No provider gate was opened by this TaskRun, no provider call was started, no
+  generated media was written, and no deploy/server sync/human acceptance/
+  business validation/durable memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_afs_provider_connected_validation_readiness.py -q
+# 5 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe tools\afs_provider_connected_validation_readiness.py --report runs\provider_smoke_readiness_gate_t16.json
+# status=ready_for_human_authorization; provider_calls_started=false;
+# secrets_printed=false; env_gates_are_not_authorization=true
+
+.\.venv\Scripts\python.exe -m pytest
+# 713 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+YAML parse for external execution state
+# yaml_parse_ok
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Deterministic Promotion Browser Harness
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
