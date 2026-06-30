@@ -305,6 +305,21 @@ update, provider call, generated media, durable memory, Company KB promotion,
 deploy, server sync, or human/business acceptance. Handoff:
 `docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-POLICY-REVIEW-SURFACE-20260630.md`.
 
+Feedback overlay prompt-approval gate addendum: the next local deterministic
+slice adds `AFS-T18c Feedback Overlay Prompt Authorization Design Gate`.
+The shared prompt policy now includes a structured `prompt_provider_gate`:
+provider prompt inclusion is blocked by default, requires human approval,
+requires the provider gate, requires prompt budget review, and requires safety
+filtering before any future overlay text could be used in provider prompts.
+Studio state keeps only this safe gate summary. The implementation deliberately
+does not use persisted field names containing `authorization`, because the
+existing Studio state sanitizer rejects that security-sensitive marker. This is
+not provider prompt injection, generated media, durable memory, Company KB
+promotion, deploy, server sync, Runtime health verification, or
+human/business acceptance. No OpenAPI snapshot update was needed; path count
+remains 52. Handoff:
+`docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-APPROVAL-GATE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

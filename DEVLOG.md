@@ -1,5 +1,60 @@
 # Devlog
 
+## 2026-06-30 - Feedback Overlay Prompt Approval Gate
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `d1c8f509ab62b43573b8af938ec8f1602723679a`.
+- Added `AFS-T18c Feedback Overlay Prompt Authorization Design Gate` as a
+  provider-closed contract slice.
+- `feedback_context_overlay_prompt_policy` now includes a structured
+  `prompt_provider_gate` with default state `blocked_by_default`,
+  `provider_prompt_inclusion_allowed=false`, human approval required, provider
+  gate required, prompt budget review required, and safety filtering required.
+- Kept the existing Studio state forbidden-key guard intact. An initial focused
+  run failed when the persisted field name contained the security-sensitive
+  word `authorization`; the implementation now uses safe approval/gate wording
+  instead of relaxing the sanitizer.
+- Studio state persistence and Studio helper normalization now pass only
+  whitelisted safe gate fields and continue to prune provider raw data, signed
+  URLs, local paths, and media-byte markers.
+- No OpenAPI snapshot update was needed; path count remains 52.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py::test_selected_feedback_overlay_stays_out_of_provider_prompt_and_records_policy tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_web_studio_feedback_candidate_static.py -q
+# 10 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_web_studio_feedback_candidate_static.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_persistence.py tests\test_model_call_context_contract.py tests\test_api_runtime_keyframe_generation_bridge.py -q
+# 37 passed, 1 existing Starlette/httpx deprecation warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 737 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Feedback Overlay Prompt Policy Review Surface
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

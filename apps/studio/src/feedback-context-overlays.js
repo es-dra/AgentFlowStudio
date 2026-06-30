@@ -20,6 +20,7 @@ export function feedbackOverlayPromptPolicyFromBundle(bundle) {
     provider_prompt_includes_context_overlays: Boolean(policy.provider_prompt_includes_context_overlays),
     overlay_text_channel: safeText(policy.overlay_text_channel, 120),
     requires_explicit_prompt_policy_gate: Boolean(policy.requires_explicit_prompt_policy_gate),
+    prompt_provider_gate: normalizePromptProviderGate(policy.prompt_provider_gate),
     context_overlay_count: safeCount(policy.context_overlay_count),
     selected_overlay_ids: safeIdList(policy.selected_overlay_ids),
     rejected_overlay_ids: safeIdList(policy.rejected_overlay_ids),
@@ -86,6 +87,22 @@ function normalizeFeedbackOverlayDecision(value) {
     provider_calls_started: false,
     writes_long_term_memory: false,
     writes_company_kb: false,
+  };
+}
+
+function normalizePromptProviderGate(value) {
+  const gate = value && typeof value === "object" ? value : {};
+  const gateId = safeText(gate.gate_id, 180);
+  if (!gateId) return null;
+  return {
+    gate_id: gateId,
+    status: safeText(gate.status, 120),
+    provider_prompt_inclusion_allowed: Boolean(gate.provider_prompt_inclusion_allowed),
+    requires_human_approval: Boolean(gate.requires_human_approval),
+    requires_provider_gate: Boolean(gate.requires_provider_gate),
+    requires_prompt_budget_review: Boolean(gate.requires_prompt_budget_review),
+    requires_safety_filter: Boolean(gate.requires_safety_filter),
+    gate_record_ref: safeText(gate.gate_record_ref, 160),
   };
 }
 

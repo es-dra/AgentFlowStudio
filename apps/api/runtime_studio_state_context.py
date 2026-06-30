@@ -246,6 +246,29 @@ def _bundle_feedback_overlay_prompt_policy(value: Any) -> dict[str, Any]:
         ids = _safe_id_list(value.get(key))
         if ids:
             result[key] = ids
+    gate = _bundle_prompt_provider_gate(value.get("prompt_provider_gate"))
+    if gate:
+        result["prompt_provider_gate"] = gate
+    return result
+
+
+def _bundle_prompt_provider_gate(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    for key in ("gate_id", "status", "gate_record_ref"):
+        text = _text(value.get(key), "", 160)
+        if text:
+            result[key] = safe_id(text) if key == "gate_id" else text
+    for key in (
+        "provider_prompt_inclusion_allowed",
+        "requires_human_approval",
+        "requires_provider_gate",
+        "requires_prompt_budget_review",
+        "requires_safety_filter",
+    ):
+        if key in value:
+            result[key] = bool(value.get(key))
     return result
 
 

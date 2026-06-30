@@ -27,11 +27,16 @@ def test_studio_state_preserves_safe_feedback_context_overlay_summary() -> None:
     assert policy["requires_explicit_prompt_policy_gate"] is True
     assert policy["context_overlay_count"] == 1
     assert policy["selected_overlay_ids"] == ["runtime-feedback-overlay:abc123"]
+    assert policy["prompt_provider_gate"]["status"] == "blocked_by_default"
+    assert policy["prompt_provider_gate"]["provider_prompt_inclusion_allowed"] is False
+    assert policy["prompt_provider_gate"]["requires_human_approval"] is True
     assert "safety_boundary" not in overlay
     assert "trace_summary" not in overlay
     assert "provider_raw" not in overlay
     assert "local_path" not in overlay
     assert "signed_url" not in overlay
+    assert "provider_raw" not in policy["prompt_provider_gate"]
+    assert "signed_url" not in policy["prompt_provider_gate"]
     assert "media_bytes" not in serialized
     assert "d:\\private" not in serialized
     assert "unsafe-signed-reference-redacted" not in serialized
@@ -61,6 +66,8 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert overlays[0]["writes_company_kb"] is False
     assert policy["provider_prompt_includes_context_overlays"] is False
     assert policy["overlay_text_channel"] == "disabled_by_default"
+    assert policy["prompt_provider_gate"]["provider_prompt_inclusion_allowed"] is False
+    assert policy["prompt_provider_gate"]["requires_provider_gate"] is True
     assert "safety_boundary" not in overlays[0]
     assert "provider_raw" not in overlays[0]
     assert "trace_summary" not in overlays[0]
@@ -172,6 +179,18 @@ def _overlay_node() -> dict:
                     "provider_prompt_includes_context_overlays": False,
                     "overlay_text_channel": "disabled_by_default",
                     "requires_explicit_prompt_policy_gate": True,
+                    "prompt_provider_gate": {
+                        "gate_id": "feedback_overlay_provider_prompt_gate_v0",
+                        "status": "blocked_by_default",
+                        "provider_prompt_inclusion_allowed": False,
+                        "requires_human_approval": True,
+                        "requires_provider_gate": True,
+                        "requires_prompt_budget_review": True,
+                        "requires_safety_filter": True,
+                        "gate_record_ref": "not_approved",
+                        "provider_raw": {"unsafe": True},
+                        "signed_url": "unsafe-signed-reference-redacted",
+                    },
                     "context_overlay_count": 1,
                     "selected_overlay_ids": ["runtime-feedback-overlay:abc123"],
                     "rejected_overlay_ids": [],

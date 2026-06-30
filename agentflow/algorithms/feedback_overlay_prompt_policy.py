@@ -8,6 +8,8 @@ SCHEMA_VERSION = "afs_feedback_overlay_prompt_policy.v0.1"
 POLICY_ID = "feedback_overlay_context_evidence_only_v0"
 DEFAULT_ACTION = "context_evidence_only"
 OVERLAY_TEXT_CHANNEL = "disabled_by_default"
+PROMPT_GATE_ID = "feedback_overlay_provider_prompt_gate_v0"
+PROMPT_GATE_STATUS = "blocked_by_default"
 
 _SAFE_ID_RE = re.compile(r"[^a-zA-Z0-9_.:-]+")
 
@@ -30,9 +32,23 @@ def feedback_overlay_prompt_policy(
         "provider_prompt_includes_context_overlays": False,
         "overlay_text_channel": OVERLAY_TEXT_CHANNEL,
         "requires_explicit_prompt_policy_gate": True,
+        "prompt_provider_gate": feedback_overlay_prompt_provider_gate(),
         "context_overlay_count": len(overlays),
         "selected_overlay_ids": _safe_ids(selected),
         "rejected_overlay_ids": _safe_ids(rejected),
+    }
+
+
+def feedback_overlay_prompt_provider_gate() -> dict[str, Any]:
+    return {
+        "gate_id": PROMPT_GATE_ID,
+        "status": PROMPT_GATE_STATUS,
+        "provider_prompt_inclusion_allowed": False,
+        "requires_human_approval": True,
+        "requires_provider_gate": True,
+        "requires_prompt_budget_review": True,
+        "requires_safety_filter": True,
+        "gate_record_ref": "not_approved",
     }
 
 
@@ -67,6 +83,9 @@ __all__ = (
     "DEFAULT_ACTION",
     "OVERLAY_TEXT_CHANNEL",
     "POLICY_ID",
+    "PROMPT_GATE_ID",
+    "PROMPT_GATE_STATUS",
     "SCHEMA_VERSION",
+    "feedback_overlay_prompt_provider_gate",
     "feedback_overlay_prompt_policy",
 )

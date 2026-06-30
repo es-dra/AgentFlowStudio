@@ -278,4 +278,16 @@ def test_selected_feedback_overlay_stays_out_of_provider_prompt_and_records_poli
     assert payload["generation_bridge"]["context_evidence"]["feedback_context_overlay_prompt_policy"][
         "provider_prompt_includes_context_overlays"
     ] is False
+    for policy in (
+        payload["context_bundle"]["feedback_context_overlay_prompt_policy"],
+        model_context["feedback_context"]["prompt_policy"],
+        model_request_plan["trace_summary"]["feedback_context_overlay_prompt_policy"],
+        payload["safe_manifest"]["feedback_context_overlay_prompt_policy"],
+        payload["generation_bridge"]["context_evidence"]["feedback_context_overlay_prompt_policy"],
+    ):
+        gate = policy["prompt_provider_gate"]
+        assert gate["status"] == "blocked_by_default"
+        assert gate["provider_prompt_inclusion_allowed"] is False
+        assert gate["requires_human_approval"] is True
+        assert gate["requires_provider_gate"] is True
     assert payload["provider_calls_started"] is False
