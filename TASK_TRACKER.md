@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+Main-loop E2E integration gate addendum: T46 rechecked the normal integration
+gate for `codex/afs-goal-mode-main-loop-e2e-20260630` and fast-forwarded the
+coherent provider-closed T41-T45 evidence package into `master`. Premerge branch
+review passed with `blocker_count=0` and `merge_review_threshold_reached=false`;
+full pytest passed (`773 passed, 520 deselected, 2 warnings`); maintenance audit
+had `failed=0`; `git diff --check` passed; and the execution YAML files parsed.
+Local `master`, `origin/master`, server `/home/afs-ops/AgentFlowStudio`, and
+server `/opt/afs/AgentFlowStudio` were fast-forwarded to `72c698ac` without
+reset/clean. Runtime health returned `status=ready`. This is runtime/structure
+verification only, not provider smoke, live provider call, generated media,
+human creative acceptance, business validation, public claim, patent/legal
+decision, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-MAIN-LOOP-E2E-INTEGRATION-GATE-20260630.md`.
+
 Multi-shot request-plan bridge consistency addendum: T45 adds a narrow
 provider-closed consistency regression to the real
 `multi_character_restaurant_note` path. The test now reads the

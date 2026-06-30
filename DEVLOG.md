@@ -1,5 +1,43 @@
 # Devlog
 
+## 2026-06-30 - Main Loop E2E Integration Gate
+
+- Completed AFS-T46 normal integration gate for
+  `codex/afs-goal-mode-main-loop-e2e-20260630`.
+- Re-ran startup scan, branch integration review, full pytest,
+  maintenance audit, `git diff --check`, and execution YAML parsing before
+  integration.
+- Fast-forwarded local `master` from `a7d536a4` to the reviewed branch head
+  `72c698ac`, pushed `origin/master`, and fast-forwarded both server checkouts:
+  `/home/afs-ops/AgentFlowStudio` and `/opt/afs/AgentFlowStudio`.
+- Runtime service stayed active and `/health` returned `status=ready` after the
+  server sync.
+- This is runtime/structure verification only. It is not provider smoke,
+  generated media, human creative acceptance, business validation, public claim,
+  patent/legal decision, or COS active-rule promotion.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --repo-root . --base-ref origin/master --allowed-untracked docs/demo-docs-20260629/ --report runs\afs_goal_mode_branch_review_t46_premerge.json
+# status=ready_for_human_merge_review; blocker_count=0; merge_review_threshold_reached=false
+
+.\.venv\Scripts\python.exe -m pytest
+# 773 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+
+YAML parse for AFS-AI-Execution-Spec.yaml and AFS-Goal-Driven-Execution-State-v0.1.yaml
+# passed
+
+ssh afs-bwg-ops "curl -fsS http://127.0.0.1:8790/health"
+# status=ready
+```
+
 ## 2026-06-30 - Multi-Shot Request Plan Bridge Consistency
 
 - Continued provider-closed work on
