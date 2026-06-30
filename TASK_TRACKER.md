@@ -8,6 +8,17 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio production-graph keyframe trace addendum: the next provider-closed
+product slice carries a safe `production_graph_review` summary from Studio
+storyboard breakdown state into generated keyframe layers and
+`lastKeyframeSourceEvidenceTrace`. The summary is limited to the production
+graph snapshot artifact id, fixed-asset reuse count, and fixed visual asset
+ids, so keyframe output records can explain fixed-asset reuse alignment without
+provider raw data, signed URLs, local paths, generated media bytes, Runtime API
+expansion, provider calls, deploy, server sync, human creative acceptance, or
+business validation. Handoff:
+`docs/handoff/AFS-STUDIO-PRODUCTION-GRAPH-KEYFRAME-TRACE-ALIGNMENT-20260630.md`.
+
 Studio keyframe source-evidence output-record addendum: the next
 provider-closed product slice surfaces `lastKeyframeSourceEvidenceTrace` in the
 Studio inspector `输出记录`. The record shows fixed-asset source evidence and

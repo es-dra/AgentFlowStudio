@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-30 - Studio Production Graph Keyframe Trace Alignment
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T33 output-record
+  trace surface.
+- Added a safe `production_graph_review` summary to Studio keyframe layers
+  created from storyboard script nodes that already hold a Runtime production
+  graph snapshot.
+- Extended `lastKeyframeSourceEvidenceTrace` to carry the same safe review
+  summary so output records can connect keyframe source evidence with
+  production graph fixed-asset reuse.
+- Kept the boundary local to Studio state and trace records: no Runtime route,
+  OpenAPI path, provider prompt inclusion policy, provider call, generated
+  media, deploy, server sync, human creative acceptance claim, or business
+  validation claim changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_keyframe_production_graph_trace.py tests\test_web_studio_keyframe_layer_source_evidence.py tests\test_web_studio_production_graph_reuse_static.py
+# 9 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warning classes only
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Studio Keyframe Source Evidence Output Record
 
 - Continued provider-closed full goal-mode work on

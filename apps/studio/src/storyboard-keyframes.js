@@ -9,6 +9,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
   const assetNodes = downstreamAssetCardNodes(state, scriptNode.id);
   const fixedAssets = fixedVisualAssetsFromAssetNodes(assetNodes);
   const fixedAssetSourceEvidenceRefs = sourceEvidenceRefs({ included_assets: fixedAssets });
+  const productionGraphReview = productionGraphReviewFromScriptNode(scriptNode);
   const candidateImageRefs = candidateAssetImageRefsFromAssetNodes(assetNodes);
   const candidateAssets = candidateAssetPlansFromAssetNodes(assetNodes);
   const missingIds = assetNodes
@@ -45,6 +46,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
       fixed_visual_asset_ids: fixedAssets.map((asset) => asset.asset_id).filter(Boolean),
       fixed_asset_source_evidence_count: fixedAssetSourceEvidenceRefs.length,
       fixed_asset_source_evidence_refs: fixedAssetSourceEvidenceRefs,
+      production_graph_review: productionGraphReview,
       missing_asset_card_node_ids: missingIds,
       unfixed_candidate_asset_card_node_ids: missingIds,
       updated_at: new Date().toISOString(),
@@ -76,6 +78,50 @@ function fixedVisualAssetsFromAssetNodes(assetNodes) {
       seen.add(assetId);
       result.push(visual);
     }
+  }
+  return result;
+}
+
+function productionGraphReviewFromScriptNode(scriptNode) {
+  const breakdown = scriptNode?.params?.storyboardBreakdown || {};
+  const graph = breakdown.productionGraph
+    || breakdown.production_graph
+    || scriptNode?.params?.productionGraph
+    || scriptNode?.params?.production_graph
+    || null;
+  const artifactId = safeToken(
+    breakdown.productionGraphArtifactId
+    || breakdown.production_graph_artifact_id
+    || scriptNode?.params?.productionGraphArtifactId
+    || scriptNode?.params?.production_graph_artifact_id
+    || "",
+  );
+  const fixedIds = productionGraphFixedAssetIds(graph);
+  const fixedCount = productionGraphFixedAssetCount(graph, fixedIds.length);
+  if (!artifactId && !fixedCount) return null;
+  return {
+    artifact_id: artifactId,
+    fixed_asset_reuse_count: fixedCount,
+    fixed_visual_asset_ids: fixedIds,
+  };
+}
+
+function productionGraphFixedAssetCount(graph, fallbackCount) {
+  const summaryCount = Number(graph?.summary?.fixed_visual_asset_count);
+  if (Number.isFinite(summaryCount) && summaryCount > 0) return Math.min(summaryCount, 99);
+  return Math.min(Math.max(Number(fallbackCount) || 0, 0), 99);
+}
+
+function productionGraphFixedAssetIds(graph) {
+  const seen = new Set();
+  const result = [];
+  for (const node of Array.isArray(graph?.nodes) ? graph.nodes : []) {
+    if (node?.node_type !== "fixed_visual_asset") continue;
+    const id = safeToken(node.asset_id || node.visual_asset_id || node.id || "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+    if (result.length >= 24) break;
   }
   return result;
 }
@@ -177,6 +223,10 @@ function assetTypeLabel(type) {
 
 function cleanText(value, limit) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+function safeToken(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").slice(0, 160);
 }
 
 function isFixedVisualAsset(asset) {
