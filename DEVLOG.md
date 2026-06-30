@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-30 - Main Loop Keyframe Bridge Evidence
+
+- Continued provider-closed work on
+  `codex/afs-goal-mode-main-loop-e2e-20260630` for AFS-T42.
+- Extended the real `multi_scene_map_chase` Runtime E2E path from keyframe
+  preflight into blocked local keyframe generation bridge evidence.
+- Added `tests/runtime_main_loop_e2e_support.py` so T41/T42 share the same
+  benchmark setup without duplicating test scaffolding; touched test/support
+  files remain below the 300-line ideal threshold.
+- Added `tests/test_api_runtime_main_loop_keyframe_bridge_e2e.py`.
+  The red baseline failed because `generation_bridge.context_evidence` did not
+  include fixed-asset source-evidence refs.
+- Updated `agentflow.algorithms.generation_bridge` so blocked bridge artifacts
+  now carry safe `included_asset_source_evidence_refs`, including the fixed
+  asset id, source human-gate id, asset-card candidate id, and non-claim flags.
+- No Runtime route, OpenAPI path, Studio UI, provider call, generated media,
+  human creative acceptance, business validation, public claim, patent/legal
+  decision, or COS active-rule promotion changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py -q
+# red before implementation: KeyError 'included_asset_source_evidence_refs'
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py -q
+# 1 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_fixed_asset_source_evidence_context.py -q
+# 5 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 772 passed, 520 deselected, 2 warnings
+```
+
 ## 2026-06-30 - Main Loop E2E Baseline Regression
 
 - Started fresh continuation branch

@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+Main-loop keyframe bridge evidence addendum: the next provider-closed slice
+extends the real `multi_scene_map_chase` Runtime E2E harness from keyframe
+preflight into blocked local keyframe generation bridge evidence. The bridge now
+records safe fixed-asset source-evidence refs inside `context_evidence`, proving
+the human-gate id, asset-card candidate id, fixed visual asset, feedback overlay,
+and context bundle reached the generation bridge input while the image provider
+gate remained blocked. The red/green loop first failed on missing
+`included_asset_source_evidence_refs`, then passed after the bridge carried the
+safe digest. Full pytest passed (`772 passed, 520 deselected, 2 warnings`). No
+Runtime route, OpenAPI path, Studio UI, provider call, generated media, human
+creative acceptance, business validation, public claim, patent/legal decision,
+or COS active-rule promotion occurred. Handoff:
+`docs/handoff/AFS-MAIN-LOOP-KEYFRAME-BRIDGE-EVIDENCE-20260630.md`.
+
 Main-loop E2E baseline addendum: fresh branch
 `codex/afs-goal-mode-main-loop-e2e-20260630` adds the first provider-closed
 Runtime E2E regression for a real benchmark script. It connects storyboard

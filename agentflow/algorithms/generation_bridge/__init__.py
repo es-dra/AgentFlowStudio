@@ -98,17 +98,23 @@ def _context_evidence(context_bundle: dict[str, Any] | None, reference_image_cou
         return {
             "context_bundle_present": False,
             "included_asset_count": 0,
+            "included_asset_source_evidence_count": 0,
+            "included_asset_source_evidence_refs": [],
             "reference_image_count": reference_image_count,
             "subject_reference_asset_id": None,
             "feedback_context_overlay_count": 0,
             "feedback_context_overlay_ids": [],
             "feedback_context_overlay_prompt_policy": feedback_overlay_prompt_policy(context_overlays=[]),
         }
+    included_assets = _list(context_bundle.get("included_assets"))
+    source_evidence_refs = _included_asset_source_evidence_refs(included_assets)
     overlays = _list(context_bundle.get("feedback_context_overlays"))
     return {
         "context_bundle_present": True,
         "mode": str(context_bundle.get("mode") or ""),
-        "included_asset_count": len(_list(context_bundle.get("included_assets"))),
+        "included_asset_count": len(included_assets),
+        "included_asset_source_evidence_count": len(source_evidence_refs),
+        "included_asset_source_evidence_refs": source_evidence_refs,
         "reference_image_count": reference_image_count,
         "subject_reference_asset_id": context_bundle.get("subject_reference_asset_id"),
         "feedback_context_overlay_count": len(overlays),
@@ -121,6 +127,40 @@ def _context_evidence(context_bundle: dict[str, Any] | None, reference_image_cou
         "draft_assets_rejected": bool((context_bundle.get("trace_summary") or {}).get("draft_assets_rejected"))
         if isinstance(context_bundle.get("trace_summary"), dict)
         else False,
+    }
+
+
+def _included_asset_source_evidence_refs(included_assets: list[Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    for item in included_assets:
+        if not isinstance(item, dict):
+            continue
+        evidence = item.get("source_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        refs.append(
+            {
+                "asset_id": _safe_text(item.get("asset_id")),
+                "asset_type": _safe_text(item.get("asset_type")),
+                "label": _safe_text(item.get("label")),
+                "status": _safe_text(item.get("status")),
+                **_source_evidence_digest(evidence),
+            }
+        )
+    return refs
+
+
+def _source_evidence_digest(evidence: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source_contract": _safe_text(evidence.get("source_contract")),
+        "source_human_gate_id": _safe_text(evidence.get("source_human_gate_id")),
+        "source_asset_card_candidate_id": _safe_text(evidence.get("source_asset_card_candidate_id")),
+        "source_stage": _safe_text(evidence.get("source_stage")),
+        "result_asset_status": _safe_text(evidence.get("result_asset_status")),
+        "provider_calls_started": bool(evidence.get("provider_calls_started")),
+        "generated_media_claimed": bool(evidence.get("generated_media_claimed")),
+        "human_creative_acceptance_claimed": bool(evidence.get("human_creative_acceptance_claimed")),
+        "business_validation_claimed": bool(evidence.get("business_validation_claimed")),
     }
 
 
@@ -154,6 +194,10 @@ def _candidate_count(value: int) -> int:
 
 def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _safe_text(value: Any) -> str:
+    return str(value or "").strip()[:180]
 
 
 __all__ = (
