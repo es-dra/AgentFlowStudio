@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-30 - Studio Promotion-to-Keyframe Evidence Chain
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T29 promotion-gate
+  fixed-reuse summary.
+- Carried safe fixed visual asset source-evidence refs into
+  `keyframeLayer.fixed_asset_source_evidence_refs` when Studio creates a
+  keyframe node from storyboard output.
+- Reused the existing `sourceEvidenceRefs()` normalizer instead of adding a
+  duplicate sanitizer in the keyframe code path.
+- Added an executable Node-based Studio regression proving unsafe fixed-asset
+  fields such as signed URLs, local paths, and base64 media bytes are not
+  retained in keyframe-layer evidence refs.
+- No Runtime route, request schema, OpenAPI path, provider call, generated
+  media, deploy, server sync, human creative acceptance claim, or business
+  validation claim occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_keyframe_layer_source_evidence.py
+# 1 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_assets_generation_static.py::test_keyframe_prompt_uses_editable_candidate_asset_plan_details tests\test_web_studio_preflight_source_evidence_static.py
+# 2 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 133 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings only
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T30
+```
+
 ## 2026-06-30 - Studio Promotion Gate Fixed Reuse Summary
 
 - Continued provider-closed full goal-mode work on

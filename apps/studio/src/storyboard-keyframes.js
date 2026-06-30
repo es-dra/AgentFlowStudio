@@ -1,4 +1,5 @@
 import { createNode, connect } from "./nodes.js";
+import { sourceEvidenceRefs } from "./generation-preflight-source-evidence.js";
 import { structuredShotFromSegment } from "./structured-shot.js";
 
 export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
@@ -7,6 +8,7 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
   if (!scriptNode) return [];
   const assetNodes = downstreamAssetCardNodes(state, scriptNode.id);
   const fixedAssets = fixedVisualAssetsFromAssetNodes(assetNodes);
+  const fixedAssetSourceEvidenceRefs = sourceEvidenceRefs({ included_assets: fixedAssets });
   const candidateImageRefs = candidateAssetImageRefsFromAssetNodes(assetNodes);
   const candidateAssets = candidateAssetPlansFromAssetNodes(assetNodes);
   const missingIds = assetNodes
@@ -41,6 +43,8 @@ export function createKeyframeNodesForStoryboard(store, sourceScriptNode) {
       candidate_asset_card_node_ids: assetNodes.map((asset) => asset.id),
       candidate_image_asset_refs: candidateImageRefs,
       fixed_visual_asset_ids: fixedAssets.map((asset) => asset.asset_id).filter(Boolean),
+      fixed_asset_source_evidence_count: fixedAssetSourceEvidenceRefs.length,
+      fixed_asset_source_evidence_refs: fixedAssetSourceEvidenceRefs,
       missing_asset_card_node_ids: missingIds,
       unfixed_candidate_asset_card_node_ids: missingIds,
       updated_at: new Date().toISOString(),

@@ -8,6 +8,16 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio promotion-to-keyframe evidence-chain addendum: the next provider-closed
+product slice carries fixed visual asset source evidence into the Studio
+`keyframeLayer` created from storyboard output. The layer now records
+`fixed_asset_source_evidence_count` and safe
+`fixed_asset_source_evidence_refs`, using the existing source-evidence
+normalizer instead of adding a duplicate sanitizer. This does not expand
+Runtime API/OpenAPI, change provider prompt inclusion policy, call providers,
+deploy, server sync, or claim human creative acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-PROMOTION-TO-KEYFRAME-EVIDENCE-CHAIN-20260630.md`.
+
 Studio promotion-gate fixed-reuse addendum: the next provider-closed product
 slice carries T28 human-gate `fixed_asset_reuse_count` into the visual-asset
 promotion review summary. The promotion panel now shows candidate provenance
