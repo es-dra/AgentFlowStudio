@@ -2,6 +2,7 @@ import { NODE_TYPES } from "../nodes.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 import { assetsFromNode } from "../asset-reference-summary.js";
+import { keyframeSourceEvidenceTraceSummaryText } from "../keyframe-source-evidence-trace.js";
 import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
 import {
   nodeAssetDecisionText,
@@ -180,8 +181,12 @@ function nextStepText(node) {
 }
 
 function recordSummary(node) {
-  const parts = [manifestSummary(node), jobSummary(node), assetSummary(node)].filter(Boolean);
+  const parts = [manifestSummary(node), jobSummary(node), keyframeEvidenceTraceSummary(node), assetSummary(node)].filter(Boolean);
   return parts.length ? parts.join("\n\n") : "还没有生成记录。";
+}
+
+function keyframeEvidenceTraceSummary(node) {
+  return keyframeSourceEvidenceTraceSummaryText(node.params?.lastKeyframeSourceEvidenceTrace);
 }
 
 function manifestSummary(node) {

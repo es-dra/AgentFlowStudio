@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-06-30 - Studio Keyframe Source Evidence Output Record
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T32 local generation
+  trace.
+- Added a safe `keyframeSourceEvidenceTraceSummaryText()` helper for displaying
+  `lastKeyframeSourceEvidenceTrace` in Studio output records.
+- Surfaced the keyframe source-evidence trace in the inspector `输出记录`
+  section, including the explicit `excluded_by_default` provider prompt policy.
+- Extended focused Node regressions to cover trace summary safety and inspector
+  wiring.
+- No Runtime route, OpenAPI path, provider call, generated media, deploy,
+  server sync, human creative acceptance claim, or business validation claim
+  occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_keyframe_layer_source_evidence.py
+# 5 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_mature_shell_static.py::test_studio_mature_shell_exposes_algorithm_console_and_quick_start_rail tests\test_web_studio_feedback_candidate_static.py::test_studio_feedback_overlay_review_surface_reads_context_bundle_only tests\test_web_studio_assets_generation_static.py::test_keyframe_prompt_uses_editable_candidate_asset_plan_details
+# 3 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings only
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T33
+```
+
 ## 2026-06-30 - Studio Keyframe Source Evidence Local Generation Trace
 
 - Continued provider-closed full goal-mode work on

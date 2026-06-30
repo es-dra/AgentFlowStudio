@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 
 def test_storyboard_keyframe_layer_records_fixed_asset_source_evidence_safely() -> None:
@@ -113,6 +114,54 @@ process.stdout.write(JSON.stringify({
     assert "_".join(["signed", "url"]) not in serialized
     assert "data_base64" not in serialized
     assert "d:\\private" not in serialized
+
+
+def test_keyframe_source_evidence_trace_summary_is_safe_for_output_record() -> None:
+    script = r'''
+import { keyframeSourceEvidenceTraceSummaryText } from "./apps/studio/src/keyframe-source-evidence-trace.js";
+
+const unsafeSignedKey = ["signed", "url"].join("_");
+const trace = {
+  trace_type: "studio_keyframe_layer_source_evidence",
+  provider_prompt_inclusion_policy: "excluded_by_default",
+  fixed_asset_source_evidence_refs: [{
+    asset_id: "fixed_lin_wan_v1",
+    asset_type: "character",
+    label: "Lin Wan",
+    status: "fixed",
+    source_asset_card_candidate_id: "asset_card_candidate:main_character",
+    [unsafeSignedKey]: "must-not-leak",
+    local_path: "D:\\private\\fixed_lin_wan.png",
+    data_base64: "BYTES_MUST_NOT_LEAK",
+  }],
+};
+
+process.stdout.write(JSON.stringify({ text: keyframeSourceEvidenceTraceSummaryText(trace) }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert "关键帧来源证据：1 项" in payload["text"]
+    assert "Lin Wan" in payload["text"]
+    assert "excluded_by_default" in payload["text"]
+    assert "_".join(["signed", "url"]) not in serialized
+    assert "data_base64" not in serialized
+    assert "d:\\private" not in serialized
+
+
+def test_inspector_output_record_wires_keyframe_source_evidence_trace_summary() -> None:
+    inspector = Path("apps/studio/src/panels/inspector-panel.js").read_text(encoding="utf-8")
+
+    assert "keyframeSourceEvidenceTraceSummaryText" in inspector
+    assert "keyframeEvidenceTraceSummary(node)" in inspector
+    assert "lastKeyframeSourceEvidenceTrace" in inspector
 
 
 def test_inspector_context_summary_surfaces_keyframe_layer_source_evidence() -> None:

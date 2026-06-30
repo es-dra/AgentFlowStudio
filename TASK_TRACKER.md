@@ -8,6 +8,14 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio keyframe source-evidence output-record addendum: the next
+provider-closed product slice surfaces `lastKeyframeSourceEvidenceTrace` in the
+Studio inspector `输出记录`. The record shows fixed-asset source evidence and
+`provider_prompt_inclusion_policy=excluded_by_default` without adding Runtime
+routes, OpenAPI fields, provider calls, deploy, server sync, or human creative
+acceptance claims. Handoff:
+`docs/handoff/AFS-STUDIO-KEYFRAME-SOURCE-EVIDENCE-OUTPUT-RECORD-20260630.md`.
+
 Studio keyframe source-evidence trace addendum: the next provider-closed
 product slice records a safe `lastKeyframeSourceEvidenceTrace` when keyframe
 responses are applied. The trace reuses the existing source-evidence normalizer

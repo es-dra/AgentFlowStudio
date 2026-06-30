@@ -24,6 +24,21 @@ export function keyframeSourceEvidenceSummaryText(node) {
   return `关键帧来源证据：${refs.slice(0, 3).map(keyframeEvidenceLabel).join("、")}`;
 }
 
+export function keyframeSourceEvidenceTraceSummaryText(trace) {
+  const refs = sourceEvidenceRefs({ included_asset_source_evidence_refs: safeTraceRefs(trace) });
+  if (!refs.length) return "";
+  const policy = String(trace?.provider_prompt_inclusion_policy || "excluded_by_default").trim();
+  return [
+    `关键帧来源证据：${refs.length} 项`,
+    refs.slice(0, 2).map(keyframeEvidenceLabel).join("、"),
+    `提示词策略：${policy}`,
+  ].filter(Boolean).join("；");
+}
+
+function safeTraceRefs(trace) {
+  return Array.isArray(trace?.fixed_asset_source_evidence_refs) ? trace.fixed_asset_source_evidence_refs : [];
+}
+
 function keyframeEvidenceLabel(item) {
   const label = compactText(assetLabel(item), 32);
   const source = compactText(item.source_asset_card_candidate_id || item.source_human_gate_id || item.source_stage || "manual", 48);
