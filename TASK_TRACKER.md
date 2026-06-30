@@ -8,6 +8,14 @@
 
 Last updated: 2026-06-26 by Codex
 
+Asset reuse candidate addendum: the next provider-closed product slice adds
+`reuse_policy` to storyboard-derived `asset_card_candidates`. Multi-shot
+assets are now marked as `project_reuse_candidate`, single-shot assets remain
+`shot_local_candidate`, and the storyboard safe manifest records
+`asset_card_project_reuse_candidate_count`. This advances fixed-asset reuse and
+human-gate preparation without writing fixed assets or calling providers.
+Handoff: `docs/handoff/AFS-ASSET-REUSE-CANDIDATE-POLICY-20260630.md`.
+
 Branch threshold gate addendum: after the authorized T19 merge/sync, new work
 continues from `master` commit `f51237df89c680dafc54296d7e013bd98cd459af` on
 fresh branch `codex/afs-goal-mode-threshold-gate-20260630`. The branch

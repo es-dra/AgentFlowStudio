@@ -152,6 +152,9 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "content_quality_report_status": content_quality_report["summary"]["status"],
         "production_graph_node_count": production_graph["summary"]["node_count"],
         "asset_card_candidate_count": asset_card_candidates["summary"]["candidate_count"],
+        "asset_card_project_reuse_candidate_count": int(
+            (asset_card_candidates["summary"].get("reuse_scope_counts") or {}).get("project_reuse_candidate") or 0
+        ),
         "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
         "discard_reason": discard_reason,
         "writes_long_term_memory": False,

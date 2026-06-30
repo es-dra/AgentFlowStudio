@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-30 - Asset Reuse Candidate Policy
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T20 threshold gate.
+- Added a deterministic `reuse_policy` to storyboard-derived
+  `asset_card_candidates`. Candidates now distinguish multi-shot
+  `project_reuse_candidate` assets from `shot_local_candidate` assets using
+  existing asset-graph `shot_refs`.
+- Exposed `reuse_scope_counts` in the candidate-set summary and
+  `asset_card_project_reuse_candidate_count` in the storyboard safe manifest.
+- This supports the fixed-asset reuse and human-gate path without writing fixed
+  asset memory, starting provider calls, storing media bytes, or claiming human
+  creative acceptance.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_candidates_contract.py -q
+# 2 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_storyboard_evidence_ledger.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_storyboard_content_quality.py tests\test_api_runtime_storyboard_breakdown.py -q
+# 24 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 752 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 132 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T21
+```
+
 ## 2026-06-30 - Branch Size Merge Review Threshold Gate
 
 - Started fresh branch `codex/afs-goal-mode-threshold-gate-20260630` from the

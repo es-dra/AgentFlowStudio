@@ -55,6 +55,8 @@ def test_storyboard_breakdown_writes_safe_asset_card_candidates(tmp_path, monkey
     assert candidate_set["summary"]["candidate_count"] == payload["asset_graph"]["asset_count"]
     assert candidate_set["summary"]["human_review_needed"] is True
     assert candidate_set["summary"]["writes_fixed_asset"] is False
+    assert candidate_set["summary"]["reuse_scope_counts"]["project_reuse_candidate"] >= 1
+    assert payload["safe_manifest"]["asset_card_project_reuse_candidate_count"] == candidate_set["summary"]["reuse_scope_counts"]["project_reuse_candidate"]
     assert candidate_set["writes_long_term_memory"] is False
     assert candidate_set["writes_company_kb"] is False
 
@@ -68,9 +70,14 @@ def test_storyboard_breakdown_writes_safe_asset_card_candidates(tmp_path, monkey
         assert candidate["asset_memory_policy"]["writes_fixed_asset"] is False
         assert candidate["asset_memory_policy"]["requires_human_confirmation"] is True
         assert candidate["provider_policy"]["provider_calls_started"] is False
+        assert candidate["reuse_policy"]["requires_human_confirmation"] is True
+        assert candidate["reuse_policy"]["writes_fixed_asset"] is False
+        assert candidate["reuse_policy"]["shot_ref_count"] == len(candidate["safe_evidence"]["shot_refs"])
+        assert candidate["reuse_policy"]["suggested_reuse_scope"] in {"project_reuse_candidate", "shot_local_candidate"}
         assert candidate["draft_fields"]["display_name"]
         assert candidate["draft_fields"]["visual_description_seed"]
         assert candidate["safe_evidence"]["shot_refs"]
+    assert any(candidate["reuse_policy"]["suggested_reuse_scope"] == "project_reuse_candidate" for candidate in candidates)
 
     assert payload["safe_manifest"]["asset_card_candidate_count"] == len(candidates)
     assert "asset_card_candidates" in payload["artifacts"]

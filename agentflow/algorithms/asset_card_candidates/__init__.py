@@ -47,6 +47,7 @@ def build_asset_card_candidates(*, project_id: str, asset_graph: dict[str, Any])
             "project_id": project_id,
             "candidate_count": len(candidates),
             "asset_types": sorted({candidate["asset_type"] for candidate in candidates}),
+            "reuse_scope_counts": _reuse_scope_counts(candidates),
             "human_review_needed": True,
             "writes_fixed_asset": False,
             "provider_calls_started": False,
@@ -86,6 +87,7 @@ def _candidate(project_id: str, asset: dict[str, Any]) -> dict[str, Any]:
             "evidence_spans": evidence_spans,
             "confidence": _confidence(asset.get("confidence")),
         },
+        "reuse_policy": _reuse_policy(asset),
         "asset_memory_policy": {
             "writes_fixed_asset": False,
             "included_in_context_before_confirmation": False,
@@ -100,6 +102,28 @@ def _candidate(project_id: str, asset: dict[str, Any]) -> dict[str, Any]:
         "writes_long_term_memory": False,
         "writes_company_kb": False,
     }
+
+
+def _reuse_policy(asset: dict[str, Any]) -> dict[str, Any]:
+    shot_refs = [str(item) for item in _list(asset.get("shot_refs"))[:24] if str(item)]
+    is_cross_shot = len(shot_refs) >= 2
+    return {
+        "suggested_reuse_scope": "project_reuse_candidate" if is_cross_shot else "shot_local_candidate",
+        "reason": "appears_across_multiple_shots" if is_cross_shot else "single_shot_evidence_only",
+        "shot_ref_count": len(shot_refs),
+        "requires_human_confirmation": True,
+        "writes_fixed_asset": False,
+        "promotion_blocked_by_default": True,
+    }
+
+
+def _reuse_scope_counts(candidates: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {"project_reuse_candidate": 0, "shot_local_candidate": 0}
+    for candidate in candidates:
+        scope = str((candidate.get("reuse_policy") or {}).get("suggested_reuse_scope") or "")
+        if scope in counts:
+            counts[scope] += 1
+    return counts
 
 
 def _visual_description_seed(asset_type: str, label: str, evidence_spans: list[dict[str, str]]) -> str:
