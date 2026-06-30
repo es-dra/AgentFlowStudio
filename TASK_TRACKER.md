@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio human-gate reuse-policy addendum: the next provider-closed product slice
+surfaces storyboard-derived `asset_card_candidates.reuse_policy` inside the
+Studio human-gate target contract. The human-gate menu now shows a visible
+reuse marker such as `Project reuse / 3 shots`, and the Runtime human-gate
+decision note carries only the safe reuse summary. This does not promote fixed
+assets, expand Runtime API/OpenAPI, open provider gates, or claim human creative
+acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-HUMAN-GATE-ASSET-REUSE-POLICY-SURFACE-20260630.md`.
+
 Asset reuse candidate addendum: the next provider-closed product slice adds
 `reuse_policy` to storyboard-derived `asset_card_candidates`. Multi-shot
 assets are now marked as `project_reuse_candidate`, single-shot assets remain

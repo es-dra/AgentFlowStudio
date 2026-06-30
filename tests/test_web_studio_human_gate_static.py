@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import subprocess
+
 from studio_static_helpers import STUDIO_ROOT, _styles
 
 
@@ -19,6 +22,7 @@ def test_studio_human_gate_hook_uses_runtime_contract_without_promotion() -> Non
     assert "needs_revision" in human_gate_source
     assert "asset_card_candidate" in human_gate_source
     assert "keyframe_generation_bridge" in human_gate_source
+    assert "human-gate-target-meta" in human_gate_source
     assert "promoteVisualAsset" not in human_gate_source
     assert "AFS_ALLOW_REMOTE" not in human_gate_source
 
@@ -31,3 +35,52 @@ def test_studio_human_gate_hook_uses_runtime_contract_without_promotion() -> Non
     assert "lastGenerationBridge" in keyframe_response
     assert "recordHumanGateDecision(payload)" in runtime_client
     assert "human-gate-popover" in styles
+    assert "human-gate-target-meta" in styles
+
+
+def test_studio_human_gate_targets_expose_asset_reuse_policy_summary() -> None:
+    script = r'''
+import { humanGateTargets } from "./apps/studio/src/human-gate.js";
+
+const node = {
+  id: "script_001",
+  params: {
+    storyboardBreakdown: {
+      assetCardCandidateArtifactId: "artifact_asset_candidates",
+      assetCardCandidates: {
+        candidates: [
+          {
+            candidate_id: "asset_card_candidate:hero",
+            asset_type: "character",
+            draft_fields: { display_name: "Hero" },
+            reuse_policy: {
+              suggested_reuse_scope: "project_reuse_candidate",
+              shot_ref_count: 3,
+              requires_human_confirmation: true,
+              writes_fixed_asset: false,
+            },
+          },
+        ],
+      },
+    },
+  },
+};
+
+process.stdout.write(JSON.stringify(humanGateTargets(node)));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    targets = json.loads(completed.stdout)
+
+    assert targets[0]["target_type"] == "asset_card_candidate"
+    assert targets[0]["reuse_policy"]["suggested_reuse_scope"] == "project_reuse_candidate"
+    assert targets[0]["reuse_policy"]["shot_ref_count"] == 3
+    assert targets[0]["reuse_policy"]["requires_human_confirmation"] is True
+    assert targets[0]["reuse_policy"]["writes_fixed_asset"] is False
+    assert targets[0]["reuse_label"] == "Project reuse / 3 shots"
+    assert "reuse_scope=project_reuse_candidate" in targets[0]["note"]

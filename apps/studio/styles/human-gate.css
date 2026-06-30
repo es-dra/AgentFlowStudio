@@ -44,6 +44,22 @@
   white-space: nowrap;
 }
 
+.human-gate-target-info {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.human-gate-target-meta {
+  width: fit-content;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-faint);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+}
+
 .human-gate-actions {
   display: flex;
   gap: 6px;

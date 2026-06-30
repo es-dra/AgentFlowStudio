@@ -29,7 +29,10 @@ function humanGateView(node, targets) {
 
   for (const target of targets.slice(0, 12)) {
     const row = el("div", "human-gate-row");
-    row.appendChild(el("span", "human-gate-target", target.label));
+    const targetInfo = el("div", "human-gate-target-info");
+    targetInfo.appendChild(el("span", "human-gate-target", target.label));
+    if (target.reuse_label) targetInfo.appendChild(el("span", "human-gate-target-meta", target.reuse_label));
+    row.appendChild(targetInfo);
     const actions = el("div", "human-gate-actions");
     actions.appendChild(decisionButton(node, target, "accepted_for_next_step", "下一步"));
     actions.appendChild(decisionButton(node, target, "needs_revision", "需修订"));
@@ -61,7 +64,7 @@ function submitHumanGateDecision(node, target, decision, button) {
     artifact_id: target.artifact_id || "",
     node_id: safeToken(node?.id),
     scope: target.scope,
-    note: "Studio local step gate decision.",
+    note: target.note || "Studio local step gate decision.",
     reviewed_at: new Date().toISOString(),
   };
   const root = button.closest(".human-gate");
@@ -90,6 +93,9 @@ function assetCardCandidateTargets(node) {
     target_id: safeToken(candidate?.candidate_id || `asset_card_candidate:${index + 1}`),
     artifact_id: safeToken(artifactId),
     scope: "asset_card_candidate_review",
+    reuse_policy: assetCandidateReusePolicy(candidate),
+    reuse_label: assetCandidateReuseLabel(assetCandidateReusePolicy(candidate)),
+    note: assetCandidateReuseNote(candidate),
     label: `${assetTypeLabel(candidate?.asset_type)} · ${safeText(candidate?.draft_fields?.display_name || candidate?.source_asset_id || `候选 ${index + 1}`)}`,
   }));
 }
@@ -113,6 +119,32 @@ function assetTypeLabel(value) {
 
 function safeToken(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").slice(0, 160);
+}
+
+function assetCandidateReusePolicy(candidate) {
+  const policy = candidate?.reuse_policy || {};
+  const shotRefCount = Math.max(0, Math.min(Number(policy.shot_ref_count) || 0, 99));
+  return {
+    suggested_reuse_scope: safeReuseScope(policy.suggested_reuse_scope),
+    shot_ref_count: shotRefCount,
+    requires_human_confirmation: policy.requires_human_confirmation !== false,
+    writes_fixed_asset: false,
+  };
+}
+
+function assetCandidateReuseNote(candidate) {
+  const policy = assetCandidateReusePolicy(candidate);
+  return `Studio local step gate decision. reuse_scope=${policy.suggested_reuse_scope}; shot_ref_count=${policy.shot_ref_count}; writes_fixed_asset=false`;
+}
+
+function safeReuseScope(value) {
+  return value === "project_reuse_candidate" ? "project_reuse_candidate" : "shot_local_candidate";
+}
+
+function assetCandidateReuseLabel(policy) {
+  if (!policy) return "";
+  const scopeLabel = policy.suggested_reuse_scope === "project_reuse_candidate" ? "Project reuse" : "Shot local";
+  return `${scopeLabel} / ${policy.shot_ref_count} shots`;
 }
 
 function safeText(value) {
