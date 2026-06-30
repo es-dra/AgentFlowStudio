@@ -1,5 +1,66 @@
 # Devlog
 
+## 2026-06-30 - Asset Promotion Gate Provenance
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `510684c0383515efcb8473a40b99145b1ec8a261`.
+- Added optional Runtime promotion provenance for fixed visual assets:
+  `source_human_gate_id` and `source_asset_card_candidate_id` are now accepted
+  by `VisualAssetPromoteRequest` and projected as a safe `promotion_gate`.
+- Added `agentflow.algorithms.fixed_asset_memory.promotion_gate` so the
+  provenance sanitization/projection stays outside the fixed asset core module
+  and does not create a new oversized-file warning.
+- Studio fixed-asset promotion now attaches the latest accepted
+  `asset_card_candidate` human gate summary when present. Direct manual
+  promotion still works without a human gate ID.
+- Updated the Runtime OpenAPI snapshot with the exporter. Public path count
+  stayed at 50; only the visual asset promotion request schema changed.
+- No provider gate, provider call, generated media, deploy, server sync, human
+  creative acceptance, business validation, or durable memory promotion
+  occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_visual_asset_promotion_gate.py tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# red baseline: Runtime response lacked promotion_gate; Studio helper file was missing
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_visual_asset_promotion_gate.py tests\test_web_studio_visual_asset_promotion_gate_static.py tests\test_api_runtime_visual_assets.py tests\test_api_runtime_human_gate.py -q
+# 9 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py -q
+# expected drift before exporter refresh
+
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\openapi\afs-runtime-service.openapi.json
+# exported; paths remained 50
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_visual_asset_promotion_gate.py tests\test_api_runtime_openapi_snapshot.py -q
+# 3 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 708 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 127 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warning counts remain: human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T12
+```
+
 ## 2026-06-30 - Studio Human Gate UI Hook
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

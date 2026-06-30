@@ -96,6 +96,18 @@ node params. No fixed asset promotion, provider gate, provider call, generated
 media, or business/human acceptance claim was added. Handoff:
 `docs/handoff/AFS-STUDIO-HUMAN-GATE-UI-HOOK-TASKRUN-20260630.md`.
 
+Asset-promotion-gate addendum: the next slice adds optional provenance between
+accepted asset-card human gate decisions and fixed visual asset promotion.
+Runtime `VisualAssetPromoteRequest` accepts `source_human_gate_id` and
+`source_asset_card_candidate_id`, stores them as a safe `promotion_gate`, and
+keeps direct manual promotion backwards-compatible. Studio attaches only the
+latest accepted `asset_card_candidate` human gate summary when present. This is
+promotion provenance, not provider smoke, generated media evidence, human
+creative acceptance, business validation, or durable memory promotion. OpenAPI
+path count remains 50; the exporter-generated snapshot now includes the two
+optional request fields. Handoff:
+`docs/handoff/AFS-ASSET-PROMOTION-GATE-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
