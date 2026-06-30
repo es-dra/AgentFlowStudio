@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 
 def test_asset_detail_source_evidence_rows_are_safe_and_local() -> None:
@@ -48,8 +49,14 @@ process.stdout.write(JSON.stringify({ rows }));
 
 
 def test_asset_detail_popover_wires_source_evidence_section() -> None:
-    source = "apps/studio/src/panels/asset-detail-popover.js"
-    text = open(source, encoding="utf-8").read()
+    text = Path("apps/studio/src/panels/asset-detail-popover.js").read_text(encoding="utf-8")
 
     assert 'detailList("来源证据", sourceEvidenceRows)' in text
     assert "assetSourceEvidenceRows(asset)" in text
+
+
+def test_visual_asset_promotion_keeps_source_evidence_in_asset_library_entry() -> None:
+    panel = Path("apps/studio/src/panels/visual-asset-panel.js").read_text(encoding="utf-8")
+
+    assert "source_evidence: localAsset.source_evidence || null" in panel
+    assert "n.params.visualAssets = mergeVisualAssets" in panel

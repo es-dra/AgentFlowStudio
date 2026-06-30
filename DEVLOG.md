@@ -1,5 +1,27 @@
 # Devlog
 
+## 2026-06-30 - Studio Asset Library Source Evidence Preservation
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T36 asset-detail
+  source-evidence surface.
+- Preserved fixed visual asset `source_evidence` when adding promoted assets to
+  the Studio asset library entry, so opening details from the library can show
+  the same evidence as the node-local visual asset.
+- Kept this as a local Studio state/evidence fix: no Runtime route, OpenAPI
+  path, provider call, generated media, deploy, server sync, human creative
+  acceptance, or business validation claim changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_asset_detail_source_evidence.py tests\test_web_studio_visual_asset_promotion_gate_static.py
+# 6 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+```
+
 ## 2026-06-30 - Studio Asset Detail Source Evidence Surface
 
 - Continued provider-closed full goal-mode work on

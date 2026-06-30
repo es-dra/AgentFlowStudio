@@ -229,6 +229,7 @@ async function submitVisualAssetReview({
       signature: localAsset.signature,
       feature_card: localAsset.feature_card,
       negative_locks: localAsset.negative_locks,
+      source_evidence: localAsset.source_evidence || null,
       created_at: new Date().toISOString(),
     });
   });

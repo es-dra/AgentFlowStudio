@@ -8,6 +8,14 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio asset-library source-evidence preservation addendum: the next
+provider-closed product slice preserves fixed visual asset `source_evidence`
+when a promoted asset is added to the Studio asset library entry. This keeps
+node-local asset detail and library-opened asset detail aligned without adding
+Runtime routes, OpenAPI paths, provider calls, generated media, deploy, server
+sync, human creative acceptance, or business validation. Handoff:
+`docs/handoff/AFS-STUDIO-ASSET-LIBRARY-SOURCE-EVIDENCE-PRESERVATION-20260630.md`.
+
 Studio asset-detail source-evidence addendum: the next provider-closed product
 slice surfaces fixed visual asset `source_evidence` inside the Studio asset
 detail popover. The view is a white-listed local review surface for human gate,
