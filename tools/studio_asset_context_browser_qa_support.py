@@ -124,6 +124,27 @@ def make_mutating_runtime_proxy(runtime_root: Path, *, allow_live_llm: bool = Fa
     return proxy_mutating_runtime_request
 
 
+def make_studio_static_route(repo: Path):
+    studio_root = (repo / "apps" / "studio").resolve()
+
+    def route_studio_static(route: Any) -> None:
+        parsed = urlsplit(route.request.url)
+        relative = parsed.path.removeprefix("/studio/").replace("/", "\\")
+        path = (studio_root / relative).resolve()
+        try:
+            path.relative_to(studio_root)
+        except ValueError:
+            route.fulfill(status=404, body=b"")
+            return
+        if not path.is_file():
+            route.fulfill(status=404, body=b"")
+            return
+        content_type = "text/javascript; charset=utf-8" if path.suffix.lower() == ".js" else "text/css; charset=utf-8"
+        route.fulfill(status=200, content_type=content_type, body=path.read_bytes())
+
+    return route_studio_static
+
+
 @contextmanager
 def remote_provider_gates_closed(*, allow_live_llm: bool = False):
     previous = {key: os.environ.get(key) for key in REMOTE_PROVIDER_GATES}

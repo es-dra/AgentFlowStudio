@@ -130,6 +130,20 @@ call, generated media, human creative acceptance, business validation, deploy,
 or server sync. Handoff:
 `docs/handoff/AFS-DETERMINISTIC-PROMOTION-UI-HARNESS-20260630.md`.
 
+Deterministic promotion browser harness addendum: the next slice adds
+`tools/studio_visual_asset_promotion_browser_qa.py` as a real browser/runtime
+harness for the fixed visual asset promotion path. It seeds a temporary Runtime
+project with a safe image asset and accepted asset-card human gate summary,
+opens `/studio/`, submits the visual asset modal, and verifies the Runtime
+visual asset record carries a sanitized `promotion_gate` while
+`provider_calls_started=false`. Runtime Studio-state persistence now allows
+safe `humanGateDecisions` through a small dedicated sanitizer module, and common
+browser static-route wiring is shared from `studio_asset_context_browser_qa_support.py`
+instead of copied across tools. This is browser/runtime verification only: no
+provider smoke, generated media, human creative acceptance, business
+validation, deploy, or server sync. Handoff:
+`docs/handoff/AFS-DETERMINISTIC-PROMOTION-BROWSER-HARNESS-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

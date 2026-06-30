@@ -1,5 +1,63 @@
 # Devlog
 
+## 2026-06-30 - Deterministic Promotion Browser Harness
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `fe4be34b535c2193fd199a6c995953ddd2e39692`.
+- Added `tools/studio_visual_asset_promotion_browser_qa.py` as a deterministic
+  browser/runtime harness for the fixed visual asset promotion flow.
+- The harness seeds a local Runtime project with one image node, a safe uploaded
+  image asset, and an accepted `asset_card_candidate` human gate summary, then
+  opens `/studio/`, submits the fixed visual asset modal, and verifies the
+  Runtime visual asset record contains the sanitized `promotion_gate`.
+- Added `apps/api/runtime_studio_state_human_gate.py` and wired
+  `humanGateDecisions` into the Runtime Studio-state sanitizer so accepted gate
+  summaries can survive Runtime hydration without storing media bytes or unsafe
+  fields.
+- Moved the duplicated Studio static-route helper from two browser QA scripts
+  into `tools/studio_asset_context_browser_qa_support.py`; the old scripts now
+  reuse that helper instead of carrying a third copy.
+- Added `tests/test_studio_visual_asset_promotion_browser_qa_tool.py` for the
+  harness path defaults and seeded Studio-state contract.
+- No provider gate, provider call, generated media, deploy, server sync, human
+  creative acceptance, business validation, or durable memory promotion
+  occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_studio_visual_asset_promotion_browser_qa_tool.py -q
+# red baseline: ImportError for missing studio_visual_asset_promotion_browser_qa
+# final: 3 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_studio_visual_asset_promotion_browser_qa_tool.py tests\test_studio_asset_context_browser_qa_tool.py tests\test_studio_asset_context_browser_qa_support.py -q
+# 12 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe tools\studio_visual_asset_promotion_browser_qa.py --report runs\studio_visual_asset_promotion_browser_qa_t15.json --timeout-ms 90000
+# passed; ignored report recorded promotion_gate, console_error_count=0,
+# response_error_count=0, provider_calls_started=false
+
+.\.venv\Scripts\python.exe -m pytest
+# first run failed because the initial sanitizer placement made
+# runtime_studio_state_param_values.py exceed the 300-line module guard
+# final run: 712 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Deterministic Promotion UI Harness
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

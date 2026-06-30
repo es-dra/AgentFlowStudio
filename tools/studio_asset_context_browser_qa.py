@@ -8,7 +8,6 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from playwright.sync_api import Page, expect, sync_playwright
 
@@ -18,6 +17,7 @@ from studio_asset_context_browser_qa_support import (
     fixed_visual_asset_record,
     free_port,
     make_mutating_runtime_proxy,
+    make_studio_static_route,
     runtime_test_client,
     start_runtime,
     stop_runtime,
@@ -128,27 +128,6 @@ def prepare_clean_project(runtime_root: Path) -> None:
     saved = client.put(f"/projects/{PROJECT_ID}/studio-state", json={"state": state})
     if saved.status_code != 200:
         raise AssertionError(f"studio-state setup failed: {saved.status_code} {saved.text}")
-
-
-def make_studio_static_route(repo: Path):
-    studio_root = (repo / "apps" / "studio").resolve()
-
-    def route_studio_static(route: Any) -> None:
-        parsed = urlsplit(route.request.url)
-        relative = parsed.path.removeprefix("/studio/").replace("/", "\\")
-        path = (studio_root / relative).resolve()
-        try:
-            path.relative_to(studio_root)
-        except ValueError:
-            route.fulfill(status=404, body=b"")
-            return
-        if not path.is_file():
-            route.fulfill(status=404, body=b"")
-            return
-        content_type = "text/javascript; charset=utf-8" if path.suffix.lower() == ".js" else "text/css; charset=utf-8"
-        route.fulfill(status=200, content_type=content_type, body=path.read_bytes())
-
-    return route_studio_static
 
 
 def run_browser_qa(
