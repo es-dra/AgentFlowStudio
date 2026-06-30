@@ -120,7 +120,12 @@ function assetTypeLabel(assetType) {
 }
 
 function promotionGateSummaryMeta(summary) {
-  return [summary?.source_asset_card_candidate_id, summary?.fixed_asset_reuse_label].filter(Boolean).join(" · ");
+  const productionGraph = summary?.production_graph_artifact_id
+    ? `production_graph=${summary.production_graph_artifact_id}`
+    : "";
+  return [summary?.source_asset_card_candidate_id, summary?.fixed_asset_reuse_label, productionGraph]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function escapeHtml(value) {

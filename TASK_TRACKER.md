@@ -8,6 +8,16 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio promotion-gate production-graph evidence addendum: the next
+provider-closed product slice records a safe `production_graph_artifact_id` in
+Studio human-gate asset-card review notes and surfaces it in the fixed visual
+asset promotion review summary. This connects `production_graph_snapshot ->
+human gate -> promotion review` in the operator evidence chain without adding
+Runtime routes, Runtime promotion payload fields, OpenAPI paths, provider
+calls, generated media, deploy, server sync, human creative acceptance, or
+business validation. Handoff:
+`docs/handoff/AFS-STUDIO-PROMOTION-GATE-PRODUCTION-GRAPH-EVIDENCE-20260630.md`.
+
 Studio production-graph keyframe trace addendum: the next provider-closed
 product slice carries a safe `production_graph_review` summary from Studio
 storyboard breakdown state into generated keyframe layers and

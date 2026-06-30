@@ -18,6 +18,7 @@ export function promotionGateReviewSummary(node) {
     shot_ref_count: reuse.shot_ref_count,
     fixed_asset_reuse_count: reuse.fixed_asset_reuse_count,
     fixed_asset_reuse_label: fixedReuseLabel(reuse.fixed_asset_reuse_count),
+    production_graph_artifact_id: reuse.production_graph_artifact_id,
     label: reuse.label,
     writes_fixed_asset: false,
   };
@@ -39,10 +40,12 @@ function parseReuseSummary(note) {
   const scope = safeReuseScope((text.match(/reuse_scope=([a-z_]+)/) || [])[1]);
   const count = Math.max(0, Math.min(Number((text.match(/shot_ref_count=(\d+)/) || [])[1]) || 0, 99));
   const fixedReuseCount = Math.max(0, Math.min(Number((text.match(/fixed_asset_reuse_count=(\d+)/) || [])[1]) || 0, 99));
+  const productionGraphArtifactId = safeToken((text.match(/production_graph_artifact_id=([a-zA-Z0-9_.:-]+)/) || [])[1]);
   return {
     reuse_scope: scope,
     shot_ref_count: count,
     fixed_asset_reuse_count: fixedReuseCount,
+    production_graph_artifact_id: productionGraphArtifactId,
     label: scope ? reuseLabel(scope, count) : "Accepted asset-card gate",
   };
 }

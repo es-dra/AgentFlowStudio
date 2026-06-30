@@ -53,3 +53,4 @@ process.stdout.write(JSON.stringify(humanGateTargets(node)));
 
     assert targets[0]["graph_reuse_label"] == "Fixed reuse / 1 asset"
     assert "fixed_asset_reuse_count=1" in targets[0]["note"]
+    assert "production_graph_artifact_id=artifact_production_graph" in targets[0]["note"]

@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-06-30 - Studio Promotion Gate Production Graph Evidence
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T34 keyframe trace
+  alignment.
+- Added the safe production graph snapshot artifact id to Studio human-gate
+  asset-card review notes when the storyboard breakdown already has a
+  production graph snapshot.
+- Extended `promotionGateReviewSummary()` and the fixed visual asset promotion
+  panel meta line to show the production graph artifact id alongside fixed
+  reuse count.
+- Kept Runtime promotion payload and public API shape unchanged; this remains a
+  Studio local review/evidence surface and does not add provider calls,
+  generated media, deploy, server sync, human creative acceptance, or business
+  validation claims.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_production_graph_reuse_static.py tests\test_web_studio_visual_asset_promotion_gate_static.py tests\test_web_studio_human_gate_static.py
+# 7 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+```
+
 ## 2026-06-30 - Studio Production Graph Keyframe Trace Alignment
 
 - Continued provider-closed full goal-mode work on

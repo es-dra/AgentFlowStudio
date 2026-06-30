@@ -90,6 +90,7 @@ function assetCardCandidateTargets(node) {
   const candidates = Array.isArray(candidateSet?.candidates) ? candidateSet.candidates : [];
   const artifactId = breakdown.assetCardCandidateArtifactId || node?.params?.assetCardCandidateArtifactId || "";
   const productionGraph = productionGraphFromBreakdown(breakdown);
+  const productionGraphArtifactId = productionGraphArtifactIdFromBreakdown(breakdown);
   const graphReuseCount = productionGraphFixedAssetCount(productionGraph);
   return candidates.map((candidate, index) => ({
     target_type: "asset_card_candidate",
@@ -99,7 +100,7 @@ function assetCardCandidateTargets(node) {
     reuse_policy: assetCandidateReusePolicy(candidate),
     reuse_label: assetCandidateReuseLabel(assetCandidateReusePolicy(candidate)),
     graph_reuse_label: productionGraphReuseLabel(productionGraph),
-    note: `${assetCandidateReuseNote(candidate)}; fixed_asset_reuse_count=${graphReuseCount}`,
+    note: assetCandidateReviewNote(candidate, graphReuseCount, productionGraphArtifactId),
     label: `${assetTypeLabel(candidate?.asset_type)} · ${safeText(candidate?.draft_fields?.display_name || candidate?.source_asset_id || `候选 ${index + 1}`)}`,
   }));
 }
@@ -141,6 +142,14 @@ function assetCandidateReuseNote(candidate) {
   return `Studio local step gate decision. reuse_scope=${policy.suggested_reuse_scope}; shot_ref_count=${policy.shot_ref_count}; writes_fixed_asset=false`;
 }
 
+function assetCandidateReviewNote(candidate, graphReuseCount, productionGraphArtifactId) {
+  return [
+    assetCandidateReuseNote(candidate),
+    `fixed_asset_reuse_count=${graphReuseCount}`,
+    productionGraphArtifactId ? `production_graph_artifact_id=${productionGraphArtifactId}` : "",
+  ].filter(Boolean).join("; ");
+}
+
 function safeReuseScope(value) {
   return value === "project_reuse_candidate" ? "project_reuse_candidate" : "shot_local_candidate";
 }
@@ -153,6 +162,15 @@ function assetCandidateReuseLabel(policy) {
 
 function productionGraphFromBreakdown(breakdown) {
   return breakdown?.productionGraph || breakdown?.production_graph || null;
+}
+
+function productionGraphArtifactIdFromBreakdown(breakdown) {
+  return safeToken(
+    breakdown?.productionGraphArtifactId
+    || breakdown?.production_graph_artifact_id
+    || breakdown?.artifacts?.production_graph_snapshot?.artifact_id
+    || "",
+  );
 }
 
 function productionGraphFixedAssetCount(graph) {

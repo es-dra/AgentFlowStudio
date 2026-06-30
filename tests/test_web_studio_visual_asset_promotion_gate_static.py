@@ -21,11 +21,13 @@ def test_studio_visual_asset_promotion_sends_accepted_human_gate_provenance() ->
     assert "promotionGateReviewSummary(node)" in render
     assert "promotionGateSummaryMeta(gateSummary)" in render
     assert "fixed_asset_reuse_label" in render
+    assert "production_graph=" in render
     assert "visual-asset-promotion-gate-summary" in render
     assert "visual-asset-promotion-gate-summary" in styles
     assert "visual-asset-promotion-gate.css" in index
     assert "source_human_gate_id" in provenance
     assert "source_asset_card_candidate_id" in provenance
+    assert "production_graph_artifact_id" in provenance
     assert "promotionGateReviewSummary" in provenance
     assert "accepted_for_next_step" in provenance
     assert "asset_card_candidate" in provenance
@@ -118,7 +120,7 @@ const node = {
         target_type: "asset_card_candidate",
         target_id: "asset card candidate / main",
         decision: "accepted_for_next_step",
-        note: "Studio local step gate decision. reuse_scope=project_reuse_candidate; shot_ref_count=3; fixed_asset_reuse_count=1; writes_fixed_asset=false",
+        note: "Studio local step gate decision. reuse_scope=project_reuse_candidate; shot_ref_count=3; fixed_asset_reuse_count=1; production_graph_artifact_id=artifact_production_graph; writes_fixed_asset=false",
       },
     ],
   },
@@ -159,6 +161,7 @@ process.stdout.write(JSON.stringify({
     assert summary["shot_ref_count"] == 3
     assert summary["fixed_asset_reuse_count"] == 1
     assert summary["fixed_asset_reuse_label"] == "Fixed reuse / 1 asset"
+    assert summary["production_graph_artifact_id"] == "artifact_production_graph"
     assert summary["label"] == "Project reuse / 3 shots"
     assert summary["writes_fixed_asset"] is False
     assert legacy_summary["reuse_scope"] == ""
