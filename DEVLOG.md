@@ -1,5 +1,65 @@
 # Devlog
 
+## 2026-06-30 - T40 Authorized Merge Sync Runtime Health Gate
+
+- Executed AFS-T40 under standing integration authorization after fresh startup
+  scan and branch review on `codex/afs-goal-mode-threshold-gate-20260630`.
+- Re-ran the required green gates: branch integration review reported
+  `blocker_count=0`, full pytest passed, Studio JS passed, maintenance audit
+  had `failed=0`, `git diff --check` passed, CLI help/version passed, and the
+  execution YAML files parsed.
+- Fast-forwarded local `master` from `f51237df89c680dafc54296d7e013bd98cd459af`
+  to `3f65c0a1178ecbe1d51c8fd16f4ca56a374d6084`, pushed `origin/master`, then
+  fast-forwarded server `/home/afs-ops/AgentFlowStudio` and
+  `/opt/afs/AgentFlowStudio` without reset or clean.
+- Verified `afs-runtime.service` remained `active/running` from
+  `/opt/afs/AgentFlowStudio` and `http://127.0.0.1:8790/health` returned
+  `status=ready`.
+- No provider smoke, live provider call, generated media, human creative
+  acceptance, business validation, public claim, patent/legal claim, or COS
+  active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --repo-root . --base-ref origin/master --allowed-untracked docs/demo-docs-20260629/ --report runs\afs_goal_mode_branch_review_t40_premerge.json
+# status=ready_for_human_merge_review; blocker_count=0; commit_count=20; changed_files=60; insertions=4860; deletions=21
+
+.\.venv\Scripts\python.exe -m pytest
+# 770 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warning classes only
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+YAML parse for AFS-AI-Execution-Spec.yaml and AFS-Goal-Driven-Execution-State-v0.1.yaml
+# passed
+
+git merge --ff-only codex/afs-goal-mode-threshold-gate-20260630
+# master fast-forwarded to 3f65c0a1178ecbe1d51c8fd16f4ca56a374d6084
+
+git push origin master
+# master -> master at 3f65c0a1178ecbe1d51c8fd16f4ca56a374d6084
+
+ssh afs-bwg-ops "git -C /home/afs-ops/AgentFlowStudio merge --ff-only origin/master"
+ssh afs-bwg-ops "git -C /opt/afs/AgentFlowStudio merge --ff-only origin/master"
+# both server checkouts fast-forwarded to 3f65c0a1178ecbe1d51c8fd16f4ca56a374d6084
+
+ssh afs-bwg-ops "curl -fsS http://127.0.0.1:8790/health"
+# status=ready; studio_static.status=ready
+```
+
 ## 2026-06-30 - Goal-Mode Threshold Merge Review Gate
 
 - Stopped feature work on `codex/afs-goal-mode-threshold-gate-20260630` for

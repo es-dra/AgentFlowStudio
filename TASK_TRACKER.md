@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+T40 authorized merge/sync/runtime health addendum: standing integration
+authorization conditions were rechecked for
+`codex/afs-goal-mode-threshold-gate-20260630`. Branch review was
+`ready_for_human_merge_review` with `blocker_count=0`; full pytest passed
+(`770 passed, 520 deselected, 2 warnings`), Studio JS passed (`134 files`),
+maintenance audit had `failed=0`, diff check passed, CLI help/version passed,
+and the execution YAML files parsed. Local `master`, `origin/master`, server
+`/home`, and server `/opt` were fast-forwarded to
+`3f65c0a1178ecbe1d51c8fd16f4ca56a374d6084` without reset/clean. Runtime health
+is `ready`. This is runtime health verification after sync, not provider smoke,
+human creative acceptance, business validation, public claim, patent/legal
+decision, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-AUTHORIZED-T40-MERGE-SYNC-RUNTIME-HEALTH-20260630.md`.
+
 Goal-mode threshold merge review addendum: T39 stops feature work on
 `codex/afs-goal-mode-threshold-gate-20260630` for the mandatory merge review
 gate. Precommit branch review from `origin/master` to
