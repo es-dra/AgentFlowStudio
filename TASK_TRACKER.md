@@ -8,6 +8,13 @@
 
 Last updated: 2026-06-26 by Codex
 
+Branch threshold gate addendum: after the authorized T19 merge/sync, new work
+continues from `master` commit `f51237df89c680dafc54296d7e013bd98cd459af` on
+fresh branch `codex/afs-goal-mode-threshold-gate-20260630`. The branch
+integration preflight now exposes the next mandatory merge-review threshold:
+20 commits, 80 changed files, or 5000 insertions. Handoff:
+`docs/handoff/AFS-BRANCH-SIZE-MERGE-REVIEW-THRESHOLD-GATE-20260630.md`.
+
 Authorized merge/sync addendum: on 2026-06-30 the human technical lead selected
 `merge` for `codex/afs-project-book-full-goal-20260630`. The release gate was
 rerun from `aba7494b88fd969bf337d692e2be3d5f63f1751f`: full pytest passed,

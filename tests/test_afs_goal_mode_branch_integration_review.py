@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tools.afs_branch_size_thresholds import build_branch_size_thresholds
 from tools.afs_goal_mode_branch_integration_review import build_branch_integration_blockers
 
 
@@ -122,3 +123,19 @@ def test_branch_integration_review_blocks_base_divergence_from_head() -> None:
             "head": "abc123",
         }
     ]
+
+
+def test_branch_size_thresholds_allow_small_provider_closed_slice() -> None:
+    thresholds = build_branch_size_thresholds(commit_count=3, changed_file_count=12, insertion_count=499)
+
+    assert thresholds["threshold_reached"] is False
+    assert thresholds["reached"] == []
+    assert thresholds["required_action"] == "continue_provider_closed_slice"
+
+
+def test_branch_size_thresholds_enter_review_at_each_limit() -> None:
+    thresholds = build_branch_size_thresholds(commit_count=20, changed_file_count=80, insertion_count=5000)
+
+    assert thresholds["threshold_reached"] is True
+    assert thresholds["reached"] == ["commits", "changed_files", "insertions"]
+    assert thresholds["required_action"] == "enter_merge_review_gate"

@@ -1,5 +1,43 @@
 # Devlog
 
+## 2026-06-30 - Branch Size Merge Review Threshold Gate
+
+- Started fresh branch `codex/afs-goal-mode-threshold-gate-20260630` from the
+  synced `master` baseline `f51237df89c680dafc54296d7e013bd98cd459af` after
+  the authorized T19 merge/sync gate.
+- Added a reusable branch-size threshold helper for the next goal-mode branch:
+  automatic merge review gate is required at 20 commits, 80 changed files, or
+  5000 insertions.
+- Extended `tools/afs_goal_mode_branch_integration_review.py` so its JSON
+  report includes insertion/deletion/binary-file counts and
+  `merge_review_thresholds` with `required_action`.
+- Added regression tests for below-threshold slices and the exact threshold
+  limits. This is governance automation only; it does not change Runtime,
+  Studio, OpenAPI, provider gates, or product behavior.
+- No provider smoke, live provider call, server sync, deploy, human acceptance,
+  business validation, generated media, or durable memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_afs_goal_mode_branch_integration_review.py -q
+# 7 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 132 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged:
+# legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T20
+```
+
 ## 2026-06-30 - Authorized Master Merge and Three-End Sync
 
 - Human technical lead authorized `merge` for

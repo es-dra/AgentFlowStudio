@@ -8,6 +8,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from tools.afs_branch_size_thresholds import build_branch_size_thresholds, diff_numstat_summary
+except ModuleNotFoundError:
+    from afs_branch_size_thresholds import build_branch_size_thresholds, diff_numstat_summary
+
 
 DEFAULT_BASE_REF = "origin/master"
 DEFAULT_BRANCH_PREFIX = "codex/"
@@ -54,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         report_path = Path(args.report)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"status": report["status"], "blocker_count": len(report["blockers"])}, ensure_ascii=False))
+    print(json.dumps({"status": report["status"], "blocker_count": len(report["blockers"]), "merge_review_threshold_reached": report["merge_review_thresholds"]["threshold_reached"], "merge_review_threshold_reasons": report["merge_review_thresholds"]["reached"]}, ensure_ascii=False))
     return 0 if report["status"] == "ready_for_human_merge_review" else 2
 
 
@@ -79,6 +84,8 @@ def collect_branch_integration_review(
     status_text = _git(repo_root, ["status", "--short", "--branch"])
     changed_files = _changed_files(repo_root, base_ref)
     commits = _commit_summaries(repo_root, base_ref)
+    diff_stat = diff_numstat_summary(repo_root, base_ref)
+    thresholds = build_branch_size_thresholds(commit_count=len(commits), changed_file_count=len(changed_files), insertion_count=diff_stat["insertions"])
     index_text = _read_text(repo_root / "docs" / "handoff" / "INDEX.md")
     blockers = build_branch_integration_blockers(
         branch=branch,
@@ -110,7 +117,11 @@ def collect_branch_integration_review(
         "commit_count_since_base": len(commits),
         "commits_since_base": [commit.__dict__ for commit in commits],
         "changed_file_count": len(changed_files),
+        "insertion_count_since_base": diff_stat["insertions"],
+        "deletion_count_since_base": diff_stat["deletions"],
+        "binary_file_count_since_base": diff_stat["binary_files"],
         "changed_files": changed_files,
+        "merge_review_thresholds": thresholds,
         "handoff_files": _handoff_files(changed_files),
         "allowed_untracked": list(allowed_untracked),
         "blockers": blockers,
