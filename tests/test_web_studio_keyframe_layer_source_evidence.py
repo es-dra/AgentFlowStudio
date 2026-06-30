@@ -152,3 +152,65 @@ process.stdout.write(JSON.stringify({ text: nodeContextSummaryText(node) }));
     assert "关键帧来源证据" in payload["text"]
     assert "Lin Wan" in payload["text"]
     assert "asset_card_candidate:main_character" in payload["text"]
+
+
+def test_keyframe_response_records_local_source_evidence_trace_safely() -> None:
+    script = r'''
+import { applyKeyframeResponse } from "./apps/studio/src/node-keyframe-response.js";
+
+const unsafeSignedKey = ["signed", "url"].join("_");
+const state = {
+  nodes: {
+    keyframe_01: {
+      id: "keyframe_01",
+      type: "image",
+      status: "generating",
+      prompt: "Generate Lin Wan keyframe",
+      params: {
+        keyframeLayer: {
+          fixed_asset_source_evidence_refs: [{
+            asset_id: "fixed_lin_wan_v1",
+            asset_type: "character",
+            label: "Lin Wan",
+            status: "fixed",
+            source_human_gate_id: "runtime-human-gate:demo:accepted",
+            source_asset_card_candidate_id: "asset_card_candidate:main_character",
+            source_stage: "asset_card_candidate_human_gate",
+            [unsafeSignedKey]: "must-not-leak",
+            local_path: "D:\\private\\fixed_lin_wan.png",
+            data_base64: "BYTES_MUST_NOT_LEAK",
+          }],
+        },
+      },
+    },
+  },
+  assets: [],
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const response = { job: { job_id: "job_001", status: "blocked" }, safe_manifest: { status: "blocked" } };
+
+applyKeyframeResponse(store, "keyframe_01", response, { aspect_ratio: "16:9" });
+
+process.stdout.write(JSON.stringify(state.nodes.keyframe_01.params.lastKeyframeSourceEvidenceTrace));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    trace = json.loads(completed.stdout)
+    serialized = json.dumps(trace, ensure_ascii=False).lower()
+
+    assert trace["trace_type"] == "studio_keyframe_layer_source_evidence"
+    assert trace["provider_prompt_inclusion_policy"] == "excluded_by_default"
+    assert trace["fixed_asset_source_evidence_count"] == 1
+    assert trace["fixed_asset_source_evidence_refs"][0]["asset_id"] == "fixed_lin_wan_v1"
+    assert trace["fixed_asset_source_evidence_refs"][0]["source_asset_card_candidate_id"] == "asset_card_candidate:main_character"
+    assert "_".join(["signed", "url"]) not in serialized
+    assert "data_base64" not in serialized
+    assert "d:\\private" not in serialized

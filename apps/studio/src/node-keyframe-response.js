@@ -3,6 +3,7 @@ import { visibleAssetForNode } from "./node-visible-assets.js";
 import { updateNodeGenerationState } from "./node-generation-progress.js";
 import { isKeyframeInProgress, keyframeResultText } from "./node-generation-results.js";
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
+import { keyframeSourceEvidenceTrace } from "./keyframe-source-evidence-trace.js";
 export function applyKeyframeResponse(store, nodeId, response, request, options = {}) {
   const status = response?.job?.status || "blocked";
   const inProgress = isKeyframeInProgress(response);
@@ -30,6 +31,7 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
     n.params.lastGenerationBridge = response?.generation_bridge || n.params.lastGenerationBridge || null;
     n.params.lastGenerationBridgeArtifactId = response?.artifacts?.keyframe_generation_bridge?.artifact_id || n.params.lastGenerationBridgeArtifactId || "";
+    n.params.lastKeyframeSourceEvidenceTrace = keyframeSourceEvidenceTrace(n) || n.params.lastKeyframeSourceEvidenceTrace || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
     n.result = keyframeResultText(response, request, succeeded, { kind });
     if (shouldRecordAsset) {

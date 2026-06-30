@@ -11,6 +11,7 @@ import {
   feedbackOverlayPromptPolicySummaryText,
   feedbackOverlaySummaryText,
 } from "../feedback-context-overlays.js";
+import { keyframeSourceEvidenceSummaryText } from "../keyframe-source-evidence-trace.js";
 
 export function projectReferenceSummaryText(state) {
   const summary = assetLifecycleSummary(state.assets || []);
@@ -45,9 +46,9 @@ export function nodeContextSummaryText(node) {
   const includedNodes = Array.isArray(bundle?.included_nodes) ? bundle.included_nodes : [];
   const feedbackOverlays = feedbackContextOverlaysFromBundle(bundle);
   const localAssets = assetsFromNode(node);
-  const keyframeEvidenceRefs = keyframeLayerSourceEvidenceRefs(node);
+  const keyframeEvidenceSummary = keyframeSourceEvidenceSummaryText(node);
 
-  if (!bundle && !localAssets.length && !feedbackOverlays.length && !keyframeEvidenceRefs.length) {
+  if (!bundle && !localAssets.length && !feedbackOverlays.length && !keyframeEvidenceSummary) {
     return "还没有引用内容。优化或生成后会显示本次携带的节点、素材和排除原因。";
   }
 
@@ -63,7 +64,7 @@ export function nodeContextSummaryText(node) {
   if (feedbackOverlays.length) {
     lines.push(`反馈上下文：${feedbackOverlays.map(feedbackOverlaySummaryText).join("；")}`);
   }
-  if (keyframeEvidenceRefs.length) lines.push(`关键帧来源证据：${keyframeEvidenceList(keyframeEvidenceRefs)}`);
+  if (keyframeEvidenceSummary) lines.push(keyframeEvidenceSummary);
   const promptPolicy = feedbackOverlayPromptPolicyFromBundle(bundle);
   if (promptPolicy) {
     lines.push(`反馈提示词策略：${feedbackOverlayPromptPolicySummaryText(promptPolicy)}`);
@@ -95,19 +96,6 @@ function assetList(items) {
     const id = assetIdFromRef(item);
     return id && label === id ? `${type} ${shortId(id)}` : `${type} ${label}`;
   }).join("、");
-}
-
-function keyframeEvidenceList(items) {
-  return items.slice(0, 3).map((item) => {
-    const label = compactText(assetLabel(item), 32);
-    const source = compactText(item.source_asset_card_candidate_id || item.source_human_gate_id || item.source_stage || "manual", 48);
-    return `${assetTypeLabel(item)} ${label} -> ${source}`;
-  }).join("、");
-}
-
-function keyframeLayerSourceEvidenceRefs(node) {
-  const refs = node?.params?.keyframeLayer?.fixed_asset_source_evidence_refs;
-  return Array.isArray(refs) ? refs.filter((item) => item && typeof item === "object") : [];
 }
 
 function warningList(bundle) {

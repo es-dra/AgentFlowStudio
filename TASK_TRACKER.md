@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio keyframe source-evidence trace addendum: the next provider-closed
+product slice records a safe `lastKeyframeSourceEvidenceTrace` when keyframe
+responses are applied. The trace reuses the existing source-evidence normalizer
+and explicitly records `provider_prompt_inclusion_policy=excluded_by_default`,
+so it remains local evidence and does not enter provider prompts by default.
+This does not expand Runtime API/OpenAPI, call providers, deploy, server sync,
+or claim human creative acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-KEYFRAME-SOURCE-EVIDENCE-LOCAL-GENERATION-TRACE-20260630.md`.
+
 Studio keyframe evidence inspector addendum: the next provider-closed product
 slice surfaces T30 `keyframeLayer.fixed_asset_source_evidence_refs` in the
 Studio inspector `本次参考摘要`. Operators can now review which fixed asset,
