@@ -38,6 +38,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
     response.raise_for_status()
     event = response.json()["feedback_event"]
     feedback = event["feedback"]
+    candidate = event["feedback_candidate"]
     serialized = json.dumps(event, ensure_ascii=False).lower()
 
     assert feedback == {
@@ -70,3 +71,36 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         assert forbidden not in serialized
     assert event["writes_long_term_memory"] is False
     assert event["writes_company_kb"] is False
+    assert candidate["artifact_type"] == "agentflow_runtime_feedback_candidate"
+    assert candidate["source_feedback_id"] == event["feedback_id"]
+    assert candidate["source_project_id"] == project_id
+    assert candidate["candidate_scope"] == "quality_feedback_candidate"
+    assert candidate["safe_target"] == {
+        "kind": "studio_quality_feedback",
+        "node_id": "video-node-001",
+        "node_type": "video",
+        "artifact_ref": "artifact-001",
+        "video_job_id": "job-001",
+    }
+    assert candidate["safe_evidence_summary"] == {
+        "rating_count": 2,
+        "decision_count": 0,
+        "has_note": True,
+        "raw_evidence_policy": "raw_evidence_not_memory",
+    }
+    assert candidate["promotion_status"] == "candidate_only"
+    assert candidate["promotion_blocked_by_default"] is True
+    assert candidate["requires_human_promotion_decision"] is True
+    assert candidate["eligible_for_context_overlay"] is False
+    assert candidate["eligible_for_durable_memory"] is False
+    assert candidate["provider_calls_started"] is False
+    assert candidate["writes_long_term_memory"] is False
+    assert candidate["writes_company_kb"] is False
+    assert candidate["safety_boundary"] == {
+        "raw_provider_response_stored": False,
+        "external_private_link_stored": False,
+        "absolute_path_stored": False,
+        "media_bytes_stored": False,
+    }
+    manifest = client.get(f"/projects/{project_id}/manifest").json()["manifest"]
+    assert manifest["feedback_refs"][0]["feedback_id"] == event["feedback_id"]

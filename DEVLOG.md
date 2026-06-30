@@ -1,5 +1,60 @@
 # Devlog
 
+## 2026-06-30 - Runtime Feedback Candidate Contract
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `5b0c15951d931e872f39164b1bae29c4cd8dc56a`.
+- Tightened the existing Runtime `/feedback` event contract so every sanitized
+  feedback event now carries a safe `feedback_candidate` summary.
+- The candidate summary records scope, safe target refs, bounded evidence
+  counts, `promotion_status=candidate_only`, and explicit promotion/provider/
+  memory false flags.
+- No new Runtime route, Studio route, OpenAPI path, provider call, generated
+  media, master merge, server sync, Runtime health claim, human creative
+  acceptance, business validation, or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py -q
+# 1 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_service.py tests\test_api_runtime_openapi_snapshot.py -q
+# 13 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# first run found 5 internal-beta acceptance failures because the new candidate
+# safety field used a forbidden artifact key fragment; renamed it to
+# external_private_link_stored and reran the failing subset.
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_afs_internal_beta_acceptance.py tests\test_afs_internal_beta_human_review_record.py tests\test_afs_internal_beta_preflight_public_edge.py -q
+# 19 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 718 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings remain: legacy_frozen_surface=10,
+# human_doc_chinese_coverage=22, secret_like_fragments=9,
+# oversized_files=59
+
+git diff --check
+# passed with CRLF normalization warning on apps/api/runtime_events.py
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T15a
+```
+
 ## 2026-06-30 - Fast-Forward Merge Preflight Gate
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

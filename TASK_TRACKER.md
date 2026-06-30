@@ -191,6 +191,20 @@ call, generated media, human creative acceptance, business validation, or
 durable memory promotion. Handoff:
 `docs/handoff/AFS-FAST-FORWARD-MERGE-PREFLIGHT-GATE-20260630.md`.
 
+Runtime feedback candidate addendum: because `AFS-T19 Authorized Master Merge +
+Three-End Sync` still requires explicit human authorization, the next safe
+local slice tightens the existing `/feedback` Runtime contract instead of
+merging or syncing. Every sanitized Runtime feedback event now carries a safe
+`feedback_candidate` summary with `promotion_status=candidate_only`,
+`promotion_blocked_by_default=true`, `requires_human_promotion_decision=true`,
+and explicit false flags for provider calls, durable memory, Company KB writes,
+context overlay eligibility, private external links, local paths, provider raw, and media
+bytes. This is T15 feedback-candidate contract evidence only: no new route,
+OpenAPI path, Studio UI, provider call, generated media, master merge, deploy,
+server sync, Runtime health claim, human creative acceptance, business
+validation, or durable memory promotion occurred. Handoff:
+`docs/handoff/AFS-RUNTIME-FEEDBACK-CANDIDATE-CONTRACT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
