@@ -173,6 +173,10 @@ def _bundle_feedback_overlay_list(value: Any) -> list[dict[str, Any]]:
         safe_target = _safe_text_dict(item.get("safe_target"), max_items=12, max_length=180)
         if safe_target:
             overlay["safe_target"] = safe_target
+        for key in ("target_binding", "scope_policy", "conflict_summary"):
+            payload = _safe_payload(item.get(key))
+            if payload:
+                overlay[key] = payload
         evidence = _safe_evidence_summary(item.get("safe_evidence_summary"))
         if evidence:
             overlay["safe_evidence_summary"] = evidence
@@ -232,6 +236,22 @@ def _safe_text_list(value: Any, *, limit: int, max_length: int) -> list[str]:
         if text and text not in result:
             result.append(text)
     return result
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            safe_id(_text(key, "", 80))[:80]: _safe_payload(item)
+            for key, item in list(value.items())[:24]
+            if safe_id(_text(key, "", 80))[:80]
+        }
+    if isinstance(value, list):
+        return [_safe_payload(item) for item in value[:24]]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return int(max(0, min(1000, value)))
+    return _text(value, "", 180)
 
 
 def _safe_artifact_ref(value: Any) -> dict[str, str]:

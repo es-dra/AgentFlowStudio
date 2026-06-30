@@ -57,6 +57,11 @@ def test_runtime_feedback_candidate_promotion_records_context_overlay_decision(t
     assert decision["candidate_id"] == candidate["candidate_id"]
     assert decision["candidate_scope"] == "quality_feedback_candidate"
     assert decision["safe_target"] == candidate["safe_target"]
+    assert decision["target_binding"] == candidate["target_binding"]
+    assert decision["scope_policy"] == candidate["scope_policy"]
+    assert decision["conflict_summary"] == candidate["conflict_summary"]
+    assert decision["scope_policy"]["global_scope_allowed"] is False
+    assert decision["conflict_summary"]["cross_candidate_check_required"] is True
     assert decision["safe_evidence_summary"] == candidate["safe_evidence_summary"]
     assert decision["feedback_taxonomy"] == candidate["feedback_taxonomy"] == ["character", "scene"]
     assert decision["safe_evidence_summary"]["taxonomy_count"] == 2

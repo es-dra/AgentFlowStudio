@@ -75,6 +75,11 @@ def test_runtime_feedback_candidate_context_overlay_records_safe_overlay(tmp_pat
     assert overlay["candidate_id"] == promotion["candidate_id"]
     assert overlay["candidate_scope"] == "quality_feedback_candidate"
     assert overlay["safe_target"] == promotion["safe_target"]
+    assert overlay["target_binding"] == promotion["target_binding"]
+    assert overlay["scope_policy"] == promotion["scope_policy"]
+    assert overlay["conflict_summary"] == promotion["conflict_summary"]
+    assert overlay["scope_policy"]["cross_project_reuse_allowed"] is False
+    assert overlay["conflict_summary"]["global_rule_promotion_allowed"] is False
     assert overlay["safe_evidence_summary"] == promotion["safe_evidence_summary"]
     assert overlay["feedback_taxonomy"] == promotion["feedback_taxonomy"] == ["character", "scene"]
     assert overlay["safe_evidence_summary"]["taxonomy_count"] == 2

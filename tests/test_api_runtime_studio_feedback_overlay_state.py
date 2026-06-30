@@ -16,6 +16,9 @@ def test_studio_state_preserves_safe_feedback_context_overlay_summary() -> None:
     assert overlay["overlay_id"] == "runtime-feedback-overlay:abc123"
     assert overlay["candidate_id"] == "runtime-feedback-candidate:feedback001"
     assert overlay["safe_target"]["node_id"] == "image_1"
+    assert overlay["target_binding"]["project_scope_required"] is True
+    assert overlay["scope_policy"]["global_scope_allowed"] is False
+    assert overlay["conflict_summary"]["cross_candidate_check_required"] is True
     assert overlay["safe_evidence_summary"]["raw_evidence_policy"] == "raw_evidence_not_memory"
     assert overlay["safe_evidence_summary"]["taxonomy_count"] == 2
     assert overlay["feedback_taxonomy"] == ["character", "scene"]
@@ -62,6 +65,8 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert overlays[0]["overlay_id"] == "runtime-feedback-overlay:abc123"
     assert overlays[0]["candidate_id"] == "runtime-feedback-candidate:feedback001"
     assert overlays[0]["safe_target"]["node_id"] == "image_1"
+    assert overlays[0]["scope_policy"]["cross_project_reuse_allowed"] is False
+    assert overlays[0]["conflict_summary"]["signal_count"] == 0
     assert overlays[0]["feedback_taxonomy"] == ["character", "scene"]
     assert overlays[0]["context_overlay_consumed"] is True
     assert overlays[0]["provider_calls_started"] is False
@@ -143,6 +148,30 @@ def _overlay_node() -> dict:
                         "candidate_id": "runtime-feedback-candidate:feedback001",
                         "candidate_scope": "quality_feedback_candidate",
                         "safe_target": {"kind": "studio_quality_feedback", "node_id": "image_1"},
+                        "target_binding": {
+                            "project_id": "studio-state-feedback-overlay",
+                            "target_kind": "studio_quality_feedback",
+                            "bound_refs": {"node_id": "image_1"},
+                            "bound_ref_count": 1,
+                            "project_scope_required": True,
+                        },
+                        "scope_policy": {
+                            "scope_level": "project_target_candidate",
+                            "global_scope_allowed": False,
+                            "cross_project_reuse_allowed": False,
+                            "company_kb_promotion_allowed": False,
+                            "requires_human_review": True,
+                            "requires_conflict_review": True,
+                        },
+                        "conflict_summary": {
+                            "status": "no_single_feedback_conflict_signal",
+                            "signals": [],
+                            "signal_count": 0,
+                            "single_feedback_check_performed": True,
+                            "cross_candidate_check_performed": False,
+                            "cross_candidate_check_required": True,
+                            "global_rule_promotion_allowed": False,
+                        },
                         "safe_evidence_summary": {
                             "rating_count": 1,
                             "decision_count": 2,

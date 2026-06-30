@@ -164,6 +164,9 @@ def _bundle_feedback_context_overlays(bundle: dict[str, Any]) -> list[dict[str, 
             "feedback_taxonomy": _safe_ref_list(
                 [_sanitize_text(taxonomy_id).strip() for taxonomy_id in _safe_list(item.get("feedback_taxonomy"))]
             ),
+            "target_binding": _safe_payload(item.get("target_binding")),
+            "scope_policy": _safe_payload(item.get("scope_policy")),
+            "conflict_summary": _safe_payload(item.get("conflict_summary")),
             "safe_evidence_summary": _safe_evidence_summary(item.get("safe_evidence_summary")),
             "overlay_scope": _sanitize_text(item.get("overlay_scope")).strip(),
             "decision_effect": _sanitize_text(item.get("decision_effect")).strip(),
@@ -193,6 +196,22 @@ def _safe_evidence_summary(value: Any) -> dict[str, Any]:
     if "taxonomy_count" in value:
         summary["taxonomy_count"] = _bounded_int(value.get("taxonomy_count"))
     return summary
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            _sanitize_text(key).strip()[:80]: _safe_payload(item)
+            for key, item in list(value.items())[:24]
+            if _sanitize_text(key).strip()
+        }
+    if isinstance(value, list):
+        return [_safe_payload(item) for item in value[:24]]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return _bounded_int(value)
+    return _sanitize_text(value).strip()[:180]
 
 
 def _bounded_int(value: Any) -> int:

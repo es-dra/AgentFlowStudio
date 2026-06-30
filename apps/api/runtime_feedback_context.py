@@ -179,6 +179,9 @@ def _overlay_summary(store: RuntimeStore, ref: dict[str, Any]) -> dict[str, Any]
         "candidate_id": _safe_text(payload.get("candidate_id"), limit=180),
         "candidate_scope": _safe_text(payload.get("candidate_scope"), limit=120),
         "safe_target": _safe_dict(payload.get("safe_target"), limit=180),
+        "target_binding": _safe_payload(payload.get("target_binding")),
+        "scope_policy": _safe_payload(payload.get("scope_policy")),
+        "conflict_summary": _safe_payload(payload.get("conflict_summary")),
         "safe_evidence_summary": _safe_evidence(payload.get("safe_evidence_summary")),
         "feedback_taxonomy": _safe_list(payload.get("feedback_taxonomy"), limit=16),
         "overlay_scope": _safe_text(overlay.get("overlay_scope"), limit=120),
@@ -245,6 +248,22 @@ def _safe_list(value: Any, *, limit: int) -> list[str]:
         if text and text not in result:
             result.append(text)
     return result
+
+
+def _safe_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            _safe_text(key, limit=80): _safe_payload(item)
+            for key, item in list(value.items())[:24]
+            if _safe_text(key, limit=80)
+        }
+    if isinstance(value, list):
+        return [_safe_payload(item) for item in value[:24]]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return _bounded_int(value)
+    return _safe_text(value, limit=180)
 
 
 def _bounded_int(value: Any) -> int:

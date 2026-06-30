@@ -347,6 +347,19 @@ promotion, master merge, deploy, server sync, Runtime health verification, or
 human/business acceptance. Handoff:
 `docs/handoff/AFS-FEEDBACK-CANDIDATE-TAXONOMY-CONTRACT-20260630.md`.
 
+Feedback candidate scope/conflict addendum: the next provider-closed product
+slice adds `AFS-T15g Feedback Candidate Scope + Conflict Contract`. Runtime
+feedback candidates now carry safe `target_binding`, `scope_policy`, and
+`conflict_summary` objects. These fields make project scope, no-global-promotion
+policy, and single-feedback conflict signals explicit, and they propagate
+through promotion decisions, context overlays, context resolver summaries,
+model-call context, and Studio-state persistence. This is a feedback governance
+contract only: no new Runtime route, OpenAPI path, Studio fetch, provider call,
+generated media, durable memory, Company KB promotion, master merge, deploy,
+server sync, Runtime health verification, or human/business acceptance.
+Handoff:
+`docs/handoff/AFS-FEEDBACK-CANDIDATE-SCOPE-CONFLICT-CONTRACT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

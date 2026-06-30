@@ -55,6 +55,9 @@ def build_runtime_feedback_candidate(
         "generated_at": generated_at,
         "candidate_scope": _candidate_scope(kind),
         "safe_target": _safe_target(feedback),
+        "target_binding": _target_binding(project_id, feedback),
+        "scope_policy": _scope_policy(kind),
+        "conflict_summary": _conflict_summary(feedback),
         "safe_evidence_summary": _safe_evidence_summary(feedback),
         "feedback_taxonomy": _safe_taxonomy(feedback.get("feedback_taxonomy")),
         "promotion_status": "candidate_only",
@@ -95,6 +98,62 @@ def _safe_target(feedback: dict[str, Any]) -> dict[str, str]:
         if value:
             target[key] = value
     return target
+
+
+def _target_binding(project_id: str, feedback: dict[str, Any]) -> dict[str, Any]:
+    target = _safe_target(feedback)
+    refs = {key: value for key, value in target.items() if key != "kind"}
+    return {
+        "project_id": _safe_token(project_id),
+        "target_kind": target["kind"],
+        "bound_refs": refs,
+        "bound_ref_count": len(refs),
+        "project_scope_required": True,
+    }
+
+
+def _scope_policy(kind: str) -> dict[str, Any]:
+    return {
+        "scope_level": _scope_level(kind),
+        "global_scope_allowed": False,
+        "cross_project_reuse_allowed": False,
+        "company_kb_promotion_allowed": False,
+        "requires_human_review": True,
+        "requires_conflict_review": True,
+    }
+
+
+def _scope_level(kind: str) -> str:
+    if kind == "studio_asset_graph_feedback":
+        return "project_asset_graph_candidate"
+    if kind == "studio_quality_feedback":
+        return "project_target_candidate"
+    return "project_feedback_candidate"
+
+
+def _conflict_summary(feedback: dict[str, Any]) -> dict[str, Any]:
+    signals: list[str] = []
+    ratings = feedback.get("ratings") if isinstance(feedback.get("ratings"), dict) else {}
+    rating_values = [int(value) for value in ratings.values() if isinstance(value, int)]
+    target_change_success = feedback.get("target_change_success")
+    if len(rating_values) >= 2 and max(rating_values) - min(rating_values) >= 3:
+        signals.append("mixed_quality_rating_signal")
+    if isinstance(target_change_success, int) and target_change_success <= 2 and any(value >= 4 for value in rating_values):
+        signals.append("revision_success_conflict_signal")
+    decisions = feedback.get("decisions") if isinstance(feedback.get("decisions"), list) else []
+    decision_values = {str(item.get("decision") or "") for item in decisions if isinstance(item, dict)}
+    if decision_values & {"confirm", "lock"} and decision_values & {"revise", "reject"}:
+        signals.append("mixed_asset_decision_signal")
+    signals = list(dict.fromkeys(signals))
+    return {
+        "status": "conflict_signal_present" if signals else "no_single_feedback_conflict_signal",
+        "signals": signals,
+        "signal_count": len(signals),
+        "single_feedback_check_performed": True,
+        "cross_candidate_check_performed": False,
+        "cross_candidate_check_required": True,
+        "global_rule_promotion_allowed": False,
+    }
 
 
 def _safe_evidence_summary(feedback: dict[str, Any]) -> dict[str, Any]:

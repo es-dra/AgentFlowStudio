@@ -83,6 +83,35 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "artifact_ref": "artifact-001",
         "video_job_id": "job-001",
     }
+    assert candidate["target_binding"] == {
+        "project_id": project_id,
+        "target_kind": "studio_quality_feedback",
+        "bound_refs": {
+            "node_id": "video-node-001",
+            "node_type": "video",
+            "artifact_ref": "artifact-001",
+            "video_job_id": "job-001",
+        },
+        "bound_ref_count": 4,
+        "project_scope_required": True,
+    }
+    assert candidate["scope_policy"] == {
+        "scope_level": "project_target_candidate",
+        "global_scope_allowed": False,
+        "cross_project_reuse_allowed": False,
+        "company_kb_promotion_allowed": False,
+        "requires_human_review": True,
+        "requires_conflict_review": True,
+    }
+    assert candidate["conflict_summary"] == {
+        "status": "no_single_feedback_conflict_signal",
+        "signals": [],
+        "signal_count": 0,
+        "single_feedback_check_performed": True,
+        "cross_candidate_check_performed": False,
+        "cross_candidate_check_required": True,
+        "global_rule_promotion_allowed": False,
+    }
     assert candidate["safe_evidence_summary"] == {
         "rating_count": 2,
         "decision_count": 0,
@@ -133,6 +162,12 @@ def test_runtime_asset_graph_feedback_records_bounded_taxonomy(tmp_path) -> None
                         "continuity_locks": ["wardrobe continuity"],
                         "negative_locks": ["do not change prop"],
                     },
+                    {
+                        "graph_asset_id": "asset-scene-002",
+                        "decision": "confirm",
+                        "label": "scene asset",
+                        "note": "Keep environment continuity.",
+                    },
                     {"graph_asset_id": "unsafe", "decision": "unknown", "note": "drop"},
                 ],
             },
@@ -154,11 +189,19 @@ def test_runtime_asset_graph_feedback_records_bounded_taxonomy(tmp_path) -> None
         "asset",
         "revision",
     ]
-    assert len(feedback["decisions"]) == 1
+    assert len(feedback["decisions"]) == 2
     assert feedback["decisions"][0]["decision"] == "revise"
+    assert feedback["decisions"][1]["decision"] == "confirm"
     assert candidate["candidate_scope"] == "asset_graph_feedback_candidate"
     assert candidate["feedback_taxonomy"] == feedback["feedback_taxonomy"]
-    assert candidate["safe_evidence_summary"]["decision_count"] == 1
+    assert candidate["target_binding"]["bound_refs"]["asset_graph_ref"] == "artifact-asset-graph-001"
+    assert candidate["scope_policy"]["scope_level"] == "project_asset_graph_candidate"
+    assert candidate["scope_policy"]["global_scope_allowed"] is False
+    assert candidate["conflict_summary"]["status"] == "conflict_signal_present"
+    assert candidate["conflict_summary"]["signals"] == ["mixed_asset_decision_signal"]
+    assert candidate["conflict_summary"]["cross_candidate_check_required"] is True
+    assert candidate["conflict_summary"]["global_rule_promotion_allowed"] is False
+    assert candidate["safe_evidence_summary"]["decision_count"] == 2
     assert candidate["safe_evidence_summary"]["taxonomy_count"] == 8
     assert '"provider_raw"' not in serialized
     assert "signed_url" not in serialized
