@@ -1,5 +1,59 @@
 # Devlog
 
+## 2026-06-30 - Studio State Feedback Policy Sanitizer Split
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `98ca7477964fe9bb428ca0343e6c4d20dc224865`.
+- Added `AFS-T18d Studio State Feedback Policy Sanitizer Split` as a
+  provider-closed maintenance/contract slice.
+- Split feedback overlay prompt-policy Studio-state sanitization out of
+  `apps/api/runtime_studio_state_context.py` into
+  `apps/api/runtime_studio_state_feedback_policy.py`.
+- Reduced `runtime_studio_state_context.py` from 300 lines to 248 lines and
+  kept the new helper at 84 lines, avoiding new oversized-file debt in the
+  current-wave state sanitizer path.
+- Kept behavior unchanged: the new helper receives the existing `_text`
+  sanitizer and `safe_id`, so local-path/runtime-artifact-path rejection and ID
+  normalization remain under the same boundary.
+- Updated the module split regression to include the new helper and keep all
+  Studio state sanitizer modules under 300 lines.
+- Corrected the T18c handoff status to reflect the already completed
+  commit/push/branch-preflight state.
+- No OpenAPI snapshot update was needed; path count remains 52.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_studio_state_modules.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_persistence.py -q
+# 19 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 737 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Feedback Overlay Prompt Approval Gate
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

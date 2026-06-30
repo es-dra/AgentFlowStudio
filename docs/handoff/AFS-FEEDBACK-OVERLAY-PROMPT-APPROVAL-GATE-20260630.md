@@ -8,7 +8,7 @@ Task ID: `AFS-T18c Feedback Overlay Prompt Authorization Design Gate`
 
 起始 HEAD: `d1c8f509ab62b43573b8af938ec8f1602723679a`
 
-状态: 已实现；focused 验证、相关验证、Studio JS、CLI 和全量 pytest 已通过；提交、push 和分支 preflight 在本文档创建时尚未执行。
+状态: 已实现；focused 验证、相关验证、Studio JS、CLI、全量 pytest、提交、push 和分支 preflight 已完成。
 
 ## 中文摘要
 
@@ -106,7 +106,7 @@ Closeout:
 .\.venv\Scripts\python.exe -m apps.cli.main version
 # 0.1.0
 
- .\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m pytest
 # 737 passed, 520 deselected, 2 warnings
 
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
@@ -120,12 +120,21 @@ git diff --check
 
 YAML parse check for external execution state
 # yaml_parse_ok
+
+git commit
+# 98ca7477964fe9bb428ca0343e6c4d20dc224865
+
+git push origin codex/afs-project-book-full-goal-20260630
+# pushed to origin/codex/afs-project-book-full-goal-20260630
+
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --report runs\goal_mode_branch_integration_review_t18c_post_push.json
+# status=ready_for_human_merge_review; blocker_count=0
 ```
 
 ## Evidence State
 
 ```text
-structure_verified_feedback_overlay_prompt_approval_gate_full_local_verification_no_merge
+structure_verified_feedback_overlay_prompt_approval_gate_pushed_branch_preflight_ready_no_merge
 ```
 
 这只是本地 deterministic Runtime/Studio contract evidence。它不是 provider smoke，不是 generated media evidence，不是 Runtime health verification，不是 server sync，不是 human creative acceptance，不是 business validation，也不是 durable memory promotion。

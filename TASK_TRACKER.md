@@ -320,6 +320,19 @@ human/business acceptance. No OpenAPI snapshot update was needed; path count
 remains 52. Handoff:
 `docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-APPROVAL-GATE-20260630.md`.
 
+Studio state feedback-policy sanitizer split addendum: because T18c pushed
+`apps/api/runtime_studio_state_context.py` to exactly 300 lines, the next
+provider-closed maintenance slice adds `AFS-T18d Studio State Feedback Policy
+Sanitizer Split`. Feedback overlay prompt-policy state sanitization now lives
+in `apps/api/runtime_studio_state_feedback_policy.py`, while the context module
+returns to 248 lines. The new helper reuses the existing `_text` sanitizer and
+`safe_id` boundary, so local-path/runtime-artifact-path rejection and safe ID
+normalization remain unchanged. This is a maintenance/contract split only: no
+Runtime route, OpenAPI path, Studio fetch, provider call, generated media,
+durable memory, Company KB promotion, deploy, server sync, Runtime health
+verification, or human/business acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-STATE-FEEDBACK-POLICY-SANITIZER-SPLIT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

@@ -12,6 +12,7 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     params_path = api_root / "runtime_studio_state_params.py"
     param_values_path = api_root / "runtime_studio_state_param_values.py"
     preview_path = api_root / "runtime_studio_state_preview.py"
+    feedback_policy_path = api_root / "runtime_studio_state_feedback_policy.py"
 
     assert sanitizer_path.is_file()
     assert context_path.is_file()
@@ -19,6 +20,7 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     assert params_path.is_file()
     assert param_values_path.is_file()
     assert preview_path.is_file()
+    assert feedback_policy_path.is_file()
     assert "from apps.api.runtime_studio_state_sanitizer import sanitize_studio_state" in route_source
     for helper_name in (
         "sanitize_studio_state",
@@ -36,6 +38,7 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     params_source = params_path.read_text(encoding="utf-8")
     param_values_source = param_values_path.read_text(encoding="utf-8")
     preview_source = preview_path.read_text(encoding="utf-8")
+    feedback_policy_source = feedback_policy_path.read_text(encoding="utf-8")
     assert "def sanitize_studio_state" in sanitizer_source
     assert "sanitize_assets" in sanitizer_source
     assert "sanitize_node_params" in sanitizer_source
@@ -49,6 +52,9 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     assert "def keyframe_layer" in param_values_source
     assert "safe_preview_url" in sanitizer_source
     assert "def sanitize_context_bundle" in context_source
+    assert "bundle_feedback_overlay_prompt_policy" in context_source
+    assert "def bundle_feedback_overlay_prompt_policy" in feedback_policy_source
+    assert "def _bundle_prompt_provider_gate" in feedback_policy_source
     assert "def sanitize_assets" in assets_source
     assert "def safe_preview_url" in preview_source
     assert "SAFE_PREVIEW_URL_PATTERN" not in sanitizer_source
@@ -59,3 +65,4 @@ def test_studio_state_route_keeps_sanitizer_and_context_helpers_split() -> None:
     assert len(params_source.splitlines()) <= 300
     assert len(param_values_source.splitlines()) <= 300
     assert len(preview_source.splitlines()) <= 300
+    assert len(feedback_policy_source.splitlines()) <= 300
