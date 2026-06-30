@@ -38,16 +38,25 @@ def build_main_loop_e2e_state(client: TestClient, project_id: str) -> MainLoopE2
     case = benchmark_case("multi_scene_map_chase")
     image_asset_id = upload_image(client, project_id)
     fixed_asset = promote_fixed_asset(client, project_id, image_asset_id)
-    storyboard_payload = _storyboard_breakdown(client, project_id, case)
+    storyboard_payload = storyboard_breakdown(client, project_id, case)
     candidate = candidate_for_label(storyboard_payload, "林晚")
     gate_payload = _accept_candidate(client, project_id, storyboard_payload, candidate)
-    feedback_payload = _record_asset_graph_feedback(client, project_id, storyboard_payload)
-    feedback_candidate = feedback_payload["feedback_event"]["feedback_candidate"]
-    promotion_payload = _promote_feedback_candidate(client, project_id, feedback_payload, feedback_candidate)
-    overlay_response_payload = _create_feedback_overlay(client, project_id, promotion_payload)
-    overlay = overlay_response_payload["feedback_candidate_context_overlay"]
+    overlay_state = create_feedback_context_overlay(
+        client,
+        project_id,
+        storyboard_payload,
+        decisions=[
+            {"graph_asset_id": "graph:character:林晚", "decision": "confirm", "label": "林晚", "note": "Keep the character identity across the next keyframe pass."},
+            {"graph_asset_id": "graph:prop:地图", "decision": "revise", "label": "地图", "note": "Map markings need clearer red-line continuity."},
+        ],
+    )
+    feedback_payload = overlay_state["feedback_payload"]
+    feedback_candidate = overlay_state["feedback_candidate"]
+    promotion_payload = overlay_state["promotion_payload"]
+    overlay_response_payload = overlay_state["overlay_response_payload"]
+    overlay = overlay_state["overlay"]
     keyframe_request = keyframe_request_payload(fixed_asset["asset_id"], overlay["overlay_id"])
-    preflight_payload = _keyframe_preflight(client, project_id, keyframe_request)
+    preflight_payload = keyframe_preflight(client, project_id, keyframe_request)
     return MainLoopE2EState(
         case=case,
         image_asset_id=image_asset_id,
@@ -187,15 +196,18 @@ def context_subgraph(asset_id: str, overlay_id: str) -> dict:
     }
 
 
-def _storyboard_breakdown(client: TestClient, project_id: str, case: dict) -> dict:
+def storyboard_breakdown(
+    client: TestClient, project_id: str, case: dict, *, node_id: str = "script_main_loop_e2e_001",
+    generated_at: str = "2026-06-30T23:58:00+08:00",
+) -> dict:
     response = client.post(
         f"/projects/{project_id}/storyboard-breakdowns",
         json={
-            "node_id": "script_main_loop_e2e_001",
+            "node_id": node_id,
             "script_text": case["script_text"],
             "target_platform": "short_video",
             "style": "cinematic",
-            "generated_at": "2026-06-30T23:58:00+08:00",
+            "generated_at": generated_at,
         },
     )
     response.raise_for_status()
@@ -220,67 +232,68 @@ def _accept_candidate(client: TestClient, project_id: str, storyboard_payload: d
     return response.json()
 
 
-def _record_asset_graph_feedback(client: TestClient, project_id: str, storyboard_payload: dict) -> dict:
-    response = client.post(
+def create_feedback_context_overlay(
+    client: TestClient,
+    project_id: str,
+    storyboard_payload: dict,
+    *,
+    node_id: str = "script_main_loop_e2e_001",
+    generated_at: str = "2026-07-01T00:00:00+08:00",
+    decisions: list[dict] | None = None,
+    rationale: str = "Promote only as project-local context evidence for the next deterministic pass.",
+    reviewed_at: str = "2026-07-01T00:01:00+08:00",
+    overlay_intent: str = "Use asset graph feedback as bounded local context evidence only.",
+    overlay_generated_at: str = "2026-07-01T00:02:00+08:00",
+) -> dict:
+    feedback = client.post(
         "/feedback",
         json={
             "project_id": project_id,
-            "generated_at": "2026-07-01T00:00:00+08:00",
+            "generated_at": generated_at,
             "feedback": {
                 "kind": "studio_asset_graph_feedback",
-                "node_id": "script_main_loop_e2e_001",
+                "node_id": node_id,
                 "node_type": "script",
                 "asset_graph_ref": storyboard_payload["artifacts"]["asset_graph"]["artifact_id"],
-                "decisions": [
-                    {
-                        "graph_asset_id": "graph:character:林晚",
-                        "decision": "confirm",
-                        "label": "林晚",
-                        "note": "Keep the character identity across the next keyframe pass.",
-                    },
-                    {
-                        "graph_asset_id": "graph:prop:地图",
-                        "decision": "revise",
-                        "label": "地图",
-                        "note": "Map markings need clearer red-line continuity.",
-                    },
-                ],
+                "decisions": decisions or [],
             },
         },
     )
-    response.raise_for_status()
-    return response.json()
-
-
-def _promote_feedback_candidate(client: TestClient, project_id: str, feedback_payload: dict, feedback_candidate: dict) -> dict:
-    response = client.post(
+    feedback.raise_for_status()
+    feedback_payload = feedback.json()
+    feedback_candidate = feedback_payload["feedback_event"]["feedback_candidate"]
+    promotion = client.post(
         f"/projects/{project_id}/feedback-candidate-promotions",
         json={
             "feedback_artifact_id": feedback_payload["artifact"]["artifact_id"],
             "candidate_id": feedback_candidate["candidate_id"],
             "decision": "promote_to_context_overlay",
-            "rationale": "Promote only as project-local context evidence for the next deterministic pass.",
-            "reviewed_at": "2026-07-01T00:01:00+08:00",
+            "rationale": rationale,
+            "reviewed_at": reviewed_at,
         },
     )
-    response.raise_for_status()
-    return response.json()
-
-
-def _create_feedback_overlay(client: TestClient, project_id: str, promotion_payload: dict) -> dict:
-    response = client.post(
+    promotion.raise_for_status()
+    promotion_payload = promotion.json()
+    overlay = client.post(
         f"/projects/{project_id}/feedback-candidate-context-overlays",
         json={
             "promotion_decision_artifact_id": promotion_payload["artifact"]["artifact_id"],
-            "overlay_intent": "Use asset graph feedback as bounded local context evidence only.",
-            "generated_at": "2026-07-01T00:02:00+08:00",
+            "overlay_intent": overlay_intent,
+            "generated_at": overlay_generated_at,
         },
     )
-    response.raise_for_status()
-    return response.json()
+    overlay.raise_for_status()
+    overlay_payload = overlay.json()
+    return {
+        "feedback_payload": feedback_payload,
+        "feedback_candidate": feedback_candidate,
+        "promotion_payload": promotion_payload,
+        "overlay_response_payload": overlay_payload,
+        "overlay": overlay_payload["feedback_candidate_context_overlay"],
+    }
 
 
-def _keyframe_preflight(client: TestClient, project_id: str, request_payload: dict) -> dict:
+def keyframe_preflight(client: TestClient, project_id: str, request_payload: dict) -> dict:
     response = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request_payload)
     response.raise_for_status()
     return response.json()

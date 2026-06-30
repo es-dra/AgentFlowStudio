@@ -6,7 +6,14 @@ from fastapi.testclient import TestClient
 
 from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
-from tests.runtime_main_loop_e2e_support import benchmark_case, promote_fixed_asset, upload_image
+from tests.runtime_main_loop_e2e_support import (
+    benchmark_case,
+    create_feedback_context_overlay,
+    keyframe_preflight,
+    promote_fixed_asset,
+    storyboard_breakdown,
+    upload_image,
+)
 
 
 def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_path, monkeypatch) -> None:
@@ -19,16 +26,35 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
     case = benchmark_case("multi_character_restaurant_note")
     zhou = _promote_character(client, project_id, label="周岚", node_id="node-ref-zhou-lan")
     chen = _promote_character(client, project_id, label="陈默", node_id="node-ref-chen-mo")
-    storyboard_payload = _storyboard_breakdown(client, project_id, case)
-    overlay_payload = _feedback_overlay(client, project_id, storyboard_payload)
-    overlay = overlay_payload["feedback_candidate_context_overlay"]
+    storyboard_payload = storyboard_breakdown(
+        client,
+        project_id,
+        case,
+        node_id="script_multi_character_bridge_001",
+        generated_at="2026-07-01T00:10:00+08:00",
+    )
+    overlay_state = create_feedback_context_overlay(
+        client,
+        project_id,
+        storyboard_payload,
+        node_id="script_multi_character_bridge_001",
+        generated_at="2026-07-01T00:11:00+08:00",
+        decisions=[
+            {"graph_asset_id": "graph:character:周岚", "decision": "confirm", "label": "周岚", "note": "Keep Zhou Lan identity stable during the letter handoff."},
+            {"graph_asset_id": "graph:character:陈默", "decision": "confirm", "label": "陈默", "note": "Keep Chen Mo identity stable during the chase to the doorway."},
+        ],
+        rationale="Use both character confirmations as local context evidence only.",
+        reviewed_at="2026-07-01T00:12:00+08:00",
+        overlay_intent="Keep two-character handoff continuity as bounded local evidence.",
+        overlay_generated_at="2026-07-01T00:13:00+08:00",
+    )
+    overlay = overlay_state["overlay"]
     request_payload = _keyframe_request(zhou["asset_id"], chen["asset_id"], overlay["overlay_id"])
 
-    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request_payload)
-    preflight.raise_for_status()
+    preflight_payload = keyframe_preflight(client, project_id, request_payload)
     generation = client.post(
         f"/projects/{project_id}/keyframe-generations",
-        json={**request_payload, "preflight_token": preflight.json()["preflight_token"]},
+        json={**request_payload, "preflight_token": preflight_payload["preflight_token"]},
     )
 
     generation.raise_for_status()
@@ -49,7 +75,7 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
     assert low <= len(storyboard_payload["shots"]) <= high
     assert {("周岚", "character"), ("陈默", "character"), ("餐厅", "scene"), ("信件", "prop")} <= labels_by_type
     assert {"周岚", "陈默"} <= candidate_labels
-    assert preflight.json()["included_asset_source_evidence_count"] == 2
+    assert preflight_payload["included_asset_source_evidence_count"] == 2
     assert payload["job"]["status"] == "blocked"
     assert payload["provider_calls_started"] is False
     assert payload["safe_manifest"]["provider_calls_started"] is False
@@ -97,74 +123,6 @@ def _promote_character(client: TestClient, project_id: str, *, label: str, node_
         source_human_gate_id=f"runtime-human-gate:baseline:{label}:accepted",
         source_asset_card_candidate_id=f"asset_card_candidate:graph_character_{label}",
     )
-
-
-def _storyboard_breakdown(client: TestClient, project_id: str, case: dict) -> dict:
-    response = client.post(
-        f"/projects/{project_id}/storyboard-breakdowns",
-        json={
-            "node_id": "script_multi_character_bridge_001",
-            "script_text": case["script_text"],
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "generated_at": "2026-07-01T00:10:00+08:00",
-        },
-    )
-    response.raise_for_status()
-    return response.json()
-
-
-def _feedback_overlay(client: TestClient, project_id: str, storyboard_payload: dict) -> dict:
-    feedback = client.post(
-        "/feedback",
-        json={
-            "project_id": project_id,
-            "generated_at": "2026-07-01T00:11:00+08:00",
-            "feedback": {
-                "kind": "studio_asset_graph_feedback",
-                "node_id": "script_multi_character_bridge_001",
-                "node_type": "script",
-                "asset_graph_ref": storyboard_payload["artifacts"]["asset_graph"]["artifact_id"],
-                "decisions": [
-                    {
-                        "graph_asset_id": "graph:character:周岚",
-                        "decision": "confirm",
-                        "label": "周岚",
-                        "note": "Keep Zhou Lan identity stable during the letter handoff.",
-                    },
-                    {
-                        "graph_asset_id": "graph:character:陈默",
-                        "decision": "confirm",
-                        "label": "陈默",
-                        "note": "Keep Chen Mo identity stable during the chase to the doorway.",
-                    },
-                ],
-            },
-        },
-    )
-    feedback.raise_for_status()
-    candidate = feedback.json()["feedback_event"]["feedback_candidate"]
-    promotion = client.post(
-        f"/projects/{project_id}/feedback-candidate-promotions",
-        json={
-            "feedback_artifact_id": feedback.json()["artifact"]["artifact_id"],
-            "candidate_id": candidate["candidate_id"],
-            "decision": "promote_to_context_overlay",
-            "rationale": "Use both character confirmations as local context evidence only.",
-            "reviewed_at": "2026-07-01T00:12:00+08:00",
-        },
-    )
-    promotion.raise_for_status()
-    overlay = client.post(
-        f"/projects/{project_id}/feedback-candidate-context-overlays",
-        json={
-            "promotion_decision_artifact_id": promotion.json()["artifact"]["artifact_id"],
-            "overlay_intent": "Keep two-character handoff continuity as bounded local evidence.",
-            "generated_at": "2026-07-01T00:13:00+08:00",
-        },
-    )
-    overlay.raise_for_status()
-    return overlay.json()
 
 
 def _keyframe_request(zhou_asset_id: str, chen_asset_id: str, overlay_id: str) -> dict:

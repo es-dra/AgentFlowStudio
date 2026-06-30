@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-06-30 - Main Loop E2E Redundancy Cleanup
+
+- Continued provider-closed work on
+  `codex/afs-goal-mode-main-loop-e2e-20260630` for AFS-T44.
+- Classified the current-branch T41-T43 redundancy and acted on the test
+  support slice instead of adding another record-heavy feature artifact.
+- Replaced duplicated storyboard breakdown, feedback-candidate promotion,
+  context-overlay creation, and keyframe preflight setup in the multi-character
+  bridge regression with shared parameterized helpers in
+  `tests/runtime_main_loop_e2e_support.py`.
+- Removed the obsolete per-test storyboard/feedback overlay helpers from
+  `tests/test_api_runtime_multi_character_keyframe_bridge_e2e.py`; the shared
+  support file is back under the 300-line ideal threshold at 299 lines, and the
+  multi-character test dropped to 178 lines.
+- No Runtime route, OpenAPI path, Studio UI, provider call, generated media,
+  human creative acceptance, business validation, public claim, patent/legal
+  decision, or COS active-rule promotion changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py
+# 3 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py tests\test_api_runtime_keyframe_generation_bridge.py -q
+# 5 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 773 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; no new T44 handoff Chinese-coverage warning
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Multi-Character Bridge Regression
 
 - Continued provider-closed work on

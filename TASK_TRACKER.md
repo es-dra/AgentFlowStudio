@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+Main-loop E2E redundancy cleanup addendum: T44 classified the current T41-T43
+branch redundancy and reduced the duplicated test-support surface instead of
+adding a new record-heavy feature slice. The multi-character bridge regression
+now reuses shared parameterized storyboard, feedback overlay, and keyframe
+preflight helpers; the shared support file is 299 lines and the multi-character
+test is 178 lines. Focused E2E passed (`3 passed, 1 warning`), adjacent bridge
+set passed (`5 passed, 1 warning`), and full pytest passed
+(`773 passed, 520 deselected, 2 warnings`). Maintenance audit stayed green for
+blocking failures (`failed=0`) and `git diff --check` passed. No Runtime route,
+OpenAPI path, Studio UI, provider call, generated media, human creative
+acceptance, business validation, public claim, patent/legal decision, or COS
+active-rule promotion occurred. Handoff:
+`docs/handoff/AFS-MAIN-LOOP-E2E-REDUNDANCY-CLEANUP-20260630.md`.
+
 Multi-character bridge regression addendum: the next provider-closed slice adds
 a second real benchmark regression using `multi_character_restaurant_note`. It
 promotes two fixed character assets (`周岚` and `陈默`), runs the real
