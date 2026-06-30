@@ -19,6 +19,17 @@ quality gates, not provider smoke, human creative acceptance, business
 validation, or durable memory promotion. Handoff:
 `docs/handoff/AFS-CONTENT-QUALITY-REPORT-TASKRUN-20260630.md`.
 
+Quality-feedback browser QA addendum: the current closeout slice verifies the
+T15h quality-feedback next-context overlay UI through a real local
+Playwright/browser harness without opening provider gates. The browser run
+found and fixed a long Runtime artifact id contract bug: feedback, promotion,
+and context-overlay artifact refs now use a 512-character artifact-ref bound in
+Studio summaries/requests and Runtime Studio-state sanitization, while ordinary
+operator text remains separately bounded. This is runtime/browser evidence for
+the feedback candidate path, not provider smoke, human creative acceptance,
+business validation, master merge, deploy, or server sync. Handoff:
+`docs/handoff/AFS-STUDIO-QUALITY-FEEDBACK-CONTEXT-OVERLAY-BROWSER-QA-20260630.md`.
+
 Content-quality benchmark addendum: the next slice adds
 `examples/agentflow/content_quality_benchmark_scripts.example.json` plus
 `tests/test_storyboard_content_quality_benchmarks.py` as the first T13/T14

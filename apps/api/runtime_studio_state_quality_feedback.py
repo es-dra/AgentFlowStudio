@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 
 TextSanitizer = Callable[[Any, str, int], str]
+ARTIFACT_REF_MAX_LENGTH = 512
 
 
 def sanitize_quality_feedback_candidates(value: Any, *, text: TextSanitizer) -> list[dict[str, Any]]:
@@ -13,14 +14,14 @@ def sanitize_quality_feedback_candidates(value: Any, *, text: TextSanitizer) -> 
             continue
         candidate = {
             "feedback_id": text(item.get("feedback_id"), "", 180),
-            "feedback_artifact_id": text(item.get("feedback_artifact_id"), "", 180),
+            "feedback_artifact_id": text(item.get("feedback_artifact_id"), "", ARTIFACT_REF_MAX_LENGTH),
             "candidate_id": text(item.get("candidate_id"), "", 180),
             "candidate_scope": text(item.get("candidate_scope"), "", 120),
             "context_overlay_requested": bool(item.get("context_overlay_requested")),
             "promotion_decision_id": text(item.get("promotion_decision_id"), "", 180),
-            "promotion_artifact_id": text(item.get("promotion_artifact_id"), "", 180),
+            "promotion_artifact_id": text(item.get("promotion_artifact_id"), "", ARTIFACT_REF_MAX_LENGTH),
             "context_overlay_id": text(item.get("context_overlay_id"), "", 180),
-            "context_overlay_artifact_id": text(item.get("context_overlay_artifact_id"), "", 180),
+            "context_overlay_artifact_id": text(item.get("context_overlay_artifact_id"), "", ARTIFACT_REF_MAX_LENGTH),
             "status": text(item.get("status"), "", 120),
             "recorded_at": text(item.get("recorded_at"), "", 80),
             "provider_calls_started": False,

@@ -73,6 +73,25 @@ def test_quality_feedback_candidate_state_rejects_provider_raw() -> None:
         )
 
 
+def test_quality_feedback_candidate_state_preserves_long_runtime_artifact_ids() -> None:
+    feedback_artifact_id = f"feedback-{'x' * 260}-runtime_feedback_event"
+    promotion_artifact_id = f"feedback-{'y' * 260}-runtime_feedback_candidate_promotion_decision"
+    overlay_artifact_id = f"feedback-{'z' * 260}-runtime_feedback_candidate_context_overlay"
+    state = _quality_feedback_candidate_state()
+    item = state["nodes"]["image_1"]["params"]["qualityFeedbackCandidates"][0]
+    item["feedback_artifact_id"] = feedback_artifact_id
+    item["promotion_artifact_id"] = promotion_artifact_id
+    item["context_overlay_artifact_id"] = overlay_artifact_id
+
+    sanitized_state = sanitize_studio_state(state)
+    candidate = sanitized_state["nodes"]["image_1"]["params"]["qualityFeedbackCandidates"][0]
+
+    assert len(feedback_artifact_id) > 180
+    assert candidate["feedback_artifact_id"] == feedback_artifact_id
+    assert candidate["promotion_artifact_id"] == promotion_artifact_id
+    assert candidate["context_overlay_artifact_id"] == overlay_artifact_id
+
+
 def _quality_feedback_candidate_state() -> dict:
     return {
         "nodes": {

@@ -1,5 +1,6 @@
 const DEFAULT_PROMOTION_RATIONALE = "Studio operator selected this feedback for the next local context pass.";
 const DEFAULT_OVERLAY_INTENT = "Carry this reviewed Studio feedback into the next local context pass.";
+const ARTIFACT_REF_MAX_LENGTH = 512;
 
 export function feedbackContextOverlayRequestOptions(value) {
   const input = value && typeof value === "object" ? value : {};
@@ -31,7 +32,7 @@ export async function promoteFeedbackCandidateToContextOverlay(runtime, feedback
 export function buildFeedbackCandidatePromotionRequest(feedbackResponse, options = {}) {
   const event = feedbackResponse?.feedback_event || {};
   const candidate = event.feedback_candidate || {};
-  const feedbackArtifactId = safeToken(feedbackResponse?.artifact?.artifact_id, 180);
+  const feedbackArtifactId = safeToken(feedbackResponse?.artifact?.artifact_id, ARTIFACT_REF_MAX_LENGTH);
   const candidateId = safeToken(candidate.candidate_id, 180);
   if (!feedbackArtifactId || !candidateId) {
     throw new Error("feedback candidate promotion requires feedback artifact and candidate id");
@@ -46,7 +47,7 @@ export function buildFeedbackCandidatePromotionRequest(feedbackResponse, options
 }
 
 export function buildFeedbackCandidateContextOverlayRequest(promotionResponse, options = {}) {
-  const promotionArtifactId = safeToken(promotionResponse?.artifact?.artifact_id, 180);
+  const promotionArtifactId = safeToken(promotionResponse?.artifact?.artifact_id, ARTIFACT_REF_MAX_LENGTH);
   if (!promotionArtifactId) {
     throw new Error("feedback context overlay requires promotion decision artifact id");
   }
@@ -64,14 +65,14 @@ export function feedbackCandidateFlowSummary(feedbackResponse, flowResult = {}) 
   const overlay = flowResult.overlay_response?.feedback_candidate_context_overlay || {};
   return {
     feedback_id: safeToken(event.feedback_id, 180),
-    feedback_artifact_id: safeToken(feedbackResponse?.artifact?.artifact_id, 180),
+    feedback_artifact_id: safeToken(feedbackResponse?.artifact?.artifact_id, ARTIFACT_REF_MAX_LENGTH),
     candidate_id: safeToken(candidate.candidate_id, 180),
     candidate_scope: safeToken(candidate.candidate_scope, 120),
     context_overlay_requested: Boolean(flowResult.requested),
     promotion_decision_id: safeToken(promotion.decision_id, 180),
-    promotion_artifact_id: safeToken(flowResult.promotion_response?.artifact?.artifact_id, 180),
+    promotion_artifact_id: safeToken(flowResult.promotion_response?.artifact?.artifact_id, ARTIFACT_REF_MAX_LENGTH),
     context_overlay_id: safeToken(overlay.overlay_id, 180),
-    context_overlay_artifact_id: safeToken(flowResult.overlay_response?.artifact?.artifact_id, 180),
+    context_overlay_artifact_id: safeToken(flowResult.overlay_response?.artifact?.artifact_id, ARTIFACT_REF_MAX_LENGTH),
     status: safeToken(flowResult.status || "recorded_feedback_candidate", 120),
     provider_calls_started: false,
     writes_long_term_memory: false,
