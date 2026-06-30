@@ -266,6 +266,19 @@ or server sync. No OpenAPI snapshot update was needed; path count remains 52.
 Handoff:
 `docs/handoff/AFS-STUDIO-FEEDBACK-OVERLAY-REVIEW-SURFACE-20260630.md`.
 
+Feedback overlay selection addendum: the next local deterministic slice adds
+`AFS-T16 Feedback Overlay Selection / Rejection UI Contract`. Studio can now
+record local `include_for_next_context` / `reject_for_next_context` decisions
+for already-consumed safe feedback overlays, persist only bounded safe decision
+fields through `/studio-state`, and carry those decisions into keyframe request
+context as `feedback_context_overlay_decisions`. Runtime context resolution now
+filters safe `feedback_context_overlays` by selected/rejected overlay IDs and
+records decision trace only when an actual decision exists. This is not provider
+prompt injection, generated media, durable memory, Company KB promotion, deploy,
+server sync, or human/business acceptance. No OpenAPI snapshot update was
+needed; path count remains 52. Handoff:
+`docs/handoff/AFS-FEEDBACK-OVERLAY-SELECTION-UI-CONTRACT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

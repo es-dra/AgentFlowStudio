@@ -60,6 +60,56 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert "d:\\private" not in serialized
 
 
+def test_studio_state_persists_feedback_overlay_decisions_as_safe_node_params(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-state-feedback-overlay-decisions"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio feedback overlay decisions"})
+
+    state = {
+        "nodes": {
+            "image_1": {
+                "type": "image",
+                "params": {
+                    "feedbackOverlayDecisions": [
+                        {
+                            "overlay_id": "runtime-feedback-overlay:abc123",
+                            "candidate_id": "runtime-feedback-candidate:feedback001",
+                            "decision": "reject_for_next_context",
+                            "reviewed_at": "2026-06-30T20:01:00+08:00",
+                            "provider_calls_started": True,
+                            "writes_long_term_memory": True,
+                            "writes_company_kb": True,
+                            "provider_raw": {"unsafe": True},
+                            "local_path": "D:\\private\\feedback.png",
+                        }
+                    ]
+                },
+            }
+        },
+        "order": ["image_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+
+    assert saved.status_code == 200
+    decisions = saved.json()["state"]["nodes"]["image_1"]["params"]["feedbackOverlayDecisions"]
+    serialized = str(decisions).lower()
+    assert decisions == [
+        {
+            "overlay_id": "runtime-feedback-overlay:abc123",
+            "candidate_id": "runtime-feedback-candidate:feedback001",
+            "decision": "reject_for_next_context",
+            "reviewed_at": "2026-06-30T20:01:00+08:00",
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "writes_company_kb": False,
+        }
+    ]
+    assert "provider_raw" not in serialized
+    assert "local_path" not in serialized
+    assert "d:\\private" not in serialized
+
+
 def _overlay_node() -> dict:
     return {
         "type": "image",

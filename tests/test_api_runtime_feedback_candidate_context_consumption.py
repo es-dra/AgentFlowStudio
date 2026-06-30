@@ -79,6 +79,14 @@ def _keyframe_request() -> dict:
     }
 
 
+def _keyframe_request_with_overlay_decisions(decisions: list[dict]) -> dict:
+    request = _keyframe_request()
+    request["context_subgraph"]["nodes"][0]["node_parameters"] = {
+        "feedback_context_overlay_decisions": decisions,
+    }
+    return request
+
+
 def test_context_resolver_consumes_promoted_feedback_overlay_without_asset_inclusion(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -160,3 +168,57 @@ def test_context_resolver_ignores_unreadable_feedback_overlay_refs(tmp_path, mon
     assert payload["subject_reference_asset_id"] is None
     assert payload["feedback_context_overlays"] == []
     assert "feedback_context_overlays" not in payload["context_bundle"]
+
+
+def test_context_resolver_applies_studio_feedback_overlay_selection_decisions(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_feedback_context_selection"
+    client.post("/projects", json={"project_id": project_id, "goal": "Feedback context selection"}).raise_for_status()
+    first = _record_context_overlay(client, project_id)
+    second = _record_context_overlay(client, project_id)
+
+    selected = client.post(
+        f"/projects/{project_id}/keyframe-generations/preflight",
+        json=_keyframe_request_with_overlay_decisions([
+            {
+                "overlay_id": first["overlay_id"],
+                "decision": "include_for_next_context",
+                "reviewed_at": "2026-06-30T20:00:00+08:00",
+                "provider_calls_started": False,
+                "writes_long_term_memory": False,
+                "writes_company_kb": False,
+            }
+        ]),
+    )
+    selected.raise_for_status()
+    selected_payload = selected.json()
+
+    assert [item["overlay_id"] for item in selected_payload["feedback_context_overlays"]] == [first["overlay_id"]]
+    assert selected_payload["context_bundle"]["trace_summary"]["feedback_context_overlay_selected_ids"] == [
+        first["overlay_id"]
+    ]
+    assert selected_payload["provider_calls_started"] is False
+    assert response_contains_unsafe_marker(selected_payload["feedback_context_overlays"]) is False
+
+    rejected = client.post(
+        f"/projects/{project_id}/keyframe-generations/preflight",
+        json=_keyframe_request_with_overlay_decisions([
+            {
+                "overlay_id": first["overlay_id"],
+                "decision": "reject_for_next_context",
+                "reviewed_at": "2026-06-30T20:01:00+08:00",
+                "provider_calls_started": False,
+                "writes_long_term_memory": False,
+                "writes_company_kb": False,
+            }
+        ]),
+    )
+    rejected.raise_for_status()
+    rejected_payload = rejected.json()
+
+    assert [item["overlay_id"] for item in rejected_payload["feedback_context_overlays"]] == [second["overlay_id"]]
+    assert rejected_payload["context_bundle"]["trace_summary"]["feedback_context_overlay_rejected_ids"] == [
+        first["overlay_id"]
+    ]
+    assert "provider_raw" not in json.dumps(rejected_payload, ensure_ascii=False).lower()

@@ -9,6 +9,7 @@ import {
   assetCardRevisionImageRefs,
   safeAssetCardRevisionSnapshot,
 } from "./asset-revision-references.js";
+import { feedbackOverlayDecisionsForRequest } from "./feedback-context-overlays.js";
 
 const GENERATION_TARGET = {
   text: "prompt",
@@ -81,6 +82,8 @@ function nodeParameterSnapshot(node) {
   if (p.styleRef) snapshot.style_ref = p.styleRef;
   if (p.directorSetup) snapshot.director_summary = directorPromptSummary(normalizeDirectorSetup(p.directorSetup));
   if (p.directorRef) snapshot.director_ref = String(p.directorRef);
+  const overlayDecisions = feedbackOverlayDecisionsForRequest(p.feedbackOverlayDecisions);
+  if (overlayDecisions.length) snapshot.feedback_context_overlay_decisions = overlayDecisions;
   const uploadedImages = uploadReferenceSummaries(node);
   if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
   return snapshot;

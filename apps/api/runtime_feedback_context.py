@@ -15,9 +15,13 @@ def attach_feedback_context_overlays(
     store: RuntimeStore,
     project_id: str,
     context_bundle: dict[str, Any],
+    context_subgraph: Any | None = None,
 ) -> dict[str, Any]:
+    decisions = feedback_context_overlay_decisions(context_subgraph)
+    has_decisions = _has_overlay_decisions(decisions)
     overlays = feedback_context_overlays(store, project_id)
-    if not overlays:
+    overlays = _apply_overlay_decisions(overlays, decisions)
+    if not overlays and not has_decisions:
         return context_bundle
     bundle = dict(context_bundle)
     trace = dict(bundle.get("trace_summary") or {})
@@ -26,7 +30,14 @@ def attach_feedback_context_overlays(
     trace["feedback_context_overlay_source"] = "project_manifest_feedback_refs"
     trace["feedback_overlays_are_memory"] = False
     trace["feedback_overlays_write_company_kb"] = False
-    bundle["feedback_context_overlays"] = overlays
+    if has_decisions:
+        trace["feedback_context_overlay_decision_source"] = "studio_context_subgraph"
+        if decisions["selected_ids"]:
+            trace["feedback_context_overlay_selected_ids"] = sorted(decisions["selected_ids"])
+        if decisions["rejected_ids"]:
+            trace["feedback_context_overlay_rejected_ids"] = sorted(decisions["rejected_ids"])
+    if overlays:
+        bundle["feedback_context_overlays"] = overlays
     bundle["trace_summary"] = trace
     reject_unsafe_payload(bundle)
     return bundle
@@ -53,6 +64,78 @@ def feedback_context_overlays(
     overlays.reverse()
     reject_unsafe_payload({"feedback_context_overlays": overlays})
     return overlays
+
+
+def feedback_context_overlay_decisions(context_subgraph: Any | None) -> dict[str, set[str]]:
+    params = _target_node_parameters(context_subgraph)
+    raw = params.get("feedback_context_overlay_decisions")
+    if not isinstance(raw, list):
+        raw = params.get("feedbackOverlayDecisions")
+    if not isinstance(raw, list):
+        return {"selected_ids": set(), "rejected_ids": set()}
+    selected_ids: set[str] = set()
+    rejected_ids: set[str] = set()
+    for item in raw[:20]:
+        if not isinstance(item, dict):
+            continue
+        overlay_id = _safe_text(item.get("overlay_id"), limit=180)
+        if not overlay_id:
+            continue
+        decision = _safe_text(item.get("decision"), limit=80)
+        if decision in {"include_for_next_context", "included_for_next_context", "include"}:
+            selected_ids.add(overlay_id)
+        if decision in {"reject_for_next_context", "rejected_for_next_context", "reject"}:
+            rejected_ids.add(overlay_id)
+    selected_ids -= rejected_ids
+    summary = {"selected_ids": selected_ids, "rejected_ids": rejected_ids}
+    reject_unsafe_payload(
+        {
+            "selected_ids": sorted(selected_ids),
+            "rejected_ids": sorted(rejected_ids),
+        }
+    )
+    return summary
+
+
+def _apply_overlay_decisions(overlays: list[dict[str, Any]], decisions: dict[str, set[str]]) -> list[dict[str, Any]]:
+    selected_ids = decisions.get("selected_ids") or set()
+    rejected_ids = decisions.get("rejected_ids") or set()
+    if not selected_ids and not rejected_ids:
+        return overlays
+    result = []
+    for overlay in overlays:
+        overlay_id = str(overlay.get("overlay_id") or "")
+        if overlay_id in rejected_ids:
+            continue
+        if selected_ids and overlay_id not in selected_ids:
+            continue
+        result.append(overlay)
+    return result
+
+
+def _has_overlay_decisions(decisions: dict[str, set[str]]) -> bool:
+    return bool(decisions.get("selected_ids") or decisions.get("rejected_ids"))
+
+
+def _target_node_parameters(context_subgraph: Any | None) -> dict[str, Any]:
+    if context_subgraph is None:
+        return {}
+    target_node_id = _attr_or_key(context_subgraph, "target_node_id")
+    nodes = _attr_or_key(context_subgraph, "nodes")
+    if not target_node_id or not isinstance(nodes, list):
+        return {}
+    for node in nodes:
+        if _attr_or_key(node, "id") != target_node_id:
+            continue
+        params = _attr_or_key(node, "node_parameters")
+        return params if isinstance(params, dict) else {}
+    return {}
+
+
+def _attr_or_key(value: Any, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
+    return getattr(value, key, None)
 
 
 def _overlay_summary(store: RuntimeStore, ref: dict[str, Any]) -> dict[str, Any] | None:
@@ -152,5 +235,6 @@ __all__ = (
     "MAX_CONTEXT_OVERLAYS",
     "OVERLAY_ARTIFACT_TYPE",
     "attach_feedback_context_overlays",
+    "feedback_context_overlay_decisions",
     "feedback_context_overlays",
 )

@@ -19,6 +19,18 @@ export function feedbackOverlaySummaryText(overlay) {
   return [effect, target, boundary].filter(Boolean).join(" / ");
 }
 
+export function feedbackOverlayDecisionsForRequest(value) {
+  const raw = Array.isArray(value) ? value : [];
+  return raw.slice(-20).map(normalizeFeedbackOverlayDecision).filter((item) => item.overlay_id);
+}
+
+export function feedbackOverlayDecisionForNode(node, overlayId) {
+  const targetId = safeText(overlayId, 180);
+  if (!targetId) return null;
+  const decisions = feedbackOverlayDecisionsForRequest(node?.params?.feedbackOverlayDecisions);
+  return [...decisions].reverse().find((item) => item.overlay_id === targetId) || null;
+}
+
 function normalizeFeedbackOverlay(value) {
   const item = value && typeof value === "object" ? value : {};
   return {
@@ -34,6 +46,21 @@ function normalizeFeedbackOverlay(value) {
     writes_long_term_memory: Boolean(item.writes_long_term_memory),
     writes_company_kb: Boolean(item.writes_company_kb),
     safe_target: safeTarget(item.safe_target),
+  };
+}
+
+function normalizeFeedbackOverlayDecision(value) {
+  const item = value && typeof value === "object" ? value : {};
+  const decision = safeText(item.decision, 80);
+  if (!["include_for_next_context", "reject_for_next_context"].includes(decision)) return {};
+  return {
+    overlay_id: safeText(item.overlay_id, 180),
+    candidate_id: safeText(item.candidate_id, 180),
+    decision,
+    reviewed_at: safeText(item.reviewed_at, 80),
+    provider_calls_started: false,
+    writes_long_term_memory: false,
+    writes_company_kb: false,
   };
 }
 

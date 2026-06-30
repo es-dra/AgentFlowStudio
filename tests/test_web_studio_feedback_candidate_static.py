@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 
@@ -37,3 +39,77 @@ def test_studio_feedback_overlay_review_surface_reads_context_bundle_only() -> N
     assert "反馈上下文" in inspector_summary
     assert "feedbackOverlaySummaryText" in inspector_summary
     assert "反馈" in algorithm_panel
+
+
+def test_studio_feedback_overlay_selection_ui_is_local_and_provider_closed() -> None:
+    review_ui = STUDIO_ROOT / "src" / "feedback-overlay-review.js"
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+
+    assert review_ui.is_file()
+    review_source = review_ui.read_text(encoding="utf-8")
+    assert "feedbackOverlayReviewTargets" in review_source
+    assert "openFeedbackOverlayReviewMenu" in review_source
+    assert "include_for_next_context" in review_source
+    assert "reject_for_next_context" in review_source
+    assert "provider_calls_started: false" in review_source
+    assert "writes_long_term_memory: false" in review_source
+    assert "writes_company_kb: false" in review_source
+    assert "fetch(" not in review_source
+    assert "recordFeedbackCandidateContextOverlay" not in review_source
+    assert "AFS_ALLOW_REMOTE" not in review_source
+
+    assert "feedbackOverlayReviewTargets" in node_menu
+    assert "openFeedbackOverlayReviewMenu" in node_menu
+    assert "选择反馈上下文" in node_menu
+
+
+def test_keyframe_generation_request_carries_feedback_overlay_decisions() -> None:
+    script = r'''
+import { buildKeyframeGenerationRequest } from "./apps/studio/src/optimizer-contract.js";
+const node = {
+  id: "keyframe_01",
+  type: "image",
+  title: "关键帧 01",
+  prompt: "生成下一帧",
+  params: {
+    model: "image2-keyframe",
+    nodeRole: "keyframe_generation",
+    lastOptimizedPromptPlain: "生成下一帧",
+    feedbackOverlayDecisions: [
+      {
+        overlay_id: "runtime-feedback-overlay:abc123",
+        candidate_id: "runtime-feedback-candidate:feedback001",
+        decision: "reject_for_next_context",
+        reviewed_at: "2026-06-30T20:01:00+08:00",
+        provider_calls_started: false,
+        writes_long_term_memory: false,
+        writes_company_kb: false,
+      },
+    ],
+  },
+};
+const state = { nodes: { keyframe_01: node }, edges: {} };
+const request = buildKeyframeGenerationRequest(state, node);
+const params = request.context_subgraph.nodes.find((item) => item.id === "keyframe_01").node_parameters;
+process.stdout.write(JSON.stringify(params.feedback_context_overlay_decisions));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    decisions = json.loads(completed.stdout)
+
+    assert decisions == [
+        {
+            "overlay_id": "runtime-feedback-overlay:abc123",
+            "candidate_id": "runtime-feedback-candidate:feedback001",
+            "decision": "reject_for_next_context",
+            "reviewed_at": "2026-06-30T20:01:00+08:00",
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "writes_company_kb": False,
+        }
+    ]

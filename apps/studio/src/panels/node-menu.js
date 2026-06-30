@@ -3,6 +3,7 @@ import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
 import { qualityFeedbackView } from "../quality-feedback.js";
 import { humanGateTargets, openHumanGateMenu } from "../human-gate.js";
+import { feedbackOverlayReviewTargets, openFeedbackOverlayReviewMenu } from "../feedback-overlay-review.js";
 import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
@@ -158,6 +159,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     addItem("check", "记录人工 Gate", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) openHumanGateMenu(fresh, anchor.point || anchor.el);
+    });
+  }
+  if (feedbackOverlayReviewTargets(node).length) {
+    addItem("layers", "选择反馈上下文", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) openFeedbackOverlayReviewMenu(store, fresh, anchor.point || anchor.el);
     });
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>

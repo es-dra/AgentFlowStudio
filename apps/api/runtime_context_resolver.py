@@ -43,7 +43,7 @@ def resolve_context_bundle(
         director_setup=director_setup,
         director_compile_fn=compile_director_setup,
     )
-    return attach_feedback_context_overlays(store, project_id, bundle)
+    return attach_feedback_context_overlays(store, project_id, bundle, context_subgraph)
 
 
 __all__ = ("RESOLVER_VERSION", "provider_prompt_from_bundle", "resolve_context_bundle")
