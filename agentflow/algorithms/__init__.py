@@ -25,6 +25,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "generation_bridge",
     "human_gate",
     "feedback_candidate_promotion",
+    "feedback_candidate_context_overlay",
     "revision_drift_control",
 )
 

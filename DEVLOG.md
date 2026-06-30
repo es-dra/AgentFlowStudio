@@ -1,5 +1,64 @@
 # Devlog
 
+## 2026-06-30 - Runtime Feedback Candidate Context Overlay Harness
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `213e11df5593e982abb21db73b0fc28be611dea8`.
+- Added `AFS-T15c Feedback Candidate Context Overlay Harness` as a local
+  deterministic Runtime contract while `AFS-T19` master merge / three-end sync
+  remains unauthorised.
+- Added a public Runtime route:
+  `POST /projects/{project_id}/feedback-candidate-context-overlays`.
+- The route reads a source `runtime_feedback_candidate_promotion_decision`
+  artifact, accepts only `promote_to_context_overlay`, writes a safe
+  `runtime_feedback_candidate_context_overlay` artifact, appends it to project
+  `feedback_refs`, and keeps provider, context-bundle, durable-memory, and
+  Company-KB writes blocked.
+- Added a thin Studio runtime-client method
+  `recordFeedbackCandidateContextOverlay(payload)` with no UI state machine.
+- Regenerated the Runtime OpenAPI snapshot with the project exporter; path
+  count is now 52.
+- No provider call, generated media, master merge, server sync, Runtime health
+  claim, human creative acceptance, business validation, or durable memory
+  promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_web_studio_feedback_candidate_static.py -q
+# red baseline: 4 failed because route/client method did not exist
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py -q
+# red after route addition: snapshot drifted as expected
+
+.\.venv\Scripts\python.exe -m apps.cli.main runtime-service-openapi-export --output docs\openapi\afs-runtime-service.openapi.json
+# Runtime Service OpenAPI exported
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_promotion.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_openapi_snapshot.py tests\test_web_studio_feedback_candidate_static.py tests\test_algorithm_library_contracts.py -q
+# 24 passed, 1 existing Starlette/httpx deprecation warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m pytest
+# 725 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning, failed=0, passed=3, warning=4
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe -c "import yaml, pathlib; path=pathlib.Path(r'D:\Learning materials\Learning_notes\10-Startup\70-Projects\AI-Native-Project-Books\2026-06-30-COS-AFS-autonomous-project-book\AFS-Goal-Driven-Execution-State-v0.1.yaml'); yaml.safe_load(path.read_text(encoding='utf-8')); print('yaml_ok')"
+# yaml_ok
+```
+
 ## 2026-06-30 - Runtime Feedback Candidate Promotion Decision Harness
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
