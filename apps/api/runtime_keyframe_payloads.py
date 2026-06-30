@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
 from apps.api.runtime_keyframe_plan import build_keyframe_plan
 from apps.api.runtime_models import KeyframeGenerationRequest
 
@@ -137,6 +138,12 @@ def keyframe_safe_manifest(
             for item in overlays
             if item.get("overlay_id")
         ]
+        payload["feedback_context_overlay_prompt_policy"] = feedback_overlay_prompt_policy(
+            context_bundle=context_bundle,
+            context_overlays=overlays,
+        )
+    else:
+        payload["feedback_context_overlay_prompt_policy"] = feedback_overlay_prompt_policy(context_overlays=[])
     return payload
 
 

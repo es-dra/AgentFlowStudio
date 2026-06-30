@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
 from agentflow.algorithms.model_call_context import sanitize_context_payload, sanitize_context_text
 
 
@@ -25,6 +26,7 @@ def build_request_plan(
     refs = list((model_call_context.get("reference_context") or {}).get("reference_image_refs") or [])
     request_mode = _request_mode(generation_target, refs)
     prompt = _prompt_text(model_call_context, canonical_brief)
+    overlay_prompt_policy = _overlay_prompt_policy(model_call_context)
     payload = {
         "artifact_type": "agentflow_model_request_plan",
         "schema_version": "afs_model_request_plan.v0.1",
@@ -51,6 +53,7 @@ def build_request_plan(
         "trace_summary": {
             "model_call_context_algorithm_id": model_call_context.get("algorithm_id"),
             "reference_image_count": len(refs),
+            "feedback_context_overlay_prompt_policy": overlay_prompt_policy,
             "projection_not_provider_execution": True,
         },
     }
@@ -78,6 +81,15 @@ def _prompt_text(model_call_context: dict[str, Any], canonical_brief: dict[str, 
                 return sanitize_context_text(canonical_brief[key])
     prompt = (model_call_context.get("input_prompt") or {}).get("visible_prompt")
     return sanitize_context_text(prompt)
+
+
+def _overlay_prompt_policy(model_call_context: dict[str, Any]) -> dict[str, Any]:
+    feedback = model_call_context.get("feedback_context") if isinstance(model_call_context, dict) else {}
+    policy = feedback.get("prompt_policy") if isinstance(feedback, dict) else {}
+    if isinstance(policy, dict) and policy:
+        return policy
+    overlays = feedback.get("context_overlays") if isinstance(feedback, dict) else []
+    return feedback_overlay_prompt_policy(context_overlays=overlays if isinstance(overlays, list) else [])
 
 
 __all__ = (

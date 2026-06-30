@@ -279,6 +279,20 @@ server sync, or human/business acceptance. No OpenAPI snapshot update was
 needed; path count remains 52. Handoff:
 `docs/handoff/AFS-FEEDBACK-OVERLAY-SELECTION-UI-CONTRACT-20260630.md`.
 
+Feedback overlay prompt-policy addendum: the next local deterministic slice
+adds `AFS-T17b Feedback Overlay Prompt Policy Gate`. Because this branch already
+used `AFS-T17` for goal-mode branch integration review, the suffix avoids a
+duplicate task-id collision. Runtime now records one shared
+`feedback_overlay_prompt_policy` across context trace, model-call context,
+request projection, keyframe safe manifest, and generation bridge evidence.
+The default policy is explicit: selected feedback overlays remain local context
+evidence only, `provider_prompt_includes_context_overlays=false`, and future
+use of overlay text in provider prompts requires a separate prompt policy gate.
+This is not provider prompt injection, generated media, durable memory, Company
+KB promotion, deploy, server sync, or human/business acceptance. No OpenAPI
+snapshot update was needed; path count remains 52. Handoff:
+`docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-POLICY-GATE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

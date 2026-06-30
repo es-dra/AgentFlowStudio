@@ -31,6 +31,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
 
 AUXILIARY_ENGINEERING_MODULES = (
     "provider_gate_manifest",
+    "feedback_overlay_prompt_policy",
     "artifact_lineage",
     "skill_action_selection",
 )

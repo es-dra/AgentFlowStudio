@@ -1,5 +1,67 @@
 # Devlog
 
+## 2026-06-30 - Feedback Overlay Prompt Policy Gate
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `b58a364a32af175ca3fdf60bd4f189ec39d8ce57`.
+- Added `AFS-T17b Feedback Overlay Prompt Policy Gate`. The suffix avoids
+  colliding with the earlier `AFS-T17 Goal-Mode Branch Integration Review` in
+  this same branch history.
+- Added a small shared `feedback_overlay_prompt_policy` helper and wired it
+  into Runtime context trace, model-call context, request projection, keyframe
+  safe manifest, and generation bridge evidence.
+- Locked the default policy: selected feedback overlays remain local context
+  evidence only, `provider_prompt_includes_context_overlays=false`, and any
+  future use of overlay text in provider prompts requires a separate explicit
+  prompt policy gate.
+- Added a regression proving a selected overlay marker stays in
+  `feedback_context_overlays` but does not appear in `keyframe_request_plan`
+  provider prompt or `model_request_plan.provider_request.prompt`.
+- No OpenAPI snapshot update was needed; path count remains 52.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py::test_selected_feedback_overlay_stays_out_of_provider_prompt_and_records_policy -q
+# red baseline: failed because feedback_context.prompt_policy did not exist
+# after implementation: 1 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_model_call_context_contract.py tests\test_api_runtime_keyframe_generation_bridge.py -q
+# 9 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_runtime_context_text.py -q
+# 4 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_model_call_context_contract.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_creative_agent_keyframes.py tests\test_api_runtime_generation_comparison.py tests\test_api_runtime_openapi_snapshot.py -q
+# 28 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 735 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Feedback Overlay Selection UI Contract
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -30,6 +31,11 @@ def attach_feedback_context_overlays(
     trace["feedback_context_overlay_source"] = "project_manifest_feedback_refs"
     trace["feedback_overlays_are_memory"] = False
     trace["feedback_overlays_write_company_kb"] = False
+    trace["feedback_context_overlay_prompt_policy"] = feedback_overlay_prompt_policy(
+        context_overlays=overlays,
+        selected_overlay_ids=decisions["selected_ids"],
+        rejected_overlay_ids=decisions["rejected_ids"],
+    )
     if has_decisions:
         trace["feedback_context_overlay_decision_source"] = "studio_context_subgraph"
         if decisions["selected_ids"]:

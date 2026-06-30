@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
+
 
 ALGORITHM_ID = "afs.generation_bridge.v0.1"
 INPUT_CONTRACT = "keyframe request, model call context, model request plan, provider gate, safe manifest"
@@ -100,6 +102,7 @@ def _context_evidence(context_bundle: dict[str, Any] | None, reference_image_cou
             "subject_reference_asset_id": None,
             "feedback_context_overlay_count": 0,
             "feedback_context_overlay_ids": [],
+            "feedback_context_overlay_prompt_policy": feedback_overlay_prompt_policy(context_overlays=[]),
         }
     overlays = _list(context_bundle.get("feedback_context_overlays"))
     return {
@@ -114,6 +117,7 @@ def _context_evidence(context_bundle: dict[str, Any] | None, reference_image_cou
             for item in overlays
             if isinstance(item, dict) and item.get("overlay_id")
         ],
+        "feedback_context_overlay_prompt_policy": feedback_overlay_prompt_policy(context_bundle=context_bundle),
         "draft_assets_rejected": bool((context_bundle.get("trace_summary") or {}).get("draft_assets_rejected"))
         if isinstance(context_bundle.get("trace_summary"), dict)
         else False,
