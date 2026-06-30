@@ -28,21 +28,25 @@ def build_storyboard_production_graph(
     shots: list[dict[str, Any]],
     asset_graph: dict[str, Any],
     content_quality_report: dict[str, Any],
+    fixed_visual_assets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     safe_script_id = _safe_id(script_node_id or "storyboard_script")
     script_graph_node_id = f"script:{safe_script_id}"
     shot_nodes = _shot_nodes(shots)
     asset_nodes = _asset_nodes(asset_graph)
+    fixed_asset_nodes = _fixed_visual_asset_nodes(fixed_visual_assets)
     quality_node = _quality_node(safe_script_id, content_quality_report)
     nodes = [
         _script_node(script_graph_node_id, script_node_id, script_text),
         *shot_nodes,
         *asset_nodes,
+        *fixed_asset_nodes,
         quality_node,
     ]
     relationships = [
         *_script_shot_relationships(script_graph_node_id, shot_nodes),
         *_shot_asset_relationships(asset_graph),
+        *_script_fixed_asset_relationships(script_graph_node_id, fixed_asset_nodes),
         {
             "relationship_type": "quality_report_evaluates_storyboard",
             "from_node_id": quality_node["node_id"],
@@ -62,6 +66,7 @@ def build_storyboard_production_graph(
             "relationship_count": len(relationships),
             "shot_count": len(shot_nodes),
             "asset_count": len(asset_nodes),
+            "fixed_visual_asset_count": len(fixed_asset_nodes),
             "human_review_needed": True,
             "content_quality_status": str(content_quality_report.get("summary", {}).get("status") or ""),
         },
@@ -142,6 +147,31 @@ def _asset_nodes(asset_graph: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _fixed_visual_asset_nodes(fixed_visual_assets: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for asset in _list(fixed_visual_assets):
+        if not isinstance(asset, dict):
+            continue
+        asset_id = str(asset.get("asset_id") or "")
+        if not asset_id:
+            continue
+        result.append(
+            {
+                "node_id": f"fixed_asset:{_safe_id(asset_id)}",
+                "node_type": "fixed_visual_asset",
+                "asset_id": asset_id,
+                "asset_type": str(asset.get("asset_type") or ""),
+                "label": str(asset.get("label") or "")[:80],
+                "status": str(asset.get("status") or ""),
+                "source_node_id": str(asset.get("source_node_id") or ""),
+                "review_state": "fixed_asset_available_for_reuse",
+                "source_evidence": _safe_source_evidence(asset.get("source_evidence")),
+                "writes_long_term_memory": False,
+            }
+        )
+    return result
+
+
 def _quality_node(script_node_id: str, report: dict[str, Any]) -> dict[str, Any]:
     summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
     return {
@@ -186,6 +216,38 @@ def _shot_asset_relationships(asset_graph: dict[str, Any]) -> list[dict[str, Any
             }
         )
     return relationships
+
+
+def _script_fixed_asset_relationships(script_node_id: str, fixed_nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "relationship_type": "script_can_reuse_fixed_asset",
+            "from_node_id": script_node_id,
+            "to_node_id": node["node_id"],
+            "source": "runtime_visual_asset_store",
+            "evidence_state": "fixed_asset_source_evidence_available" if node.get("source_evidence") else "fixed_asset_available",
+        }
+        for node in fixed_nodes
+    ]
+
+
+def _safe_source_evidence(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    keys = (
+        "artifact_type",
+        "source_contract",
+        "source_human_gate_id",
+        "source_asset_card_candidate_id",
+        "source_stage",
+        "result_asset_status",
+        "provider_calls_started",
+        "generated_media_claimed",
+        "human_creative_acceptance_claimed",
+        "business_validation_claimed",
+        "safe_payload",
+    )
+    return {key: value.get(key) for key in keys if key in value}
 
 
 def _safe_id(value: str) -> str:

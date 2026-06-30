@@ -22,6 +22,7 @@ from apps.api.runtime_storyboard_local import local_storyboard_shots
 from apps.api.runtime_storyboard_provider_parse import shots_from_provider_text
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
+from apps.api.runtime_visual_assets import list_visual_assets, public_visual_asset
 
 
 STORYBOARD_NON_CLAIMS = [
@@ -38,7 +39,8 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
         job_id = store.new_job_id("storyboard_breakdown", project_id)
         output_dir = store.run_dir(project_id, job_id)
         try:
-            result = build_storyboard_breakdown(project_id, request, output_dir)
+            fixed_visual_assets = [public_visual_asset(item) for item in list_visual_assets(store, project_id, status="fixed")]
+            result = build_storyboard_breakdown(project_id, request, output_dir, fixed_visual_assets=fixed_visual_assets)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_storyboard_breakdown")) from exc
 
@@ -86,7 +88,13 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
         }
 
 
-def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequest, output_dir: Path) -> dict[str, Any]:
+def build_storyboard_breakdown(
+    project_id: str,
+    request: StoryboardBreakdownRequest,
+    output_dir: Path,
+    *,
+    fixed_visual_assets: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     gate = llm_provider_gate()
     provider_calls_started = False
     shots: list[dict[str, Any]] | None = None
@@ -134,6 +142,7 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         shots=shots,
         asset_graph=asset_graph,
         content_quality_report=content_quality_report,
+        fixed_visual_assets=fixed_visual_assets or [],
     )
     asset_card_candidates = build_asset_card_candidates(project_id=project_id, asset_graph=asset_graph)
     safe_manifest = {
@@ -151,6 +160,9 @@ def build_storyboard_breakdown(project_id: str, request: StoryboardBreakdownRequ
         "asset_graph_asset_count": int(asset_graph.get("asset_count") or 0),
         "content_quality_report_status": content_quality_report["summary"]["status"],
         "production_graph_node_count": production_graph["summary"]["node_count"],
+        "fixed_visual_asset_source_evidence_count": sum(
+            1 for item in (fixed_visual_assets or []) if isinstance(item, dict) and item.get("source_evidence")
+        ),
         "asset_card_candidate_count": asset_card_candidates["summary"]["candidate_count"],
         "asset_card_project_reuse_candidate_count": int(
             (asset_card_candidates["summary"].get("reuse_scope_counts") or {}).get("project_reuse_candidate") or 0

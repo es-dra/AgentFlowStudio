@@ -1,5 +1,40 @@
 # Devlog
 
+## 2026-06-30 - Production Graph Fixed Asset Reuse Evidence
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T24 fixed asset
+  source-evidence context slice.
+- Let storyboard production graph consume current project fixed visual assets
+  through their safe public projection.
+- Added `fixed_visual_asset` graph nodes and `script_can_reuse_fixed_asset`
+  relationships so the production graph now records which fixed assets are
+  available for reuse and which source evidence they carry.
+- Added `safe_manifest.fixed_visual_asset_source_evidence_count` so the
+  storyboard artifact records whether fixed asset source evidence was present.
+- No provider call, generated media, Runtime request schema expansion, deploy,
+  server sync, human creative acceptance claim, or business validation claim
+  occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_production_graph_contract.py -q
+# 3 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_storyboard_evidence_ledger.py tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_fixed_asset_source_evidence_context.py -q
+# 8 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T25
+```
+
 ## 2026-06-30 - Fixed Asset Source Evidence Context
 
 - Continued provider-closed full goal-mode work on

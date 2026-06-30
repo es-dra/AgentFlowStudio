@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Production-graph fixed-asset reuse addendum: the next provider-closed product
+slice lets storyboard production graph consume current project fixed visual
+assets through their safe public projection. The graph now includes
+`fixed_visual_asset` nodes, `script_can_reuse_fixed_asset` relationships, and a
+safe manifest count for fixed asset source evidence. This does not add request
+fields, expand OpenAPI, call providers, deploy, or claim human creative
+acceptance. Handoff:
+`docs/handoff/AFS-PRODUCTION-GRAPH-FIXED-ASSET-REUSE-EVIDENCE-20260630.md`.
+
 Fixed-asset source-evidence addendum: the next provider-closed product slice
 adds a safe `source_evidence` projection to fixed visual assets, derived from
 the existing `promotion_gate`. Keyframe context now carries this evidence via

@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import base64
 import json
 
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_errors import response_contains_unsafe_marker
 from apps.api.runtime_service import create_runtime_app
+
+
+PNG_B64 = base64.b64encode(
+    base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+    )
+).decode("ascii")
 
 
 def test_production_graph_algorithm_is_registered() -> None:
@@ -70,3 +78,94 @@ def test_storyboard_breakdown_writes_safe_production_graph_snapshot(tmp_path, mo
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_storyboard_production_graph_includes_fixed_asset_source_evidence(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_production_graph_fixed_asset_source_evidence"
+    image_asset_id = _upload_image(client, project_id)
+    fixed_asset = _promote_fixed_asset(client, project_id, image_asset_id)
+
+    response = client.post(
+        f"/projects/{project_id}/storyboard-breakdowns",
+        json={
+            "node_id": "script_graph_fixed_asset_001",
+            "script_text": "Lin Wan returns to the old observatory and checks the red map.",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-06-30T23:55:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    graph = payload["production_graph"]
+    fixed_nodes = [node for node in graph["nodes"] if node.get("node_type") == "fixed_visual_asset"]
+    relationships = graph["relationships"]
+    serialized = json.dumps(graph, ensure_ascii=False).lower()
+
+    assert graph["summary"]["fixed_visual_asset_count"] == 1
+    assert payload["safe_manifest"]["fixed_visual_asset_source_evidence_count"] == 1
+    assert fixed_nodes == [
+        {
+            "node_id": f"fixed_asset:{fixed_asset['asset_id']}",
+            "node_type": "fixed_visual_asset",
+            "asset_id": fixed_asset["asset_id"],
+            "asset_type": "character",
+            "label": "Lin Wan",
+            "status": "fixed",
+            "source_node_id": "node-ref",
+            "review_state": "fixed_asset_available_for_reuse",
+            "source_evidence": fixed_asset["source_evidence"],
+            "writes_long_term_memory": False,
+        }
+    ]
+    assert {
+        "relationship_type": "script_can_reuse_fixed_asset",
+        "from_node_id": "script:script_graph_fixed_asset_001",
+        "to_node_id": f"fixed_asset:{fixed_asset['asset_id']}",
+        "source": "runtime_visual_asset_store",
+        "evidence_state": "fixed_asset_source_evidence_available",
+    } in relationships
+    assert "data_base64" not in serialized
+    assert "signed_url" not in serialized
+    assert "c:\\" not in serialized
+    assert "d:\\" not in serialized
+
+
+def _upload_image(client: TestClient, project_id: str) -> str:
+    response = client.post(
+        f"/projects/{project_id}/image-assets",
+        json={
+            "node_id": "node-ref",
+            "filename": "reference.png",
+            "mime_type": "image/png",
+            "data_base64": PNG_B64,
+            "role": "character_reference",
+            "generated_at": "2026-06-30T23:50:00+08:00",
+        },
+    )
+    response.raise_for_status()
+    return response.json()["asset"]["asset_id"]
+
+
+def _promote_fixed_asset(client: TestClient, project_id: str, image_asset_id: str) -> dict:
+    response = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json={
+            "source_image_asset_refs": [image_asset_id],
+            "asset_type": "character",
+            "label": "Lin Wan",
+            "signature": "black short hair, red trench coat, scar above left brow",
+            "feature_card": {"appearance": "young woman with black short hair"},
+            "negative_locks": ["keep black short hair"],
+            "source_node_id": "node-ref",
+            "source_human_gate_id": "runtime-human-gate:demo:accepted",
+            "source_asset_card_candidate_id": "asset_card_candidate:main_character",
+            "review_decision": "fixed",
+            "reviewed_at": "2026-06-30T23:52:00+08:00",
+        },
+    )
+    response.raise_for_status()
+    return response.json()["asset"]
