@@ -249,6 +249,7 @@ function inspectorSignature(state, node) {
     node?.prompt || "",
     node?.result || "",
     JSON.stringify(node?.params?.lastContextBundle || {}),
+    JSON.stringify(node?.params?.keyframeLayer || {}),
     JSON.stringify(node?.params?.lastSafeManifest || node?.params?.lastGenerationManifest || {}),
     JSON.stringify(node?.params?.jobProgress || {}),
     node?.params?.lastOptimizedPromptPlain || "",

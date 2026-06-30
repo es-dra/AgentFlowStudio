@@ -113,3 +113,42 @@ process.stdout.write(JSON.stringify({
     assert "_".join(["signed", "url"]) not in serialized
     assert "data_base64" not in serialized
     assert "d:\\private" not in serialized
+
+
+def test_inspector_context_summary_surfaces_keyframe_layer_source_evidence() -> None:
+    script = r'''
+import { nodeContextSummaryText } from "./apps/studio/src/panels/inspector-context-summary.js";
+
+const node = {
+  id: "keyframe_01",
+  type: "image",
+  params: {
+    keyframeLayer: {
+      fixed_asset_source_evidence_count: 1,
+      fixed_asset_source_evidence_refs: [{
+        asset_id: "fixed_lin_wan_v1",
+        asset_type: "character",
+        label: "Lin Wan",
+        status: "fixed",
+        source_human_gate_id: "runtime-human-gate:demo:accepted",
+        source_asset_card_candidate_id: "asset_card_candidate:main_character",
+        source_stage: "asset_card_candidate_human_gate",
+      }],
+    },
+  },
+};
+
+process.stdout.write(JSON.stringify({ text: nodeContextSummaryText(node) }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert "关键帧来源证据" in payload["text"]
+    assert "Lin Wan" in payload["text"]
+    assert "asset_card_candidate:main_character" in payload["text"]

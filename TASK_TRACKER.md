@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio keyframe evidence inspector addendum: the next provider-closed product
+slice surfaces T30 `keyframeLayer.fixed_asset_source_evidence_refs` in the
+Studio inspector `本次参考摘要`. Operators can now review which fixed asset,
+human gate, or asset-card candidate supplied a keyframe node's source evidence.
+This is a local review surface only; it does not expand Runtime API/OpenAPI,
+change provider prompt inclusion policy, call providers, deploy, server sync,
+or claim human creative acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-KEYFRAME-EVIDENCE-INSPECTOR-REVIEW-SURFACE-20260630.md`.
+
 Studio promotion-to-keyframe evidence-chain addendum: the next provider-closed
 product slice carries fixed visual asset source evidence into the Studio
 `keyframeLayer` created from storyboard output. The layer now records
