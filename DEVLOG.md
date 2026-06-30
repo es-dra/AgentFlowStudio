@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-30 - Studio Feedback Overlay Review Surface
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `7be884f75829da9e6614aab288898b11f04775bb`.
+- Added `AFS-T15e Studio Feedback Overlay Review Surface`.
+- Studio state persistence now keeps bounded safe
+  `lastContextBundle.feedback_context_overlays` summaries so consumed feedback
+  overlays survive `/studio-state` save/load without carrying provider raw,
+  signed URLs, local paths, trace internals, safety-boundary fragments, or media
+  byte markers.
+- Added a pure Studio helper for feedback overlay summary/count rendering, then
+  wired it into the existing inspector context summary and algorithm process
+  panel. The UI reads only `lastContextBundle`; it does not create overlays,
+  call provider routes, or start live generation.
+- Added focused sanitizer/API persistence tests in a new small test file instead
+  of pushing the existing Studio-state test over the 500-line hard threshold.
+- No OpenAPI snapshot update was needed; path count remains 52.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_persistence.py tests\test_web_studio_feedback_candidate_static.py -q
+# 19 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_web_studio_feedback_candidate_static.py -q
+# 6 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 730 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 129 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning, failed=0, passed=3, warning=4
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe -c "import yaml, pathlib; path=pathlib.Path(r'D:\Learning materials\Learning_notes\10-Startup\70-Projects\AI-Native-Project-Books\2026-06-30-COS-AFS-autonomous-project-book\AFS-Goal-Driven-Execution-State-v0.1.yaml'); yaml.safe_load(path.read_text(encoding='utf-8')); print('yaml_ok')"
+# yaml_ok
+```
+
 ## 2026-06-30 - Feedback Candidate Context Resolver Consumption Harness
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

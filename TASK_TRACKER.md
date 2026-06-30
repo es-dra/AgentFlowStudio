@@ -253,6 +253,19 @@ durable memory, Company KB, generated media, deploy, or server sync. No OpenAPI
 snapshot update was needed; path count remains 52. Handoff:
 `docs/handoff/AFS-FEEDBACK-CANDIDATE-CONTEXT-CONSUMPTION-TASKRUN-20260630.md`.
 
+Studio feedback overlay review-surface addendum: the next local deterministic
+slice adds `AFS-T15e Studio Feedback Overlay Review Surface`. Studio state
+now persists bounded safe `lastContextBundle.feedback_context_overlays`
+summaries, dropping provider raw, trace internals, signed URLs, local paths,
+safety-boundary fragments, and media-byte markers before save/load. The
+existing inspector context summary and algorithm process panel now render
+consumed feedback overlay counts/summaries from `lastContextBundle` only. This
+is a review surface and Studio-state contract, not overlay creation UI, provider
+prompt policy, generated media, durable memory, Company KB promotion, deploy,
+or server sync. No OpenAPI snapshot update was needed; path count remains 52.
+Handoff:
+`docs/handoff/AFS-STUDIO-FEEDBACK-OVERLAY-REVIEW-SURFACE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

@@ -1,4 +1,5 @@
 import { assetsFromNode, assetCarryState } from "../asset-reference-summary.js";
+import { feedbackOverlayCount } from "../feedback-context-overlays.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 
@@ -149,7 +150,9 @@ function projectSummary(state) {
 function nodeSummary(node, bundle) {
   const assets = Array.isArray(bundle?.included_assets) ? bundle.included_assets.length : 0;
   const nodes = Array.isArray(bundle?.included_nodes) ? bundle.included_nodes.length : 0;
+  const feedback = feedbackOverlayCount(bundle);
   if (assets || nodes) return `已参考 ${nodes} 个节点 / ${assets} 个素材`;
+  if (feedback) return `已消费 ${feedback} 条反馈上下文`;
   if (hasRequestEvidence(node)) return "已有请求与安全摘要";
   return "触发生成时再展开";
 }
@@ -237,6 +240,7 @@ function hasFeedbackSignal(node) {
     || node.params?.feedbackEventId
     || node.params?.videoRevision?.lastRevisionJobId
     || node.params?.lastRevisionJobId
+    || feedbackOverlayCount(node.params?.lastContextBundle)
   );
 }
 
