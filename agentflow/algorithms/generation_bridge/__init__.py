@@ -98,13 +98,22 @@ def _context_evidence(context_bundle: dict[str, Any] | None, reference_image_cou
             "included_asset_count": 0,
             "reference_image_count": reference_image_count,
             "subject_reference_asset_id": None,
+            "feedback_context_overlay_count": 0,
+            "feedback_context_overlay_ids": [],
         }
+    overlays = _list(context_bundle.get("feedback_context_overlays"))
     return {
         "context_bundle_present": True,
         "mode": str(context_bundle.get("mode") or ""),
         "included_asset_count": len(_list(context_bundle.get("included_assets"))),
         "reference_image_count": reference_image_count,
         "subject_reference_asset_id": context_bundle.get("subject_reference_asset_id"),
+        "feedback_context_overlay_count": len(overlays),
+        "feedback_context_overlay_ids": [
+            str(item.get("overlay_id") or "")[:180]
+            for item in overlays
+            if isinstance(item, dict) and item.get("overlay_id")
+        ],
         "draft_assets_rejected": bool((context_bundle.get("trace_summary") or {}).get("draft_assets_rejected"))
         if isinstance(context_bundle.get("trace_summary"), dict)
         else False,

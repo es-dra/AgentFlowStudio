@@ -130,6 +130,13 @@ def keyframe_safe_manifest(
     if context_bundle:
         payload["context_bundle_mode"] = context_bundle.get("mode")
         payload["context_included_asset_count"] = len(context_bundle.get("included_assets", []))
+        overlays = [item for item in context_bundle.get("feedback_context_overlays", []) if isinstance(item, dict)]
+        payload["context_feedback_overlay_count"] = len(overlays)
+        payload["context_feedback_overlay_ids"] = [
+            str(item.get("overlay_id") or "")[:180]
+            for item in overlays
+            if item.get("overlay_id")
+        ]
     return payload
 
 

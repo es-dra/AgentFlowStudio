@@ -102,6 +102,7 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
         "asset_conflicts": list((bundle or {}).get("asset_conflicts") or []),
         "reference_image_channel": list((bundle or {}).get("reference_image_channel") or []),
         "subject_reference_asset_id": (bundle or {}).get("subject_reference_asset_id"),
+        "feedback_context_overlays": list((bundle or {}).get("feedback_context_overlays") or []),
         "preflight_token": _preflight_token(kind, request, bundle),
         "non_claims": [
             "preflight_only",
@@ -152,6 +153,15 @@ def _bundle_digest(bundle: dict[str, Any] | None) -> dict[str, Any] | None:
         "asset_conflicts": list(bundle.get("asset_conflicts") or []),
         "reference_image_channel": list(bundle.get("reference_image_channel") or []),
         "subject_reference_asset_id": bundle.get("subject_reference_asset_id"),
+        "feedback_context_overlays": [
+            {
+                "overlay_id": item.get("overlay_id"),
+                "candidate_id": item.get("candidate_id"),
+                "decision_effect": item.get("decision_effect"),
+            }
+            for item in bundle.get("feedback_context_overlays", [])
+            if isinstance(item, dict)
+        ],
         "temporary_lock_overrides": list(bundle.get("temporary_lock_overrides") or []),
         "temporary_asset_exclusions": list(bundle.get("temporary_asset_exclusions") or []),
     }

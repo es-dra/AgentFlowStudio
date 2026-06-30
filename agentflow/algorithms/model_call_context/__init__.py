@@ -60,6 +60,7 @@ def build_model_call_context(
     retired_ids = _asset_ids(retired_assets)
     refs = _dedupe([*_bundle_reference_refs(bundle), *(reference_image_refs or [])])
     events = [sanitize_quality_feedback(item) for item in (feedback_events or []) if isinstance(item, dict)]
+    overlays = _bundle_feedback_context_overlays(bundle)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "algorithm_id": ALGORITHM_ID,
@@ -80,6 +81,7 @@ def build_model_call_context(
             "context_bundle_algorithm_id": bundle.get("algorithm_id"),
             "included_asset_count": len(bundle.get("included_assets") or []),
             "excluded_asset_count": len(bundle.get("excluded_assets") or []),
+            "feedback_context_overlay_count": len(overlays),
             "upstream_ref_count": len(upstream_refs or []),
         },
         "asset_context": {
@@ -100,6 +102,7 @@ def build_model_call_context(
         },
         "feedback_context": {
             "events": events,
+            "context_overlays": overlays,
             "revision_control": revision_control or {},
             "feedback_is_memory": False,
         },
@@ -115,6 +118,7 @@ def build_model_call_context(
             "context_bundle_present": bool(context_bundle),
             "included_asset_ids": _bundle_asset_ids(bundle, "included_assets"),
             "excluded_asset_ids": _bundle_asset_ids(bundle, "excluded_assets"),
+            "feedback_context_overlay_ids": [item["overlay_id"] for item in overlays if item.get("overlay_id")],
             "warning_ids": _warning_ids(bundle),
             "draft_assets_rejected": True,
             "raw_evidence_not_memory": True,
@@ -137,6 +141,28 @@ def _bundle_asset_ids(bundle: dict[str, Any], key: str) -> list[str]:
 def _bundle_reference_refs(bundle: dict[str, Any]) -> list[str]:
     values = bundle.get("reference_image_channel") if isinstance(bundle, dict) else []
     return [str(item.get("asset_id") or "") for item in (values or []) if isinstance(item, dict)]
+
+
+def _bundle_feedback_context_overlays(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    values = bundle.get("feedback_context_overlays") if isinstance(bundle, dict) else []
+    overlays: list[dict[str, Any]] = []
+    for item in (values if isinstance(values, list) else []):
+        if not isinstance(item, dict):
+            continue
+        overlay = {
+            "overlay_id": _sanitize_text(item.get("overlay_id")).strip(),
+            "candidate_id": _sanitize_text(item.get("candidate_id")).strip(),
+            "candidate_scope": _sanitize_text(item.get("candidate_scope")).strip(),
+            "overlay_scope": _sanitize_text(item.get("overlay_scope")).strip(),
+            "decision_effect": _sanitize_text(item.get("decision_effect")).strip(),
+            "context_overlay_consumed": bool(item.get("context_overlay_consumed")),
+            "provider_calls_started": False,
+            "writes_long_term_memory": False,
+            "writes_company_kb": False,
+        }
+        if overlay["overlay_id"]:
+            overlays.append(overlay)
+    return overlays
 
 
 def _warning_ids(bundle: dict[str, Any]) -> list[str]:

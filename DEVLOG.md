@@ -1,5 +1,65 @@
 # Devlog
 
+## 2026-06-30 - Feedback Candidate Context Resolver Consumption Harness
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `6bffc18a6eceeabcf45733ddfd4c87e85a84cd80`.
+- Added `AFS-T15d Feedback Candidate Context Resolver Consumption Harness`.
+- Added a small Runtime helper that reads safe
+  `runtime_feedback_candidate_context_overlay` artifacts from project
+  `feedback_refs`, skips missing or unsafe overlay refs, and attaches bounded
+  `feedback_context_overlays` summaries to the local context bundle.
+- Wired the overlay summaries into keyframe/video preflight digest output,
+  model-call context feedback evidence, keyframe safe manifest counts, and the
+  local generation bridge context evidence.
+- Preserved the hard boundary: promoted feedback overlays do not enter
+  `included_assets`, `reference_image_channel`, `subject_reference_asset_id`,
+  durable memory, Company KB, generated media, provider raw output, or live
+  provider calls.
+- No OpenAPI route or snapshot update was needed; path count remains 52.
+- No Studio UI state machine, provider call, generated media, master merge,
+  server sync, Runtime health claim, human creative acceptance, business
+  validation, or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py -q
+# red baseline: 2 failed because feedback_context_overlays were not attached
+# after implementation: 2 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_promotion.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_context_resolver.py tests\test_api_runtime_context_resolver_asset_card_candidates.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_model_call_context_contract.py tests\test_model_call_context_runtime_routes.py -q
+# 41 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_model_call_context_contract.py -q
+# 14 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_promotion.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_context_resolver.py tests\test_api_runtime_context_resolver_asset_card_candidates.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_model_call_context_contract.py tests\test_model_call_context_runtime_routes.py tests\test_api_runtime_openapi_snapshot.py -q
+# 42 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 727 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning, failed=0, passed=3, warning=4
+# after converting the new handoff to Chinese-primary, human_doc_chinese_coverage remains at the existing 22 tracked warnings
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe -c "import yaml, pathlib; path=pathlib.Path(r'D:\Learning materials\Learning_notes\10-Startup\70-Projects\AI-Native-Project-Books\2026-06-30-COS-AFS-autonomous-project-book\AFS-Goal-Driven-Execution-State-v0.1.yaml'); yaml.safe_load(path.read_text(encoding='utf-8')); print('yaml_ok')"
+# yaml_ok
+```
+
 ## 2026-06-30 - Runtime Feedback Candidate Context Overlay Harness
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
