@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-06-30 - Studio Asset Detail Source Evidence Surface
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T35 promotion-gate
+  production graph evidence slice.
+- Surfaced fixed visual asset `source_evidence` in the Studio asset detail
+  popover as a small white-listed evidence section.
+- Added `assetSourceEvidenceRows()` as a pure helper so the display boundary can
+  be tested without browser/provider calls.
+- Kept the surface local to Studio review UI; no Runtime route, OpenAPI path,
+  provider prompt inclusion policy, provider call, generated media, deploy,
+  server sync, human creative acceptance, or business validation claim changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_asset_detail_source_evidence.py tests\test_web_studio_keyframe_layer_source_evidence.py
+# 7 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+```
+
 ## 2026-06-30 - Studio Promotion Gate Production Graph Evidence
 
 - Continued provider-closed full goal-mode work on

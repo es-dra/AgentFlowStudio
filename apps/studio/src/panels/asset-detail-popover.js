@@ -34,6 +34,8 @@ function renderAssetDetail(pop, store, runtime, asset, assetId, visualAssetId = 
   pop.appendChild(detailList("特征卡", featureCardRows(asset.feature_card)));
   pop.appendChild(detailList("锁定项", Array.isArray(asset.negative_locks) ? asset.negative_locks : []));
   pop.appendChild(detailRow("来源节点", asset.source_node_id || "未记录"));
+  const sourceEvidenceRows = assetSourceEvidenceRows(asset);
+  if (sourceEvidenceRows.length) pop.appendChild(detailList("来源证据", sourceEvidenceRows));
   if (asset.disabled_reason) pop.appendChild(detailRow("本次携带", asset.disabled_reason));
   const actions = el("div", "asset-detail-actions");
   const selectedId = store.get().selection.nodeIds[0];
@@ -187,6 +189,18 @@ function detailList(label, items) {
   return wrap;
 }
 
+export function assetSourceEvidenceRows(asset) {
+  const evidence = asset?.source_evidence;
+  if (!evidence || typeof evidence !== "object") return [];
+  return [
+    evidence.source_human_gate_id ? `human_gate: ${safeEvidenceText(evidence.source_human_gate_id)}` : "",
+    evidence.source_asset_card_candidate_id ? `asset_candidate: ${safeEvidenceText(evidence.source_asset_card_candidate_id)}` : "",
+    evidence.source_stage ? `stage: ${safeEvidenceText(evidence.source_stage)}` : "",
+    "provider_calls_started" in evidence ? `provider_calls_started=${evidence.provider_calls_started === true ? "true" : "false"}` : "",
+    "human_creative_acceptance_claimed" in evidence ? `human_creative_acceptance_claimed=${evidence.human_creative_acceptance_claimed === true ? "true" : "false"}` : "",
+  ].filter(Boolean);
+}
+
 function featureCardRows(card) {
   if (!card || typeof card !== "object") return [];
   return Object.entries(card)
@@ -232,4 +246,8 @@ function assetTypeLabel(asset) {
 
 function isFixedAsset(asset) {
   return ["fixed", "ready", ""].includes(String(asset?.status || asset?.asset_status || ""));
+}
+
+function safeEvidenceText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 160);
 }

@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio asset-detail source-evidence addendum: the next provider-closed product
+slice surfaces fixed visual asset `source_evidence` inside the Studio asset
+detail popover. The view is a white-listed local review surface for human gate,
+asset-card candidate, stage, and non-claim booleans; it does not expose signed
+URLs, local paths, media bytes, provider raw data, Runtime routes, OpenAPI
+paths, provider calls, deploy, server sync, human creative acceptance, or
+business validation. Handoff:
+`docs/handoff/AFS-STUDIO-ASSET-DETAIL-SOURCE-EVIDENCE-SURFACE-20260630.md`.
+
 Studio promotion-gate production-graph evidence addendum: the next
 provider-closed product slice records a safe `production_graph_artifact_id` in
 Studio human-gate asset-card review notes and surfaces it in the fixed visual
