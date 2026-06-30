@@ -612,13 +612,15 @@ def test_visual_asset_cards_support_prop_assets_across_frontend_and_runtime_cont
 
 def test_visual_asset_draft_and_existing_asset_edit_show_inline_loading() -> None:
     visual_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
+    promotion_request = (STUDIO_ROOT / "src" / "panels" / "visual-asset-promotion-request.js").read_text(encoding="utf-8")
     visual_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     asset_detail = (STUDIO_ROOT / "src" / "panels" / "asset-detail-popover.js").read_text(encoding="utf-8")
     styles = _styles()
 
     assert "existingAsset" in visual_panel
-    assert "supersedes_asset_id" in visual_panel
+    assert "supersedesAssetId" in visual_panel
+    assert "supersedes_asset_id" in promotion_request
     assert "image_asset_refs" in visual_panel
     assert "seedFromExistingAsset" in visual_panel
     assert "is-drafting" in visual_panel

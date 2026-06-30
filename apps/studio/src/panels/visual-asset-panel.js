@@ -2,7 +2,7 @@ import { showModal, el } from "../overlay.js";
 import { visualAssetDefaults } from "./visual-asset-defaults.js";
 import { lockChipsForAssetType, renderVisualAssetPanel } from "./visual-asset-panel-render.js";
 import { formatRuntimeError } from "../runtime-error-utils.js";
-import { promotionGateProvenance } from "../human-gate-provenance.js";
+import { buildVisualAssetPromotionPayload } from "./visual-asset-promotion-request.js";
 
 export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character", existingAsset = null }) {
   if (!runtime?.promoteVisualAsset) {
@@ -185,19 +185,17 @@ async function submitVisualAssetReview({
   negativeLocks,
   supersedesAssetId = "",
 }) {
-  const payload = {
-    source_image_asset_refs: [imageAsset.asset_id],
-    asset_type: assetType,
+  const payload = buildVisualAssetPromotionPayload({
+    node,
+    imageAsset,
+    decision,
     label,
+    assetType,
     signature,
-    feature_card: featureCard,
-    negative_locks: negativeLocks,
-    source_node_id: node.id,
-    ...promotionGateProvenance(node),
-    supersedes_asset_id: supersedesAssetId || null,
-    review_decision: decision,
-    reviewed_at: new Date().toISOString(),
-  };
+    featureCard,
+    negativeLocks,
+    supersedesAssetId,
+  });
   const response = await runtime.promoteVisualAsset(payload);
   const asset = response?.asset;
   const localAsset = asset?.asset_id ? {

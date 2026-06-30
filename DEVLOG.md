@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Deterministic Promotion UI Harness
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `e2a4862222444783a6c4cfe53246d150c886c379`.
+- Added `apps/studio/src/panels/visual-asset-promotion-request.js` as a small
+  deterministic builder for fixed visual asset promotion payloads.
+- `visual-asset-panel.js` now calls the builder instead of assembling Runtime
+  request fields inline. The panel stayed under the 300-line threshold and the
+  request contract is directly import-testable.
+- Extended `tests/test_web_studio_visual_asset_promotion_gate_static.py` from a
+  string-only guard into an executable Node harness. It verifies accepted
+  asset-card human gate provenance, sanitization, direct-promotion fallback, and
+  absence of provider/media-byte fields in the payload.
+- Calibrated one brittle static assertion in
+  `tests/test_web_studio_prompt_script_static.py`: `supersedes_asset_id` now
+  belongs to the builder module while the panel continues to pass
+  `supersedesAssetId`.
+- No Runtime/OpenAPI change, provider gate, provider call, generated media,
+  deploy, server sync, human creative acceptance, business validation, or
+  durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# red baseline: missing visual-asset-promotion-request.js
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# 2 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py tests\test_web_studio_human_gate_static.py tests\test_api_runtime_visual_asset_promotion_gate.py tests\test_api_runtime_visual_assets.py -q
+# 9 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# first run exposed brittle static assertion after extracting the builder
+# final run: 709 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Browser Studio Gate Flow QA
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

@@ -118,6 +118,18 @@ only, not provider smoke, generated media evidence, human creative acceptance,
 business validation, deploy verification, or server three-end sync. Handoff:
 `docs/handoff/AFS-BROWSER-STUDIO-GATE-FLOW-QA-20260630.md`.
 
+Deterministic promotion UI harness addendum: the next slice extracts Studio
+fixed-visual-asset promotion payload construction into
+`visual-asset-promotion-request.js` and covers it with an executable Node
+harness. The harness proves accepted asset-card human gate provenance is
+included, sanitized, and omitted for direct promotion without accepted gate
+evidence. This replaces a brittle string-only check with deterministic payload
+verification and keeps `visual-asset-panel.js` under the 300-line threshold.
+This is Studio contract verification only: no Runtime/OpenAPI change, provider
+call, generated media, human creative acceptance, business validation, deploy,
+or server sync. Handoff:
+`docs/handoff/AFS-DETERMINISTIC-PROMOTION-UI-HARNESS-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
