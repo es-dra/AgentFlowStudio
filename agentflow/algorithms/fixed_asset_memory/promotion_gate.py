@@ -39,6 +39,25 @@ def public_promotion_gate(value: Any) -> dict[str, Any] | None:
     return {key: value.get(key) for key in keys if key in value}
 
 
+def public_source_evidence(value: Any, *, result_asset_status: str) -> dict[str, Any] | None:
+    gate = public_promotion_gate(value)
+    if not gate:
+        return None
+    return {
+        "artifact_type": "agentflow_fixed_visual_asset_source_evidence",
+        "source_contract": str(gate.get("source_contract") or ""),
+        "source_human_gate_id": str(gate.get("source_human_gate_id") or ""),
+        "source_asset_card_candidate_id": str(gate.get("source_asset_card_candidate_id") or ""),
+        "source_stage": "asset_card_candidate_human_gate" if gate.get("source_asset_card_candidate_id") else "manual_visual_asset_promotion",
+        "result_asset_status": str(result_asset_status or ""),
+        "provider_calls_started": bool(gate.get("provider_calls_started")),
+        "generated_media_claimed": bool(gate.get("generated_media_claimed")),
+        "human_creative_acceptance_claimed": bool(gate.get("human_creative_acceptance_claimed")),
+        "business_validation_claimed": bool(gate.get("business_validation_claimed")),
+        "safe_payload": True,
+    }
+
+
 def safe_ref(value: Any) -> str:
     text = str(value or "").strip()
     allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-"

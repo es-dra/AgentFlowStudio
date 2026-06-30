@@ -52,6 +52,19 @@ def test_visual_asset_promotion_records_safe_human_gate_provenance(tmp_path) -> 
         "human_creative_acceptance_claimed": False,
         "business_validation_claimed": False,
     }
+    assert asset["source_evidence"] == {
+        "artifact_type": "agentflow_fixed_visual_asset_source_evidence",
+        "source_contract": "runtime_human_gate_decision",
+        "source_human_gate_id": "runtime-human-gate:demo:accepted",
+        "source_asset_card_candidate_id": "asset_card_candidate:main_character",
+        "source_stage": "asset_card_candidate_human_gate",
+        "result_asset_status": "fixed",
+        "provider_calls_started": False,
+        "generated_media_claimed": False,
+        "human_creative_acceptance_claimed": False,
+        "business_validation_claimed": False,
+        "safe_payload": True,
+    }
     assert asset["status"] == "fixed"
     assert asset["image_asset_refs"] == [image_asset_id]
     assert "data_base64" not in serialized
@@ -62,6 +75,7 @@ def test_visual_asset_promotion_records_safe_human_gate_provenance(tmp_path) -> 
     detail = client.get(f"/projects/{project_id}/visual-assets/{asset['asset_id']}")
     assert detail.status_code == 200
     assert detail.json()["asset"]["promotion_gate"] == gate
+    assert detail.json()["asset"]["source_evidence"] == asset["source_evidence"]
 
 
 def test_visual_asset_promotion_gate_fields_are_public_openapi_contract(tmp_path) -> None:

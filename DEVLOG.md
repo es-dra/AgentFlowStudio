@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-06-30 - Fixed Asset Source Evidence Context
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T23 Studio promotion
+  gate reuse summary surface.
+- Added a safe `source_evidence` public projection for fixed visual assets,
+  derived from the existing `promotion_gate` instead of duplicating source data
+  into the stored asset record.
+- Let keyframe context inherit this safe evidence through the existing
+  `public_visual_asset()` path, connecting `asset_card_candidate -> human gate
+  -> fixed visual asset -> keyframe context`.
+- Added a small focused context test rather than expanding the already large
+  context-resolver test file.
+- No Runtime request schema expansion, provider call, generated media, deploy,
+  server sync, human creative acceptance claim, or business validation claim
+  occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_visual_asset_promotion_gate.py -q
+# 2 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_fixed_asset_source_evidence_context.py -q
+# 1 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T24
+```
+
 ## 2026-06-30 - Studio Promotion Gate Reuse Summary Surface
 
 - Continued provider-closed full goal-mode work on

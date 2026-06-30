@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentflow.algorithms.fixed_asset_memory.continuity import asset_continuity_context
-from agentflow.algorithms.fixed_asset_memory.promotion_gate import promotion_gate, public_promotion_gate
+from agentflow.algorithms.fixed_asset_memory.promotion_gate import promotion_gate, public_promotion_gate, public_source_evidence
 
 
 ALGORITHM_ID = "afs.fixed_asset_memory.v0.1"
@@ -118,6 +118,9 @@ def public_visual_asset(record: dict[str, Any]) -> dict[str, Any]:
     gate = public_promotion_gate(record.get("promotion_gate"))
     if gate:
         payload["promotion_gate"] = gate
+    source_evidence = public_source_evidence(record.get("promotion_gate"), result_asset_status=str(record.get("status") or ""))
+    if source_evidence:
+        payload["source_evidence"] = source_evidence
     return payload
 
 

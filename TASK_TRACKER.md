@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Fixed-asset source-evidence addendum: the next provider-closed product slice
+adds a safe `source_evidence` projection to fixed visual assets, derived from
+the existing `promotion_gate`. Keyframe context now carries this evidence via
+the existing `public_visual_asset()` path, connecting `asset_card_candidate ->
+human gate -> fixed visual asset -> keyframe context` without adding request
+fields, expanding OpenAPI, calling providers, or claiming human creative
+acceptance. Handoff:
+`docs/handoff/AFS-FIXED-ASSET-SOURCE-EVIDENCE-CONTEXT-20260630.md`.
+
 Studio promotion-gate reuse-summary addendum: the next provider-closed product
 slice surfaces the latest accepted asset-card human-gate reuse summary inside
 the fixed visual asset promotion panel. The review surface shows safe local
