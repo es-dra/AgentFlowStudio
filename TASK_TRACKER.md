@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+Multi-shot request-plan bridge consistency addendum: T45 adds a narrow
+provider-closed consistency regression to the real
+`multi_character_restaurant_note` path. The test now reads the
+`keyframe_request_plan` artifact and verifies its context bundle carries the
+same two fixed asset ids, source asset-card candidate ids, and feedback overlay
+id that appear in blocked keyframe bridge evidence. Focused test passed
+(`1 passed, 1 warning`), adjacent bridge set passed (`5 passed, 1 warning`),
+and full pytest passed (`773 passed, 520 deselected, 2 warnings`). Maintenance
+audit stayed green for blocking failures (`failed=0`) and `git diff --check`
+passed. No Runtime route, OpenAPI path, Studio UI, provider call, generated
+media, human creative acceptance, business validation, public claim,
+patent/legal decision, or COS active-rule promotion occurred. Handoff:
+`docs/handoff/AFS-MULTI-SHOT-REQUEST-PLAN-BRIDGE-CONSISTENCY-20260630.md`.
+
 Main-loop E2E redundancy cleanup addendum: T44 classified the current T41-T43
 branch redundancy and reduced the duplicated test-support surface instead of
 adding a new record-heavy feature slice. The multi-character bridge regression

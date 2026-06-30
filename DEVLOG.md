@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-30 - Multi-Shot Request Plan Bridge Consistency
+
+- Continued provider-closed work on
+  `codex/afs-goal-mode-main-loop-e2e-20260630` for AFS-T45.
+- Added a narrow request-plan/bridge consistency check to the real
+  `multi_character_restaurant_note` Runtime E2E regression.
+- The test now reads the `keyframe_request_plan` artifact and verifies its
+  context bundle keeps the same two fixed asset ids, source asset-card
+  candidate ids, and feedback overlay id that appear in blocked bridge evidence.
+- No Runtime route, OpenAPI path, Studio UI, provider call, generated media,
+  human creative acceptance, business validation, public claim, patent/legal
+  decision, or COS active-rule promotion changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py -q
+# 1 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py tests\test_api_runtime_keyframe_generation_bridge.py -q
+# 5 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 773 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Main Loop E2E Redundancy Cleanup
 
 - Continued provider-closed work on

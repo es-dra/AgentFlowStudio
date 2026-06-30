@@ -60,16 +60,27 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
     generation.raise_for_status()
     payload = generation.json()
     bridge = payload["generation_bridge"]
+    request_plan = client.get(f"/artifacts/{payload['artifacts']['keyframe_request_plan']['artifact_id']}").json()[
+        "payload"
+    ]
+    request_context = request_plan["context_bundle"]
     source_refs = bridge["context_evidence"]["included_asset_source_evidence_refs"]
     source_candidate_ids = {item["source_asset_card_candidate_id"] for item in source_refs}
     source_human_gate_ids = {item["source_human_gate_id"] for item in source_refs}
     fixed_asset_ids = {item["asset_id"] for item in source_refs}
+    request_plan_asset_ids = {item["asset_id"] for item in request_context["included_assets"]}
+    request_plan_candidate_ids = {
+        item["source_evidence"]["source_asset_card_candidate_id"] for item in request_context["included_assets"]
+    }
     labels_by_type = {(asset["label"], asset["asset_type"]) for asset in storyboard_payload["asset_graph"]["assets"]}
     candidate_labels = {
         item["draft_fields"]["display_name"]
         for item in storyboard_payload["asset_card_candidates"]["candidates"]
     }
-    serialized = json.dumps({"generation": payload, "bridge": bridge}, ensure_ascii=False).lower()
+    serialized = json.dumps(
+        {"generation": payload, "bridge": bridge, "request_plan_context": request_context},
+        ensure_ascii=False,
+    ).lower()
     low, high = case["expected_shot_range"]
 
     assert low <= len(storyboard_payload["shots"]) <= high
@@ -99,11 +110,16 @@ def test_multi_character_benchmark_reaches_keyframe_bridge_source_evidence(tmp_p
         "runtime-human-gate:baseline:周岚:accepted",
         "runtime-human-gate:baseline:陈默:accepted",
     }
+    assert request_plan_asset_ids == fixed_asset_ids
+    assert request_plan_candidate_ids == source_candidate_ids
+    assert request_context["feedback_context_overlays"][0]["overlay_id"] == overlay["overlay_id"]
+    assert request_context["trace_summary"]["feedback_context_overlay_selected_ids"] == [overlay["overlay_id"]]
     assert all(item["provider_calls_started"] is False for item in source_refs)
     assert all(item["human_creative_acceptance_claimed"] is False for item in source_refs)
     assert bridge["provider_evidence"]["provider_gate"]["status"] == "blocked"
     assert bridge["provider_evidence"]["blocks"][0]["block_id"] == "remote_image_gate_closed"
     assert response_contains_unsafe_marker(bridge) is False
+    assert response_contains_unsafe_marker(request_context) is False
     assert '"provider_raw"' not in serialized
     assert '"signed_url"' not in serialized
     assert "data_base64" not in serialized
