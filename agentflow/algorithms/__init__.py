@@ -23,6 +23,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "production_graph",
     "evidence_ledger",
     "generation_bridge",
+    "human_gate",
     "revision_drift_control",
 )
 

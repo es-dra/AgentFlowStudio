@@ -1,5 +1,67 @@
 # Devlog
 
+## 2026-06-30 - Runtime Human Gate Contract
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `9a47869482faf7b8f1e1dbd4352681f1356aa532`.
+- Added deterministic `agentflow.algorithms.human_gate` and a public Runtime
+  route `POST /projects/{project_id}/human-gate-decisions`.
+- The route records local human gate decisions for `asset_card_candidate` and
+  `keyframe_generation_bridge` targets, writes a safe
+  `runtime_human_gate_decision` artifact and run trace, and appends the
+  decision to project `feedback_refs`.
+- Studio now has a thin `recordHumanGateDecision(payload)` Runtime client
+  method, without adding UI or a new Studio state machine.
+- Updated the Runtime OpenAPI snapshot with the exporter; public path count
+  changed from 49 to 50.
+- Kept this as local step-gate evidence only: no provider gate, provider call,
+  generated media, fixed asset promotion, Studio UI change, deploy, server
+  sync, human creative acceptance, business validation, or durable memory
+  promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_human_gate.py -q
+# red baseline: 3 failed, missing Runtime route returned 404
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_human_gate.py -q
+# 3 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py -q
+# expected drift before exporter refresh
+
+OpenAPI exporter
+# before_paths=49; after_paths=50
+# added_paths=['/projects/{project_id}/human-gate-decisions']
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_human_gate.py tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_feedback.py tests\test_api_runtime_asset_card_candidates_contract.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_web_studio_assets_generation_static.py::test_mvp_experience_hardening_video_status_and_feedback_markers -q
+# 10 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 704 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# secret_like_fragments remains at the existing count of 9 after removing
+# the initial unsafe-test literal.
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T10
+```
+
 ## 2026-06-30 - Keyframe Local Generation Bridge
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

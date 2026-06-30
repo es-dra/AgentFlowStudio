@@ -32,6 +32,7 @@ from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_ro
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
+from apps.api.runtime_human_gate import register_runtime_human_gate_routes
 from apps.api.runtime_keyframe_routes import register_runtime_keyframe_routes
 from apps.api.runtime_image_assets import register_runtime_image_asset_routes
 from apps.api.runtime_asset_card_drafts import register_runtime_asset_card_routes
@@ -317,6 +318,7 @@ def create_runtime_app(
     register_runtime_image_asset_routes(app, store)
     register_runtime_asset_card_routes(app, store)
     register_runtime_visual_asset_routes(app, store)
+    register_runtime_human_gate_routes(app, store)
     register_runtime_keyframe_routes(app, store)
     register_runtime_video_routes(app, store)
     register_runtime_video_revision_routes(app, store)

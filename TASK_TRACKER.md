@@ -75,6 +75,17 @@ provider calls, generating media bytes, or claiming human/business success.
 Handoff:
 `docs/handoff/AFS-KEYFRAME-GENERATION-BRIDGE-TASKRUN-20260630.md`.
 
+Human-gate addendum: the next slice adds `agentflow.algorithms.human_gate` and
+public Runtime route `POST /projects/{project_id}/human-gate-decisions`.
+Runtime can now record safe local step-gate decisions for
+`asset_card_candidate` and `keyframe_generation_bridge` targets, append them to
+project `feedback_refs`, and expose the contract through OpenAPI. Studio has a
+thin `recordHumanGateDecision(payload)` client method, but no UI state machine
+or fixed asset promotion was added. This is not provider smoke, human creative
+acceptance, business validation, generated media, or durable memory promotion.
+Handoff:
+`docs/handoff/AFS-HUMAN-GATE-CONTRACT-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

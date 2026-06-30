@@ -293,6 +293,17 @@ class FeedbackRecordRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class HumanGateDecisionRequest(BaseModel):
+    target_type: Literal["asset_card_candidate", "keyframe_generation_bridge"]
+    target_id: str = Field(min_length=1)
+    decision: Literal["accepted_for_next_step", "needs_revision", "rejected"]
+    artifact_id: str | None = None
+    node_id: str | None = None
+    scope: str | None = None
+    note: str = ""
+    reviewed_at: str = Field(min_length=1)
+
+
 class StudioClientEventRequest(BaseModel):
     event_type: str = Field(min_length=1, max_length=80)
     severity: Literal["info", "warning", "error"] = "info"
@@ -322,6 +333,7 @@ __all__ = (
     "DirectorSetup2D",
     "FeedbackRecordRequest",
     "GenerationComparisonRequest",
+    "HumanGateDecisionRequest",
     "ImageAssetUploadRequest",
     "KeyframeGenerationRequest",
     "PromptOptimizationRequest",

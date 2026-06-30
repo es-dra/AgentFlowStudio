@@ -920,6 +920,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "node?.previewUrl" in feedback_source
     assert "preview_url" not in feedback_source
     assert "recordFeedback(feedback)" in runtime_client
+    assert "recordHumanGateDecision(payload)" in runtime_client
+    assert "/human-gate-decisions" in runtime_client
     assert "promoteVideoAsset(payload)" in runtime_client
     assert "/video-assets/promote" in runtime_client
     assert 'return requestJson("/feedback"' in runtime_client
