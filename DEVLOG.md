@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Browser Studio Gate Flow QA
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `f758ca8da101735cb48ae36b797dbbe0fba5c302`.
+- Ran an in-app Browser QA smoke against local Runtime `/studio/` with an
+  isolated temp runtime root and explicit provider gates set to false.
+- Verified `/health` was `ready`, `studio_static.status=ready`, and provider
+  gates were all false in the QA runtime environment.
+- Verified `/studio/` rendered a non-empty first screen with title
+  `AFS Studio 创作图谱`, no framework overlay, and zero browser console
+  warnings/errors.
+- Exercised the empty-project template gate: clicking `角色设定卡` before a
+  project exists opens `请先新建项目` instead of silently failing.
+- Exercised the continuation path: clicking `新建项目` -> `创建并切换` created
+  `AFS 内测项目` and materialized the role-setting template as three canvas
+  nodes, with zero console warnings/errors.
+- Stopped the temporary Runtime after QA; port `8790` returned to no listener.
+- No product code, OpenAPI, provider config, provider call, generated media,
+  deploy, server sync, human creative acceptance, business validation, or
+  durable memory promotion occurred.
+
+Verification so far:
+
+```text
+Invoke-RestMethod http://127.0.0.1:8790/health
+# status=ready; studio_static.status=ready; provider_gates all false
+
+Browser QA
+# /studio/ loaded at http://127.0.0.1:8790/studio/?project=studio-empty
+# title: AFS Studio 创作图谱
+# DOM non-empty; no framework overlay; console warn/error count 0
+# empty-project template gate opened 请先新建项目
+# project creation created AFS 内测项目 and 3 role-setting nodes
+# final console warn/error count 0
+
+Runtime cleanup
+# listener_count=0 on port 8790 after stopping temp process
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 127 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warning counts remain: human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T13
+```
+
 ## 2026-06-30 - Asset Promotion Gate Provenance
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

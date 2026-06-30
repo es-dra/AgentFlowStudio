@@ -108,6 +108,16 @@ path count remains 50; the exporter-generated snapshot now includes the two
 optional request fields. Handoff:
 `docs/handoff/AFS-ASSET-PROMOTION-GATE-TASKRUN-20260630.md`.
 
+Browser Studio gate-flow QA addendum: the next slice performs an in-app Browser
+smoke against local `/studio/` with a temporary Runtime root and explicit
+provider gates set to false. The QA verifies the first screen renders, console
+warn/error logs stay empty, the empty-project template gate asks the user to
+create a project, and the project-creation continuation path creates a role
+setting template with three canvas nodes. This is rendered UI/runtime smoke
+only, not provider smoke, generated media evidence, human creative acceptance,
+business validation, deploy verification, or server three-end sync. Handoff:
+`docs/handoff/AFS-BROWSER-STUDIO-GATE-FLOW-QA-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
