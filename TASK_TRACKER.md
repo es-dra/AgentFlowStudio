@@ -6,7 +6,18 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-26 by Codex
+Last updated: 2026-06-30 by Codex
+
+Goal-mode threshold merge review addendum: T39 stops feature work on
+`codex/afs-goal-mode-threshold-gate-20260630` for the mandatory merge review
+gate. Precommit branch review from `origin/master` to
+`fa04cfbe83b9559303d256a1b8813d64cce144af` found 19 commits, 59 changed files,
+4610 insertions, 20 deletions, and 0 blockers; the T39 record commit reaches the
+20-commit threshold. Full pytest, Studio JS check, maintenance audit
+(`failed=0`), diff check, CLI help/version, and branch review passed. The
+recommended next action is human-authorized merge/split/defer decision, not more
+feature work on this branch. Handoff:
+`docs/handoff/AFS-GOAL-MODE-THRESHOLD-MERGE-REVIEW-GATE-20260630.md`.
 
 Studio source-evidence non-claim flags addendum: the next provider-closed
 product slice retains `provider_calls_started` and

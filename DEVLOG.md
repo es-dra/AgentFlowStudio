@@ -1,5 +1,48 @@
 # Devlog
 
+## 2026-06-30 - Goal-Mode Threshold Merge Review Gate
+
+- Stopped feature work on `codex/afs-goal-mode-threshold-gate-20260630` for
+  T39 threshold review instead of adding another product slice.
+- Reviewed `origin/master..HEAD` at
+  `fa04cfbe83b9559303d256a1b8813d64cce144af`: 19 commits, 59 changed files,
+  4610 insertions, 20 deletions, and 0 branch review blockers before this gate
+  record.
+- Classified the branch as a coherent provider-closed asset reuse/source
+  evidence chain: runtime/algorithm contracts, Studio review surfaces, focused
+  tests, governance tooling, and handoff records.
+- Recommendation: merge after explicit human authorization; do not continue
+  feature work on this branch because the T39 record reaches the 20-commit
+  threshold.
+- No Runtime route, OpenAPI path, provider gate, provider call, generated media,
+  deploy, server sync, human creative acceptance, business validation, or
+  durable-memory promotion changed.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 770 passed, 520 deselected, 2 warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warning classes only
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --repo-root . --base-ref origin/master --allowed-untracked docs/demo-docs-20260629/ --report runs\afs_goal_mode_branch_review_t39_precommit.json
+# status=ready_for_human_merge_review; blocker_count=0
+```
+
 ## 2026-06-30 - Studio Source Evidence Non-Claim Flags
 
 - Continued provider-closed full goal-mode work on
