@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-06-30 - Studio Keyframe Preflight Source Evidence Surface
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T26 Runtime
+  preflight source-evidence summary slice.
+- Added a small Studio helper that turns
+  `included_asset_source_evidence_refs` into a safe one-line review summary.
+- Surfaced that summary in the existing fixed-asset carry confirmation modal,
+  so the operator can see which carried fixed assets came from which human gate
+  or asset-card candidate before continuing generation.
+- Reused the existing asset reference label helper and removed the duplicate
+  local `assetTypeLabel()` from `node-generation-guards.js`; the touched large
+  file shrank from 322 lines to 320 lines.
+- No Runtime route, request schema, OpenAPI path, provider call, generated
+  media, deploy, server sync, human creative acceptance claim, or business
+  validation claim occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_preflight_source_evidence_static.py -q
+# 1 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 133 files
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_preflight_source_evidence_static.py tests\test_web_studio_assets_generation_static.py::test_loop003_qal003_001_fixed_asset_submit_interlock_has_regression_markers tests\test_web_studio_assets_generation_static.py::test_asset_card_generation_uses_optional_fixed_asset_carry_policy -q
+# 3 passed
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T27
+```
+
 ## 2026-06-30 - Keyframe Preflight Source Evidence Summary
 
 - Continued provider-closed full goal-mode work on

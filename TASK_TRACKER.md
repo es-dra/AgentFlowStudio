@@ -8,6 +8,17 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio preflight source-evidence surface addendum: the next provider-closed
+product slice surfaces Runtime `included_asset_source_evidence_refs` in the
+existing fixed-asset carry confirmation modal. Operators can now see the human
+gate or asset-card candidate source for carried fixed assets before continuing
+generation. The slice adds a small pure Studio helper, reuses existing asset
+label helpers, and shrinks `node-generation-guards.js` slightly. It does not
+add Runtime routes, request fields, OpenAPI paths, provider calls, generated
+media, deploy, server sync, human creative acceptance, or business validation.
+Handoff:
+`docs/handoff/AFS-STUDIO-KEYFRAME-PREFLIGHT-SOURCE-EVIDENCE-SURFACE-20260630.md`.
+
 Keyframe-preflight source-evidence addendum: the next provider-closed product
 slice adds a compact safe review summary for fixed visual asset source evidence
 to generation preflight responses. `included_asset_source_evidence_count` and

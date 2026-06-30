@@ -1,5 +1,7 @@
 ﻿import { buildAssetReferenceActions } from "./asset-reference-inspector.js";
 import { el, showModal } from "./overlay.js";
+import { assetLabel, assetTypeLabel } from "./asset-reference-summary.js";
+import { preflightSourceEvidenceSummaryText } from "./generation-preflight-source-evidence.js";
 
 export async function prepareGenerationRequest(store, runtime, node, request, kind) {
   const preflight = kind === "video_revision"
@@ -149,12 +151,14 @@ function showCarryConfirmModal(preflight, node, kind, policy = {}) {
       input.value = asset.asset_id;
       checks.set(asset.asset_id, input);
       const text = el("span", "carry-asset-text");
-      text.textContent = `${assetTypeLabel(asset)} · ${asset.label || asset.asset_id}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
+      text.textContent = `${assetTypeLabel(asset)} · ${assetLabel(asset)}${asset.asset_id === subjectId ? " · 主体参考图" : ""}`;
       const sig = el("small", "", asset.signature || asset.detail_level || "");
       row.append(input, text, sig);
       list.appendChild(row);
     }
     body.appendChild(list);
+    const sourceEvidenceSummary = preflightSourceEvidenceSummaryText(preflight);
+    if (sourceEvidenceSummary) body.appendChild(el("div", "carry-muted", sourceEvidenceSummary));
     const warningBox = el("div", conflicts.length ? "carry-warning" : "carry-muted");
     if (optionalCarry) {
       warningBox.textContent = conflicts.length
@@ -264,7 +268,7 @@ function showUnconnectedNamedAssetModal(assets, kind) {
     const list = el("div", "carry-asset-list");
     for (const asset of assets) {
       const row = el("div", "carry-asset-row");
-      row.appendChild(el("span", "carry-asset-text", `${assetTypeLabel(asset)} · ${asset.label || asset.asset_id}`));
+      row.appendChild(el("span", "carry-asset-text", `${assetTypeLabel(asset)} · ${assetLabel(asset)}`));
       row.appendChild(el("small", "", asset.reason || "未连接且未注入"));
       list.appendChild(row);
     }
@@ -289,12 +293,6 @@ function showUnconnectedNamedAssetModal(assets, kind) {
     cancel.addEventListener("click", () => finish({ action: "cancel" }));
     submit.addEventListener("click", () => finish({ action: "exclude", assetIds: assetIds() }));
   });
-}
-
-function assetTypeLabel(asset) {
-  if (asset.asset_type === "scene") return "场景";
-  if (asset.asset_type === "prop") return "道具";
-  return "角色";
 }
 
 function normalizeAssetExclusions(values) {
