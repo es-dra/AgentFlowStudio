@@ -1,4 +1,6 @@
-﻿const CHARACTER_FIELDS = [
+import { promotionGateReviewSummary } from "../human-gate-provenance.js";
+
+const CHARACTER_FIELDS = [
   ["identity", "身份", "28 岁左右的女性私家侦探，神情冷静"],
   ["hair", "发型/毛发/颜色", "黑色短发；或黑色短毛、虎斑纹"],
   ["face", "面部/头部特征", "瓜子脸，左眉尾一道细疤；或额头 M 字纹、眼睛和耳朵特征"],
@@ -61,6 +63,7 @@ export function lockChipsForAssetType(assetType) {
 export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, previous, defaults, drafting = false }) {
   const fields = assetType === "character" ? CHARACTER_FIELDS : assetType === "prop" ? PROP_FIELDS : SCENE_FIELDS;
   const lockChips = lockChipsForAssetType(assetType);
+  const gateSummary = promotionGateReviewSummary(node);
   modal.innerHTML = `
     <div class="modal-head">
       <div>
@@ -77,6 +80,13 @@ export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, pre
         <small>${escapeHtml(imageAsset.asset_id)}</small>
       </div>
     </div>
+    ${gateSummary ? `
+      <div class="visual-asset-promotion-gate-summary">
+        <strong>Human gate</strong>
+        <span>${escapeHtml(gateSummary.label)}</span>
+        <small>${escapeHtml(gateSummary.source_asset_card_candidate_id)}</small>
+      </div>
+    ` : ""}
     <div class="va-type-row">
       <button class="va-type${assetType === "character" ? " active" : ""}" data-type="character">角色资产</button>
       <button class="va-type${assetType === "scene" ? " active" : ""}" data-type="scene">场景资产</button>

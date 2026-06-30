@@ -1,5 +1,45 @@
 # Devlog
 
+## 2026-06-30 - Studio Promotion Gate Reuse Summary Surface
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T22 Studio
+  human-gate reuse-policy surface.
+- Added a local Studio review summary for the fixed-asset promotion panel. The
+  panel now shows the latest accepted `asset_card_candidate` human-gate reuse
+  summary, such as `Project reuse / 3 shots`, before the operator confirms a
+  fixed visual asset.
+- Kept the Runtime promotion payload stable: it still sends only
+  `source_human_gate_id` and `source_asset_card_candidate_id`; it does not send
+  `reuse_scope` or expand OpenAPI.
+- Added a safe fallback for legacy accepted gate decisions without reuse notes:
+  they display as `Accepted asset-card gate` instead of pretending to be
+  shot-local or project-reusable.
+- No provider call, generated media, deploy, server sync, human creative
+  acceptance claim, or business validation claim occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# 3 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py tests\test_api_runtime_visual_asset_promotion_gate.py tests\test_web_studio_human_gate_static.py -q
+# 7 passed, 1 existing warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 132 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T23
+```
+
 ## 2026-06-30 - Studio Human Gate Asset Reuse Policy Surface
 
 - Continued provider-closed full goal-mode work on

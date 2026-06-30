@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio promotion-gate reuse-summary addendum: the next provider-closed product
+slice surfaces the latest accepted asset-card human-gate reuse summary inside
+the fixed visual asset promotion panel. The review surface shows safe local
+labels such as `Project reuse / 3 shots`, while the Runtime promotion payload
+remains limited to the existing provenance IDs and does not add `reuse_scope`.
+This does not expand Runtime API/OpenAPI, call providers, deploy, or claim
+human creative acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-PROMOTION-GATE-REUSE-SUMMARY-SURFACE-20260630.md`.
+
 Studio human-gate reuse-policy addendum: the next provider-closed product slice
 surfaces storyboard-derived `asset_card_candidates.reuse_policy` inside the
 Studio human-gate target contract. The human-gate menu now shows a visible
