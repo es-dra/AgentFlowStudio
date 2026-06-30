@@ -60,7 +60,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "writes_company_kb": False,
         "safety_boundary": {
             "no_provider_raw": True,
-            "no_signed_url": True,
+            "no_private_external_link": True,
             "no_local_path": True,
             "no_media_bytes": True,
         },

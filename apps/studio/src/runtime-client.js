@@ -246,6 +246,7 @@ function inferUserAction(route, method) {
   if (/\/keyframe-generations$/.test(route) && method === "POST") return "click_generate_keyframe";
   if (/\/prompt-optimizations$/.test(route)) return "click_optimize_prompt";
   if (/\/image-assets$/.test(route) && method === "POST") return "upload_image_asset";
+  if (/\/feedback-candidate-promotions$/.test(route) && method === "POST") return "record_feedback_candidate_promotion";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
   if (/\/studio-state$/.test(route) && method === "PUT") return "save_studio_state";
   return "";
@@ -424,6 +425,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
         method: "POST",
         payload: { project_id: projectId, feedback, generated_at: new Date().toISOString() },
       });
+    },
+    recordFeedbackCandidatePromotion(payload) {
+      return requestJson(`/projects/${encoded}/feedback-candidate-promotions`, { method: "POST", payload });
     },
     recordHumanGateDecision(payload) {
       return requestJson(`/projects/${encoded}/human-gate-decisions`, { method: "POST", payload });

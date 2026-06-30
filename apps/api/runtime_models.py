@@ -295,6 +295,14 @@ class FeedbackRecordRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class FeedbackCandidatePromotionRequest(BaseModel):
+    feedback_artifact_id: str = Field(min_length=1)
+    candidate_id: str = Field(min_length=1)
+    decision: Literal["promote_to_context_overlay", "reject", "needs_more_evidence"]
+    rationale: str = Field(min_length=1)
+    reviewed_at: str = Field(min_length=1)
+
+
 class HumanGateDecisionRequest(BaseModel):
     target_type: Literal["asset_card_candidate", "keyframe_generation_bridge"]
     target_id: str = Field(min_length=1)
@@ -333,6 +341,7 @@ __all__ = (
     "ContextSubgraphEdge",
     "ContextSubgraphNode",
     "DirectorSetup2D",
+    "FeedbackCandidatePromotionRequest",
     "FeedbackRecordRequest",
     "GenerationComparisonRequest",
     "HumanGateDecisionRequest",

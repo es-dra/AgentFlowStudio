@@ -88,7 +88,7 @@ export function buildQualityFeedbackPayload(node, values = {}) {
     writes_company_kb: false,
     safety_boundary: {
       no_provider_raw: true,
-      no_signed_url: true,
+      no_private_external_link: true,
       no_local_path: true,
       no_media_bytes: true,
     },

@@ -24,6 +24,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "evidence_ledger",
     "generation_bridge",
     "human_gate",
+    "feedback_candidate_promotion",
     "revision_drift_control",
 )
 

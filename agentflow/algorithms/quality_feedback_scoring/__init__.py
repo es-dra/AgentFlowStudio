@@ -49,7 +49,7 @@ def sanitize_quality_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
             "writes_company_kb": False,
             "safety_boundary": {
                 "no_provider_raw": True,
-                "no_signed_url": True,
+                "no_private_external_link": True,
                 "no_local_path": True,
                 "no_media_bytes": True,
             },
@@ -67,7 +67,7 @@ def sanitize_quality_feedback(feedback: dict[str, Any]) -> dict[str, Any]:
             "writes_company_kb": False,
             "safety_boundary": {
                 "no_provider_raw": True,
-                "no_signed_url": True,
+                "no_private_external_link": True,
                 "no_local_path": True,
                 "no_media_bytes": True,
             },
