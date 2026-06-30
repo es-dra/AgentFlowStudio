@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-06-30 - Main Loop E2E Baseline Regression
+
+- Started fresh continuation branch
+  `codex/afs-goal-mode-main-loop-e2e-20260630` from synced `master`
+  `a7d536a4c22412c5f3f77cfcf5da8fb6fbaa3718`.
+- Added a provider-closed Runtime E2E regression using the real
+  `multi_scene_map_chase` benchmark script. The test exercises storyboard
+  content quality, fixed visual asset reuse, production graph, evidence ledger,
+  human gate, asset-graph feedback candidate, feedback overlay promotion, and
+  keyframe preflight context consumption.
+- Fixed two CJK reference-preservation gaps found by the E2E harness:
+  human-gate target IDs and fixed-asset source-evidence candidate refs now keep
+  Chinese asset-card candidate suffixes such as
+  `asset_card_candidate:graph_character_林晚`.
+- Kept provider gates closed. No provider smoke, live provider call, generated
+  media, human creative acceptance, business validation, public claim, patent
+  or legal decision, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_main_loop_e2e.py -q
+# 1 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 771 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warning classes only
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - T40 Authorized Merge Sync Runtime Health Gate
 
 - Executed AFS-T40 under standing integration authorization after fresh startup

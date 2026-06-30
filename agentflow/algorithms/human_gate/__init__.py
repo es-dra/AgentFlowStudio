@@ -25,7 +25,7 @@ NON_CLAIMS = [
     "not durable memory promotion",
 ]
 
-SAFE_TOKEN_RE = re.compile(r"[^a-zA-Z0-9_.:-]+")
+SAFE_TOKEN_RE = re.compile(r"[^0-9A-Za-z\u4e00-\u9fff_.:-]+")
 
 
 def build_human_gate_decision(

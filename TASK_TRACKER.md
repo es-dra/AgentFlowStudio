@@ -8,6 +8,20 @@
 
 Last updated: 2026-06-30 by Codex
 
+Main-loop E2E baseline addendum: fresh branch
+`codex/afs-goal-mode-main-loop-e2e-20260630` adds the first provider-closed
+Runtime E2E regression for a real benchmark script. It connects storyboard
+content quality, Production Graph, fixed visual asset source evidence, Evidence
+Ledger, Human Gate, asset-graph Feedback Candidate, feedback context overlay,
+and keyframe preflight context consumption in one test. The red/green loop
+fixed CJK candidate-ref truncation in human-gate target IDs and fixed-asset
+source evidence. Full pytest passed (`771 passed, 520 deselected, 2 warnings`),
+maintenance audit has `failed=0`, and diff check passed. This is deterministic
+runtime verification, not provider smoke, generated media, human creative
+acceptance, business validation, public claim, patent/legal decision, or COS
+active-rule promotion. Handoff:
+`docs/handoff/AFS-MAIN-LOOP-E2E-BASELINE-20260630.md`.
+
 T40 authorized merge/sync/runtime health addendum: standing integration
 authorization conditions were rechecked for
 `codex/afs-goal-mode-threshold-gate-20260630`. Branch review was

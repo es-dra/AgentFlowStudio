@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -59,6 +60,4 @@ def public_source_evidence(value: Any, *, result_asset_status: str) -> dict[str,
 
 
 def safe_ref(value: Any) -> str:
-    text = str(value or "").strip()
-    allowed = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-"
-    return "".join(char if char in allowed else "_" for char in text).strip("_")[:160]
+    return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_.:-]+", "_", str(value or "").strip()).strip("_")[:160]
