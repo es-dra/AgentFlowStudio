@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-06-30 - Keyframe Preflight Source Evidence Summary
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T25 production graph
+  fixed-asset reuse evidence slice.
+- Added safe fixed-asset source-evidence summary fields to generation preflight
+  responses: `included_asset_source_evidence_count` and
+  `included_asset_source_evidence_refs`.
+- Kept the detailed asset evidence in `included_assets` while adding a compact
+  review surface for keyframe preflight and future Studio display.
+- Included source-evidence identifiers in the preflight token digest so stale
+  review tokens track source-provenance changes, not only asset ids.
+- No Runtime route, request schema, OpenAPI path, provider call, generated
+  media, deploy, server sync, human creative acceptance claim, or business
+  validation claim occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_fixed_asset_source_evidence_context.py tests\test_api_runtime_context_resolver.py -q
+# 19 passed, 1 existing warning
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T26
+```
+
 ## 2026-06-30 - Production Graph Fixed Asset Reuse Evidence
 
 - Continued provider-closed full goal-mode work on

@@ -91,13 +91,17 @@ def preflight_token_matches(
 
 
 def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest, bundle: dict[str, Any] | None) -> dict[str, Any]:
+    included_assets = list((bundle or {}).get("included_assets") or [])
+    source_evidence_refs = _included_asset_source_evidence_refs(included_assets)
     payload = {
         "schema_version": "afs_generation_preflight.v0.1",
         "generation_kind": kind,
         "provider_calls_started": False,
         "requires_provider_gate": False,
         "context_bundle": bundle,
-        "included_assets": list((bundle or {}).get("included_assets") or []),
+        "included_assets": included_assets,
+        "included_asset_source_evidence_count": len(source_evidence_refs),
+        "included_asset_source_evidence_refs": source_evidence_refs,
         "excluded_assets": list((bundle or {}).get("excluded_assets") or []),
         "asset_conflicts": list((bundle or {}).get("asset_conflicts") or []),
         "reference_image_channel": list((bundle or {}).get("reference_image_channel") or []),
@@ -141,6 +145,7 @@ def _bundle_digest(bundle: dict[str, Any] | None) -> dict[str, Any] | None:
                 "version": item.get("version"),
                 "feature_card_hash": item.get("feature_card_hash"),
                 "detail_level": item.get("detail_level"),
+                "source_evidence": _source_evidence_digest(item.get("source_evidence")),
             }
             for item in bundle.get("included_assets", [])
             if isinstance(item, dict)
@@ -177,6 +182,42 @@ def _descriptor_limits(service_id: str, *, prompt_default: int, reference_defaul
         int(getattr(descriptor, "prompt_char_limit", prompt_default) or prompt_default),
         int(getattr(descriptor, "reference_image_slots", reference_default) or reference_default),
     )
+
+
+def _included_asset_source_evidence_refs(included_assets: list[Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    for item in included_assets:
+        if not isinstance(item, dict):
+            continue
+        evidence = item.get("source_evidence")
+        if not isinstance(evidence, dict):
+            continue
+        refs.append(
+            {
+                "asset_id": str(item.get("asset_id") or ""),
+                "asset_type": str(item.get("asset_type") or ""),
+                "label": str(item.get("label") or ""),
+                "status": str(item.get("status") or ""),
+                **_source_evidence_digest(evidence),
+            }
+        )
+    return refs
+
+
+def _source_evidence_digest(evidence: Any) -> dict[str, Any] | None:
+    if not isinstance(evidence, dict):
+        return None
+    return {
+        "source_contract": str(evidence.get("source_contract") or ""),
+        "source_human_gate_id": str(evidence.get("source_human_gate_id") or ""),
+        "source_asset_card_candidate_id": str(evidence.get("source_asset_card_candidate_id") or ""),
+        "source_stage": str(evidence.get("source_stage") or ""),
+        "result_asset_status": str(evidence.get("result_asset_status") or ""),
+        "provider_calls_started": bool(evidence.get("provider_calls_started")),
+        "generated_media_claimed": bool(evidence.get("generated_media_claimed")),
+        "human_creative_acceptance_claimed": bool(evidence.get("human_creative_acceptance_claimed")),
+        "business_validation_claimed": bool(evidence.get("business_validation_claimed")),
+    }
 
 
 __all__ = (

@@ -21,17 +21,16 @@ def test_fixed_asset_source_evidence_flows_into_keyframe_context(tmp_path, monke
     project_id = "proj_fixed_asset_source_evidence_context"
     image_asset_id = _upload_image(client, project_id)
     visual_asset = _promote_asset_from_candidate(client, project_id, image_asset_id)
+    request_payload = {
+        "node_id": "target-node",
+        "prompt_text": "Draw Lin Wan in the observatory.",
+        "optimized_prompt": "Draw Lin Wan in the observatory.",
+        "context_subgraph": _context_subgraph(visual_asset["asset_id"]),
+        "generated_at": "2026-06-30T23:40:00+08:00",
+    }
 
-    response = client.post(
-        f"/projects/{project_id}/keyframe-generations/preflight",
-        json={
-            "node_id": "target-node",
-            "prompt_text": "Draw Lin Wan in the observatory.",
-            "optimized_prompt": "Draw Lin Wan in the observatory.",
-            "context_subgraph": _context_subgraph(visual_asset["asset_id"]),
-            "generated_at": "2026-06-30T23:40:00+08:00",
-        },
-    )
+    response = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request_payload)
+    repeated = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request_payload)
 
     assert response.status_code == 200
     payload = response.json()
@@ -44,6 +43,27 @@ def test_fixed_asset_source_evidence_flows_into_keyframe_context(tmp_path, monke
     assert included[0]["source_evidence"]["source_asset_card_candidate_id"] == "asset_card_candidate:main_character"
     assert included[0]["source_evidence"]["provider_calls_started"] is False
     assert included[0]["source_evidence"]["human_creative_acceptance_claimed"] is False
+    assert payload["included_asset_source_evidence_count"] == 1
+    assert payload["included_asset_source_evidence_refs"] == [
+        {
+            "asset_id": visual_asset["asset_id"],
+            "asset_type": "character",
+            "label": "Lin Wan",
+            "status": "fixed",
+            "source_contract": "runtime_human_gate_decision",
+            "source_human_gate_id": "runtime-human-gate:demo:accepted",
+            "source_asset_card_candidate_id": "asset_card_candidate:main_character",
+            "source_stage": "asset_card_candidate_human_gate",
+            "result_asset_status": "fixed",
+            "provider_calls_started": False,
+            "generated_media_claimed": False,
+            "human_creative_acceptance_claimed": False,
+            "business_validation_claimed": False,
+        }
+    ]
+    assert repeated.status_code == 200
+    assert repeated.json()["preflight_token"] == payload["preflight_token"]
+    assert repeated.json()["included_asset_source_evidence_refs"] == payload["included_asset_source_evidence_refs"]
     assert "data_base64" not in serialized
     assert "signed_url" not in serialized
     assert "c:\\" not in serialized

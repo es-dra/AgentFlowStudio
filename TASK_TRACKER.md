@@ -8,6 +8,17 @@
 
 Last updated: 2026-06-26 by Codex
 
+Keyframe-preflight source-evidence addendum: the next provider-closed product
+slice adds a compact safe review summary for fixed visual asset source evidence
+to generation preflight responses. `included_asset_source_evidence_count` and
+`included_asset_source_evidence_refs` let keyframe review surfaces identify
+which included fixed assets came from which human gate and asset-card
+candidate. The preflight token digest now includes the same source-evidence
+identifiers. This does not add routes, request fields, OpenAPI paths, provider
+calls, generated media, deploy, server sync, human creative acceptance, or
+business validation. Handoff:
+`docs/handoff/AFS-KEYFRAME-PREFLIGHT-SOURCE-EVIDENCE-SUMMARY-20260630.md`.
+
 Production-graph fixed-asset reuse addendum: the next provider-closed product
 slice lets storyboard production graph consume current project fixed visual
 assets through their safe public projection. The graph now includes
