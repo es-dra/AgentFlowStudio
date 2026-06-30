@@ -8,6 +8,18 @@
 
 Last updated: 2026-06-26 by Codex
 
+Authorized merge/sync addendum: on 2026-06-30 the human technical lead selected
+`merge` for `codex/afs-project-book-full-goal-20260630`. The release gate was
+rerun from `aba7494b88fd969bf337d692e2be3d5f63f1751f`: full pytest passed,
+Studio JS check passed, maintenance audit had `failed=0`, branch preflight was
+`ready_for_human_merge_review`, and `git diff --check` passed. Local `master`
+was fast-forwarded from the frozen baseline `6071ef1a` to `aba7494b`, pushed to
+GitHub, and fast-forwarded on both `/home/afs-ops/AgentFlowStudio` and
+`/opt/afs/AgentFlowStudio`. Runtime `/health` was read-only checked as
+`status=ready`; no provider smoke, live provider call, human acceptance, or
+business validation occurred. Handoff:
+`docs/handoff/AFS-AUTHORIZED-MASTER-MERGE-THREE-END-SYNC-20260630.md`.
+
 Current goal-mode addendum: 2026-06-30 started the project-book full goal-mode
 branch `codex/afs-project-book-full-goal-20260630` from the synced baseline
 `6071ef1aa665930df2b9fa383260fc68ed4e4e64`. First verified slice targets

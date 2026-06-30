@@ -1,5 +1,53 @@
 # Devlog
 
+## 2026-06-30 - Authorized Master Merge and Three-End Sync
+
+- Human technical lead authorized `merge` for
+  `codex/afs-project-book-full-goal-20260630` after T19 branch integration
+  review.
+- Re-ran the release gate from the codex branch at
+  `aba7494b88fd969bf337d692e2be3d5f63f1751f` before touching `master`.
+- Fast-forwarded local `master` from
+  `6071ef1aa665930df2b9fa383260fc68ed4e4e64` to
+  `aba7494b88fd969bf337d692e2be3d5f63f1751f` with `git merge --ff-only`.
+- Pushed `master` to GitHub and fast-forwarded both server checkouts:
+  `/home/afs-ops/AgentFlowStudio` and `/opt/afs/AgentFlowStudio`.
+- Runtime Service was not restarted. A read-only `/health` check reported
+  `status=ready`; provider gates were observed but no provider smoke or live
+  provider call was run.
+- No generated media, provider raw response, secret, signed URL, human creative
+  acceptance, business validation, or durable memory promotion was claimed.
+- Next goal-mode work must start from the new `master` baseline on a fresh
+  `codex/*` branch. The next branch must enter merge review automatically when
+  it reaches any threshold: 20 commits, 80 changed files, or 5000 insertions.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest
+# 750 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 132 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --report runs\goal_mode_branch_integration_review_t19_authorized_premerge.json
+# status=ready_for_human_merge_review; blocker_count=0
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+```
+
 ## 2026-06-30 - Studio Quality Feedback Context Overlay Browser QA
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
