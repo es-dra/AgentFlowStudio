@@ -84,7 +84,7 @@ export function renderVisualAssetPanel(modal, { assetType, node, imageAsset, pre
       <div class="visual-asset-promotion-gate-summary">
         <strong>Human gate</strong>
         <span>${escapeHtml(gateSummary.label)}</span>
-        <small>${escapeHtml(gateSummary.source_asset_card_candidate_id)}</small>
+        <small>${escapeHtml(promotionGateSummaryMeta(gateSummary))}</small>
       </div>
     ` : ""}
     <div class="va-type-row">
@@ -117,6 +117,10 @@ function assetTypeLabel(assetType) {
   if (assetType === "character") return "角色";
   if (assetType === "prop") return "道具";
   return "场景";
+}
+
+function promotionGateSummaryMeta(summary) {
+  return [summary?.source_asset_card_candidate_id, summary?.fixed_asset_reuse_label].filter(Boolean).join(" · ");
 }
 
 function escapeHtml(value) {

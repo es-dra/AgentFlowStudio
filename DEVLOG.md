@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-06-30 - Studio Promotion Gate Fixed Reuse Summary
+
+- Continued provider-closed full goal-mode work on
+  `codex/afs-goal-mode-threshold-gate-20260630` after the T28 production graph
+  fixed-asset reuse surface.
+- Extended `promotionGateReviewSummary()` to parse
+  `fixed_asset_reuse_count` from accepted asset-card human-gate notes.
+- Surfaced the fixed-asset reuse label in the visual-asset promotion review
+  summary, so promotion review shows both candidate provenance and graph reuse
+  background.
+- No Runtime route, request schema, OpenAPI path, provider call, generated
+  media, deploy, server sync, human creative acceptance claim, or business
+  validation claim occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# 3 passed
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 133 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; existing warnings unchanged
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_ok=True; current_task_id=AFS-T29
+```
+
 ## 2026-06-30 - Studio Production Graph Fixed Asset Reuse Surface
 
 - Continued provider-closed full goal-mode work on

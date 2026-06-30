@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio promotion-gate fixed-reuse addendum: the next provider-closed product
+slice carries T28 human-gate `fixed_asset_reuse_count` into the visual-asset
+promotion review summary. The promotion panel now shows candidate provenance
+plus fixed-asset reuse background before an operator confirms a fixed visual
+asset. This does not add Runtime routes, request fields, OpenAPI paths,
+provider calls, generated media, deploy, server sync, human creative
+acceptance, or business validation. Handoff:
+`docs/handoff/AFS-STUDIO-PROMOTION-GATE-FIXED-REUSE-SUMMARY-20260630.md`.
+
 Studio production-graph fixed-asset reuse addendum: the next provider-closed
 product slice persists Runtime `production_graph` into Studio storyboard
 breakdown state and surfaces fixed-asset reuse evidence as human-gate metadata
