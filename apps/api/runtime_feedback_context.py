@@ -180,6 +180,7 @@ def _overlay_summary(store: RuntimeStore, ref: dict[str, Any]) -> dict[str, Any]
         "candidate_scope": _safe_text(payload.get("candidate_scope"), limit=120),
         "safe_target": _safe_dict(payload.get("safe_target"), limit=180),
         "safe_evidence_summary": _safe_evidence(payload.get("safe_evidence_summary")),
+        "feedback_taxonomy": _safe_list(payload.get("feedback_taxonomy"), limit=16),
         "overlay_scope": _safe_text(overlay.get("overlay_scope"), limit=120),
         "overlay_intent": _safe_text(overlay.get("overlay_intent"), limit=600),
         "decision_effect": _safe_text(overlay.get("decision_effect"), limit=120),
@@ -224,12 +225,26 @@ def _safe_dict(value: Any, *, limit: int) -> dict[str, str]:
 def _safe_evidence(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
-    return {
+    summary = {
         "rating_count": _bounded_int(value.get("rating_count")),
         "decision_count": _bounded_int(value.get("decision_count")),
         "has_note": bool(value.get("has_note")),
         "raw_evidence_policy": _safe_text(value.get("raw_evidence_policy"), limit=120) or "raw_evidence_not_memory",
     }
+    if "taxonomy_count" in value:
+        summary["taxonomy_count"] = _bounded_int(value.get("taxonomy_count"))
+    return summary
+
+
+def _safe_list(value: Any, *, limit: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:limit]:
+        text = _safe_text(item, limit=80)
+        if text and text not in result:
+            result.append(text)
+    return result
 
 
 def _bounded_int(value: Any) -> int:

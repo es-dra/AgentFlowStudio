@@ -54,6 +54,7 @@ def build_feedback_candidate_context_overlay(
         "candidate_scope": _safe_token(promotion_decision.get("candidate_scope")),
         "safe_target": _safe_dict(promotion_decision.get("safe_target")),
         "safe_evidence_summary": _safe_summary(promotion_decision.get("safe_evidence_summary")),
+        "feedback_taxonomy": _safe_list(promotion_decision.get("feedback_taxonomy"), limit=16),
         "overlay": {
             "overlay_scope": "next_local_context_pass",
             "overlay_intent": _safe_text(overlay_intent),
@@ -96,12 +97,26 @@ def _safe_dict(value: Any) -> dict[str, str]:
 def _safe_summary(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
-    return {
+    summary = {
         "rating_count": _bounded_int(value.get("rating_count")),
         "decision_count": _bounded_int(value.get("decision_count")),
         "has_note": bool(value.get("has_note")),
         "raw_evidence_policy": _safe_token(value.get("raw_evidence_policy")) or "raw_evidence_not_memory",
     }
+    if "taxonomy_count" in value:
+        summary["taxonomy_count"] = _bounded_int(value.get("taxonomy_count"))
+    return summary
+
+
+def _safe_list(value: Any, *, limit: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:limit]:
+        text = _safe_token(item)
+        if text and text not in result:
+            result.append(text)
+    return result
 
 
 def _bounded_int(value: Any) -> int:

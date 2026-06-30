@@ -113,6 +113,8 @@ def test_context_resolver_consumes_promoted_feedback_overlay_without_asset_inclu
     assert preflight_payload["feedback_context_overlays"] == context_overlays
     assert context_overlays[0]["overlay_id"] == overlay["overlay_id"]
     assert context_overlays[0]["candidate_id"] == overlay["candidate_id"]
+    assert context_overlays[0]["feedback_taxonomy"] == overlay["feedback_taxonomy"] == ["character"]
+    assert context_overlays[0]["safe_evidence_summary"]["taxonomy_count"] == 1
     assert context_overlays[0]["context_overlay_consumed"] is True
     assert context_overlays[0]["provider_calls_started"] is False
     assert context_overlays[0]["writes_long_term_memory"] is False
@@ -137,6 +139,7 @@ def test_context_resolver_consumes_promoted_feedback_overlay_without_asset_inclu
     assert bridge["context_evidence"]["feedback_context_overlay_ids"] == [overlay["overlay_id"]]
     assert model_context["context_sources"]["feedback_context_overlay_count"] == 1
     assert model_context["feedback_context"]["context_overlays"][0]["overlay_id"] == overlay["overlay_id"]
+    assert model_context["feedback_context"]["context_overlays"][0]["feedback_taxonomy"] == ["character"]
     assert model_context["feedback_context"]["feedback_is_memory"] is False
     assert model_context["safety_boundary"]["feedback_is_not_memory"] is True
     assert response_contains_unsafe_marker(context_overlays) is False

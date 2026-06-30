@@ -8,7 +8,7 @@ Task ID: `AFS-T18d Studio State Feedback Policy Sanitizer Split`
 
 起始 HEAD: `98ca7477964fe9bb428ca0343e6c4d20dc224865`
 
-状态: 已实现；focused 验证和本地 closeout 验证已通过；提交、push 和 branch preflight 待执行。
+状态: 已实现；focused 验证、本地 closeout 验证、commit、push 和 branch preflight 均已完成。
 
 ## 中文摘要
 
@@ -104,7 +104,7 @@ YAML parse check for external execution state
 ## Evidence State
 
 ```text
-structure_verified_studio_state_feedback_policy_sanitizer_split_full_local_verification_no_merge
+structure_verified_studio_state_feedback_policy_sanitizer_split_pushed_branch_preflight_ready_no_merge
 ```
 
 这只是本地 deterministic maintenance/contract evidence。它不是 provider smoke，不是 generated media evidence，不是 Runtime health verification，不是 server sync，不是 human creative acceptance，不是 business validation，也不是 durable memory promotion。

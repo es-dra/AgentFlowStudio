@@ -161,6 +161,10 @@ def _bundle_feedback_context_overlays(bundle: dict[str, Any]) -> list[dict[str, 
             "overlay_id": _sanitize_text(item.get("overlay_id")).strip(),
             "candidate_id": _sanitize_text(item.get("candidate_id")).strip(),
             "candidate_scope": _sanitize_text(item.get("candidate_scope")).strip(),
+            "feedback_taxonomy": _safe_ref_list(
+                [_sanitize_text(taxonomy_id).strip() for taxonomy_id in _safe_list(item.get("feedback_taxonomy"))]
+            ),
+            "safe_evidence_summary": _safe_evidence_summary(item.get("safe_evidence_summary")),
             "overlay_scope": _sanitize_text(item.get("overlay_scope")).strip(),
             "decision_effect": _sanitize_text(item.get("decision_effect")).strip(),
             "context_overlay_consumed": bool(item.get("context_overlay_consumed")),
@@ -171,6 +175,32 @@ def _bundle_feedback_context_overlays(bundle: dict[str, Any]) -> list[dict[str, 
         if overlay["overlay_id"]:
             overlays.append(overlay)
     return overlays
+
+
+def _safe_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _safe_evidence_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    summary = {
+        "rating_count": _bounded_int(value.get("rating_count")),
+        "decision_count": _bounded_int(value.get("decision_count")),
+        "has_note": bool(value.get("has_note")),
+        "raw_evidence_policy": _sanitize_text(value.get("raw_evidence_policy")).strip() or "raw_evidence_not_memory",
+    }
+    if "taxonomy_count" in value:
+        summary["taxonomy_count"] = _bounded_int(value.get("taxonomy_count"))
+    return summary
+
+
+def _bounded_int(value: Any) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(number, 1000))
 
 
 def _warning_ids(bundle: dict[str, Any]) -> list[str]:

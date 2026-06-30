@@ -76,6 +76,8 @@ def test_runtime_feedback_candidate_context_overlay_records_safe_overlay(tmp_pat
     assert overlay["candidate_scope"] == "quality_feedback_candidate"
     assert overlay["safe_target"] == promotion["safe_target"]
     assert overlay["safe_evidence_summary"] == promotion["safe_evidence_summary"]
+    assert overlay["feedback_taxonomy"] == promotion["feedback_taxonomy"] == ["character", "scene"]
+    assert overlay["safe_evidence_summary"]["taxonomy_count"] == 2
     assert overlay_effect["overlay_scope"] == "next_local_context_pass"
     assert overlay_effect["candidate_included_in_context"] is True
     assert overlay_effect["context_overlay_written"] is True

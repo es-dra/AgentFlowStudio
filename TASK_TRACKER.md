@@ -333,6 +333,20 @@ durable memory, Company KB promotion, deploy, server sync, Runtime health
 verification, or human/business acceptance. Handoff:
 `docs/handoff/AFS-STUDIO-STATE-FEEDBACK-POLICY-SANITIZER-SPLIT-20260630.md`.
 
+Feedback candidate taxonomy addendum: because `AFS-T19 Authorized Master Merge
++ Three-End Sync` still requires explicit human authorization, the next
+provider-closed product slice adds `AFS-T15f Feedback Candidate Taxonomy
+Contract`. Sanitized Runtime feedback now carries bounded `feedback_taxonomy`
+IDs for quality feedback, asset-graph feedback, and generic runtime feedback.
+The same safe taxonomy IDs and `taxonomy_count` propagate through
+`feedback_candidate`, promotion decisions, context overlays, context resolver
+summaries, model-call context, and Studio-state persistence. This is a
+candidate-feedback contract improvement only: no new Runtime route, OpenAPI
+path, Studio fetch, provider call, generated media, durable memory, Company KB
+promotion, master merge, deploy, server sync, Runtime health verification, or
+human/business acceptance. Handoff:
+`docs/handoff/AFS-FEEDBACK-CANDIDATE-TAXONOMY-CONTRACT-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

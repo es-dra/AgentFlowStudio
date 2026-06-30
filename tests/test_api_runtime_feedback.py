@@ -52,6 +52,7 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "ratings": {"identity_similarity": 5, "scene_continuity": 4},
         "target_change_success": 3,
         "drift_notes": "Bearer <redacted> <local-path-redacted> <url-redacted> keep note",
+        "feedback_taxonomy": ["character", "scene", "revision"],
         "prompt_char_count": 0,
         "result_char_count": 0,
         "raw_evidence_policy": "raw_evidence_not_memory",
@@ -86,8 +87,10 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
         "rating_count": 2,
         "decision_count": 0,
         "has_note": True,
+        "taxonomy_count": 3,
         "raw_evidence_policy": "raw_evidence_not_memory",
     }
+    assert candidate["feedback_taxonomy"] == ["character", "scene", "revision"]
     assert candidate["promotion_status"] == "candidate_only"
     assert candidate["promotion_blocked_by_default"] is True
     assert candidate["requires_human_promotion_decision"] is True
@@ -104,3 +107,58 @@ def test_runtime_feedback_recording_sanitizes_and_whitelists_payload(tmp_path) -
     }
     manifest = client.get(f"/projects/{project_id}/manifest").json()["manifest"]
     assert manifest["feedback_refs"][0]["feedback_id"] == event["feedback_id"]
+
+
+def test_runtime_asset_graph_feedback_records_bounded_taxonomy(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "feedback-asset-graph-taxonomy-demo"
+    client.post("/projects", json={"project_id": project_id, "goal": "Feedback taxonomy demo"}).raise_for_status()
+
+    response = client.post(
+        "/feedback",
+        json={
+            "project_id": project_id,
+            "generated_at": "2026-06-30T12:05:00+08:00",
+            "feedback": {
+                "kind": "studio_asset_graph_feedback",
+                "node_id": "script-node-001",
+                "node_type": "script",
+                "asset_graph_ref": "artifact-asset-graph-001",
+                "decisions": [
+                    {
+                        "graph_asset_id": "asset-character-001",
+                        "decision": "revise",
+                        "label": "character asset",
+                        "note": "Model failed to keep face identity and keyframe framing.",
+                        "continuity_locks": ["wardrobe continuity"],
+                        "negative_locks": ["do not change prop"],
+                    },
+                    {"graph_asset_id": "unsafe", "decision": "unknown", "note": "drop"},
+                ],
+            },
+        },
+    )
+    response.raise_for_status()
+    event = response.json()["feedback_event"]
+    feedback = event["feedback"]
+    candidate = event["feedback_candidate"]
+    serialized = json.dumps(event, ensure_ascii=False).lower()
+
+    assert feedback["feedback_taxonomy"] == [
+        "character",
+        "scene",
+        "prop",
+        "shot",
+        "provider",
+        "generation_failure",
+        "asset",
+        "revision",
+    ]
+    assert len(feedback["decisions"]) == 1
+    assert feedback["decisions"][0]["decision"] == "revise"
+    assert candidate["candidate_scope"] == "asset_graph_feedback_candidate"
+    assert candidate["feedback_taxonomy"] == feedback["feedback_taxonomy"]
+    assert candidate["safe_evidence_summary"]["decision_count"] == 1
+    assert candidate["safe_evidence_summary"]["taxonomy_count"] == 8
+    assert '"provider_raw"' not in serialized
+    assert "signed_url" not in serialized

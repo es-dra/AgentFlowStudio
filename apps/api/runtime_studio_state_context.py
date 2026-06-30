@@ -176,6 +176,9 @@ def _bundle_feedback_overlay_list(value: Any) -> list[dict[str, Any]]:
         evidence = _safe_evidence_summary(item.get("safe_evidence_summary"))
         if evidence:
             overlay["safe_evidence_summary"] = evidence
+        taxonomy = _safe_text_list(item.get("feedback_taxonomy"), limit=16, max_length=80)
+        if taxonomy:
+            overlay["feedback_taxonomy"] = taxonomy
         for key in (
             "context_overlay_consumed",
             "candidate_feedback_included_in_context",
@@ -209,7 +212,7 @@ def _safe_evidence_summary(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
     result: dict[str, Any] = {}
-    for key in ("rating_count", "decision_count"):
+    for key in ("rating_count", "decision_count", "taxonomy_count"):
         if key in value:
             result[key] = int(max(0, min(1000, _number(value.get(key), 0))))
     if "has_note" in value:
@@ -217,6 +220,17 @@ def _safe_evidence_summary(value: Any) -> dict[str, Any]:
     policy = _text(value.get("raw_evidence_policy"), "", 120)
     if policy:
         result["raw_evidence_policy"] = policy
+    return result
+
+
+def _safe_text_list(value: Any, *, limit: int, max_length: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:limit]:
+        text = _text(item, "", max_length)
+        if text and text not in result:
+            result.append(text)
     return result
 
 

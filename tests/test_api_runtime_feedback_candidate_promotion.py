@@ -58,6 +58,8 @@ def test_runtime_feedback_candidate_promotion_records_context_overlay_decision(t
     assert decision["candidate_scope"] == "quality_feedback_candidate"
     assert decision["safe_target"] == candidate["safe_target"]
     assert decision["safe_evidence_summary"] == candidate["safe_evidence_summary"]
+    assert decision["feedback_taxonomy"] == candidate["feedback_taxonomy"] == ["character", "scene"]
+    assert decision["safe_evidence_summary"]["taxonomy_count"] == 2
     assert effect["decision"] == "promote_to_context_overlay"
     assert effect["decision_effect"] == "eligible_for_next_context_overlay"
     assert effect["context_overlay_allowed"] is True

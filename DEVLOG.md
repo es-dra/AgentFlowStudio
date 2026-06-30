@@ -1,5 +1,59 @@
 # Devlog
 
+## 2026-06-30 - Feedback Candidate Taxonomy Contract
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `a87b8f2f29c0e32c0f9d28fff86c2242be8decd3`.
+- Added `AFS-T15f Feedback Candidate Taxonomy Contract` as a provider-closed
+  feedback/knowledge-accumulation slice.
+- `sanitize_quality_feedback(...)` now emits a bounded `feedback_taxonomy`
+  list for Studio quality feedback, asset-graph feedback, and generic runtime
+  feedback using controlled category IDs only.
+- Runtime `feedback_candidate`, promotion-decision artifacts, context-overlay
+  artifacts, context resolver summaries, model-call context, and Studio-state
+  persistence now preserve the safe taxonomy IDs plus `taxonomy_count`.
+- Kept the contract additive: no new Runtime route, no OpenAPI path change, no
+  Studio fetch, no provider gate, and no generated media or durable memory
+  write.
+- Corrected the T18d handoff status to reflect the already completed
+  commit/push/branch-preflight state.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_promotion.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_feedback_overlay_state.py -q
+# 15 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_promotion.py tests\test_api_runtime_feedback_candidate_context_overlay.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_model_call_context_contract.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_openapi_snapshot.py -q
+# 25 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 738 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed, with existing CRLF normalization warning for apps/api/runtime_events.py
+
+YAML parse check for external execution state
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Studio State Feedback Policy Sanitizer Split
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

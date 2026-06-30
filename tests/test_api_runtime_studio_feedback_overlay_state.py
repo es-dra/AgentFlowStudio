@@ -17,6 +17,8 @@ def test_studio_state_preserves_safe_feedback_context_overlay_summary() -> None:
     assert overlay["candidate_id"] == "runtime-feedback-candidate:feedback001"
     assert overlay["safe_target"]["node_id"] == "image_1"
     assert overlay["safe_evidence_summary"]["raw_evidence_policy"] == "raw_evidence_not_memory"
+    assert overlay["safe_evidence_summary"]["taxonomy_count"] == 2
+    assert overlay["feedback_taxonomy"] == ["character", "scene"]
     assert overlay["context_overlay_consumed"] is True
     assert overlay["provider_calls_started"] is False
     assert overlay["writes_long_term_memory"] is False
@@ -60,6 +62,7 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert overlays[0]["overlay_id"] == "runtime-feedback-overlay:abc123"
     assert overlays[0]["candidate_id"] == "runtime-feedback-candidate:feedback001"
     assert overlays[0]["safe_target"]["node_id"] == "image_1"
+    assert overlays[0]["feedback_taxonomy"] == ["character", "scene"]
     assert overlays[0]["context_overlay_consumed"] is True
     assert overlays[0]["provider_calls_started"] is False
     assert overlays[0]["writes_long_term_memory"] is False
@@ -144,8 +147,10 @@ def _overlay_node() -> dict:
                             "rating_count": 1,
                             "decision_count": 2,
                             "has_note": True,
+                            "taxonomy_count": 2,
                             "raw_evidence_policy": "raw_evidence_not_memory",
                         },
+                        "feedback_taxonomy": ["character", "scene"],
                         "overlay_scope": "next_local_context_pass",
                         "overlay_intent": "Use reviewed feedback only as safe local context.",
                         "decision_effect": "included_in_context",

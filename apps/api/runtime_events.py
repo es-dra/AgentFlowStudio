@@ -56,6 +56,7 @@ def build_runtime_feedback_candidate(
         "candidate_scope": _candidate_scope(kind),
         "safe_target": _safe_target(feedback),
         "safe_evidence_summary": _safe_evidence_summary(feedback),
+        "feedback_taxonomy": _safe_taxonomy(feedback.get("feedback_taxonomy")),
         "promotion_status": "candidate_only",
         "promotion_blocked_by_default": True,
         "requires_human_promotion_decision": True,
@@ -103,12 +104,24 @@ def _safe_evidence_summary(feedback: dict[str, Any]) -> dict[str, Any]:
         "rating_count": len(ratings),
         "decision_count": len(decisions),
         "has_note": bool(str(feedback.get("drift_notes") or feedback.get("note") or "").strip()),
+        "taxonomy_count": len(_safe_taxonomy(feedback.get("feedback_taxonomy"))),
         "raw_evidence_policy": str(feedback.get("raw_evidence_policy") or "raw_evidence_not_memory"),
     }
 
 
 def _safe_token(value: Any) -> str:
     return SAFE_TOKEN_RE.sub("_", str(value or "")).strip("_")[:180]
+
+
+def _safe_taxonomy(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:16]:
+        taxonomy_id = _safe_token(item)
+        if taxonomy_id and taxonomy_id not in result:
+            result.append(taxonomy_id)
+    return result
 
 
 def runtime_review_decision_event(
