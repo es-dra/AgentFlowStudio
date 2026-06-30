@@ -1,5 +1,9 @@
 import { assetsFromNode, assetCarryState } from "../asset-reference-summary.js";
-import { feedbackOverlayCount } from "../feedback-context-overlays.js";
+import {
+  feedbackOverlayCount,
+  feedbackOverlayPromptPolicyFromBundle,
+  feedbackOverlayPromptPolicySummaryText,
+} from "../feedback-context-overlays.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
 
@@ -40,7 +44,8 @@ export function algorithmConsoleSection(node) {
       ["目标", generationTargetLabel(node), "target"],
       ["纳入", includedLabel(node, bundle), "context"],
       ["排除", excludedLabel(bundle), "warning"],
-    ],
+      promptPolicyStat(bundle),
+    ].filter(Boolean),
     warnings: traceWarnings(node, bundle, manifest),
   });
 }
@@ -209,6 +214,12 @@ function excludedLabel(bundle) {
   const excluded = Array.isArray(bundle?.excluded_assets) ? bundle.excluded_assets.length : 0;
   const conflicts = Array.isArray(bundle?.asset_conflicts) ? bundle.asset_conflicts.length : 0;
   return excluded || conflicts ? `${excluded + conflicts} 项` : "无";
+}
+
+function promptPolicyStat(bundle) {
+  const policy = feedbackOverlayPromptPolicyFromBundle(bundle);
+  if (!policy) return null;
+  return ["反馈策略", feedbackOverlayPromptPolicySummaryText(policy), "drift"];
 }
 
 function traceWarnings(node, bundle, manifest) {

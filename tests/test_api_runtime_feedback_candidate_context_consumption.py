@@ -263,6 +263,9 @@ def test_selected_feedback_overlay_stays_out_of_provider_prompt_and_records_poli
     assert marker in json.dumps(payload["context_bundle"]["feedback_context_overlays"], ensure_ascii=False)
     assert marker not in request_plan["provider_prompt"]
     assert marker not in model_request_plan["provider_request"]["prompt"]
+    assert payload["context_bundle"]["feedback_context_overlay_prompt_policy"][
+        "provider_prompt_includes_context_overlays"
+    ] is False
     assert model_context["feedback_context"]["prompt_policy"]["provider_prompt_includes_context_overlays"] is False
     assert model_context["feedback_context"]["prompt_policy"]["requires_explicit_prompt_policy_gate"] is True
     assert model_context["feedback_context"]["prompt_policy"]["context_overlay_count"] == 1

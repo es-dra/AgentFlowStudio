@@ -1,5 +1,57 @@
 # Devlog
 
+## 2026-06-30 - Feedback Overlay Prompt Policy Review Surface
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `76d2c407c8c0e9622e4421bc185f13d82c1f6a14`.
+- Added `AFS-T18b Feedback Overlay Prompt Policy Review Surface`.
+- Runtime context bundles now expose a safe top-level
+  `feedback_context_overlay_prompt_policy` for Studio display, reusing the
+  policy already recorded in context trace.
+- Studio state persistence now keeps only bounded prompt-policy summary fields
+  and continues to prune trace internals, provider raw data, signed URLs, local
+  paths, and media-byte markers.
+- Studio shows the policy in existing review surfaces: the node context summary
+  and the algorithm process panel both report that selected feedback overlays
+  remain local context and are not injected into generation prompts by default.
+- No OpenAPI snapshot update was needed; path count remains 52.
+- No provider call, generated media, master merge, deploy, server sync, Runtime
+  health claim, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py::test_selected_feedback_overlay_stays_out_of_provider_prompt_and_records_policy tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_web_studio_feedback_candidate_static.py -q
+# 10 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_web_studio_feedback_candidate_static.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_persistence.py tests\test_model_call_context_contract.py tests\test_api_runtime_keyframe_generation_bridge.py -q
+# 37 passed, 1 existing Starlette/httpx deprecation warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 130 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe -m pytest
+# 737 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+
+YAML parse check for external execution state
+# yaml_parse_ok
+```
+
 ## 2026-06-30 - Feedback Overlay Prompt Policy Gate
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

@@ -41,6 +41,67 @@ def test_studio_feedback_overlay_review_surface_reads_context_bundle_only() -> N
     assert "反馈" in algorithm_panel
 
 
+def test_studio_feedback_overlay_prompt_policy_review_surface_is_local() -> None:
+    overlay_helper = STUDIO_ROOT / "src" / "feedback-context-overlays.js"
+    inspector_summary = (STUDIO_ROOT / "src" / "panels" / "inspector-context-summary.js").read_text(encoding="utf-8")
+    algorithm_panel = (STUDIO_ROOT / "src" / "panels" / "algorithm-context-panel.js").read_text(encoding="utf-8")
+
+    overlay_source = overlay_helper.read_text(encoding="utf-8")
+    assert "feedbackOverlayPromptPolicyFromBundle" in overlay_source
+    assert "feedbackOverlayPromptPolicySummaryText" in overlay_source
+    assert "feedback_context_overlay_prompt_policy" in overlay_source
+    assert "provider_prompt_includes_context_overlays" in overlay_source
+    assert "fetch(" not in overlay_source
+    assert "recordFeedbackCandidateContextOverlay" not in overlay_source
+    assert "AFS_ALLOW_REMOTE" not in overlay_source
+
+    assert "feedbackOverlayPromptPolicyFromBundle" in inspector_summary
+    assert "反馈提示词策略" in inspector_summary
+    assert "feedbackOverlayPromptPolicyFromBundle" in algorithm_panel
+    assert "反馈策略" in algorithm_panel
+
+
+def test_feedback_overlay_prompt_policy_summary_is_bounded() -> None:
+    script = r'''
+import {
+  feedbackOverlayPromptPolicyFromBundle,
+  feedbackOverlayPromptPolicySummaryText,
+} from "./apps/studio/src/feedback-context-overlays.js";
+
+const bundle = {
+  feedback_context_overlay_prompt_policy: {
+    policy_id: "feedback_overlay_context_evidence_only_v0",
+    default_action: "context_evidence_only",
+    provider_prompt_includes_context_overlays: false,
+    overlay_text_channel: "disabled_by_default",
+    requires_explicit_prompt_policy_gate: true,
+    context_overlay_count: 1,
+    selected_overlay_ids: ["runtime-feedback-overlay:abc123"],
+    provider_raw: { unsafe: true },
+    local_path: "D:\\private\\feedback.png",
+  },
+};
+const policy = feedbackOverlayPromptPolicyFromBundle(bundle);
+process.stdout.write(JSON.stringify({ policy, text: feedbackOverlayPromptPolicySummaryText(policy) }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    result = json.loads(completed.stdout)
+    serialized = json.dumps(result, ensure_ascii=False).lower()
+
+    assert result["policy"]["policy_id"] == "feedback_overlay_context_evidence_only_v0"
+    assert result["policy"]["provider_prompt_includes_context_overlays"] is False
+    assert result["text"] == "本地上下文，不注入生成提示词"
+    assert "provider_raw" not in serialized
+    assert "local_path" not in serialized
+    assert "d:\\private" not in serialized
+
+
 def test_studio_feedback_overlay_selection_ui_is_local_and_provider_closed() -> None:
     review_ui = STUDIO_ROOT / "src" / "feedback-overlay-review.js"
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")

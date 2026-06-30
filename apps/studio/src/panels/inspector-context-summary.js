@@ -7,6 +7,8 @@ import {
 import { assetLifecycleSummary } from "../asset-lifecycle.js";
 import {
   feedbackContextOverlaysFromBundle,
+  feedbackOverlayPromptPolicyFromBundle,
+  feedbackOverlayPromptPolicySummaryText,
   feedbackOverlaySummaryText,
 } from "../feedback-context-overlays.js";
 
@@ -59,6 +61,10 @@ export function nodeContextSummaryText(node) {
   if (!includedAssets.length && localAssets.length) lines.push(`当前节点候选：${assetList(localAssets)}`);
   if (feedbackOverlays.length) {
     lines.push(`反馈上下文：${feedbackOverlays.map(feedbackOverlaySummaryText).join("；")}`);
+  }
+  const promptPolicy = feedbackOverlayPromptPolicyFromBundle(bundle);
+  if (promptPolicy) {
+    lines.push(`反馈提示词策略：${feedbackOverlayPromptPolicySummaryText(promptPolicy)}`);
   }
   const warnings = warningList(bundle);
   if (warnings.length) lines.push(`提醒：${warnings.join("；")}`);

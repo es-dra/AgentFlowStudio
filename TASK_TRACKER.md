@@ -293,6 +293,18 @@ KB promotion, deploy, server sync, or human/business acceptance. No OpenAPI
 snapshot update was needed; path count remains 52. Handoff:
 `docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-POLICY-GATE-20260630.md`.
 
+Feedback overlay prompt-policy review-surface addendum: the next local
+deterministic slice adds `AFS-T18b Feedback Overlay Prompt Policy Review
+Surface`. Runtime now exposes the safe prompt policy at
+`context_bundle.feedback_context_overlay_prompt_policy`, and Studio state
+persistence keeps only bounded policy summary fields. Existing Studio review
+surfaces now display the boundary: feedback overlays remain local context and
+are not injected into generation prompts by default. This is review-surface
+evidence only: no prompt injection authorization, new route, OpenAPI snapshot
+update, provider call, generated media, durable memory, Company KB promotion,
+deploy, server sync, or human/business acceptance. Handoff:
+`docs/handoff/AFS-FEEDBACK-OVERLAY-PROMPT-POLICY-REVIEW-SURFACE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

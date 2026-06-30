@@ -7,6 +7,7 @@ from apps.api.runtime_store import safe_id
 
 
 LOCAL_PATH_PATTERN = re.compile(r"([a-zA-Z]:\\|/Users/|/home/|data/processed/runs)")
+SAFE_PROMPT_POLICY_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.:-]+")
 
 
 def sanitize_context_bundle(value: Any) -> dict[str, Any]:
@@ -33,6 +34,13 @@ def sanitize_context_bundle(value: Any) -> dict[str, Any]:
     overlays = _bundle_feedback_overlay_list(value.get("feedback_context_overlays"))
     if overlays:
         result["feedback_context_overlays"] = overlays
+    trace = value.get("trace_summary") if isinstance(value.get("trace_summary"), dict) else {}
+    policy = _bundle_feedback_overlay_prompt_policy(
+        value.get("feedback_context_overlay_prompt_policy")
+        or trace.get("feedback_context_overlay_prompt_policy")
+    )
+    if policy:
+        result["feedback_context_overlay_prompt_policy"] = policy
     return result
 
 
@@ -218,6 +226,37 @@ def _safe_artifact_ref(value: Any) -> dict[str, str]:
         text = _text(value.get(key), "", 180)
         if text:
             result[key] = text
+    return result
+
+
+def _bundle_feedback_overlay_prompt_policy(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    for key in ("schema_version", "policy_id", "default_action", "overlay_text_channel"):
+        text = _text(value.get(key), "", 160)
+        if text:
+            result[key] = safe_id(text) if key == "policy_id" else text
+    for key in ("provider_prompt_includes_context_overlays", "requires_explicit_prompt_policy_gate"):
+        if key in value:
+            result[key] = bool(value.get(key))
+    if "context_overlay_count" in value:
+        result["context_overlay_count"] = int(max(0, min(1000, _number(value.get("context_overlay_count"), 0))))
+    for key in ("selected_overlay_ids", "rejected_overlay_ids"):
+        ids = _safe_id_list(value.get(key))
+        if ids:
+            result[key] = ids
+    return result
+
+
+def _safe_id_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value[:20]:
+        text = SAFE_PROMPT_POLICY_ID_PATTERN.sub("_", _text(item, "", 180).strip())
+        if text and text not in result:
+            result.append(text)
     return result
 
 

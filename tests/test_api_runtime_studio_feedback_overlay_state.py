@@ -10,8 +10,9 @@ def test_studio_state_preserves_safe_feedback_context_overlay_summary() -> None:
     sanitized = sanitize_studio_state({"nodes": {"image_1": _overlay_node()}})
 
     overlays = sanitized["nodes"]["image_1"]["params"]["lastContextBundle"]["feedback_context_overlays"]
+    policy = sanitized["nodes"]["image_1"]["params"]["lastContextBundle"]["feedback_context_overlay_prompt_policy"]
     overlay = overlays[0]
-    serialized = str(overlays).lower()
+    serialized = str(sanitized).lower()
     assert overlay["overlay_id"] == "runtime-feedback-overlay:abc123"
     assert overlay["candidate_id"] == "runtime-feedback-candidate:feedback001"
     assert overlay["safe_target"]["node_id"] == "image_1"
@@ -21,6 +22,11 @@ def test_studio_state_preserves_safe_feedback_context_overlay_summary() -> None:
     assert overlay["writes_long_term_memory"] is False
     assert overlay["writes_company_kb"] is False
     assert overlay["artifact_ref"]["artifact_id"] == "artifact_feedback_overlay_001"
+    assert policy["policy_id"] == "feedback_overlay_context_evidence_only_v0"
+    assert policy["provider_prompt_includes_context_overlays"] is False
+    assert policy["requires_explicit_prompt_policy_gate"] is True
+    assert policy["context_overlay_count"] == 1
+    assert policy["selected_overlay_ids"] == ["runtime-feedback-overlay:abc123"]
     assert "safety_boundary" not in overlay
     assert "trace_summary" not in overlay
     assert "provider_raw" not in overlay
@@ -44,6 +50,7 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert saved.status_code == 200
     restored = client.get(f"/projects/{project_id}/studio-state").json()["state"]
     overlays = restored["nodes"]["image_1"]["params"]["lastContextBundle"]["feedback_context_overlays"]
+    policy = restored["nodes"]["image_1"]["params"]["lastContextBundle"]["feedback_context_overlay_prompt_policy"]
     serialized = str(restored).lower()
     assert overlays[0]["overlay_id"] == "runtime-feedback-overlay:abc123"
     assert overlays[0]["candidate_id"] == "runtime-feedback-candidate:feedback001"
@@ -52,6 +59,8 @@ def test_studio_state_persists_feedback_context_overlay_summary_only(tmp_path) -
     assert overlays[0]["provider_calls_started"] is False
     assert overlays[0]["writes_long_term_memory"] is False
     assert overlays[0]["writes_company_kb"] is False
+    assert policy["provider_prompt_includes_context_overlays"] is False
+    assert policy["overlay_text_channel"] == "disabled_by_default"
     assert "safety_boundary" not in overlays[0]
     assert "provider_raw" not in overlays[0]
     assert "trace_summary" not in overlays[0]
@@ -155,7 +164,26 @@ def _overlay_node() -> dict:
                         "local_path": "D:\\private\\feedback.png",
                         "signed_url": "unsafe-signed-reference-redacted",
                     }
-                ]
+                ],
+                "feedback_context_overlay_prompt_policy": {
+                    "schema_version": "afs_feedback_overlay_prompt_policy.v0.1",
+                    "policy_id": "feedback_overlay_context_evidence_only_v0",
+                    "default_action": "context_evidence_only",
+                    "provider_prompt_includes_context_overlays": False,
+                    "overlay_text_channel": "disabled_by_default",
+                    "requires_explicit_prompt_policy_gate": True,
+                    "context_overlay_count": 1,
+                    "selected_overlay_ids": ["runtime-feedback-overlay:abc123"],
+                    "rejected_overlay_ids": [],
+                    "provider_raw": {"unsafe": True},
+                    "signed_url": "unsafe-signed-reference-redacted",
+                },
+                "trace_summary": {
+                    "feedback_context_overlay_prompt_policy": {
+                        "policy_id": "unsafe-trace-policy",
+                        "provider_prompt_includes_context_overlays": True,
+                    }
+                },
             }
         },
     }

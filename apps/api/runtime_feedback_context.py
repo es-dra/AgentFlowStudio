@@ -31,11 +31,14 @@ def attach_feedback_context_overlays(
     trace["feedback_context_overlay_source"] = "project_manifest_feedback_refs"
     trace["feedback_overlays_are_memory"] = False
     trace["feedback_overlays_write_company_kb"] = False
-    trace["feedback_context_overlay_prompt_policy"] = feedback_overlay_prompt_policy(
+    prompt_policy = feedback_overlay_prompt_policy(
         context_overlays=overlays,
         selected_overlay_ids=decisions["selected_ids"],
         rejected_overlay_ids=decisions["rejected_ids"],
     )
+    trace["feedback_context_overlay_prompt_policy"] = prompt_policy
+    if overlays or has_decisions:
+        bundle["feedback_context_overlay_prompt_policy"] = prompt_policy
     if has_decisions:
         trace["feedback_context_overlay_decision_source"] = "studio_context_subgraph"
         if decisions["selected_ids"]:
