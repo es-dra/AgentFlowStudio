@@ -8,6 +8,15 @@
 
 Last updated: 2026-06-26 by Codex
 
+Studio source-evidence non-claim flags addendum: the next provider-closed
+product slice retains `provider_calls_started` and
+`human_creative_acceptance_claimed` inside the shared Studio `sourceEvidenceRefs()`
+normalizer. This keeps preflight, keyframe layer, trace, and asset-detail
+evidence surfaces aligned around the same safe non-claim flags without adding
+Runtime routes, OpenAPI paths, provider calls, generated media, deploy, server
+sync, human creative acceptance, or business validation. Handoff:
+`docs/handoff/AFS-STUDIO-SOURCE-EVIDENCE-NON-CLAIM-FLAGS-20260630.md`.
+
 Studio asset-library source-evidence preservation addendum: the next
 provider-closed product slice preserves fixed visual asset `source_evidence`
 when a promoted asset is added to the Studio asset library entry. This keeps

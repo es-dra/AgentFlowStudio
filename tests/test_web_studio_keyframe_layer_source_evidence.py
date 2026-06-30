@@ -56,6 +56,8 @@ const state = {
             source_human_gate_id: "runtime-human-gate:demo:accepted",
             source_asset_card_candidate_id: "asset_card_candidate:main_character",
             source_stage: "asset_card_candidate_human_gate",
+            provider_calls_started: false,
+            human_creative_acceptance_claimed: false,
             [unsafeSignedKey]: "source-signed-reference",
             local_path: "D:\\private\\source_fixed_lin_wan.png",
             data_base64: "SOURCE_BYTES_MUST_NOT_LEAK",
@@ -109,6 +111,8 @@ process.stdout.write(JSON.stringify({
             "source_human_gate_id": "runtime-human-gate:demo:accepted",
             "source_asset_card_candidate_id": "asset_card_candidate:main_character",
             "source_stage": "asset_card_candidate_human_gate",
+            "provider_calls_started": False,
+            "human_creative_acceptance_claimed": False,
         }
     ]
     assert "_".join(["signed", "url"]) not in serialized

@@ -33,6 +33,8 @@ function fallbackRefFromAsset(asset) {
     source_human_gate_id: evidence.source_human_gate_id,
     source_asset_card_candidate_id: evidence.source_asset_card_candidate_id,
     source_stage: evidence.source_stage,
+    provider_calls_started: evidence.provider_calls_started === true,
+    human_creative_acceptance_claimed: evidence.human_creative_acceptance_claimed === true,
   };
 }
 
@@ -45,6 +47,8 @@ function normalizeRef(ref) {
     source_human_gate_id: safeText(ref?.source_human_gate_id, 120),
     source_asset_card_candidate_id: safeText(ref?.source_asset_card_candidate_id, 120),
     source_stage: safeText(ref?.source_stage, 80),
+    provider_calls_started: ref?.provider_calls_started === true,
+    human_creative_acceptance_claimed: ref?.human_creative_acceptance_claimed === true,
   };
 }
 
