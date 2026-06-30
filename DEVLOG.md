@@ -1,5 +1,49 @@
 # Devlog
 
+## 2026-06-30 - Goal-Mode Branch Integration Review
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `1af42f1462632436452dfe7358c7bbd9115cdf70`.
+- Added `tools/afs_goal_mode_branch_integration_review.py` as a deterministic
+  pre-merge branch hygiene gate for the accumulated goal-mode branch.
+- The tool checks that the codex branch is on the expected prefix, local HEAD,
+  upstream, and GitHub remote branch are aligned, local `master` matches
+  `origin/master`, only explicitly allowed untracked files remain, no forbidden
+  runtime/provider/generated-media paths are present in the branch diff, and
+  new handoffs are indexed.
+- Added `tests/test_afs_goal_mode_branch_integration_review.py` for allowed
+  dirty ledger behavior, missing handoff index entries, forbidden artifact
+  paths, wrong branch state, unpushed state, and local-base drift.
+- This TaskRun is a branch integration review only. It does not merge to
+  `master`, deploy, sync server checkouts, restart Runtime, open provider gates,
+  run provider calls, claim human acceptance, claim business validation, or
+  promote durable memory.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_afs_goal_mode_branch_integration_review.py -q
+# 4 passed
+
+.\.venv\Scripts\python.exe -m pytest
+# 717 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Provider Smoke Readiness Gate
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

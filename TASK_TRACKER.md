@@ -157,6 +157,18 @@ media, human creative acceptance, business validation, deploy, or server sync
 occurred. Handoff:
 `docs/handoff/AFS-PROVIDER-SMOKE-READINESS-GATE-20260630.md`.
 
+Goal-mode branch integration review addendum: the next slice adds
+`tools/afs_goal_mode_branch_integration_review.py` plus
+`tests/test_afs_goal_mode_branch_integration_review.py` as a deterministic
+pre-merge hygiene gate for the accumulated goal-mode branch. The review checks
+codex branch naming, local/upstream/GitHub alignment, local `master` versus
+`origin/master`, allowed dirty ledger, forbidden local/provider/generated-media
+paths, and handoff index coverage. This is branch-readiness evidence for human
+merge review only: no merge, deploy, server sync, Runtime health claim,
+provider call, generated media, human creative acceptance, business validation,
+or durable memory promotion occurred. Handoff:
+`docs/handoff/AFS-GOAL-MODE-BRANCH-INTEGRATION-REVIEW-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.
