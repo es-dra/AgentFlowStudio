@@ -75,6 +75,7 @@ def collect_branch_integration_review(
     base_head = _git(repo_root, ["rev-parse", base_ref]).strip()
     base_branch = base_ref.split("/", 1)[-1] if "/" in base_ref else base_ref
     local_base_head = _git_optional(repo_root, ["rev-parse", base_branch]).strip()
+    base_is_ancestor = _is_ancestor(repo_root, base_ref, "HEAD")
     status_text = _git(repo_root, ["status", "--short", "--branch"])
     changed_files = _changed_files(repo_root, base_ref)
     commits = _commit_summaries(repo_root, base_ref)
@@ -87,6 +88,7 @@ def collect_branch_integration_review(
         remote=remote,
         base_head=base_head,
         local_base_head=local_base_head,
+        base_is_ancestor=base_is_ancestor,
         status_text=status_text,
         changed_files=changed_files,
         handoff_index_text=index_text,
@@ -103,6 +105,8 @@ def collect_branch_integration_review(
         "remote_head": remote,
         "base_head": base_head,
         "local_base_head": local_base_head,
+        "base_is_ancestor_of_head": base_is_ancestor,
+        "merge_mode_recommendation": _merge_mode_recommendation(blockers, base_is_ancestor),
         "commit_count_since_base": len(commits),
         "commits_since_base": [commit.__dict__ for commit in commits],
         "changed_file_count": len(changed_files),
@@ -135,6 +139,7 @@ def build_branch_integration_blockers(
     remote: str,
     base_head: str,
     local_base_head: str,
+    base_is_ancestor: bool,
     status_text: str,
     changed_files: list[str],
     handoff_index_text: str,
@@ -149,6 +154,8 @@ def build_branch_integration_blockers(
         blockers.append({"block_id": "remote_branch_not_aligned", "head": _short(head), "remote": _short(remote)})
     if local_base_head and base_head != local_base_head:
         blockers.append({"block_id": "local_base_not_aligned_with_origin", "base": _short(base_head), "local_base": _short(local_base_head)})
+    if not base_is_ancestor:
+        blockers.append({"block_id": "base_not_ancestor_of_head", "base": _short(base_head), "head": _short(head)})
     dirty = _disallowed_status_lines(status_text, allowed_untracked)
     if dirty:
         blockers.append({"block_id": "disallowed_worktree_dirty", "lines": dirty})
@@ -214,6 +221,25 @@ def _remote_branch_head(repo_root: Path, branch: str) -> str:
     if not output:
         return ""
     return output.split()[0]
+
+
+def _is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def _merge_mode_recommendation(blockers: list[dict[str, Any]], base_is_ancestor: bool) -> str:
+    if blockers:
+        return "blocked"
+    if base_is_ancestor:
+        return "fast_forward_candidate_after_human_authorization"
+    return "merge_conflict_or_divergence_review_required"
 
 
 def _next_action(blockers: list[dict[str, Any]]) -> str:

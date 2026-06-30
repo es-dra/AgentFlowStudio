@@ -180,6 +180,17 @@ This is a human merge-review gate only: no merge, deploy, server sync, Runtime
 health claim, provider call, generated media, human creative acceptance,
 business validation, or durable memory promotion occurred.
 
+Fast-forward merge preflight addendum: the next slice enhances
+`tools/afs_goal_mode_branch_integration_review.py` so the report explicitly
+checks whether `origin/master` is an ancestor of the current codex branch
+`HEAD`. The report now exposes `base_is_ancestor_of_head` and
+`merge_mode_recommendation`, and blocks with `base_not_ancestor_of_head` if the
+base has diverged. This prepares the next authorized master-merge task while
+still performing no merge, deploy, server sync, Runtime health claim, provider
+call, generated media, human creative acceptance, business validation, or
+durable memory promotion. Handoff:
+`docs/handoff/AFS-FAST-FORWARD-MERGE-PREFLIGHT-GATE-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

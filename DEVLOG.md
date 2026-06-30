@@ -1,5 +1,50 @@
 # Devlog
 
+## 2026-06-30 - Fast-Forward Merge Preflight Gate
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `38a1bdeacecaf2a347c063b058c65b5aba5b6371`.
+- Enhanced `tools/afs_goal_mode_branch_integration_review.py` so the merge
+  review report explicitly checks whether `origin/master` is an ancestor of the
+  current codex branch `HEAD`.
+- Added `base_is_ancestor_of_head` and `merge_mode_recommendation` to the
+  report, with `fast_forward_candidate_after_human_authorization` used only
+  when the rest of the branch review has no blockers.
+- Added a `base_not_ancestor_of_head` blocker and a focused regression test so
+  a diverged base cannot be reported as ready for human merge review.
+- No merge to `master`, server sync, Runtime health check, provider call,
+  generated media, human creative acceptance, business validation, or durable
+  memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_afs_goal_mode_branch_integration_review.py -q
+# 5 passed
+
+.\.venv\Scripts\python.exe -m pytest
+# 718 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --report runs\goal_mode_branch_integration_review_t19a_dirty.json
+# status=needs_attention while T19a files are dirty;
+# base_is_ancestor_of_head=true
+```
+
 ## 2026-06-30 - Human Merge Review + Baseline Freeze Decision
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

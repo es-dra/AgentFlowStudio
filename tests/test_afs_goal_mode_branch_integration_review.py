@@ -12,6 +12,7 @@ def test_branch_integration_review_allows_known_demo_docs_untracked() -> None:
         remote="abc123",
         base_head="base123",
         local_base_head="base123",
+        base_is_ancestor=True,
         status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n?? docs/demo-docs-20260629/\n",
         changed_files=[
             "docs/handoff/AFS-PROVIDER-SMOKE-READINESS-GATE-20260630.md",
@@ -34,6 +35,7 @@ def test_branch_integration_review_blocks_missing_handoff_index_entry() -> None:
         remote="abc123",
         base_head="base123",
         local_base_head="base123",
+        base_is_ancestor=True,
         status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
         changed_files=["docs/handoff/AFS-NEW-TASKRUN.md"],
         handoff_index_text="",
@@ -57,6 +59,7 @@ def test_branch_integration_review_blocks_forbidden_artifact_paths() -> None:
         remote="abc123",
         base_head="base123",
         local_base_head="base123",
+        base_is_ancestor=True,
         status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
         changed_files=["runs/live-smoke.json", "docs/handoff/AFS-OK.md", "apps/studio/assets/generated.png"],
         handoff_index_text="- `AFS-OK.md`\n",
@@ -80,6 +83,7 @@ def test_branch_integration_review_blocks_unpushed_or_wrong_branch_state() -> No
         remote="",
         base_head="base123",
         local_base_head="base999",
+        base_is_ancestor=True,
         status_text="## master...origin/master\n M DEVLOG.md\n?? scratch.txt\n",
         changed_files=[],
         handoff_index_text="",
@@ -92,4 +96,29 @@ def test_branch_integration_review_blocks_unpushed_or_wrong_branch_state() -> No
         "remote_branch_not_aligned",
         "local_base_not_aligned_with_origin",
         "disallowed_worktree_dirty",
+    ]
+
+
+def test_branch_integration_review_blocks_base_divergence_from_head() -> None:
+    blockers = build_branch_integration_blockers(
+        branch="codex/afs-project-book-full-goal-20260630",
+        expected_branch_prefix="codex/",
+        head="abc123",
+        upstream="abc123",
+        remote="abc123",
+        base_head="base123",
+        local_base_head="base123",
+        base_is_ancestor=False,
+        status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
+        changed_files=[],
+        handoff_index_text="",
+        allowed_untracked=("docs/demo-docs-20260629/",),
+    )
+
+    assert blockers == [
+        {
+            "block_id": "base_not_ancestor_of_head",
+            "base": "base123",
+            "head": "abc123",
+        }
     ]
