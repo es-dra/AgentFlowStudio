@@ -169,6 +169,17 @@ provider call, generated media, human creative acceptance, business validation,
 or durable memory promotion occurred. Handoff:
 `docs/handoff/AFS-GOAL-MODE-BRANCH-INTEGRATION-REVIEW-20260630.md`.
 
+Human merge review addendum: the next slice records
+`docs/handoff/AFS-HUMAN-MERGE-REVIEW-BASELINE-DECISION-20260630.md` as the
+baseline-freeze decision packet for the accumulated goal-mode branch. Current
+branch review remains `ready_for_human_merge_review` with `blocker_count=0`;
+local HEAD, upstream, and GitHub remote branch are aligned at
+`21760e5d59707323ff305ae6a90e8ffa719b04cf`, while `origin/master` remains at
+the frozen three-end baseline `6071ef1aa665930df2b9fa383260fc68ed4e4e64`.
+This is a human merge-review gate only: no merge, deploy, server sync, Runtime
+health claim, provider call, generated media, human creative acceptance,
+business validation, or durable memory promotion occurred.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

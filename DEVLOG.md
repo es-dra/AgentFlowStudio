@@ -1,5 +1,50 @@
 # Devlog
 
+## 2026-06-30 - Human Merge Review + Baseline Freeze Decision
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `21760e5d59707323ff305ae6a90e8ffa719b04cf`.
+- Recorded `docs/handoff/AFS-HUMAN-MERGE-REVIEW-BASELINE-DECISION-20260630.md`
+  as the T18 human merge-review evidence packet for the accumulated goal-mode
+  branch.
+- Re-ran the branch integration review and confirmed
+  `ready_for_human_merge_review` with `blocker_count=0`.
+- Captured the branch facts for human decision: local HEAD/upstream/GitHub
+  remote branch all at `21760e5d59707323ff305ae6a90e8ffa719b04cf`,
+  `origin/master` at `6071ef1aa665930df2b9fa383260fc68ed4e4e64`, 15 commits,
+  77 changed files, and 15 indexed TaskRun handoffs since the frozen baseline.
+- Corrected stale T17 handoff wording that still said commit/push was pending.
+- No merge to `master`, server sync, Runtime restart/health claim, provider
+  smoke, generated media, human creative acceptance, business validation, or
+  durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --report runs\goal_mode_branch_integration_review_t18_preflight.json
+# status=ready_for_human_merge_review; blocker_count=0
+
+.\.venv\Scripts\python.exe -m pytest
+# 717 passed, 520 deselected, 2 existing warnings
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 128 files
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# human_doc_chinese_coverage remained at the existing 22 after the T18 handoff
+# was expanded with Chinese decision notes.
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Goal-Mode Branch Integration Review
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

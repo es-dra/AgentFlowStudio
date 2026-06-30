@@ -8,7 +8,8 @@ Branch: `codex/afs-project-book-full-goal-20260630`
 
 Start HEAD: `1af42f1462632436452dfe7358c7bbd9115cdf70`
 
-Status: implemented and locally verified; pending commit/push at time of writing.
+Status: implemented, locally verified, committed, pushed, and post-commit branch
+review passed.
 
 本轮目标是在进入人工 merge 决策、服务器同步或 provider smoke 之前，给
 goal-mode codex 分支增加一个本地、可重复、无 provider 成本的集成审查门。
@@ -112,9 +113,15 @@ git diff --check
 # passed
 ```
 
-Post-commit remote branch alignment must be rerun after this TaskRun is
-committed and pushed. The review tool intentionally cannot return a clean
-branch-review result while the T17 files themselves are still dirty.
+Post-commit remote branch alignment:
+
+```text
+.\.venv\Scripts\python.exe tools\afs_goal_mode_branch_integration_review.py --report runs\goal_mode_branch_integration_review_t17_final.json
+# status=ready_for_human_merge_review; blocker_count=0
+
+local HEAD = upstream = GitHub remote branch
+# 21760e5d59707323ff305ae6a90e8ffa719b04cf
+```
 
 ## Evidence State
 
