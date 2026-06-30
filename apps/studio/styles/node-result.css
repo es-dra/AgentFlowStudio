@@ -192,6 +192,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+.quality-feedback-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  min-width: 0;
+}
+.quality-feedback-context input {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 .quality-feedback-status {
   flex: 1;

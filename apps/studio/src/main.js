@@ -17,7 +17,8 @@ import { openProjectHub } from "./project-hub.js";
 import { syncRuntimeAssets } from "./runtime-asset-sync.js";
 import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
-import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality-feedback.js";
+import { QUALITY_FEEDBACK_EVENT } from "./quality-feedback.js";
+import { handleQualityFeedbackRuntime } from "./quality-feedback-runtime-flow.js";
 import { HUMAN_GATE_DECISION_EVENT, HUMAN_GATE_DECISION_RESULT_EVENT } from "./human-gate.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
@@ -94,7 +95,7 @@ async function bootstrap() {
 
 function bindQualityFeedback() {
   window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => {
-    handleQualityFeedback(event);
+    handleQualityFeedbackRuntime({ event, runtime, store });
   });
 }
 
@@ -197,26 +198,6 @@ async function handleVideoAssetCardDraft(event) {
       current.params.lastVideoAssetCardDraftStatus = "failed";
       current.result = `${current.result || ""}\n视频资产卡识别失败：${safeError(error)}`.trim();
     });
-  }
-}
-
-async function handleQualityFeedback(event) {
-  const requestId = String(event.detail?.request_id || "");
-  try {
-    const feedback = event.detail?.feedback;
-    if (!feedback || typeof feedback !== "object") throw new Error("feedback payload is empty");
-    const response = await runtime.recordFeedback(feedback);
-    window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_RESULT_EVENT, {
-      detail: {
-        request_id: requestId,
-        ok: true,
-        feedback_id: response?.feedback_event?.feedback_id || response?.artifact?.artifact_id || "",
-      },
-    }));
-  } catch (error) {
-    window.dispatchEvent(new CustomEvent(QUALITY_FEEDBACK_RESULT_EVENT, {
-      detail: { request_id: requestId, ok: false, error: safeError(error) },
-    }));
   }
 }
 

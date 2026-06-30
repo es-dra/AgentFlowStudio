@@ -7,6 +7,7 @@ from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS,
 from apps.api.runtime_studio_state_context import sanitize_context_bundle
 from apps.api.runtime_studio_state_feedback_overlay import sanitize_feedback_overlay_decisions
 from apps.api.runtime_studio_state_human_gate import sanitize_human_gate_decisions
+from apps.api.runtime_studio_state_quality_feedback import sanitize_quality_feedback_candidates
 from apps.api.runtime_store import safe_id
 
 
@@ -25,7 +26,7 @@ SAFE_NODE_PARAM_KEYS = (
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
-    "humanGateDecisions", "feedbackOverlayDecisions",
+    "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
 )
 
 
@@ -94,6 +95,8 @@ def _sanitize_param(
         return sanitize_human_gate_decisions(value, text=text)
     if key == "feedbackOverlayDecisions":
         return sanitize_feedback_overlay_decisions(value, text=text)
+    if key == "qualityFeedbackCandidates":
+        return sanitize_quality_feedback_candidates(value, text=text)
     if key == "scriptSegmentIndex":
         return int(max(0, min(9999, number(value, 0))))
     if key in {"nodeRole", "sourceTextNodeId", "directorRef"}:

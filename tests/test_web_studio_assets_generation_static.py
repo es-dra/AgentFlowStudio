@@ -940,6 +940,7 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "downloadResolvedMedia(asset.preview_url" in drawer_assets
     assert "导出原图" in drawer_assets
     media_preview = (STUDIO_ROOT / "src" / "media-preview-modal.js").read_text(encoding="utf-8")
+    feedback_runtime_flow = (STUDIO_ROOT / "src" / "quality-feedback-runtime-flow.js").read_text(encoding="utf-8")
     assert "openMediaPreviewModal" in media_preview
     assert "downloadResolvedMedia" in media_preview
     assert "setRuntimeMediaSource(link, url)" in media_preview
@@ -950,8 +951,8 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "反馈视频质量" in node_menu
     assert "编辑关键帧资产约束" in node_menu
     assert "s.ui.promptBarNodeId = fresh.id" in node_menu
-    assert "handleQualityFeedback" in main
-    assert "runtime.recordFeedback" in main
+    assert "handleQualityFeedbackRuntime" in main
+    assert "runtime.recordFeedback" in feedback_runtime_flow
     assert 'action === "content-card" || action === "video-asset-card-draft"' in action_handler
     assert "resolveEventNode(event) || event.detail?.node" in main
     assert "正在识别视频资产卡" in main

@@ -19,6 +19,98 @@ def test_studio_runtime_client_exposes_feedback_candidate_promotion_contract() -
     assert "record_feedback_candidate_context_overlay" in runtime_client
 
 
+def test_studio_quality_feedback_can_request_reviewed_context_overlay() -> None:
+    quality_feedback = (STUDIO_ROOT / "src" / "quality-feedback.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    runtime_flow = (STUDIO_ROOT / "src" / "quality-feedback-runtime-flow.js").read_text(encoding="utf-8")
+    candidate_flow = (STUDIO_ROOT / "src" / "feedback-candidate-flow.js").read_text(encoding="utf-8")
+
+    assert "data-feedback-next-context" in quality_feedback
+    assert "context_overlay" in quality_feedback
+    assert "include_next_context" in quality_feedback
+    assert "feedbackResultText" in quality_feedback
+    assert "handleQualityFeedbackRuntime" in main
+    assert "async function handleQualityFeedback" not in main
+    assert "recordFeedbackCandidatePromotion" in runtime_flow + candidate_flow
+    assert "recordFeedbackCandidateContextOverlay" in runtime_flow + candidate_flow
+    assert "qualityFeedbackCandidates" in runtime_flow
+    assert "provider_calls_started: false" in candidate_flow
+    assert "writes_long_term_memory: false" in candidate_flow
+    assert "writes_company_kb: false" in candidate_flow
+    assert "fetch(" not in candidate_flow + runtime_flow
+    assert "AFS_ALLOW_REMOTE" not in candidate_flow + runtime_flow
+
+
+def test_studio_feedback_candidate_flow_is_explicit_and_safe() -> None:
+    script = r'''
+import {
+  feedbackCandidateFlowSummary,
+  promoteFeedbackCandidateToContextOverlay,
+} from "./apps/studio/src/feedback-candidate-flow.js";
+
+const feedbackResponse = {
+  artifact: { artifact_id: "artifact_feedback_001" },
+  feedback_event: {
+    feedback_id: "runtime-feedback:project:001",
+    feedback_candidate: {
+      candidate_id: "runtime-feedback-candidate:001",
+      candidate_scope: "quality_feedback_candidate",
+    },
+  },
+};
+const calls = [];
+const runtime = {
+  async recordFeedbackCandidatePromotion(payload) {
+    calls.push({ kind: "promotion", payload });
+    return {
+      artifact: { artifact_id: "artifact_promotion_001" },
+      feedback_candidate_promotion_decision: { decision_id: "promotion_decision_001" },
+    };
+  },
+  async recordFeedbackCandidateContextOverlay(payload) {
+    calls.push({ kind: "overlay", payload });
+    return {
+      artifact: { artifact_id: "artifact_overlay_001" },
+      feedback_candidate_context_overlay: { overlay_id: "runtime-feedback-overlay:001" },
+    };
+  },
+};
+
+const skipped = await promoteFeedbackCandidateToContextOverlay(runtime, feedbackResponse, { requested: false });
+const promoted = await promoteFeedbackCandidateToContextOverlay(runtime, feedbackResponse, {
+  requested: true,
+  rationale: "Use https://example.test/token and D:\\private\\asset.png",
+  overlay_intent: "Use Bearer secret and D:\\private\\context.png",
+});
+const summary = feedbackCandidateFlowSummary(feedbackResponse, promoted);
+process.stdout.write(JSON.stringify({ skipped, calls, summary }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    serialized = json.dumps(payload, ensure_ascii=False).lower()
+
+    assert payload["skipped"] == {"requested": False, "status": "not_requested"}
+    assert [call["kind"] for call in payload["calls"]] == ["promotion", "overlay"]
+    assert payload["calls"][0]["payload"]["decision"] == "promote_to_context_overlay"
+    assert payload["calls"][0]["payload"]["feedback_artifact_id"] == "artifact_feedback_001"
+    assert payload["calls"][0]["payload"]["candidate_id"] == "runtime-feedback-candidate:001"
+    assert payload["calls"][1]["payload"]["promotion_decision_artifact_id"] == "artifact_promotion_001"
+    assert payload["summary"]["context_overlay_requested"] is True
+    assert payload["summary"]["context_overlay_id"] == "runtime-feedback-overlay:001"
+    assert payload["summary"]["provider_calls_started"] is False
+    assert payload["summary"]["writes_long_term_memory"] is False
+    assert payload["summary"]["writes_company_kb"] is False
+    assert "https://example.test" not in serialized
+    assert "bearer secret" not in serialized
+    assert "d:\\private" not in serialized
+
+
 def test_studio_feedback_overlay_review_surface_reads_context_bundle_only() -> None:
     overlay_helper = STUDIO_ROOT / "src" / "feedback-context-overlays.js"
     inspector_summary = (STUDIO_ROOT / "src" / "panels" / "inspector-context-summary.js").read_text(encoding="utf-8")

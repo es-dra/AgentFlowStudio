@@ -374,6 +374,20 @@ Company KB promotion, master merge, deploy, server sync, Runtime health
 verification, or human/business acceptance. Handoff:
 `docs/handoff/AFS-MODEL-CALL-FEEDBACK-OVERLAY-SANITIZER-SPLIT-20260630.md`.
 
+Studio quality feedback context-overlay UI addendum: the next provider-closed
+product slice adds `AFS-T15h Studio Quality Feedback Context Overlay UI Hook`.
+Studio quality feedback remains raw evidence by default, but the feedback form
+now has an explicit default-off operator choice to promote the recorded
+feedback candidate and write a safe Runtime context-overlay artifact for the
+next local context pass. The Runtime routes already existed; this slice wires
+the Studio UI to them through small helper modules, stores only a bounded
+`qualityFeedbackCandidates` node summary, and adds a Runtime Studio-state
+sanitizer for that summary. This is a local feedback-loop UI contract only: no
+new Runtime route, OpenAPI path, provider call, generated media, durable
+memory, Company KB promotion, master merge, deploy, server sync, Runtime health
+verification, or human/business acceptance. Handoff:
+`docs/handoff/AFS-STUDIO-QUALITY-FEEDBACK-CONTEXT-OVERLAY-UI-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

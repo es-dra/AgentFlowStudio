@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Studio Quality Feedback Context Overlay UI Hook
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `ee87172d6a32bf90e91bdf246458ceb040b96fb5`.
+- Added `AFS-T15h Studio Quality Feedback Context Overlay UI Hook` as a
+  provider-closed feedback-loop/Studio UX slice.
+- Added an explicit, default-off quality-feedback checkbox that lets the
+  operator request "next local context" inclusion after recording feedback.
+- Extracted Studio feedback Runtime handling from `main.js` into
+  `quality-feedback-runtime-flow.js`, with `feedback-candidate-flow.js`
+  building the promotion and context-overlay requests.
+- The UI now records only a bounded `qualityFeedbackCandidates` summary on the
+  node. Runtime Studio-state persistence gained a dedicated sanitizer for that
+  summary, forcing `provider_calls_started=false`, `writes_long_term_memory=false`,
+  and `writes_company_kb=false`.
+- No Runtime route, OpenAPI path, provider gate, generated media, durable
+  memory, Company KB promotion, master merge, deploy, server sync, Runtime
+  health verification, or human/business acceptance occurred.
+- Cleanup note: the initial test placement pushed an existing test file over
+  the oversized threshold; it was split into
+  `tests/test_api_runtime_studio_quality_feedback_state.py`, returning
+  `oversized_files` to the prior count of 59.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_api_runtime_studio_quality_feedback_state.py tests\test_api_runtime_studio_state_modules.py tests\test_web_studio_feedback_candidate_static.py tests\test_web_studio_assets_generation_static.py -q
+# 42 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_feedback.py tests\test_api_runtime_feedback_candidate_context_consumption.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_persistence.py tests\test_api_runtime_studio_feedback_overlay_state.py tests\test_api_runtime_studio_state_modules.py tests\test_web_studio_assets_generation_static.py tests\test_web_studio_feedback_candidate_static.py -q
+# 62 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 743 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 132 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# existing warnings: legacy_frozen_surface=10, human_doc_chinese_coverage=22,
+# secret_like_fragments=9, oversized_files=59
+
+git diff --check
+# passed
+```
+
 ## 2026-06-30 - Model Call Feedback Overlay Sanitizer Split
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit
