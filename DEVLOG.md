@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Keyframe Local Generation Bridge
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `71060697c7e5d9ddd95e19d1f49a900245d0b655`.
+- Added deterministic `agentflow.algorithms.generation_bridge` and wired
+  gate-closed keyframe generation to write `keyframe_generation_bridge.json`.
+- The bridge records model/context/request-plan refs, provider gate state,
+  planned local candidate ids, and explicit non-claims while keeping
+  `provider_calls_started=false` and `bridge_media_generated=false`.
+- `keyframe_generation_artifacts(...)` now registers the bridge artifact only
+  when it exists, preserving compatibility with older keyframe runs and async
+  poll paths.
+- Moved bridge artifact writing into
+  `apps/api/runtime_keyframe_generation_bridge.py` to avoid embedding the new
+  bridge body in the already oversized `runtime_keyframes.py`.
+- No provider gate, provider call, Studio UI change, public OpenAPI path
+  change, generated media, deploy, server sync, human creative acceptance,
+  business validation, or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_keyframe_generation_bridge.py
+# red baseline: missing generation_bridge module and Runtime payload
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_generation_manifest_safety.py
+# 4 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_context_resolver.py::test_generate_context_uses_connected_fixed_assets_and_lock_overrides tests\test_api_runtime_context_resolver.py::test_generate_context_uses_label_matched_fixed_assets_without_edges tests\test_api_runtime_context_resolver.py::test_context_bundle_reproducibility_metadata_is_deterministic tests\test_api_runtime_asset_card_drafts.py::test_asset_card_draft_gate_closed_blocks_before_provider_and_stays_safe
+# 4 passed, 1 existing Starlette/httpx deprecation warning
+
+.\.venv\Scripts\python.exe -m pytest
+# 701 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 125 files
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T8
+```
+
 ## 2026-06-30 - Storyboard-to-Asset Evidence Ledger
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

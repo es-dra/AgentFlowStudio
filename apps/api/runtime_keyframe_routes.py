@@ -222,6 +222,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             "writes_company_kb": False,
             "safe_manifest": safe_manifest,
             "context_bundle": result.get("context_bundle"),
+            "generation_bridge": result.get("generation_bridge"),
             "model_call_context_id": result["model_call_context"]["context_id"],
             "artifacts": artifacts,
             "candidate_previews": candidate_previews,

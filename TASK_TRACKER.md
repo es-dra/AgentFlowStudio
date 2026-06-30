@@ -66,6 +66,15 @@ smoke, human creative acceptance, business validation, fixed asset memory, or
 durable memory promotion. Handoff:
 `docs/handoff/AFS-EVIDENCE-LEDGER-STORYBOARD-ASSET-TASKRUN-20260630.md`.
 
+Generation-bridge addendum: the next slice adds
+`agentflow.algorithms.generation_bridge` and gate-closed keyframe generation
+now writes a safe `keyframe_generation_bridge` artifact. This gives T8 a
+fake/local deterministic generation bridge that records model/context/request
+refs, planned candidate ids, and provider-gate evidence without starting
+provider calls, generating media bytes, or claiming human/business success.
+Handoff:
+`docs/handoff/AFS-KEYFRAME-GENERATION-BRIDGE-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

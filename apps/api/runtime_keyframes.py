@@ -27,6 +27,7 @@ from apps.api.runtime_keyframe_payloads import (
     keyframe_request_plan,
     keyframe_safe_manifest,
 )
+from apps.api.runtime_keyframe_generation_bridge import write_keyframe_generation_bridge
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_state import load_creative_memory_state
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
@@ -445,6 +446,20 @@ def build_keyframe_generation(
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
     )
+    generation_bridge = write_keyframe_generation_bridge(
+        output_dir,
+        project_id=project_id,
+        request=request,
+        status=status,
+        provider_gate=provider_gate,
+        provider_calls_started=provider_calls_started,
+        reference_image_count=len(reference_images),
+        blocks=blocks,
+        context_bundle=context_bundle,
+        model_call_context=model_call_context,
+        model_request_plan=model_request_plan,
+        safe_manifest=safe_manifest,
+    )
     for payload in (model_call_context, model_request_plan, request_plan, candidates, safe_manifest):
         reject_unsafe_payload(payload)
     write_json(output_dir / "model_call_context.json", model_call_context)
@@ -476,6 +491,7 @@ def build_keyframe_generation(
         "context_bundle": context_bundle,
         "model_call_context": model_call_context,
         "model_request_plan": model_request_plan,
+        "generation_bridge": generation_bridge,
         "tool_gate_state": {
             "remote_llm": "not_requested",
             "remote_asr": "blocked_by_default",

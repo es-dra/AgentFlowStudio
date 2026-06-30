@@ -56,7 +56,7 @@ def prompt_memory_artifacts(
 
 
 def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict[str, Any]:
-    return {
+    artifacts = {
         "model_call_context": store.register_artifact(
             output_dir / "model_call_context.json",
             role="model_call_context",
@@ -78,6 +78,13 @@ def keyframe_generation_artifacts(store: RuntimeStore, output_dir: Path) -> dict
             role="keyframe_generation_safe_manifest",
         ),
     }
+    bridge_path = output_dir / "keyframe_generation_bridge.json"
+    if bridge_path.is_file():
+        artifacts["keyframe_generation_bridge"] = store.register_artifact(
+            bridge_path,
+            role="keyframe_generation_bridge",
+        )
+    return artifacts
 
 
 def feedback_ref(artifact: dict[str, Any], feedback_id: str) -> dict[str, Any]:

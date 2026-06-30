@@ -22,6 +22,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "asset_card_candidates",
     "production_graph",
     "evidence_ledger",
+    "generation_bridge",
     "revision_drift_control",
 )
 
