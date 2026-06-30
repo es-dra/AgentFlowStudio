@@ -1,0 +1,72 @@
+.human-gate-popover {
+  width: min(380px, calc(100vw - 32px));
+  padding: 0;
+}
+
+.human-gate {
+  border-radius: var(--radius-card);
+  background: rgba(20, 22, 25, 0.96);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  white-space: normal;
+}
+
+.human-gate-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 7px;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.human-gate-head small {
+  grid-column: 2;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.human-gate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
+}
+
+.human-gate-target {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.human-gate-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.human-gate-submit {
+  border: 1px solid var(--border-card);
+  border-radius: 6px;
+  background: var(--bg-chip);
+  color: var(--text-primary);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.human-gate-submit:hover { background: var(--bg-chip-active); }
+
+.human-gate-submit:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.human-gate-status {
+  color: var(--text-faint);
+  font-size: 11px;
+  min-height: 16px;
+}

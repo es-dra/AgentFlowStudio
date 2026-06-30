@@ -28,6 +28,8 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
       n.params.uploads = mergeImageAssets(n.params.uploads || [], reusableAssetForNode(n, reusableAsset, kind)).slice(-4);
     }
     n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
+    n.params.lastGenerationBridge = response?.generation_bridge || n.params.lastGenerationBridge || null;
+    n.params.lastGenerationBridgeArtifactId = response?.artifacts?.keyframe_generation_bridge?.artifact_id || n.params.lastGenerationBridgeArtifactId || "";
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
     n.result = keyframeResultText(response, request, succeeded, { kind });
     if (shouldRecordAsset) {

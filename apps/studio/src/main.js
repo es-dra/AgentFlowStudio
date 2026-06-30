@@ -18,6 +18,7 @@ import { syncRuntimeAssets } from "./runtime-asset-sync.js";
 import { arrangeCanvas, bindStudioKeyboard } from "./studio-keyboard.js";
 import { icon } from "./icons.js";
 import { QUALITY_FEEDBACK_EVENT, QUALITY_FEEDBACK_RESULT_EVENT } from "./quality-feedback.js";
+import { HUMAN_GATE_DECISION_EVENT, HUMAN_GATE_DECISION_RESULT_EVENT } from "./human-gate.js";
 import { renderTopbar } from "./studio-topbar.js";
 import { ensureAuthSession, signOut } from "./auth-gate.js";
 import { initialProjectId } from "./studio-project-session.js";
@@ -68,6 +69,7 @@ async function bootstrap() {
   bindCanvasContextMenu(store, runtimeRef, { arrange: () => arrangeCanvas(store) });
   bindStudioKeyboard({ store, runtime: runtimeRef });
   bindQualityFeedback();
+  bindHumanGateDecisionEvents();
   bindVideoAssetCardDraft();
   bindStudioWorkflowEvents();
 
@@ -93,6 +95,12 @@ async function bootstrap() {
 function bindQualityFeedback() {
   window.addEventListener(QUALITY_FEEDBACK_EVENT, (event) => {
     handleQualityFeedback(event);
+  });
+}
+
+function bindHumanGateDecisionEvents() {
+  window.addEventListener(HUMAN_GATE_DECISION_EVENT, (event) => {
+    handleHumanGateDecision(event);
   });
 }
 
@@ -210,6 +218,46 @@ async function handleQualityFeedback(event) {
       detail: { request_id: requestId, ok: false, error: safeError(error) },
     }));
   }
+}
+
+async function handleHumanGateDecision(event) {
+  const requestId = String(event.detail?.request_id || "");
+  const payload = event.detail?.payload;
+  try {
+    if (!payload || typeof payload !== "object") throw new Error("human gate payload is empty");
+    const response = await runtime.recordHumanGateDecision(payload);
+    const humanGateId = response?.human_gate_decision?.human_gate_id || response?.artifact?.artifact_id || "";
+    recordHumanGateDecisionOnNode(payload, humanGateId, response?.job?.status || "succeeded");
+    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
+      detail: { request_id: requestId, ok: true, human_gate_id: humanGateId },
+    }));
+  } catch (error) {
+    window.dispatchEvent(new CustomEvent(HUMAN_GATE_DECISION_RESULT_EVENT, {
+      detail: { request_id: requestId, ok: false, error: safeError(error) },
+    }));
+  }
+}
+
+function recordHumanGateDecisionOnNode(payload, humanGateId, status) {
+  const nodeId = String(payload?.node_id || "");
+  if (!nodeId) return;
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    const decisions = Array.isArray(node.params.humanGateDecisions) ? node.params.humanGateDecisions : [];
+    node.params.humanGateDecisions = [
+      ...decisions,
+      {
+        human_gate_id: String(humanGateId || ""),
+        target_type: String(payload.target_type || ""),
+        target_id: String(payload.target_id || ""),
+        decision: String(payload.decision || ""),
+        status: String(status || ""),
+        recorded_at: new Date().toISOString(),
+        writes_long_term_memory: false,
+      },
+    ].slice(-12);
+  }, { history: false });
 }
 
 function renderAll(state) {

@@ -86,6 +86,16 @@ acceptance, business validation, generated media, or durable memory promotion.
 Handoff:
 `docs/handoff/AFS-HUMAN-GATE-CONTRACT-TASKRUN-20260630.md`.
 
+Studio human-gate hook addendum: the next slice adds a thin Studio UI hook for
+the Runtime human gate contract. Storyboard breakdown keeps safe
+`asset_card_candidates` refs on the source script node, keyframe generation
+keeps safe `generation_bridge` refs on the image node, and the node menu shows
+`记录人工 Gate` only when such targets exist. The UI calls
+`recordHumanGateDecision(payload)` and records only safe decision summaries in
+node params. No fixed asset promotion, provider gate, provider call, generated
+media, or business/human acceptance claim was added. Handoff:
+`docs/handoff/AFS-STUDIO-HUMAN-GATE-UI-HOOK-TASKRUN-20260630.md`.
+
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are
 not current task entrypoints.

@@ -1,5 +1,58 @@
 # Devlog
 
+## 2026-06-30 - Studio Human Gate UI Hook
+
+- Continued on `codex/afs-project-book-full-goal-20260630` after commit
+  `4c18b2660ed1bef2875eb529330eb84cb74ead1b`.
+- Added a thin Studio human gate hook for the T10 Runtime contract. Nodes with
+  safe `asset_card_candidates` or `generation_bridge` refs now expose
+  `记录人工 Gate` from the node menu.
+- Storyboard breakdown responses now keep safe asset-card candidate refs on the
+  source script node, and keyframe responses keep the safe generation bridge ref
+  on the image node.
+- The new `human-gate.js` popover dispatches local step-gate decisions through
+  `runtime.recordHumanGateDecision(payload)`, then records only a safe
+  `human_gate_id` summary in `node.params.humanGateDecisions`.
+- No fixed asset promotion, provider gate, provider call, generated media,
+  OpenAPI change, deploy, server sync, human creative acceptance, business
+  validation, or durable memory promotion occurred.
+
+Verification so far:
+
+```text
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_human_gate_static.py -q
+# red baseline: missing human-gate.js
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_human_gate_static.py -q
+# 1 passed
+
+.\.venv\Scripts\python.exe -m pytest tests\test_web_studio_human_gate_static.py tests\test_web_studio_assets_generation_static.py::test_mvp_experience_hardening_video_status_and_feedback_markers tests\test_api_runtime_human_gate.py -q
+# 5 passed, 1 existing Starlette/httpx deprecation warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 126 files
+
+.\.venv\Scripts\python.exe -m pytest
+# 705 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+.\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; passed=3; warning=4
+# oversized_files remains at the existing count of 59 after moving human gate
+# styles into a dedicated CSS file.
+
+git diff --check
+# passed
+
+YAML parse check for AFS-Goal-Driven-Execution-State-v0.1.yaml
+# yaml_parse_ok; current_task_id=AFS-T11
+```
+
 ## 2026-06-30 - Runtime Human Gate Contract
 
 - Continued on `codex/afs-project-book-full-goal-20260630` after commit

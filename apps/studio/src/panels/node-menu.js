@@ -2,6 +2,7 @@ import { el, showPopover } from "../overlay.js";
 import { icon } from "../icons.js";
 import { duplicateNode, deleteNodes } from "../nodes.js";
 import { qualityFeedbackView } from "../quality-feedback.js";
+import { humanGateTargets, openHumanGateMenu } from "../human-gate.js";
 import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
@@ -151,6 +152,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     addItem("image", "生成关键帧层", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) createStoryboardKeyframeLayer(store, fresh);
+    });
+  }
+  if (humanGateTargets(node).length) {
+    addItem("check", "记录人工 Gate", () => {
+      const fresh = store.get().nodes[nodeId];
+      if (fresh) openHumanGateMenu(fresh, anchor.point || anchor.el);
     });
   }
   addItem("bookmark", node.params?.isReference ? "取消参考" : "设为参考", () =>
