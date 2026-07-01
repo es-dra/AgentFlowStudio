@@ -54,6 +54,21 @@ YAML parse for AFS-AI-Execution-Spec.yaml and AFS-Goal-Driven-Execution-State-v0
 # passed
 ```
 
+Full pytest was also executed after the T47 code and record commits:
+
+```text
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t47-full -q
+# 774 passed, 520 deselected, 2 warnings, 4 failed
+```
+
+Failure classification:
+
+- `tests/test_maintenance_audit.py` two failures were basetemp-path artifacts from running full pytest under ignored `.venv`; both targeted maintenance tests passed under a normal workspace basetemp.
+- `tests/test_api_runtime_service.py::test_runtime_service_reports_health_and_capabilities_without_secrets` failed because repo-local basetemp makes `runtime_root_persisted=false`; T47 did not touch `apps/api/runtime_info.py` or this health contract.
+- `tests/test_codex_local_provider_errors.py::test_codex_local_missing_cli_is_reported_as_model_gateway_error` failed before provider dispatch because local `C:/Users/chenzy/.afs-codex` chmod is denied on this workstation.
+
+The full pytest result is therefore recorded as environment/path-sensitive residual risk, not as a T47 provider-closed Studio main-path regression.
+
 ## Cleanup
 
 - Current-wave QA tool files were split under the 300-line maintenance threshold.
