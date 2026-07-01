@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-07-02 - SPEC2 Accepted Generation Plan Assembly Contract
+
+- Completed AFS-T58 on `codex/afs-t58-generation-plan-contract-20260702` from T57 integration commit `be476eed107cdaf318f6a6f8a5c3d7c6ac33c95f`.
+- Added `agentflow.algorithms.branch_workflow_package._generation_plan_packet`, a deterministic local helper that assembles `accepted_generation_plan_packet` only after the existing generation-planning candidate, fixed-asset confirmation evidence, residual-question closure evidence, accepted review state, and protected non-claim checks are complete.
+- The default T57 fixture remains blocked with `packet_state=blocked_pending_generation_plan_prerequisites`; the accepted packet path is proven through an explicit repo-local fixture mutation with branch-specific fixed asset refs, residual closure refs, evidence refs, owner/reviewer/close-condition refs, review state, non-claim boundaries, and provider-closed generation-request planning fields.
+- Preserved local-only evidence origin boundaries and fail-closed behavior for fake external confirmations, provider response evidence, graph writes, unsafe markers, and protected non-claim collapse.
+- No Runtime route, OpenAPI path, Studio UI, provider adapter/config, external download, provider call, generated media, reader playback, storage lifecycle, deploy/server sync, Runtime health claim, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t58-red tests\test_branch_workflow_accepted_generation_plan_packet.py -q
+# expected red: 2 failed, 1 passed because accepted_generation_plan_packet was not implemented
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t58-focused tests\test_branch_workflow_accepted_generation_plan_packet.py -q
+# 3 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t58-branch-contract tests\test_branch_workflow_package_contract.py tests\test_branch_workflow_generation_planning_gate.py tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_accepted_generation_plan_packet.py -q
+# 37 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t58-impacted tests\test_branch_workflow_accepted_generation_plan_packet.py tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_generation_planning_gate.py tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 69 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning-only categories, including current-scope _validator.py at 311 lines
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - SPEC2 Fixed Asset Confirmation Evidence Contract Integration
 
 - Integrated AFS-T57 into `master` from evaluated worktree `C:\Users\chenzy\.codex\worktrees\5e58\AgentFlowStudio` on top of docs-cleanup commit `7823a86c972b238227da50d3009b24ef9bfcd0ba`.

@@ -21,6 +21,7 @@ from agentflow.algorithms.interactive_manga_branch_package._helpers import (
 
 from ._support import known_refs, repo_root_for_fixture, validation_report
 from ._confirmation_evidence import validate_fixed_asset_confirmation_evidence
+from ._generation_plan_packet import build_accepted_generation_plan_packet
 from ._generation_planning import build_generation_planning_candidate
 from ._review_status import validate_review_status
 from . import (
@@ -81,6 +82,15 @@ def validate_branch_workflow_package_fixture(
     generation_planning_candidate = build_generation_planning_candidate(
         package, assets, evidence_requirements, readiness, review_status, payload["non_claims"], fixed_asset_confirmation_evidence
     )
+    accepted_generation_plan_packet = build_accepted_generation_plan_packet(
+        package,
+        assets,
+        graph_artifacts,
+        review_status,
+        fixed_asset_confirmation_evidence,
+        generation_planning_candidate,
+        payload["non_claims"],
+    )
     return validation_report(
         payload,
         package,
@@ -95,6 +105,7 @@ def validate_branch_workflow_package_fixture(
         review_status,
         fixed_asset_confirmation_evidence,
         generation_planning_candidate,
+        accepted_generation_plan_packet,
     )
 
 

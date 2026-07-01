@@ -23,10 +23,12 @@ FAILURE_MODES = (
     "fixed_asset_confirmation_evidence_missing",
     "residual_question_closure_evidence_missing",
     "non_local_fixed_asset_confirmation_evidence",
+    "accepted_generation_plan_packet_claim_collapse",
 )
 EVIDENCE_BOUNDARY = (
     "deterministic branch workflow package readiness wrapper only; reuses T53 structure "
-    "contract and makes no Runtime, Studio, provider, media, or product readiness claim"
+    "contract and assembles local generation-plan structure evidence without Runtime, "
+    "Studio, provider, media, or product readiness claims"
 )
 
 REFERENCE_POLICY = "reference_only_no_node_write"

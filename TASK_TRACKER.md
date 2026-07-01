@@ -9,6 +9,28 @@
 Last updated: 2026-07-02 by Codex
 
 
+SPEC2 accepted generation plan assembly contract addendum: T58 adds the next
+deterministic `branch_workflow_package` report section,
+`accepted_generation_plan_packet`. The default T57 package remains blocked
+because branch-specific fixed-asset confirmation and residual-question closure
+evidence are incomplete. An explicitly confirmed repo-local fixture mutation
+can now assemble `packet_state=accepted_local_generation_plan_packet` with
+fixed asset refs, residual closure refs, evidence refs, owner/reviewer/close
+condition refs, review state, non-claim boundaries, and provider-closed
+generation-request planning fields. The packet is structure evidence only and
+keeps provider calls, generated media, graph writes, Runtime/OpenAPI/Studio,
+reader playback, storage lifecycle, human acceptance, business validation,
+final schema acceptance, product readiness, deploy/runtime health, CompanyOS
+projection, durable-memory promotion, and COS active-rule promotion as
+non-claims. Focused red/green pytest passed (`2 failed, 1 passed` expected red;
+then `3 passed`); branch workflow contract tests passed (`37 passed`);
+impacted T58/T57/T56/T55/T54/T53/T52/algorithm contract tests passed
+(`69 passed`). Maintenance audit reported `failed=0` with warning-only
+categories, including the current-scope `_validator.py` 311-line oversized
+warning; `git diff --check` passed.
+Handoff:
+`docs/handoff/AFS-T58-SPEC2-ACCEPTED-GENERATION-PLAN-ASSEMBLY-CONTRACT-20260702.md`.
+
 SPEC2 fixed-asset confirmation evidence contract integration addendum: T57 was
 integrated into `master` from evaluated worktree
 `C:\Users\chenzy\.codex\worktrees\5e58\AgentFlowStudio` on top of docs-cleanup
