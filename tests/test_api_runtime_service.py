@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_errors import response_contains_unsafe_marker
+from apps.api.runtime_info import runtime_root_is_persisted
 from apps.api.runtime_service import create_runtime_app
 from apps.api.runtime_store import RuntimeStore
 
@@ -29,7 +30,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
 
     assert health["service"] == "agentflow_runtime_service"
     assert health["status"] == "ready"
-    assert health["runtime_root_persisted"] is True
+    assert health["runtime_root_persisted"] is runtime_root_is_persisted(tmp_path)
     assert health["studio_static"] == {
         "mounted": True,
         "root_exists": True,

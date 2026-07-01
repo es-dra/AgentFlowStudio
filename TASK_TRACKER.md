@@ -8,6 +8,24 @@
 
 Last updated: 2026-07-01 by Codex
 
+Full pytest residual triage addendum: T48 resolves the T47 full pytest quality
+debt without opening provider or expanding product/runtime surfaces. The
+`.venv` basetemp maintenance failures were fixture isolation debt; the affected
+maintenance-audit fixtures now initialize their own git repos. The
+`runtime_root_persisted` failure was a hard-coded assertion against a
+path-sensitive production helper; the test now asserts against
+`runtime_root_is_persisted(tmp_path)`. The Codex local provider error test now
+isolates `AFS_CODEX_HOME` under pytest tmp and disables bootstrap so workstation
+`C:/Users/chenzy/.afs-codex` chmod state cannot mask the missing-CLI behavior.
+Focused residual pytest passed (`4 passed, 1 warning`), full pytest passed
+(`778 passed, 520 deselected, 2 warnings`), maintenance audit had `failed=0`,
+and `git diff --check` passed. This is deterministic fixture/test
+stabilization only, not provider smoke, generated media, human creative
+acceptance, business validation, public claim, patent/legal decision, external
+download, deploy verification, Runtime health verification, or COS active-rule
+promotion. Handoff:
+`docs/handoff/AFS-FULL-PYTEST-RESIDUAL-TRIAGE-20260701.md`.
+
 Studio main-path browser QA addendum: T47 records the execution method as Agentic Loop Engineering; the project book, execution spec, task ledger, and state file are loop artifacts, while AFS remains the AI-native manga/video/image content production workbench. T47 verifies `/studio/` can carry the
 Runtime main-loop evidence path without opening providers: real benchmark
 storyboard seed -> asset card/fixed asset/human-gate evidence -> production

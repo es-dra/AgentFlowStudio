@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-07-01 - Full Pytest Residual Triage
+
+- Completed AFS-T48 on `codex/afs-post-main-loop-e2e-continuation-20260630` as provider-closed full pytest residual triage.
+- Converted the four T47 full pytest residuals into deterministic fixture/test conclusions: `.venv` basetemp maintenance failures were git-fixture isolation debt, `runtime_root_persisted` was a hard-coded test assumption, and `C:/Users/chenzy/.afs-codex` chmod denial was user-home fixture leakage.
+- Updated the affected tests with minimal fixture changes; no Runtime route, OpenAPI, Studio UI, provider adapter behavior, generated media path, or business/product surface was expanded.
+- Managed thread register remains active: AFS Redundancy Maintenance Lane is still owned by `019f1b8c-4e67-7840-93ca-5cd0b99b1d21` and was not edited by T48; CompanyOS projection lane `019f1ba2-9956-7c80-9d18-c0d541b3142c` remains its own uncommitted/unpushed follow-up.
+- No provider smoke, live provider call, generated media, human creative acceptance, business validation, public claim, patent/legal decision, external download, deploy verification, Runtime health claim, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t48-residual tests\test_maintenance_audit.py::test_maintenance_audit_reports_expected_contract_shape tests\test_maintenance_audit.py::test_historical_docs_are_exempt_only_when_summary_exists tests\test_api_runtime_service.py::test_runtime_service_reports_health_and_capabilities_without_secrets tests\test_codex_local_provider_errors.py::test_codex_local_missing_cli_is_reported_as_model_gateway_error -q
+# 4 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t48-full -q
+# 778 passed, 520 deselected, 2 warnings
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
+
 ## 2026-07-01 - Studio Main Path Browser QA
 
 - Completed AFS-T47 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed Studio main-path browser smoke.

@@ -9,6 +9,7 @@ from tools.maintenance_audit import build_maintenance_audit
 
 
 def test_maintenance_audit_reports_expected_contract_shape(tmp_path) -> None:
+    _init_git_repo(tmp_path)
     (tmp_path / "AGENTS.md").write_text(
         "# 规则\n\nTreat `D:\\Learning materials\\Learning_notes\\Company` as legacy.\n",
         encoding="utf-8",
@@ -175,6 +176,7 @@ def test_chinese_doc_coverage_ignores_machine_contract_blocks(tmp_path) -> None:
 
 
 def test_historical_docs_are_exempt_only_when_summary_exists(tmp_path) -> None:
+    _init_git_repo(tmp_path)
     docs = tmp_path / "docs"
     handoff = docs / "handoff"
     archive = docs / "archive"
@@ -197,6 +199,18 @@ def test_historical_docs_are_exempt_only_when_summary_exists(tmp_path) -> None:
     coverage = checks_with_summary["human_doc_chinese_coverage"]
     assert coverage["status"] == "passed"
     assert coverage["historical_docs_exempted_count"] == 1
+
+
+def _init_git_repo(path: Path) -> None:
+    subprocess.run(
+        ["git", "init"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="ignore",
+    )
 
 
 def test_maintenance_audit_classifies_git_state_and_excludes_ignored_oversized_files(tmp_path) -> None:
