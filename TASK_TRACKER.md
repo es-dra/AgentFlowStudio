@@ -8,6 +8,27 @@
 
 Last updated: 2026-07-02 by Codex
 
+Professional Prompt Optimization deterministic hardening addendum: real Chinese
+image/keyframe/video prompts now enter a provider-closed professional visual
+contract path before prompt assembly. The new helper extracts actual CJK
+subject, emotion, scene, action, and motion semantics for prompts such as
+`女生在笑`, `女生微笑`, `雨夜街道，紧张`, `让她慢慢回头微笑`, and `开心`.
+Optimized image/keyframe prompts now include subject identity, restrained
+realistic expression cues, expression decomposition before action, body/action
+carrier, scene grounding, light/camera details, continuity, and negative
+constraints. Optimized video prompts now include start state, transition,
+movement/body carrier, camera/environment motion, end state, duration/beat
+language, and first-frame/source continuity when available; image-to-video
+optimization focuses on motion-first continuation rather than restating the
+whole upstream image. Focused red/green semantic tests passed (`5 failed` before
+implementation, then `5 passed`); impacted prompt optimizer/API contract tests
+passed (`81 passed`); full pytest passed (`862 passed, 520 deselected, 2
+warnings`). Studio JS was not touched. This is deterministic prompt-contract
+verification only, not provider smoke, generated-media quality, human creative
+acceptance, business validation, deploy/runtime health, CompanyOS projection,
+durable-memory promotion, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-PROFESSIONAL-PROMPT-OPTIMIZATION-DETERMINISTIC-HARDENING-20260702.md`.
+
 
 Video node duration/provenance idempotence revision addendum: this revision
 patches the evaluator-blocking follow-up on top of commit `2f96939c`. Studio

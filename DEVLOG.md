@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-07-02 - Professional Prompt Optimization Deterministic Hardening
+
+- Completed provider-closed deterministic hardening on `codex/afs-professional-prompt-optimization-hardening-20260702` from base `4cc62a36df5d724f0861154d195067f260e65fc1`.
+- Added a focused professional prompt contract helper for visual prompt optimization. Real CJK prompts such as `女生在笑`, `女生微笑`, `雨夜街道，紧张`, `让她慢慢回头微笑`, and `开心` now extract subject, emotion, scene, action, and motion semantics before prompt assembly.
+- Hardened image/keyframe prompt assembly with subject identity, restrained realistic expression cues, expression-before-action decomposition, body/action carrier, grounded scene, light/camera details, continuity, and professional negative constraints.
+- Hardened video prompt assembly with start state, transition, movement/body carrier, camera/environment motion, end state, duration/beat language, and first-frame/source continuity when available. Image-to-video optimization now emphasizes motion-first continuation and provenance instead of restating the full upstream image.
+- Added focused semantic tests at `tests/test_api_runtime_professional_prompt_optimization.py`; Studio JS was not touched and the lightweight optimize action remains unchanged.
+- No provider call, generated media, external download, Studio redesign, server/deploy sync, Runtime health claim, OpenAPI change, human acceptance, business validation, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+- Handoff: `docs/handoff/AFS-PROFESSIONAL-PROMPT-OPTIMIZATION-DETERMINISTIC-HARDENING-20260702.md`.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_professional_prompt_optimization.py
+# red before implementation: 5 failed, 1 warning
+# green after implementation: 5 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_prompt_memory_loop.py tests\test_api_runtime_prompt_memory_candidates.py tests\test_api_runtime_creative_agent_keyframes.py tests\test_api_runtime_context_resolver.py tests\test_api_runtime_director_setup_prompt.py tests\test_algorithm_library_contracts.py
+# 81 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -q
+# 862 passed, 520 deselected, 2 warnings
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - Video Node Duration and Provenance Idempotence Revision
 
 - Completed the evaluator-blocking duration/provenance idempotence revision on `codex/afs-video-node-duration-provenance-revision-20260702` from commit `2f96939c784b9e41616a29a5fde6061d8a2263aa`.

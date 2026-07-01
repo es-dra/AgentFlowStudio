@@ -19,6 +19,7 @@ from agentflow.knowledge.creative_prompt_rules import (
 )
 from apps.api.runtime_creative_agent import build_creative_agent_decision
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_professional_prompt_contract import professional_section_details
 from apps.api.runtime_prompt_memory_slots import extract_prompt_slots
 from apps.api.runtime_prompt_memory_user_prompt import build_user_prompt
 
@@ -126,6 +127,7 @@ def _prompt_sections(
         section: format_director_scenario_reference(director_scenario, section)
         for section in SECTION_ORDER
     }
+    professional_details = professional_section_details(request, slots)
     text_by_section = {
         "Intent": (
             f"Optimize this {request.node_type} node for {request.generation_target} on {request.target_platform}. "
@@ -168,7 +170,10 @@ def _prompt_sections(
             f"{scenario_by_section.get('Negative Constraints', '')} {_suppressed_text(suppressed)} {rule_guidance.get('Negative Constraints', '')}"
         ),
     }
-    return [{"title": section, "text": text_by_section[section].strip()} for section in SECTION_ORDER]
+    return [
+        {"title": section, "text": _join_section_text(text_by_section[section], professional_details.get(section))}
+        for section in SECTION_ORDER
+    ]
 
 
 def _guidance_by_section(rules: list[dict[str, Any]]) -> dict[str, str]:
@@ -251,6 +256,10 @@ def _suppressed_text(suppressed: list[dict[str, str]]) -> str:
     if not suppressed:
         return ""
     return "Suppressed lower-priority preference: " + "; ".join(item["value"] for item in suppressed)
+
+
+def _join_section_text(base: str, professional_detail: str | None) -> str:
+    return " ".join(part.strip() for part in (base, professional_detail or "") if part and part.strip())
 
 
 def _list(value: Any) -> list[Any]:
