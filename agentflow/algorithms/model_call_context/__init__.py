@@ -44,8 +44,10 @@ def build_model_call_context(
     rejected_assets: list[dict[str, Any]] | None = None,
     retired_assets: list[dict[str, Any]] | None = None,
     reference_image_refs: list[str] | None = None,
+    input_source: dict[str, Any] | None = None,
     upstream_refs: list[str] | None = None,
     user_preferences: dict[str, Any] | None = None,
+    duration_contract: dict[str, Any] | None = None,
     expert_rule_ids: list[str] | None = None,
     provider_constraints: dict[str, Any] | None = None,
     feedback_events: list[dict[str, Any]] | None = None,
@@ -106,9 +108,11 @@ def build_model_call_context(
         "reference_context": {
             "reference_image_refs": _safe_ref_list(refs),
             "reference_image_count": len(refs),
+            "input_source": _sanitize_payload(input_source or {}),
         },
         "preference_context": {
             "user_preferences": user_preferences or {},
+            "duration_contract": _sanitize_payload(duration_contract or {}),
             "expert_rule_ids": _safe_ref_list(expert_rule_ids or []),
         },
         "feedback_context": {

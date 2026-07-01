@@ -19,6 +19,7 @@ from apps.api.runtime_media_validation import reference_image_size_blocks
 from apps.api.runtime_model_call_context import video_generation_model_call_context
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_store import RuntimeStore, read_json
+from apps.api.runtime_video_contract import video_duration_contract, video_input_mode, video_input_source_contract
 from apps.api.runtime_video_candidates import safe_outputs
 from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV
 from apps.api.runtime_video_gate import gate_closed_block, provider_not_ready_block, video_gate
@@ -90,6 +91,8 @@ def submit_video_generation(
         resolution=request.resolution,
         aspect_ratio=request.aspect_ratio,
         candidate_count=request.candidate_count,
+        input_mode=video_input_mode(request),
+        input_source_mode=video_input_source_contract(request).get("source_mode"),
     )
     if request.candidate_count != 1:
         raise RuntimeApiError(
@@ -190,21 +193,6 @@ def submit_video_generation(
         )
         return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, provider_not_ready_block(reason))
     provider_model = _provider_model(registry, request.provider_service_id)
-    _validate_provider_request(request, descriptor)
-    runtime_file_event(
-        "video",
-        "provider_capability_checked",
-        request_id=request_id,
-        client_request_id=client_request_id,
-        project_id=project_id,
-        node_id=request.node_id,
-        job_id=job_id,
-        provider_service_id=request.provider_service_id,
-        duration_sec=request.duration_sec,
-        resolution=request.resolution,
-        aspect_ratio=request.aspect_ratio,
-        elapsed_ms=_elapsed_ms(started),
-    )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_VIDEO_ENV) or REMOTE_VIDEO_ENV)
     gate = video_gate(required_gate)
     if gate["status"] == "blocked":
@@ -223,6 +211,22 @@ def submit_video_generation(
             elapsed_ms=_elapsed_ms(started),
         )
         return _blocked_result(project_id, output_dir, context_bundle, model_call_context, artifacts, model_request_plan, gate_closed_block(required_gate), gate)
+    _validate_provider_request(request, descriptor)
+    runtime_file_event(
+        "video",
+        "provider_capability_checked",
+        request_id=request_id,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        node_id=request.node_id,
+        job_id=job_id,
+        provider_service_id=request.provider_service_id,
+        duration_sec=request.duration_sec,
+        resolution=request.resolution,
+        aspect_ratio=request.aspect_ratio,
+        input_mode=video_input_mode(request),
+        elapsed_ms=_elapsed_ms(started),
+    )
     min_edge = int(getattr(descriptor, "min_reference_image_edge_px", 0) or 0)
     if size_blocks := reference_image_size_blocks(frame_metadata, min_edge_px=min_edge, capability="video", required_gate=required_gate):
         runtime_file_event(
@@ -265,6 +269,9 @@ def submit_video_generation(
         duration_sec=request.duration_sec,
         resolution=request.resolution,
         motion=request.motion,
+        input_mode=video_input_mode(request),
+        input_source=video_input_source_contract(request),
+        duration_contract=video_duration_contract(request.duration_sec),
     )
     runtime_file_event(
         "video",
@@ -342,7 +349,15 @@ def submit_video_generation(
             submit_elapsed_ms=_elapsed_ms(started),
             provider_elapsed_ms=provider_elapsed_ms,
         )
-    manifest = safe_manifest(project_id, status="submitted", provider_calls_started=True, provider_gate=gate, context_bundle=context_bundle, model_call_context_id=model_call_context["context_id"])
+    manifest = safe_manifest(
+        project_id,
+        status="submitted",
+        provider_calls_started=True,
+        provider_gate=gate,
+        context_bundle=context_bundle,
+        model_call_context_id=model_call_context["context_id"],
+        **_manifest_contract_kwargs(model_call_context, model_request_plan),
+    )
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     return result_from_manifest(status="submitted", safe_manifest=manifest, task_state=task_state, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
 
@@ -395,6 +410,7 @@ def poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path
             provider_calls_started=True,
             blocks=[_provider_not_ready_block(str(exc), provider_error_summary)],
             context_bundle=_context_bundle(state),
+            **_manifest_contract_kwargs_from_state(state),
         )
         write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "poll_failed"
@@ -414,7 +430,14 @@ def poll_video_generation(store: RuntimeStore, project_id: str, output_dir: Path
             provider_elapsed_ms=provider_elapsed_ms,
             elapsed_ms=_elapsed_ms(started),
         )
-        manifest = safe_manifest(project_id, status="running", provider_calls_started=True, blocks=[], context_bundle=_context_bundle(state))
+        manifest = safe_manifest(
+            project_id,
+            status="running",
+            provider_calls_started=True,
+            blocks=[],
+            context_bundle=_context_bundle(state),
+            **_manifest_contract_kwargs_from_state(state),
+        )
         write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
         state["status"] = "running"
         state.setdefault("running_started_at", poll_time)
@@ -455,7 +478,16 @@ def complete_video_result(
     task_state["last_poll_at"] = completed_at
     task_state["completed_at"] = completed_at
     write_task_state(output_dir, task_state)
-    manifest = safe_manifest(project_id, status="succeeded", provider_calls_started=True, provider_gate=provider_gate, outputs=outputs, context_bundle=context_bundle, model_call_context_id=str(task_state.get("model_call_context_id") or ""))
+    manifest = safe_manifest(
+        project_id,
+        status="succeeded",
+        provider_calls_started=True,
+        provider_gate=provider_gate,
+        outputs=outputs,
+        context_bundle=context_bundle,
+        model_call_context_id=str(task_state.get("model_call_context_id") or ""),
+        **_manifest_contract_kwargs_from_state(task_state),
+    )
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     runtime_file_event(
         "video",
@@ -482,8 +514,10 @@ def _model_call_context(project_id: str, request: VideoGenerationRequest, contex
             "provider_service_id": request.provider_service_id,
             "required_gate": REMOTE_VIDEO_ENV,
             "duration_sec": request.duration_sec,
+            "duration_contract": video_duration_contract(request.duration_sec),
             "resolution": request.resolution,
             "aspect_ratio": request.aspect_ratio,
+            "input_mode": video_input_mode(request),
             "reference_image_slots": 1 + int(bool(request.last_frame_image_asset_id)),
         },
     )
@@ -500,6 +534,20 @@ def _validate_provider_request(request: VideoGenerationRequest, descriptor: Any)
             details={
                 "duration_sec": request.duration_sec,
                 "allowed": supported_durations,
+                "provider_service_id": request.provider_service_id,
+            },
+        )
+    input_mode = video_input_mode(request)
+    supported_input_modes = [str(item) for item in getattr(descriptor, "frame_modes", []) or []]
+    if supported_input_modes and input_mode not in supported_input_modes:
+        raise RuntimeApiError(
+            "unsupported_input_mode",
+            "褰撳墠瑙嗛妯″瀷涓嶆敮鎸佽棣栧抚/棣栧熬甯ц緭鍏ユā寮忋€?",
+            stage="provider_capability_check",
+            user_action=f"璇锋敼涓烘ā鍨嬫敮鎸佺殑杈撳叆妯″紡锛?{', '.join(supported_input_modes)}銆?",
+            details={
+                "input_mode": input_mode,
+                "allowed": supported_input_modes,
                 "provider_service_id": request.provider_service_id,
             },
         )
@@ -532,7 +580,16 @@ def _validate_provider_request(request: VideoGenerationRequest, descriptor: Any)
 
 
 def _blocked_result(project_id: str, output_dir: Path, context_bundle: dict[str, Any] | None, model_call_context: dict[str, Any], artifacts: dict[str, Any], model_request_plan: dict[str, Any], block: dict[str, Any], provider_gate: dict[str, str] | None = None, *, blocks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    manifest = safe_manifest(project_id, status="blocked", provider_calls_started=False, provider_gate=provider_gate, blocks=blocks or [block], context_bundle=context_bundle, model_call_context_id=model_call_context["context_id"])
+    manifest = safe_manifest(
+        project_id,
+        status="blocked",
+        provider_calls_started=False,
+        provider_gate=provider_gate,
+        blocks=blocks or [block],
+        context_bundle=context_bundle,
+        model_call_context_id=model_call_context["context_id"],
+        **_manifest_contract_kwargs(model_call_context, model_request_plan),
+    )
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     return result_from_manifest(status="blocked", safe_manifest=manifest, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
 
@@ -557,6 +614,7 @@ def _poll_failed_result(
         blocks=[_provider_not_ready_block(reason, provider_error_summary or {})],
         context_bundle=context_bundle,
         model_call_context_id=model_call_context["context_id"],
+        **_manifest_contract_kwargs(model_call_context, model_request_plan),
     )
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     return result_from_manifest(status="poll_failed", safe_manifest=manifest, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
@@ -652,6 +710,9 @@ def _task_state(
         "task": provider_task_for_state(provider_task),
         "first_frame_image_asset_id": request.first_frame_image_asset_id,
         "last_frame_image_asset_id": request.last_frame_image_asset_id,
+        "input_source": video_input_source_contract(request),
+        "input_mode": video_input_mode(request),
+        "duration_contract": video_duration_contract(request.duration_sec),
         "created_at": now,
         "submitted_at": now,
         "provider_raw_persisted": False,
@@ -661,6 +722,32 @@ def _task_state(
         "model_call_context_id": model_call_context["context_id"],
         "model_request_plan_ref": "model_request_plan.json",
         "video_generation_plan": generation_plan,
+    }
+
+
+def _manifest_contract_kwargs(model_call_context: dict[str, Any], model_request_plan: dict[str, Any] | None = None) -> dict[str, Any]:
+    reference_context = model_call_context.get("reference_context") if isinstance(model_call_context, dict) else {}
+    preference_context = model_call_context.get("preference_context") if isinstance(model_call_context, dict) else {}
+    provider_constraints = model_call_context.get("provider_constraints") if isinstance(model_call_context, dict) else {}
+    plan = model_request_plan if isinstance(model_request_plan, dict) else {}
+    input_source = plan.get("input_source") if isinstance(plan.get("input_source"), dict) else (
+        reference_context.get("input_source") if isinstance(reference_context, dict) else {}
+    )
+    duration_contract = plan.get("duration_contract") if isinstance(plan.get("duration_contract"), dict) else (
+        preference_context.get("duration_contract") if isinstance(preference_context, dict) else {}
+    )
+    return {
+        "input_source": input_source if isinstance(input_source, dict) else {},
+        "input_mode": str(provider_constraints.get("input_mode") or ""),
+        "duration_contract": duration_contract if isinstance(duration_contract, dict) else {},
+    }
+
+
+def _manifest_contract_kwargs_from_state(state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "input_source": state.get("input_source") if isinstance(state.get("input_source"), dict) else {},
+        "input_mode": str(state.get("input_mode") or ""),
+        "duration_contract": state.get("duration_contract") if isinstance(state.get("duration_contract"), dict) else {},
     }
 
 

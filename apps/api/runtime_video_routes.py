@@ -93,6 +93,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
             node_id=node_id,
             provider_service_id=request.provider_service_id,
             first_frame_image_asset_id=request.first_frame_image_asset_id,
+            input_source_mode=(request.input_source.source_mode if request.input_source else "explicit_first_frame_selection"),
             duration_sec=request.duration_sec,
             resolution=request.resolution,
             aspect_ratio=request.aspect_ratio,

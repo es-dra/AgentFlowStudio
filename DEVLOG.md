@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-07-02 - Video Node Deterministic Slice Recovery
+
+- Completed provider-closed deterministic recovery on `codex/afs-video-node-deterministic-slice-recovery-20260702` from T58 baseline `38c7cf5ef08b6d84217ef145129c4592866d8b49`.
+- Added explicit video first-frame input source contracts for direct video-node uploads, upstream uploaded-image nodes, upstream generated-image/keyframe nodes, fixed visual asset references, and explicit first-frame selection.
+- Added Runtime `VideoInputSource`, `input_mode`, and `duration_contract` propagation through preflight, model-call context, provider-neutral request plan, safe manifest, and task state. Closed video gates now return deterministic planning artifacts before provider-specific duration/input-mode checks start; gate-open provider-specific unsupported duration and input-mode errors remain structured and reject before provider submit.
+- Widened the Studio video duration selector to the request contract boundary values `1s`, `5s`, `10s`, and `15s`, while preserving the 5s default and provider-specific duration checks.
+- Added `tests/test_web_studio_video_node_contract.py`, expanded Runtime video generation contract tests, regenerated the Runtime OpenAPI snapshot, and recorded the handoff at `docs/handoff/AFS-VIDEO-NODE-DETERMINISTIC-SLICE-RECOVERY-20260702.md`.
+- No provider call, generated media, external download, server/deploy sync, Runtime health claim, human acceptance, business validation, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+npm run check:studio-js
+# JS syntax check passed: 134 files
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_video_node_contract.py tests\test_api_runtime_video_generations.py tests\test_volc_seedance_video_adapter.py tests\test_web_studio_frontend_wave.py -q
+# 50 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py -q
+# 1 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main --help
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -q
+# 854 passed, 520 deselected, 2 warnings
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - SPEC2 Accepted Generation Plan Assembly Contract
 
 - Completed AFS-T58 on `codex/afs-t58-generation-plan-contract-20260702` from T57 integration commit `be476eed107cdaf318f6a6f8a5c3d7c6ac33c95f`.

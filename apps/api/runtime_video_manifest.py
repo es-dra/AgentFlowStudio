@@ -133,6 +133,9 @@ def safe_manifest(
     outputs: list[dict[str, Any]] | None = None,
     context_bundle: dict[str, Any] | None = None,
     model_call_context_id: str | None = None,
+    input_source: dict[str, Any] | None = None,
+    input_mode: str | None = None,
+    duration_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest = {
         "schema_version": "afs_video_generation_safe_manifest.v0.1",
@@ -154,6 +157,12 @@ def safe_manifest(
     if model_call_context_id:
         manifest["model_call_context_id"] = model_call_context_id
         manifest["model_request_plan_ref"] = "model_request_plan.json"
+    if input_source:
+        manifest["input_source"] = input_source
+    if input_mode:
+        manifest["input_mode"] = input_mode
+    if duration_contract:
+        manifest["duration_contract"] = duration_contract
     if context_bundle:
         manifest["context_bundle_mode"] = context_bundle.get("mode")
         manifest["context_included_asset_count"] = len(context_bundle.get("included_assets") or [])

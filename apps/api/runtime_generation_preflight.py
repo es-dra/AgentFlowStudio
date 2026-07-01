@@ -9,6 +9,7 @@ from agentflow_studio.model_gateway.provider_adapter import load_provider_regist
 from apps.api.runtime_context_resolver import resolve_context_bundle
 from apps.api.runtime_models import KeyframeGenerationRequest, VideoGenerationRequest
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
+from apps.api.runtime_video_contract import video_duration_contract, video_input_mode, video_input_source_contract
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -107,6 +108,7 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
         "reference_image_channel": list((bundle or {}).get("reference_image_channel") or []),
         "subject_reference_asset_id": (bundle or {}).get("subject_reference_asset_id"),
         "feedback_context_overlays": list((bundle or {}).get("feedback_context_overlays") or []),
+        **_video_contract_fields(kind, request),
         "preflight_token": _preflight_token(kind, request, bundle),
         "non_claims": [
             "preflight_only",
@@ -117,6 +119,16 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
     }
     reject_unsafe_payload(payload)
     return payload
+
+
+def _video_contract_fields(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> dict[str, Any]:
+    if kind != "video" or not isinstance(request, VideoGenerationRequest):
+        return {}
+    return {
+        "input_source": video_input_source_contract(request),
+        "input_mode": video_input_mode(request),
+        "duration_contract": video_duration_contract(request.duration_sec),
+    }
 
 
 def _preflight_token(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest, bundle: dict[str, Any] | None) -> str:

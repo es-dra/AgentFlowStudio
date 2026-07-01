@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from agentflow.algorithms.model_call_context import build_model_call_context
+from apps.api.runtime_video_contract import video_duration_contract, video_input_source_contract
 
 
 def prompt_optimization_model_call_context(
@@ -70,12 +71,15 @@ def video_generation_model_call_context(
             getattr(request, "first_frame_image_asset_id", None),
             getattr(request, "last_frame_image_asset_id", None),
         ),
+        input_source=video_input_source_contract(request),
         user_preferences={
             "duration_sec": request.duration_sec,
+            "duration_contract": video_duration_contract(request.duration_sec),
             "motion": request.motion,
             "resolution": request.resolution,
             "aspect_ratio": request.aspect_ratio,
         },
+        duration_contract=video_duration_contract(request.duration_sec),
         provider_constraints=provider_constraints,
     )
 
@@ -121,15 +125,18 @@ def revision_model_call_context(
         generation_target="revision",
         input_prompt=request.revision_intent,
         reference_image_refs=_image_refs(request.first_frame_image_asset_id, request.last_frame_image_asset_id),
+        input_source=video_input_source_contract(request),
         upstream_refs=_image_refs(request.base_video_job_id, request.base_video_artifact_id, request.parent_revision_job_id),
         user_preferences={
             "duration_sec": request.duration_sec,
+            "duration_contract": video_duration_contract(request.duration_sec),
             "resolution": request.resolution,
             "aspect_ratio": request.aspect_ratio,
             "motion": request.motion,
             "provider_capability_mode": request.provider_capability_mode,
             "preserve_policy": request.preserve_policy,
         },
+        duration_contract=video_duration_contract(request.duration_sec),
         provider_constraints=provider_constraints,
         feedback_events=[
             {

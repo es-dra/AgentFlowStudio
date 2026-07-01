@@ -1,7 +1,7 @@
 import { buildContextSubgraph } from "./optimizer-contract.js";
 import { providerServiceForVideoModel } from "./presets/models.js";
 import { lastImageAsset, resizeNodeForImagePreview } from "./node-image-assets.js";
-import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll } from "./video-node-flow.js";
+import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll, videoInputSourceForRequest } from "./video-node-flow.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
 import { firstCandidatePreview, setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
 import { parseDuration, videoResultText, videoRevisionResultText } from "./node-generation-results.js";
@@ -114,6 +114,10 @@ export async function startRemoteVideoGeneration(store, runtime, node) {
     setNodeError(store, node.id, "请先在节点菜单中上传图片并设为首帧，再生成图生视频。");
     return;
   }
+  if (!String(node.prompt || node.params?.lastOptimizedPromptPlain || "").trim()) {
+    setNodeError(store, node.id, "请先填写视频提示词，再提交图生视频。");
+    return;
+  }
   node = store.get().nodes[node.id] || node;
   const previousNodeState = generationRestoreSnapshot(node);
   store.set((s) => {
@@ -191,11 +195,12 @@ export async function startRemoteVideoRevision(store, runtime, node) {
 function buildVideoGenerationRequest(store, node, firstFrame) {
   return {
     node_id: node.id,
-    prompt_text: node.prompt || "保持首帧主体身份，生成自然克制的镜头运动。",
+    prompt_text: node.prompt || node.params?.lastOptimizedPromptPlain || "",
     optimized_prompt: node.params?.lastOptimizedPromptPlain || null,
     provider_service_id: providerServiceForVideoModel(node.params?.model),
     first_frame_image_asset_id: firstFrame,
     last_frame_image_asset_id: node.params?.lastFrameImageAssetId || null,
+    input_source: videoInputSourceForRequest(node, firstFrame),
     duration_sec: parseDuration(node.params?.spec?.duration),
     resolution: String(node.params?.spec?.resolution || "720P").toLowerCase(),
     aspect_ratio: node.params?.spec?.ratio || "9:16",

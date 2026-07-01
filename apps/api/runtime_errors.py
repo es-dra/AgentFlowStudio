@@ -134,6 +134,8 @@ def safe_public_details(details: dict[str, Any]) -> dict[str, Any]:
             for item in value[:20]:
                 if isinstance(item, dict):
                     items.append(safe_public_details({str(k): v for k, v in item.items()}))
+                elif isinstance(item, (int, float, bool)) or item is None:
+                    items.append(item)
                 else:
                     items.append(safe_public_text(item, fallback=""))
             payload[safe_key] = items

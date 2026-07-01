@@ -222,10 +222,10 @@ def test_generation_panel_uses_node_specific_settings_profiles() -> None:
         "reuseSource",
     ):
         assert unused_setting not in profile
-    assert "VIDEO_DURATIONS = [\"5s\", \"10s\"]" in specs
+    assert "VIDEO_DURATIONS = [\"1s\", \"5s\", \"10s\", \"15s\"]" in specs
     assert "VIDEO_RESOLUTIONS = [\"480P\", \"720P\"]" in specs
     assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"3:4\"]" in specs
-    assert "15s" not in specs
+    assert "20s" not in specs
     assert "1080P" not in specs
     assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"21:9\"]" not in specs
     styles = _read("styles/studio-media-experience.css")

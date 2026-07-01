@@ -230,6 +230,7 @@ function inferRequestMeta(route, method, payload) {
     provider_service_id: String(payload?.provider_service_id || "").slice(0, 120),
     has_first_frame: Boolean(payload?.first_frame_image_asset_id),
     first_frame_image_asset_id: String(payload?.first_frame_image_asset_id || "").slice(0, 120),
+    video_input_source_mode: String(payload?.input_source?.source_mode || "").slice(0, 80),
     duration_sec: payload?.duration_sec,
     resolution: payload?.resolution,
     aspect_ratio: payload?.aspect_ratio,

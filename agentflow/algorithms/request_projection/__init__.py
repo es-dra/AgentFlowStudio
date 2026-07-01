@@ -24,6 +24,8 @@ def build_request_plan(
         raise ValueError("model_call_context requires context_id")
     generation_target = str(model_call_context.get("generation_target") or "").strip()
     refs = list((model_call_context.get("reference_context") or {}).get("reference_image_refs") or [])
+    input_source = _input_source(model_call_context)
+    duration_contract = _duration_contract(model_call_context)
     request_mode = _request_mode(generation_target, refs)
     prompt = _prompt_text(model_call_context, canonical_brief)
     overlay_prompt_policy = _overlay_prompt_policy(model_call_context)
@@ -35,11 +37,15 @@ def build_request_plan(
         "operation_intent": model_call_context.get("operation_intent"),
         "generation_target": generation_target,
         "request_mode": request_mode,
+        "input_source": input_source,
+        "duration_contract": duration_contract,
         "provider_neutral": True,
         "provider_service_id": provider_service_id or "not_selected",
         "provider_request": {
             "prompt": prompt,
             "reference_image_refs": refs,
+            "input_source": input_source,
+            "duration_seconds": duration_contract.get("duration_seconds"),
             "context_id": context_id,
             "mode": request_mode,
         },
@@ -53,6 +59,8 @@ def build_request_plan(
         "trace_summary": {
             "model_call_context_algorithm_id": model_call_context.get("algorithm_id"),
             "reference_image_count": len(refs),
+            "input_source_mode": input_source.get("source_mode") or "",
+            "duration_seconds": duration_contract.get("duration_seconds"),
             "feedback_context_overlay_prompt_policy": overlay_prompt_policy,
             "projection_not_provider_execution": True,
         },
@@ -72,6 +80,18 @@ def _request_mode(generation_target: str, refs: list[str]) -> str:
     if generation_target == "revision":
         return "revision"
     raise ValueError("unsupported generation target")
+
+
+def _input_source(model_call_context: dict[str, Any]) -> dict[str, Any]:
+    context = model_call_context.get("reference_context") if isinstance(model_call_context, dict) else {}
+    source = context.get("input_source") if isinstance(context, dict) else {}
+    return source if isinstance(source, dict) else {}
+
+
+def _duration_contract(model_call_context: dict[str, Any]) -> dict[str, Any]:
+    context = model_call_context.get("preference_context") if isinstance(model_call_context, dict) else {}
+    contract = context.get("duration_contract") if isinstance(context, dict) else {}
+    return contract if isinstance(contract, dict) else {}
 
 
 def _prompt_text(model_call_context: dict[str, Any], canonical_brief: dict[str, Any] | None) -> str:

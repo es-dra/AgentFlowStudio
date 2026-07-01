@@ -9,6 +9,29 @@
 Last updated: 2026-07-02 by Codex
 
 
+Video node deterministic slice recovery addendum: recovered an inspectable
+provider-closed video-node contract on
+`codex/afs-video-node-deterministic-slice-recovery-20260702` from baseline
+`38c7cf5ef08b6d84217ef145129c4592866d8b49`. Studio now preserves explicit
+first-frame input-source state for direct video-node uploads, upstream
+uploaded-image nodes, upstream generated-image/keyframe nodes, fixed visual
+asset references, and explicit first-frame selection. Runtime now carries
+`input_source`, `input_mode`, and a 1-15 second `duration_contract` through
+preflight, model-call context, provider-neutral request plan, safe manifest,
+and task state. Closed video gates return deterministic planning artifacts
+without provider calls; gate-open provider-specific unsupported duration and
+input-mode paths reject with structured errors before provider submit. Focused
+red/green evidence passed (`8 failed, 1 passed` expected red; then `10
+passed`); required video/adapter/frontend focused tests passed (`50 passed`);
+OpenAPI snapshot passed (`1 passed`); full pytest passed (`854 passed, 520
+deselected, 2 warnings`); maintenance audit reported `failed=0` with
+warning-only existing categories; `git diff --check` passed. This is
+deterministic request-planning and validation evidence only, not provider smoke,
+generated-media quality, human creative acceptance, business validation,
+deploy/runtime health, CompanyOS projection, durable-memory promotion, or COS
+active-rule promotion. Handoff:
+`docs/handoff/AFS-VIDEO-NODE-DETERMINISTIC-SLICE-RECOVERY-20260702.md`.
+
 SPEC2 accepted generation plan assembly contract addendum: T58 adds the next
 deterministic `branch_workflow_package` report section,
 `accepted_generation_plan_packet`. The default T57 package remains blocked

@@ -125,6 +125,9 @@ class ProviderDispatchRequest:
     duration_sec: int | None = None
     resolution: str | None = None
     motion: str = ""
+    input_mode: str | None = None
+    input_source: dict[str, Any] | None = None
+    duration_contract: dict[str, Any] | None = None
 
 
 class ProviderAdapter(Protocol):

@@ -173,6 +173,21 @@ class KeyframeGenerationRequest(BaseModel):
     generated_at: str = Field(min_length=1)
 
 
+class VideoInputSource(BaseModel):
+    source_mode: Literal[
+        "uploaded_image",
+        "upstream_uploaded_image",
+        "upstream_generated_image",
+        "visual_asset_reference",
+        "explicit_first_frame_selection",
+    ]
+    source_asset_id: str = Field(min_length=1)
+    source_node_id: str | None = None
+    source_job_id: str | None = None
+    visual_asset_id: str | None = None
+    role: Literal["first_frame", "last_frame", "reference_image"] = "first_frame"
+
+
 class VideoGenerationRequest(BaseModel):
     node_id: str | None = None
     prompt_text: str = Field(min_length=1)
@@ -180,7 +195,8 @@ class VideoGenerationRequest(BaseModel):
     provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str = Field(min_length=1)
     last_frame_image_asset_id: str | None = None
-    duration_sec: int = Field(default=5, gt=0)
+    input_source: VideoInputSource | None = None
+    duration_sec: int = Field(default=5, ge=1, le=15)
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
     motion: str = ""
@@ -210,7 +226,8 @@ class VideoRevisionRequest(BaseModel):
     provider_service_id: str = "seedance_i2v"
     first_frame_image_asset_id: str = Field(min_length=1)
     last_frame_image_asset_id: str | None = None
-    duration_sec: int = Field(default=5, gt=0)
+    input_source: VideoInputSource | None = None
+    duration_sec: int = Field(default=5, ge=1, le=15)
     resolution: str = "720p"
     aspect_ratio: str = "9:16"
     motion: str = ""
@@ -371,5 +388,6 @@ __all__ = (
     "VisualAssetRetireRequest",
     "VideoAssetPromoteRequest",
     "VideoGenerationRequest",
+    "VideoInputSource",
     "VideoRevisionRequest",
 )
