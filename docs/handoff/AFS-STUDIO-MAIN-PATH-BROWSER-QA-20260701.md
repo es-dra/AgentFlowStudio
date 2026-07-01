@@ -1,5 +1,9 @@
 # AFS Studio Main Path Browser QA - 2026-07-01
 
+## Execution Method
+
+This T47 closeout records the development method as Agentic Loop Engineering. The project book, execution spec, task ledger, and state file are loop artifacts, not the product identity. AgentFlow Studio remains the AI-native manga/video/image content production workbench.
+
 ## Scope
 
 AFS-T47 verifies that `/studio/` can naturally carry the Runtime main-loop evidence path in a provider-closed browser flow:

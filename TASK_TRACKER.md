@@ -8,7 +8,7 @@
 
 Last updated: 2026-07-01 by Codex
 
-Studio main-path browser QA addendum: T47 verifies `/studio/` can carry the
+Studio main-path browser QA addendum: T47 records the execution method as Agentic Loop Engineering; the project book, execution spec, task ledger, and state file are loop artifacts, while AFS remains the AI-native manga/video/image content production workbench. T47 verifies `/studio/` can carry the
 Runtime main-loop evidence path without opening providers: real benchmark
 storyboard seed -> asset card/fixed asset/human-gate evidence -> production
 graph summary -> keyframe request plan and blocked bridge evidence -> feedback

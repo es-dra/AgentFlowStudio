@@ -3,6 +3,7 @@
 ## 2026-07-01 - Studio Main Path Browser QA
 
 - Completed AFS-T47 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed Studio main-path browser smoke.
+- Terminology note for this closeout: the execution method is Agentic Loop Engineering; the project book, execution spec, task ledger, and state file are loop artifacts. AFS product identity remains the AI-native manga/video/image content production workbench.
 - Added a reusable browser QA harness that seeds the real Runtime main-loop E2E baseline, opens `/studio/`, creates a keyframe layer from a script node, runs the generation bridge with the image provider gate closed, records a feedback overlay include decision, and verifies the second blocked request plan carries fixed-asset, production-graph, source-evidence, and overlay context safely.
 - Fixed the deterministic Studio state bridge so safe production graph summaries, source-evidence refs, human-gate non-claim flags, and keyframe-layer evidence can survive Studio state persistence without keeping unsafe runtime trace payloads.
 - No provider smoke, live provider call, generated media, human creative acceptance, business validation, public claim, patent/legal decision, external download, or COS active-rule promotion occurred.
