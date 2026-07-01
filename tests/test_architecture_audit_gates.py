@@ -180,10 +180,7 @@ def _package_cycles(edges: dict[str, set[str]]) -> list[set[str]]:
 
 def _hidden_cli_commands() -> set[str]:
     names: set[str] = set()
-    for path in (
-        Path("apps/cli/production_memory_command_registry.py"),
-        Path("apps/cli/support_command_registry.py"),
-    ):
+    for path in (Path("apps/cli/production_memory_command_registry.py"),):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):

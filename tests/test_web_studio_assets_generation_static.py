@@ -343,7 +343,6 @@ def test_active_video_paths_do_not_reference_retired_video_provider() -> None:
         Path("agentflow_studio/model_gateway/provider_adapter.py"),
         Path("agentflow_studio/model_gateway/provider_adapter_impl.py"),
         Path("configs/providers.example.json"),
-        Path("apps/cli/support_command_registry.py"),
     ]
 
     for path in active_paths:

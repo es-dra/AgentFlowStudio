@@ -17,10 +17,6 @@ from apps.reporting.run_reports import inspect_run_output, review_run_output
 def register_commands(app: typer.Typer) -> None:
     register_product_commands(app)
 
-    from apps.cli.support_command_registry import register_support_commands
-
-    register_support_commands(app)
-
 
 def register_product_commands(app: typer.Typer) -> None:
     app.command(name="slice-real")(slice_real_command)

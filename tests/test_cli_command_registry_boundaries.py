@@ -225,11 +225,9 @@ def test_hidden_production_memory_support_commands_remain_callable() -> None:
     assert "recorded-at" in result.output
 
 
-def test_support_command_registry_has_no_retired_provider_smoke_surface() -> None:
-    source = SUPPORT_REGISTRY.read_text(encoding="utf-8")
+def test_support_command_registry_noop_wrapper_is_removed() -> None:
+    source = PRODUCT_REGISTRY.read_text(encoding="utf-8")
 
-    assert "hidden=True" not in source
-    assert "smoke" not in source
-    assert "minimax-image-smoke" not in source
-    assert "memory-advantage-demo-012" not in source
-    assert "memory-advantage-demo-015" not in source
+    assert not SUPPORT_REGISTRY.exists()
+    assert "support_command_registry" not in source
+    assert "register_support_commands" not in source
