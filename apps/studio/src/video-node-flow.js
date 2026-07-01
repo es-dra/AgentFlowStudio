@@ -138,22 +138,16 @@ function directUploadedFirstFrameAsset(node) {
 
 function explicitFirstFrameSource(node, assetId) {
   const existing = node?.params?.videoInputSource || {};
-  const upload = (Array.isArray(node?.params?.uploads) ? node.params.uploads : [])
-    .find((item) => String(item?.asset_id || item?.assetId || "") === assetId);
-  const uploadSourceRole = String(upload?.source_role || upload?.role || "").toLowerCase();
-  const upstreamNodeId = node?.params?.sourceKeyframeNodeId || upload?.source_node_id || null;
-  const upstreamJobId = node?.params?.sourceKeyframeJobId || upload?.source_job_id || null;
-  const hasKeyframeProvenance = uploadSourceRole === "generated_keyframe_reference"
-    || Boolean(upstreamNodeId)
-    || Boolean(upstreamJobId);
+  const context = firstFrameSourceContext(node, assetId);
+  const { upload, hasKeyframeProvenance } = context;
   const sourceMode = hasKeyframeProvenance
     ? "upstream_generated_image"
-    : existing.source_mode || "explicit_first_frame_selection";
+    : context.uploadSourceMode || context.existingSourceMode || "explicit_first_frame_selection";
   const sourceNodeId = hasKeyframeProvenance
-    ? upstreamNodeId || existing.source_node_id || node?.id || null
+    ? context.sourceKeyframeNodeId || upload?.source_node_id || existing.source_node_id || node?.id || null
     : existing.source_node_id || upload?.source_node_id || node?.id || null;
   const sourceJobId = hasKeyframeProvenance
-    ? upstreamJobId || existing.source_job_id || null
+    ? context.sourceKeyframeJobId || upload?.source_job_id || existing.source_job_id || null
     : existing.source_job_id || upload?.source_job_id || null;
   return normalizeImageAssetRef({
     ...(upload || {}),
@@ -161,8 +155,33 @@ function explicitFirstFrameSource(node, assetId) {
     source_mode: sourceMode,
     source_node_id: sourceNodeId,
     source_job_id: sourceJobId,
-    visual_asset_id: existing.visual_asset_id || null,
+    visual_asset_id: existing.visual_asset_id || upload?.visual_asset_id || null,
   }, sourceMode, node);
+}
+
+function firstFrameSourceContext(node, assetId) {
+  const existing = node?.params?.videoInputSource || {};
+  const upload = (Array.isArray(node?.params?.uploads) ? node.params.uploads : [])
+    .find((item) => String(item?.asset_id || item?.assetId || "") === assetId);
+  const sourceKeyframeNodeId = node?.params?.sourceKeyframeNodeId || null;
+  const sourceKeyframeJobId = node?.params?.sourceKeyframeJobId || null;
+  const uploadSourceRole = String(upload?.source_role || "").toLowerCase();
+  const uploadSourceMode = videoSourceModeIfPresent(upload?.source_mode);
+  const existingSourceMode = videoSourceModeIfPresent(existing?.source_mode);
+  const hasKeyframeProvenance = Boolean(sourceKeyframeNodeId)
+    || Boolean(sourceKeyframeJobId)
+    || uploadSourceRole === "generated_keyframe_reference"
+    || uploadSourceMode === "upstream_generated_image"
+    || existingSourceMode === "upstream_generated_image";
+  return {
+    existing,
+    upload,
+    sourceKeyframeNodeId,
+    sourceKeyframeJobId,
+    uploadSourceMode,
+    existingSourceMode,
+    hasKeyframeProvenance,
+  };
 }
 
 function latestReadyImageAssetFromNode(state, sourceNodeId) {
@@ -215,6 +234,11 @@ function videoSourceMode(value) {
   return "explicit_first_frame_selection";
 }
 
+function videoSourceModeIfPresent(value) {
+  const mode = String(value || "").trim();
+  return mode ? videoSourceMode(mode) : "";
+}
+
 function videoInputSourceFromAsset(asset, node) {
   return {
     source_mode: videoSourceMode(asset?.source_mode),
@@ -229,13 +253,20 @@ function videoInputSourceFromAsset(asset, node) {
 export function videoInputSourceForRequest(node, firstFrameAssetId) {
   const source = node?.params?.videoInputSource || {};
   const assetId = String(firstFrameAssetId || source.source_asset_id || node?.params?.firstFrameImageAssetId || "").trim();
-  const hasKeyframeProvenance = Boolean(node?.params?.sourceKeyframeNodeId) || Boolean(node?.params?.sourceKeyframeJobId);
-  const sourceMode = source.source_mode || (hasKeyframeProvenance ? "upstream_generated_image" : "");
+  const context = firstFrameSourceContext(node, assetId);
+  const { upload, hasKeyframeProvenance } = context;
+  const sourceMode = hasKeyframeProvenance
+    ? "upstream_generated_image"
+    : context.existingSourceMode || context.uploadSourceMode || "";
   return {
     source_mode: videoSourceMode(sourceMode),
     source_asset_id: assetId,
-    source_node_id: source.source_node_id || node?.params?.sourceKeyframeNodeId || node?.id || null,
-    source_job_id: source.source_job_id || node?.params?.sourceKeyframeJobId || null,
+    source_node_id: hasKeyframeProvenance
+      ? context.sourceKeyframeNodeId || source.source_node_id || upload?.source_node_id || node?.id || null
+      : source.source_node_id || upload?.source_node_id || node?.id || null,
+    source_job_id: hasKeyframeProvenance
+      ? context.sourceKeyframeJobId || source.source_job_id || upload?.source_job_id || null
+      : source.source_job_id || upload?.source_job_id || null,
     visual_asset_id: source.visual_asset_id || null,
     role: source.role || "first_frame",
   };

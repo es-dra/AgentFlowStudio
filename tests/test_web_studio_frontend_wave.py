@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 
@@ -222,7 +224,10 @@ def test_generation_panel_uses_node_specific_settings_profiles() -> None:
         "reuseSource",
     ):
         assert unused_setting not in profile
-    assert "VIDEO_DURATIONS = [\"1s\", \"5s\", \"10s\", \"15s\"]" in specs
+    assert "VIDEO_DURATIONS" in specs
+    assert "\"2s\"" in specs or "length: 15" in specs
+    assert "\"7s\"" in specs or "length: 15" in specs
+    assert "\"14s\"" in specs or "length: 15" in specs
     assert "VIDEO_RESOLUTIONS = [\"480P\", \"720P\"]" in specs
     assert "VIDEO_RATIOS = [\"16:9\", \"9:16\", \"1:1\", \"4:3\", \"3:4\"]" in specs
     assert "20s" not in specs
@@ -232,6 +237,34 @@ def test_generation_panel_uses_node_specific_settings_profiles() -> None:
     assert ".generation-panel .generation-setting-image" in styles
     assert "grid-template-columns: minmax(0, 1fr) 112px" in styles
     assert ".generation-setting-grid .generation-field:last-child" not in styles
+
+
+def test_video_duration_options_cover_one_to_fifteen_seconds() -> None:
+    script = r'''
+import { VIDEO_DURATIONS } from "./apps/studio/src/presets/specs.js";
+import { generationProfile } from "./apps/studio/src/panels/generation-panel-profile.js";
+
+const profile = generationProfile({ type: "video", params: {} });
+const durationField = profile.fields.find((field) => field.key === "duration");
+process.stdout.write(JSON.stringify({
+  durations: VIDEO_DURATIONS,
+  profileOptions: durationField?.options || [],
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig",
+    )
+    payload = json.loads(completed.stdout)
+
+    expected = [f"{second}s" for second in range(1, 16)]
+    assert payload["durations"] == expected
+    assert payload["profileOptions"] == expected
+    for representative in ("2s", "7s", "14s"):
+        assert representative in payload["durations"]
 
 
 def test_generation_projection_is_split_from_node_actions() -> None:

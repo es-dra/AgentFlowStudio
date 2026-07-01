@@ -22,7 +22,7 @@ def _run_node(script: str) -> dict:
 def test_direct_video_upload_is_explicit_first_frame_source() -> None:
     payload = _run_node(
         r'''
-import { ensureVideoFirstFrameAsset } from "./apps/studio/src/video-node-flow.js";
+import { ensureVideoFirstFrameAsset, videoInputSourceForRequest } from "./apps/studio/src/video-node-flow.js";
 
 const state = {
   nodes: {
@@ -46,20 +46,26 @@ const state = {
 };
 const store = { get: () => state, set: (mutator) => mutator(state) };
 const inferred = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
-process.stdout.write(JSON.stringify({ inferred, node: state.nodes.video_1 }));
+const repeated = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+const requestSource = videoInputSourceForRequest(state.nodes.video_1, repeated.asset_id);
+process.stdout.write(JSON.stringify({ inferred, repeated, requestSource, node: state.nodes.video_1 }));
 '''
     )
 
     assert payload["inferred"]["asset_id"] == "img_direct_upload"
     assert payload["inferred"]["source_mode"] == "uploaded_image"
+    assert payload["repeated"]["source_mode"] == "uploaded_image"
+    assert payload["requestSource"]["source_mode"] == "uploaded_image"
+    assert payload["requestSource"]["source_node_id"] == "video_1"
+    assert payload["requestSource"]["source_job_id"] is None
     assert payload["node"]["params"]["firstFrameImageAssetId"] == "img_direct_upload"
-    assert payload["node"]["params"]["videoInputSource"]["source_mode"] == "uploaded_image"
+    assert payload["node"]["params"]["videoInputSource"] == payload["requestSource"]
 
 
 def test_upstream_uploaded_image_node_is_video_first_frame_source() -> None:
     payload = _run_node(
         r'''
-import { ensureVideoFirstFrameAsset } from "./apps/studio/src/video-node-flow.js";
+import { ensureVideoFirstFrameAsset, videoInputSourceForRequest } from "./apps/studio/src/video-node-flow.js";
 
 const state = {
   nodes: {
@@ -82,13 +88,19 @@ const state = {
 };
 const store = { get: () => state, set: (mutator) => mutator(state) };
 const inferred = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
-process.stdout.write(JSON.stringify({ inferred, node: state.nodes.video_1 }));
+const repeated = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+const requestSource = videoInputSourceForRequest(state.nodes.video_1, repeated.asset_id);
+process.stdout.write(JSON.stringify({ inferred, repeated, requestSource, node: state.nodes.video_1 }));
 '''
     )
 
     assert payload["inferred"]["asset_id"] == "img_upstream_upload"
     assert payload["inferred"]["source_mode"] == "upstream_uploaded_image"
-    assert payload["node"]["params"]["videoInputSource"]["source_node_id"] == "image_upload_1"
+    assert payload["repeated"]["source_mode"] == "upstream_uploaded_image"
+    assert payload["requestSource"]["source_mode"] == "upstream_uploaded_image"
+    assert payload["requestSource"]["source_node_id"] == "image_upload_1"
+    assert payload["requestSource"]["source_job_id"] is None
+    assert payload["node"]["params"]["videoInputSource"] == payload["requestSource"]
 
 
 def test_upstream_generated_image_node_is_video_first_frame_source() -> None:
@@ -202,12 +214,14 @@ const state = {
 };
 const store = { get: () => state, set: (mutator) => mutator(state) };
 const firstFrame = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
-const requestSource = videoInputSourceForRequest(state.nodes.video_1, firstFrame.asset_id);
-process.stdout.write(JSON.stringify({ firstFrame, requestSource, node: state.nodes.video_1 }));
+const repeated = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+const requestSource = videoInputSourceForRequest(state.nodes.video_1, repeated.asset_id);
+process.stdout.write(JSON.stringify({ firstFrame, repeated, requestSource, node: state.nodes.video_1 }));
 '''
     )
 
     assert payload["firstFrame"]["source_mode"] == "upstream_generated_image"
+    assert payload["repeated"]["source_mode"] == "upstream_generated_image"
     assert payload["requestSource"]["source_mode"] == "upstream_generated_image"
     assert payload["requestSource"]["source_node_id"] == "keyframe_01"
     assert payload["requestSource"]["source_job_id"] == "kf_job_001"

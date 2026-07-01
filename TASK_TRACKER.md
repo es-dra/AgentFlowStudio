@@ -9,6 +9,29 @@
 Last updated: 2026-07-02 by Codex
 
 
+Video node duration/provenance idempotence revision addendum: this revision
+patches the evaluator-blocking follow-up on top of commit `2f96939c`. Studio
+first-frame provenance is now idempotent across repeated
+`ensureVideoFirstFrameAsset()` and `videoInputSourceForRequest()` calls:
+generic upload `source_node_id` / `source_job_id` no longer imply keyframe
+provenance, direct uploads remain `uploaded_image`, upstream uploaded images
+remain `upstream_uploaded_image`, and explicit keyframe/generated indicators
+still preserve `upstream_generated_image` with the original keyframe node/job
+ids. Studio video duration choices now cover all one-second modes from `1s`
+through `15s`; backend/provider duration guards remain unchanged. Focused
+red/green tests reproduced the direct-upload/upstream-upload flips and the
+four-option duration surface before the patch, then passed after the patch
+(`24 passed`). Required verification passed: Studio JS check (`134 files`),
+impacted bundle (`64 passed, 1 warning`), full pytest (`857 passed, 520
+deselected, 2 warnings`), maintenance audit (`failed=0`, warning-only
+categories), and `git diff --check`. OpenAPI was not touched. This is
+deterministic Studio/request contract verification only, not provider smoke,
+generated-media quality, human creative acceptance, business validation, deploy
+or Runtime health verification, CompanyOS projection, durable-memory promotion,
+or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-VIDEO-NODE-DURATION-PROVENANCE-IDEMPOTENCE-REVISION-20260702.md`.
+
+
 Video node keyframe provenance revision addendum: resolved the evaluator-blocking
 keyframe-continuation provenance gap on
 `codex/afs-video-node-keyframe-provenance-revision-20260702` from

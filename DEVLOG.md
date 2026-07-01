@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-07-02 - Video Node Duration and Provenance Idempotence Revision
+
+- Completed the evaluator-blocking duration/provenance idempotence revision on `codex/afs-video-node-duration-provenance-revision-20260702` from commit `2f96939c784b9e41616a29a5fde6061d8a2263aa`.
+- Fixed `explicitFirstFrameSource()` / `videoInputSourceForRequest()` so generic upload `source_node_id` or `source_job_id` no longer upgrades a first-frame source to `upstream_generated_image`.
+- Preserved repeated direct-upload and upstream uploaded-image request sources as `uploaded_image` and `upstream_uploaded_image`, while keyframe-generated sources still preserve original keyframe node/job provenance as `upstream_generated_image`.
+- Replaced the Studio video duration option surface with deterministic `1s` through `15s` choices, preserving the existing `5s` default and backend/provider duration guards.
+- Added regression coverage for repeated ensure/request idempotence and runtime duration option generation through the generation-panel profile.
+- No provider call, generated media, external download, server/deploy sync, Runtime health claim, OpenAPI change, human acceptance, business validation, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_video_node_contract.py tests\test_web_studio_frontend_wave.py -q
+# red before patch: direct upload and upstream uploaded image flipped to upstream_generated_image; duration list exposed only 1s/5s/10s/15s
+# green after patch: 24 passed
+
+npm run check:studio-js
+# JS syntax check passed: 134 files
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_video_node_contract.py tests\test_api_runtime_video_generations.py tests\test_volc_seedance_video_adapter.py tests\test_web_studio_frontend_wave.py tests\test_api_runtime_studio_state.py tests\test_api_runtime_studio_state_modules.py -q
+# 64 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -q
+# 857 passed, 520 deselected, 2 warnings
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
+
+OpenAPI was not touched, so the OpenAPI snapshot was not regenerated or rerun for this revision.
+
 ## 2026-07-02 - Video Node Keyframe Provenance Revision
 
 - Completed the evaluator-blocking provenance revision on `codex/afs-video-node-keyframe-provenance-revision-20260702` from video-node recovery commit `87cbe3247261d819e3752e0e5a18cf96223d03e4`.

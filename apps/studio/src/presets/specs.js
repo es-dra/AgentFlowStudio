@@ -8,7 +8,7 @@ export const IMAGE_RATIOS = [
 
 export const VIDEO_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4"];
 export const VIDEO_RESOLUTIONS = ["480P", "720P"];
-export const VIDEO_DURATIONS = ["1s", "5s", "10s", "15s"];
+export const VIDEO_DURATIONS = Array.from({ length: 15 }, (_, index) => `${index + 1}s`);
 
 export const IMAGE_COUNTS = [1, 2, 4];
 export const VIDEO_COUNTS = [1];
