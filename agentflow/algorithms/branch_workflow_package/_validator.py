@@ -20,6 +20,7 @@ from agentflow.algorithms.interactive_manga_branch_package._helpers import (
 )
 
 from ._support import known_refs, repo_root_for_fixture, validation_report
+from ._generation_planning import build_generation_planning_candidate
 from ._review_status import validate_review_status
 from . import (
     BRANCH_ASSET_SCOPES,
@@ -64,8 +65,9 @@ def validate_branch_workflow_package_fixture(
     shots = _validate_branch_shots(required_list(package, "branch_shots"), refs, paths)
     assets = _validate_asset_needs(required_list(package, "asset_needs"), refs)
     constraints = _validate_continuity_constraints(required_list(package, "continuity_constraints"), refs)
+    evidence_requirements = required_list(package, "evidence_requirements")
     readiness = _validate_evidence_requirements(
-        required_list(package, "evidence_requirements"),
+        evidence_requirements,
         refs,
         graph_artifacts,
         assets,
@@ -73,6 +75,9 @@ def validate_branch_workflow_package_fixture(
     )
     handoff = _validate_handoff(required_dict(package, "handoff"), refs)
     readiness["blocked_reasons"] = list(handoff.get("blocked_reasons") or [])
+    generation_planning_candidate = build_generation_planning_candidate(
+        package, assets, evidence_requirements, readiness, review_status, payload["non_claims"]
+    )
     return validation_report(
         payload,
         package,
@@ -85,6 +90,7 @@ def validate_branch_workflow_package_fixture(
         graph_artifacts,
         readiness,
         review_status,
+        generation_planning_candidate,
     )
 
 

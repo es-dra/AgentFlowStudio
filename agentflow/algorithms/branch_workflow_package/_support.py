@@ -58,6 +58,7 @@ def validation_report(
     graph_artifacts: set[str],
     readiness: dict[str, Any],
     review_status: dict[str, Any],
+    generation_planning_candidate: dict[str, Any],
 ) -> dict[str, Any]:
     asset_scope_counts = Counter(str(item["scope"]) for item in assets.values())
     confirmation_counts = Counter(str(item["confirmation_state"]) for item in assets.values())
@@ -95,6 +96,7 @@ def validation_report(
         },
         "residual_boundary": review_status["residual_boundary"],
         "readiness": readiness,
+        "generation_planning_candidate": generation_planning_candidate,
         "source_boundary_refs": list(payload.get("source_boundary_refs") or []),
         "residual_boundaries": list(payload.get("residual_boundaries") or []),
         "non_claims": dict(payload["non_claims"]),

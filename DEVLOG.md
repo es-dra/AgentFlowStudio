@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-07-02 - SPEC2 Generation Planning Evidence Gate
+
+- Completed AFS-T56 on `codex/afs-t56-spec2-generation-planning-evidence-gate-20260702` from current `master` at T55 commit `1786c61d5c4f99f3ebd9358c0e482d1ea9b54082`.
+- Extended the T54/T55 `branch_workflow_package` validator with `agentflow.algorithms.branch_workflow_package._generation_planning`, a deterministic local generation-planning candidate gate that reports `generation_planning_candidate` as structure evidence only.
+- The gate requires repo-local fixture evidence origins, complete implementation-ready asset evidence, generation-planning review acceptance, no unresolved open questions, residual-boundary allowance, and protected non-claim preservation before marking the candidate eligible.
+- Integration decision for delivery: narrowed accepted evidence origins to the literal `repo_local_fixture` value; the unused `deterministic_fixture` alias was not retained.
+- The default fixture remains blocked because branch-specific candidate assets are unconfirmed and PB3/T54 residual questions still block `accepted_for_generation_planning`; the report now surfaces those blockers without collapsing them into provider/product readiness.
+- No Runtime route, OpenAPI path, Studio UI, provider adapter/config, external download, provider call, generated media, reader playback, storage lifecycle, deploy/server sync, Runtime health claim, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t56-red tests\test_branch_workflow_package_contract.py -q
+# expected red before implementation: 3 failed, 18 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t56-focused tests\test_branch_workflow_package_contract.py tests\test_branch_workflow_generation_planning_gate.py -q
+# 21 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t56-impacted tests\test_branch_workflow_generation_planning_gate.py tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 53 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning-only existing categories
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - SPEC2 Review Status Residual Boundary Hardening
 
 - Integrated AFS-T55 on `codex/afs-t55-spec2-review-status-residual-boundary-hardening-20260702` after rebasing the worktree from the stale T54 base onto current `origin/master` at `f15b47db`. The integration replayed only the T55 branch workflow package hardening and added fresh project record entries on top of the C1 docs cleanup baseline.

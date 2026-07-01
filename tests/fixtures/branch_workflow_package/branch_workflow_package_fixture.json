@@ -390,6 +390,7 @@
         "evidence_requirement_id": "ev_workflow_structure",
         "evidence_requirement_ref": "evidence_req:workflow-structure",
         "evidence_type": "structure",
+        "evidence_origin": "repo_local_fixture",
         "required_for_stage": "review_ready",
         "source_refs": [
           "storyboard:demo-001",
@@ -428,6 +429,7 @@
         "evidence_requirement_id": "ev_implementation_ready_assets",
         "evidence_requirement_ref": "evidence_req:implementation-ready-assets",
         "evidence_type": "implementation_ready_asset",
+        "evidence_origin": "repo_local_fixture",
         "required_for_stage": "accepted_for_generation_planning",
         "source_refs": [
           "fixed_asset:map-v1",
@@ -477,6 +479,7 @@
         "evidence_requirement_id": "ev_handoff_non_claims",
         "evidence_requirement_ref": "evidence_req:handoff-non-claims",
         "evidence_type": "handoff",
+        "evidence_origin": "repo_local_fixture",
         "required_for_stage": "review_ready",
         "source_refs": [
           "handoff:t54-branch-workflow-review"

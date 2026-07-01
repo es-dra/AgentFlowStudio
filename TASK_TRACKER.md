@@ -9,6 +9,32 @@
 Last updated: 2026-07-02 by Codex
 
 
+SPEC2 generation-planning evidence gate addendum: T56 extends the T55-hardened
+`branch_workflow_package` contract with a deterministic
+`generation_planning_candidate` report section. The new gate accepts only
+repo-local fixture evidence; integration narrowed the accepted evidence-origin
+set to the literal `repo_local_fixture` value. It preserves shared versus
+branch-specific asset policy, keeps confirmed and unconfirmed candidate assets
+separate, rejects
+non-local evidence origins, and requires implementation-ready asset evidence,
+generation-planning review acceptance, no unresolved open questions,
+residual-boundary allowance, and protected non-claim preservation before the
+candidate becomes eligible. The default T54/T55 fixture remains blocked because
+branch-specific assets are unconfirmed and PB3/T54 residual questions still
+block `accepted_for_generation_planning`; the reported candidate is structure
+evidence only, not provider, product, Runtime, Studio, or human-acceptance
+readiness. Focused red/green pytest passed (`3 failed, 18 passed` expected red;
+then `21 passed`); impacted T56/T55/T54/T53/T52/algorithm contract tests passed
+(`53 passed`). Maintenance audit reported `failed=0` with existing warning-only
+categories, and `git diff --check` passed. This is deterministic
+generation-planning evidence gating only, not final schema acceptance, product
+readiness, Runtime/OpenAPI/Studio readiness, provider smoke, generated-media
+quality, human creative acceptance, business validation, public/legal/patent
+decision, deploy/runtime health, CompanyOS projection, durable-memory
+promotion, or COS active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T56-SPEC2-GENERATION-PLANNING-EVIDENCE-GATE-20260702.md`.
+
 SPEC2 review-status residual-boundary hardening addendum: T55 integrates a
 deterministic hardening layer for the T54 `branch_workflow_package` contract
 after rebasing onto current `origin/master` at `f15b47db`. The new
