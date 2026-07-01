@@ -21,6 +21,7 @@ from studio_asset_context_browser_qa_support import (
     stop_runtime,
     wait_for_http,
 )
+from studio_delivery_readiness_gate import build_delivery_readiness
 from studio_main_path_browser_qa_support import (
     ASSET_NODE_ID,
     SCRIPT_NODE_ID,
@@ -118,9 +119,10 @@ def run_browser_qa(
                 raise AssertionError(f"console errors: {console_errors[:5]}; response errors: {actionable_errors[:5]}")
             report = {
                 "artifact_type": "studio_main_path_browser_qa_report",
-                "schema_version": "0.1.0",
+                "schema_version": "0.2.0",
                 "status": "passed",
                 "project_id": project_id,
+                "case_id": seed["case_id"],
                 "base_url": base_url,
                 "runtime_root": str(runtime_root),
                 "screenshot": str(screenshot_path),
@@ -145,6 +147,7 @@ def run_browser_qa(
                     "not deploy verification",
                 ],
             }
+            report["delivery_readiness"] = build_delivery_readiness(report, seed)
             if unsafe_marker({"plan": plan, "final_node": final_node}):
                 raise AssertionError("main-path browser QA leaked unsafe fields")
             return report

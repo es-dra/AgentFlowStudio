@@ -10,6 +10,7 @@ if str(TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(TOOLS_ROOT))
 
 from tools import studio_main_path_browser_qa as main_path_qa
+from tools.studio_delivery_readiness_gate import build_delivery_readiness
 from tools.studio_asset_context_browser_qa_support import runtime_test_client
 
 
@@ -43,6 +44,11 @@ def test_prepare_project_seeds_runtime_main_path_studio_contract(tmp_path) -> No
     serialized = json.dumps(state, ensure_ascii=False).lower()
 
     assert seed["project_id"] == project_id
+    assert seed["case_id"] == "multi_role_prop_exchange_chase"
+    assert seed["shot_count"] == 6
+    assert seed["content_quality_human_review_needed"] is True
+    assert seed["asset_card_candidate_count"] >= 3
+    assert seed["production_graph_relationship_count"] >= 1
     assert seed["overlay_id"].startswith("runtime-feedback-context-overlay:")
     assert seed["fixed_asset_id"]
     assert state["order"] == [main_path_qa.SCRIPT_NODE_ID, main_path_qa.ASSET_NODE_ID]
@@ -133,3 +139,64 @@ def test_main_path_browser_qa_tool_stays_provider_closed() -> None:
     assert '"provider_calls_started": False' in source
     assert "AFS_ALLOW_REMOTE" not in source
     assert "not provider smoke" in source
+
+
+def test_delivery_readiness_gate_reports_internal_provider_closed_tryout_ready() -> None:
+    report = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "fixed_asset_id": "visual_asset:seed",
+        "production_graph_artifact_id": "artifact_production_graph_seed",
+        "second_request_plan_artifact_id": "artifact_keyframe_request_plan_seed",
+        "second_bridge_artifact_id": "artifact_keyframe_bridge_seed",
+        "overlay_id": "runtime-feedback-context-overlay:seed",
+        "feedback_overlay_decision_recorded": True,
+        "provider_calls_started": False,
+        "console_error_count": 0,
+        "response_error_count": 0,
+    }
+    seed = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "shot_count": 6,
+        "expected_shot_range": [6, 6],
+        "content_quality_human_review_needed": True,
+        "asset_card_candidate_count": 9,
+        "production_graph_relationship_count": 21,
+        "fixed_visual_asset_count": 1,
+    }
+
+    readiness = build_delivery_readiness(report, seed)
+
+    assert readiness["verdict"] == "internal_provider_closed_tryout_ready"
+    assert readiness["product_readiness"] == "provider_closed_internal_tryout_path_ready"
+    assert {item["status"] for item in readiness["checks"]} == {"passed"}
+    assert "human_creative_acceptance_not_claimed" in readiness["remaining_gates"]
+    assert "provider_smoke_requires_explicit_authorization" in readiness["remaining_gates"]
+
+
+def test_delivery_readiness_gate_blocks_missing_provider_closed_signal() -> None:
+    report = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "fixed_asset_id": "visual_asset:seed",
+        "production_graph_artifact_id": "artifact_production_graph_seed",
+        "second_request_plan_artifact_id": "artifact_keyframe_request_plan_seed",
+        "second_bridge_artifact_id": "artifact_keyframe_bridge_seed",
+        "overlay_id": "runtime-feedback-context-overlay:seed",
+        "feedback_overlay_decision_recorded": True,
+        "provider_calls_started": True,
+        "console_error_count": 0,
+        "response_error_count": 0,
+    }
+    seed = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "shot_count": 6,
+        "expected_shot_range": [6, 6],
+        "content_quality_human_review_needed": True,
+        "asset_card_candidate_count": 9,
+        "production_graph_relationship_count": 21,
+        "fixed_visual_asset_count": 1,
+    }
+
+    readiness = build_delivery_readiness(report, seed)
+
+    assert readiness["verdict"] == "not_ready_with_blockers"
+    assert any(item["check_id"] == "provider_closed_browser_runtime" and item["status"] == "blocked" for item in readiness["checks"])

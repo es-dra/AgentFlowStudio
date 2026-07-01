@@ -33,9 +33,9 @@ class MainLoopE2EState:
     preflight_payload: dict
 
 
-def build_main_loop_e2e_state(client: TestClient, project_id: str) -> MainLoopE2EState:
+def build_main_loop_e2e_state(client: TestClient, project_id: str, *, case_id: str = "multi_scene_map_chase") -> MainLoopE2EState:
     client.post("/projects", json={"project_id": project_id, "goal": "Main loop E2E baseline"}).raise_for_status()
-    case = benchmark_case("multi_scene_map_chase")
+    case = benchmark_case(case_id)
     image_asset_id = upload_image(client, project_id)
     fixed_asset = promote_fixed_asset(client, project_id, image_asset_id)
     storyboard_payload = storyboard_breakdown(client, project_id, case)

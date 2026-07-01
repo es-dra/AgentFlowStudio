@@ -28,13 +28,19 @@ def storage_key(project_id: str) -> str:
     return f"afs_studio_canvas_v2:{project_id}"
 
 
-def prepare_project(runtime_root: Path, *, project_id: str, repo: Path = REPO_ROOT) -> dict[str, Any]:
+def prepare_project(
+    runtime_root: Path,
+    *,
+    project_id: str,
+    repo: Path = REPO_ROOT,
+    case_id: str = "multi_role_prop_exchange_chase",
+) -> dict[str, Any]:
     client = runtime_test_client(runtime_root)
     previous_cwd = Path.cwd()
     try:
         os.chdir(repo)
         with browser_qa_provider_context():
-            state = build_main_loop_e2e_state(client, project_id)
+            state = build_main_loop_e2e_state(client, project_id, case_id=case_id)
     finally:
         os.chdir(previous_cwd)
     image_assets = client.get(f"/projects/{project_id}/image-assets").json()["assets"]
@@ -44,6 +50,13 @@ def prepare_project(runtime_root: Path, *, project_id: str, repo: Path = REPO_RO
         raise AssertionError(f"studio-state setup failed: {saved.status_code} {saved.text}")
     return {
         "project_id": project_id,
+        "case_id": state.case["id"],
+        "shot_count": len(state.storyboard_payload["shots"]),
+        "expected_shot_range": list(state.case["expected_shot_range"]),
+        "content_quality_human_review_needed": bool(state.storyboard_payload["content_quality_report"]["summary"].get("human_review_needed", False)),
+        "asset_card_candidate_count": len(state.storyboard_payload["asset_card_candidates"]["candidates"]),
+        "production_graph_relationship_count": len(state.storyboard_payload["production_graph"].get("relationships", [])),
+        "fixed_visual_asset_count": state.storyboard_payload["production_graph"]["summary"].get("fixed_visual_asset_count", 0),
         "script_node_id": SCRIPT_NODE_ID,
         "asset_node_id": ASSET_NODE_ID,
         "overlay_id": state.overlay["overlay_id"],

@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-07-01 - Studio Main-Path Delivery Readiness Gate
+
+- Completed AFS-T50 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed internal delivery readiness gate for the Studio/Runtime main path.
+- Upgraded `tools/studio_main_path_browser_qa.py` to seed the T49 real-script benchmark `multi_role_prop_exchange_chase` and emit `delivery_readiness.verdict=internal_provider_closed_tryout_ready` when storyboard/content-quality, asset candidate/fixed asset, Production Graph reuse, keyframe request/preflight/blocked bridge, and feedback overlay checks all pass.
+- Added `tools/studio_delivery_readiness_gate.py` as the small readiness contract and kept current-wave files below the 300-line maintenance threshold after cleanup.
+- Product verdict: ready for internal provider-closed tryout as structure-verified workflow evidence. Remaining gates: provider smoke, generated-media quality review, human creative acceptance, business validation, public/legal/patent decisions, deploy/runtime health, and COS active-rule promotion.
+- AFS Redundancy Maintenance Lane remains archive_deferred; CompanyOS/COS items are governance/integration authorization items and were not modified by T50.
+- No provider smoke, live provider call, generated media, human creative acceptance, business validation, public claim, patent/legal decision, external download, deploy verification, Runtime health claim, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t50-focused tests\test_studio_main_path_browser_qa_tool.py tests\test_api_runtime_main_loop_e2e.py tests\test_storyboard_content_quality_benchmarks.py -q
+# 9 passed, 1 warning
+
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t50-impacted tests\test_studio_main_path_browser_qa_tool.py tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py tests\test_storyboard_content_quality_benchmarks.py tests\test_api_runtime_studio_state_persistence.py tests\test_web_studio_keyframe_production_graph_trace.py tests\test_web_studio_visual_asset_promotion_gate_static.py -q
+# 20 passed, 1 warning
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe tools\studio_main_path_browser_qa.py --runtime-root .venv\t50-browser-runtime --report runs\t50_studio_main_path_delivery_readiness.json --screenshot runs\t50_studio_main_path_delivery_readiness.png
+# passed; verdict=internal_provider_closed_tryout_ready; provider_calls_started=false; console_error_count=0; response_error_count=0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
 ## 2026-07-01 - Content Quality Benchmark Expansion
 
 - Completed AFS-T49 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed content-quality benchmark expansion.

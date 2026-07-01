@@ -8,6 +8,24 @@
 
 Last updated: 2026-07-01 by Codex
 
+
+Studio main-path delivery readiness addendum: T50 adds a provider-closed
+internal delivery readiness gate for the Studio/Runtime main path. The browser
+QA harness now seeds the real `multi_role_prop_exchange_chase` benchmark and
+emits `delivery_readiness.verdict=internal_provider_closed_tryout_ready` only
+when storyboard/content-quality, asset-card candidate/fixed-asset path,
+Production Graph fixed-asset reuse, keyframe request/preflight/blocked bridge,
+feedback overlay, and provider-closed browser/runtime checks pass. Focused
+pytest passed (`9 passed, 1 warning`), impacted Runtime/Studio tests passed
+(`20 passed, 1 warning`), Studio JS passed (`134 files`), browser readiness
+harness passed with `provider_calls_started=false`, maintenance audit had
+`failed=0`, and `git diff --check` passed. Product readiness is limited to
+internal provider-closed tryout as structure-verified workflow evidence; human
+creative acceptance, provider smoke, generated-media quality, business
+validation, public/legal/patent decisions, deploy/runtime health, and COS
+active-rule promotion remain separate gates. Handoff:
+`docs/handoff/AFS-STUDIO-MAIN-PATH-DELIVERY-READINESS-GATE-20260701.md`.
+
 Content-quality benchmark expansion addendum: T49 adds a provider-closed
 real-script benchmark, `multi_role_prop_exchange_chase`, to cover a
 three-character misunderstanding, restaurant/street/office scene transitions,
