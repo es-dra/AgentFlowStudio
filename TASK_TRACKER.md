@@ -8,6 +8,25 @@
 
 Last updated: 2026-07-01 by Codex
 
+Content-quality benchmark expansion addendum: T49 adds a provider-closed
+real-script benchmark, `multi_role_prop_exchange_chase`, to cover a
+three-character misunderstanding, restaurant/street/office scene transitions,
+map and letter prop continuity, emotion shift, action continuity, and
+six-beat narrative shot rhythm. The benchmark test now verifies asset-card
+candidate continuity and Production Graph relationships, not only report-level
+content-quality checks. Focused benchmark pytest passed (`1 passed`), impacted
+storyboard/content-quality/runtime tests passed (`26 passed, 1 warning`),
+maintenance audit had `failed=0`, and `git diff --check` passed. The benchmark
+file remains under the 300-line ideal threshold at 297 lines. The AFS
+Redundancy Maintenance Lane is now blocker-closed through fresh rebuild on
+`codex/afs-redundancy-maintenance-ledger-rebuild-20260701` at `eb16cc3e`, with
+owner review/push pending outside this T49 lane. This is deterministic
+provider-closed benchmark/runtime structure evidence only, not provider smoke,
+generated media, human creative acceptance, business validation, public claim,
+patent/legal decision, external download, deploy verification, Runtime health
+verification, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-CONTENT-QUALITY-BENCHMARK-EXPANSION-20260701.md`.
+
 Full pytest residual triage addendum: T48 resolves the T47 full pytest quality
 debt without opening provider or expanding product/runtime surfaces. The
 `.venv` basetemp maintenance failures were fixture isolation debt; the affected

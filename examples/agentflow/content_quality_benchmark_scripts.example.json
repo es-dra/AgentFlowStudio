@@ -185,6 +185,113 @@
         "dialogue_staging",
         "prop_handoff"
       ]
+    },
+    {
+      "id": "multi_role_prop_exchange_chase",
+      "purpose": "Multi-role misunderstanding, prop exchange, cross-scene pursuit, emotion reversal, action continuity, and narrative-driven shot rhythm without provider calls.",
+      "script_text": "1. @周岚 在 @餐厅 角落把 @地图 塞进 @陈默 的信封里，低声说这不是给 @林晚 看的。\n2. @林晚 推门进来，误以为 @陈默 在转交假线索，愤怒地夺过 @信件 。\n3. @陈默 追出 @餐厅 冲到雨夜 @街道 ，一边解释 @地图 背面有失踪仓库的入口编号。\n4. @周岚 抢回 @地图 又递给 @林晚 ，情绪从戒备变成犹豫，三人沿 @街道 奔向旧 @办公室 。\n5. 到达 @办公室 门口时，@手机 突然震动，屏幕上出现同一张 @地图 的红色路线。\n6. @林晚 停下，把 @信件 交还给 @陈默 ，@周岚 挡住身后的追兵，镜头从 @地图 切到三人的表情。",
+      "expected_shot_range": [
+        6,
+        6
+      ],
+      "forbidden_shot_counts": [
+        5
+      ],
+      "expected_assets": [
+        {
+          "label": "周岚",
+          "asset_type": "character"
+        },
+        {
+          "label": "陈默",
+          "asset_type": "character"
+        },
+        {
+          "label": "林晚",
+          "asset_type": "character"
+        },
+        {
+          "label": "餐厅",
+          "asset_type": "scene"
+        },
+        {
+          "label": "街道",
+          "asset_type": "scene"
+        },
+        {
+          "label": "办公室",
+          "asset_type": "scene"
+        },
+        {
+          "label": "地图",
+          "asset_type": "prop"
+        },
+        {
+          "label": "信件",
+          "asset_type": "prop"
+        },
+        {
+          "label": "手机",
+          "asset_type": "prop"
+        }
+      ],
+      "expected_relationship_shots": [
+        [
+          "周岚",
+          "陈默"
+        ],
+        [
+          "林晚",
+          "陈默"
+        ],
+        [
+          "周岚",
+          "林晚",
+          "陈默"
+        ]
+      ],
+      "expected_scene_sequence": [
+        "餐厅",
+        "街道",
+        "办公室"
+      ],
+      "expected_reused_assets": [
+        {
+          "label": "地图",
+          "asset_type": "prop",
+          "min_shot_refs": 4
+        },
+        {
+          "label": "信件",
+          "asset_type": "prop",
+          "min_shot_refs": 2
+        }
+      ],
+      "expected_story_terms": {
+        "emotion_change": [
+          "愤怒",
+          "戒备",
+          "犹豫"
+        ],
+        "action_continuity": [
+          "塞进",
+          "夺过",
+          "追出",
+          "抢回",
+          "递给",
+          "交还",
+          "挡住"
+        ],
+        "rhythm_reason": [
+          "1.",
+          "2.",
+          "3.",
+          "4.",
+          "5.",
+          "6."
+        ]
+      },
+      "quality_focus": ["multi_role_relationship", "scene_transition", "prop_continuity", "emotion_turn", "action_continuity", "narrative_shot_rhythm", "asset_candidate_continuity", "production_graph_evidence"]
     }
   ]
 }

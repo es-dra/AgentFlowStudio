@@ -1,5 +1,30 @@
 # Devlog
 
+## 2026-07-01 - Content Quality Benchmark Expansion
+
+- Completed AFS-T49 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed content-quality benchmark expansion.
+- Added `multi_role_prop_exchange_chase`, a real six-beat short-drama benchmark for three-character misunderstanding, restaurant/street/office scene transitions, map and letter prop continuity, emotion shift, action continuity, and narrative-driven shot rhythm.
+- Expanded the benchmark test so each case now verifies asset-card candidate continuity and Production Graph relationships in addition to content-quality report checks; the new case asserts relationship shots, scene order, reused prop candidates, story terms, and forbidden fixed five-shot rhythm.
+- Kept the benchmark file below the 300-line ideal threshold at 297 lines after current-wave metadata compaction.
+- Managed thread register update: the AFS Redundancy Maintenance Lane has been superseded/closed as a blocker through fresh rebuild; branch `codex/afs-redundancy-maintenance-ledger-rebuild-20260701` is at `eb16cc3e`, no-op verification is complete, and owner review/push is pending outside T49.
+- No provider smoke, live provider call, generated media, human creative acceptance, business validation, public claim, patent/legal decision, external download, deploy verification, Runtime health claim, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t49-focused tests\test_storyboard_content_quality_benchmarks.py -q
+# 1 passed
+
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t49-impacted tests\test_storyboard_content_quality_benchmarks.py tests\test_api_runtime_storyboard_content_quality.py tests\test_api_runtime_storyboard_breakdown.py tests\test_api_runtime_storyboard_evidence_ledger.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_main_loop_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py -q
+# 26 passed, 1 warning
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
+
 ## 2026-07-01 - Full Pytest Residual Triage
 
 - Completed AFS-T48 on `codex/afs-post-main-loop-e2e-continuation-20260630` as provider-closed full pytest residual triage.
