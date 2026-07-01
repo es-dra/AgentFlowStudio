@@ -1,5 +1,20 @@
 # Devlog
 
+## 2026-07-02 - Docs Currentness Archive Cleanup
+
+- Continued C1 on `codex/afs-c1-docs-cli-micro-cleanup-20260702` after merging current `origin/master` with T54. The protected untracked `docs/demo-docs-20260629/` files remained untouched.
+- Moved 11 unindexed/unreferenced historical handoff files from `docs/handoff/` to `docs/archive/handoff/`, and 9 unindexed/unreferenced maintenance ledgers from `docs/maintenance/` to `docs/archive/maintenance/`.
+- Added `docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md` as the currentness/index record for this cleanup and added it to `docs/handoff/INDEX.md`.
+- No tracked docs were physically deleted in this pass. Provider gates stayed closed; no server/deploy/runtime health, external download, generated media, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe tools\repository_retention_review.py --summary-only
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+git diff --check
+```
+
 ## 2026-07-02 - SPEC2 Branch Workflow Package Contract
 
 - Completed AFS-T54 on `codex/afs-t54-spec2-branch-workflow-package-20260702` in an isolated worktree from `master` at `5ddbd399`, leaving the primary checkout's protected untracked `docs/demo-docs-20260629/` untouched.

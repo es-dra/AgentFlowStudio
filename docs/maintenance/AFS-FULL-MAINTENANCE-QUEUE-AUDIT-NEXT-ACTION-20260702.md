@@ -1,5 +1,17 @@
 # AFS Full Maintenance Queue Audit And Next Action - 2026-07-02
 
+## C1 Execution Update - 2026-07-02
+
+本文件的原始判断停在“先建立历史摘要，再决定归档/删除”。后续 C1 已完成第一步并执行第一批可恢复归档：
+
+- `docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md` 已存在，并继续作为历史文档摘要入口。
+- `docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md` 是本轮实际 currentness / cleanup ledger。
+- 11 个无当前索引入口、无外部引用的 handoff 已移动到 `docs/archive/handoff/`。
+- 9 个无当前索引入口、无外部引用的 maintenance 账本已移动到 `docs/archive/maintenance/`。
+- 本轮没有物理删除 tracked docs，未触碰 `docs/demo-docs-20260629/`、provider、server、runtime evidence、local config、secret、generated/private media 或 CompanyOS active rule。
+
+后续接手时，应从上述 ledger 继续处理剩余“被 `TASK_TRACKER.md`、`DEVLOG.md` 或维护账本引用”的旧文件，而不是重复本文件的 summary-only 预备动作。
+
 中文摘要：本文件是 T51-T54 与 R3 之后的维护队列复核，不是分支卫生重复报告。R3 已经处理旧 redundancy branch / worktree residue；本轮把剩余维护债按审计 warning、超大模块、松散/待办文档、过期 handoff、server-sync 残留、本地保护路径重新归类，并给出下一条可执行清理建议。本文不执行 provider、server sync、deploy、删除、reset、clean、外部下载、客户/成本/私有素材处理或 CompanyOS active-rule 晋升。
 
 ## 中文执行说明

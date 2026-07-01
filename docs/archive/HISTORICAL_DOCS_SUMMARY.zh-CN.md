@@ -27,7 +27,7 @@
 
 | 分组 | 代表文件 | 当前动作 |
 |---|---|---|
-| T46-T53 主线 evidence | `AFS-MAIN-LOOP-E2E-INTEGRATION-GATE-20260630.md`、`AFS-T51-*`、`AFS-T52-*`、`AFS-T53-*` | 保留；这些文件仍记录 provider-closed 主线证据、验证命令和非声明边界 |
+| T46-T54 主线 evidence | `AFS-MAIN-LOOP-E2E-INTEGRATION-GATE-20260630.md`、`AFS-T51-*`、`AFS-T52-*`、`AFS-T53-*`、`AFS-T54-*` | 保留；这些文件仍记录 provider-closed 主线证据、验证命令和非声明边界 |
 | 2026-06-30 TASKRUN 包 | `*-TASKRUN-20260630.md` | 摘要保留；不逐个作为新任务入口，后续可在明确授权下合并或归档 |
 | Studio/Runtime 当前能力记录 | `AFS-STUDIO-*`、`AFS-RUNTIME-*`、`AFS-PROVIDER-*` | 按 `docs/handoff/INDEX.md` 路由读取；旧 UI 或旧 Workbench 方向不自动恢复 |
 | 早期 MVP/QA 记录 | `AFS-MVP-*`、`AFS-BROWSER-*`、旧 acceptance drill | 保留为历史 evidence；需要先检查当前 Runtime/Studio 状态再引用 |
@@ -56,10 +56,20 @@
 | owner-decision | 任何会删除历史证据、影响 server/deploy、触碰 provider、或改变 CompanyOS 规则状态的动作 |
 | do-not-touch | `docs/demo-docs-20260629/`、local config、secret、provider raw response、signed URL、generated/private media bytes、ignored runtime evidence |
 
+## 2026-07-02 已归档批次
+
+本轮在 C1 分支上执行第一批实质瘦身：11 个无当前索引入口、无外部引用的 handoff
+移动到 `docs/archive/handoff/`，9 个无当前索引入口、无外部引用的 maintenance 账本移动到
+`docs/archive/maintenance/`。完整清单和判定理由见
+`docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md`。
+
+本轮没有物理删除 tracked docs。仍被 `TASK_TRACKER.md`、`DEVLOG.md` 或维护账本引用的旧文件
+保留在原位置，后续必须先解除或明确保留引用，再判断归档或删除。
+
 ## C1 清理结论
 
 - 已建立历史文档中文摘要和当前性索引，供维护审计区分历史证据与当前入口。
-- 本摘要允许后续维护审计把历史 handoff/maintenance 文档作为已摘要历史证据处理，但不代表这些文件已经可以批量删除。
+- 本摘要允许后续维护审计把历史 handoff/maintenance 文档作为已摘要历史证据处理；本轮已将 20 个无当前索引入口且无外部引用的历史文件移动到 `docs/archive/`，不再让它们散落在活跃目录中。
 - 后续若要删除或归档文件，必须先基于本摘要列出候选清单、证明当前索引不再引用、运行维护审计，并取得明确授权。
 - 本轮不执行 server sync、deploy、Runtime health 检查、provider smoke、外部下载、媒体清理、COS/CompanyOS active-rule promotion。
 
