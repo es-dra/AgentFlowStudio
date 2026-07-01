@@ -43,6 +43,21 @@ def known_refs(source_payload: dict[str, Any], package: dict[str, Any]) -> set[s
         if item.get("source_asset_ref"):
             refs.add(str(item["source_asset_ref"]))
     refs.add(required_text(required_dict(package, "handoff"), "handoff_ref"))
+    confirmation = package.get("fixed_asset_confirmation_evidence")
+    if isinstance(confirmation, dict):
+        refs.update(str(ref) for ref in confirmation.get("local_confirmation_evidence_refs") or [])
+        for item in confirmation.get("asset_confirmation_records") or []:
+            if not isinstance(item, dict):
+                continue
+            for field in ("confirmation_ref", "source_asset_ref", "owner_decision_ref", "reviewer_decision_ref", "close_condition_ref"):
+                if item.get(field):
+                    refs.add(str(item[field]))
+        for item in confirmation.get("residual_question_closures") or []:
+            if not isinstance(item, dict):
+                continue
+            for field in ("closure_ref", "owner_decision_ref", "reviewer_decision_ref", "close_condition_ref"):
+                if item.get(field):
+                    refs.add(str(item[field]))
     return refs
 
 
@@ -58,6 +73,7 @@ def validation_report(
     graph_artifacts: set[str],
     readiness: dict[str, Any],
     review_status: dict[str, Any],
+    fixed_asset_confirmation_evidence: dict[str, Any],
     generation_planning_candidate: dict[str, Any],
 ) -> dict[str, Any]:
     asset_scope_counts = Counter(str(item["scope"]) for item in assets.values())
@@ -96,6 +112,7 @@ def validation_report(
         },
         "residual_boundary": review_status["residual_boundary"],
         "readiness": readiness,
+        "fixed_asset_confirmation_evidence": fixed_asset_confirmation_evidence,
         "generation_planning_candidate": generation_planning_candidate,
         "source_boundary_refs": list(payload.get("source_boundary_refs") or []),
         "residual_boundaries": list(payload.get("residual_boundaries") or []),

@@ -9,6 +9,35 @@
 Last updated: 2026-07-02 by Codex
 
 
+SPEC2 fixed-asset confirmation evidence contract integration addendum: T57 was
+integrated into `master` from evaluated worktree
+`C:\Users\chenzy\.codex\worktrees\5e58\AgentFlowStudio` on top of docs-cleanup
+commit `7823a86c972b238227da50d3009b24ef9bfcd0ba`. The integration replayed
+only the scoped `branch_workflow_package` confirmation-evidence algorithm,
+fixture, focused/contract tests, T57 handoff, and handoff-index delta, while
+merging `DEVLOG.md` and this tracker deliberately above the C2 docs-cleanup
+records. The new deterministic contract adds `fixed_asset_confirmation_evidence`
+and residual-question closure evidence: the shared map fixed asset is confirmed
+by default, while branch-specific assets remain visible as unconfirmed
+candidates and cannot become implementation-ready or generation-planning
+eligible without repo-local confirmation records, fixed asset source refs,
+confirmation source refs, owner/reviewer decision refs, close-condition refs,
+protected non-claim refs, provider prompt closure, and graph-write closure.
+Residual questions cannot be closed without target refs, evidence refs,
+owner/reviewer decision refs, and a non-claim-preserving close condition.
+Focused integration pytest passed (`16 passed`); branch workflow contract tests
+passed (`34 passed`); impacted T57/T56/T55/T54/T53/T52/algorithm contract tests
+passed (`66 passed`); full pytest passed (`841 passed, 520 deselected, 2
+warnings`). Maintenance audit reported `failed=0` with warning-only categories,
+including the current-scope T57 focused test oversized warning. This is
+deterministic confirmation/closure evidence only, not final schema acceptance,
+product readiness, Runtime/OpenAPI/Studio readiness, provider smoke,
+generated-media quality, human creative acceptance, business validation,
+public/legal/patent decision, deploy/runtime health, CompanyOS projection,
+durable-memory promotion, or COS active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T57-SPEC2-FIXED-ASSET-CONFIRMATION-EVIDENCE-CONTRACT-20260702.md`.
+
 Docs low-value deletion cleanup addendum: The C2 docs cleanup on
 `codex/afs-docs-low-value-deletion-cleanup-20260702` deleted the 20 C1 archive
 copies under `docs/archive/handoff/` and `docs/archive/maintenance/`. Those

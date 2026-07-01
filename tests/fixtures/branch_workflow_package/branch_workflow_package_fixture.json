@@ -114,6 +114,48 @@
         ]
       }
     },
+    "fixed_asset_confirmation_evidence": {
+      "evidence_ref": "fixed_asset_confirmation_evidence:branch-workflow-package-v0",
+      "evidence_origin": "repo_local_fixture",
+      "confirmation_state": "pending_branch_specific_confirmation",
+      "local_confirmation_evidence_refs": [
+        "evidence:fixed-asset-confirmation-map-v1"
+      ],
+      "provider_prompt_inclusion_allowed": false,
+      "graph_node_writes_required": false,
+      "asset_confirmation_records": [
+        {
+          "confirmation_ref": "asset_confirmation:map-v1",
+          "evidence_origin": "repo_local_fixture",
+          "asset_need_ref": "asset_need:map-shared",
+          "source_asset_ref": "fixed_asset:map-v1",
+          "target_refs": [
+            "asset_need:map-shared",
+            "fixed_asset:map-v1"
+          ],
+          "confirmation_source_refs": [
+            "evidence:human-gate-map-v1"
+          ],
+          "owner_decision_ref": "owner_decision:map-v1-fixed",
+          "reviewer_decision_ref": "reviewer_decision:map-v1-fixed",
+          "decision_state": "confirmed_for_generation_planning",
+          "close_condition_ref": "close_condition:map-v1-fixed-non-claim-preserving",
+          "close_condition": "non_claim_preserving_owner_decision_recorded",
+          "implementation_ready_evidence_allowed": true,
+          "provider_prompt_inclusion_allowed": false,
+          "graph_node_writes_required": false,
+          "protected_non_claim_refs": [
+            "provider_smoke",
+            "generated_media_quality",
+            "human_creative_acceptance",
+            "business_validation",
+            "final_schema_acceptance",
+            "product_readiness"
+          ]
+        }
+      ],
+      "residual_question_closures": []
+    },
     "choice_points": [
       {
         "choice_point_id": "cp_reveal_map",

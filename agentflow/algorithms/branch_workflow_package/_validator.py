@@ -20,6 +20,7 @@ from agentflow.algorithms.interactive_manga_branch_package._helpers import (
 )
 
 from ._support import known_refs, repo_root_for_fixture, validation_report
+from ._confirmation_evidence import validate_fixed_asset_confirmation_evidence
 from ._generation_planning import build_generation_planning_candidate
 from ._review_status import validate_review_status
 from . import (
@@ -75,8 +76,10 @@ def validate_branch_workflow_package_fixture(
     )
     handoff = _validate_handoff(required_dict(package, "handoff"), refs)
     readiness["blocked_reasons"] = list(handoff.get("blocked_reasons") or [])
+    fixed_asset_confirmation_evidence = validate_fixed_asset_confirmation_evidence(package, assets, review_status, refs, payload["non_claims"])
+    readiness.update(fixed_asset_confirmation_evidence["readiness"])
     generation_planning_candidate = build_generation_planning_candidate(
-        package, assets, evidence_requirements, readiness, review_status, payload["non_claims"]
+        package, assets, evidence_requirements, readiness, review_status, payload["non_claims"], fixed_asset_confirmation_evidence
     )
     return validation_report(
         payload,
@@ -90,6 +93,7 @@ def validate_branch_workflow_package_fixture(
         graph_artifacts,
         readiness,
         review_status,
+        fixed_asset_confirmation_evidence,
         generation_planning_candidate,
     )
 

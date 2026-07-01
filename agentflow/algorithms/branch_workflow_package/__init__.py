@@ -20,6 +20,9 @@ FAILURE_MODES = (
     "residual_boundary_claim_collapse",
     "non_local_generation_planning_evidence",
     "generation_planning_claim_collapse",
+    "fixed_asset_confirmation_evidence_missing",
+    "residual_question_closure_evidence_missing",
+    "non_local_fixed_asset_confirmation_evidence",
 )
 EVIDENCE_BOUNDARY = (
     "deterministic branch workflow package readiness wrapper only; reuses T53 structure "

@@ -219,23 +219,14 @@ def test_branch_workflow_keeps_unresolved_residuals_out_of_generation_planning_r
     from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
 
     payload = load_json_fixture(FIXTURE_PATH)
-    for item in payload["branch_workflow_package"]["asset_needs"]:
-        item["confirmation_state"] = "fixed_asset_available"
-        item["implementation_ready_evidence_allowed"] = True
-    requirement = _evidence_requirement(payload, "evidence_req:implementation-ready-assets")
-    requirement["evidence_state"] = "fixed_asset_available"
-    requirement["implementation_ready_evidence_refs"] = [
-        "asset_need:map-shared",
-        "fixed_asset:map-v1",
-        "asset_need:ally-trust-reveal",
-        "asset_need:shadow-cover-hide",
-    ]
-    requirement["excluded_unconfirmed_candidate_refs"] = []
+    _add_branch_confirmation_evidence_without_residual_closure(payload)
 
     report = validate_branch_workflow_package_fixture(payload)
 
     assert report["readiness"]["implementation_ready_evidence_complete"] is False
     assert report["readiness"]["residual_blocked_stages"] == ["accepted_for_generation_planning"]
+    assert report["readiness"]["fixed_asset_confirmation_evidence_complete"] is True
+    assert report["readiness"]["residual_question_closure_evidence_complete"] is False
 
 
 def test_branch_workflow_rejects_unconfirmed_candidates_in_implementation_ready_evidence() -> None:
@@ -286,3 +277,76 @@ def _evidence_requirement(payload: dict, ref: str) -> dict:
         if item["evidence_requirement_ref"] == ref:
             return item
     raise AssertionError(ref)
+
+
+def _add_branch_confirmation_evidence_without_residual_closure(payload: dict) -> None:
+    branch_sources = {
+        "asset_need:ally-trust-reveal": (
+            "fixed_asset:ally-trust-reveal-v1",
+            "evidence:fixed-asset-confirmation-ally-trust-v1",
+        ),
+        "asset_need:shadow-cover-hide": (
+            "fixed_asset:shadow-cover-hide-v1",
+            "evidence:fixed-asset-confirmation-shadow-cover-v1",
+        ),
+    }
+    package = payload["branch_workflow_package"]
+    for asset_need in package["asset_needs"]:
+        source = branch_sources.get(asset_need["asset_need_ref"])
+        if source is None:
+            continue
+        asset_need["source_asset_ref"] = source[0]
+        asset_need["confirmation_state"] = "fixed_asset_available"
+        asset_need["implementation_ready_evidence_allowed"] = True
+    requirement = _evidence_requirement(payload, "evidence_req:implementation-ready-assets")
+    requirement["evidence_state"] = "fixed_asset_available"
+    requirement["implementation_ready_evidence_refs"] = [
+        "asset_need:map-shared",
+        "fixed_asset:map-v1",
+        *branch_sources.keys(),
+    ]
+    requirement["excluded_unconfirmed_candidate_refs"] = []
+    requirement["mapped_refs"]["asset_refs"] = [
+        "asset_need:map-shared",
+        "fixed_asset:map-v1",
+        "asset_need:ally-trust-reveal",
+        "fixed_asset:ally-trust-reveal-v1",
+        "asset_need:shadow-cover-hide",
+        "fixed_asset:shadow-cover-hide-v1",
+    ]
+    requirement["mapped_refs"]["candidate_asset_refs"] = []
+    requirement["mapped_refs"]["evidence_refs"] = [
+        "evidence:fixed-asset-confirmation-ally-trust-v1",
+        "evidence:fixed-asset-confirmation-shadow-cover-v1",
+        "evidence:branch-structure-check",
+    ]
+    confirmation = package["fixed_asset_confirmation_evidence"]
+    confirmation["local_confirmation_evidence_refs"].extend(source[1] for source in branch_sources.values())
+    for asset_ref, (source_ref, evidence_ref) in branch_sources.items():
+        suffix = asset_ref.removeprefix("asset_need:")
+        confirmation["asset_confirmation_records"].append(
+            {
+                "confirmation_ref": f"asset_confirmation:{suffix}-v1",
+                "evidence_origin": "repo_local_fixture",
+                "asset_need_ref": asset_ref,
+                "source_asset_ref": source_ref,
+                "target_refs": [asset_ref],
+                "confirmation_source_refs": [evidence_ref],
+                "owner_decision_ref": f"owner_decision:{suffix}-fixed",
+                "reviewer_decision_ref": f"reviewer_decision:{suffix}-fixed",
+                "decision_state": "confirmed_for_generation_planning",
+                "close_condition_ref": f"close_condition:{suffix}-fixed-non-claim-preserving",
+                "close_condition": "non_claim_preserving_owner_decision_recorded",
+                "implementation_ready_evidence_allowed": True,
+                "provider_prompt_inclusion_allowed": False,
+                "graph_node_writes_required": False,
+                "protected_non_claim_refs": [
+                    "provider_smoke",
+                    "generated_media_quality",
+                    "human_creative_acceptance",
+                    "business_validation",
+                    "final_schema_acceptance",
+                    "product_readiness",
+                ],
+            }
+        )

@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-07-02 - SPEC2 Fixed Asset Confirmation Evidence Contract Integration
+
+- Integrated AFS-T57 into `master` from evaluated worktree `C:\Users\chenzy\.codex\worktrees\5e58\AgentFlowStudio` on top of docs-cleanup commit `7823a86c972b238227da50d3009b24ef9bfcd0ba`.
+- Replayed only the scoped fixed-asset confirmation evidence contract delta: branch workflow package algorithm files, fixture, focused/contract tests, T57 handoff, and handoff index. `DEVLOG.md` and `TASK_TRACKER.md` were merged deliberately above the docs-cleanup records instead of replaying stale T56-base versions.
+- Added `agentflow.algorithms.branch_workflow_package._confirmation_evidence`, a deterministic local validator for fixed-asset confirmation evidence and residual-question closure evidence inside the existing `branch_workflow_package` contract.
+- The default fixture now carries a pending `fixed_asset_confirmation_evidence` envelope with the shared map asset confirmed and both branch-specific assets still visible as unconfirmed candidates. The default package remains blocked for generation planning.
+- Branch-specific assets cannot become implementation-ready evidence without repo-local confirmation records, fixed asset source refs, confirmation source refs, owner/reviewer decision refs, close-condition refs, protected non-claim refs, provider prompt closure, and graph-write closure.
+- Residual questions cannot be closed without target refs, evidence refs, owner/reviewer decision refs, and explicit non-claim-preserving close conditions. `generation_planning_candidate` now checks both fixed-asset confirmation completeness and residual-question closure completeness.
+- Preserved docs cleanup delivered at `7823a86c`; did not touch `docs/demo-docs-20260629/`, Runtime/OpenAPI/Studio/provider/storage/reader/deploy/server surfaces, generated media, CompanyOS/Learning_notes material, or COS state.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t57-integration-focused tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_generation_planning_gate.py -q
+# 16 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t57-integration-branch-contract tests\test_branch_workflow_package_contract.py tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_generation_planning_gate.py -q
+# 34 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t57-integration-impacted tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_generation_planning_gate.py tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 66 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t57-integration-full -q
+# 841 passed, 520 deselected, 2 warnings
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning-only categories including the T57 focused test oversized warning
+```
+
 ## 2026-07-02 - Docs Low-Value Deletion Cleanup
 
 - Continued the C1 docs cleanup on `codex/afs-docs-low-value-deletion-cleanup-20260702` from T56 / `origin/master` commit `61b5b8b9d98577df1d2b7c0c273f32869ffb8518`.

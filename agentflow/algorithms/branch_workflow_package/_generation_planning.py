@@ -27,9 +27,10 @@ def build_generation_planning_candidate(
     readiness: dict[str, Any],
     review_status: dict[str, Any],
     non_claims: dict[str, Any],
+    fixed_asset_confirmation_evidence: dict[str, Any],
 ) -> dict[str, Any]:
     evidence_requirement_refs = _validate_local_evidence_origins(evidence_requirements)
-    checks = _eligibility_checks(readiness, review_status, non_claims)
+    checks = _eligibility_checks(readiness, review_status, non_claims, fixed_asset_confirmation_evidence)
     blocked_reasons = _blocked_reasons(checks)
     return {
         "candidate_kind": "generation_planning_candidate",
@@ -43,6 +44,7 @@ def build_generation_planning_candidate(
         "eligible": not blocked_reasons,
         "evidence_origin": "repo_local_fixture",
         "evidence_requirement_refs": evidence_requirement_refs,
+        "fixed_asset_confirmation_evidence_ref": fixed_asset_confirmation_evidence["evidence_ref"],
         "provider_calls_started": False,
         "generated_media": False,
         "product_readiness": False,
@@ -70,16 +72,24 @@ def _eligibility_checks(
     readiness: dict[str, Any],
     review_status: dict[str, Any],
     non_claims: dict[str, Any],
+    fixed_asset_confirmation_evidence: dict[str, Any],
 ) -> dict[str, bool]:
     residual_boundary = review_status["residual_boundary"]
     residual_blocked_stages = set(readiness.get("residual_blocked_stages") or [])
     unresolved_questions = list(readiness.get("unresolved_open_question_refs") or [])
+    confirmation_checks = fixed_asset_confirmation_evidence["checks"]
     return {
         "local_fixture_evidence_only": True,
         "implementation_ready_evidence_complete": bool(readiness["implementation_ready_evidence_complete"]),
+        "fixed_asset_confirmation_evidence_complete": bool(
+            confirmation_checks["branch_specific_asset_confirmation_complete"]
+        ),
         "review_accepted_for_generation_planning": str(review_status["review_state"])
         in GENERATION_PLANNING_ACCEPTED_STATES,
         "no_unresolved_open_questions": not unresolved_questions,
+        "residual_question_closure_evidence_complete": bool(
+            confirmation_checks["residual_question_closure_evidence_complete"]
+        ),
         "residual_allows_generation_planning": (
             GENERATION_PLANNING_STAGE not in residual_blocked_stages
             and residual_boundary["allowed_stage"] == GENERATION_PLANNING_STAGE
@@ -92,10 +102,14 @@ def _blocked_reasons(checks: dict[str, bool]) -> list[str]:
     reasons: list[str] = []
     if not checks["implementation_ready_evidence_complete"]:
         reasons.append("implementation_ready_evidence_incomplete")
+    if not checks["fixed_asset_confirmation_evidence_complete"]:
+        reasons.append("fixed_asset_confirmation_evidence_missing")
     if not checks["review_accepted_for_generation_planning"]:
         reasons.append("review_status_not_accepted_for_generation_planning")
     if not checks["no_unresolved_open_questions"]:
         reasons.append("unresolved_open_questions_block_generation_planning")
+    if not checks["residual_question_closure_evidence_complete"]:
+        reasons.append("residual_question_closure_evidence_missing")
     if not checks["residual_allows_generation_planning"]:
         reasons.append("residual_boundary_blocks_generation_planning")
     if not checks["protected_non_claims_preserved"]:
