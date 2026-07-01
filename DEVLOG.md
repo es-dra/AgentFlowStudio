@@ -1,5 +1,39 @@
 # Devlog
 
+## 2026-07-02 - Video Node Keyframe Provenance Revision
+
+- Completed the evaluator-blocking provenance revision on `codex/afs-video-node-keyframe-provenance-revision-20260702` from video-node recovery commit `87cbe3247261d819e3752e0e5a18cf96223d03e4`.
+- Fixed `createVideoNodeFromKeyframe()` so keyframe-created video nodes persist `videoInputSource` as `upstream_generated_image` with the original keyframe node id, first-frame asset id, and keyframe job id.
+- Hardened `explicitFirstFrameSource()` so `ensureVideoFirstFrameAsset()` does not downgrade generated-keyframe continuation nodes to `explicit_first_frame_selection` when the first-frame id is already set.
+- Added a narrow backend Studio-state sanitizer for `videoInputSource`, plus a persistence test so save/reload keeps the new source model.
+- Added a deterministic request-chain test covering `createVideoNodeFromKeyframe()` -> `ensureVideoFirstFrameAsset()` -> `videoInputSourceForRequest()`.
+- No provider call, generated media, external download, server/deploy sync, Runtime health claim, OpenAPI change, human acceptance, business validation, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+Detached base reproduction at 87cbe3247261d819e3752e0e5a18cf96223d03e4
+# expected failure: requestSource.source_mode=explicit_first_frame_selection, source_node_id=node_1, source_job_id=null
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_video_node_contract.py::test_keyframe_selected_first_frame_overrides_stale_explicit_source tests\test_web_studio_video_node_contract.py::test_keyframe_continuation_request_preserves_generated_image_provenance tests\test_api_runtime_studio_state.py::test_studio_state_preserves_safe_video_lifecycle_fields -q
+# 3 passed, 1 warning
+
+npm run check:studio-js
+# JS syntax check passed: 134 files
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_video_node_contract.py tests\test_api_runtime_video_generations.py tests\test_volc_seedance_video_adapter.py tests\test_web_studio_frontend_wave.py -q
+# 52 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -q
+# 856 passed, 520 deselected, 2 warnings
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - Video Node Deterministic Slice Recovery
 
 - Completed provider-closed deterministic recovery on `codex/afs-video-node-deterministic-slice-recovery-20260702` from T58 baseline `38c7cf5ef08b6d84217ef145129c4592866d8b49`.

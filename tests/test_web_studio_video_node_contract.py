@@ -163,6 +163,118 @@ process.stdout.write(JSON.stringify({ inferred, node: state.nodes.video_1 }));
     assert payload["node"]["params"]["videoInputSource"]["source_mode"] == "explicit_first_frame_selection"
 
 
+def test_keyframe_selected_first_frame_overrides_stale_explicit_source() -> None:
+    payload = _run_node(
+        r'''
+import { ensureVideoFirstFrameAsset, videoInputSourceForRequest } from "./apps/studio/src/video-node-flow.js";
+
+const state = {
+  nodes: {
+    video_1: {
+      id: "video_1",
+      type: "video",
+      params: {
+        sourceKeyframeNodeId: "keyframe_01",
+        sourceKeyframeJobId: "kf_job_001",
+        sourceKeyframeAssetId: "img_keyframe_001",
+        firstFrameImageAssetId: "img_keyframe_001",
+        videoInputSource: {
+          source_mode: "explicit_first_frame_selection",
+          source_asset_id: "img_keyframe_001",
+          source_node_id: "video_1",
+          role: "first_frame",
+        },
+        uploads: [{
+          asset_id: "img_keyframe_001",
+          filename: "keyframe_01.png",
+          role: "first_frame",
+          source_role: "generated_keyframe_reference",
+          source_node_id: "keyframe_01",
+          source_job_id: "kf_job_001",
+          preview_url: "/projects/p/image-assets/img_keyframe_001/preview",
+        }],
+      },
+      result: "",
+    },
+  },
+  edges: {},
+  assets: [],
+};
+const store = { get: () => state, set: (mutator) => mutator(state) };
+const firstFrame = ensureVideoFirstFrameAsset(store, state.nodes.video_1);
+const requestSource = videoInputSourceForRequest(state.nodes.video_1, firstFrame.asset_id);
+process.stdout.write(JSON.stringify({ firstFrame, requestSource, node: state.nodes.video_1 }));
+'''
+    )
+
+    assert payload["firstFrame"]["source_mode"] == "upstream_generated_image"
+    assert payload["requestSource"]["source_mode"] == "upstream_generated_image"
+    assert payload["requestSource"]["source_node_id"] == "keyframe_01"
+    assert payload["requestSource"]["source_job_id"] == "kf_job_001"
+    assert payload["node"]["params"]["videoInputSource"] == payload["requestSource"]
+
+
+def test_keyframe_continuation_request_preserves_generated_image_provenance() -> None:
+    payload = _run_node(
+        r'''
+import { createVideoNodeFromKeyframe } from "./apps/studio/src/keyframe-video-continuation.js";
+import { ensureVideoFirstFrameAsset, videoInputSourceForRequest } from "./apps/studio/src/video-node-flow.js";
+
+const state = {
+  nodes: {
+    keyframe_01: {
+      id: "keyframe_01",
+      type: "image",
+      title: "Keyframe - shot 01",
+      x: 120,
+      y: 80,
+      w: 420,
+      h: 320,
+      prompt: "Generated keyframe",
+      status: "complete",
+      previewUrl: "/projects/p/image-assets/img_keyframe_001/preview",
+      params: {
+        nodeRole: "keyframe_generation",
+        lastKeyframeJobId: "kf_job_001",
+        spec: { ratio: "16:9", duration: "5s", resolution: "720P" },
+        uploads: [{
+          asset_id: "img_keyframe_001",
+          filename: "keyframe_01.png",
+          preview_url: "/projects/p/image-assets/img_keyframe_001/preview",
+          role: "generated_keyframe_reference",
+        }],
+      },
+    },
+  },
+  edges: {},
+  order: ["keyframe_01"],
+  selection: { nodeIds: ["keyframe_01"], edgeId: null },
+  ui: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: (prefix) => `${prefix}_${++seq}`,
+  set: (mutator) => mutator(state),
+};
+
+const video = createVideoNodeFromKeyframe(store, state.nodes.keyframe_01);
+const firstFrame = ensureVideoFirstFrameAsset(store, video);
+const requestSource = videoInputSourceForRequest(video, firstFrame.asset_id);
+process.stdout.write(JSON.stringify({ video, firstFrame, requestSource }));
+'''
+    )
+
+    source = payload["requestSource"]
+    assert payload["firstFrame"]["asset_id"] == "img_keyframe_001"
+    assert source["source_mode"] == "upstream_generated_image"
+    assert source["source_asset_id"] == "img_keyframe_001"
+    assert source["source_node_id"] == "keyframe_01"
+    assert source["source_job_id"] == "kf_job_001"
+    assert source["role"] == "first_frame"
+    assert payload["video"]["params"]["videoInputSource"] == source
+
+
 def test_video_submit_payload_carries_source_and_duration_contract_markers() -> None:
     source = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
 

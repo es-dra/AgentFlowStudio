@@ -47,6 +47,13 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
       sourceKeyframeAssetId: frameAsset.asset_id,
       firstFrameImageAssetId: frameAsset.asset_id,
       firstFramePreviewUrl: frameAsset.preview_url || source.previewUrl || "",
+      videoInputSource: {
+        source_mode: "upstream_generated_image",
+        source_asset_id: frameAsset.asset_id,
+        source_node_id: source.id,
+        source_job_id: source.params?.lastKeyframeJobId || frameAsset.source_job_id || null,
+        role: "first_frame",
+      },
       motion: node.params?.motion || DEFAULT_KEYFRAME_VIDEO_MOTION,
       spec: {
         ...(node.params?.spec || {}),
@@ -59,7 +66,7 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
       uploads: mergeImageAssets(node.params?.uploads || [], {
         ...frameAsset,
         role: "first_frame",
-        source_role: frameAsset.role || frameAsset.source_role || null,
+        source_role: frameAsset.source_role || frameAsset.role || "generated_keyframe_reference",
       }).slice(-4),
       videoAssetPlan,
       videoAssetRecognition: {

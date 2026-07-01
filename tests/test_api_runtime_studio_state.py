@@ -279,6 +279,15 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
                         "/projects/studio-video-state/video-generations/"
                         "video_job_001/candidates/candidate_001/preview"
                     ),
+                    "videoInputSource": {
+                        "source_mode": "upstream_generated_image",
+                        "source_asset_id": "img_first_001",
+                        "source_node_id": "keyframe_1",
+                        "source_job_id": "keyframe_job_001",
+                        "visual_asset_id": "unsafe/path/ignored",
+                        "role": "ignored_role",
+                        "extra": "ignored",
+                    },
                     "quotaOverrideConfirmed": True,
                 },
                 "status": "generating",
@@ -295,6 +304,14 @@ def test_studio_state_preserves_safe_video_lifecycle_fields(tmp_path) -> None:
     assert params["lastFrameImageAssetId"] == "img_last_001"
     assert params["lastVideoJobId"] == "video_job_001"
     assert params["lastVideoPreviewUrl"].endswith("/video-generations/video_job_001/candidates/candidate_001/preview")
+    assert params["videoInputSource"] == {
+        "source_mode": "upstream_generated_image",
+        "source_asset_id": "img_first_001",
+        "source_node_id": "keyframe_1",
+        "source_job_id": "keyframe_job_001",
+        "visual_asset_id": "unsafe-path-ignored",
+        "role": "first_frame",
+    }
     assert params["quotaOverrideConfirmed"] is True
     assert "previewUrl" not in restored.json()["state"]["nodes"]["video_1"]
 

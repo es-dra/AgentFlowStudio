@@ -19,6 +19,7 @@ SAFE_NODE_PARAM_KEYS = (
     "model", "spec", "camera", "motion", "styleRef", "attachments", "directorSetup", "directorRef",
     "isReference", "intent", "uploads", "previewAspectRatio", "visualAssets", "visual_asset_ids",
     "firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastVideoPreviewUrl",
+    "videoInputSource",
     *SAFE_GENERATION_PARAM_KEYS,
     "quotaOverrideConfirmed", "lastContextBundle", "nodeRole", "sourceTextNodeId", "scriptSegmentIndex",
     "structuredShot", "shotAssetRefs", "assetPrepState", "asset_prep", "assetCardDraft",
@@ -63,6 +64,8 @@ def _sanitize_param(
         return safe_id(text(value, "", 120))
     if key == "lastVideoPreviewUrl":
         return preview_url(value, project_id=project_id)
+    if key == "videoInputSource":
+        return _video_input_source(value, text=text)
     if key in SAFE_GENERATION_PARAM_KEYS:
         return sanitize_generation_param(key, value, project_id=project_id, preview_url=preview_url, text=text, number=number)
     if key == "quotaOverrideConfirmed":
@@ -104,6 +107,29 @@ def _sanitize_param(
     if key == "lastOptimizedPromptPlain":
         return text(value, "", 4000)
     return value
+
+
+def _video_input_source(value: Any, *, text: TextSanitizer) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    source_mode = text(value.get("source_mode"), "", 80)
+    if source_mode not in {
+        "uploaded_image",
+        "upstream_uploaded_image",
+        "upstream_generated_image",
+        "visual_asset_reference",
+        "explicit_first_frame_selection",
+    }:
+        source_mode = "explicit_first_frame_selection"
+    result = {
+        "source_mode": source_mode,
+        "source_asset_id": safe_id(text(value.get("source_asset_id"), "", 120)),
+        "source_node_id": safe_id(text(value.get("source_node_id"), "", 120)),
+        "source_job_id": safe_id(text(value.get("source_job_id"), "", 120)),
+        "visual_asset_id": safe_id(text(value.get("visual_asset_id"), "", 120)),
+        "role": "first_frame",
+    }
+    return {key: item for key, item in result.items() if item}
 
 
 __all__ = ("SAFE_NODE_PARAM_KEYS", "sanitize_node_params")

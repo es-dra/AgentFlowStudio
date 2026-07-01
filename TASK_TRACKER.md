@@ -9,6 +9,27 @@
 Last updated: 2026-07-02 by Codex
 
 
+Video node keyframe provenance revision addendum: resolved the evaluator-blocking
+keyframe-continuation provenance gap on
+`codex/afs-video-node-keyframe-provenance-revision-20260702` from
+`87cbe3247261d819e3752e0e5a18cf96223d03e4`. Keyframe-created video nodes now
+persist `videoInputSource.source_mode=upstream_generated_image` with the
+original keyframe node id, first-frame asset id, and keyframe job id.
+`ensureVideoFirstFrameAsset()` no longer downgrades that continuation path to
+`explicit_first_frame_selection` when a first-frame id already exists. The
+backend Studio-state sanitizer now allowlists and narrowly sanitizes
+`videoInputSource` so save/reload preserves the source model. Detached-base
+reproduction failed with the evaluator symptom. Focused regression/persistence
+checks passed (`3 passed`); required Studio/video/frontend bundle passed (`52
+passed`); full pytest passed (`856 passed, 520 deselected, 2 warnings`).
+Maintenance audit reported `failed=0` with warning-only existing categories,
+and `git diff --check` passed.
+This is deterministic provenance/request/state evidence only, not provider
+smoke, generated-media quality, human creative acceptance, business validation,
+deploy/runtime health, CompanyOS projection, durable-memory promotion, or COS
+active-rule promotion. Handoff:
+`docs/handoff/AFS-VIDEO-NODE-KEYFRAME-PROVENANCE-REVISION-20260702.md`.
+
 Video node deterministic slice recovery addendum: recovered an inspectable
 provider-closed video-node contract on
 `codex/afs-video-node-deterministic-slice-recovery-20260702` from baseline

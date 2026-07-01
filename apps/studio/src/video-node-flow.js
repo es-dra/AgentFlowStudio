@@ -140,14 +140,29 @@ function explicitFirstFrameSource(node, assetId) {
   const existing = node?.params?.videoInputSource || {};
   const upload = (Array.isArray(node?.params?.uploads) ? node.params.uploads : [])
     .find((item) => String(item?.asset_id || item?.assetId || "") === assetId);
+  const uploadSourceRole = String(upload?.source_role || upload?.role || "").toLowerCase();
+  const upstreamNodeId = node?.params?.sourceKeyframeNodeId || upload?.source_node_id || null;
+  const upstreamJobId = node?.params?.sourceKeyframeJobId || upload?.source_job_id || null;
+  const hasKeyframeProvenance = uploadSourceRole === "generated_keyframe_reference"
+    || Boolean(upstreamNodeId)
+    || Boolean(upstreamJobId);
+  const sourceMode = hasKeyframeProvenance
+    ? "upstream_generated_image"
+    : existing.source_mode || "explicit_first_frame_selection";
+  const sourceNodeId = hasKeyframeProvenance
+    ? upstreamNodeId || existing.source_node_id || node?.id || null
+    : existing.source_node_id || upload?.source_node_id || node?.id || null;
+  const sourceJobId = hasKeyframeProvenance
+    ? upstreamJobId || existing.source_job_id || null
+    : existing.source_job_id || upload?.source_job_id || null;
   return normalizeImageAssetRef({
     ...(upload || {}),
     asset_id: assetId,
-    source_mode: existing.source_mode || "explicit_first_frame_selection",
-    source_node_id: existing.source_node_id || node?.id || null,
-    source_job_id: existing.source_job_id || null,
+    source_mode: sourceMode,
+    source_node_id: sourceNodeId,
+    source_job_id: sourceJobId,
     visual_asset_id: existing.visual_asset_id || null,
-  }, existing.source_mode || "explicit_first_frame_selection", node);
+  }, sourceMode, node);
 }
 
 function latestReadyImageAssetFromNode(state, sourceNodeId) {
@@ -214,11 +229,13 @@ function videoInputSourceFromAsset(asset, node) {
 export function videoInputSourceForRequest(node, firstFrameAssetId) {
   const source = node?.params?.videoInputSource || {};
   const assetId = String(firstFrameAssetId || source.source_asset_id || node?.params?.firstFrameImageAssetId || "").trim();
+  const hasKeyframeProvenance = Boolean(node?.params?.sourceKeyframeNodeId) || Boolean(node?.params?.sourceKeyframeJobId);
+  const sourceMode = source.source_mode || (hasKeyframeProvenance ? "upstream_generated_image" : "");
   return {
-    source_mode: videoSourceMode(source.source_mode),
+    source_mode: videoSourceMode(sourceMode),
     source_asset_id: assetId,
-    source_node_id: source.source_node_id || node?.id || null,
-    source_job_id: source.source_job_id || null,
+    source_node_id: source.source_node_id || node?.params?.sourceKeyframeNodeId || node?.id || null,
+    source_job_id: source.source_job_id || node?.params?.sourceKeyframeJobId || null,
     visual_asset_id: source.visual_asset_id || null,
     role: source.role || "first_frame",
   };
