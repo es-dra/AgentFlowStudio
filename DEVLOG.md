@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-07-01 - Shared Object Evidence Fixture
+
+- Completed AFS-T52 on `codex/afs-t52-shared-object-evidence-fixture-20260701` in an isolated worktree so the primary checkout's T51 dirty files and `docs/demo-docs-20260629/` remained untouched.
+- Added `agentflow.algorithms.shared_object_evidence`, a deterministic local validator for the Stage1 shared object/evidence fixture. It validates stable refs, object counts, unresolved refs, Production Graph node/reference separation, unsafe-marker rejection, partial-evidence gap reasons, handoff completeness, fixed-asset source evidence, and protected non-claims.
+- Added `tests/fixtures/shared_object_evidence/stage1_contract_fixture.json` and `tests/test_shared_object_evidence_contract_fixture.py`. The fixture covers project, script, storyboard, base shots, branch path/shot, asset candidate, fixed asset, Production Graph node/reference, evidence refs, feedback review state, handoff envelope, and reuse scope.
+- Stage1 residual is carried explicitly as `stage1_evaluator_system_error_residual` in the handoff envelope and reported as `evaluator_system_error_residual_carried`; it does not block deterministic local fixture verification.
+- No Runtime route, OpenAPI path, Studio UI, provider adapter/config, external download, generated media, provider call, deploy, Runtime health claim, CompanyOS projection, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t52-red tests\test_shared_object_evidence_contract_fixture.py -q
+# red as expected: 8 failed because shared_object_evidence was not implemented
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t52-green tests\test_shared_object_evidence_contract_fixture.py -q
+# 8 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t52-impacted-worktree tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py tests\test_model_call_context_contract.py tests\test_api_runtime_production_graph_contract.py tests\test_api_runtime_storyboard_evidence_ledger.py -q
+# 36 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warnings are legacy_frozen_surface, human_doc_chinese_coverage, secret_like_fragments, oversized_files
+
+git diff --check
+# passed
+```
+
 ## 2026-07-01 - Provider-Closed Internal Tryout Packet
 
 - Completed AFS-T51 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed internal tryout packet lane.

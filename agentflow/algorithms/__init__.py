@@ -26,6 +26,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "human_gate",
     "feedback_candidate_promotion",
     "feedback_candidate_context_overlay",
+    "shared_object_evidence",
     "revision_drift_control",
 )
 

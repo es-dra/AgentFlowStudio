@@ -9,6 +9,25 @@
 Last updated: 2026-07-01 by Codex
 
 
+Shared object evidence fixture addendum: T52 adds a deterministic local
+contract fixture before Interactive Manga, Social Square, or Director Console
+expansion. The new `shared_object_evidence` algorithm validates a repo-local
+fixture for canonical refs, object counts, unresolved refs, Production Graph
+node/reference separation, unsafe-marker rejection, evidence-gap reasons,
+handoff envelope completeness, fixed-asset source evidence, reuse scope, and
+protected non-claims. The Stage1 evaluator system-error residual is carried as
+`stage1_evaluator_system_error_residual`, not erased or upgraded into acceptance.
+Focused red/green pytest passed (`8 passed` after the expected missing-module
+red), impacted algorithm/graph/ledger tests passed (`36 passed, 1 warning`).
+Maintenance audit reported `failed=0` with warning-only existing categories,
+and `git diff --check` passed.
+This is deterministic structure verification only, not final schema acceptance,
+Runtime/OpenAPI/Studio readiness, provider smoke, generated-media quality,
+human creative acceptance, business validation, public/legal/patent decision,
+deploy/runtime health, CompanyOS projection, or COS active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T52-SHARED-OBJECT-EVIDENCE-FIXTURE-20260701.md`.
+
 Provider-closed internal tryout packet addendum: T51 adds a deterministic
 packet builder for the T50 Studio/Runtime browser readiness report. The packet
 requires `delivery_readiness.verdict=internal_provider_closed_tryout_ready`,
