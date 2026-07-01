@@ -155,6 +155,7 @@ not a claim that human acceptance or business validation has happened.
 
 ## Current Maintenance Evidence
 
+- `../maintenance/AFS-FULL-MAINTENANCE-QUEUE-AUDIT-NEXT-ACTION-20260702.md`
 - `../maintenance/AFS-LEGACY-FREEZE-20260613.md`
 - `AFS-PROJECT-INVENTORY-001.md`
 - `../maintenance/AFS-PROJECT-INVENTORY-20260612.md`
