@@ -9,6 +9,26 @@
 Last updated: 2026-07-02 by Codex
 
 
+SPEC2 review-status residual-boundary hardening addendum: T55 integrates a
+deterministic hardening layer for the T54 `branch_workflow_package` contract
+after rebasing onto current `origin/master` at `f15b47db`. The new
+`_review_status` validator requires structured review open questions, non-empty
+target/evidence refs, owner/next-action/close-condition routing, and a structured
+`residual_boundary` envelope. Unresolved residuals now remain review-only,
+block `accepted_for_generation_planning`, keep implementation-ready evidence
+incomplete, and expose blocked stages plus unresolved question refs in the
+validation report. Focused post-rebase pytest passed (`18 passed`); impacted
+T55/T54/T53/T52/algorithm contract tests passed (`50 passed`). Integration
+gates passed: maintenance audit `failed=0`, full pytest `825 passed, 520
+deselected, 2 warnings`, and `git diff --check` passed. This is deterministic
+residual-boundary validation only, not final schema acceptance, product
+readiness, Runtime/OpenAPI/Studio readiness, provider smoke, generated-media
+quality, human creative acceptance, business validation, public/legal/patent
+decision, deploy/runtime health, CompanyOS projection, durable-memory
+promotion, or COS active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T55-SPEC2-REVIEW-STATUS-RESIDUAL-BOUNDARY-HARDENING-20260702.md`.
+
 SPEC2 branch workflow package contract addendum: T54 adds the deterministic
 `branch_workflow_package` wrapper contract on top of T53 rather than
 duplicating the T53 branch package validator. The new algorithm validates a

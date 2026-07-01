@@ -106,6 +106,138 @@ def test_branch_workflow_carries_pb3_stage_residual_boundaries() -> None:
     ]
 
 
+def test_branch_workflow_exposes_review_status_and_residual_risk_envelope() -> None:
+    from agentflow.algorithms.branch_workflow_package import load_branch_workflow_package_fixture
+
+    report = load_branch_workflow_package_fixture(FIXTURE_PATH)
+
+    assert report["review_status"] == {
+        "review_state": "structure_verified_pending_review",
+        "blockers": ["branch_specific_assets_unconfirmed"],
+        "open_question_count": 2,
+        "open_question_refs": [
+            "review_question:branch-specific-assets-confirmation",
+            "review_question:pb3-residual-boundary-final-schema",
+        ],
+        "unresolved_open_question_refs": [
+            "review_question:branch-specific-assets-confirmation",
+            "review_question:pb3-residual-boundary-final-schema",
+        ],
+    }
+    assert report["residual_boundary"] == {
+        "boundary_ref": "residual_boundary:t54-pb3-review-envelope",
+        "residual_risk_state": "open_residual_review_only",
+        "allowed_stage": "review_ready",
+        "blocked_stages": ["accepted_for_generation_planning"],
+        "source_residual_refs": [
+            "pb3_local_package_commit_8296afa31b639224bcb3e7c1f8dea70000ea00b4_review_pending_local_package",
+            "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+            "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready",
+            "stage1_evaluator_system_error_residual",
+        ],
+        "claim_boundary": "review_ready_with_residual_risk_not_schema_or_product_acceptance",
+        "implementation_ready_evidence_allowed": False,
+        "protected_non_claim_refs": [
+            "final_schema_acceptance",
+            "product_readiness",
+            "provider_smoke",
+            "generated_media_quality",
+            "human_creative_acceptance",
+            "business_validation",
+        ],
+    }
+    assert report["readiness"]["residual_blocked_stages"] == ["accepted_for_generation_planning"]
+    assert report["readiness"]["unresolved_open_question_refs"] == [
+        "review_question:branch-specific-assets-confirmation",
+        "review_question:pb3-residual-boundary-final-schema",
+    ]
+
+
+def test_branch_workflow_requires_structured_review_questions_and_residual_boundary() -> None:
+    from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    payload["branch_workflow_package"]["review_status"]["open_questions"] = ["branch_specific_assets_unconfirmed"]
+
+    with pytest.raises(ValueError, match="open question"):
+        validate_branch_workflow_package_fixture(payload)
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    payload["branch_workflow_package"]["review_status"]["residual_boundary"] = (
+        "pass_with_residual_risk_not_schema_or_product_acceptance"
+    )
+
+    with pytest.raises(ValueError, match="residual_boundary"):
+        validate_branch_workflow_package_fixture(payload)
+
+
+def test_branch_workflow_rejects_open_question_as_implementation_ready_evidence() -> None:
+    from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    question = payload["branch_workflow_package"]["review_status"]["open_questions"][0]
+    question["implementation_ready_evidence_allowed"] = True
+
+    with pytest.raises(ValueError, match="open question cannot be implementation-ready evidence"):
+        validate_branch_workflow_package_fixture(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "mutation"),
+    (
+        ("target_refs", "missing"),
+        ("target_refs", "empty"),
+        ("evidence_refs", "missing"),
+        ("evidence_refs", "empty"),
+    ),
+)
+def test_branch_workflow_requires_open_question_target_and_evidence_refs(field: str, mutation: str) -> None:
+    from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    question = payload["branch_workflow_package"]["review_status"]["open_questions"][0]
+    if mutation == "missing":
+        question.pop(field)
+    else:
+        question[field] = []
+
+    with pytest.raises(ValueError, match=f"{field} must be a non-empty list"):
+        validate_branch_workflow_package_fixture(payload)
+
+
+def test_branch_workflow_rejects_generation_planning_claim_with_unresolved_residual() -> None:
+    from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    payload["branch_workflow_package"]["review_status"]["review_state"] = "accepted_for_generation_planning"
+
+    with pytest.raises(ValueError, match="unresolved residual cannot be accepted-for-generation planning"):
+        validate_branch_workflow_package_fixture(payload)
+
+
+def test_branch_workflow_keeps_unresolved_residuals_out_of_generation_planning_readiness() -> None:
+    from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
+
+    payload = load_json_fixture(FIXTURE_PATH)
+    for item in payload["branch_workflow_package"]["asset_needs"]:
+        item["confirmation_state"] = "fixed_asset_available"
+        item["implementation_ready_evidence_allowed"] = True
+    requirement = _evidence_requirement(payload, "evidence_req:implementation-ready-assets")
+    requirement["evidence_state"] = "fixed_asset_available"
+    requirement["implementation_ready_evidence_refs"] = [
+        "asset_need:map-shared",
+        "fixed_asset:map-v1",
+        "asset_need:ally-trust-reveal",
+        "asset_need:shadow-cover-hide",
+    ]
+    requirement["excluded_unconfirmed_candidate_refs"] = []
+
+    report = validate_branch_workflow_package_fixture(payload)
+
+    assert report["readiness"]["implementation_ready_evidence_complete"] is False
+    assert report["readiness"]["residual_blocked_stages"] == ["accepted_for_generation_planning"]
+
+
 def test_branch_workflow_rejects_unconfirmed_candidates_in_implementation_ready_evidence() -> None:
     from agentflow.algorithms.branch_workflow_package import load_json_fixture, validate_branch_workflow_package_fixture
 

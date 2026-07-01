@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-07-02 - SPEC2 Review Status Residual Boundary Hardening
+
+- Integrated AFS-T55 on `codex/afs-t55-spec2-review-status-residual-boundary-hardening-20260702` after rebasing the worktree from the stale T54 base onto current `origin/master` at `f15b47db`. The integration replayed only the T55 branch workflow package hardening and added fresh project record entries on top of the C1 docs cleanup baseline.
+- Added `agentflow.algorithms.branch_workflow_package._review_status` to validate structured `review_status.open_questions` and the `residual_boundary` envelope. Open questions now require owner/next-action/close-condition fields plus non-empty target and evidence refs, and residuals cannot be converted into implementation-ready or generation-planning evidence.
+- Updated the SPEC2 fixture and contract tests so unresolved PB3/T54 residuals keep `readiness.implementation_ready_evidence_complete=false`, preserve blocked stages, surface unresolved question refs, expose the residual claim boundary, and fail closed if a review state claims `accepted_for_generation_planning` while residuals remain open.
+- No Runtime route, OpenAPI path, Studio UI, provider adapter/config, external download, provider call, generated media, reader playback, storage lifecycle, deploy/server sync, Runtime health claim, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t55-integration-focused tests\test_branch_workflow_package_contract.py -q
+# 18 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t55-integration-impacted tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 50 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t55-integration-full -q
+# 825 passed, 520 deselected, 2 warnings
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - Docs Currentness Archive Cleanup
 
 - Continued C1 on `codex/afs-c1-docs-cli-micro-cleanup-20260702` after merging current `origin/master` with T54. The protected untracked `docs/demo-docs-20260629/` files remained untouched.

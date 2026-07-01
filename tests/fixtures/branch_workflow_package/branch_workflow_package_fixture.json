@@ -48,9 +48,71 @@
     ],
     "review_status": {
       "review_state": "structure_verified_pending_review",
-      "open_questions": [],
+      "open_questions": [
+        {
+          "question_ref": "review_question:branch-specific-assets-confirmation",
+          "question_state": "open",
+          "residual_ref": "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+          "target_refs": [
+            "asset_need:ally-trust-reveal",
+            "asset_need:shadow-cover-hide"
+          ],
+          "evidence_refs": [
+            "evidence_req:implementation-ready-assets"
+          ],
+          "blocked_stages": [
+            "accepted_for_generation_planning"
+          ],
+          "implementation_ready_evidence_allowed": false,
+          "owner": "future_asset_confirmation_lane",
+          "next_action": "Confirm or explicitly exclude branch-specific candidate assets before generation planning.",
+          "close_condition": "owner_decision_recorded_or_branch_specific_assets_remain_excluded"
+        },
+        {
+          "question_ref": "review_question:pb3-residual-boundary-final-schema",
+          "question_state": "residual_open",
+          "residual_ref": "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready",
+          "target_refs": [
+            "branch_package:map-choice-demo"
+          ],
+          "evidence_refs": [
+            "evidence_req:workflow-structure"
+          ],
+          "blocked_stages": [
+            "accepted_for_generation_planning"
+          ],
+          "implementation_ready_evidence_allowed": false,
+          "owner": "future_spec2_evaluator_lane",
+          "next_action": "Run the future SPEC2 evaluator gate before final schema or generation-planning acceptance.",
+          "close_condition": "residual_evaluator_gate_passes_or_package_stays_review_only"
+        }
+      ],
       "blockers": ["branch_specific_assets_unconfirmed"],
-      "residual_boundary": "pass_with_residual_risk_not_schema_or_product_acceptance"
+      "residual_boundary": {
+        "boundary_ref": "residual_boundary:t54-pb3-review-envelope",
+        "residual_risk_state": "open_residual_review_only",
+        "residual_ref": "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+        "source_residual_refs": [
+          "pb3_local_package_commit_8296afa31b639224bcb3e7c1f8dea70000ea00b4_review_pending_local_package",
+          "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate",
+          "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready",
+          "stage1_evaluator_system_error_residual"
+        ],
+        "allowed_stage": "review_ready",
+        "blocked_stages": [
+          "accepted_for_generation_planning"
+        ],
+        "implementation_ready_evidence_allowed": false,
+        "claim_boundary": "review_ready_with_residual_risk_not_schema_or_product_acceptance",
+        "protected_non_claim_refs": [
+          "final_schema_acceptance",
+          "product_readiness",
+          "provider_smoke",
+          "generated_media_quality",
+          "human_creative_acceptance",
+          "business_validation"
+        ]
+      }
     },
     "choice_points": [
       {

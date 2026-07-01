@@ -20,6 +20,7 @@ from agentflow.algorithms.interactive_manga_branch_package._helpers import (
 )
 
 from ._support import known_refs, repo_root_for_fixture, validation_report
+from ._review_status import validate_review_status
 from . import (
     BRANCH_ASSET_SCOPES,
     IMPLEMENTATION_READY_ASSET_STATES,
@@ -56,7 +57,8 @@ def validate_branch_workflow_package_fixture(
     source_payload, source_report = _validate_source_package(payload, package, source_root)
     refs = known_refs(source_payload, package)
     graph_artifacts = _validate_graph_references(package, refs, source_report)
-    _validate_package_root(package, refs)
+    residual_refs = {str(ref) for ref in payload.get("residual_boundaries") or []}
+    review_status = _validate_package_root(package, refs, residual_refs)
     choices = _validate_choice_points(required_list(package, "choice_points"), refs)
     paths = _validate_branch_paths(required_list(package, "branch_paths"), refs, choices)
     shots = _validate_branch_shots(required_list(package, "branch_shots"), refs, paths)
@@ -67,6 +69,7 @@ def validate_branch_workflow_package_fixture(
         refs,
         graph_artifacts,
         assets,
+        review_status,
     )
     handoff = _validate_handoff(required_dict(package, "handoff"), refs)
     readiness["blocked_reasons"] = list(handoff.get("blocked_reasons") or [])
@@ -81,6 +84,7 @@ def validate_branch_workflow_package_fixture(
         constraints,
         graph_artifacts,
         readiness,
+        review_status,
     )
 
 
@@ -99,15 +103,18 @@ def _validate_source_package(
     return source_payload, source_report
 
 
-def _validate_package_root(package: dict[str, Any], refs: set[str]) -> None:
-    if required_text(package, "package_stage") not in PACKAGE_STAGES:
+def _validate_package_root(package: dict[str, Any], refs: set[str], residual_refs: set[str]) -> dict[str, Any]:
+    package_stage = required_text(package, "package_stage")
+    if package_stage not in PACKAGE_STAGES:
         raise ValueError("unknown branch workflow package stage")
     for field in ("package_ref", "project_id", "source_script_ref", "source_storyboard_ref"):
         require_resolved_ref(required_text(package, field), refs, owner=package["package_id"], field=field)
-    review_status = required_dict(package, "review_status")
-    required_text(review_status, "review_state")
-    if not isinstance(review_status.get("blockers"), list):
-        raise ValueError("review_status.blockers must be a list")
+    return validate_review_status(
+        required_dict(package, "review_status"),
+        refs,
+        residual_refs,
+        package_stage=package_stage,
+    )
 
 
 def _validate_graph_references(package: dict[str, Any], refs: set[str], source_report: dict[str, Any]) -> set[str]:
@@ -215,10 +222,12 @@ def _validate_evidence_requirements(
     refs: set[str],
     graph_artifacts: set[str],
     assets: dict[str, dict[str, Any]],
+    review_status: dict[str, Any],
 ) -> dict[str, Any]:
     unconfirmed = sorted(ref for ref, item in assets.items() if item["confirmation_state"] in UNCONFIRMED_ASSET_STATES)
     implementation_ready_refs: list[str] = []
     excluded_candidates: list[str] = []
+    residual_blocked_stages = set(review_status["residual_blocked_stages"])
     review_complete = True
     generation_complete = True
     for item in dict_items(items, "evidence requirement"):
@@ -241,11 +250,15 @@ def _validate_evidence_requirements(
         excluded_candidates.extend(str(candidate) for candidate in item.get("excluded_unconfirmed_candidate_refs") or [])
     if sorted(set(excluded_candidates)) != unconfirmed:
         raise ValueError("unconfirmed candidates must be explicitly excluded from implementation-ready evidence")
+    if "accepted_for_generation_planning" in residual_blocked_stages:
+        generation_complete = False
     return {
         "review_ready_evidence_complete": review_complete,
         "implementation_ready_evidence_complete": generation_complete and not unconfirmed,
         "implementation_ready_asset_refs": sorted(set(implementation_ready_refs)),
         "excluded_unconfirmed_candidate_refs": unconfirmed,
+        "residual_blocked_stages": sorted(residual_blocked_stages),
+        "unresolved_open_question_refs": list(review_status["unresolved_open_question_refs"]),
     }
 
 

@@ -16,6 +16,8 @@ FAILURE_MODES = (
     "graph_node_write_claim",
     "unsafe_payload_marker",
     "claim_state_collapse",
+    "open_question_claim_collapse",
+    "residual_boundary_claim_collapse",
 )
 EVIDENCE_BOUNDARY = (
     "deterministic branch workflow package readiness wrapper only; reuses T53 structure "

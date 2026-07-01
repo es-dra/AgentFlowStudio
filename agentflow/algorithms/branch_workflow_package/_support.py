@@ -57,6 +57,7 @@ def validation_report(
     constraints: dict[str, dict[str, Any]],
     graph_artifacts: set[str],
     readiness: dict[str, Any],
+    review_status: dict[str, Any],
 ) -> dict[str, Any]:
     asset_scope_counts = Counter(str(item["scope"]) for item in assets.values())
     confirmation_counts = Counter(str(item["confirmation_state"]) for item in assets.values())
@@ -85,6 +86,14 @@ def validation_report(
             "graph_node_writes_required": False,
             "graph_artifact_refs": sorted(graph_artifacts),
         },
+        "review_status": {
+            "review_state": review_status["review_state"],
+            "blockers": review_status["blockers"],
+            "open_question_count": len(review_status["open_questions"]),
+            "open_question_refs": review_status["open_question_refs"],
+            "unresolved_open_question_refs": review_status["unresolved_open_question_refs"],
+        },
+        "residual_boundary": review_status["residual_boundary"],
         "readiness": readiness,
         "source_boundary_refs": list(payload.get("source_boundary_refs") or []),
         "residual_boundaries": list(payload.get("residual_boundaries") or []),
