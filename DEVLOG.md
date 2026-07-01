@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-07-02 - SPEC2 Branch Workflow Package Contract
+
+- Completed AFS-T54 on `codex/afs-t54-spec2-branch-workflow-package-20260702` in an isolated worktree from `master` at `5ddbd399`, leaving the primary checkout's protected untracked `docs/demo-docs-20260629/` untouched.
+- Added `agentflow.algorithms.branch_workflow_package`, a deterministic SPEC2 wrapper contract for `branch_workflow_package` that reuses the T53 `interactive_manga_branch_package` fixture as source evidence instead of duplicating the branch package validator.
+- Added `tests/fixtures/branch_workflow_package/branch_workflow_package_fixture.json` and `tests/test_branch_workflow_package_contract.py`. The fixture validates choice point, branch path, branch shot, asset need, continuity constraint, evidence requirement, review status, and handoff envelope fields while preserving the shared versus branch-specific asset distinction.
+- The validator checks graph references are reference-only, rejects unsafe markers, preserves protected non-claims, keeps review-ready evidence separate from implementation-ready evidence, and fails if unconfirmed branch-specific candidates are included in implementation-ready evidence.
+- PB3 local package commit `8296afa31b639224bcb3e7c1f8dea70000ea00b4` remains `review_pending_local_package`; PB3 SPEC evaluator and Stage0/Stage1 evaluator outcomes are carried only as `pass_with_residual_risk` review boundaries, not final schema, product, runtime, provider, or acceptance claims.
+- No Runtime route, OpenAPI path, Studio UI, provider adapter/config, external download, provider call, generated media, reader playback, deploy/server sync, Runtime health claim, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t54-red tests\test_branch_workflow_package_contract.py -q
+# red as expected: 9 failed because branch_workflow_package was not implemented
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t54-green tests\test_branch_workflow_package_contract.py -q
+# 9 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t54-impacted-final tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 41 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning-only categories include the new English T54 handoff in human_doc_chinese_coverage
+
+git diff --check
+# passed
+```
+
 ## 2026-07-01 - Interactive Manga Branch Package Contract
 
 - Completed AFS-T53 on `codex/afs-t53-interactive-manga-branch-package-20260701` in an isolated worktree from `master` at `56c3f700`, leaving the primary checkout's untracked `docs/demo-docs-20260629/` and `docs/maintenance/AFS-MAINTENANCE-REDUNDANCY-STATUS-20260701.md` untouched.
