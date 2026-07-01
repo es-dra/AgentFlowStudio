@@ -27,6 +27,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "feedback_candidate_promotion",
     "feedback_candidate_context_overlay",
     "shared_object_evidence",
+    "interactive_manga_branch_package",
     "revision_drift_control",
 )
 

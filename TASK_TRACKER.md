@@ -9,6 +9,30 @@
 Last updated: 2026-07-01 by Codex
 
 
+Interactive Manga branch package contract addendum: T53 adds the deterministic
+Stage 2 branch package fixture before reader/provider/Social Square/Director
+Console work. The new `interactive_manga_branch_package` algorithm validates a
+repo-local fixture with one choice point, two branch paths, four branch shots,
+base storyboard/shot mappings plus branch-specific shot refs, shared and
+branch-specific asset needs, shared and branch-specific continuity constraints,
+evidence mappings to storyboard refs, Production Graph artifact refs, asset
+refs, evidence refs, and handoff envelope refs, without graph node writes.
+Unsafe markers fail closed and protected non-claims remain false, including
+provider prompt inclusion, reader playback, Runtime route, Studio UI, OpenAPI
+path, generated media, human creative acceptance, business validation, deploy
+runtime health, CompanyOS projection, final schema acceptance, and product
+readiness. Focused red/green pytest passed (`9 passed` after the expected
+missing-module red); impacted T53/T52/algorithm contract tests passed
+(`32 passed`). Maintenance audit reported `failed=0` with warning-only
+existing categories, and `git diff --check` passed. This is deterministic
+branch package structure verification only, not final schema acceptance,
+product readiness, Runtime/OpenAPI/Studio readiness, provider smoke,
+generated-media quality, human creative acceptance, business validation,
+public/legal/patent decision, deploy/runtime health, CompanyOS projection,
+durable-memory promotion, or COS active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T53-INTERACTIVE-MANGA-BRANCH-PACKAGE-CONTRACT-20260701.md`.
+
 Shared object evidence fixture addendum: T52 adds a deterministic local
 contract fixture before Interactive Manga, Social Square, or Director Console
 expansion. The new `shared_object_evidence` algorithm validates a repo-local

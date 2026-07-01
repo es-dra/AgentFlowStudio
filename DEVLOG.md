@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-07-01 - Interactive Manga Branch Package Contract
+
+- Completed AFS-T53 on `codex/afs-t53-interactive-manga-branch-package-20260701` in an isolated worktree from `master` at `56c3f700`, leaving the primary checkout's untracked `docs/demo-docs-20260629/` and `docs/maintenance/AFS-MAINTENANCE-REDUNDANCY-STATUS-20260701.md` untouched.
+- Added `agentflow.algorithms.interactive_manga_branch_package`, a deterministic local validator for one Interactive Manga branch package fixture. It verifies one choice point, two branch paths, branch shots mapped back to base storyboard/shot refs with branch-specific shot refs, shared versus branch-specific asset needs, continuity scopes, evidence requirement mappings, graph-reference-only behavior, unsafe-marker rejection, and protected non-claims. The validator is split into public exports, helper functions, and a 287-line contract validator to avoid a new oversized module.
+- Added `tests/fixtures/interactive_manga_branch_package/branch_package_fixture.json` and `tests/test_interactive_manga_branch_package_contract.py`. The fixture builds on the T52 shared-object/evidence boundary by carrying Stage1/T52 source refs and `stage1_evaluator_system_error_residual` without upgrading it into acceptance.
+- No reader playback, public interactive runtime, Studio UI, Runtime route, OpenAPI path, provider prompt inclusion, provider call, image/video/ASR, external download, generated media, deploy/server sync, Runtime health claim, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t53-red tests\test_interactive_manga_branch_package_contract.py -q
+# red as expected: 9 failed because interactive_manga_branch_package was not implemented
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t53-green tests\test_interactive_manga_branch_package_contract.py -q
+# 9 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-t53-final-impacted tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 32 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warnings are existing legacy_frozen_surface, human_doc_chinese_coverage, secret_like_fragments, oversized_files categories
+
+git diff --check
+# passed
+```
+
 ## 2026-07-01 - Shared Object Evidence Fixture
 
 - Completed AFS-T52 on `codex/afs-t52-shared-object-evidence-fixture-20260701` in an isolated worktree so the primary checkout's T51 dirty files and `docs/demo-docs-20260629/` remained untouched.
