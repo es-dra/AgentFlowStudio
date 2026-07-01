@@ -4,6 +4,16 @@
 
 This T47 closeout records the development method as Agentic Loop Engineering. The project book, execution spec, task ledger, and state file are loop artifacts, not the product identity. AgentFlow Studio remains the AI-native manga/video/image content production workbench.
 
+## Managed Thread Register
+
+Agentic Loop Engineering is running as a proactive discovery loop, so handoff records must track adjacent managed lanes, not only the current worker's task.
+
+| Lane | Owner / source thread | Status | Next action | Close condition |
+|---|---|---|---|---|
+| AFS T47 main-path browser QA | Current AFS Full Goal Worker | Completed and pushed on `codex/afs-post-main-loop-e2e-continuation-20260630`; final head `6198e715`. | Do not add more T47 functionality; select the next provider-closed item only after checking whether the redundancy maintenance lane has been handed off. | Branch review remains `blocker_count=0`, below threshold, with only `docs/demo-docs-20260629/` as do-not-touch untracked state. |
+| AFS Redundancy Maintenance Lane | `019f1b8c-4e67-7840-93ca-5cd0b99b1d21`, converted from old read-only audit thread | Pending handoff; current T47 thread must not create or edit its target file while active. | Lane owner should create `docs/maintenance/AFS-SOURCE-COMPOSITION-REDUNDANCY-AUDIT-20260701.md`, run no-op verification, and produce the first low-risk cleanup prompts. | Audit exists with no-op verification and cleanup prompts; no code deletion, provider opening, generated media, business claim, or COS active-rule promotion. |
+| CompanyOS projection lane | `019f1ba2-9956-7c80-9d18-c0d541b3142c` | Completed by its lane but not committed/pushed; projection integration follow-up remains open. | Lane owner should handle commit/push/integration verification in the CompanyOS/source repo context. | Projection changes are committed/pushed or explicitly deferred by that lane; do not treat it as closed from AFS T47. |
+
 ## Scope
 
 AFS-T47 verifies that `/studio/` can naturally carry the Runtime main-loop evidence path in a provider-closed browser flow:
@@ -47,7 +57,7 @@ YAML parse for AFS-AI-Execution-Spec.yaml and AFS-Goal-Driven-Execution-State-v0
 ## Cleanup
 
 - Current-wave QA tool files were split under the 300-line maintenance threshold.
-- `.tmp/pytest-t47-*` is generated basetemp from this run. Deletion hit Windows access denial, so it remains local cleanup pending and is not staged.
+- `.tmp/pytest-t47-*` is generated basetemp from this run. Deletion first hit Windows access denial; the temporary directories were later moved to ignored `.venv/cleanup-pending/` and are not staged.
 - `docs/demo-docs-20260629/` remains do-not-touch, untracked, and unstaged.
 
 ## Non-Claims
