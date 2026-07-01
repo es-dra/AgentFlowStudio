@@ -31,6 +31,70 @@ def test_main_path_browser_qa_screenshot_can_be_overridden(tmp_path) -> None:
     assert screenshot == explicit.resolve()
 
 
+def test_main_path_browser_qa_ignores_recovered_studio_state_conflict_only_with_saved_evidence() -> None:
+    response_errors = [{"status": 409, "url": "http://127.0.0.1:8790/projects/demo/studio-state"}]
+    console_error = "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    recovery = {"studio_state_conflict_recovered": True}
+
+    ignored = [item for item in response_errors if main_path_qa.is_ignored_response_error(item, recovery)]
+    actionable_console = [item for item in [console_error] if not main_path_qa.is_ignored_console_error(item, ignored, recovery)]
+
+    assert ignored == response_errors
+    assert actionable_console == []
+
+
+def test_main_path_browser_qa_keeps_unrecovered_studio_state_conflict_actionable() -> None:
+    response_errors = [{"status": 409, "url": "http://127.0.0.1:8790/projects/demo/studio-state"}]
+    console_error = "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    recovery = {"studio_state_conflict_recovered": False}
+
+    ignored = [item for item in response_errors if main_path_qa.is_ignored_response_error(item, recovery)]
+    actionable_console = [item for item in [console_error] if not main_path_qa.is_ignored_console_error(item, ignored, recovery)]
+
+    assert ignored == []
+    assert actionable_console == [console_error]
+
+
+def test_main_path_browser_qa_keeps_unrelated_409_actionable() -> None:
+    response_error = {"status": 409, "url": "http://127.0.0.1:8790/projects/demo/other-route"}
+
+    assert main_path_qa.is_ignored_response_error(response_error, {"studio_state_conflict_recovered": True}) is False
+
+
+def test_main_path_browser_qa_keeps_non_recovered_console_and_network_failures_actionable() -> None:
+    recovered = {"studio_state_conflict_recovered": True}
+    ignored_studio_conflict = [{"status": 409, "url": "http://127.0.0.1:8790/projects/demo/studio-state"}]
+
+    assert main_path_qa.is_ignored_response_error({"status": 500, "url": "http://127.0.0.1:8790/projects/demo/studio-state"}, recovered) is False
+    assert main_path_qa.is_ignored_console_error("Failed to load resource: the server responded with a status of 500 (Internal Server Error)", ignored_studio_conflict, recovered) is False
+    assert main_path_qa.is_ignored_console_error("Uncaught TypeError: Cannot read properties of undefined", ignored_studio_conflict, recovered) is False
+    assert main_path_qa.is_ignored_console_error("Failed to load resource: the server responded with a status of 409 (Conflict)", [], recovered) is False
+
+
+def test_main_path_browser_qa_recovery_evidence_requires_saved_keyframe_decision() -> None:
+    state = {
+        "nodes": {
+            "node_keyframe": {
+                "id": "node_keyframe",
+                "params": {
+                    "keyframeLayer": {"status": "ready_with_fixed_assets"},
+                    "lastKeyframeJobId": "job_123",
+                    "feedbackOverlayDecisions": [{"overlay_id": "overlay_123", "decision": "include_for_next_context"}],
+                },
+            }
+        }
+    }
+
+    recovered = main_path_qa.studio_state_conflict_recovery_from_state(state, "node_keyframe", "overlay_123")
+    missing_decision = main_path_qa.studio_state_conflict_recovery_from_state(state, "node_keyframe", "overlay_missing")
+
+    assert recovered["studio_state_conflict_recovered"] is True
+    assert recovered["saved_keyframe_job_id"] == "job_123"
+    assert recovered["saved_feedback_overlay_decision"] is True
+    assert recovered["saved_keyframe_layer"] is True
+    assert missing_decision["studio_state_conflict_recovered"] is False
+
+
 def test_prepare_project_seeds_runtime_main_path_studio_contract(tmp_path) -> None:
     project_id = "studio-main-path-seed-test"
 

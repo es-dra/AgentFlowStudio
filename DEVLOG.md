@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-07-01 - Provider-Closed Internal Tryout Packet
+
+- Completed AFS-T51 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed internal tryout packet lane.
+- Added `tools/studio_provider_closed_tryout_packet.py`, which validates the T50 browser readiness report, requires `internal_provider_closed_tryout_ready`, fails closed on provider-call signals, and writes a JSON packet plus optional Markdown review summary.
+- Added `tests/test_studio_provider_closed_tryout_packet.py` for non-claim preservation, missing-gate failures, provider-call fail-closed behavior, CLI output, and provider-closed static guards.
+- Revised the browser evidence harness after evaluator review: recovered `/studio-state` `409 Conflict` save retries are suppressed only when the run proves persisted saved keyframe/feedback evidence; unrecovered `/studio-state` conflicts, unrelated `409` responses, and non-recovered console/network failures still fail.
+- No `apps/studio/` change, provider config change, live provider call, generated media, human creative acceptance, business validation, public/legal/patent decision, deploy/runtime health claim, or COS active-rule promotion occurred. This entry claims `provider_calls_started=false` in the generated evidence, not ambient environment-level provider gate closure.
+
+Verification:
+
+```text
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t51-tryout tests\test_studio_provider_closed_tryout_packet.py tests\test_studio_main_path_browser_qa_tool.py -q
+# 17 passed, 1 warning
+
+.\.venv\Scripts\python.exe tools\studio_main_path_browser_qa.py --runtime-root .venv\t51-browser-runtime --report runs\t51_studio_main_path_delivery_readiness.json --screenshot runs\t51_studio_main_path_delivery_readiness.png
+# passed; provider_calls_started=false; verdict=internal_provider_closed_tryout_ready; console_error_count=0; response_error_count=0
+
+.\.venv\Scripts\python.exe tools\studio_provider_closed_tryout_packet.py --readiness-report runs\t51_studio_main_path_delivery_readiness.json --output runs\t51_provider_closed_internal_tryout_packet.json --markdown runs\t51_provider_closed_internal_tryout_packet.md
+# passed; provider_calls_started=false
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0
+
+git diff --check
+# passed; no whitespace errors; Git printed line-ending normalization warnings only
+```
+
 ## 2026-07-01 - Studio Main-Path Delivery Readiness Gate
 
 - Completed AFS-T50 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed internal delivery readiness gate for the Studio/Runtime main path.

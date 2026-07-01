@@ -9,6 +9,30 @@
 Last updated: 2026-07-01 by Codex
 
 
+Provider-closed internal tryout packet addendum: T51 adds a deterministic
+packet builder for the T50 Studio/Runtime browser readiness report. The packet
+requires `delivery_readiness.verdict=internal_provider_closed_tryout_ready`,
+fails closed on any `provider_calls_started=true` signal, preserves explicit
+non-claims for provider smoke, generated-media quality, human creative
+acceptance, business validation, public/legal/patent approval, deploy/runtime
+health, and COS active-rule promotion, and writes JSON plus optional Markdown
+evidence under `runs/`. The evaluator revision makes the `/studio-state`
+`409 Conflict` filter recovery-aware: only a conflict paired with persisted
+saved keyframe/feedback evidence may be suppressed, while unrecovered
+`/studio-state` conflicts, unrelated `409` responses, and non-recovered
+console/network failures remain actionable. Focused pytest passed
+(`17 passed, 1 warning`), browser readiness evidence passed with
+`provider_calls_started=false`, and the packet builder passed with
+`provider_calls_started=false`. This records no environment-level provider gate
+state claim. Project gates passed:
+`tools/maintenance_audit.py` reported `failed=0`, and `git diff --check`
+passed with line-ending normalization warnings only. This is an internal
+provider-closed tryout packet only, not provider smoke, live provider call,
+generated media, human creative acceptance, business validation, public claim,
+patent/legal decision, external download, deploy verification, Runtime health
+verification, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-T51-PROVIDER-CLOSED-INTERNAL-TRYOUT-PACKET-20260701.md`.
+
 Studio main-path delivery readiness addendum: T50 adds a provider-closed
 internal delivery readiness gate for the Studio/Runtime main path. The browser
 QA harness now seeds the real `multi_role_prop_exchange_chase` benchmark and

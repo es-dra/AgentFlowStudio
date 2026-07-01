@@ -114,9 +114,12 @@ def run_browser_qa(
             final_node = node_from_storage(page, project_id, keyframe_id)
             assert_main_path_evidence(seed, keyframe_layer, first, second, plan, final_node)
             page.screenshot(path=str(screenshot_path), full_page=True)
-            actionable_errors = [item for item in response_errors if not item["url"].endswith("/favicon.ico")]
-            if console_errors or actionable_errors:
-                raise AssertionError(f"console errors: {console_errors[:5]}; response errors: {actionable_errors[:5]}")
+            studio_state_recovery = studio_state_conflict_recovery_evidence(client, project_id, keyframe_id, seed["overlay_id"], response_errors)
+            ignored_errors = [item for item in response_errors if is_ignored_response_error(item, studio_state_recovery)]
+            actionable_errors = [item for item in response_errors if item not in ignored_errors]
+            actionable_console_errors = [item for item in console_errors if not is_ignored_console_error(item, ignored_errors, studio_state_recovery)]
+            if actionable_console_errors or actionable_errors:
+                raise AssertionError(f"console errors: {actionable_console_errors[:5]}; response errors: {actionable_errors[:5]}")
             report = {
                 "artifact_type": "studio_main_path_browser_qa_report",
                 "schema_version": "0.2.0",
@@ -135,8 +138,9 @@ def run_browser_qa(
                 "second_request_plan_artifact_id": second["generation"]["artifacts"]["keyframe_request_plan"]["artifact_id"],
                 "feedback_overlay_decision_recorded": True,
                 "provider_calls_started": False,
-                "console_error_count": len(console_errors),
+                "console_error_count": len(actionable_console_errors),
                 "response_error_count": len(actionable_errors),
+                "studio_state_conflict_recovery": studio_state_recovery,
                 "browser_api_post_proxy": "fastapi_testclient",
                 "non_claims": [
                     "browser/runtime structure verification only",
@@ -251,11 +255,66 @@ def menu_index(texts: list[str], needles: tuple[str, ...], *, fallback: int | No
     raise AssertionError(f"menu item not found in: {texts}")
 
 
+def studio_state_conflict_recovery_evidence(
+    client: Any, project_id: str, keyframe_id: str, overlay_id: str, response_errors: list[dict[str, Any]], *, timeout_seconds: float = 5.0
+) -> dict[str, Any]:
+    conflict_count = sum(1 for item in response_errors if is_studio_state_conflict(item))
+    evidence = {
+        "studio_state_conflict_count": conflict_count,
+        "recovery_source": "",
+        "recovery_status_code": 0,
+        **studio_state_conflict_recovery_from_state({}, keyframe_id, overlay_id),
+    }
+    deadline = time.time() + timeout_seconds
+    while conflict_count and time.time() <= deadline:
+        response = client.get(f"/projects/{project_id}/studio-state")
+        evidence["recovery_status_code"] = response.status_code
+        if response.status_code == 200:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {}
+            evidence["recovery_source"] = str(payload.get("source", "")) if isinstance(payload, dict) else ""
+            evidence.update(studio_state_conflict_recovery_from_state(payload.get("state") if isinstance(payload, dict) else None, keyframe_id, overlay_id))
+            if evidence["studio_state_conflict_recovered"]:
+                break
+        time.sleep(0.2)
+    return evidence
+
+
+def studio_state_conflict_recovery_from_state(state: Any, keyframe_id: str, overlay_id: str) -> dict[str, Any]:
+    nodes = state.get("nodes") if isinstance(state, dict) else {}
+    node = nodes.get(keyframe_id) if isinstance(nodes, dict) else {}
+    params = node.get("params") if isinstance(node, dict) and isinstance(node.get("params"), dict) else {}
+    decisions = params.get("feedbackOverlayDecisions") if isinstance(params.get("feedbackOverlayDecisions"), list) else ()
+    saved_decision = any(isinstance(item, dict) and item.get("overlay_id") == overlay_id and item.get("decision") == "include_for_next_context" for item in decisions)
+    saved_job_id = str(params.get("lastKeyframeJobId") or "")
+    saved_layer = isinstance(params.get("keyframeLayer"), dict)
+    saved_node_id = str(node.get("id") or "") if isinstance(node, dict) else ""
+    return {
+        "studio_state_conflict_recovered": bool(saved_node_id == keyframe_id and saved_job_id and saved_decision and saved_layer),
+        "saved_keyframe_node_id": saved_node_id,
+        "saved_keyframe_job_id": saved_job_id,
+        "saved_feedback_overlay_decision": saved_decision,
+        "saved_keyframe_layer": saved_layer,
+    }
+
+
+def is_studio_state_conflict(item: dict[str, Any]) -> bool:
+    return item.get("status") == 409 and "/studio-state" in str(item.get("url", ""))
+
+
+def is_ignored_response_error(item: dict[str, Any], recovery_evidence: dict[str, Any] | None = None) -> bool:
+    url = str(item.get("url", ""))
+    if url.endswith("/favicon.ico"):
+        return True
+    return is_studio_state_conflict(item) and bool((recovery_evidence or {}).get("studio_state_conflict_recovered"))
+
+
+def is_ignored_console_error(text: str, ignored_response_errors: list[dict[str, Any]], recovery_evidence: dict[str, Any] | None = None) -> bool:
+    has_ignored_studio_conflict = any(is_studio_state_conflict(item) for item in ignored_response_errors)
+    return bool((recovery_evidence or {}).get("studio_state_conflict_recovered")) and has_ignored_studio_conflict and "Failed to load resource" in text and "409 (Conflict)" in text
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-
-
-
-
