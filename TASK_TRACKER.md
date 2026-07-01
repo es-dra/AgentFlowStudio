@@ -6,8 +6,34 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-01 by Codex
+Last updated: 2026-07-02 by Codex
 
+
+SPEC2 branch workflow package contract addendum: T54 adds the deterministic
+`branch_workflow_package` wrapper contract on top of T53 rather than
+duplicating the T53 branch package validator. The new algorithm validates a
+SPEC2 package object with choice point, branch path, branch shot, asset need,
+continuity constraint, evidence requirement, review status, and handoff
+envelope fields. It cross-checks the T53 fixture as source evidence, preserves
+shared versus branch-specific asset scopes, excludes unconfirmed candidates
+from implementation-ready evidence, keeps review-ready evidence separate from
+accepted-for-generation evidence, rejects unsafe markers, preserves protected
+non-claims, and keeps Production Graph usage reference-only with no graph node
+writes. PB3 commit `8296afa31b639224bcb3e7c1f8dea70000ea00b4` remains
+`review_pending_local_package`, and PB3 SPEC plus Stage0/Stage1 evaluator
+outcomes remain `pass_with_residual_risk` boundaries only. Focused red/green
+pytest passed (`9 passed` after the expected missing-module red); impacted
+T54/T53/T52/algorithm contract tests passed (`41 passed`). Maintenance audit
+reported `failed=0` with warning-only categories, including the new English T54
+handoff under human_doc_chinese_coverage, and `git diff --check` passed. This
+is deterministic branch workflow package readiness
+verification only, not final schema acceptance, product readiness,
+Runtime/OpenAPI/Studio readiness, provider smoke, generated-media quality,
+human creative acceptance, business validation, public/legal/patent decision,
+deploy/runtime health, CompanyOS projection, durable-memory promotion, or COS
+active-rule promotion.
+Handoff:
+`docs/handoff/AFS-T54-SPEC2-BRANCH-WORKFLOW-PACKAGE-CONTRACT-20260702.md`.
 
 Interactive Manga branch package contract addendum: T53 adds the deterministic
 Stage 2 branch package fixture before reader/provider/Social Square/Director
