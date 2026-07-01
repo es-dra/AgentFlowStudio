@@ -27,6 +27,7 @@ FORBIDDEN_STUDIO_KEYS = {
 }
 PRUNED_RUNTIME_PARAM_KEYS = {
     "lastContextBundle",
+    "lastKeyframeSourceEvidenceTrace",
     "temporaryLockOverrides",
     "feedbackOverlayDecisions",
 }

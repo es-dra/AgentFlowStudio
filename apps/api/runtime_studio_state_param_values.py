@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 from apps.api.runtime_studio_state_safe_text import has_media_filename_fragment
 from apps.api.runtime_store import safe_id
+from apps.api.runtime_studio_state_storyboard import production_graph_review, production_graph_snapshot, source_evidence_refs, visual_assets
 
 
 TextSanitizer = Callable[[Any, str, int], str]
@@ -118,7 +119,7 @@ def storyboard_breakdown(value: Any, *, text: TextSanitizer, number: NumberSanit
     if not isinstance(value, dict):
         return {}
     shots = [structured_shot(item, text=text, number=number) for item in list(value.get("shots") or [])[:80] if isinstance(item, dict)]
-    return {
+    result = {
         "job_id": text(value.get("job_id"), "", 120),
         "status": text(value.get("status"), "", 40),
         "mode": text(value.get("mode"), "", 80),
@@ -131,49 +132,38 @@ def storyboard_breakdown(value: Any, *, text: TextSanitizer, number: NumberSanit
         "updated_at": text(value.get("updated_at"), "", 80),
         "shots": shots,
     }
+    graph = production_graph_snapshot(value.get("productionGraph") or value.get("production_graph"), text=text, number=number)
+    graph_artifact_id = text(
+        value.get("productionGraphArtifactId") or value.get("production_graph_artifact_id"),
+        "",
+        180,
+    )
+    if graph:
+        result["productionGraph"] = graph
+    if graph_artifact_id:
+        result["productionGraphArtifactId"] = graph_artifact_id
+    return result
 
 
 def keyframe_layer(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {}
-    return {
+    refs = source_evidence_refs(value.get("fixed_asset_source_evidence_refs"), text=text)
+    result = {
         "status": text(value.get("status"), "", 80),
         "source_script_node_id": text(value.get("source_script_node_id"), "", 120),
         "source_asset_card_node_ids": text_list(value.get("source_asset_card_node_ids"), text=text, max_items=24, max_length=120),
+        "candidate_asset_card_node_ids": text_list(value.get("candidate_asset_card_node_ids"), text=text, max_items=24, max_length=120),
+        "candidate_image_asset_refs": text_list(value.get("candidate_image_asset_refs"), text=text, max_items=8, max_length=120, safe=True),
         "fixed_visual_asset_ids": text_list(value.get("fixed_visual_asset_ids"), text=text, max_items=24, max_length=120, safe=True),
+        "fixed_asset_source_evidence_count": int(max(0, min(99, len(refs)))),
+        "fixed_asset_source_evidence_refs": refs,
+        "production_graph_review": production_graph_review(value.get("production_graph_review"), text=text),
         "missing_asset_card_node_ids": text_list(value.get("missing_asset_card_node_ids"), text=text, max_items=24, max_length=120),
+        "unfixed_candidate_asset_card_node_ids": text_list(value.get("unfixed_candidate_asset_card_node_ids"), text=text, max_items=24, max_length=120),
         "updated_at": text(value.get("updated_at"), "", 80),
     }
-
-
-def visual_assets(value: Any, *, project_id: str | None, preview_url: PreviewUrlSanitizer, text: TextSanitizer) -> list[dict[str, Any]]:
-    assets: list[dict[str, Any]] = []
-    for item in value if isinstance(value, list) else []:
-        if not isinstance(item, dict):
-            continue
-        asset = {
-            "asset_id": safe_id(text(item.get("asset_id") or item.get("visual_asset_id"), "", 120)),
-            "visual_asset_id": safe_id(text(item.get("visual_asset_id") or item.get("asset_id"), "", 120)),
-            "asset_type": asset_type(item.get("asset_type")),
-            "label": text(item.get("label") or item.get("title"), "", 120),
-            "status": text(item.get("status") or item.get("asset_status"), "fixed", 40),
-            "signature": text(item.get("signature") or item.get("safe_summary"), "", 1000),
-            "feature_card": text_map(item.get("feature_card"), text=text, max_items=32, max_length=1000),
-            "negative_locks": text_list(item.get("negative_locks"), text=text, max_items=32, max_length=500),
-            "image_asset_refs": text_list(item.get("image_asset_refs"), text=text, max_items=16, max_length=120, safe=True),
-            "source_node_id": text(item.get("source_node_id"), "", 120),
-            "runtime_status": text(item.get("runtime_status"), "", 80),
-            "disabled_reason": text(item.get("disabled_reason"), "", 240),
-            "excluded_reason": text(item.get("excluded_reason"), "", 120),
-        }
-        preview = preview_url(item.get("preview_url"), project_id=project_id) if item.get("preview_url") else ""
-        if preview:
-            asset["preview_url"] = preview
-        if asset["asset_id"]:
-            assets.append(asset)
-        if len(assets) >= 24:
-            break
-    return assets
+    return {key: item for key, item in result.items() if item not in ("", [], {}, None)}
 
 
 def uploads(value: Any, *, project_id: str | None, preview_url: PreviewUrlSanitizer, text: TextSanitizer, number: NumberSanitizer) -> list[dict[str, Any]]:

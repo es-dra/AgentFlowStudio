@@ -6,7 +6,26 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-30 by Codex
+Last updated: 2026-07-01 by Codex
+
+Studio main-path browser QA addendum: T47 verifies `/studio/` can carry the
+Runtime main-loop evidence path without opening providers: real benchmark
+storyboard seed -> asset card/fixed asset/human-gate evidence -> production
+graph summary -> keyframe request plan and blocked bridge evidence -> feedback
+overlay include decision -> second blocked keyframe bridge. A small Runtime
+state sanitizer fix preserves safe production graph/source-evidence/non-claim
+fields while pruning unsafe runtime trace payloads. Browser QA passed with
+`provider_calls_started=false`, `console_error_count=0`, and
+`response_error_count=0`; Studio JS passed (`134 files`); focused related pytest
+passed (`18 passed, 1 warning`); maintenance audit had `failed=0`; `git diff
+--check` and execution YAML parsing passed. Cleanup note: generated
+`.tmp/pytest-t47-*` basetemp remains local cleanup pending after Windows access
+denial; it is not staged and follow-up verification used ignored `.venv`
+basetemp. This is browser/runtime structure verification only, not provider
+smoke, generated media, human creative acceptance, business validation, public
+claim, patent/legal decision, external download, deploy verification, or COS
+active-rule promotion. Handoff:
+`docs/handoff/AFS-STUDIO-MAIN-PATH-BROWSER-QA-20260701.md`.
 
 Main-loop E2E integration gate addendum: T46 rechecked the normal integration
 gate for `codex/afs-goal-mode-main-loop-e2e-20260630` and fast-forwarded the

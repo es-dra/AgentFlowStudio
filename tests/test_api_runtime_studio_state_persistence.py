@@ -26,6 +26,10 @@ def test_studio_state_prunes_runtime_bundle_details_before_safety_scan(tmp_path)
                 "params": {
                     "model": "image2-keyframe",
                     "temporaryLockOverrides": [{"asset_id": "va_1", "lock_text": "keep black hair"}],
+                    "lastKeyframeSourceEvidenceTrace": {
+                        "trace_type": "studio_keyframe_layer_source_evidence",
+                        "production_graph_review": {"artifact_id": "artifact_pg_1"},
+                    },
                     "lastContextBundle": {
                         "trace_summary": "not persisted in studio state",
                         "included_assets": [{"asset_id": "va_1"}],
@@ -44,6 +48,7 @@ def test_studio_state_prunes_runtime_bundle_details_before_safety_scan(tmp_path)
     assert params["lastContextBundle"]["included_assets"] == [{"asset_id": "va_1"}]
     assert "trace_summary" not in params["lastContextBundle"]
     assert "temporaryLockOverrides" not in params
+    assert "lastKeyframeSourceEvidenceTrace" not in params
     assert params["visualAssets"][0]["asset_id"] == "va_fixed_1"
 
 

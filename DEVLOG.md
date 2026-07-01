@@ -1,5 +1,35 @@
 # Devlog
 
+## 2026-07-01 - Studio Main Path Browser QA
+
+- Completed AFS-T47 on `codex/afs-post-main-loop-e2e-continuation-20260630` as a provider-closed Studio main-path browser smoke.
+- Added a reusable browser QA harness that seeds the real Runtime main-loop E2E baseline, opens `/studio/`, creates a keyframe layer from a script node, runs the generation bridge with the image provider gate closed, records a feedback overlay include decision, and verifies the second blocked request plan carries fixed-asset, production-graph, source-evidence, and overlay context safely.
+- Fixed the deterministic Studio state bridge so safe production graph summaries, source-evidence refs, human-gate non-claim flags, and keyframe-layer evidence can survive Studio state persistence without keeping unsafe runtime trace payloads.
+- No provider smoke, live provider call, generated media, human creative acceptance, business validation, public claim, patent/legal decision, external download, or COS active-rule promotion occurred.
+- Cleanup note: `.tmp/pytest-t47-*` is generated pytest basetemp from this run; deletion hit Windows access denial and remains local cleanup pending. Later verification used ignored `.venv` basetemp to avoid adding more untracked scan noise.
+
+Verification:
+
+```text
+npm.cmd run check:studio-js
+# JS syntax check passed: 134 files
+
+.\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp .venv\pytest-t47-focused tests\test_studio_main_path_browser_qa_tool.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_main_loop_e2e.py tests\test_web_studio_keyframe_production_graph_trace.py tests\test_web_studio_visual_asset_promotion_gate_static.py tests\test_api_runtime_studio_state_persistence.py tests\test_api_runtime_studio_state_modules.py -q
+# 18 passed, 1 warning
+
+.\.venv\Scripts\python.exe tools\studio_main_path_browser_qa.py --runtime-root .venv\t47-browser-runtime --report runs\t47_studio_main_path_browser_qa.json --screenshot runs\t47_studio_main_path_browser_qa.png
+# passed; provider_calls_started=false; console_error_count=0; response_error_count=0
+
+.\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warnings include generated .tmp cleanup-pending files and existing historical warnings
+
+git diff --check
+# passed
+
+YAML parse for AFS-AI-Execution-Spec.yaml and AFS-Goal-Driven-Execution-State-v0.1.yaml
+# passed
+```
+
 ## 2026-06-30 - Main Loop E2E Integration Gate
 
 - Completed AFS-T46 normal integration gate for

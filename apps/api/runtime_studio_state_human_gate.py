@@ -18,7 +18,9 @@ def sanitize_human_gate_decisions(value: Any, *, text: TextSanitizer) -> list[di
             "decision": text(item.get("decision"), "", 80),
             "status": text(item.get("status"), "", 80),
             "recorded_at": text(item.get("recorded_at"), "", 80),
+            "provider_calls_started": bool(item.get("provider_calls_started")),
             "writes_long_term_memory": bool(item.get("writes_long_term_memory")),
+            "writes_company_kb": bool(item.get("writes_company_kb")),
         }
         if decision["human_gate_id"] or decision["target_id"]:
             decisions.append(decision)
