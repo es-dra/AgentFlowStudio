@@ -1,6 +1,6 @@
 # AFS 历史文档摘要与当前性索引 - 2026-07-02
 
-本文是 `docs/handoff/`、`docs/maintenance/` 和其它历史长文的当前性摘要。它的作用是降低维护审计噪声，让后续维护者区分“仍需阅读的当前入口”和“只需保留摘要的历史证据”。本文不删除、不归档、不改写原始 handoff，也不把任何反馈晋升为长期记忆或 CompanyOS active rule。
+本文是 `docs/handoff/`、`docs/maintenance/` 和其它历史长文的当前性摘要。它的作用是降低维护审计噪声，让后续维护者区分“仍需阅读的当前入口”和“只需保留摘要的历史证据”。C2 清理已经把 C1 归档批次中无当前索引入口、无外部引用、且已由本摘要和清理账本承接的 20 个历史文件从 live tree 删除；恢复路径是 git 历史，不再是常驻 archive 目录。本文不把任何反馈晋升为长期记忆或 CompanyOS active rule。
 
 ## 范围
 
@@ -9,7 +9,7 @@
 | `docs/handoff/` | 先摘要和索引，后续再由独立 lane 判断是否归档或删除 | 保留为历史证据，不作为默认任务入口 |
 | `docs/maintenance/` | 保留维护账本和决策记录，避免重复审计 | 当前维护入口仍从最新审计和本摘要进入 |
 | `docs/task_briefs/`、`docs/testing/`、`docs/workbench/` | 只在需要追溯旧任务时读取 | 不作为当前 MVP 路线入口 |
-| `docs/archive/` | 存放历史摘要和瘦身后的证据索引 | 不作为产品、Runtime、provider 或发布状态声明 |
+| `docs/archive/` | 保留历史摘要；不再为低价值旧 handoff/maintenance 文件保留常驻副本 | 不作为产品、Runtime、provider 或发布状态声明 |
 
 ## 当前入口
 
@@ -66,10 +66,24 @@
 本轮没有物理删除 tracked docs。仍被 `TASK_TRACKER.md`、`DEVLOG.md` 或维护账本引用的旧文件
 保留在原位置，后续必须先解除或明确保留引用，再判断归档或删除。
 
+## 2026-07-02 已删除批次
+
+C2 文档瘦身在 `codex/afs-docs-low-value-deletion-cleanup-20260702` 上执行直接删除：
+C1 归档的 20 个文件已经由本摘要、`docs/handoff/INDEX.md` 的维护入口和
+`docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md` 承接。
+这些文件没有当前索引入口，除 `DEVLOG.md` 与维护摘要/账本外没有活跃引用；继续保留
+`docs/archive/handoff/` 与 `docs/archive/maintenance/` 的逐文件副本只会扩大历史噪声。
+
+恢复方式：
+
+```powershell
+git restore --source=61b5b8b9d98577df1d2b7c0c273f32869ffb8518 -- docs/archive/handoff docs/archive/maintenance
+```
+
 ## C1 清理结论
 
 - 已建立历史文档中文摘要和当前性索引，供维护审计区分历史证据与当前入口。
-- 本摘要允许后续维护审计把历史 handoff/maintenance 文档作为已摘要历史证据处理；本轮已将 20 个无当前索引入口且无外部引用的历史文件移动到 `docs/archive/`，不再让它们散落在活跃目录中。
+- 本摘要允许后续维护审计把历史 handoff/maintenance 文档作为已摘要历史证据处理；C1 已将 20 个无当前索引入口且无外部引用的历史文件移出活跃目录，C2 已删除这些常驻 archive 副本，恢复路径保留在 git 历史中。
 - 后续若要删除或归档文件，必须先基于本摘要列出候选清单、证明当前索引不再引用、运行维护审计，并取得明确授权。
 - 本轮不执行 server sync、deploy、Runtime health 检查、provider smoke、外部下载、媒体清理、COS/CompanyOS active-rule promotion。
 

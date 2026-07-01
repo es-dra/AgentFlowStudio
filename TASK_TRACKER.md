@@ -9,6 +9,17 @@
 Last updated: 2026-07-02 by Codex
 
 
+Docs low-value deletion cleanup addendum: The C2 docs cleanup on
+`codex/afs-docs-low-value-deletion-cleanup-20260702` deleted the 20 C1 archive
+copies under `docs/archive/handoff/` and `docs/archive/maintenance/`. Those
+files had already been removed from active `docs/handoff/` and
+`docs/maintenance/`, had no current index route, and were referenced only by
+the archive summary / cleanup ledger and DEVLOG. Current recovery route:
+`git restore --source=61b5b8b9d98577df1d2b7c0c273f32869ffb8518 -- docs/archive/handoff docs/archive/maintenance`.
+This is docs noise reduction only, not product readiness, provider smoke,
+Runtime/Studio verification, generated-media validation, server/deploy health,
+CompanyOS projection, durable-memory promotion, or COS active-rule promotion.
+
 SPEC2 generation-planning evidence gate addendum: T56 extends the T55-hardened
 `branch_workflow_package` contract with a deterministic
 `generation_planning_candidate` report section. The new gate accepts only

@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-07-02 - Docs Low-Value Deletion Cleanup
+
+- Continued the C1 docs cleanup on `codex/afs-docs-low-value-deletion-cleanup-20260702` from T56 / `origin/master` commit `61b5b8b9d98577df1d2b7c0c273f32869ffb8518`.
+- Deleted the 20 C1 archived Markdown files under `docs/archive/handoff/` and `docs/archive/maintenance/` after confirming they had no current handoff index entry and no live references beyond `DEVLOG.md` plus the archive summary / cleanup ledger.
+- Updated `docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md` and `docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md` so the live repo keeps the summary, reasons, and git recovery route instead of retaining low-value duplicate archive copies.
+- Protected scope held: no `docs/demo-docs-20260629/`, provider/config/secret, generated media, Runtime/OpenAPI/Studio/product, server/deploy, CompanyOS source, durable-memory promotion, or COS active-rule change.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\repository_retention_review.py --summary-only
+# delete_candidate_count=0; manual_review_required_count=0; remove_applied_pending_stage=20
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning-only existing categories
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp D:\Projects\AgentFlowStudio\.venv\pytest-docs-deletion-audit tests\test_repository_retention_review.py tests\test_maintenance_audit.py -q
+# 15 passed
+
+docs/handoff/INDEX.md target check
+# passed
+
+git diff --check
+# passed
+
+git diff --cached --check
+# passed before staging
+```
+
 ## 2026-07-02 - SPEC2 Generation Planning Evidence Gate
 
 - Completed AFS-T56 on `codex/afs-t56-spec2-generation-planning-evidence-gate-20260702` from current `master` at T55 commit `1786c61d5c4f99f3ebd9358c0e482d1ea9b54082`.
