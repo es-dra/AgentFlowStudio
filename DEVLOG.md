@@ -8970,8 +8970,10 @@ Boundaries:
   `AFS_RUNTIME_SERVICE_HOST`, so a public bind with auth disabled is not
   reported as local-only or acceptance-ready.
 - Hardened public-edge, three-end, and HTTP preflight reports with safe
-  readiness/non-claim fields. Public edge 200 plus auth-disabled Runtime now
-  reports `public_edge_auth_not_ready`, not `ready_for_public_auth`.
+  readiness/non-claim fields. Three-end report fields now carry alignment
+  evidence only, while loaded-code freshness stays a non-claim. Public edge 200
+  plus auth-disabled Runtime now reports `public_edge_auth_not_ready`, not
+  `ready_for_public_auth`.
 - Added shared readiness sanitization helper and refreshed the Runtime OpenAPI
   snapshot.
 
@@ -8982,11 +8984,12 @@ python -m pytest -q tests/test_api_runtime_service.py tests/test_api_runtime_aut
 # 49 passed
 ```
 
-Boundaries: service/runtime/preflight readiness only; no runtime loaded-code
-freshness except explicit three-end alignment fields, no provider smoke,
-generated-media QA, human creative acceptance, product/business/public/legal
-readiness, CompanyOS projection, durable-memory promotion, or COS active-rule
-promotion.
+Boundaries: service/runtime/preflight readiness only. Runtime loaded-code
+freshness remains unclaimed unless service PID/timestamp changed after
+authorized restart/reload plus local/public health evidence; current three-end
+fields are alignment evidence only. No provider smoke, generated-media QA,
+human creative acceptance, product/business/public/legal readiness, CompanyOS
+projection, durable-memory promotion, or COS active-rule promotion.
 
 - Created a multi-role QA plan and run ledger for the internal-test replacement pass, covering creator, returning creator, creative director, asset librarian, QA gatekeeper, release operator, privacy/security, waiting user, small viewport, and failure-recovery perspectives.
 - Fixed local browser QA startup under proxy-enabled developer machines: health checks now bypass `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY` for local Runtime probes, Runtime subprocesses receive `NO_PROXY`, and the QA helper passes the correct `AFS_RUNTIME_ROOT`.

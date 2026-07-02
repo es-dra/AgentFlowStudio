@@ -18,8 +18,9 @@ PB-P1-01/PB-P1-11.
 - Updated public-edge preflight so a public 200 edge with Runtime auth disabled
   becomes `public_edge_auth_not_ready`, not `ready_for_public_auth`.
 - Added three-end and internal HTTP preflight readiness/non-claim fields so
-  runtime freshness, service health, public-edge auth, and human/product
-  acceptance remain separate.
+  runtime three-end alignment evidence, loaded-code freshness non-claims,
+  service health, public-edge auth, and human/product acceptance remain
+  separate.
 - Regenerated `docs/openapi/afs-runtime-service.openapi.json`.
 
 ## Verification
@@ -31,7 +32,9 @@ python -m pytest -q tests/test_api_runtime_service.py tests/test_api_runtime_aut
 
 ## Non-Claims
 
-- No runtime loaded-code freshness beyond explicit three-end alignment fields.
+- Runtime loaded-code freshness remains unclaimed unless service PID/timestamp
+  changed after authorized restart/reload plus local/public health evidence;
+  current three-end fields are alignment evidence only.
 - No provider smoke.
 - No generated-media QA.
 - No human creative acceptance.

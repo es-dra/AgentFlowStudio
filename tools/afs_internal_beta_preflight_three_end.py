@@ -109,13 +109,14 @@ def _safe_provider_gates(value: Any) -> dict[str, bool]:
         return {}
     allowed = {"llm", "image", "video", "vision", "asr", "external_download"}
     return {str(key): bool(val) for key, val in value.items() if str(key) in allowed}
-def _safe_readiness_claims(value: Any) -> dict[str, bool]:
+def _safe_readiness_claims(value: Any) -> dict[str, bool | str]:
     if not isinstance(value, dict):
         value = {}
     return {
         "repo_ends_aligned": bool(value.get("repo_ends_aligned")),
         "runtime_service_ready": bool(value.get("runtime_service_ready")),
-        "runtime_freshness_verified": bool(value.get("runtime_freshness_verified")),
+        "runtime_three_end_alignment_evidence": bool(value.get("runtime_three_end_alignment_evidence")),
+        "runtime_loaded_code_freshness_claim": str(value.get("runtime_loaded_code_freshness_claim") or "not_claimed"),
         "acceptance_ready": bool(value.get("acceptance_ready")),
         "human_creative_acceptance": bool(value.get("human_creative_acceptance")),
         "product_readiness": bool(value.get("product_readiness")),

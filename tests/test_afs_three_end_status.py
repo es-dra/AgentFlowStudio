@@ -56,7 +56,8 @@ def test_three_end_report_marks_drift_without_leaking_server_details() -> None:
     assert report["ends"]["server_opt"]["aligned_with_origin"] is False
     assert report["runtime_health"]["status"] == "ready"
     assert report["runtime_health"]["provider_gates"]["video"] is False
-    assert report["readiness_claims"]["runtime_freshness_verified"] is False
+    assert report["readiness_claims"]["runtime_three_end_alignment_evidence"] is False
+    assert report["readiness_claims"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert report["readiness_claims"]["acceptance_ready"] is False
     assert report["readiness_claims"]["product_readiness"] is False
     assert "not human creative acceptance" in report["non_claims"]
@@ -69,7 +70,7 @@ def test_three_end_report_marks_drift_without_leaking_server_details() -> None:
     assert "session_token" not in serialized
 
 
-def test_safe_runtime_health_keeps_only_public_booleans() -> None:
+def test_safe_runtime_health_keeps_only_public_readiness_fields() -> None:
     safe = safe_runtime_health(
         {
             "service": "agentflow_runtime_service",
@@ -78,7 +79,7 @@ def test_safe_runtime_health_keeps_only_public_booleans() -> None:
             "auth_required": True,
             "studio_static": {"status": "ready", "mounted": True, "root_exists": True},
             "provider_gates": {"llm": 1, "video": 0, "unknown": "/private"},
-            "readiness": {"service_ready": True, "runtime_freshness_verified": False, "acceptance_ready": False},
+            "readiness": {"service_ready": True, "runtime_three_end_alignment_evidence": False, "acceptance_ready": False},
             "signed_url": "https://example.test/signed",
         }
     )
@@ -102,9 +103,10 @@ def test_safe_runtime_health_keeps_only_public_booleans() -> None:
             "service_ready": True,
             "auth_ready_for_public_edge": False,
             "public_edge_verified": False,
-            "runtime_freshness_verified": False,
+            "runtime_three_end_alignment_evidence": False,
             "acceptance_ready": False,
             "product_readiness": False,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
         },
     }
 
@@ -125,7 +127,8 @@ def test_three_end_alignment_does_not_claim_acceptance_or_product_readiness() ->
     assert report["readiness_claims"] == {
         "repo_ends_aligned": True,
         "runtime_service_ready": True,
-        "runtime_freshness_verified": True,
+        "runtime_three_end_alignment_evidence": True,
+        "runtime_loaded_code_freshness_claim": "not_claimed",
         "acceptance_ready": False,
         "human_creative_acceptance": False,
         "product_readiness": False,

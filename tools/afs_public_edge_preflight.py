@@ -94,7 +94,8 @@ def run_public_edge_preflight(
             "runtime_status": safe_health.get("status", ""),
             "studio_static_status": safe_health.get("studio_static", {}).get("status", ""),
             "auth_required": safe_health.get("auth_required", False),
-            "runtime_freshness_verified": bool(safe_health.get("readiness", {}).get("runtime_freshness_verified")),
+            "runtime_three_end_alignment_evidence": bool(safe_health.get("readiness", {}).get("runtime_three_end_alignment_evidence")),
+            "runtime_loaded_code_freshness_claim": str(safe_health.get("readiness", {}).get("runtime_loaded_code_freshness_claim") or "not_claimed"),
             "acceptance_ready": bool(safe_health.get("readiness", {}).get("acceptance_ready")),
         },
     )
@@ -135,7 +136,8 @@ def run_public_edge_preflight(
         "runtime_health": safe_health,
         "readiness_boundary": {
             "public_edge_auth_ready": status == "ready_for_public_auth",
-            "runtime_freshness_verified": False,
+            "runtime_three_end_alignment_evidence": False,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
             "acceptance_ready": False,
             "human_acceptance_claim": "not_claimed",
             "product_readiness_claim": "not_claimed",

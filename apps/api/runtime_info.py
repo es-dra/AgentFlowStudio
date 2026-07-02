@@ -10,7 +10,7 @@ LOCAL_BIND_HOSTS = {"", "127.0.0.1", "localhost", "::1"}
 DEFAULT_RUNTIME_BIND_HOST = "127.0.0.1"
 READINESS_NON_CLAIMS = [
     "not_public_edge_verified",
-    "not_runtime_code_freshness_verified",
+    "not_runtime_loaded_code_freshness",
     "not_provider_smoke",
     "not_generated_media_qa",
     "not_human_creative_acceptance",
@@ -58,7 +58,7 @@ def runtime_health_payload(
             "no_browser_persistence": True,
             "no_provider_call_by_default": True,
             "no_durable_memory_write": True,
-            "runtime_freshness_verified": False,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
             "acceptance_ready": False,
             "product_readiness": False,
         },
@@ -105,7 +105,7 @@ def runtime_exposure_payload(*, runtime_bind_host: str | None = None, auth_requi
 def runtime_readiness_payload(*, auth_required: bool, exposure: dict[str, Any]) -> dict[str, Any]:
     blocked_or_unverified = [
         "public_edge_not_verified_by_health",
-        "runtime_code_freshness_not_verified_by_health",
+        "runtime_loaded_code_freshness_requires_restart_or_reload_evidence",
         "provider_smoke_not_run_by_health",
         "generated_media_qa_not_run_by_health",
         "human_creative_acceptance_not_claimed",
@@ -119,12 +119,13 @@ def runtime_readiness_payload(*, auth_required: bool, exposure: dict[str, Any]) 
         "service_ready": True,
         "auth_ready_for_public_edge": bool(auth_required),
         "public_edge_verified": False,
-        "runtime_freshness_verified": False,
+        "runtime_three_end_alignment_evidence": False,
+        "runtime_loaded_code_freshness_claim": "not_claimed",
         "acceptance_ready": False,
         "human_creative_acceptance": False,
         "product_readiness": False,
         "business_validation": False,
-        "claim_boundary": "Service health only; public edge auth, runtime code freshness, provider smoke, generated-media QA, human creative acceptance, and product/business/public/legal readiness are not claimed.",
+        "claim_boundary": "Service health only; public edge auth, runtime loaded-code freshness, provider smoke, generated-media QA, human creative acceptance, and product/business/public/legal readiness are not claimed.",
         "blocked_or_unverified": blocked_or_unverified,
         "non_claims": list(READINESS_NON_CLAIMS),
     }

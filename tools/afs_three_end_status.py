@@ -133,7 +133,7 @@ def build_three_end_report(
     safe_health = safe_runtime_health(runtime_health or {})
     health_ready = runtime_health is None or safe_health.get("status") == "ready"
     all_aligned = aligned_count == len(snapshots) and health_ready
-    runtime_freshness_verified = all_aligned and runtime_health is not None
+    runtime_three_end_alignment_evidence = all_aligned and runtime_health is not None
     return {
         "artifact_type": "afs_three_end_status_report",
         "schema_version": "0.1.0",
@@ -152,13 +152,15 @@ def build_three_end_report(
         "readiness_claims": {
             "repo_ends_aligned": aligned_count == len(snapshots),
             "runtime_service_ready": health_ready,
-            "runtime_freshness_verified": runtime_freshness_verified,
+            "runtime_three_end_alignment_evidence": runtime_three_end_alignment_evidence,
+            "runtime_loaded_code_freshness_claim": "not_claimed",
             "acceptance_ready": False,
             "human_creative_acceptance": False,
             "product_readiness": False,
         },
         "non_claims": [
             "three-end alignment only",
+            "not runtime loaded-code freshness",
             "not provider smoke",
             "not generated-media QA",
             "not human creative acceptance",

@@ -77,7 +77,8 @@ def _safe_readiness_boundary(value: Any) -> dict[str, bool | str]:
         value = {}
     return {
         "public_edge_auth_ready": bool(value.get("public_edge_auth_ready")),
-        "runtime_freshness_verified": bool(value.get("runtime_freshness_verified")),
+        "runtime_three_end_alignment_evidence": bool(value.get("runtime_three_end_alignment_evidence")),
+        "runtime_loaded_code_freshness_claim": str(value.get("runtime_loaded_code_freshness_claim") or "not_claimed"),
         "acceptance_ready": bool(value.get("acceptance_ready")),
         "human_acceptance_claim": str(value.get("human_acceptance_claim") or "not_claimed"),
         "product_readiness_claim": str(value.get("product_readiness_claim") or "not_claimed"),

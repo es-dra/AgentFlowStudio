@@ -63,7 +63,8 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     }
     assert health["readiness"]["service_ready"] is True
     assert health["readiness"]["auth_ready_for_public_edge"] is False
-    assert health["readiness"]["runtime_freshness_verified"] is False
+    assert health["readiness"]["runtime_three_end_alignment_evidence"] is False
+    assert health["readiness"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert health["readiness"]["public_edge_verified"] is False
     assert health["readiness"]["acceptance_ready"] is False
     assert health["readiness"]["product_readiness"] is False
@@ -71,7 +72,7 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "not_human_creative_acceptance" in health["readiness"]["non_claims"]
     assert health["boundaries"]["local_only"] is True
     assert health["boundaries"]["public_edge_verified"] is False
-    assert health["boundaries"]["runtime_freshness_verified"] is False
+    assert health["boundaries"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert health["boundaries"]["acceptance_ready"] is False
     assert capabilities["actions"] == [
         "create_project",
@@ -130,7 +131,8 @@ def test_runtime_health_public_bind_auth_disabled_is_not_local_or_acceptance_rea
     assert health["readiness"]["auth_ready_for_public_edge"] is False
     assert health["readiness"]["acceptance_ready"] is False
     assert health["readiness"]["product_readiness"] is False
-    assert health["readiness"]["runtime_freshness_verified"] is False
+    assert health["readiness"]["runtime_three_end_alignment_evidence"] is False
+    assert health["readiness"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert "public_bind_runtime_auth_disabled" in health["readiness"]["blocked_or_unverified"]
 
 

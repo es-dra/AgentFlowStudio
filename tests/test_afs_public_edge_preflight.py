@@ -58,7 +58,8 @@ def test_public_edge_preflight_reports_ready_when_edge_and_runtime_are_ready() -
     assert report["runtime_health"]["provider_gates"] == {"llm": True, "image": True, "video": False}
     assert report["readiness_boundary"] == {
         "public_edge_auth_ready": True,
-        "runtime_freshness_verified": False,
+        "runtime_three_end_alignment_evidence": False,
+        "runtime_loaded_code_freshness_claim": "not_claimed",
         "acceptance_ready": False,
         "human_acceptance_claim": "not_claimed",
         "product_readiness_claim": "not_claimed",
@@ -78,7 +79,7 @@ def test_public_edge_preflight_blocks_auth_disabled_runtime_from_public_auth_rea
             "readiness": {
                 "service_ready": True,
                 "auth_ready_for_public_edge": False,
-                "runtime_freshness_verified": False,
+                "runtime_three_end_alignment_evidence": False,
                 "acceptance_ready": False,
             },
         },

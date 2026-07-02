@@ -40,12 +40,13 @@ def test_http_preflight_can_embed_safe_three_end_status(tmp_path: Path, monkeypa
                 "status": "ready",
                 "runtime_root": str(tmp_path / "unsafe-runtime-root"),
                 "provider_gates": {"llm": True, "image": True, "video": False, "unknown": "secret"},
-                "readiness": {"service_ready": True, "runtime_freshness_verified": False, "acceptance_ready": False},
+                "readiness": {"service_ready": True, "runtime_three_end_alignment_evidence": False, "acceptance_ready": False},
             },
             "readiness_claims": {
                 "repo_ends_aligned": True,
                 "runtime_service_ready": True,
-                "runtime_freshness_verified": True,
+                "runtime_three_end_alignment_evidence": True,
+                "runtime_loaded_code_freshness_claim": "not_claimed",
                 "acceptance_ready": False,
                 "human_creative_acceptance": False,
                 "product_readiness": False,
@@ -69,9 +70,11 @@ def test_http_preflight_can_embed_safe_three_end_status(tmp_path: Path, monkeypa
     assert captured["server"] == "afs-bwg-ops"
     assert report["status"] == "ready_for_http_acceptance"
     assert report["three_end_status"]["status"] == "aligned"
-    assert report["three_end_status"]["readiness_claims"]["runtime_freshness_verified"] is True
+    assert report["three_end_status"]["readiness_claims"]["runtime_three_end_alignment_evidence"] is True
+    assert report["three_end_status"]["readiness_claims"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert report["three_end_status"]["readiness_claims"]["acceptance_ready"] is False
-    assert report["readiness_claims"]["runtime_freshness_verified"] is True
+    assert report["readiness_claims"]["runtime_three_end_alignment_evidence"] is True
+    assert report["readiness_claims"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert report["readiness_claims"]["acceptance_ready"] is False
     assert report["three_end_status"]["summary"]["checked_end_count"] == 3
     assert checks["three_end_status"]["status"] == "passed"

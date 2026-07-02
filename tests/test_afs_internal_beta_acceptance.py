@@ -206,7 +206,8 @@ def test_http_preflight_uses_health_without_invite_codes_or_provider_calls(tmp_p
         "external_download": False,
     }
     assert report["safe_health"]["readiness"]["service_ready"] is True
-    assert report["safe_health"]["readiness"]["runtime_freshness_verified"] is False
+    assert report["safe_health"]["readiness"]["runtime_three_end_alignment_evidence"] is False
+    assert report["safe_health"]["readiness"]["runtime_loaded_code_freshness_claim"] == "not_claimed"
     assert report["safe_health"]["readiness"]["acceptance_ready"] is False
     assert (tmp_path / "preflight-report.json").is_file()
 
