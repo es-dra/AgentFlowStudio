@@ -204,7 +204,8 @@ def test_generate_context_uses_label_matched_fixed_assets_without_edges(tmp_path
     assert asset["asset_id"] not in {item["asset_id"] for item in bundle["excluded_assets"]}
 
 
-def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is_rejected(tmp_path) -> None:
+def test_scene_asset_never_occupies_subject_reference_and_frontend_asset_text_is_rejected(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_scene_subject_ref"
     scene_image = _upload(client, project_id, "scene-node")
@@ -308,7 +309,8 @@ def test_director_setup_asset_binding_reads_signature_from_backend_store(tmp_pat
     assert bundle["director_compile_result"]["asset_refs_used"] == [asset["asset_id"]]
 
 
-def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path) -> None:
+def test_legacy_background_context_is_not_consumed_by_context_resolver(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     store = RuntimeStore(tmp_path)
     legacy_dir = tmp_path / "creative_memory" / "proj_legacy_context"
     legacy_dir.mkdir(parents=True, exist_ok=True)

@@ -137,21 +137,19 @@ def test_codex_image_handoff_runtime_poll_route_completes_after_worker(tmp_path,
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    submit = client.post(
-        "/projects/proj_codex_image/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled character keyframe.",
-            "optimized_prompt": "A controlled character keyframe, cinematic lighting.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "provider_service_id": "codex_image",
-            "seed": 120617,
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled character keyframe.",
+        "optimized_prompt": "A controlled character keyframe, cinematic lighting.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "provider_service_id": "codex_image",
+        "seed": 120617,
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, "proj_codex_image", request)
     assert submit.status_code == 200
     submitted_payload = submit.json()
     job_id = submitted_payload["job"]["job_id"]
@@ -212,16 +210,14 @@ def test_codex_image_handoff_runtime_poll_recovers_terminal_failed_state_after_w
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_codex_terminal_recovery"
 
-    submit = client.post(
-        f"/projects/{project_id}/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled tabby cat keyframe.",
-            "optimized_prompt": "A controlled tabby cat keyframe, cinematic lighting.",
-            "provider_service_id": "codex_image",
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled tabby cat keyframe.",
+        "optimized_prompt": "A controlled tabby cat keyframe, cinematic lighting.",
+        "provider_service_id": "codex_image",
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, project_id, request)
     assert submit.status_code == 200
     job_id = submit.json()["job"]["job_id"]
     output_dir = tmp_path / "runs" / project_id / job_id
@@ -256,16 +252,14 @@ def test_codex_image_handoff_poll_fails_safely_when_provider_config_disappears(t
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    submit = client.post(
-        "/projects/proj_codex_missing_config/keyframe-generations",
-        json={
-            "node_id": "image-node-1",
-            "prompt_text": "Generate a controlled keyframe.",
-            "optimized_prompt": "A controlled keyframe.",
-            "provider_service_id": "codex_image",
-            "generated_at": "2026-06-17T10:26:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-1",
+        "prompt_text": "Generate a controlled keyframe.",
+        "optimized_prompt": "A controlled keyframe.",
+        "provider_service_id": "codex_image",
+        "generated_at": "2026-06-17T10:26:00+08:00",
+    }
+    submit = _submit_keyframe_with_preflight(client, "proj_codex_missing_config", request)
     assert submit.status_code == 200
     job_id = submit.json()["job"]["job_id"]
     monkeypatch.delenv("AFS_PROVIDER_CONFIG", raising=False)
@@ -569,6 +563,15 @@ def _store(tmp_path: Path, payload: dict):
     path = tmp_path / "providers.local.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return load_company_provider_secrets(path)
+
+
+def _submit_keyframe_with_preflight(client: TestClient, project_id: str, request: dict[str, object]):
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
+    )
 
 
 def _image_worker_request() -> dict:

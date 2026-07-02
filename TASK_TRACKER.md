@@ -8,6 +8,28 @@
 
 Last updated: 2026-07-02 by Codex
 
+Pre-human creative hardening integration addendum: Lane I1 integrated D2, D5,
+D1/D1R, D3/D3R, and D4 on isolated branch
+`codex/afs-pre-human-hardening-integration-20260702` from verified
+`origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`. Integration preserved
+accepted-plan non-acceptance boundaries, provider-submit preflight requirements,
+scoped runtime readiness wording, runtime log/artifact leakage hardening, and
+provider-closed readiness packet currency. D3 compatibility was handled by not
+adding an alias for the retired runtime freshness field; active consumers now use
+`runtime_three_end_alignment_evidence` and
+`runtime_loaded_code_freshness_claim: "not_claimed"`, with no active retired
+field references found. Stale deterministic tests were updated to either keep
+provider gates closed or run fresh preflight before fake-provider submit.
+Verification passed: focused union (`194 passed, 1 warning`), OpenAPI snapshot
+(`1 passed` after export), Studio JS (`135 files`), full pytest (`892 passed,
+520 deselected, 2 warnings`), maintenance audit (`failed=0`, warning-only), and
+`git diff --check`. This is local integration readiness for evaluator review,
+not provider smoke, generated-media QA, human creative acceptance, product
+readiness, business/public/legal readiness, deploy/runtime loaded-code
+freshness, CompanyOS projection, durable-memory promotion, or COS active-rule
+promotion. Handoff:
+`docs/handoff/AFS-PRE-HUMAN-CREATIVE-HARDENING-INTEGRATION-20260702.md`.
+
 Runtime log/artifact leakage hardening addendum: Lane D4 hardens PB-P1-10 /
 PB-P1-11 surfaces without provider calls or server operations. Runtime logging
 now uses a shared sensitive-key/private-fragment sanitizer for client events,

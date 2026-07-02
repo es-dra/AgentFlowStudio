@@ -220,20 +220,18 @@ def test_keyframe_generation_returns_safe_image_preview_url(tmp_path, monkeypatc
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_preview/keyframe-generations",
-        json={
-            "node_id": "image-node-preview-001",
-            "prompt_text": "A controlled vertical keyframe of a founder in a night studio.",
-            "optimized_prompt": "Intent: keyframe.\nCamera/Framing: aspect ratio 9:16.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "seed": 120612,
-            "generated_at": "2026-06-12T10:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-preview-001",
+        "prompt_text": "A controlled vertical keyframe of a founder in a night studio.",
+        "optimized_prompt": "Intent: keyframe.\nCamera/Framing: aspect ratio 9:16.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "seed": 120612,
+        "generated_at": "2026-06-12T10:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_preview", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -344,17 +342,15 @@ def test_async_image_provider_already_complete_returns_succeeded_preview(tmp_pat
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: DoneRegistry())
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_async_done/keyframe-generations",
-        json={
-            "node_id": "image-node-async-done-001",
-            "prompt_text": "A controlled character sheet.",
-            "optimized_prompt": "A controlled character sheet.",
-            "aspect_ratio": "16:9",
-            "candidate_count": 1,
-            "generated_at": "2026-06-23T06:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-async-done-001",
+        "prompt_text": "A controlled character sheet.",
+        "optimized_prompt": "A controlled character sheet.",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "generated_at": "2026-06-23T06:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_async_done", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -395,17 +391,15 @@ def test_keyframe_generation_retries_readiness_error_once(tmp_path, monkeypatch)
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_retry/keyframe-generations",
-        json={
-            "node_id": "image-node-retry-001",
-            "prompt_text": "A controlled vertical keyframe.",
-            "optimized_prompt": "A controlled vertical keyframe.",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "generated_at": "2026-06-12T12:10:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-retry-001",
+        "prompt_text": "A controlled vertical keyframe.",
+        "optimized_prompt": "A controlled vertical keyframe.",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-06-12T12:10:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_retry", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -430,17 +424,15 @@ def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monke
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_keyframe_timeout/keyframe-generations",
-        json={
-            "node_id": "image-node-timeout-001",
-            "prompt_text": "A controlled character reference sheet.",
-            "optimized_prompt": "A controlled character reference sheet.",
-            "aspect_ratio": "16:9",
-            "candidate_count": 1,
-            "generated_at": "2026-06-24T15:40:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-timeout-001",
+        "prompt_text": "A controlled character reference sheet.",
+        "optimized_prompt": "A controlled character reference sheet.",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "generated_at": "2026-06-24T15:40:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_timeout", request)
 
     assert result.status_code == 200
     payload = result.json()
@@ -510,17 +502,15 @@ def test_keyframe_generation_uses_provider_descriptor_prompt_limit(tmp_path, mon
     )
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
 
-    result = client.post(
-        "/projects/proj_descriptor_limit/keyframe-generations",
-        json={
-            "node_id": "image-node-limit-001",
-            "prompt_text": "A long keyframe prompt.",
-            "optimized_prompt": "A cinematic rooftop prompt with many details. " * 20,
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "generated_at": "2026-06-12T10:20:00+08:00",
-        },
-    )
+    request = {
+        "node_id": "image-node-limit-001",
+        "prompt_text": "A long keyframe prompt.",
+        "optimized_prompt": "A cinematic rooftop prompt with many details. " * 20,
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-06-12T10:20:00+08:00",
+    }
+    result = _submit_keyframe_with_preflight(client, "proj_descriptor_limit", request)
 
     assert result.status_code == 200
     assert len(str(captured["prompt"])) <= 64
@@ -544,6 +534,15 @@ def test_keyframe_generation_openapi_has_no_provider_secret_surface(tmp_path) ->
     assert "provider_config" not in serialized
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
+
+
+def _submit_keyframe_with_preflight(client: TestClient, project_id: str, request: dict[str, object]):
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
+    )
 
 
 class _FakeDescriptor:

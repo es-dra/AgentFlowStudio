@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-07-02 - Pre-Human Creative Hardening Integration
+
+- Completed Lane I1 integration on `codex/afs-pre-human-hardening-integration-20260702` from verified `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.
+- Integrated D2, D5, D1/D1R, D3/D3R, and D4 in the requested order, preserving lane handoffs and project-local records.
+- Resolved D3 compatibility by not adding an alias for the retired runtime freshness field: D3R updated active consumers to `runtime_three_end_alignment_evidence` plus `runtime_loaded_code_freshness_claim: "not_claimed"`, and final scans found no active retired-field references.
+- Fixed stale deterministic tests that submitted directly while remote image/video gates were open by adding explicit provider-closed env cleanup or fresh preflight tokens before fake-provider submit paths.
+- Verification passed: focused union `194 passed, 1 warning`; OpenAPI export plus snapshot `1 passed`; Studio JS `135 files`; full pytest `892 passed, 520 deselected, 2 warnings`; maintenance audit `failed=0` warning-only; `git diff --check` passed.
+- No push, server sync/restart/reload/deploy, provider call, generated-media QA, human creative acceptance, product readiness, business/public/legal readiness, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+- Handoff: `docs/handoff/AFS-PRE-HUMAN-CREATIVE-HARDENING-INTEGRATION-20260702.md`.
+
 ## 2026-07-02 - Runtime Log/Artifact Leakage Hardening
 
 - Completed D4 Runtime log/artifact leakage hardening on `codex/afs-d4-runtime-log-artifact-hardening-20260702` from base `f00fbc6c1404a4c3b812056a0f142626edb75ea8`.

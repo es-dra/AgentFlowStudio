@@ -173,17 +173,20 @@ def test_runtime_video_generation_immediate_completion_keeps_model_call_artifact
         generated_at="2026-06-18T10:19:00+08:00",
     )
 
+    request = {
+        "node_id": "video-node-002",
+        "prompt_text": "Animate the keyframe into an immediate completed shot.",
+        "optimized_prompt": "Animate the keyframe into an immediate completed shot.",
+        "first_frame_image_asset_id": image_asset_id,
+        "provider_service_id": "immediate_video",
+        "duration_sec": 5,
+        "generated_at": "2026-06-18T10:20:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
     result = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "node_id": "video-node-002",
-            "prompt_text": "Animate the keyframe into an immediate completed shot.",
-            "optimized_prompt": "Animate the keyframe into an immediate completed shot.",
-            "first_frame_image_asset_id": image_asset_id,
-            "provider_service_id": "immediate_video",
-            "duration_sec": 5,
-            "generated_at": "2026-06-18T10:20:00+08:00",
-        },
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
     )
 
     assert result.status_code == 200
