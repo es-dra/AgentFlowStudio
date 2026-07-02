@@ -6,7 +6,7 @@ from uuid import uuid4
 
 
 ALGORITHM_ID = "afs.human_gate.v0.1"
-INPUT_CONTRACT = "safe operator decision for a local asset/keyframe contract artifact"
+INPUT_CONTRACT = "safe operator decision for a local asset/keyframe/plan contract artifact"
 OUTPUT_CONTRACT = "runtime human gate decision event without provider calls, promotion, or durable memory writes"
 FAILURE_MODES = ("unsupported_target_type", "unsupported_decision", "unsafe_decision_payload")
 EVIDENCE_BOUNDARY = (
@@ -14,7 +14,7 @@ EVIDENCE_BOUNDARY = (
     "or fixed-asset promotion"
 )
 
-SUPPORTED_TARGET_TYPES = {"asset_card_candidate", "keyframe_generation_bridge"}
+SUPPORTED_TARGET_TYPES = {"asset_card_candidate", "keyframe_generation_bridge", "accepted_generation_plan_packet"}
 SUPPORTED_DECISIONS = {"accepted_for_next_step", "needs_revision", "rejected"}
 NON_CLAIMS = [
     "not creative quality acceptance",
@@ -86,6 +86,8 @@ def _default_scope(target_type: str) -> str:
         return "asset_card_candidate_review"
     if target_type == "keyframe_generation_bridge":
         return "keyframe_generation_bridge_review"
+    if target_type == "accepted_generation_plan_packet":
+        return "accepted_generation_plan_packet_review"
     return "runtime_human_gate"
 
 

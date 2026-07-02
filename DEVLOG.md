@@ -1,5 +1,42 @@
 # Devlog
 
+## 2026-07-02 - D2 Accepted Generation Plan Evidence Hardening
+
+- Completed Lane D2 on `codex/afs-d2-accepted-generation-plan-hardening-20260702` from `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.
+- Hardened `POST /projects/{project_id}/accepted-generation-plan-packets/preview` so bundled fixture modes are non-acceptance demo evidence only. `confirmed_local_fixture` now returns `fixture_demo_non_acceptance`, `accepted=false`, `job.status=blocked`, and `preview_status=blocked`.
+- Added project-scoped preview source support with `source_artifact_id` and `source_human_gate_id`. Accepted preview state now requires a safe project artifact whose packet is not `repo_local_fixture` evidence plus a manifest-linked `accepted_generation_plan_packet` local human-gate decision targeting that source artifact.
+- Added safe manifest `accepted_generation_plan_refs` so operators/evaluators can recover latest plan preview refs without provider raw, media bytes, signed URLs, private paths, human creative acceptance claims, or business validation claims.
+- Extended Runtime/Studio human-gate target support to `accepted_generation_plan_packet`; Studio fixture copy now says `Fixture demo (blocked)` and reserves accepted wording for project artifact step-gate evidence.
+- Regenerated the Runtime OpenAPI snapshot for the request model and human-gate enum changes.
+- Handoff: `docs/handoff/AFS-D2-ACCEPTED-GENERATION-PLAN-HARDENING-20260702.md`.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_api_runtime_human_gate.py -q
+# 9 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_web_studio_accepted_generation_plan_static.py tests\test_web_studio_human_gate_static.py -q
+# 5 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -c "from pathlib import Path; from apps.api.openapi_export import export_openapi_schema; export_openapi_schema(Path('docs/openapi/afs-runtime-service.openapi.json'))"
+# regenerated committed OpenAPI snapshot
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_api_runtime_human_gate.py tests\test_web_studio_accepted_generation_plan_static.py tests\test_web_studio_human_gate_static.py -q
+# 16 passed, 1 warning
+
+npm run check:studio-js
+# JS syntax check passed: 135 files
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_api_runtime_human_gate.py tests\test_api_runtime_openapi_snapshot.py -q
+# 11 passed, 1 warning
+
+git diff --check
+# passed
+```
+
+Non-claims: no provider smoke, live provider call, external download, generated media, generated-media QA, human creative acceptance, product readiness, business validation, public/legal/patent readiness, deploy/runtime freshness, CompanyOS/COS promotion, durable-memory promotion, or final integration claim.
+
 ## 2026-07-02 - Accepted Generation Plan Runtime/Studio Bridge
 
 - Completed Lane C on `codex/afs-accepted-generation-plan-runtime-studio-bridge-20260702` from baseline `2491cfff534362ff2c9d7dafed5faccc0c93a656`.

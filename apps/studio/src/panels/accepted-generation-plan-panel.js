@@ -25,7 +25,7 @@ export function openAcceptedGenerationPlanPanel(runtime) {
   const body = el("div", "modal-body accepted-generation-plan-body");
   const controls = el("div", "accepted-plan-controls");
   const defaultBtn = modeButton("Default package", DEFAULT_FIXTURE_MODE);
-  const confirmedBtn = modeButton("Confirmed local fixture", CONFIRMED_FIXTURE_MODE);
+  const confirmedBtn = modeButton("Fixture demo (blocked)", CONFIRMED_FIXTURE_MODE);
   controls.append(defaultBtn, confirmedBtn);
   const content = el("div", "accepted-plan-content");
   body.append(controls, content);
@@ -90,9 +90,12 @@ function renderPlan(content, response) {
   const packet = response?.packet || {};
 
   const status = el("section", `accepted-plan-status ${state.accepted ? "accepted" : "blocked"}`);
+  const acceptedTitle = provenance.source_mode === "project_artifact"
+    ? "Project plan step-gate recorded"
+    : "Local fixture demo, not acceptance";
   status.innerHTML = [
     `<span>${icon(state.accepted ? "check" : "lock", 18)}</span>`,
-    `<div><strong>${escapeHtml(state.accepted ? "Accepted local plan packet" : "Blocked pending prerequisites")}</strong>`,
+    `<div><strong>${escapeHtml(state.accepted ? acceptedTitle : "Blocked pending prerequisites")}</strong>`,
     `<small>${escapeHtml(packet.packet_state || state.packet_state || "unknown")}</small></div>`,
   ].join("");
   content.appendChild(status);
@@ -100,7 +103,7 @@ function renderPlan(content, response) {
   content.appendChild(metricGrid([
     ["State", state.packet_state || ""],
     ["Request", state.request_state || ""],
-    ["Provenance", provenance.evidence_origin || ""],
+    ["Source", provenance.source_mode || provenance.evidence_origin || ""],
     ["Fixture", provenance.fixture_mode || ""],
   ]));
   content.appendChild(listSection("Residual blockers", [

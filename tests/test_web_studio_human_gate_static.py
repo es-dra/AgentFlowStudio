@@ -22,6 +22,7 @@ def test_studio_human_gate_hook_uses_runtime_contract_without_promotion() -> Non
     assert "needs_revision" in human_gate_source
     assert "asset_card_candidate" in human_gate_source
     assert "keyframe_generation_bridge" in human_gate_source
+    assert "accepted_generation_plan_packet" in human_gate_source
     assert "human-gate-target-meta" in human_gate_source
     assert "promoteVisualAsset" not in human_gate_source
     assert "AFS_ALLOW_REMOTE" not in human_gate_source
@@ -84,3 +85,33 @@ process.stdout.write(JSON.stringify(humanGateTargets(node)));
     assert targets[0]["reuse_policy"]["writes_fixed_asset"] is False
     assert targets[0]["reuse_label"] == "Project reuse / 3 shots"
     assert "reuse_scope=project_reuse_candidate" in targets[0]["note"]
+
+
+def test_studio_human_gate_targets_include_accepted_generation_plan_packet() -> None:
+    script = r'''
+import { humanGateTargets } from "./apps/studio/src/human-gate.js";
+
+const node = {
+  id: "plan_review_001",
+  params: {
+    acceptedGenerationPlanArtifactId: "runs-plan-review-source",
+    acceptedGenerationPlanPacket: { packet_state: "accepted_project_generation_plan_packet" },
+  },
+};
+
+process.stdout.write(JSON.stringify(humanGateTargets(node)));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    targets = json.loads(completed.stdout)
+
+    assert targets[0]["target_type"] == "accepted_generation_plan_packet"
+    assert targets[0]["target_id"] == "runs-plan-review-source"
+    assert targets[0]["artifact_id"] == "runs-plan-review-source"
+    assert targets[0]["scope"] == "accepted_generation_plan_packet_review"
+    assert "human_creative_acceptance=false" in targets[0]["note"]

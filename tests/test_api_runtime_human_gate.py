@@ -80,6 +80,38 @@ def test_runtime_human_gate_records_keyframe_bridge_revision_decision(tmp_path) 
     assert gate["human_acceptance_scope"] == "local_step_gate_only"
 
 
+def test_runtime_human_gate_records_accepted_generation_plan_packet_decision(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "human-gate-plan-demo"
+    client.post("/projects", json={"project_id": project_id, "goal": "Human gate accepted plan demo"}).raise_for_status()
+
+    response = client.post(
+        f"/projects/{project_id}/human-gate-decisions",
+        json={
+            "target_type": "accepted_generation_plan_packet",
+            "target_id": "runs-human-gate-plan-demo-plan-source",
+            "decision": "accepted_for_next_step",
+            "artifact_id": "runs-human-gate-plan-demo-plan-source",
+            "scope": "accepted_generation_plan_packet_review",
+            "note": "Local plan packet can move to evaluator review; no creative acceptance claimed.",
+            "reviewed_at": "2026-07-02T10:30:00+08:00",
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    event = payload["human_gate_decision"]
+    gate = event["decision"]
+
+    assert gate["target_type"] == "accepted_generation_plan_packet"
+    assert gate["decision"] == "accepted_for_next_step"
+    assert gate["scope"] == "accepted_generation_plan_packet_review"
+    assert gate["provider_calls_started"] is False
+    assert gate["human_acceptance_scope"] == "local_step_gate_only"
+    assert gate["promotes_fixed_asset"] is False
+    assert event["writes_long_term_memory"] is False
+    assert "not creative quality acceptance" in event["non_claims"]
+
+
 def test_runtime_human_gate_rejects_unsafe_note_payload(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "human-gate-safety-demo"

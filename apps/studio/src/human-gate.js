@@ -9,6 +9,8 @@ export function humanGateTargets(node) {
   targets.push(...assetCardCandidateTargets(node));
   const bridge = keyframeBridgeTarget(node);
   if (bridge) targets.push(bridge);
+  const planPacket = acceptedGenerationPlanPacketTarget(node);
+  if (planPacket) targets.push(planPacket);
   return targets;
 }
 
@@ -115,6 +117,20 @@ function keyframeBridgeTarget(node) {
     artifact_id: safeToken(artifactId),
     scope: "keyframe_generation_bridge_review",
     label: "关键帧请求链 · provider 前确认",
+  };
+}
+
+function acceptedGenerationPlanPacketTarget(node) {
+  const packet = node?.params?.acceptedGenerationPlanPacket || null;
+  const artifactId = node?.params?.acceptedGenerationPlanArtifactId || packet?.artifact_id || "";
+  if (!packet && !artifactId) return null;
+  return {
+    target_type: "accepted_generation_plan_packet",
+    target_id: safeToken(artifactId || packet?.packet_id || node?.id || "accepted_generation_plan_packet"),
+    artifact_id: safeToken(artifactId),
+    scope: "accepted_generation_plan_packet_review",
+    note: "Studio local plan step gate decision. provider_calls_started=false; human_creative_acceptance=false; business_validation=false",
+    label: "Generation plan packet - local step gate only",
   };
 }
 

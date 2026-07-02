@@ -8,6 +8,30 @@
 
 Last updated: 2026-07-02 by Codex
 
+D2 accepted generation plan evidence hardening addendum: Lane D2 converts the
+accepted-generation-plan preview from fixture acceptance simulation into a
+local step-gate evidence path. Runtime preview now accepts optional
+`source_artifact_id` and `source_human_gate_id`; `accepted=true` is possible
+only for a safe project-scoped plan packet whose evidence origin is not
+`repo_local_fixture` and whose source artifact is targeted by a manifest-linked
+`accepted_generation_plan_packet` human-gate decision. Bundled fixture modes,
+including `confirmed_local_fixture`, remain non-acceptance demo evidence and
+return blocked workflow state (`job.status=blocked`, `preview_status=blocked`,
+manifest status `blocked`). Runtime writes safe `accepted_generation_plan_refs`
+into the project manifest for evaluator/operator recovery. Studio now labels
+the fixture control as `Fixture demo (blocked)` and reserves accepted copy for
+project artifact step-gate evidence. Focused Runtime/human-gate tests passed
+(`9 passed, 1 warning`), Studio static tests passed (`5 passed`), OpenAPI
+snapshot was regenerated and the final combined guard passed (`16 passed, 1
+warning`), Studio JS passed (`135 files`), final Runtime/OpenAPI focus passed
+(`11 passed, 1 warning`), and `git diff --check` passed. This is
+provider-closed plan-review/local
+step-gate evidence only, not provider smoke, generated-media QA, human creative
+acceptance, product readiness, business validation, deploy/runtime freshness,
+CompanyOS/COS promotion, durable-memory promotion, or final integration.
+Handoff:
+`docs/handoff/AFS-D2-ACCEPTED-GENERATION-PLAN-HARDENING-20260702.md`.
+
 Accepted generation plan Runtime/Studio bridge addendum: Lane C adds a
 provider-closed Runtime/Studio review bridge for the T58
 `accepted_generation_plan_packet` capability. Runtime now exposes

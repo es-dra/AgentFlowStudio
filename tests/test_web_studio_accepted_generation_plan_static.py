@@ -16,6 +16,9 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
     assert "load(DEFAULT_FIXTURE_MODE)" in panel
     assert "previewAcceptedGenerationPlanPacket" in panel
     assert "accepted-plan-status" in panel
+    assert "Local fixture demo, not acceptance" in panel
+    assert "Project plan step-gate recorded" in panel
+    assert "source_mode" in panel
     assert "residual_blockers" in panel
     assert "non_claim_boundaries" in panel
     assert "not_provider_smoke" in panel
@@ -39,8 +42,8 @@ def test_studio_accepted_generation_plan_panel_requires_explicit_confirmed_fixtu
     panel = (STUDIO_ROOT / "src" / "panels" / "accepted-generation-plan-panel.js").read_text(encoding="utf-8")
 
     assert 'modeButton("Default package", DEFAULT_FIXTURE_MODE)' in panel
-    assert 'modeButton("Confirmed local fixture", CONFIRMED_FIXTURE_MODE)' in panel
+    assert 'modeButton("Fixture demo (blocked)", CONFIRMED_FIXTURE_MODE)' in panel
     assert "confirmedBtn.addEventListener" in panel
     assert "load(CONFIRMED_FIXTURE_MODE)" in panel
-    assert "Accepted local plan packet" in panel
+    assert "Accepted local plan packet" not in panel
     assert "Blocked pending prerequisites" in panel

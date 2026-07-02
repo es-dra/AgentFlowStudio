@@ -327,7 +327,7 @@ class FeedbackCandidateContextOverlayRequest(BaseModel):
 
 
 class HumanGateDecisionRequest(BaseModel):
-    target_type: Literal["asset_card_candidate", "keyframe_generation_bridge"]
+    target_type: Literal["asset_card_candidate", "keyframe_generation_bridge", "accepted_generation_plan_packet"]
     target_id: str = Field(min_length=1)
     decision: Literal["accepted_for_next_step", "needs_revision", "rejected"]
     artifact_id: str | None = None
