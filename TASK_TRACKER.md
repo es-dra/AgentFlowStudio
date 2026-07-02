@@ -8,6 +8,30 @@
 
 Last updated: 2026-07-02 by Codex
 
+Accepted generation plan Runtime/Studio bridge addendum: Lane C adds a
+provider-closed Runtime/Studio review bridge for the T58
+`accepted_generation_plan_packet` capability. Runtime now exposes
+`POST /projects/{project_id}/accepted-generation-plan-packets/preview`, writes a
+safe preview artifact and run trace, and keeps the default `default_unconfirmed`
+package blocked with `packet_state=blocked_pending_generation_plan_prerequisites`
+and `accepted=false`. Surfacing
+`packet_state=accepted_local_generation_plan_packet` requires explicit
+`fixture_mode=confirmed_local_fixture` and local fixed-asset/residual-closure
+contract conditions. Studio adds only a minimal dock-opened review modal and
+Runtime client method; it loads the blocked default first and shows state,
+provenance, residual blockers, residual closure refs, and explicit non-claim
+boundaries. Focused red/green API evidence passed (`3 failed` with 404 before
+implementation, then `3 passed`); combined API/Studio static tests passed (`5
+passed, 1 warning`); OpenAPI snapshot passed after regeneration (`1 passed`);
+Studio JS passed (`135 files`); impacted T58/T57/T56/T55/T54/T53/T52/algorithm
+contract bundle passed (`75 passed, 1 warning`); Runtime service tests passed
+(`12 passed, 1 warning`); `git diff --check` passed. This is Runtime/Studio
+plan-review evidence only, not provider smoke, live provider calls, generated
+media, generated-media QA, human creative acceptance, business validation,
+product readiness, server/deploy/runtime health, CompanyOS projection,
+durable-memory promotion, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-ACCEPTED-GENERATION-PLAN-RUNTIME-STUDIO-BRIDGE-20260702.md`.
+
 Professional Prompt Optimization deterministic hardening addendum: real Chinese
 image/keyframe/video prompts now enter a provider-closed professional visual
 contract path before prompt assembly. The new helper extracts actual CJK

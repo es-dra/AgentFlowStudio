@@ -3,6 +3,7 @@ import { openAddNodeMenu } from "./add-node-menu.js";
 import { openGalleryModal } from "./gallery-modal.js";
 import { openHistoryModal } from "./history-modal.js";
 import { openShortcutsPanel } from "./shortcuts-panel.js";
+import { openAcceptedGenerationPlanPanel } from "./accepted-generation-plan-panel.js";
 import { fitVisibleCanvasViewport, visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 
@@ -41,6 +42,10 @@ export function renderDock(store, runtime) {
   const historyBtn = dockBtn("clock", "历史资产");
   historyBtn.addEventListener("click", () => openHistoryModal(store));
   dock.appendChild(historyBtn);
+
+  const planBtn = dockBtn("lock", "Accepted generation plan");
+  planBtn.addEventListener("click", () => openAcceptedGenerationPlanPanel(runtime));
+  dock.appendChild(planBtn);
 
   dock.appendChild(el("span", "dock-sep"));
 

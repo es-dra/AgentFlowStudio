@@ -250,6 +250,7 @@ function inferUserAction(route, method) {
   if (/\/feedback-candidate-promotions$/.test(route) && method === "POST") return "record_feedback_candidate_promotion";
   if (/\/feedback-candidate-context-overlays$/.test(route) && method === "POST") return "record_feedback_candidate_context_overlay";
   if (/\/human-gate-decisions$/.test(route) && method === "POST") return "record_human_gate_decision";
+  if (/\/accepted-generation-plan-packets\/preview$/.test(route) && method === "POST") return "preview_accepted_generation_plan_packet";
   if (/\/studio-state$/.test(route) && method === "PUT") return "save_studio_state";
   return "";
 }
@@ -436,6 +437,12 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     recordHumanGateDecision(payload) {
       return requestJson(`/projects/${encoded}/human-gate-decisions`, { method: "POST", payload });
+    },
+    previewAcceptedGenerationPlanPacket(payload = {}) {
+      return requestJson(`/projects/${encoded}/accepted-generation-plan-packets/preview`, {
+        method: "POST",
+        payload: { fixture_mode: "default_unconfirmed", ...payload },
+      });
     },
     loadStudioState() {
       return requestJson(`/projects/${encoded}/studio-state`);

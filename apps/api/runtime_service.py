@@ -31,6 +31,7 @@ from apps.api.runtime_social_square import register_runtime_social_square_routes
 from apps.api.runtime_shot_asset_plan import register_runtime_shot_asset_plan_routes
 from apps.api.runtime_storyboard_breakdown import register_runtime_storyboard_routes
 from apps.api.runtime_generation_comparisons import register_runtime_generation_comparison_routes
+from apps.api.runtime_accepted_generation_plan import register_runtime_accepted_generation_plan_routes
 from apps.api.runtime_company_os import register_runtime_company_os_routes
 from apps.api.runtime_feedback_candidate import register_runtime_feedback_candidate_routes
 from apps.api.runtime_human_gate import register_runtime_human_gate_routes
@@ -325,6 +326,7 @@ def create_runtime_app(
     register_runtime_video_routes(app, store)
     register_runtime_video_revision_routes(app, store)
     register_runtime_generation_comparison_routes(app, store)
+    register_runtime_accepted_generation_plan_routes(app, store)
     register_runtime_studio_state_routes(app, store)
     register_runtime_sprite_routes(app, store)
     configure_site_static(app, site_root)

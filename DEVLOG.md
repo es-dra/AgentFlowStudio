@@ -1,5 +1,44 @@
 # Devlog
 
+## 2026-07-02 - Accepted Generation Plan Runtime/Studio Bridge
+
+- Completed Lane C on `codex/afs-accepted-generation-plan-runtime-studio-bridge-20260702` from baseline `2491cfff534362ff2c9d7dafed5faccc0c93a656`.
+- Added a provider-closed Runtime preview endpoint for T58 `accepted_generation_plan_packet`: `POST /projects/{project_id}/accepted-generation-plan-packets/preview`.
+- Preserved the default unconfirmed package as blocked: default request mode is `default_unconfirmed`, returning `packet_state=blocked_pending_generation_plan_prerequisites` and `accepted=false`.
+- Added explicit `confirmed_local_fixture` mode for the accepted local fixture contract, carrying state, provenance, residual blockers/closures, and non-claim boundaries without provider calls or generated media.
+- Added a minimal Studio review surface: one dock button, one Runtime client method, and one compact modal that loads the blocked default first and requires a separate confirmed-fixture control for the accepted packet.
+- Regenerated the Runtime OpenAPI snapshot for the new route.
+- No provider call, external download, generated media, generated-media QA, broad UI redesign, server/deploy sync, live Runtime health claim, human creative acceptance, business validation, product readiness, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+- Handoff: `docs/handoff/AFS-ACCEPTED-GENERATION-PLAN-RUNTIME-STUDIO-BRIDGE-20260702.md`.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp %TEMP%\afs-lane-c-api-red tests\test_api_runtime_accepted_generation_plan_packet.py -q
+# red before route implementation: 3 failed with 404
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp %TEMP%\afs-lane-c-focused-2 tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_web_studio_accepted_generation_plan_static.py -q
+# 5 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp %TEMP%\afs-lane-c-openapi-check-2 tests\test_api_runtime_openapi_snapshot.py -q
+# 1 passed after OpenAPI snapshot regeneration
+
+npm.cmd run check:studio-js
+# JS syntax check passed: 135 files
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp %TEMP%\afs-lane-c-impacted-1 tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_api_runtime_openapi_snapshot.py tests\test_web_studio_accepted_generation_plan_static.py tests\test_branch_workflow_accepted_generation_plan_packet.py tests\test_branch_workflow_confirmation_evidence_contract.py tests\test_branch_workflow_generation_planning_gate.py tests\test_branch_workflow_package_contract.py tests\test_interactive_manga_branch_package_contract.py tests\test_shared_object_evidence_contract_fixture.py tests\test_algorithm_library_contracts.py -q
+# 75 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -p no:cacheprovider --basetemp %TEMP%\afs-lane-c-service-1 tests\test_api_runtime_service.py -q
+# 12 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m apps.cli.main version
+# 0.1.0
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - Professional Prompt Optimization Deterministic Hardening
 
 - Completed provider-closed deterministic hardening on `codex/afs-professional-prompt-optimization-hardening-20260702` from base `4cc62a36df5d724f0861154d195067f260e65fc1`.
