@@ -1,5 +1,30 @@
 # Devlog
 
+## 2026-07-02 - I2 Hardening Integration Merge and Server Hash Sync
+
+- Fast-forwarded I1 branch `codex/afs-pre-human-hardening-integration-20260702`
+  into local `master` and pushed `origin/master` from
+  `f00fbc6c1404a4c3b812056a0f142626edb75ea8` to
+  `eebb9180810825d286a736cabba854512bfff466`.
+- Pre-push verification on I1 passed: OpenAPI export plus snapshot `1 passed`,
+  Studio JS `135 files`, full pytest `892 passed, 520 deselected, 2 warnings`,
+  maintenance audit `failed=0` warning-only, and `git diff --check` passed.
+- Post-push verification on integrated `master` passed with the same OpenAPI,
+  Studio JS, full pytest, maintenance audit, and diff-hygiene results.
+- Fast-forwarded server `/home/afs-ops/AgentFlowStudio` and
+  `/opt/afs/AgentFlowStudio` to the pushed integration hash with `git fetch`,
+  ancestry check, and `git merge --ff-only origin/master`; preserved `/home`
+  ops-local untracked docs.
+- Runtime service-control was blocked: `sudo -n true` required a password, so no
+  restart/reload was attempted. `afs-runtime.service` stayed active at PID
+  `1962036` with start timestamp `2026-06-28 12:58:16 UTC`; local and public
+  `/health` returned `status=ready`, but runtime loaded-code freshness is not
+  claimed.
+- Provider smoke was not rerun. E1 remains pre-integration external route smoke
+  evidence only, not media QA, human acceptance, product readiness, or
+  post-integration loaded-code evidence.
+- Handoff: `docs/handoff/AFS-I2-HARDENING-INTEGRATION-MERGE-SERVER-SYNC-20260702.md`.
+
 ## 2026-07-02 - Pre-Human Creative Hardening Integration
 
 - Completed Lane I1 integration on `codex/afs-pre-human-hardening-integration-20260702` from verified `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.

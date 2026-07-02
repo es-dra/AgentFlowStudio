@@ -8,6 +8,27 @@
 
 Last updated: 2026-07-02 by Codex
 
+I2 hardening integration execution addendum: I2 fast-forwarded evaluator-passed
+I1 branch `codex/afs-pre-human-hardening-integration-20260702` into local
+`master` and pushed `origin/master` from
+`f00fbc6c1404a4c3b812056a0f142626edb75ea8` to
+`eebb9180810825d286a736cabba854512bfff466`. Pre-push verification on I1 and
+post-push verification on integrated `master` both passed OpenAPI snapshot
+(`1 passed`), Studio JS (`135 files`), full pytest (`892 passed, 520
+deselected, 2 warnings`), maintenance audit (`failed=0`, warning-only), and
+`git diff --check`. Server `/home/afs-ops/AgentFlowStudio` and
+`/opt/afs/AgentFlowStudio` were fast-forwarded to the pushed integration hash
+with ancestry-safe commands and no reset/clean; `/home` ops-local untracked docs
+were preserved. Service-control is blocked because `sudo -n true` requires a
+password, so `afs-runtime.service` was not restarted/reloaded; local/public
+`/health` returned `status=ready`, but runtime loaded-code freshness is not
+claimed. Provider smoke was not rerun; E1 remains pre-integration external route
+smoke evidence only. This is origin integration plus server hash sync evidence,
+not generated-media QA, human creative acceptance, product readiness,
+business/public/legal readiness, CompanyOS projection, durable-memory promotion,
+COS active-rule promotion, or runtime loaded-code freshness. Handoff:
+`docs/handoff/AFS-I2-HARDENING-INTEGRATION-MERGE-SERVER-SYNC-20260702.md`.
+
 Pre-human creative hardening integration addendum: Lane I1 integrated D2, D5,
 D1/D1R, D3/D3R, and D4 on isolated branch
 `codex/afs-pre-human-hardening-integration-20260702` from verified
