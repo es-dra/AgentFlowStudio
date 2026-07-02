@@ -195,21 +195,32 @@ class RuntimeStore:
         resolved = Path(path).resolve()
         if not resolved.exists():
             raise FileNotFoundError(str(path))
+        relative_path = resolved.relative_to(self.root.resolve()).as_posix()
         artifact_id = safe_id(str(resolved.relative_to(self.root.resolve()).with_suffix("")))
         payload = read_json(resolved) if resolved.suffix.lower() == ".json" else None
         artifact_type = str((payload or {}).get("artifact_type") or (payload or {}).get("kind") or "text_artifact")
         entry = {
             "artifact_id": artifact_id,
-            "relative_path": resolved.relative_to(self.root.resolve()).as_posix(),
+            "relative_path": relative_path,
             "filename": resolved.name,
             "artifact_type": artifact_type,
             "role": role,
             "media_type": "application/json" if resolved.suffix.lower() == ".json" else "text/markdown",
         }
+        project_id = _project_id_from_artifact_relative_path(relative_path)
+        if project_id:
+            entry["project_id"] = project_id
         index = self._artifact_index()
         index.setdefault("artifacts", {})[artifact_id] = entry
         write_json(self.index_path, index)
         return public_artifact_ref(entry)
+
+    def artifact_project_id(self, artifact_id: str) -> str:
+        index = self._artifact_index()
+        entry = dict(index.get("artifacts", {}).get(artifact_id) or {})
+        if not entry:
+            raise KeyError(artifact_id)
+        return str(entry.get("project_id") or _project_id_from_artifact_relative_path(str(entry.get("relative_path") or "")))
 
     def read_artifact(self, artifact_id: str) -> dict[str, Any]:
         index = self._artifact_index()
@@ -297,6 +308,13 @@ def _is_within(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _project_id_from_artifact_relative_path(relative_path: str) -> str:
+    parts = [part for part in str(relative_path or "").replace("\\", "/").split("/") if part]
+    if len(parts) >= 2 and parts[0] in {"projects", "runs", "feedback"}:
+        return safe_id(parts[1])
+    return ""
 
 
 __all__ = (

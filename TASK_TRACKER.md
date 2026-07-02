@@ -8,6 +8,25 @@
 
 Last updated: 2026-07-02 by Codex
 
+Runtime log/artifact leakage hardening addendum: Lane D4 hardens PB-P1-10 /
+PB-P1-11 surfaces without provider calls or server operations. Runtime logging
+now uses a shared sensitive-key/private-fragment sanitizer for client events,
+request/audit/business logs, and file logs. Nested sensitive keys, prompt
+fragments, local/private paths, signed/remote URLs, raw payloads, and media
+bytes are omitted or redacted from durable logs. `/studio/client-events` also no
+longer crashes when a client payload includes its own `event_type`. Runtime
+artifact reads now use path/index-derived project ownership for artifacts under
+`projects/`, `runs/`, and `feedback/`, enforcing auth-scoped cross-project
+access while preserving auth-disabled local artifact reads. Focused red/green
+evidence passed (`3 failed, 1 passed` before implementation; then `4 passed`);
+adjacent Runtime/Auth/Media/Logging tests passed (`29 passed`); full pytest
+passed (`871 passed, 520 deselected, 2 warnings`); `git diff --check` passed.
+This is deterministic leakage-hardening evidence only, not provider smoke,
+generated-media QA, human creative acceptance, Runtime loaded-code freshness,
+product/business/public/legal readiness, server/deploy health, CompanyOS
+projection, durable-memory promotion, or COS active-rule promotion. Handoff:
+`docs/handoff/AFS-RUNTIME-LOG-ARTIFACT-LEAKAGE-HARDENING-20260702.md`.
+
 D5 provider-closed readiness packet currency addendum: Lane D5 updates the
 provider-closed internal tryout/readiness packet path on top of D2 commit
 `654002a295330c0722102d8a2202804189865235`. The readiness browser QA now opens

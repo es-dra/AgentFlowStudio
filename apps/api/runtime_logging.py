@@ -10,6 +10,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 
 from apps.api.runtime_file_logging import configure_runtime_file_logging, runtime_file_event
+from apps.api.runtime_log_safety import safe_log_key, safe_log_value, sanitize_log_text, should_omit_log_key
 
 
 LOG_LEVEL_ENV = "AFS_LOG_LEVEL"
@@ -119,7 +120,11 @@ def configure_runtime_request_logging(app: FastAPI, env: dict[str, str] | None =
 def audit_event(event_type: str, **fields: Any) -> None:
     payload = {
         "event_type": event_type,
-        **{key: _safe_value(value) for key, value in fields.items() if value not in (None, "")},
+        **{
+            safe_log_key(key): _safe_value(value, key=str(key))
+            for key, value in fields.items()
+            if value not in (None, "") and not should_omit_log_key(key)
+        },
     }
     logging.getLogger(AUDIT_LOGGER_NAME).info("runtime_audit %s", _json(payload))
 
@@ -178,12 +183,14 @@ def client_ip_from_request(request: Request) -> str:
     return str(request.client.host if request.client else "")[:80]
 
 
-def log_business_event(event_type: str, **fields: Any) -> None:
+def log_business_event(event_type: str, /, **fields: Any) -> None:
     file_log_domain = str(fields.pop("file_log_domain", "") or _domain_from_event(event_type))
     file_log_event = str(fields.pop("file_log_event", "") or _event_from_event_type(event_type))
     file_log_level = str(fields.pop("file_log_level", "INFO") or "INFO")
     payload = {
-        key: _safe_value(value) for key, value in fields.items() if value not in (None, "")
+        safe_log_key(key): _safe_value(value, key=str(key))
+        for key, value in fields.items()
+        if value not in (None, "") and not should_omit_log_key(key)
     }
     logging.getLogger(REQUEST_LOGGER_NAME).info("%s %s", event_type, _json(payload))
     runtime_file_event(
@@ -204,7 +211,7 @@ def _request_id(request: Request) -> str:
 
 def _safe_header(request: Request, name: str, limit: int) -> str:
     value = str(request.headers.get(name) or "").strip()
-    return value[:limit]
+    return sanitize_log_text(value, key=name, limit=limit)
 
 
 def _int_env(value: str | None, default: int) -> int:
@@ -215,14 +222,8 @@ def _int_env(value: str | None, default: int) -> int:
     return max(0, parsed)
 
 
-def _safe_value(value: Any) -> Any:
-    if isinstance(value, (int, float, bool)):
-        return value
-    if isinstance(value, dict):
-        return {str(key)[:80]: _safe_value(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_safe_value(item) for item in value[:20]]
-    return str(value)[:240]
+def _safe_value(value: Any, *, key: str = "") -> Any:
+    return safe_log_value(value, key=key, string_limit=240)
 
 
 def _json(payload: dict[str, Any]) -> str:

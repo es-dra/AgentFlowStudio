@@ -257,8 +257,9 @@ def create_runtime_app(
     @app.get("/artifacts/{artifact_id}")
     def artifact(artifact_id: str, request: Request) -> dict[str, Any]:
         try:
+            artifact_project_id = store.artifact_project_id(artifact_id)
             artifact_payload = store.read_artifact(artifact_id)
-            _enforce_payload_project_access(auth, request, artifact_payload)
+            _enforce_payload_project_access(auth, request, artifact_payload, artifact_project_id=artifact_project_id)
             return artifact_payload
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="artifact not found") from exc
@@ -353,11 +354,35 @@ def _enforce_project_access(auth: RuntimeAuthStore, request: Request, project_id
         raise HTTPException(status_code=403, detail="project access denied")
 
 
-def _enforce_payload_project_access(auth: RuntimeAuthStore, request: Request, payload: dict[str, Any]) -> None:
+def _enforce_payload_project_access(
+    auth: RuntimeAuthStore,
+    request: Request,
+    payload: dict[str, Any],
+    *,
+    artifact_project_id: str = "",
+) -> None:
     body = payload.get("payload") if isinstance(payload.get("payload"), dict) else payload
-    project_id = str(body.get("project_id", "") if isinstance(body, dict) else "")
+    project_id = artifact_project_id or _project_id_from_payload(body)
     if project_id:
         _enforce_project_access(auth, request, project_id)
+
+
+def _project_id_from_payload(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("project_id", "source_project_id"):
+            project_id = str(value.get(key) or "")
+            if project_id:
+                return project_id
+        for item in value.values():
+            project_id = _project_id_from_payload(item)
+            if project_id:
+                return project_id
+    if isinstance(value, list):
+        for item in value:
+            project_id = _project_id_from_payload(item)
+            if project_id:
+                return project_id
+    return ""
 
 
 __all__ = (

@@ -1,5 +1,28 @@
 # Devlog
 
+## 2026-07-02 - Runtime Log/Artifact Leakage Hardening
+
+- Completed D4 Runtime log/artifact leakage hardening on `codex/afs-d4-runtime-log-artifact-hardening-20260702` from base `f00fbc6c1404a4c3b812056a0f142626edb75ea8`.
+- Added shared Runtime log sanitization in `apps/api/runtime_log_safety.py`, applying the project sensitive-key/private-fragment policy to request/audit/business logging and file logging.
+- Sanitized nested client-event/process logging fields so secret-like keys, raw payloads, media bytes, local paths, signed/remote URLs, and provider prompt text do not appear in durable logs.
+- Fixed `/studio/client-events` logging when the client payload contains an `event_type` field by making `log_business_event()` accept its event name as positional-only.
+- Added path/index-derived artifact project ownership and enforced auth-scoped `/artifacts/{artifact_id}` reads for artifacts stored under project, run, and feedback paths, while preserving auth-disabled local artifact reads.
+- No provider calls, credentials, external downloads, server/deploy operations, generated-media QA, human creative acceptance, product/business/legal readiness, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+- Handoff: `docs/handoff/AFS-RUNTIME-LOG-ARTIFACT-LEAKAGE-HARDENING-20260702.md`.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_runtime_log_artifact_hardening.py tests\test_api_runtime_auth.py tests\test_api_runtime_service.py tests\test_api_runtime_media_contract.py tests\test_runtime_generation_logging_static.py -q
+# 29 passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest -q
+# 871 passed, 520 deselected, 2 warnings
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - Provider Submit Preflight Hardening
 
 - Completed Lane D1 provider-submit preflight hardening on `codex/afs-d1-provider-preflight-hardening-20260702` from baseline `f00fbc6c1404a4c3b812056a0f142626edb75ea8`.

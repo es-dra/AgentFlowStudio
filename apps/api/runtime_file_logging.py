@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from apps.api.runtime_log_safety import sanitize_log_text, should_omit_log_key
+
 
 FILE_LOG_ENABLED_ENV = "AFS_FILE_LOG_ENABLED"
 FILE_LOG_DIR_ENV = "AFS_FILE_LOG_DIR"
@@ -21,8 +23,6 @@ DEFAULT_FILE_LOG_MAX_BYTES = 50 * 1024 * 1024
 DEFAULT_FILE_LOG_BACKUP_COUNT = 20
 TRUE_VALUES = {"1", "true", "yes", "on"}
 LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
-SECRET_KEY_RE = re.compile(r"(?i)(api.?key|token|secret|password|cookie|authorization|credential|signed.?url)")
-LOCAL_PATH_RE = re.compile(r"(?i)([a-z]:\\|/home/|/users/|/tmp/|/var/lib/afs-runtime|data/processed/runs)")
 
 _CONFIG: dict[str, Any] = {}
 _LOCK = threading.Lock()
@@ -131,7 +131,7 @@ def _normalize_fields(fields: dict[str, Any]) -> dict[str, Any]:
         if raw_value in (None, ""):
             continue
         key = aliases.get(str(raw_key), str(raw_key))
-        if SECRET_KEY_RE.search(key):
+        if should_omit_log_key(key):
             continue
         value = _safe_value(raw_value, key=key)
         if value in (None, ""):
@@ -158,14 +158,9 @@ def _safe_value(value: Any, *, key: str = "") -> Any:
         return ",".join(
             f"{_safe_token(item_key, 'field')}:{_safe_value(item, key=str(item_key))}"
             for item_key, item in list(value.items())[:10]
-            if not SECRET_KEY_RE.search(str(item_key))
+            if not should_omit_log_key(item_key)
         )
-    text = " ".join(str(value or "").split()).strip()
-    if not text or SECRET_KEY_RE.search(text):
-        return ""
-    text = re.sub(r"data:[^\s]+", "[data-url omitted]", text, flags=re.IGNORECASE)
-    text = re.sub(r"https?://\S+", "[url omitted]", text, flags=re.IGNORECASE)
-    text = LOCAL_PATH_RE.sub("[path omitted]", text)
+    text = sanitize_log_text(value, key=key, limit=4000 if "prompt" in str(key).lower() else 240)
     limit = 4000 if "prompt" in str(key).lower() else 240
     return text[:limit]
 
