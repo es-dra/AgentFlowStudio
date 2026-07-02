@@ -18,6 +18,7 @@ from apps.api.runtime_generation_preflight import (
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
 from apps.api.runtime_models import GenerationComparisonRequest, KeyframeGenerationRequest
+from apps.api.runtime_recovery_contract import public_batch_status, runtime_recovery_envelope
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
@@ -105,10 +106,28 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
         )
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
         public_job = store.write_job(runtime_job(job_id, project_id, "generation_comparison", status, artifacts=artifacts))
+        runtime_recovery = runtime_recovery_envelope(
+            project_id=project_id,
+            job_id=job_id,
+            capability="multi_image_comparison",
+            status=status,
+            requested_count=len(report.get("arms") or []),
+            output_count=sum(1 for item in report.get("arms") or [] if item.get("result_refs")),
+            blocks=[block for item in report.get("arms") or [] for block in item.get("blocks") or []],
+            provider_gate=report.get("provider_gate") or {},
+            provider_calls_started=bool(report.get("provider_calls_started")),
+            retry_count=sum(int(item.get("retry_count") or 0) for item in report.get("arms") or []),
+            artifacts=artifacts,
+            candidate_previews=[],
+            reusable_assets=[],
+            stage="comparison",
+            non_claims=COMPARISON_NON_CLAIMS,
+        )
         return {
             "job": public_job,
             "report": report,
             "artifacts": artifacts,
+            "runtime_recovery": runtime_recovery,
             "provider_calls_started": report["provider_calls_started"],
             "writes_long_term_memory": False,
             "writes_company_kb": False,
@@ -200,12 +219,20 @@ def build_generation_comparison_report(
         )
         plan = read_json(arm_dir / "keyframe_request_plan.json")
         arm_results.append(_arm_report(arm, result, plan))
-    status = "blocked" if any(item["status"] == "blocked" for item in arm_results) else "succeeded"
+    status = _comparison_status(arm_results)
+    batch_status = public_batch_status(
+        status=status,
+        requested_count=len(arm_results) or 1,
+        output_count=sum(1 for item in arm_results if item.get("result_refs")),
+        blocks=[block for item in arm_results for block in item.get("blocks") or []],
+        provider_calls_started=any(item["provider_calls_started"] for item in arm_results),
+    )
     report = {
         "artifact_type": "generation_comparison_report",
         "schema_version": "0.1.0",
         "project_id": project_id,
         "status": status,
+        "batch_status": batch_status,
         "arms": arm_results,
         "manual_scores": request.manual_scores,
         "provider_calls_started": any(item["provider_calls_started"] for item in arm_results),
@@ -308,10 +335,28 @@ def _arm_report(arm: dict[str, Any], result: dict[str, Any], plan: dict[str, Any
         "reference_images": plan.get("reference_images") or [],
         "context_bundle": plan.get("context_bundle"),
         "result_refs": [
-            {"candidate_id": item.get("candidate_id"), "image_ref": item.get("image_ref")}
+            {"candidate_id": item.get("candidate_id"), "review_state": "ready_for_review"}
             for item in result.get("provider_outputs", [])
         ],
     }
+
+
+def _comparison_status(arms: list[dict[str, Any]]) -> str:
+    if not arms:
+        return "failed"
+    complete = [item for item in arms if item.get("result_refs")]
+    blocked_or_failed = [
+        item
+        for item in arms
+        if item.get("status") in {"blocked", "failed", "poll_failed", "needs_attention"} or item.get("blocks")
+    ]
+    if complete and blocked_or_failed:
+        return "partially_complete"
+    if complete:
+        return "succeeded"
+    if all(item.get("status") == "blocked" for item in arms):
+        return "blocked"
+    return "failed"
 
 
 def _tool_gate_state(arms: list[dict[str, Any]]) -> dict[str, str]:

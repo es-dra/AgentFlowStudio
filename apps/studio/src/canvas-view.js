@@ -166,7 +166,7 @@ function syncNodeStateStrip(elNode, node, def) {
 function syncNodeBody(elNode, node, def, store) {
   const body = elNode.querySelector('[data-role="body"]');
   body.hidden = Boolean(node.collapsed);
-  body.classList.toggle("full-bleed-media", node.type === "image" && node.status === "complete" && Boolean(node.previewUrl));
+  body.classList.toggle("full-bleed-media", node.type === "image" && ["complete", "partial"].includes(node.status) && Boolean(node.previewUrl));
   const signature = nodeBodySignature(node);
   if (body.dataset.signature !== signature) {
     if (body.contains(document.activeElement) && document.activeElement?.classList?.contains("node-content-editor")) {
@@ -203,6 +203,11 @@ function syncRunAction(elNode, node) {
   }
   runBtn.hidden = false;
   runBtn.dataset.action = "run";
+  if (["error", "partial"].includes(node.status)) {
+    runBtn.title = "Retry failed items";
+    runBtn.innerHTML = icon("retry", 13);
+    return;
+  }
   runBtn.title = "生成";
   runBtn.innerHTML = icon("play", 13);
 }

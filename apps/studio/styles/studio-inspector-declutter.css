@@ -89,6 +89,38 @@
   scrollbar-width: thin;
 }
 
+@media (max-width: 520px) {
+  #inspector {
+    top: calc(var(--topbar-h) + 8px);
+    right: 8px;
+    bottom: auto;
+    width: 46px;
+    min-height: 46px;
+    max-height: 46px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  #inspector > :not(.inspector-collapse-toggle) {
+    display: none;
+  }
+
+  #inspector .inspector-collapse-toggle {
+    position: static;
+    width: 30px;
+    min-height: 30px;
+    justify-content: center;
+    margin: 0;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  #inspector .inspector-collapse-toggle span {
+    display: none;
+  }
+}
+
 .inspector-disclosure {
   padding-top: 7px;
 }

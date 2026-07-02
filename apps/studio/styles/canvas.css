@@ -25,6 +25,7 @@
 
 #node-layer { position: absolute; left: 0; top: 0; z-index: var(--z-nodes); }
 
+@media (max-width: 520px) { #drawer:not(.collapsed) ~ #canvas-root .node { width: calc(100vw - var(--mobile-drawer-w, var(--drawer-w)) - 24px) !important; min-width: 0; } #drawer.collapsed ~ #canvas-root .node { width: min(280px, calc(100vw - 24px)) !important; } }
 /* ---------- 节点卡 ---------- */
 .node {
   position: absolute;

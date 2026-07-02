@@ -62,7 +62,7 @@ export function scheduleVideoAutoPoll({
   attempts = 0,
 }) {
   const status = response?.job?.status || "blocked";
-  if (!["submitted", "running"].includes(status)) {
+  if (!["submitted", "pending", "running"].includes(status)) {
     clearVideoAutoPoll(nodeId);
     return;
   }

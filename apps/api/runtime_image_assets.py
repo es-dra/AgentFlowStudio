@@ -225,7 +225,7 @@ def _asset_metadata(
         asset_id=asset_id,
         source_node_id=request.node_id,
         role=request.role,
-        filename=Path(request.filename).name or "upload",
+        filename=_safe_upload_filename(request.filename) or "upload",
         image_bytes=image_bytes,
         mime_type=mime_type,
         dimensions=dimensions,
@@ -252,7 +252,7 @@ def _image_asset_metadata(
         "asset_id": asset_id,
         "source_node_id": source_node_id,
         "role": safe_id(role or "reference_image"),
-        "filename": Path(filename).name or "image",
+        "filename": _safe_upload_filename(filename) or "image",
         "mime_type": mime_type,
         "file_suffix": _suffix_for_mime(mime_type),
         "byte_count": len(image_bytes),
@@ -295,6 +295,10 @@ def _image_kind(image_bytes: bytes, declared_mime: str) -> tuple[str, str]:
 
 def _suffix_for_mime(mime_type: str) -> str:
     return ".png" if mime_type == "image/png" else ".jpg"
+
+
+def _safe_upload_filename(value: str) -> str:
+    return str(value or "").replace("\\", "/").split("/")[-1].strip()
 
 
 def _asset_dir(store: RuntimeStore, project_id: str, asset_id: str) -> Path:

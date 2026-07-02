@@ -8,6 +8,71 @@
 
 Last updated: 2026-07-02 by Codex
 
+P0 Runtime + Studio state recovery integration candidate addendum: Integration
+branch `codex/p0-state-recovery-integration-20260703` was created from
+baseline/reference `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in
+`/home/afs-ops/.codex/worktrees/14b4/AgentFlowStudio`. The worker integrated
+only the accepted Runtime recovery candidate from worktree `2bb8` and the
+accepted Studio gate/status recovery candidate from worktree `6775`, leaving
+both source worktrees read-only. Final candidate adds the Runtime
+`runtime_recovery` envelope and safe manifest recovery fields, Studio status and
+retry-failed-items surfaces, direct Studio consumption of `runtime_recovery`
+status/preserved outputs/safe artifact pointers, safe repeated async keyframe
+terminal poll reconstruction without public provider-output echo, and
+cross-platform safe image upload filename sanitization. Verification passed:
+py_compile on touched Runtime/tests, Studio JS `138 files`, focused
+Runtime/Studio recovery pytest `53 passed`, mocked Playwright job-center
+recovery checks at `390x820` and `1366x900`, maintenance audit `failed=0`
+warning-only, and `git diff --check`. Full non-legacy pytest was run; after
+in-scope fixes, residual blockers are the absent external
+`D:/.../10-Startup/.../knowledgebase` path and OpenAPI `ValidationError` schema
+drift from the temporary latest dependency environment. No provider gate opened,
+no live provider call, no generated-media QA, no server/deploy/restart, no
+push/merge, no runtime loaded-code freshness, no human acceptance, no product or
+business readiness, and no CompanyOS/COS or durable-memory promotion is claimed.
+Handoff:
+`docs/handoff/AFS-P0-STATE-RECOVERY-INTEGRATION-CANDIDATE-20260703.md`.
+
+Runtime state/artifact recovery addendum: Lane
+`IMP-P0-RUNTIME-STATE-ARTIFACT-RECOVERY` implemented a Runtime-side recovery
+contract on `codex/runtime-state-artifact-recovery-20260703` for dispatch
+`TD-AFS-V02-IMP-RUNTIME-STATE-ARTIFACT-RECOVERY-20260703-001`. Runtime now has
+a shared safe recovery envelope for keyframe/image, multi-image comparison, and
+video responses, carrying accepted public batch states, stage, provider gate,
+`provider_calls_started`, safe artifact pointers, provenance, retry metadata,
+and non-claim review copy. Keyframe partial provider results preserve and
+register valid generated image assets while failed/missing items remain visible
+and retryable; async keyframe poll recovery preserves valid outputs from
+failed/blocked provider payloads. Mixed multi-image comparison arms now surface
+`partially_complete` and no longer expose relative `image_ref` paths. Video
+no-output completion no longer creates fake MP4 placeholders outside fake/fixture
+providers and surfaces `needs_attention` with safe retry metadata. Verification
+available in this shell passed `python3 -m py_compile` on touched Runtime/tests,
+`git diff --check`, and helper line count `291`. Focused pytest is still pending
+because this checkout has no `python` command and `/usr/bin/python3` lacks the
+`pytest` module. No provider gate was opened; no live provider submit/poll,
+generated-media QA, server/deploy/restart, Runtime loaded-code freshness,
+human acceptance, product/business/public/legal readiness, CompanyOS/COS
+promotion, or durable-memory promotion is claimed. Handoff:
+`docs/handoff/AFS-RUNTIME-STATE-ARTIFACT-RECOVERY-20260703.md`.
+
+Runtime async poll safe-manifest fixback addendum: Lane
+`FIX-P0-RUNTIME-ASYNC-POLL-SAFE-MANIFEST-SANITIZE` removed the verifier-found
+public async keyframe poll leak where `safe_manifest.outputs` echoed normalized
+provider outputs and provider `image_path` became `image_ref`. The async poll
+public response now preserves reviewable partial artifacts only through safe
+candidate preview and `runtime_recovery` pointers; provider-output internals and
+run-local media refs are not echoed through the public safe manifest. A focused
+async submit-plus-poll regression was added to assert public poll JSON excludes
+`image_candidates/`, `image_ref`, `image_path`, `output_dir`, `request.json`,
+and handoff-job internals while keeping retry scope on failed/missing items.
+Available local verification passed `python3 -m py_compile` on the touched
+Runtime/test modules and `git diff --check`; pytest remains pending because
+`/usr/bin/python3` has no `pytest` module in this checkout. No live provider,
+Studio, deploy/restart, merge/push, generated-media QA, human acceptance,
+product/commercial/public/legal readiness, CompanyOS/COS promotion, or durable
+memory promotion is claimed.
+
 I2 hardening integration execution addendum: I2 fast-forwarded evaluator-passed
 I1 branch `codex/afs-pre-human-hardening-integration-20260702` into local
 `master` and pushed `origin/master` from

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import base64
+import json
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from agentflow.harness.json_io import write_json
+from apps.api import runtime_generation_comparisons
 from apps.api.runtime_service import create_runtime_app
 
 
@@ -93,3 +97,63 @@ def test_generation_comparison_report_defines_a_b_c_arms_without_gate_network(tm
     assert "keep Lin Wan identity" in arms["C"]["provider_prompt"]
     assert arms["C"]["subject_reference_asset_id"] == asset["asset_id"]
     assert report["arm_definitions"]["A"].startswith("original prompt")
+
+
+def test_generation_comparison_uses_partial_state_for_mixed_image_arms(tmp_path, monkeypatch) -> None:
+    def fake_build_keyframe_generation(store, project_id, request, output_dir, *, include_fixed_assets=True):
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        write_json(
+            Path(output_dir) / "keyframe_request_plan.json",
+            {
+                "artifact_type": "agentflow_keyframe_request_plan",
+                "context_path": "context_subgraph_v0.1" if include_fixed_assets else "legacy_asset_refs",
+                "provider_prompt": request.optimized_prompt or request.prompt_text,
+                "reference_images": [],
+            },
+        )
+        if Path(output_dir).name == "A":
+            return {
+                "status": "succeeded",
+                "provider_gate": {"capability": "image", "env": "AFS_ALLOW_REMOTE_IMAGE", "status": "ready_not_run"},
+                "provider_calls_started": True,
+                "provider_outputs": [{"candidate_id": "candidate_001", "image_ref": "image_candidates/candidate_001.png"}],
+                "safe_manifest": {"retry_count": 0, "blocks": []},
+                "tool_gate_state": {},
+            }
+        return {
+            "status": "blocked",
+            "provider_gate": {"capability": "image", "env": "AFS_ALLOW_REMOTE_IMAGE", "status": "blocked"},
+            "provider_calls_started": False,
+            "provider_outputs": [],
+            "safe_manifest": {
+                "retry_count": 0,
+                "blocks": [{"block_id": "remote_image_gate_closed", "reason": "gate closed", "required_gate": "AFS_ALLOW_REMOTE_IMAGE"}],
+            },
+            "tool_gate_state": {},
+        }
+
+    monkeypatch.setattr(runtime_generation_comparisons, "build_keyframe_generation", fake_build_keyframe_generation)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    response = client.post(
+        "/projects/proj_generation_compare_partial/generation-comparisons",
+        json={
+            "node_id": "target-node",
+            "prompt_text": "Lin Wan on rooftop.",
+            "optimized_prompt": "A controlled rooftop keyframe.",
+            "generated_at": "2026-06-24T12:30:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    report = payload["report"]
+
+    assert payload["job"]["status"] == "partially_complete"
+    assert report["status"] == "partially_complete"
+    assert report["batch_status"] == "partially_complete"
+    assert report["arms"][0]["result_refs"] == [{"candidate_id": "candidate_001", "review_state": "ready_for_review"}]
+    assert "image_candidates/candidate_001.png" not in json.dumps(payload, ensure_ascii=False)
+    assert payload["runtime_recovery"]["status"] == "partially_complete"
+    assert payload["runtime_recovery"]["retry"]["preserved_item_ids"] == ["candidate_001"]
+    assert payload["runtime_recovery"]["retry"]["retryable_item_ids"] == ["candidate_002", "candidate_003"]

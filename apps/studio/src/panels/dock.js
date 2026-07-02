@@ -43,7 +43,7 @@ export function renderDock(store, runtime) {
   historyBtn.addEventListener("click", () => openHistoryModal(store));
   dock.appendChild(historyBtn);
 
-  const planBtn = dockBtn("lock", "Accepted generation plan");
+  const planBtn = dockBtn("lock", "Generation plan review");
   planBtn.addEventListener("click", () => openAcceptedGenerationPlanPanel(runtime));
   dock.appendChild(planBtn);
 

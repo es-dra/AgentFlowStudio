@@ -29,6 +29,7 @@ from apps.api.runtime_logging import (
     user_action_from_request,
 )
 from apps.api.runtime_models import KeyframeGenerationRequest
+from apps.api.runtime_recovery_contract import runtime_recovery_envelope
 from apps.api.runtime_store import safe_id
 from apps.api.runtime_store import RuntimeStore
 from apps.api.runtime_tracing import artifact_refs, blocked_refs_from_blocks, write_run_trace
@@ -227,6 +228,23 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             output_dir=output_dir,
             outputs=result.get("provider_outputs") or [],
         )
+        runtime_recovery = runtime_recovery_envelope(
+            project_id=project_id,
+            job_id=job_id,
+            capability="image_keyframe",
+            status=status,
+            requested_count=request.candidate_count,
+            output_count=len(candidate_previews),
+            blocks=safe_manifest.get("blocks") or [],
+            provider_gate=result["provider_gate"],
+            provider_calls_started=bool(result["provider_calls_started"]),
+            retry_count=int(safe_manifest.get("retry_count") or 0),
+            artifacts=artifacts,
+            candidate_previews=candidate_previews,
+            reusable_assets=reusable_image_assets,
+            stage=str(safe_manifest.get("stage") or ""),
+            non_claims=KEYFRAME_NON_CLAIMS,
+        )
         _log_keyframe_event(
             "keyframe_generation_response_returned" if status not in {"blocked", "failed"} else "keyframe_generation_blocked",
             http_request,
@@ -252,6 +270,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             "artifacts": artifacts,
             "candidate_previews": candidate_previews,
             "reusable_image_assets": reusable_image_assets,
+            "runtime_recovery": runtime_recovery,
             "flow": build_flow_summary(store, project_id),
             "non_claims": KEYFRAME_NON_CLAIMS,
         }
@@ -339,6 +358,24 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             output_dir=output_dir,
             outputs=provider_outputs,
         )
+        requested_count = int((safe_manifest.get("batch_summary") or {}).get("requested_count") or len(provider_outputs) or 1)
+        runtime_recovery = runtime_recovery_envelope(
+            project_id=project_id,
+            job_id=job_id,
+            capability="image_keyframe",
+            status=status,
+            requested_count=requested_count,
+            output_count=len(candidate_previews),
+            blocks=safe_manifest.get("blocks") or [],
+            provider_gate=result["provider_gate"],
+            provider_calls_started=bool(result["provider_calls_started"]),
+            retry_count=int(safe_manifest.get("retry_count") or 0),
+            artifacts=artifacts,
+            candidate_previews=candidate_previews,
+            reusable_assets=reusable_image_assets,
+            stage=str(safe_manifest.get("stage") or ""),
+            non_claims=KEYFRAME_NON_CLAIMS,
+        )
         _log_keyframe_event(
             "keyframe_generation_poll_completed",
             http_request,
@@ -362,6 +399,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             "artifacts": artifacts,
             "candidate_previews": candidate_previews,
             "reusable_image_assets": reusable_image_assets,
+            "runtime_recovery": runtime_recovery,
             "flow": build_flow_summary(store, project_id),
             "non_claims": KEYFRAME_NON_CLAIMS,
         }

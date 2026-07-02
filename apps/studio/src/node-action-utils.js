@@ -1,4 +1,5 @@
 import { formatStructuredRuntimeError } from "./runtime-error-utils.js";
+import { safePublicText } from "./generation-status-policy.js";
 
 export function safeError(error) {
   const structured = formatStructuredRuntimeError(error);
@@ -18,7 +19,11 @@ export function setNodeError(store, nodeId, message) {
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
+    if (!n.params || typeof n.params !== "object") n.params = {};
     n.status = "error";
     n.result = message;
+    n.params.generationPolicyStatus = "failed";
+    n.params.generationBlockedReason = safePublicText(message);
+    n.params.generationNextAction = "Resolve the blocked reason, then retry failed items only.";
   });
 }

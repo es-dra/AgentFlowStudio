@@ -5,6 +5,7 @@ from typing import Any
 from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
 from apps.api.runtime_keyframe_plan import build_keyframe_plan
 from apps.api.runtime_models import KeyframeGenerationRequest
+from apps.api.runtime_recovery_contract import annotate_blocks, recovery_manifest_fields
 
 
 def keyframe_request_plan(
@@ -101,6 +102,7 @@ def keyframe_safe_manifest(
     context_bundle: dict[str, Any] | None,
     non_claims: list[str],
 ) -> dict[str, Any]:
+    safe_blocks = annotate_blocks(blocks)
     payload = {
         "artifact_type": "agentflow_keyframe_generation_safe_manifest",
         "schema_version": "0.1.0",
@@ -118,7 +120,7 @@ def keyframe_safe_manifest(
         "reference_image_count": reference_image_count,
         "retry_count": retry_count,
         "seed": request.seed,
-        "blocks": blocks,
+        "blocks": safe_blocks,
         "safe_artifacts": [
             "keyframe_request_plan.json",
             "keyframe_candidates_summary.json",
@@ -128,6 +130,18 @@ def keyframe_safe_manifest(
         "writes_company_kb": False,
         "non_claims": non_claims,
     }
+    payload.update(
+        recovery_manifest_fields(
+            status=status,
+            requested_count=request.candidate_count,
+            output_count=output_count,
+            blocks=safe_blocks,
+            provider_calls_started=provider_calls_started,
+            retry_count=retry_count,
+            stage="provider_gate" if status == "blocked" else "",
+            capability="image_keyframe",
+        )
+    )
     if context_bundle:
         payload["context_bundle_mode"] = context_bundle.get("mode")
         payload["context_included_asset_count"] = len(context_bundle.get("included_assets", []))

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 from typing import Any
 
 from agentflow.harness.json_io import write_json
 from agentflow_studio.model_gateway.errors import ModelGatewayError
+from agentflow_studio.model_gateway.image_utils import image_dimensions
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_file_logging import runtime_file_event
 from apps.api.runtime_keyframe_payloads import keyframe_candidate_summary, keyframe_safe_manifest
@@ -64,6 +66,8 @@ def poll_keyframe_generation(
             return recovered
         manifest = read_json(output_dir / "keyframe_generation_safe_manifest.json")
         outputs = manifest.get("outputs") if isinstance(manifest.get("outputs"), list) else []
+        if not outputs:
+            outputs = _provider_outputs_from_candidate_files(output_dir)
         runtime_file_event(
             "keyframe",
             "poll_terminal_cached",
@@ -174,6 +178,23 @@ def poll_keyframe_generation(
             progress=progress,
         )
     if status in {"failed", "blocked", "poll_failed"}:
+        if _provider_outputs(raw):
+            result = _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
+            runtime_file_event(
+                "keyframe",
+                "poll_partially_complete",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=request.node_id,
+                job_id=job_id,
+                provider_service_id=provider_service_id,
+                status=result.get("status"),
+                output_count=len(result.get("provider_outputs") or []),
+                provider_elapsed_ms=provider_elapsed_ms,
+                elapsed_ms=_elapsed_ms(started),
+            )
+            return result
         reason = _safe_error(_json_dumps_safe(raw.get("blocks") or raw))
         runtime_file_event(
             "keyframe",
@@ -230,7 +251,7 @@ def _recovered_terminal_provider_result(
         provider_elapsed_ms = _elapsed_ms(provider_started)
     except ModelGatewayError:
         return None
-    if str(raw.get("status") or "").lower() != "succeeded":
+    if str(raw.get("status") or "").lower().replace("-", "_") not in {"succeeded", "complete", "completed", "partial", "partially_complete"}:
         return None
     result = _keyframe_succeeded_result(output_dir, project_id, request, state, provider_gate, context_bundle, raw)
     runtime_file_event(
@@ -298,16 +319,23 @@ def _keyframe_succeeded_result(
     raw: dict[str, Any],
 ) -> dict[str, Any]:
     provider_outputs = _provider_outputs(raw)
-    state["status"] = "succeeded"
+    blocks = _provider_manifest_blocks(
+        raw,
+        str(provider_gate.get("env") or REMOTE_IMAGE_ENV),
+        request.candidate_count,
+        len(provider_outputs),
+    )
+    status = _keyframe_result_status(str(raw.get("status") or "succeeded"), request.candidate_count, provider_outputs, blocks)
+    state["status"] = status
     _write_task_state(output_dir, state)
     prompt = str(state.get("provider_prompt") or request.optimized_prompt or request.prompt_text)
     candidates = keyframe_candidate_summary(request, prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
     manifest = keyframe_safe_manifest(
         project_id,
         request,
-        status="succeeded",
+        status=status,
         provider_gate=provider_gate,
-        blocks=[],
+        blocks=blocks,
         provider_calls_started=True,
         output_count=len(provider_outputs),
         reference_image_count=int(state.get("reference_image_count") or 0),
@@ -315,12 +343,11 @@ def _keyframe_succeeded_result(
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
     )
-    manifest["outputs"] = provider_outputs
     _write_json_checked(output_dir / "keyframe_candidates_summary.json", candidates)
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
     progress = raw.get("progress") if isinstance(raw.get("progress"), dict) else None
     return _result(
-        status="succeeded",
+        status=status,
         provider_gate=provider_gate,
         provider_calls_started=True,
         provider_outputs=provider_outputs,
@@ -383,6 +410,41 @@ def _provider_task_for_poll(task: Any, output_dir: Path) -> dict[str, Any]:
     return payload
 
 
+def _provider_outputs_from_candidate_files(output_dir: Path) -> list[dict[str, Any]]:
+    image_dir = (output_dir / "image_candidates").resolve()
+    root = output_dir.resolve()
+    try:
+        image_dir.relative_to(root)
+    except ValueError:
+        return []
+    outputs: list[dict[str, Any]] = []
+    for path in sorted(image_dir.glob("candidate_*.*")):
+        try:
+            resolved = path.resolve()
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        if resolved.suffix.lower() not in {".png", ".jpg", ".jpeg"} or not resolved.is_file():
+            continue
+        candidate_id = resolved.stem
+        if not candidate_id.startswith("candidate_"):
+            continue
+        data = resolved.read_bytes()
+        dimensions = image_dimensions(data) or {}
+        outputs.append(
+            {
+                "candidate_id": candidate_id,
+                "byte_count": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "width": dimensions.get("width"),
+                "height": dimensions.get("height"),
+                "aspect_ratio": dimensions.get("aspect_ratio"),
+                "provider_url_persisted": False,
+            }
+        )
+    return outputs
+
+
 def _write_task_state(output_dir: Path, state: dict[str, Any]) -> None:
     _write_json_checked(output_dir / "keyframe_task_state.json", state)
 
@@ -437,6 +499,57 @@ def _json_dumps_safe(value: Any) -> str:
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 2)
+
+
+def _provider_manifest_blocks(
+    manifest: dict[str, Any],
+    required_gate: str,
+    requested_count: int,
+    output_count: int,
+) -> list[dict[str, str]]:
+    blocks: list[dict[str, str]] = []
+    raw_blocks = manifest.get("blocks") if isinstance(manifest.get("blocks"), list) else []
+    for item in raw_blocks:
+        if not isinstance(item, dict):
+            continue
+        block = {
+            "block_id": str(item.get("block_id") or item.get("code") or "remote_image_provider_not_ready")[:100],
+            "reason": _safe_error(str(item.get("reason") or item.get("message") or item.get("error") or "Image provider did not complete this item.")),
+            "required_gate": str(item.get("required_gate") or required_gate),
+        }
+        candidate_id = str(item.get("candidate_id") or "")
+        if candidate_id.startswith("candidate_"):
+            block["candidate_id"] = candidate_id[:32]
+        blocks.append(block)
+    if output_count < requested_count and _provider_status_allows_partial(str(manifest.get("status") or "")):
+        blocks.append(
+            {
+                "block_id": "remote_image_candidate_missing",
+                "reason": "Image provider returned fewer reviewable candidates than requested.",
+                "required_gate": required_gate,
+            }
+        )
+    return blocks
+
+
+def _keyframe_result_status(
+    provider_status: str,
+    requested_count: int,
+    provider_outputs: list[dict[str, Any]],
+    blocks: list[dict[str, Any]],
+) -> str:
+    normalized = str(provider_status or "").strip().lower().replace("-", "_")
+    output_count = len(provider_outputs)
+    if output_count > 0 and (normalized in {"partial", "partially_complete"} or output_count < requested_count or blocks):
+        return "partially_complete"
+    if normalized in {"failed", "blocked", "timed_out", "timeout", "skipped"}:
+        return "partially_complete" if output_count else "failed"
+    return "succeeded"
+
+
+def _provider_status_allows_partial(status: str) -> bool:
+    normalized = str(status or "").strip().lower().replace("-", "_")
+    return normalized in {"", "succeeded", "success", "complete", "completed", "partial", "partially_complete"}
 
 
 __all__ = ("poll_keyframe_generation",)

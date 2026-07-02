@@ -1,5 +1,7 @@
 import { icon } from "../icons.js";
+import { generationReadinessSummary, safePublicText } from "../generation-status-policy.js";
 import { el, showModal } from "../overlay.js";
+import { shouldRetryFailedItemsOnly } from "../node-generation-retry.js";
 import {
   applyGenerationProfileSettings,
   generationProfile,
@@ -22,6 +24,8 @@ export function openGenerationPanel({ store, node, onRun }) {
 
   const body = el("div", "modal-body generation-panel-body");
   body.appendChild(nodeSummary(current));
+  const gatePanel = generationGatePanel(generationReadinessSummary(current, profile, current.prompt || current.content || ""));
+  body.appendChild(gatePanel.wrap);
   const promptField = field("提示词", "textarea");
   promptField.input.value = current.prompt || current.content || "";
   promptField.input.rows = 5;
@@ -35,10 +39,13 @@ export function openGenerationPanel({ store, node, onRun }) {
 
   const actions = el("div", "modal-actions generation-panel-actions");
   const cancel = el("button", "ghost-btn", "取消");
-  const confirm = el("button", "primary-btn", profile.runsGeneration === false ? "保存设置" : "开始生成");
+  const retryDefault = shouldRetryFailedItemsOnly(current);
+  const confirm = el("button", "primary-btn", profile.runsGeneration === false ? "保存设置" : retryDefault ? "Retry failed items" : "开始生成");
   confirm.innerHTML = profile.runsGeneration === false
     ? `${icon("check", 13)}<span>保存设置</span>`
-    : `${icon("play", 13)}<span>开始生成</span>`;
+    : retryDefault
+      ? `${icon("retry", 13)}<span>Retry failed items</span>`
+      : `${icon("play", 13)}<span>开始生成</span>`;
   actions.append(cancel, confirm);
   modal.append(head, body, actions);
 
@@ -47,7 +54,16 @@ export function openGenerationPanel({ store, node, onRun }) {
   positionGenerationPanel(modal, current.id);
   closeBtn.addEventListener("click", close);
   cancel.addEventListener("click", close);
+  const syncGate = () => {
+    const summary = generationReadinessSummary(current, profile, promptField.input.value);
+    renderGenerationGate(gatePanel, summary);
+    confirm.disabled = Boolean(summary.blocked);
+    confirm.title = summary.blocked ? summary.blockedReason || summary.nextAction : "";
+  };
+  promptField.input.addEventListener("input", syncGate);
+  syncGate();
   confirm.addEventListener("click", () => {
+    if (confirm.disabled) return;
     store.set((s) => {
       const target = s.nodes[current.id];
       if (!target) return;
@@ -63,6 +79,40 @@ export function openGenerationPanel({ store, node, onRun }) {
   });
   setTimeout(() => promptField.input.focus(), 20);
   return close;
+}
+
+function generationGatePanel(summary) {
+  const wrap = el("section", "generation-gate-panel");
+  const panel = { wrap };
+  renderGenerationGate(panel, summary);
+  return panel;
+}
+
+function renderGenerationGate(panel, summary) {
+  panel.wrap.className = `generation-gate-panel${summary.blocked ? " blocked" : ""}`;
+  panel.wrap.replaceChildren();
+  const head = el("div", "generation-gate-head");
+  head.innerHTML = [
+    `<span>${icon(summary.blocked ? "lock" : "check", 13)}</span>`,
+    `<strong>${escapeHtml(summary.title)}</strong>`,
+  ].join("");
+  panel.wrap.appendChild(head);
+  panel.wrap.appendChild(gateRow("State", summary.detail));
+  if (summary.blockedReason) panel.wrap.appendChild(gateRow("Blocked reason", summary.blockedReason));
+  panel.wrap.appendChild(gateRow("Next action", summary.nextAction));
+  if (summary.rows?.length) {
+    const list = el("div", "generation-gate-list");
+    for (const item of summary.rows) {
+      list.appendChild(gateRow(item.label, `${item.status}: ${item.detail}`));
+    }
+    panel.wrap.appendChild(list);
+  }
+}
+
+function gateRow(label, value) {
+  const row = el("div", "generation-gate-row");
+  row.innerHTML = `<small>${escapeHtml(label)}</small><span>${escapeHtml(safePublicText(value, 220))}</span>`;
+  return row;
 }
 
 function renderProfileSettings(settings, node, profile) {

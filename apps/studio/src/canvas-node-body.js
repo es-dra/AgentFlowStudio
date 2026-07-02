@@ -3,6 +3,7 @@ import { directorSummary, normalizeDirectorSetup } from "./director-data.js";
 import { icon } from "./icons.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { canRunNodeGeneration } from "./node-actions.js";
+import { generationStatusCard } from "./generation-status-view.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 
 export function buildNodeBody(node, def, store = null) {
@@ -13,6 +14,7 @@ export function buildNodeBody(node, def, store = null) {
   if (node.type === "director") return directorBody(node, def);
   if (node.status === "generating") return generationBody(node);
   if (node.status === "cancelled") return cancelledBody(node);
+  if (node.status === "partial") return partialBody(node);
   if (node.type === "image" && node.status === "complete" && node.previewUrl) return completeBody(node);
   if (node.status === "complete" && node.result) return completeBody(node);
   if (node.status === "error") return errorBody(node);
@@ -60,9 +62,10 @@ export function statusLabel(status) {
     running: "生成中",
     generating: "生成中",
     pending: "排队中",
-    complete: "已完成",
-    error: "需检查",
-    cancelled: "已取消",
+    complete: "complete",
+    partial: "partially_complete",
+    error: "failed",
+    cancelled: "needs_attention",
   }[status] || "待生成";
 }
 
@@ -111,6 +114,7 @@ function directorBody(node, def) {
 
 function generationBody(node) {
   const out = [generationProgressView(node)];
+  out.push(generationStatusCard(node, { compact: true, refs: false }));
   if (node.result) out.push(resultView(node));
   return out;
 }
@@ -129,13 +133,21 @@ function completeBody(node) {
   if (node.type === "image" && node.previewUrl) return imageCompleteBody(node);
   const ok = document.createElement("div");
   ok.className = "node-status success";
-  ok.innerHTML = `${icon("check", 13)}<span>已完成</span>`;
+  ok.innerHTML = `${icon("check", 13)}<span>complete · ready for review · not yet accepted</span>`;
   const bundle = bundleSummary(node);
   return bundle ? [ok, bundle, resultView(node)] : [ok, resultView(node)];
 }
 
 function imageCompleteBody(node) {
   return [resultView(node)];
+}
+
+function partialBody(node) {
+  const out = [generationStatusCard(node)];
+  const bundle = bundleSummary(node);
+  if (bundle) out.push(bundle);
+  if (node.result || node.previewUrl) out.push(resultView(node));
+  return out;
 }
 
 function contentBlock(node, store) {
@@ -177,13 +189,13 @@ function isEditableContentNode(node) {
 }
 
 function errorBody(node) {
+  const out = [generationStatusCard(node)];
   const err = document.createElement("div");
   err.className = "node-status error";
   const message = canRunNodeGeneration(node)
-    ? "生成失败，可在节点菜单重试"
+    ? "failed · retry failed items"
     : "处理失败，请检查该节点的专用操作或错误详情";
   err.innerHTML = `${icon("x", 13)}<span>${escapeHtml(message)}</span>`;
-  const out = [];
   const bundle = bundleSummary(node);
   if (bundle) out.push(err, bundle);
   else out.push(err);

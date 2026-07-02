@@ -14,8 +14,8 @@ const NON_CLAIM_BOUNDARY_LABELS = [
 export function openAcceptedGenerationPlanPanel(runtime) {
   const modal = el("div", "modal compact accepted-generation-plan-modal");
   const head = el("div", "modal-head accepted-generation-plan-head");
-  head.appendChild(el("strong", "", "Accepted generation plan"));
-  head.appendChild(el("small", "", "Provider-closed review"));
+  head.appendChild(el("strong", "", "Generation plan review"));
+  head.appendChild(el("small", "", "Provider-closed / not yet accepted"));
   const closeBtn = el("button", "modal-close");
   closeBtn.type = "button";
   closeBtn.innerHTML = icon("x", 15);
@@ -24,7 +24,7 @@ export function openAcceptedGenerationPlanPanel(runtime) {
 
   const body = el("div", "modal-body accepted-generation-plan-body");
   const controls = el("div", "accepted-plan-controls");
-  const defaultBtn = modeButton("Default package", DEFAULT_FIXTURE_MODE);
+  const defaultBtn = modeButton("Default package (blocked)", DEFAULT_FIXTURE_MODE);
   const confirmedBtn = modeButton("Fixture demo (blocked)", CONFIRMED_FIXTURE_MODE);
   controls.append(defaultBtn, confirmedBtn);
   const content = el("div", "accepted-plan-content");
@@ -69,14 +69,14 @@ function setActiveMode(controls, fixtureMode) {
 function renderLoading(content, fixtureMode) {
   content.replaceChildren();
   const panel = el("div", "accepted-plan-empty");
-  panel.innerHTML = `${icon("layers", 20)}<strong>Loading ${escapeHtml(fixtureMode)}</strong><small>Plan preview only. No provider call is started.</small>`;
+  panel.innerHTML = `${icon("layers", 20)}<strong>Loading ${escapeHtml(fixtureMode)}</strong><small>Plan preview only. No provider call is started; not yet accepted.</small>`;
   content.appendChild(panel);
 }
 
 function renderError(content, error) {
   content.replaceChildren();
   const panel = el("div", "accepted-plan-error");
-  panel.innerHTML = `${icon("x", 18)}<strong>Plan preview failed</strong><small>${escapeHtml(error?.message || "Runtime request failed")}</small>`;
+  panel.innerHTML = `${icon("x", 18)}<strong>needs_attention</strong><small>${escapeHtml(error?.message || "Runtime request failed")}</small>`;
   content.appendChild(panel);
 }
 
@@ -91,26 +91,26 @@ function renderPlan(content, response) {
 
   const status = el("section", `accepted-plan-status ${state.accepted ? "accepted" : "blocked"}`);
   const acceptedTitle = provenance.source_mode === "project_artifact"
-    ? "Project plan step-gate recorded"
-    : "Local fixture demo, not acceptance";
+    ? "Plan step-gate recorded for review"
+    : "Local fixture demo, not accepted";
   status.innerHTML = [
     `<span>${icon(state.accepted ? "check" : "lock", 18)}</span>`,
-    `<div><strong>${escapeHtml(state.accepted ? acceptedTitle : "Blocked pending prerequisites")}</strong>`,
+    `<div><strong>${escapeHtml(state.accepted ? `complete · ${acceptedTitle} · not yet accepted` : "needs_attention · blocked pending prerequisites")}</strong>`,
     `<small>${escapeHtml(packet.packet_state || state.packet_state || "unknown")}</small></div>`,
   ].join("");
   content.appendChild(status);
 
   content.appendChild(metricGrid([
+    ["Policy status", state.accepted ? "complete" : "needs_attention"],
     ["State", state.packet_state || ""],
     ["Request", state.request_state || ""],
     ["Source", provenance.source_mode || provenance.evidence_origin || ""],
-    ["Fixture", provenance.fixture_mode || ""],
   ]));
-  content.appendChild(listSection("Residual blockers", [
+  content.appendChild(listSection("Blocked reasons / next actions", [
     ...(blockers.blocked_reasons || []),
     ...(blockers.pending_branch_asset_refs || []),
     ...(blockers.unresolved_open_question_refs || []),
-  ], "No residual blockers in this local fixture packet."));
+  ], "No blocked reason returned in this preview packet."));
   content.appendChild(listSection("Residual closure refs", blockers.residual_closure_refs || [], "No residual closures are recorded."));
   content.appendChild(listSection(
     "Non-claim boundaries",
@@ -120,7 +120,7 @@ function renderPlan(content, response) {
   content.appendChild(metricGrid([
     ["Provider calls", nonClaims.provider_calls_started ? "started" : "not started"],
     ["Media QA", nonClaims.generated_media_quality ? "claimed" : "not claimed"],
-    ["Product readiness", nonClaims.product_readiness ? "claimed" : "not claimed"],
+    ["Readiness claim", nonClaims.product_readiness ? "claimed" : "not claimed"],
     ["Business validation", nonClaims.business_validation ? "claimed" : "not claimed"],
   ]));
 }

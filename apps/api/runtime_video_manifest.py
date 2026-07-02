@@ -6,6 +6,7 @@ from typing import Any
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_recovery_contract import annotate_blocks, recovery_manifest_fields, runtime_recovery_envelope
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 from apps.api.runtime_video_candidates import candidate_previews
 from apps.api.runtime_video_constants import REMOTE_VIDEO_ENV, VIDEO_NON_CLAIMS
@@ -18,6 +19,25 @@ def video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], re
     model_call_context = result.get("model_call_context") if isinstance(result.get("model_call_context"), dict) else {}
     model_call_context_id = str(model_call_context.get("context_id") or (result.get("safe_manifest") or {}).get("model_call_context_id") or "")
     safe = result.get("safe_manifest") or {}
+    candidate_preview_refs = candidate_previews(project_id, job_id, outputs)
+    requested_count = int((safe.get("batch_summary") or {}).get("requested_count") or 1)
+    recovery = runtime_recovery_envelope(
+        project_id=project_id,
+        job_id=job_id,
+        capability="video",
+        status=str(job.get("status") or result.get("status") or ""),
+        requested_count=requested_count,
+        output_count=len(candidate_preview_refs),
+        blocks=safe.get("blocks") if isinstance(safe.get("blocks"), list) else [],
+        provider_gate=safe.get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
+        provider_calls_started=bool(safe.get("provider_calls_started")),
+        retry_count=int((safe.get("retry") or {}).get("retry_count") or 0),
+        artifacts=job.get("artifacts") or result.get("artifacts") or {},
+        candidate_previews=candidate_preview_refs,
+        reusable_assets=[],
+        stage=str(safe.get("stage") or ""),
+        non_claims=VIDEO_NON_CLAIMS,
+    )
     return {
         "job": job,
         "provider_gate": safe.get("provider_gate") or video_gate(REMOTE_VIDEO_ENV),
@@ -27,7 +47,8 @@ def video_response(store: RuntimeStore, project_id: str, job: dict[str, Any], re
         "model_call_context_id": model_call_context_id or None,
         "video_generation_plan": result.get("video_generation_plan") or safe.get("video_generation_plan"),
         "artifacts": job.get("artifacts") or result.get("artifacts") or {},
-        "candidate_previews": candidate_previews(project_id, job_id, outputs),
+        "candidate_previews": candidate_preview_refs,
+        "runtime_recovery": recovery,
         "flow": {"project_id": project_id},
         "non_claims": VIDEO_NON_CLAIMS,
     }
@@ -137,6 +158,7 @@ def safe_manifest(
     input_mode: str | None = None,
     duration_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    safe_blocks = annotate_blocks(blocks)
     manifest = {
         "schema_version": "afs_video_generation_safe_manifest.v0.1",
         "status": status,
@@ -145,7 +167,7 @@ def safe_manifest(
         "capability": "video",
         "provider_gate": provider_gate or video_gate(REMOTE_VIDEO_ENV),
         "provider_calls_started": provider_calls_started,
-        "blocks": blocks or [],
+        "blocks": safe_blocks,
         "outputs": outputs or [],
         "media_bytes_returned_by_api": False,
         "provider_raw_response_stored": False,
@@ -154,6 +176,18 @@ def safe_manifest(
         "writes_company_kb": False,
         "non_claims": VIDEO_NON_CLAIMS,
     }
+    manifest.update(
+        recovery_manifest_fields(
+            status=status,
+            requested_count=1,
+            output_count=len(outputs or []),
+            blocks=safe_blocks,
+            provider_calls_started=provider_calls_started,
+            retry_count=0,
+            stage="provider_gate" if status == "blocked" else "",
+            capability="video",
+        )
+    )
     if model_call_context_id:
         manifest["model_call_context_id"] = model_call_context_id
         manifest["model_request_plan_ref"] = "model_request_plan.json"

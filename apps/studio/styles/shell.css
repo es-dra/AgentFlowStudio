@@ -291,9 +291,13 @@
 @media (max-width: 520px) {
   :root {
     --drawer-w: min(156px, 40vw);
+    --mobile-drawer-w: min(156px, 40vw);
+  }
+  #drawer {
+    width: var(--mobile-drawer-w);
   }
   #topbar.drawer-open {
-    left: var(--drawer-w);
+    left: var(--mobile-drawer-w);
     padding: 0 6px;
     overflow: hidden;
     gap: 6px;
@@ -313,6 +317,14 @@
     max-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  #drawer:not(.collapsed) ~ #canvas-root #canvas-viewport {
+    left: var(--mobile-drawer-w);
+    width: calc(100vw - var(--mobile-drawer-w));
+  }
+  #drawer.collapsed ~ #canvas-root #canvas-viewport {
+    left: 0;
+    width: 100vw;
   }
   #canvas-empty-hint {
     left: calc(var(--drawer-w) + (100vw - var(--drawer-w)) / 2);

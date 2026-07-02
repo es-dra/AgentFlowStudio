@@ -369,7 +369,11 @@ def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_p
     )
 
     assert response.status_code == 200
-    assert response.json()["job"]["status"] == "succeeded"
+    payload = response.json()
+    assert payload["job"]["status"] == "needs_attention"
+    assert payload["candidate_previews"] == []
+    assert payload["runtime_recovery"]["status"] == "needs_attention"
+    assert payload["runtime_recovery"]["retry"]["default_scope"] == "failed_items_only"
     assert captured["capability"] == "video"
     assert captured["service_id"] == "seedance_i2v"
     assert len(captured["reference_image_paths"]) == 2

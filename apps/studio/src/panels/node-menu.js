@@ -40,7 +40,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   addItem(node.collapsed ? "chevronDown" : "chevronUp", node.collapsed ? "展开" : "折叠", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
   if (canRetryGeneration(node)) {
-    addItem("retry", "重试生成", () => {
+    addItem("retry", ["error", "partial"].includes(node.status) ? "Retry failed items" : "重试生成", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) startNodeGeneration(store, runtime, fresh);
     });

@@ -1,3 +1,5 @@
+import { responseStatusSummary } from "./generation-status-policy.js";
+
 const KIND_LABELS = {
   asset: "资产图生成",
   keyframe: "图片生成",
@@ -33,6 +35,15 @@ export function setSubmittingGenerationState(node, kind, options = {}) {
     terminal: false,
   };
   params.progressPercent = params.jobProgress.percent;
+  params.generationPolicyStatus = options.retrying ? "retrying" : "";
+  params.generationStatusDetail = options.retrying
+    ? "Retrying failed items. Preserved outputs remain visible."
+    : "Waiting for generation status. Keep the page open.";
+  params.generationBlockedReason = "";
+  params.generationNextAction = options.retrying
+    ? "Wait for Runtime status; provider quota may be used."
+    : "Wait for Runtime status; completed outputs will remain visible.";
+  params.retryFailedItemsOnly = Boolean(options.retrying);
   if (options.clearPreview !== false) {
     params.candidatePreviewUrls = [];
   }
@@ -53,6 +64,13 @@ export function updateNodeGenerationState(node, response, options = {}) {
   params.jobProgress = progress;
   params.progressPercent = progress.percent;
   if (progress.terminal) params.terminalProgress = progress;
+  const summary = responseStatusSummary(response, { retrying: options.retrying });
+  params.generationPolicyStatus = summary.policyStatus;
+  params.generationStatusDetail = summary.detail;
+  params.generationBlockedReason = summary.blockedReason;
+  params.generationNextAction = summary.nextAction;
+  params.generationSafeRefs = summary.safeRefs;
+  params.retryFailedItemsOnly = summary.policyStatus === "retrying";
   const candidates = candidatePreviewItems(response);
   if (candidates.length) {
     params.candidatePreviewUrls = candidates;

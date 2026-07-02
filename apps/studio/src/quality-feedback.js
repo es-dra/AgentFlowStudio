@@ -103,7 +103,7 @@ export function buildQualityFeedbackPayload(node, values = {}) {
 
 function shouldShowFeedback(node) {
   if (!node || !["image", "video"].includes(node.type)) return false;
-  if (node.status !== "complete") return false;
+  if (!["complete", "partial"].includes(node.status)) return false;
   return Boolean(node.result || node?.previewUrl);
 }
 

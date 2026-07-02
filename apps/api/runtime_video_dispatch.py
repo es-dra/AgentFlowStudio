@@ -470,19 +470,22 @@ def complete_video_result(
     poll_elapsed_ms: float | None = None,
     provider_elapsed_ms: float | None = None,
 ) -> dict[str, Any]:
-    outputs = safe_outputs(output_dir, raw)
+    outputs = safe_outputs(output_dir, raw, allow_fake_placeholder=_allow_fake_video_placeholder(task_state, raw))
     context_bundle = _context_bundle(task_state)
     completed_at = _utc_now()
-    task_state["status"] = "succeeded"
+    status = "succeeded" if outputs else "needs_attention"
+    blocks = [] if outputs else [_video_output_missing_block()]
+    task_state["status"] = status
     task_state.setdefault("running_started_at", task_state.get("created_at") or completed_at)
     task_state["last_poll_at"] = completed_at
     task_state["completed_at"] = completed_at
     write_task_state(output_dir, task_state)
     manifest = safe_manifest(
         project_id,
-        status="succeeded",
+        status=status,
         provider_calls_started=True,
         provider_gate=provider_gate,
+        blocks=blocks,
         outputs=outputs,
         context_bundle=context_bundle,
         model_call_context_id=str(task_state.get("model_call_context_id") or ""),
@@ -491,7 +494,7 @@ def complete_video_result(
     write_json_checked(output_dir / "video_generation_safe_manifest.json", manifest)
     runtime_file_event(
         "video",
-        "succeeded",
+        "succeeded" if outputs else "needs_attention",
         request_id=task_state.get("request_id"),
         client_request_id=task_state.get("client_request_id"),
         project_id=project_id,
@@ -501,7 +504,7 @@ def complete_video_result(
         elapsed_ms=submit_elapsed_ms if submit_elapsed_ms is not None else poll_elapsed_ms,
         provider_elapsed_ms=provider_elapsed_ms,
     )
-    return result_from_manifest(status="succeeded", safe_manifest=manifest, task_state=task_state, outputs=outputs, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
+    return result_from_manifest(status=status, safe_manifest=manifest, task_state=task_state, outputs=outputs, context_bundle=context_bundle, artifacts=artifacts, model_call_context=model_call_context, model_request_plan=model_request_plan)
 
 
 def _model_call_context(project_id: str, request: VideoGenerationRequest, context_bundle: dict[str, Any] | None) -> dict[str, Any]:
@@ -624,6 +627,20 @@ def _provider_not_ready_block(reason: str, provider_error_summary: dict[str, Any
     block: dict[str, Any] = dict(provider_not_ready_block(reason))
     block.update({key: value for key, value in provider_error_summary.items() if value not in (None, "")})
     return block
+
+
+def _video_output_missing_block() -> dict[str, Any]:
+    return {
+        "block_id": "remote_video_output_missing",
+        "reason": "Video provider did not return a reviewable video artifact.",
+        "required_gate": REMOTE_VIDEO_ENV,
+    }
+
+
+def _allow_fake_video_placeholder(task_state: dict[str, Any], raw: dict[str, Any]) -> bool:
+    service_id = str(task_state.get("provider_service_id") or "").lower()
+    provider = str(raw.get("provider") or raw.get("source") or "").lower()
+    return service_id.startswith("fake") or provider in {"fake", "fixture"}
 
 
 def _provider_error_summary(error: Exception) -> dict[str, Any]:

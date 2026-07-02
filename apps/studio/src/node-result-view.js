@@ -64,7 +64,9 @@ function resultActions(node, result) {
   continueButton.className = "mini-btn";
   continueButton.type = "button";
   continueButton.dataset.action = "continue-generate";
-  continueButton.innerHTML = `${icon("play", 12)}<span>继续生成</span>`;
+  continueButton.innerHTML = node.status === "partial"
+    ? `${icon("retry", 12)}<span>Retry failed items</span>`
+    : `${icon("play", 12)}<span>继续生成</span>`;
   actions.appendChild(continueButton);
 
   const assetButton = document.createElement("button");

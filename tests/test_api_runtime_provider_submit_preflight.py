@@ -278,7 +278,9 @@ def test_generation_comparison_gate_open_accepts_matching_preflight_token(tmp_pa
 
     assert submitted.status_code == 200
     payload = submitted.json()
-    assert payload["report"]["status"] == "succeeded"
+    assert payload["report"]["status"] == "failed"
+    assert payload["runtime_recovery"]["status"] == "failed"
+    assert payload["runtime_recovery"]["retry"]["default_scope"] == "failed_items_only"
     assert payload["provider_calls_started"] is True
     assert captured == [("image", "image_relay"), ("image", "image_relay"), ("image", "image_relay")]
 

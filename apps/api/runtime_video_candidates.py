@@ -7,7 +7,7 @@ from apps.api.runtime_store import safe_id
 from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID, VIDEO_SUFFIX_TYPES
 
 
-def safe_outputs(output_dir: Path, raw: dict[str, Any]) -> list[dict[str, Any]]:
+def safe_outputs(output_dir: Path, raw: dict[str, Any], *, allow_fake_placeholder: bool = False) -> list[dict[str, Any]]:
     outputs: list[dict[str, Any]] = []
     for index, item in enumerate(raw.get("outputs") or [], start=1):
         if not isinstance(item, dict):
@@ -30,7 +30,7 @@ def safe_outputs(output_dir: Path, raw: dict[str, Any]) -> list[dict[str, Any]]:
                 "provider_url_persisted": False,
             }
         )
-    if outputs:
+    if outputs or not allow_fake_placeholder:
         return outputs
     candidate_dir = output_dir / "video_candidates"
     candidate_dir.mkdir(parents=True, exist_ok=True)

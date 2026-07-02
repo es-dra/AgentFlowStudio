@@ -7,7 +7,10 @@ import { firstCandidatePreview, setSubmittingGenerationState, updateNodeGenerati
 import { parseDuration, videoResultText, videoRevisionResultText } from "./node-generation-results.js";
 import { clearOneRunOverrides, normalizeStringList, prepareGenerationRequest } from "./node-generation-guards.js";
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
+import { appendPreservedOutput, isPartialTerminalResponse, nodeStatusFromTerminalResponse, retryFailedItemsPlan, retryResultText, retrySubmittingOptions } from "./node-generation-retry.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration } from "./node-generation-restore.js";
+
+const VIDEO_CANCELLED_LOCAL_ONLY_STATUS = "cancelled_local_only";
 
 export function setNodeVideoFrame(store, node, slot = "first") {
   const imageAsset = lastImageAsset(node);
@@ -120,12 +123,18 @@ export async function startRemoteVideoGeneration(store, runtime, node) {
   }
   node = store.get().nodes[node.id] || node;
   const previousNodeState = generationRestoreSnapshot(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    setSubmittingGenerationState(n, "video", { label: "正在提交视频任务", percent: 8 });
-    n.result = "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    setSubmittingGenerationState(n, "video", retryPlan.retrying
+      ? retrySubmittingOptions("正在提交视频任务")
+      : { label: "正在提交视频任务", percent: 8 });
+    n.result = retryPlan.retrying
+      ? retryResultText()
+      : "视频任务提交中...\n提交后如本地取消，只会停止 Studio 轮询；厂商侧任务仍可能继续执行并计费。";
   });
   let submitAttempted = false;
   try {
@@ -164,12 +173,18 @@ export async function startRemoteVideoRevision(store, runtime, node) {
   }
   node = store.get().nodes[node.id] || node;
   const previousNodeState = generationRestoreSnapshot(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    setSubmittingGenerationState(n, "video_revision", { label: "正在提交视频修订", percent: 8 });
-    n.result = "Preparing experimental video revision...";
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    setSubmittingGenerationState(n, "video_revision", retryPlan.retrying
+      ? retrySubmittingOptions("正在提交视频修订")
+      : { label: "正在提交视频修订", percent: 8 });
+    n.result = retryPlan.retrying
+      ? retryResultText()
+      : "Preparing experimental video revision...";
   });
   let submitAttempted = false;
   try {
@@ -236,6 +251,7 @@ function applyVideoRevisionResponse(store, nodeId, response) {
     const n = s.nodes[nodeId];
     if (!n) return;
     const preview = firstCandidatePreview(response);
+    const partial = isPartialTerminalResponse(response, preview);
     updateNodeGenerationState(n, response, { kind: "video_revision" });
     if (preview?.url) {
       n.previewUrl = preview.url;
@@ -248,19 +264,21 @@ function applyVideoRevisionResponse(store, nodeId, response) {
       lastRevisionJobId: response?.job?.job_id || null,
       lastSafeManifest: response?.safe_manifest || null,
     };
-    n.status = status === "succeeded" ? "complete" : ["submitted", "running"].includes(status) ? "generating" : "error";
+    n.status = nodeStatusFromTerminalResponse(status, partial);
     n.result = videoRevisionResultText(response);
   });
 }
 
 function applyVideoResponse(store, nodeId, response) {
   const status = response?.job?.status || "blocked";
-  if (!["submitted", "running"].includes(status)) clearVideoAutoPoll(nodeId);
+  if (!["submitted", "pending", "running"].includes(status)) clearVideoAutoPoll(nodeId);
+  if (status === VIDEO_CANCELLED_LOCAL_ONLY_STATUS) clearVideoAutoPoll(nodeId);
   store.set((s) => {
     const n = s.nodes[nodeId];
     if (!n) return;
     const preview = firstCandidatePreview(response);
     const previewUrl = preview?.url || null;
+    const partial = isPartialTerminalResponse(response, preview);
     updateNodeGenerationState(n, response, { kind: "video" });
     n.params.lastVideoJobId = response?.job?.job_id || null;
     n.params.lastVideoPreviewUrl = previewUrl;
@@ -270,7 +288,7 @@ function applyVideoResponse(store, nodeId, response) {
       n.previewUrl = previewUrl;
       resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
     }
-    n.status = status === "succeeded" ? "complete" : status === "cancelled_local_only" ? "cancelled" : ["submitted", "running"].includes(status) ? "generating" : "error";
+    n.status = nodeStatusFromTerminalResponse(status, partial);
     n.result = videoResultText(response);
   });
 }

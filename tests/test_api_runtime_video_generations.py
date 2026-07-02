@@ -284,6 +284,68 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     assert "d:\\" not in serialized
 
 
+def test_video_generation_does_not_create_fake_placeholder_for_non_fixture_provider(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_VIDEO", "true")
+
+    class NoOutputRegistry:
+        def descriptor(self, service_id: str):
+            assert service_id == "real_video"
+            return SimpleNamespace(
+                required_gate="AFS_ALLOW_REMOTE_VIDEO",
+                prompt_char_limit=2000,
+                supported_durations_sec=[5],
+                supported_resolutions=["720p"],
+                supported_aspect_ratios=["9:16"],
+                frame_modes=["first_frame"],
+                min_reference_image_edge_px=0,
+            )
+
+        def submit(self, capability: str, service_id: str, request):
+            assert capability == "video"
+            assert service_id == "real_video"
+            return {"service_id": service_id, "capability": capability, "task": {"status": "submitted", "task_id": "real-no-output"}}
+
+        def poll(self, capability: str, service_id: str, task):
+            assert capability == "video"
+            assert service_id == "real_video"
+            return {"status": "succeeded", "outputs": [], "provider": "real"}
+
+    monkeypatch.setattr(runtime_video_routes, "load_provider_registry", lambda: NoOutputRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-real-no-output"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video no-output guard"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_no_output_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "real_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-24T13:00:00+08:00",
+    }
+
+    submitted = client.post(
+        f"/projects/{project_id}/video-generations",
+        json=_with_video_preflight_token(client, project_id, request),
+    )
+    assert submitted.status_code == 200
+    job_id = submitted.json()["job"]["job_id"]
+
+    polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
+
+    assert polled.status_code == 200
+    payload = polled.json()
+    assert payload["job"]["status"] == "needs_attention"
+    assert payload["safe_manifest"]["status"] == "needs_attention"
+    assert payload["safe_manifest"]["blocks"][0]["block_id"] == "remote_video_output_missing"
+    assert payload["candidate_previews"] == []
+    assert payload["runtime_recovery"]["status"] == "needs_attention"
+    assert payload["runtime_recovery"]["retry"]["retryable_item_ids"] == ["candidate_001"]
+    assert not (tmp_path / "runtime" / "runs" / project_id / job_id / "video_candidates" / "candidate_001.mp4").exists()
+
+
 def test_video_provider_prompt_removes_image_edit_language() -> None:
     request = runtime_video_routes.VideoGenerationRequest(
         prompt_text="基于当前关键帧生成视频",

@@ -32,8 +32,8 @@ def public_job_from_store(store: RuntimeStore, job_id: str) -> dict[str, Any]:
 
 
 def job_progress(action: str, status: str) -> dict[str, Any]:
-    terminal = status in {"succeeded", "failed", "blocked", "cancelled"}
-    active = status in {"submitted", "running", "pending"}
+    terminal = status in {"succeeded", "complete", "partially_complete", "failed", "blocked", "needs_attention", "cancelled", "cancelled_local_only", "poll_failed"}
+    active = status in {"submitted", "running", "pending", "retrying"}
     percent = 100 if terminal else 0 if status == "submitted" else None
     mode = "complete" if terminal else "queued" if status == "submitted" else "indeterminate" if active else "idle"
     progress: dict[str, Any] = {"stage": action, "percent": percent, "terminal": terminal}

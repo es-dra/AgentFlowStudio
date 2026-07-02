@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-07-03 - P0 Runtime + Studio State Recovery Integration Candidate
+
+- Created integration branch `codex/p0-state-recovery-integration-20260703` from baseline `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in `/home/afs-ops/.codex/worktrees/14b4/AgentFlowStudio`.
+- Integrated the accepted Runtime state/artifact recovery candidate from `/home/afs-ops/.codex/worktrees/2bb8/AgentFlowStudio` and the accepted Studio gate/status recovery candidate from `/home/afs-ops/.codex/worktrees/6775/AgentFlowStudio` without mutating either source worktree.
+- Added the Studio bridge for `runtime_recovery` shaped responses, safe repeated async keyframe terminal poll reconstruction, cross-platform safe upload filename sanitization, and stale no-output expectation updates.
+- Verification passed: py_compile on touched Runtime/tests, Studio JS `138 files`, focused Runtime/Studio recovery pytest `53 passed`, mocked Playwright job-center recovery checks at `390x820` and `1366x900`, maintenance audit `failed=0` warning-only, and `git diff --check`.
+- Full non-legacy pytest after in-scope fixes has residual non-integration blockers: missing external `D:/.../10-Startup/.../knowledgebase` source-KB path and an OpenAPI snapshot mismatch limited to generated `ValidationError` schema under the temporary latest dependency environment.
+- No provider gates, live provider calls, server/deploy/restart, generated-media QA, human acceptance, product/business/public/legal readiness, CompanyOS/COS promotion, durable-memory promotion, push, or merge occurred.
+- Handoff: `docs/handoff/AFS-P0-STATE-RECOVERY-INTEGRATION-CANDIDATE-20260703.md`.
+
+## 2026-07-02 - Runtime State/Artifact Recovery Contract
+
+- Implemented lane `IMP-P0-RUNTIME-STATE-ARTIFACT-RECOVERY` on `codex/runtime-state-artifact-recovery-20260703` for dispatch `TD-AFS-V02-IMP-RUNTIME-STATE-ARTIFACT-RECOVERY-20260703-001`.
+- Added a shared Runtime recovery contract helper for accepted public batch states, safe artifact pointers, provider gate/call provenance, preserved outputs, failed-item retry scope, full-batch rerun non-default metadata, and non-claim review copy.
+- Added `batch_status`, `stage`, failure class, retry metadata, and safe provenance to keyframe/video safe manifests, plus `runtime_recovery` envelopes to keyframe, video, and multi-image comparison responses.
+- Keyframe partial provider results now preserve/register valid generated image assets while missing/failed items remain visible and retryable. Async keyframe polling also preserves valid outputs from failed/blocked provider poll payloads.
+- Multi-image comparison mixed output/block arms now surface `partially_complete` and no longer expose relative `image_ref` paths in result refs.
+- Video completion no longer fabricates a fake MP4 for non-fixture providers with no valid output; fake placeholders are contained to fake/fixture providers, and real no-output completions surface `needs_attention`.
+- Fixback `FIX-P0-RUNTIME-ASYNC-POLL-SAFE-MANIFEST-SANITIZE` removed the async keyframe poll public `safe_manifest["outputs"]` echo and stopped normalizing provider `image_path` into `image_ref`, preserving reviewable outputs through safe candidate/recovery pointers only.
+- Added focused async submit-plus-poll regression coverage asserting public poll JSON excludes `image_candidates/`, `image_ref`, `image_path`, `output_dir`, `request.json`, and handoff-job internals while retaining safe preview/retry metadata.
+- Verification available in this shell passed: `python3 -m py_compile` on touched Runtime/tests, `git diff --check`, and helper line count `291`. Focused pytest was blocked because `python` is missing and `python3` has no `pytest` module in this worktree.
+- No provider gate was opened; no live provider submit/poll, generated-media QA, server operation, deploy/restart, CompanyOS/COS promotion, durable-memory promotion, product readiness, business/public/legal readiness, human acceptance, or Runtime loaded-code freshness is claimed.
+- Handoff: `docs/handoff/AFS-RUNTIME-STATE-ARTIFACT-RECOVERY-20260703.md`.
+
 ## 2026-07-02 - I2 Hardening Integration Merge and Server Hash Sync
 
 - Fast-forwarded I1 branch `codex/afs-pre-human-hardening-integration-20260702`

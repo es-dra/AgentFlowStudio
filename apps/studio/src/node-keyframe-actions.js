@@ -1,6 +1,7 @@
 import { buildKeyframeGenerationRequest } from "./optimizer-contract.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
 import { setSubmittingGenerationState } from "./node-generation-progress.js";
+import { appendPreservedOutput, retryFailedItemsPlan, retrySubmittingOptions } from "./node-generation-retry.js";
 import { isKeyframeInProgress } from "./node-generation-results.js";
 import { clearOneRunOverrides, prepareGenerationRequest } from "./node-generation-guards.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration, sleep } from "./node-generation-restore.js";
@@ -30,13 +31,19 @@ export async function pollNodeKeyframeGeneration(store, runtime, node) {
 export async function startRemoteKeyframeGeneration(store, runtime, node) {
   const previousNodeState = generationRestoreSnapshot(node);
   const generationKind = nodeGenerationKind(node);
+  const retryPlan = retryFailedItemsPlan(node);
   store.set((s) => {
     const n = s.nodes[node.id];
     if (!n) return;
     n.status = "generating";
-    n.result = null;
-    n.previewUrl = null;
-    setSubmittingGenerationState(n, generationKind, { label: submitLabel(generationKind), percent: 8 });
+    if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
+    else {
+      n.result = null;
+      n.previewUrl = null;
+    }
+    setSubmittingGenerationState(n, generationKind, retryPlan.retrying
+      ? retrySubmittingOptions(submitLabel(generationKind))
+      : { label: submitLabel(generationKind), percent: 8 });
   });
   let submitAttempted = false;
   let submittedAtMs = 0;

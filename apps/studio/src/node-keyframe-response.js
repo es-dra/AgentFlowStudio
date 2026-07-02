@@ -13,14 +13,14 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     if (!n) return;
     const reusableAsset = response?.reusable_image_assets?.[0] || null;
     const preview = response?.candidate_previews?.[0] || previewFromReusableAsset(reusableAsset);
-    const succeeded = status === "succeeded"
-      || Boolean(preview?.preview_url && (response?.safe_manifest?.output_count ?? 0) > 0)
-      || Boolean(reusableAsset?.preview_url);
+    const outputCount = Number(response?.safe_manifest?.output_count || 0);
+    const succeeded = status === "succeeded";
+    const partial = !succeeded && !inProgress && Boolean(preview?.preview_url || reusableAsset?.preview_url || outputCount > 0);
     const jobId = response?.job?.job_id || null;
-    const shouldRecordAsset = succeeded && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
+    const shouldRecordAsset = (succeeded || partial) && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
     updateNodeGenerationState(n, response, { kind });
     n.params.lastKeyframeJobId = jobId || n.params.lastKeyframeJobId || null;
-    n.status = succeeded ? "complete" : inProgress ? "generating" : "error";
+    n.status = succeeded ? "complete" : inProgress ? "generating" : partial ? "partial" : "error";
     if (preview?.preview_url) {
       n.previewUrl = preview.preview_url;
       resizeNodeForImagePreview(n, preview, request.aspect_ratio);
@@ -33,12 +33,13 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     n.params.lastGenerationBridgeArtifactId = response?.artifacts?.keyframe_generation_bridge?.artifact_id || n.params.lastGenerationBridgeArtifactId || "";
     n.params.lastKeyframeSourceEvidenceTrace = keyframeSourceEvidenceTrace(n) || n.params.lastKeyframeSourceEvidenceTrace || null;
     reconcileVisualAssetBadges(n, response?.context_bundle || null);
-    n.result = keyframeResultText(response, request, succeeded, { kind });
+    n.result = keyframeResultText(response, request, succeeded, { kind, partial });
     if (shouldRecordAsset) {
       n.params.lastKeyframeCompletedJobId = jobId;
       const asset = visibleAssetForNode(store, n);
       s.assets.unshift({
         ...asset,
+        status: partial ? "partially_complete" : asset.status,
         safe_summary: (n.prompt || "").slice(0, 90),
         job_id: jobId,
         artifact_id: response?.artifacts?.keyframe_generation_safe_manifest?.artifact_id || null,
