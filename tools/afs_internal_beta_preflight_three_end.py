@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from tools.afs_readiness_claims import safe_readiness_projection
 from tools.afs_three_end_status import run_three_end_status
 
 
@@ -42,6 +43,7 @@ def safe_three_end_status(value: Any) -> dict[str, Any]:
         "summary": _safe_three_end_summary(value.get("summary")),
         "ends": _safe_three_end_snapshots(value.get("ends")),
         "runtime_health": _safe_runtime_health(health),
+        "readiness_claims": _safe_readiness_claims(value.get("readiness_claims")),
     }
 
 
@@ -86,6 +88,7 @@ def _safe_runtime_health(payload: dict[str, Any]) -> dict[str, Any]:
         "auth_required": bool(payload.get("auth_required")),
         "studio_static": _safe_studio_static(payload.get("studio_static")),
         "provider_gates": _safe_provider_gates(payload.get("provider_gates")),
+        "readiness": safe_readiness_projection(payload.get("readiness")),
     }
 
 
@@ -106,3 +109,14 @@ def _safe_provider_gates(value: Any) -> dict[str, bool]:
         return {}
     allowed = {"llm", "image", "video", "vision", "asr", "external_download"}
     return {str(key): bool(val) for key, val in value.items() if str(key) in allowed}
+def _safe_readiness_claims(value: Any) -> dict[str, bool]:
+    if not isinstance(value, dict):
+        value = {}
+    return {
+        "repo_ends_aligned": bool(value.get("repo_ends_aligned")),
+        "runtime_service_ready": bool(value.get("runtime_service_ready")),
+        "runtime_freshness_verified": bool(value.get("runtime_freshness_verified")),
+        "acceptance_ready": bool(value.get("acceptance_ready")),
+        "human_creative_acceptance": bool(value.get("human_creative_acceptance")),
+        "product_readiness": bool(value.get("product_readiness")),
+    }

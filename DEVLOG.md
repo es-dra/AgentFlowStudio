@@ -8960,6 +8960,34 @@ Boundaries:
 
 ## 2026-06-21 - Full-Coverage Studio Internal Test Replacement Pass
 
+# 2026-07-02 - D3 Runtime Readiness/Auth Claim Boundary Hardening
+
+- Split Runtime `/health` service health from exposure/auth/readiness claims:
+  service health can remain `status=ready`, while new `service_health`,
+  `exposure`, and `readiness` fields make public-edge auth, bind state, runtime
+  freshness, human acceptance, and product readiness explicit non-claims.
+- Wired Runtime bind host into the health payload from CLI `--host` and
+  `AFS_RUNTIME_SERVICE_HOST`, so a public bind with auth disabled is not
+  reported as local-only or acceptance-ready.
+- Hardened public-edge, three-end, and HTTP preflight reports with safe
+  readiness/non-claim fields. Public edge 200 plus auth-disabled Runtime now
+  reports `public_edge_auth_not_ready`, not `ready_for_public_auth`.
+- Added shared readiness sanitization helper and refreshed the Runtime OpenAPI
+  snapshot.
+
+Verification:
+
+```text
+python -m pytest -q tests/test_api_runtime_service.py tests/test_api_runtime_auth.py tests/test_afs_public_edge_preflight.py tests/test_afs_three_end_status.py tests/test_afs_internal_beta_acceptance.py tests/test_afs_internal_beta_preflight_public_edge.py tests/test_afs_internal_beta_preflight_three_end.py tests/test_api_runtime_openapi_snapshot.py
+# 49 passed
+```
+
+Boundaries: service/runtime/preflight readiness only; no runtime loaded-code
+freshness except explicit three-end alignment fields, no provider smoke,
+generated-media QA, human creative acceptance, product/business/public/legal
+readiness, CompanyOS projection, durable-memory promotion, or COS active-rule
+promotion.
+
 - Created a multi-role QA plan and run ledger for the internal-test replacement pass, covering creator, returning creator, creative director, asset librarian, QA gatekeeper, release operator, privacy/security, waiting user, small viewport, and failure-recovery perspectives.
 - Fixed local browser QA startup under proxy-enabled developer machines: health checks now bypass `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY` for local Runtime probes, Runtime subprocesses receive `NO_PROXY`, and the QA helper passes the correct `AFS_RUNTIME_ROOT`.
 - Updated stale browser QA selectors for the current quick-create menu and duplicate save-asset actions, then added a deterministic `--stub-llm` mode so UI/Runtime browser coverage can run without depending on local provider readiness.

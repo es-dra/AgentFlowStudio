@@ -56,6 +56,10 @@ def test_three_end_report_marks_drift_without_leaking_server_details() -> None:
     assert report["ends"]["server_opt"]["aligned_with_origin"] is False
     assert report["runtime_health"]["status"] == "ready"
     assert report["runtime_health"]["provider_gates"]["video"] is False
+    assert report["readiness_claims"]["runtime_freshness_verified"] is False
+    assert report["readiness_claims"]["acceptance_ready"] is False
+    assert report["readiness_claims"]["product_readiness"] is False
+    assert "not human creative acceptance" in report["non_claims"]
 
     serialized = json.dumps(report, ensure_ascii=False)
     assert "/etc/afs" not in serialized
@@ -74,6 +78,7 @@ def test_safe_runtime_health_keeps_only_public_booleans() -> None:
             "auth_required": True,
             "studio_static": {"status": "ready", "mounted": True, "root_exists": True},
             "provider_gates": {"llm": 1, "video": 0, "unknown": "/private"},
+            "readiness": {"service_ready": True, "runtime_freshness_verified": False, "acceptance_ready": False},
             "signed_url": "https://example.test/signed",
         }
     )
@@ -93,6 +98,37 @@ def test_safe_runtime_health_keeps_only_public_booleans() -> None:
             "status": "ready",
         },
         "provider_gates": {"llm": True, "video": False},
+        "readiness": {
+            "service_ready": True,
+            "auth_ready_for_public_edge": False,
+            "public_edge_verified": False,
+            "runtime_freshness_verified": False,
+            "acceptance_ready": False,
+            "product_readiness": False,
+        },
+    }
+
+
+def test_three_end_alignment_does_not_claim_acceptance_or_product_readiness() -> None:
+    local = parse_repo_snapshot("local", "## master...origin/master\n", "abc1234", "abc1234")
+    home = parse_repo_snapshot("server_home", "## master...origin/master\n", "abc1234", "abc1234")
+    opt = parse_repo_snapshot("server_opt", "## master...origin/master\n", "abc1234", "abc1234")
+
+    report = build_three_end_report(
+        local=local,
+        server_home=home,
+        server_opt=opt,
+        runtime_health={"status": "ready", "auth_required": True},
+    )
+
+    assert report["status"] == "aligned"
+    assert report["readiness_claims"] == {
+        "repo_ends_aligned": True,
+        "runtime_service_ready": True,
+        "runtime_freshness_verified": True,
+        "acceptance_ready": False,
+        "human_creative_acceptance": False,
+        "product_readiness": False,
     }
 
 

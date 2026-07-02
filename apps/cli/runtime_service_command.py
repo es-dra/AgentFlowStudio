@@ -25,7 +25,7 @@ def runtime_service_command(
 
     from apps.api.runtime_service import create_runtime_app
 
-    app = create_runtime_app(runtime_root=runtime_root)
+    app = create_runtime_app(runtime_root=runtime_root, runtime_bind_host=host)
     typer.echo(f"AgentFlow Runtime Service listening on http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, reload=False, access_log=_access_log_enabled())
 

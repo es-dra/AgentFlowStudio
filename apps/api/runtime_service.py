@@ -96,6 +96,7 @@ def create_runtime_app(
     runtime_root: Path = DEFAULT_RUNTIME_ROOT,
     studio_root: Path = DEFAULT_STUDIO_ROOT,
     site_root: Path = DEFAULT_SITE_ROOT,
+    runtime_bind_host: str | None = None,
 ) -> FastAPI:
     configure_runtime_logging()
     configure_runtime_threadpool_compat()
@@ -117,6 +118,7 @@ def create_runtime_app(
         return runtime_health_payload(
             runtime_root=runtime_root,
             studio_static=studio_static_status(studio_root),
+            runtime_bind_host=runtime_bind_host,
         )
 
     @app.get("/capabilities")

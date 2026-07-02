@@ -7,7 +7,8 @@ from apps.api.runtime_service import DEFAULT_RUNTIME_ROOT, create_runtime_app
 
 
 runtime_root = Path(os.environ.get("AFS_RUNTIME_SERVICE_ROOT", str(DEFAULT_RUNTIME_ROOT)))
-app = create_runtime_app(runtime_root=runtime_root)
+runtime_bind_host = os.environ.get("AFS_RUNTIME_SERVICE_HOST", "127.0.0.1")
+app = create_runtime_app(runtime_root=runtime_root, runtime_bind_host=runtime_bind_host)
 TRUE_VALUES = {"1", "true", "yes", "on"}
 
 

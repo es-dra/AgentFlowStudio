@@ -20,6 +20,8 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "AFS_ALLOW_REMOTE_ASR",
         "AFS_ALLOW_EXTERNAL_DOWNLOAD",
         "AFS_PROVIDER_CONFIG",
+        "AFS_AUTH_ENABLED",
+        "AFS_RUNTIME_SERVICE_HOST",
     ):
         monkeypatch.delenv(name, raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
@@ -30,6 +32,11 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
 
     assert health["service"] == "agentflow_runtime_service"
     assert health["status"] == "ready"
+    assert health["service_health"] == {
+        "status": "ready",
+        "scope": "process_health_only",
+        "claims_acceptance_ready": False,
+    }
     assert health["runtime_root_persisted"] is runtime_root_is_persisted(tmp_path)
     assert health["studio_static"] == {
         "mounted": True,
@@ -46,6 +53,26 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
         "asr": False,
         "external_download": False,
     }
+    assert health["exposure"] == {
+        "bind_host": "127.0.0.1",
+        "local_only": True,
+        "public_bind": False,
+        "auth_required": False,
+        "public_edge_verified": False,
+        "claim_status": "local_bind_only",
+    }
+    assert health["readiness"]["service_ready"] is True
+    assert health["readiness"]["auth_ready_for_public_edge"] is False
+    assert health["readiness"]["runtime_freshness_verified"] is False
+    assert health["readiness"]["public_edge_verified"] is False
+    assert health["readiness"]["acceptance_ready"] is False
+    assert health["readiness"]["product_readiness"] is False
+    assert "runtime_auth_disabled" in health["readiness"]["blocked_or_unverified"]
+    assert "not_human_creative_acceptance" in health["readiness"]["non_claims"]
+    assert health["boundaries"]["local_only"] is True
+    assert health["boundaries"]["public_edge_verified"] is False
+    assert health["boundaries"]["runtime_freshness_verified"] is False
+    assert health["boundaries"]["acceptance_ready"] is False
     assert capabilities["actions"] == [
         "create_project",
         "list_projects",
@@ -85,6 +112,26 @@ def test_runtime_service_reports_health_and_capabilities_without_secrets(tmp_pat
     assert "providers.local" not in serialized
     assert "afs_provider_config" not in serialized
     assert str(tmp_path).lower() not in serialized
+
+
+def test_runtime_health_public_bind_auth_disabled_is_not_local_or_acceptance_ready(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_AUTH_ENABLED", raising=False)
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path, runtime_bind_host="0.0.0.0"))
+    health = client.get("/health").json()
+
+    assert health["status"] == "ready"
+    assert health["auth_required"] is False
+    assert health["exposure"]["public_bind"] is True
+    assert health["exposure"]["local_only"] is False
+    assert health["exposure"]["claim_status"] == "public_bind_without_runtime_auth"
+    assert health["boundaries"]["local_only"] is False
+    assert health["readiness"]["service_ready"] is True
+    assert health["readiness"]["auth_ready_for_public_edge"] is False
+    assert health["readiness"]["acceptance_ready"] is False
+    assert health["readiness"]["product_readiness"] is False
+    assert health["readiness"]["runtime_freshness_verified"] is False
+    assert "public_bind_runtime_auth_disabled" in health["readiness"]["blocked_or_unverified"]
 
 
 def test_runtime_health_keeps_repo_relative_runtime_root_non_persisted(tmp_path) -> None:
