@@ -1,5 +1,41 @@
 # Devlog
 
+## 2026-07-02 - D5 Provider-Closed Readiness Packet Currency
+
+- Completed Lane D5 on `codex/afs-d5-provider-closed-readiness-20260702` from D2 commit `654002a295330c0722102d8a2202804189865235`; base remains `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.
+- Updated the provider-closed internal tryout/readiness packet tooling so the D2 accepted-generation-plan bridge is a required readiness input.
+- Added browser QA coverage that opens the Studio accepted generation plan modal and records the default blocked preview evidence: `preview_status=blocked`, `job.status=blocked`, `accepted=false`, `source_mode=fixture_demo`, `provider_calls_started=false`, and `provider_gate=closed`.
+- Added fail-closed checks for accepted-plan non-claim collapse, including product readiness, deploy/runtime health, provider smoke, generated-media QA, human creative acceptance, business validation, public/legal/patent readiness, and COS promotion.
+- Generated local ignored evidence at `runs\d5_studio_main_path_delivery_readiness.json`, `runs\d5_studio_main_path_delivery_readiness.png`, `runs\d5_provider_closed_internal_tryout_packet.json`, and `runs\d5_provider_closed_internal_tryout_packet.md`.
+- Handoff: `docs/handoff/AFS-D5-PROVIDER-CLOSED-READINESS-PACKET-CURRENCY-20260702.md`.
+
+Verification:
+
+```text
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_studio_provider_closed_tryout_packet.py tests\test_studio_main_path_browser_qa_tool.py -q
+# 21 passed, 1 warning
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\studio_main_path_browser_qa.py --runtime-root .venv\d5-browser-runtime --report runs\d5_studio_main_path_delivery_readiness.json --screenshot runs\d5_studio_main_path_delivery_readiness.png
+# passed; accepted generation plan preview POST returned 200; provider_calls_started=false
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\studio_provider_closed_tryout_packet.py --readiness-report runs\d5_studio_main_path_delivery_readiness.json --output runs\d5_provider_closed_internal_tryout_packet.json --markdown runs\d5_provider_closed_internal_tryout_packet.md
+# passed; provider_calls_started=false
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_accepted_generation_plan_packet.py tests\test_api_runtime_human_gate.py tests\test_web_studio_accepted_generation_plan_static.py tests\test_web_studio_human_gate_static.py tests\test_studio_provider_closed_tryout_packet.py tests\test_studio_main_path_browser_qa_tool.py -q
+# 36 passed, 1 warning
+
+npm run check:studio-js
+# JS syntax check passed: 135 files
+
+git diff --check
+# passed
+
+D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe tools\maintenance_audit.py
+# status=warning; failed=0; warning categories include existing legacy/doc/secret-like/oversized findings
+```
+
+Non-claims: no provider smoke, live provider call, external download, generated media, generated-media QA, human creative acceptance, product readiness, business validation, public/legal/patent readiness, deploy/runtime freshness, CompanyOS/COS promotion, durable-memory promotion, or final integration claim.
+
 ## 2026-07-02 - D2 Accepted Generation Plan Evidence Hardening
 
 - Completed Lane D2 on `codex/afs-d2-accepted-generation-plan-hardening-20260702` from `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.

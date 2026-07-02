@@ -196,6 +196,36 @@ def test_main_path_evidence_assertion_accepts_blocked_overlay_selected_chain() -
     main_path_qa.assert_main_path_evidence(seed, keyframe_layer, blocked, second, plan, final_node)
 
 
+def test_accepted_generation_plan_modal_evidence_requires_blocked_non_claim_preview() -> None:
+    evidence = main_path_qa.accepted_generation_plan_modal_evidence(
+        _accepted_generation_plan_preview_payload(),
+        "Blocked pending prerequisites\nProvider calls\nnot started\nProduct readiness\nnot claimed",
+    )
+
+    main_path_qa.assert_accepted_generation_plan_modal_evidence(evidence)
+
+    assert evidence["preview_status"] == "blocked"
+    assert evidence["accepted"] is False
+    assert evidence["provider_calls_started"] is False
+    assert "not_product_readiness" in evidence["explicit_non_claims"]
+
+
+def test_accepted_generation_plan_modal_evidence_rejects_claimed_product_readiness() -> None:
+    payload = _accepted_generation_plan_preview_payload()
+    payload["operator_evidence"]["non_claim_boundaries"]["product_readiness"] = True
+    evidence = main_path_qa.accepted_generation_plan_modal_evidence(
+        payload,
+        "Blocked pending prerequisites\nProvider calls\nnot started\nProduct readiness\nnot claimed",
+    )
+
+    try:
+        main_path_qa.assert_accepted_generation_plan_modal_evidence(evidence)
+    except AssertionError as exc:
+        assert "product_readiness_claimed" in str(exc)
+    else:
+        raise AssertionError("claimed product readiness should fail closed")
+
+
 def test_main_path_browser_qa_tool_stays_provider_closed() -> None:
     source = (REPO_ROOT / "tools" / "studio_main_path_browser_qa.py").read_text(encoding="utf-8")
 
@@ -203,9 +233,76 @@ def test_main_path_browser_qa_tool_stays_provider_closed() -> None:
     assert '"provider_calls_started": False' in source
     assert "AFS_ALLOW_REMOTE" not in source
     assert "not provider smoke" in source
+    assert "check_accepted_generation_plan_modal" in source
 
 
 def test_delivery_readiness_gate_reports_internal_provider_closed_tryout_ready() -> None:
+    report = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "fixed_asset_id": "visual_asset:seed",
+        "production_graph_artifact_id": "artifact_production_graph_seed",
+        "second_request_plan_artifact_id": "artifact_keyframe_request_plan_seed",
+        "second_bridge_artifact_id": "artifact_keyframe_bridge_seed",
+        "overlay_id": "runtime-feedback-context-overlay:seed",
+        "feedback_overlay_decision_recorded": True,
+        "provider_calls_started": False,
+        "console_error_count": 0,
+        "response_error_count": 0,
+        "accepted_generation_plan_modal": _accepted_generation_plan_modal(),
+    }
+    seed = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "shot_count": 6,
+        "expected_shot_range": [6, 6],
+        "content_quality_human_review_needed": True,
+        "asset_card_candidate_count": 9,
+        "production_graph_relationship_count": 21,
+        "fixed_visual_asset_count": 1,
+    }
+
+    readiness = build_delivery_readiness(report, seed)
+
+    assert readiness["verdict"] == "internal_provider_closed_tryout_ready"
+    assert readiness["product_readiness"] == "not_product_readiness_provider_closed_tryout_only"
+    assert {item["status"] for item in readiness["checks"]} == {"passed"}
+    assert any(item["check_id"] == "accepted_generation_plan_default_blocked_preview" for item in readiness["checks"])
+    assert "product_readiness_not_claimed" in readiness["remaining_gates"]
+    assert "deploy_server_sync_runtime_health_not_claimed" in readiness["remaining_gates"]
+    assert "human_creative_acceptance_not_claimed" in readiness["remaining_gates"]
+    assert "provider_smoke_requires_explicit_authorization" in readiness["remaining_gates"]
+
+
+def test_delivery_readiness_gate_blocks_missing_provider_closed_signal() -> None:
+    report = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "fixed_asset_id": "visual_asset:seed",
+        "production_graph_artifact_id": "artifact_production_graph_seed",
+        "second_request_plan_artifact_id": "artifact_keyframe_request_plan_seed",
+        "second_bridge_artifact_id": "artifact_keyframe_bridge_seed",
+        "overlay_id": "runtime-feedback-context-overlay:seed",
+        "feedback_overlay_decision_recorded": True,
+        "provider_calls_started": True,
+        "console_error_count": 0,
+        "response_error_count": 0,
+        "accepted_generation_plan_modal": _accepted_generation_plan_modal(),
+    }
+    seed = {
+        "case_id": "multi_role_prop_exchange_chase",
+        "shot_count": 6,
+        "expected_shot_range": [6, 6],
+        "content_quality_human_review_needed": True,
+        "asset_card_candidate_count": 9,
+        "production_graph_relationship_count": 21,
+        "fixed_visual_asset_count": 1,
+    }
+
+    readiness = build_delivery_readiness(report, seed)
+
+    assert readiness["verdict"] == "not_ready_with_blockers"
+    assert any(item["check_id"] == "provider_closed_browser_runtime" and item["status"] == "blocked" for item in readiness["checks"])
+
+
+def test_delivery_readiness_gate_blocks_missing_accepted_generation_plan_preview() -> None:
     report = {
         "case_id": "multi_role_prop_exchange_chase",
         "fixed_asset_id": "visual_asset:seed",
@@ -230,37 +327,76 @@ def test_delivery_readiness_gate_reports_internal_provider_closed_tryout_ready()
 
     readiness = build_delivery_readiness(report, seed)
 
-    assert readiness["verdict"] == "internal_provider_closed_tryout_ready"
-    assert readiness["product_readiness"] == "provider_closed_internal_tryout_path_ready"
-    assert {item["status"] for item in readiness["checks"]} == {"passed"}
-    assert "human_creative_acceptance_not_claimed" in readiness["remaining_gates"]
-    assert "provider_smoke_requires_explicit_authorization" in readiness["remaining_gates"]
-
-
-def test_delivery_readiness_gate_blocks_missing_provider_closed_signal() -> None:
-    report = {
-        "case_id": "multi_role_prop_exchange_chase",
-        "fixed_asset_id": "visual_asset:seed",
-        "production_graph_artifact_id": "artifact_production_graph_seed",
-        "second_request_plan_artifact_id": "artifact_keyframe_request_plan_seed",
-        "second_bridge_artifact_id": "artifact_keyframe_bridge_seed",
-        "overlay_id": "runtime-feedback-context-overlay:seed",
-        "feedback_overlay_decision_recorded": True,
-        "provider_calls_started": True,
-        "console_error_count": 0,
-        "response_error_count": 0,
-    }
-    seed = {
-        "case_id": "multi_role_prop_exchange_chase",
-        "shot_count": 6,
-        "expected_shot_range": [6, 6],
-        "content_quality_human_review_needed": True,
-        "asset_card_candidate_count": 9,
-        "production_graph_relationship_count": 21,
-        "fixed_visual_asset_count": 1,
-    }
-
-    readiness = build_delivery_readiness(report, seed)
-
     assert readiness["verdict"] == "not_ready_with_blockers"
-    assert any(item["check_id"] == "provider_closed_browser_runtime" and item["status"] == "blocked" for item in readiness["checks"])
+    assert any(
+        item["check_id"] == "accepted_generation_plan_default_blocked_preview" and item["status"] == "blocked"
+        for item in readiness["checks"]
+    )
+
+
+def _accepted_generation_plan_preview_payload() -> dict:
+    return {
+        "preview_status": "blocked",
+        "job": {"status": "blocked", "job_id": "job_accepted_plan_preview"},
+        "artifact": {"artifact_id": "artifact_accepted_plan_preview"},
+        "operator_evidence": {
+            "state": {"packet_state": "blocked_pending_generation_plan_prerequisites", "accepted": False},
+            "provenance": {"source_mode": "fixture_demo", "fixture_demo_non_acceptance": True},
+            "non_claim_boundaries": {
+                "provider_calls_started": False,
+                "provider_gate": "closed",
+                "provider_smoke": False,
+                "generated_media_quality": False,
+                "product_readiness": False,
+                "human_creative_acceptance": False,
+                "business_validation": False,
+                "deploy_runtime_health": False,
+                "cos_active_rule_promotion": False,
+                "explicit_non_claims": [
+                    "not_provider_smoke",
+                    "not_generated_media_qa",
+                    "not_product_readiness",
+                    "not_human_creative_acceptance",
+                    "not_business_validation",
+                    "not_deploy_runtime_health",
+                    "fixture_demo_not_acceptance",
+                ],
+            },
+        },
+    }
+
+
+def _accepted_generation_plan_modal() -> dict:
+    return {
+        "modal_opened": True,
+        "default_fixture_mode": "default_unconfirmed",
+        "preview_status": "blocked",
+        "job_status": "blocked",
+        "packet_state": "blocked_pending_generation_plan_prerequisites",
+        "accepted": False,
+        "source_mode": "fixture_demo",
+        "fixture_demo_non_acceptance": True,
+        "provider_calls_started": False,
+        "provider_gate": "closed",
+        "provider_smoke_claimed": False,
+        "generated_media_quality_claimed": False,
+        "product_readiness_claimed": False,
+        "human_creative_acceptance_claimed": False,
+        "business_validation_claimed": False,
+        "deploy_runtime_health_claimed": False,
+        "cos_active_rule_promotion_claimed": False,
+        "explicit_non_claims": [
+            "not_provider_smoke",
+            "not_generated_media_qa",
+            "not_product_readiness",
+            "not_human_creative_acceptance",
+            "not_business_validation",
+            "not_deploy_runtime_health",
+            "fixture_demo_not_acceptance",
+        ],
+        "artifact_id": "artifact_accepted_plan_preview",
+        "job_id": "job_accepted_plan_preview",
+        "rendered_blocked_status": True,
+        "rendered_provider_not_started": True,
+        "rendered_product_readiness_not_claimed": True,
+    }

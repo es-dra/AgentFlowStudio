@@ -10,12 +10,15 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_VERDICT = "internal_provider_closed_tryout_ready"
 EVIDENCE_STATE = "provider_closed_internal_tryout_packet_structure_verified"
+ACCEPTED_GENERATION_PLAN_CHECK_ID = "accepted_generation_plan_default_blocked_preview"
 REQUIRED_SOURCE_REMAINING_GATES = {
     "provider_smoke_requires_explicit_authorization",
     "generated_media_quality_requires_provider_run_and_review",
+    "product_readiness_not_claimed",
     "human_creative_acceptance_not_claimed",
     "business_validation_not_claimed",
     "public_legal_patent_claim_not_made",
+    "deploy_server_sync_runtime_health_not_claimed",
     "cos_active_rule_promotion_not_made",
 }
 EVIDENCE_CHECKS = {
@@ -25,10 +28,12 @@ EVIDENCE_CHECKS = {
     "keyframe_request_preflight_blocked_bridge": "keyframe_preflight_blocked_bridge",
     "feedback_overlay_context": "feedback_overlay_human_gate_non_claim",
     "provider_closed_browser_runtime": "provider_closed_browser_runtime",
+    "accepted_generation_plan_bridge": ACCEPTED_GENERATION_PLAN_CHECK_ID,
 }
 NON_CLAIM_GATES = [
     ("provider_smoke", "provider_smoke_requires_explicit_authorization"),
     ("generated_media_quality", "generated_media_quality_requires_provider_run_and_review"),
+    ("product_readiness", "product_readiness_not_claimed"),
     ("human_creative_acceptance", "human_creative_acceptance_not_claimed"),
     ("business_validation", "business_validation_not_claimed"),
     ("public_legal_patent", "public_legal_patent_claim_not_made"),
@@ -75,6 +80,7 @@ def build_tryout_packet(report: dict[str, Any], *, readiness_report_path: Path |
     missing_checks = sorted(set(EVIDENCE_CHECKS.values()) - set(checks))
     if missing_checks:
         raise PacketError(f"readiness report missing checks: {', '.join(missing_checks)}")
+    accepted_generation_plan_bridge = _validated_accepted_generation_plan_bridge(checks)
 
     packet = {
         "artifact_type": "afs_provider_closed_internal_tryout_packet",
@@ -105,6 +111,7 @@ def build_tryout_packet(report: dict[str, Any], *, readiness_report_path: Path |
         "cos_active_rule_promotion_claimed": False,
         "source_artifacts": _source_artifacts(report),
         "source_evidence_summary": _source_evidence_summary(checks),
+        "accepted_generation_plan_bridge": accepted_generation_plan_bridge,
         "readiness_checks": [_safe_check(item) for item in readiness.get("checks", [])],
         "remaining_gate_non_claims": _remaining_gate_non_claims(readiness),
         "operator_review_packet": _operator_review_packet(),
@@ -174,6 +181,8 @@ def _validated_readiness(report: dict[str, Any]) -> dict[str, Any]:
 
 
 def _source_artifacts(report: dict[str, Any]) -> dict[str, Any]:
+    accepted_plan = report.get("accepted_generation_plan_modal")
+    accepted_plan = accepted_plan if isinstance(accepted_plan, dict) else {}
     return {
         "screenshot": _display_path(report.get("screenshot", "")),
         "fixed_asset_id": report.get("fixed_asset_id", ""),
@@ -182,6 +191,8 @@ def _source_artifacts(report: dict[str, Any]) -> dict[str, Any]:
         "first_bridge_artifact_id": report.get("first_bridge_artifact_id", ""),
         "second_bridge_artifact_id": report.get("second_bridge_artifact_id", ""),
         "second_request_plan_artifact_id": report.get("second_request_plan_artifact_id", ""),
+        "accepted_generation_plan_preview_artifact_id": accepted_plan.get("artifact_id", ""),
+        "accepted_generation_plan_preview_job_id": accepted_plan.get("job_id", ""),
     }
 
 
@@ -207,6 +218,66 @@ def _remaining_gate_non_claims(readiness: dict[str, Any]) -> list[dict[str, Any]
         }
         for gate_id, source_gate in NON_CLAIM_GATES
     ]
+
+
+def _validated_accepted_generation_plan_bridge(checks: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    item = checks.get(ACCEPTED_GENERATION_PLAN_CHECK_ID)
+    evidence = item.get("evidence") if isinstance(item, dict) else None
+    if not isinstance(evidence, dict):
+        raise PacketError("accepted generation plan bridge evidence is missing")
+    required_non_claims = {
+        "not_provider_smoke",
+        "not_generated_media_qa",
+        "not_product_readiness",
+        "not_human_creative_acceptance",
+        "not_business_validation",
+        "not_deploy_runtime_health",
+        "fixture_demo_not_acceptance",
+    }
+    explicit_non_claims = set(evidence.get("explicit_non_claims") or [])
+    expected = {
+        "modal_opened": True,
+        "default_fixture_mode": "default_unconfirmed",
+        "preview_status": "blocked",
+        "job_status": "blocked",
+        "accepted": False,
+        "source_mode": "fixture_demo",
+        "fixture_demo_non_acceptance": True,
+        "provider_calls_started": False,
+        "provider_gate": "closed",
+        "provider_smoke_claimed": False,
+        "generated_media_quality_claimed": False,
+        "product_readiness_claimed": False,
+        "human_creative_acceptance_claimed": False,
+        "business_validation_claimed": False,
+        "deploy_runtime_health_claimed": False,
+        "cos_active_rule_promotion_claimed": False,
+        "rendered_blocked_status": True,
+        "rendered_provider_not_started": True,
+        "rendered_product_readiness_not_claimed": True,
+    }
+    wrong = [key for key, value in expected.items() if evidence.get(key) != value]
+    if wrong:
+        raise PacketError(f"accepted generation plan bridge evidence failed non-claim checks: {', '.join(wrong)}")
+    if not required_non_claims.issubset(explicit_non_claims):
+        missing = sorted(required_non_claims - explicit_non_claims)
+        raise PacketError(f"accepted generation plan bridge missing non-claims: {', '.join(missing)}")
+    if not evidence.get("artifact_id") or not evidence.get("job_id"):
+        raise PacketError("accepted generation plan bridge is missing preview artifact/job evidence")
+    return {
+        "check_id": ACCEPTED_GENERATION_PLAN_CHECK_ID,
+        "preview_status": evidence["preview_status"],
+        "job_status": evidence["job_status"],
+        "packet_state": evidence.get("packet_state", ""),
+        "accepted": False,
+        "source_mode": evidence["source_mode"],
+        "fixture_demo_non_acceptance": True,
+        "provider_calls_started": False,
+        "provider_gate": "closed",
+        "artifact_id": evidence.get("artifact_id", ""),
+        "job_id": evidence.get("job_id", ""),
+        "explicit_non_claims": sorted(required_non_claims),
+    }
 
 
 def _operator_review_packet() -> dict[str, Any]:

@@ -8,6 +8,29 @@
 
 Last updated: 2026-07-02 by Codex
 
+D5 provider-closed readiness packet currency addendum: Lane D5 updates the
+provider-closed internal tryout/readiness packet path on top of D2 commit
+`654002a295330c0722102d8a2202804189865235`. The readiness browser QA now opens
+the Studio accepted generation plan modal and records default blocked preview
+evidence (`preview_status=blocked`, `job.status=blocked`, `accepted=false`,
+`source_mode=fixture_demo`, `provider_calls_started=false`,
+`provider_gate=closed`). The delivery readiness gate now requires
+`accepted_generation_plan_default_blocked_preview`; the tryout packet carries an
+`accepted_generation_plan_bridge` section with preview artifact/job refs and
+fails closed if the accepted-plan evidence claims product readiness,
+deploy/runtime health, provider smoke, generated-media QA, human creative
+acceptance, business validation, public/legal/patent readiness, or COS
+promotion. Focused packet/browser tests passed (`21 passed, 1 warning`), real
+browser QA passed and wrote ignored local evidence under `runs\d5_*`, packet
+generation passed, combined accepted-plan/static/packet/browser tests passed
+(`36 passed, 1 warning`), Studio JS passed (`135 files`), and `git diff
+--check` passed. Maintenance audit reported `failed=0` with warning-only
+categories. This is provider-closed structure/readiness evidence only, not
+provider smoke, generated-media QA, human creative acceptance, product
+readiness, business validation, deploy/runtime freshness, CompanyOS/COS
+promotion, durable-memory promotion, or final integration. Handoff:
+`docs/handoff/AFS-D5-PROVIDER-CLOSED-READINESS-PACKET-CURRENCY-20260702.md`.
+
 D2 accepted generation plan evidence hardening addendum: Lane D2 converts the
 accepted-generation-plan preview from fixture acceptance simulation into a
 local step-gate evidence path. Runtime preview now accepts optional

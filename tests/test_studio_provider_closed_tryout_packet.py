@@ -23,6 +23,12 @@ def test_tryout_packet_preserves_provider_closed_non_claims() -> None:
     assert packet["deploy_runtime_health_claimed"] is False
     assert packet["cos_active_rule_promotion_claimed"] is False
     assert packet["source_artifacts"]["screenshot"] == "runs/t50_studio_main_path_delivery_readiness.png"
+    assert packet["source_artifacts"]["accepted_generation_plan_preview_artifact_id"] == "artifact_accepted_plan_preview"
+    assert packet["accepted_generation_plan_bridge"]["preview_status"] == "blocked"
+    assert packet["accepted_generation_plan_bridge"]["job_status"] == "blocked"
+    assert packet["accepted_generation_plan_bridge"]["accepted"] is False
+    assert packet["accepted_generation_plan_bridge"]["provider_calls_started"] is False
+    assert "not_product_readiness" in packet["accepted_generation_plan_bridge"]["explicit_non_claims"]
     assert {item["summary_id"] for item in packet["source_evidence_summary"]} == {
         "storyboard_content_quality",
         "asset_candidate_fixed_asset_path",
@@ -30,10 +36,12 @@ def test_tryout_packet_preserves_provider_closed_non_claims() -> None:
         "keyframe_request_preflight_blocked_bridge",
         "feedback_overlay_context",
         "provider_closed_browser_runtime",
+        "accepted_generation_plan_bridge",
     }
     assert {item["gate_id"] for item in packet["remaining_gate_non_claims"]} >= {
         "provider_smoke",
         "generated_media_quality",
+        "product_readiness",
         "human_creative_acceptance",
         "business_validation",
         "public_legal_patent",
@@ -67,6 +75,22 @@ def test_tryout_packet_requires_remaining_gate_non_claims() -> None:
         assert "human_creative_acceptance_not_claimed" in str(exc)
     else:
         raise AssertionError("missing remaining gate should fail closed")
+
+
+def test_tryout_packet_rejects_accepted_generation_plan_claim_collapse() -> None:
+    report = _readiness_report()
+    for item in report["delivery_readiness"]["checks"]:
+        if item["check_id"] == "accepted_generation_plan_default_blocked_preview":
+            item["evidence"]["product_readiness_claimed"] = True
+            break
+
+    try:
+        packet_tool.build_tryout_packet(report)
+    except packet_tool.PacketError as exc:
+        assert "accepted generation plan bridge" in str(exc)
+        assert "product_readiness_claimed" in str(exc)
+    else:
+        raise AssertionError("accepted-plan claim collapse should fail closed")
 
 
 def test_tryout_packet_cli_writes_json_and_markdown(tmp_path: Path) -> None:
@@ -122,12 +146,13 @@ def _readiness_report() -> dict:
         "provider_calls_started": False,
         "console_error_count": 0,
         "response_error_count": 0,
+        "accepted_generation_plan_modal": _accepted_generation_plan_modal(),
         "delivery_readiness": {
             "artifact_type": "afs_provider_closed_delivery_readiness_gate",
             "schema_version": "0.1.0",
             "verdict": "internal_provider_closed_tryout_ready",
-            "product_readiness": "provider_closed_internal_tryout_path_ready",
-            "quality_evidence": "real_script_runtime_studio_main_path_structure_verified",
+            "product_readiness": "not_product_readiness_provider_closed_tryout_only",
+            "quality_evidence": "real_script_runtime_studio_main_path_and_plan_modal_structure_verified",
             "governance_evidence": "provider_closed_non_claims_preserved",
             "checks": [
                 _check("real_script_input", "multi_role_prop_exchange_chase"),
@@ -137,16 +162,55 @@ def _readiness_report() -> dict:
                 _check("keyframe_preflight_blocked_bridge", {"second_request_plan_artifact_id": "artifact_keyframe_request_plan_second", "second_bridge_artifact_id": "artifact_keyframe_bridge_second"}),
                 _check("feedback_overlay_human_gate_non_claim", {"overlay_id": "runtime-feedback-context-overlay:seed", "feedback_overlay_decision_recorded": True}),
                 _check("provider_closed_browser_runtime", {"provider_calls_started": False, "console_error_count": 0, "response_error_count": 0}),
+                _check("accepted_generation_plan_default_blocked_preview", _accepted_generation_plan_modal()),
             ],
             "remaining_gates": [
                 "provider_smoke_requires_explicit_authorization",
                 "generated_media_quality_requires_provider_run_and_review",
+                "product_readiness_not_claimed",
                 "human_creative_acceptance_not_claimed",
                 "business_validation_not_claimed",
                 "public_legal_patent_claim_not_made",
+                "deploy_server_sync_runtime_health_not_claimed",
                 "cos_active_rule_promotion_not_made",
             ],
         },
+    }
+
+
+def _accepted_generation_plan_modal() -> dict:
+    return {
+        "modal_opened": True,
+        "default_fixture_mode": "default_unconfirmed",
+        "preview_status": "blocked",
+        "job_status": "blocked",
+        "packet_state": "blocked_pending_generation_plan_prerequisites",
+        "accepted": False,
+        "source_mode": "fixture_demo",
+        "fixture_demo_non_acceptance": True,
+        "provider_calls_started": False,
+        "provider_gate": "closed",
+        "provider_smoke_claimed": False,
+        "generated_media_quality_claimed": False,
+        "product_readiness_claimed": False,
+        "human_creative_acceptance_claimed": False,
+        "business_validation_claimed": False,
+        "deploy_runtime_health_claimed": False,
+        "cos_active_rule_promotion_claimed": False,
+        "explicit_non_claims": [
+            "not_provider_smoke",
+            "not_generated_media_qa",
+            "not_product_readiness",
+            "not_human_creative_acceptance",
+            "not_business_validation",
+            "not_deploy_runtime_health",
+            "fixture_demo_not_acceptance",
+        ],
+        "artifact_id": "artifact_accepted_plan_preview",
+        "job_id": "job_accepted_plan_preview",
+        "rendered_blocked_status": True,
+        "rendered_provider_not_started": True,
+        "rendered_product_readiness_not_claimed": True,
     }
 
 

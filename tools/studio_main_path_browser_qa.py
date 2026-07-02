@@ -113,6 +113,7 @@ def run_browser_qa(
             plan = artifact_payload(client, second["generation"]["artifacts"]["keyframe_request_plan"]["artifact_id"])
             final_node = node_from_storage(page, project_id, keyframe_id)
             assert_main_path_evidence(seed, keyframe_layer, first, second, plan, final_node)
+            accepted_generation_plan_modal = check_accepted_generation_plan_modal(page)
             page.screenshot(path=str(screenshot_path), full_page=True)
             studio_state_recovery = studio_state_conflict_recovery_evidence(client, project_id, keyframe_id, seed["overlay_id"], response_errors)
             ignored_errors = [item for item in response_errors if is_ignored_response_error(item, studio_state_recovery)]
@@ -141,11 +142,14 @@ def run_browser_qa(
                 "console_error_count": len(actionable_console_errors),
                 "response_error_count": len(actionable_errors),
                 "studio_state_conflict_recovery": studio_state_recovery,
+                "accepted_generation_plan_modal": accepted_generation_plan_modal,
                 "browser_api_post_proxy": "fastapi_testclient",
                 "non_claims": [
                     "browser/runtime structure verification only",
                     "not provider smoke",
                     "not generated media evidence",
+                    "not generated-media QA",
+                    "not product readiness",
                     "not human creative acceptance",
                     "not business validation",
                     "not deploy verification",
@@ -209,6 +213,99 @@ def submit_keyframe_generation(page: Page, project_id: str, keyframe_id: str) ->
         arg={"key": storage_key(project_id), "nodeId": keyframe_id},
     )
     return {"preflight": preflight_response.value.json(), "generation": payload, "request": request}
+
+
+def check_accepted_generation_plan_modal(page: Page) -> dict[str, Any]:
+    with page.expect_response(lambda r: "/accepted-generation-plan-packets/preview" in r.url and r.request.method == "POST") as preview_response:
+        page.locator('#dock .dock-btn[title="Accepted generation plan"]').click()
+    if preview_response.value.status != 200:
+        raise AssertionError(f"accepted generation plan preview failed: {preview_response.value.status} {preview_response.value.text()}")
+    payload = preview_response.value.json()
+    modal = page.locator(".accepted-generation-plan-modal")
+    expect(modal).to_be_visible()
+    expect(page.locator(".accepted-plan-mode.active")).to_have_attribute("data-fixture-mode", "default_unconfirmed")
+    expect(page.locator(".accepted-plan-status.blocked")).to_be_visible()
+    modal_text = modal.inner_text()
+    evidence = accepted_generation_plan_modal_evidence(payload, modal_text)
+    assert_accepted_generation_plan_modal_evidence(evidence)
+    return evidence
+
+
+def accepted_generation_plan_modal_evidence(payload: dict[str, Any], modal_text: str) -> dict[str, Any]:
+    operator = payload.get("operator_evidence") if isinstance(payload.get("operator_evidence"), dict) else {}
+    state = operator.get("state") if isinstance(operator.get("state"), dict) else {}
+    provenance = operator.get("provenance") if isinstance(operator.get("provenance"), dict) else {}
+    non_claims = operator.get("non_claim_boundaries") if isinstance(operator.get("non_claim_boundaries"), dict) else {}
+    explicit_non_claims = non_claims.get("explicit_non_claims") if isinstance(non_claims.get("explicit_non_claims"), list) else []
+    job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+    artifact = payload.get("artifact") if isinstance(payload.get("artifact"), dict) else {}
+    return {
+        "modal_opened": True,
+        "default_fixture_mode": "default_unconfirmed",
+        "preview_status": payload.get("preview_status", ""),
+        "job_status": job.get("status", ""),
+        "packet_state": state.get("packet_state", ""),
+        "accepted": state.get("accepted"),
+        "source_mode": provenance.get("source_mode", ""),
+        "fixture_demo_non_acceptance": provenance.get("fixture_demo_non_acceptance"),
+        "provider_calls_started": non_claims.get("provider_calls_started"),
+        "provider_gate": non_claims.get("provider_gate", ""),
+        "provider_smoke_claimed": non_claims.get("provider_smoke"),
+        "generated_media_quality_claimed": non_claims.get("generated_media_quality"),
+        "product_readiness_claimed": non_claims.get("product_readiness"),
+        "human_creative_acceptance_claimed": non_claims.get("human_creative_acceptance"),
+        "business_validation_claimed": non_claims.get("business_validation"),
+        "deploy_runtime_health_claimed": non_claims.get("deploy_runtime_health"),
+        "cos_active_rule_promotion_claimed": non_claims.get("cos_active_rule_promotion"),
+        "explicit_non_claims": explicit_non_claims,
+        "artifact_id": artifact.get("artifact_id", ""),
+        "job_id": job.get("job_id", ""),
+        "rendered_blocked_status": "Blocked pending prerequisites" in modal_text,
+        "rendered_provider_not_started": "not started" in modal_text,
+        "rendered_product_readiness_not_claimed": "Product readiness" in modal_text and "not claimed" in modal_text,
+    }
+
+
+def assert_accepted_generation_plan_modal_evidence(evidence: dict[str, Any]) -> None:
+    required_non_claims = {
+        "not_provider_smoke",
+        "not_generated_media_qa",
+        "not_product_readiness",
+        "not_human_creative_acceptance",
+        "not_business_validation",
+        "not_deploy_runtime_health",
+        "fixture_demo_not_acceptance",
+    }
+    explicit_non_claims = set(evidence.get("explicit_non_claims") or [])
+    expected = {
+        "modal_opened": True,
+        "default_fixture_mode": "default_unconfirmed",
+        "preview_status": "blocked",
+        "job_status": "blocked",
+        "accepted": False,
+        "source_mode": "fixture_demo",
+        "fixture_demo_non_acceptance": True,
+        "provider_calls_started": False,
+        "provider_gate": "closed",
+        "provider_smoke_claimed": False,
+        "generated_media_quality_claimed": False,
+        "product_readiness_claimed": False,
+        "human_creative_acceptance_claimed": False,
+        "business_validation_claimed": False,
+        "deploy_runtime_health_claimed": False,
+        "cos_active_rule_promotion_claimed": False,
+        "rendered_blocked_status": True,
+        "rendered_provider_not_started": True,
+        "rendered_product_readiness_not_claimed": True,
+    }
+    wrong = [key for key, value in expected.items() if evidence.get(key) != value]
+    if wrong:
+        raise AssertionError(f"accepted generation plan modal evidence mismatch: {wrong}")
+    missing_non_claims = sorted(required_non_claims - explicit_non_claims)
+    if missing_non_claims:
+        raise AssertionError(f"accepted generation plan modal missing non-claims: {missing_non_claims}")
+    if not evidence.get("artifact_id") or not evidence.get("job_id"):
+        raise AssertionError("accepted generation plan modal did not return preview artifact/job evidence")
 
 
 def select_feedback_overlay_for_next_context(page: Page, project_id: str, keyframe_id: str, overlay_id: str) -> None:
