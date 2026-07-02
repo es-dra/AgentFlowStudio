@@ -20,6 +20,12 @@ PNG_BYTES = base64.b64decode(
 PNG_B64 = base64.b64encode(PNG_BYTES).decode("ascii")
 
 
+def _with_keyframe_preflight_token(client: TestClient, project_id: str, request: dict) -> dict:
+    preflight = client.post(f"/projects/{project_id}/keyframe-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return {**request, "preflight_token": preflight.json()["preflight_token"]}
+
+
 def test_reference_image_resolution_respects_zero_provider_slots(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     upload = client.post(
@@ -91,21 +97,22 @@ def test_uploaded_image_asset_can_drive_connected_keyframe_reference(tmp_path, m
     preview = client.get(asset["preview_url"])
     assert preview.status_code == 200
     assert preview.content == PNG_BYTES
+    request = {
+        "node_id": "image-node-with-upstream-ref",
+        "prompt_text": "Use the connected three-view reference to create a rain rooftop keyframe.",
+        "optimized_prompt": "Use the connected reference image to preserve identity.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "asset_refs": [asset["asset_id"]],
+        "seed": 120612,
+        "generated_at": "2026-06-12T10:26:00+08:00",
+    }
 
     result = client.post(
         "/projects/proj_connected_refs/keyframe-generations",
-        json={
-            "node_id": "image-node-with-upstream-ref",
-            "prompt_text": "Use the connected three-view reference to create a rain rooftop keyframe.",
-            "optimized_prompt": "Use the connected reference image to preserve identity.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "asset_refs": [asset["asset_id"]],
-            "seed": 120612,
-            "generated_at": "2026-06-12T10:26:00+08:00",
-        },
+        json=_with_keyframe_preflight_token(client, "proj_connected_refs", request),
     )
 
     assert result.status_code == 200
@@ -210,37 +217,39 @@ def test_generated_keyframe_asset_can_drive_next_connected_reference(tmp_path, m
 
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    first_request = {
+        "node_id": "character-reference-node",
+        "prompt_text": "Create a reusable character reference keyframe.",
+        "optimized_prompt": "A front-facing controlled character reference image.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-06-12T10:26:00+08:00",
+    }
 
     first = client.post(
         "/projects/proj_generated_refs/keyframe-generations",
-        json={
-            "node_id": "character-reference-node",
-            "prompt_text": "Create a reusable character reference keyframe.",
-            "optimized_prompt": "A front-facing controlled character reference image.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "generated_at": "2026-06-12T10:26:00+08:00",
-        },
+        json=_with_keyframe_preflight_token(client, "proj_generated_refs", first_request),
     )
     assert first.status_code == 200
     generated_asset = first.json()["reusable_image_assets"][0]
     assert generated_asset["source_candidate_id"] == "candidate_001"
+    second_request = {
+        "node_id": "downstream-rain-rooftop-node",
+        "prompt_text": "Use the connected character reference for a rain rooftop keyframe.",
+        "optimized_prompt": "Preserve the connected reference character while changing scene to a rain rooftop.",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "asset_refs": [generated_asset["asset_id"]],
+        "generated_at": "2026-06-12T10:27:00+08:00",
+    }
 
     second = client.post(
         "/projects/proj_generated_refs/keyframe-generations",
-        json={
-            "node_id": "downstream-rain-rooftop-node",
-            "prompt_text": "Use the connected character reference for a rain rooftop keyframe.",
-            "optimized_prompt": "Preserve the connected reference character while changing scene to a rain rooftop.",
-            "target_platform": "short_video",
-            "style": "cinematic",
-            "aspect_ratio": "9:16",
-            "candidate_count": 1,
-            "asset_refs": [generated_asset["asset_id"]],
-            "generated_at": "2026-06-12T10:27:00+08:00",
-        },
+        json=_with_keyframe_preflight_token(client, "proj_generated_refs", second_request),
     )
     assert second.status_code == 200
     payload = second.json()
@@ -300,9 +309,7 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
     first_ref = _upload_reference(client, project_id, "old-candidate.png")
     second_ref = _upload_reference(client, project_id, "detail.png")
 
-    result = client.post(
-        f"/projects/{project_id}/keyframe-generations",
-        json={
+    request = {
             "node_id": "asset-card-node",
             "prompt_text": "Regenerate the robot asset reference sheet after a card edit.",
             "optimized_prompt": "Regenerate the robot asset reference sheet after a card edit.",
@@ -327,7 +334,11 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
                 },
             },
             "generated_at": "2026-06-23T13:20:00+08:00",
-        },
+        }
+
+    result = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json=_with_keyframe_preflight_token(client, project_id, request),
     )
 
     assert result.status_code == 200
@@ -398,9 +409,7 @@ def test_image_relay_openai_route_uses_edit_for_reference_asset_even_with_legacy
     project_id = "proj_image_relay_openai_refs"
     asset_id = _upload_reference(client, project_id, "library-reference.png")
 
-    result = client.post(
-        f"/projects/{project_id}/keyframe-generations",
-        json={
+    request = {
             "node_id": "image-node-with-library-ref",
             "prompt_text": "Use the selected library reference for a new keyframe.",
             "optimized_prompt": "Use the selected library reference for a new keyframe.",
@@ -411,7 +420,11 @@ def test_image_relay_openai_route_uses_edit_for_reference_asset_even_with_legacy
             "provider_service_id": "image_relay",
             "asset_refs": [asset_id],
             "generated_at": "2026-06-26T10:26:00+08:00",
-        },
+        }
+
+    result = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json=_with_keyframe_preflight_token(client, project_id, request),
     )
 
     assert result.status_code == 200
@@ -439,9 +452,10 @@ def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path
 
     monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: GuardedRegistry())
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_tiny_ref_guard"
 
     upload = client.post(
-        "/projects/proj_tiny_ref_guard/image-assets",
+        f"/projects/{project_id}/image-assets",
         json={
             "node_id": "tiny-ref-node",
             "filename": "tiny.png",
@@ -454,9 +468,7 @@ def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path
     assert upload.status_code == 200
     asset_id = upload.json()["asset"]["asset_id"]
 
-    result = client.post(
-        "/projects/proj_tiny_ref_guard/keyframe-generations",
-        json={
+    request = {
             "node_id": "image-node-with-tiny-ref",
             "prompt_text": "Use the tiny reference image for a portrait.",
             "optimized_prompt": "Use the tiny reference image for a portrait.",
@@ -466,7 +478,11 @@ def test_tiny_keyframe_reference_blocks_before_remote_provider_dispatch(tmp_path
             "candidate_count": 1,
             "asset_refs": [asset_id],
             "generated_at": "2026-06-12T10:26:00+08:00",
-        },
+        }
+
+    result = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json=_with_keyframe_preflight_token(client, project_id, request),
     )
 
     assert result.status_code == 200

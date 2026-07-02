@@ -252,6 +252,7 @@ class GenerationComparisonRequest(BaseModel):
     provider_service_id: str = "image_relay"
     context_subgraph: ContextSubgraph | None = None
     manual_scores: dict[str, Any] = Field(default_factory=dict)
+    preflight_token: str | None = None
     generated_at: str = Field(min_length=1)
 
 

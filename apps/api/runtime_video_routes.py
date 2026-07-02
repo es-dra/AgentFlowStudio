@@ -8,7 +8,11 @@ from fastapi.responses import FileResponse
 
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_errors import RuntimeApiError, runtime_api_error_detail, safe_error_detail
-from apps.api.runtime_generation_preflight import preflight_token_matches, video_generation_preflight
+from apps.api.runtime_generation_preflight import (
+    preflight_token_matches,
+    provider_submit_preflight_requirement,
+    video_generation_preflight,
+)
 from apps.api.runtime_logging import (
     client_request_id_from_request,
     log_business_event,
@@ -100,6 +104,28 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
             candidate_count=request.candidate_count,
             has_preflight_token=bool(request.preflight_token),
         )
+        preflight_requirement = provider_submit_preflight_requirement("video", request)
+        if preflight_requirement["required"] and not request.preflight_token:
+            detail = safe_error_detail(
+                "missing_preflight",
+                detail_code="preflight_required",
+                message="Please run generation preflight again before submitting to a remote video provider.",
+                user_action="Run preflight, then resubmit the unchanged generation request.",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=node_id,
+                action="video_generation",
+                stage="preflight_required",
+                status="blocked",
+                retryable=True,
+                details={
+                    "provider_calls_started": False,
+                    "required_gate": preflight_requirement["required_gate"],
+                },
+            )
+            _log_video_rejected(http_request, detail)
+            raise HTTPException(status_code=428, detail=detail)
         if request.preflight_token:
             try:
                 expected_preflight = video_generation_preflight(store, project_id, request)
@@ -129,6 +155,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
                     node_id=node_id,
                     action="video_generation",
                     stage="preflight_token",
+                    details={"provider_calls_started": False},
                 )
                 _log_video_rejected(http_request, detail)
                 raise HTTPException(status_code=409, detail=detail)

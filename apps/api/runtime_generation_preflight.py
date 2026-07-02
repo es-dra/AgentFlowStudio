@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from typing import Any
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
@@ -16,6 +17,9 @@ from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 DEFAULT_IMAGE_PROMPT_LIMIT = 1500
 DEFAULT_IMAGE_REFERENCE_SLOTS = 1
 DEFAULT_VIDEO_PROMPT_LIMIT = 2000
+REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"
+REMOTE_VIDEO_ENV = "AFS_ALLOW_REMOTE_VIDEO"
+REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def keyframe_generation_preflight(
@@ -91,6 +95,18 @@ def preflight_token_matches(
     return bool(provided_token) and provided_token == expected_preflight.get("preflight_token")
 
 
+def provider_submit_preflight_requirement(
+    kind: str,
+    request: KeyframeGenerationRequest | VideoGenerationRequest,
+) -> dict[str, Any]:
+    required_gate = _provider_required_gate(kind, request)
+    return {
+        "required": _env_gate_open(required_gate),
+        "required_gate": required_gate,
+        "provider_calls_started": False,
+    }
+
+
 def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest, bundle: dict[str, Any] | None) -> dict[str, Any]:
     included_assets = list((bundle or {}).get("included_assets") or [])
     source_evidence_refs = _included_asset_source_evidence_refs(included_assets)
@@ -99,6 +115,7 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
         "generation_kind": kind,
         "provider_calls_started": False,
         "requires_provider_gate": False,
+        "provider_submit_preflight": provider_submit_preflight_requirement(kind, request),
         "context_bundle": bundle,
         "included_assets": included_assets,
         "included_asset_source_evidence_count": len(source_evidence_refs),
@@ -138,6 +155,7 @@ def _preflight_token(kind: str, request: KeyframeGenerationRequest | VideoGenera
     digest = {
         "kind": kind,
         "request": request_payload,
+        "provider_submit_preflight": provider_submit_preflight_requirement(kind, request),
         "bundle": _bundle_digest(bundle),
     }
     data = json.dumps(digest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -196,6 +214,19 @@ def _descriptor_limits(service_id: str, *, prompt_default: int, reference_defaul
     )
 
 
+def _provider_required_gate(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> str:
+    default_gate = REMOTE_VIDEO_ENV if kind == "video" else REMOTE_IMAGE_ENV
+    try:
+        descriptor = load_provider_registry().descriptor(request.provider_service_id)
+    except (ModelGatewayError, ValueError, OSError):
+        return default_gate
+    return str(getattr(descriptor, "required_gate", default_gate) or default_gate)
+
+
+def _env_gate_open(required_gate: str) -> bool:
+    return os.environ.get(required_gate, "").strip().lower() in REMOTE_TRUE_VALUES
+
+
 def _included_asset_source_evidence_refs(included_assets: list[Any]) -> list[dict[str, Any]]:
     refs: list[dict[str, Any]] = []
     for item in included_assets:
@@ -235,5 +266,6 @@ def _source_evidence_digest(evidence: Any) -> dict[str, Any] | None:
 __all__ = (
     "keyframe_generation_preflight",
     "preflight_token_matches",
+    "provider_submit_preflight_requirement",
     "video_generation_preflight",
 )

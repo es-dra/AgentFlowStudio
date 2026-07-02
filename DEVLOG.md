@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-07-02 - Provider Submit Preflight Hardening
+
+- Completed Lane D1 provider-submit preflight hardening on `codex/afs-d1-provider-preflight-hardening-20260702` from baseline `f00fbc6c1404a4c3b812056a0f142626edb75ea8`.
+- Runtime keyframe and video submit routes now require a matching current preflight token before provider-capable submit when the relevant remote provider gate is open.
+- Runtime generation-comparison submit now follows the same fresh-preflight rule when image dispatch is possible: `/projects/{project_id}/generation-comparisons/preflight` returns no-submit comparison evidence and a token derived from the A/B/C keyframe-arm preflights, while `/generation-comparisons` rejects missing or stale tokens before any arm can reach provider dispatch.
+- Preflight tokens now include provider-submit gate state, so a token produced while gates were closed cannot authorize a later gate-open submit.
+- Gate-closed/local planning behavior remains available without requiring a token; preflight responses remain no-submit evidence with `provider_calls_started=false`.
+- Updated gate-open keyframe/video/comparison tests to run the preflight endpoint before fake provider submit paths; rejected missing/stale paths assert no-submit evidence.
+- Regenerated the Runtime Service OpenAPI snapshot for the new comparison preflight route and comparison request `preflight_token` field.
+- No real provider call, provider smoke, generated media, generated-media QA, human creative acceptance, business validation, public/legal readiness, CompanyOS projection, durable-memory promotion, or COS active-rule promotion occurred.
+
+Verification:
+
+```text
+python -m pytest tests\test_api_runtime_provider_submit_preflight.py -q
+# 9 passed
+
+python -m pytest tests\test_api_runtime_generation_comparison.py -q
+# 1 passed
+
+python -m apps.cli.main runtime-service-openapi-export --output docs\openapi\afs-runtime-service.openapi.json
+# exported
+
+python -m pytest tests\test_api_runtime_openapi_snapshot.py -q
+# 1 passed
+
+python -m pytest tests\test_api_runtime_provider_submit_preflight.py tests\test_api_runtime_generation_comparison.py tests\test_api_runtime_openapi_snapshot.py tests\test_api_runtime_asset_card_revision_legacy_slots.py tests\test_api_runtime_keyframe_reference_assets.py tests\test_api_runtime_keyframe_generation_bridge.py tests\test_api_runtime_main_loop_keyframe_bridge_e2e.py tests\test_api_runtime_multi_character_keyframe_bridge_e2e.py tests\test_api_runtime_generation_manifest_safety.py tests\test_api_runtime_video_generations.py tests\test_api_runtime_video_routes_modules.py tests\test_api_runtime_video_revisions.py tests\test_volc_seedance_video_adapter.py tests\test_web_studio_assets_generation_static.py -q
+# 90 passed
+
+git diff --check
+# passed
+```
+
 ## 2026-07-02 - D5 Provider-Closed Readiness Packet Currency
 
 - Completed Lane D5 on `codex/afs-d5-provider-closed-readiness-20260702` from D2 commit `654002a295330c0722102d8a2202804189865235`; base remains `origin/master=f00fbc6c1404a4c3b812056a0f142626edb75ea8`.

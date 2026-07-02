@@ -12,7 +12,11 @@ from apps.api.runtime_artifacts import keyframe_generation_artifacts
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_generated_image_assets import register_generated_image_asset
-from apps.api.runtime_generation_preflight import keyframe_generation_preflight, preflight_token_matches
+from apps.api.runtime_generation_preflight import (
+    keyframe_generation_preflight,
+    preflight_token_matches,
+    provider_submit_preflight_requirement,
+)
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframe_async import poll_keyframe_generation
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
@@ -99,6 +103,26 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             asset_ref_count=len(request.asset_refs or []),
             has_preflight_token=bool(request.preflight_token),
         )
+        preflight_requirement = provider_submit_preflight_requirement("keyframe", request)
+        if preflight_requirement["required"] and not request.preflight_token:
+            detail = safe_error_detail(
+                "missing_preflight",
+                detail_code="preflight_required",
+                request_id=request_id,
+                client_request_id=client_request_id,
+                project_id=project_id,
+                node_id=node_id,
+                action="keyframe_generation",
+                stage="preflight_required",
+                status="blocked",
+                retryable=True,
+                details={
+                    "provider_calls_started": False,
+                    "required_gate": preflight_requirement["required_gate"],
+                },
+            )
+            _log_keyframe_rejected(http_request, detail, status_code=428, elapsed_ms=_elapsed_ms(started))
+            raise HTTPException(status_code=428, detail=detail)
         if request.preflight_token:
             try:
                 expected_preflight = keyframe_generation_preflight(store, project_id, request)
@@ -125,6 +149,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
                     action="keyframe_generation",
                     stage="preflight_token",
                     retryable=True,
+                    details={"provider_calls_started": False},
                 )
                 _log_keyframe_rejected(http_request, detail, status_code=409, elapsed_ms=_elapsed_ms(started))
                 raise HTTPException(status_code=409, detail=detail)

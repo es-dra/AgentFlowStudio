@@ -51,6 +51,12 @@ def _upload_image(client: TestClient, project_id: str) -> str:
     return upload.json()["asset"]["asset_id"]
 
 
+def _with_video_preflight_token(client: TestClient, project_id: str, request: dict) -> dict:
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
+    return {**request, "preflight_token": preflight.json()["preflight_token"]}
+
+
 def test_video_generation_requires_explicit_first_frame(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
@@ -147,17 +153,18 @@ def test_tiny_video_first_frame_blocks_before_provider_submit(tmp_path, monkeypa
     project_id = "video-tiny-first-frame-guard"
     client.post("/projects", json={"project_id": project_id, "goal": "Video tiny first frame guard"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 200
@@ -236,19 +243,20 @@ def test_fake_async_video_submit_poll_and_preview(tmp_path, monkeypatch) -> None
     project_id = "video-fake-async"
     client.post("/projects", json={"project_id": project_id, "goal": "Video async flow"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "node_id": "video_1",
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "9:16",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
     assert submitted.status_code == 200
     job = submitted.json()["job"]
@@ -348,19 +356,20 @@ def test_video_generation_strips_adapter_output_dir_from_persisted_task_state(tm
     project_id = "video-path-safe-task-state"
     client.post("/projects", json={"project_id": project_id, "goal": "Video task state path hygiene"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "node_id": "video_1",
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "node_id": "video_1",
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "9:16",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert submitted.status_code == 200
@@ -408,17 +417,18 @@ def test_video_generation_provider_internal_error_writes_safe_manifest(tmp_path,
     project_id = "video-provider-internal-error"
     client.post("/projects", json={"project_id": project_id, "goal": "Video safe error guard"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 200
@@ -457,17 +467,18 @@ def test_video_generation_seedance_400_summary_writes_safe_manifest(tmp_path, mo
     project_id = "video-seedance-400-summary"
     client.post("/projects", json={"project_id": project_id, "goal": "Video Seedance 400 summary"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 200
@@ -509,17 +520,18 @@ def test_video_generation_policy_failure_writes_policy_block(tmp_path, monkeypat
     project_id = "video-policy-block"
     client.post("/projects", json={"project_id": project_id, "goal": "Video policy block"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "generated_at": "2026-06-13T10:00:00+08:00",
+    }
 
     submitted = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A slow camera push in.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "generated_at": "2026-06-13T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
     job_id = submitted.json()["job"]["job_id"]
     polled = client.post(f"/projects/{project_id}/video-generations/{job_id}/poll")
@@ -849,18 +861,19 @@ def test_video_generation_gate_open_returns_structured_unsupported_duration(tmp_
     project_id = "video-provider-duration-guard"
     client.post("/projects", json={"project_id": project_id, "goal": "Video provider duration guard"})
     asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A controlled image-to-video move.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 10,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-07-02T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "A controlled image-to-video move.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": asset_id,
-            "duration_sec": 10,
-            "resolution": "720p",
-            "aspect_ratio": "16:9",
-            "generated_at": "2026-07-02T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 422
@@ -897,19 +910,20 @@ def test_video_generation_gate_open_returns_structured_unsupported_input_mode(tm
     client.post("/projects", json={"project_id": project_id, "goal": "Video provider input mode guard"})
     first_id = _upload_image(client, project_id)
     last_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "Move from first frame to last frame.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": first_id,
+        "last_frame_image_asset_id": last_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-07-02T10:00:00+08:00",
+    }
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "Move from first frame to last frame.",
-            "provider_service_id": "fake_video",
-            "first_frame_image_asset_id": first_id,
-            "last_frame_image_asset_id": last_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "16:9",
-            "generated_at": "2026-07-02T10:00:00+08:00",
-        },
+        json=_with_video_preflight_token(client, project_id, request),
     )
 
     assert response.status_code == 422

@@ -350,19 +350,22 @@ def test_runtime_video_generation_passes_first_and_last_frames_to_provider(tmp_p
     client.post("/projects", json={"project_id": project_id, "goal": "Seedance first last frame"})
     first_id = _upload_image(client, project_id, "first_frame")
     last_id = _upload_image(client, project_id, "last_frame")
+    request = {
+        "prompt_text": "Move from first frame to last frame.",
+        "provider_service_id": "seedance_i2v",
+        "first_frame_image_asset_id": first_id,
+        "last_frame_image_asset_id": last_id,
+        "duration_sec": 5,
+        "resolution": "720p",
+        "aspect_ratio": "16:9",
+        "generated_at": "2026-06-24T20:00:00+08:00",
+    }
+    preflight = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+    assert preflight.status_code == 200
 
     response = client.post(
         f"/projects/{project_id}/video-generations",
-        json={
-            "prompt_text": "Move from first frame to last frame.",
-            "provider_service_id": "seedance_i2v",
-            "first_frame_image_asset_id": first_id,
-            "last_frame_image_asset_id": last_id,
-            "duration_sec": 5,
-            "resolution": "720p",
-            "aspect_ratio": "16:9",
-            "generated_at": "2026-06-24T20:00:00+08:00",
-        },
+        json={**request, "preflight_token": preflight.json()["preflight_token"]},
     )
 
     assert response.status_code == 200
