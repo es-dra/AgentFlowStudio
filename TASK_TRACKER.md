@@ -8,6 +8,14 @@
 
 Last updated: 2026-07-02 by Codex
 
+Current-state maintenance pointer - 2026-07-03: For tracker/devlog current
+entrypoints, release/current-state summary, provider/REL1B blockers, historical
+summary routes, and the rule blocking old-stream pruning until docs refscan plus
+Owner/CTO gates, use
+`docs/maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`. This is
+an additive pointer only; no tracker content has been pruned, archived, deleted,
+or promoted to readiness/provider/human/business/legal/COS claims.
+
 P0 Runtime + Studio state recovery integration candidate addendum: Integration
 branch `codex/p0-state-recovery-integration-20260703` was created from
 baseline/reference `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in

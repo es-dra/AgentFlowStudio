@@ -98,6 +98,10 @@ archived.
 - `AFS-TEST-CONTRACT-CALIBRATION-TASKRUN-20260630.md`
 - `AFS-GOAL-MODE-READINESS-GATE-20260630.md`
 
+## Owner Review / Package Landing
+
+- `AFS-PROJECT-BOOK-PACKAGE-LANDING-OWNER-INDEX-20260703.md`
+
 ## AFS Studio
 
 - `AFS-PROFESSIONAL-PROMPT-OPTIMIZATION-DETERMINISTIC-HARDENING-20260702.md`
@@ -174,6 +178,7 @@ not a claim that human acceptance or business validation has happened.
 
 ## Current Maintenance Evidence
 
+- `../maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`
 - `../archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`
 - `../maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md`
 - `../maintenance/AFS-FULL-MAINTENANCE-QUEUE-AUDIT-NEXT-ACTION-20260702.md`

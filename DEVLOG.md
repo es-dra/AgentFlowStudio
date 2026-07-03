@@ -1,5 +1,17 @@
 # Devlog
 
+## 2026-07-03 - Tracker / Devlog Current State Index Pointer
+
+- Added an additive current-state maintenance index for tracker/devlog routing:
+  `docs/maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`.
+- The index records canonical `/studio/` and Runtime Service entrypoints,
+  provider/REL1B blockers, historical-summary routes, and the rule that no
+  old-stream tracker/devlog content is removed until docs refscan plus
+  Owner/CTO gates pass.
+- No pruning, deletion, archive, provider/live smoke, generated-media QA,
+  readiness, human/business/legal claim, CompanyOS/COS promotion, durable-memory
+  promotion, runtime/server action, commit, push, or merge occurred.
+
 ## 2026-07-03 - P0 Runtime + Studio State Recovery Integration Candidate
 
 - Created integration branch `codex/p0-state-recovery-integration-20260703` from baseline `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in `/home/afs-ops/.codex/worktrees/14b4/AgentFlowStudio`.
