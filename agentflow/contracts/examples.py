@@ -29,6 +29,7 @@ AGENTFLOW_EXAMPLE_PATHS = (
     Path("examples/agentflow/artifact_map.example.json"),
     Path("examples/agentflow/feedback_event.example.jsonl"),
     Path("examples/agentflow/control_events_active_pending.example.jsonl"),
+    Path("examples/agentflow/control_events_worker_final_ingest.example.jsonl"),
     Path("examples/agentflow/control_register_active_pending.example.json"),
     Path("examples/agentflow/memory_candidate.example.json"),
     Path("examples/agentflow/memory_promotion_decision.example.json"),

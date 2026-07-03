@@ -18,6 +18,22 @@ ACK_STATES = frozenset({"no_ack", "ack_delivery_confirmed", "ack_delivery_failed
 ARCHIVE_POLICIES = frozenset({"agent_created_archive_when_useless"})
 ARCHIVE_EVALUATION_STATES = frozenset({"not_allowed", "allowed", "blocked_pending_ack"})
 CLAIM_STATES = frozenset({"not_claimed", "claimed", "verified", "rejected"})
+WORKER_FINAL_INGEST_CONTRACT = "repo_local_control_event_worker_final_ingest_v0.1"
+WORKER_FINAL_RECOVERY_SOURCES = frozenset(
+    {
+        "direct_thread_delivery",
+        "local_final_only",
+        "legacy_bridge",
+        "pendingWorktreeId",
+        "worker_final_read",
+    }
+)
+WORKER_FINAL_CLOSE_STATES = frozenset(
+    {
+        "control_event_bus_worker_final_ingest_redispatch_completed",
+        "control_event_bus_worker_final_ingest_redispatch_blocked_exact_reason",
+    }
+)
 EVIDENCE_SOURCE_CLASSES = frozenset(
     {
         "dispatcher_instruction",
@@ -38,6 +54,7 @@ EVENT_TYPES = frozenset(
         "archive_policy_evaluated",
         "archive_executed",
         "ack_state_changed",
+        "worker_final_ingested",
     }
 )
 FIXED_ROLE_SURFACE_ROLES = frozenset({"dispatcher", "cto_disposition", "implementation_worker", "evaluator"})
@@ -61,4 +78,7 @@ __all__ = (
     "IMPLEMENTATION_LANE_KINDS",
     "INPUT_CONTRACT",
     "OUTPUT_CONTRACT",
+    "WORKER_FINAL_CLOSE_STATES",
+    "WORKER_FINAL_INGEST_CONTRACT",
+    "WORKER_FINAL_RECOVERY_SOURCES",
 )

@@ -6,7 +6,7 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-02 by Codex
+Last updated: 2026-07-03 by Codex
 
 Current-state maintenance pointer - 2026-07-03: For tracker/devlog current
 entrypoints, release/current-state summary, provider/REL1B blockers, historical
@@ -15,6 +15,60 @@ Owner/CTO gates, use
 `docs/maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`. This is
 an additive pointer only; no tracker content has been pruned, archived, deleted,
 or promoted to readiness/provider/human/business/legal/COS claims.
+
+Control kernel Phase1b scheduler/eventbus integration addendum: Lane
+`INT-P1-CONTROL-KERNEL-PHASE1B-SCHEDULER-EVENTBUS-INTEGRATION` integrated
+accepted scheduler-linter source commit
+`03d39eb5dc5c577af6ce87b6b4da1e770a9fe6d2` and event-bus worker-final ingest
+source commit `28616fdd7ac55bd8093f7af07abf6acb3a2c1a26` into local `master`
+for dispatch
+`TD-AFS-V02-INT-P1-CONTROL-KERNEL-PHASE1B-SCHEDULER-EVENTBUS-INTEGRATION-20260703-001`.
+Pre-integration HEAD was OpenAPI baseline
+`4966d20aeea35dfc0bc6d33b0110689dbed02f81`, which was preserved. Conflict
+strategy was non-mutating merge simulation followed by `git cherry-pick
+--no-commit`; only expected additive conflicts in tracker/devlog/index,
+`control_event_register` export, and focused tests were resolved. Verification
+available in this checkout passed `python3 -m py_compile` on touched control
+modules/tests and `.venv/bin/python -m pytest tests/test_control_event_register.py
+tests/test_contract_registry_examples.py -q` with `20 passed`; system
+`python3 -m pytest` remains blocked because `/usr/bin/python3` has no `pytest`
+module. Pre-existing untracked `docs/demo/` and
+`docs/maintenance/AFS-DEMO-DOCS-CHINESE-20260629.md` were preserved untouched.
+No source-sync/fetch/pull/push, deploy/restart/runtime/server action, provider
+gate/call, REL1B, generated-media QA, OpenAPI/DOC2/COS/CompanyOS mutation,
+readiness/human/business/public/legal claim, durable-memory promotion, archive
+execution, or self-archive is claimed. Archive policy remains
+`agent_created_archive_when_useless`, `owner_manual_archive_excluded=no`,
+`archive_after_ack_delivery_confirmed=true`. Handoff:
+`docs/handoff/AFS-CONTROL-KERNEL-PHASE1B-SCHEDULER-EVENTBUS-INTEGRATION-20260703.md`.
+
+Control scheduler linters minimal redispatch addendum: Lane
+`IMP-P1-CONTROL-SCHEDULER-LINTERS-MINIMAL-REDISPATCH` implemented a bounded
+lint-only scheduler check slice on
+`codex/control-scheduler-linters-minimal-redispatch-20260703` for dispatch
+`TD-AFS-V02-IMP-P1-CONTROL-SCHEDULER-LINTERS-MINIMAL-REDISPATCH-20260703-001`.
+The slice adds read-only `lint_control_scheduler_state()` findings for completed
+BU not processed, join_all without reason, single active lane without dependency
+reason, stale lane without recovery outcome, and post-closeout next action
+without a real wakeup/monitor mechanism. Verification available in this checkout
+passed `python3 -m py_compile` on touched control/test modules and a no-pytest
+assertion script covering clean state, all five requested findings, pseudo
+wakeup rejection for `current_codex_delegation_response` plus inert
+`monitor_ref`, and read-only/no-mutation behavior. Recovery dispatch
+`TD-AFS-V02-RECOVERY-P1-CONTROL-SCHEDULER-LINTERS-MINIMAL-DURABLE-ARTIFACT-20260703-001`
+created a durable local artifact on the same scheduler-linter branch and does
+not claim evaluator pass or integration. Focused pytest is blocked because
+`/usr/bin/python3` has no `pytest`; CLI help/version checks are blocked because
+`/usr/bin/python3` has no `typer`. No archive daemon, destructive migration,
+historical replay, source-sync/fetch/pull/push, deploy/restart/runtime/server
+action, REL1B, provider gate/call, Runtime/Studio/OpenAPI/DOC2/COS/CompanyOS
+mutation, generated-media QA, readiness claim, human/business/public/legal
+claim, durable-memory promotion, self-archive, or merge is claimed. Archive
+policy remains `agent_created_archive_when_useless`,
+`owner_manual_archive_excluded=no`,
+`archive_after_ack_delivery_confirmed=true`, with execution blocked until ACK
+delivery is confirmed. Handoff:
+`docs/handoff/AFS-CONTROL-SCHEDULER-LINTERS-MINIMAL-REDISPATCH-20260703.md`.
 
 Project Book Owner acceptance matrix redispatch addendum: Lane
 `DOC-P1-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-UPDATE-REDISPATCH` produced a
@@ -32,6 +86,53 @@ OpenAPI/DOC2/COS/CompanyOS mutation, cleanup/delete/archive, package-complete
 claim, readiness claim, human/business/public/legal claim, or durable-memory
 promotion occurred. Handoff:
 `docs/handoff/AFS-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-REDISPATCH-20260703.md`.
+
+Control event bus worker-final ingest durable recovery addendum: Lane
+`RECOVERY-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-DURABLE-ARTIFACT`
+recovered the previously uncommitted worker-final ingest slice onto durable
+local branch
+`codex/recovery-p1-control-event-bus-worker-final-ingest-durable-artifact-20260703`
+for dispatch
+`TD-AFS-V02-RECOVERY-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-DURABLE-ARTIFACT-20260703-001`.
+Source worktree was `/home/afs-ops/.codex/worktrees/f109/AgentFlowStudio`;
+close state is
+`control_event_bus_worker_final_ingest_durable_artifact_recovered`. This is
+durable artifact recovery only, not evaluator pass or integration. No merge,
+push/fetch/pull, source-sync, provider gate/call, archive daemon, Runtime,
+Studio, OpenAPI, DOC2, COS, CompanyOS, server/deploy/restart, readiness,
+human/business/public/legal claim, durable-memory promotion, or self-archive is
+claimed. Post-closeout next action: run a fresh evaluator against the durable
+branch. Handoff:
+`docs/handoff/AFS-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH-20260703.md`.
+
+Control event bus worker-final ingest redispatch addendum: Lane
+`SPEC-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH` produced a bounded
+repo-local spec/test slice on
+`codex/spec-p1-control-event-bus-worker-final-ingest-redispatch-20260703` for
+dispatch
+`TD-AFS-V02-SPEC-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH-20260703-001`.
+Route basis is CTO disposition
+`readback_accepted_reaffirm_parallel_architecture_redispatch`. The control
+event register adapter now accepts `worker_final_ingested` events with canonical
+TD/BU/event ids, bounded recovery sources `direct_thread_delivery`,
+`local_final_only`, `legacy_bridge`, `pendingWorktreeId`, and
+`worker_final_read`, exact-duplicate idempotency, conflicting duplicate TD/BU
+rejection, materialization-failure coverage, no-ACK preservation, safe evidence
+classification, and archive-after-ACK blocking. The superseded old
+pendingWorktreeId
+`remote-ssh-discovered:afs-bwg-ops:c1ce9c63-b0ec-4a5a-ad13-7a0309dfde2c`
+is recorded as reconciliation evidence only and was not used, repaired, synced,
+or archived. Verification available in this checkout passed `python3 -m py_compile`,
+a focused no-pytest assertion script, contract fixture load, and
+`git diff --check`; focused pytest is blocked because `/usr/bin/python3` has no
+`pytest` module, and CLI help/version checks are blocked because
+`/usr/bin/python3` has no `typer` module. No archive daemon,
+destructive migration/archive daemon, full historical replay,
+source sync/fetch/pull/push, Runtime/Studio/OpenAPI/DOC2/COS/CompanyOS/provider
+or server/deploy/restart mutation, provider gate/call,
+readiness/human/business/public/legal claim, durable-memory promotion,
+self-archive, or merge is claimed. Handoff:
+`docs/handoff/AFS-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH-20260703.md`.
 
 Runtime idempotent submit redispatch durable addendum: Lane
 `IMP-P1-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE` implemented a bounded

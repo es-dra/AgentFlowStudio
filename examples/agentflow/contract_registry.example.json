@@ -185,6 +185,10 @@
       "description": "Claim-state changes and non-claim boundaries are separate first-class control events."
     },
     {
+      "rule_id": "control_event_worker_final_ingest_idempotency",
+      "description": "Worker-final ingest records canonical TD/BU/event ids, dedupes identical repeats, and rejects conflicting duplicate finals."
+    },
+    {
       "rule_id": "router_decision_only",
       "description": "Router decisions record selection reasoning and must not claim skill execution."
     },

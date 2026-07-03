@@ -17,6 +17,11 @@ from ._constants import (
     IMPLEMENTATION_LANE_KINDS,
 )
 from ._helpers import reject_unsafe_markers, required_dict, required_text
+from ._worker_final import (
+    apply_worker_final_ingest,
+    dedupe_worker_final_ingest_events,
+    validate_worker_final_ingest,
+)
 
 
 def validate_control_event(event: dict[str, Any]) -> None:
@@ -56,17 +61,23 @@ def validate_control_event(event: dict[str, Any]) -> None:
             raise ValueError("archive_executed event requires archive_execution_confirmed true")
     elif event_type == "ack_state_changed":
         _validate_ack(required_dict(payload, "ack"))
+    elif event_type == "worker_final_ingested":
+        worker_final = validate_worker_final_ingest(payload, event)
+        _validate_ack(required_dict(worker_final, "ack"))
+        _validate_archive_policy(required_dict(worker_final, "archive_policy"))
+        if worker_final["archive_policy"].get("archive_execution_allowed") is True:
+            if worker_final["ack"].get("ack_delivery_confirmed") is not True:
+                raise ValueError("worker-final archive cannot be allowed before ack delivery confirmation")
+        if "non_claims" in worker_final:
+            _validate_non_claim_event({"non_claims": worker_final["non_claims"]})
 
 
 def materialize_control_register(events: list[dict[str, Any]]) -> dict[str, Any]:
     lanes: dict[str, dict[str, Any]] = {}
-    seen_event_ids: set[str] = set()
-    for event in events:
+    deduped_events = dedupe_worker_final_ingest_events(events)
+    for event in deduped_events:
         validate_control_event(event)
         event_id = str(event["event_id"])
-        if event_id in seen_event_ids:
-            raise ValueError(f"duplicate control event_id: {event_id}")
-        seen_event_ids.add(event_id)
         lane = _lane(lanes, event)
         lane["event_ids"].append(event_id)
         lane["last_event_id"] = event_id
@@ -78,7 +89,7 @@ def materialize_control_register(events: list[dict[str, Any]]) -> dict[str, Any]
         "schema_version": CONTROL_EVENT_SCHEMA_VERSION,
         "artifact_type": CONTROL_REGISTER_ARTIFACT_TYPE,
         "register_scope": "active_pending_control_lanes",
-        "materialized_from_event_count": len(events),
+        "materialized_from_event_count": len(deduped_events),
         "active_pending_lane_ids": sorted(
             lane_id for lane_id, lane in lanes.items() if lane.get("state") in ACTIVE_PENDING_STATES
         ),
@@ -139,6 +150,8 @@ def _apply_event(lane: dict[str, Any], event: dict[str, Any]) -> None:
         _require_archive_execution_allowed(lane)
         lane["archive_execution"] = {"event_id": event["event_id"], "archive_execution_confirmed": True}
         lane["state"] = "archived"
+    elif event_type == "worker_final_ingested":
+        apply_worker_final_ingest(lane, event)
 
 
 def _lane(lanes: dict[str, dict[str, Any]], event: dict[str, Any]) -> dict[str, Any]:

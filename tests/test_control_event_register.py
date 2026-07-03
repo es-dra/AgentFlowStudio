@@ -8,6 +8,7 @@ import pytest
 
 
 EVENT_LOG_PATH = Path("examples/agentflow/control_events_active_pending.example.jsonl")
+WORKER_FINAL_EVENT_LOG_PATH = Path("examples/agentflow/control_events_worker_final_ingest.example.jsonl")
 REGISTER_PATH = Path("examples/agentflow/control_register_active_pending.example.json")
 
 
@@ -15,6 +16,12 @@ def _events() -> list[dict]:
     from agentflow.algorithms.control_event_register import load_control_event_log
 
     return load_control_event_log(EVENT_LOG_PATH)
+
+
+def _worker_final_events() -> list[dict]:
+    from agentflow.algorithms.control_event_register import load_control_event_log
+
+    return load_control_event_log(WORKER_FINAL_EVENT_LOG_PATH)
 
 
 def test_control_event_register_algorithm_is_registered() -> None:
@@ -140,4 +147,224 @@ def test_invalid_evidence_source_classification_is_rejected() -> None:
     event["evidence_source"]["source_class"] = "unknown_review_surface"
 
     with pytest.raises(ValueError, match="unsupported evidence source classification"):
+        validate_control_event(event)
+
+
+def test_control_scheduler_linter_accepts_explicitly_reasoned_state() -> None:
+    from agentflow.algorithms.control_event_register import lint_control_scheduler_state
+
+    state = {
+        "scheduler_policy": {
+            "fan_in_mode": "join_all",
+            "join_all_reason": "both bounded lanes must return before evaluator handoff",
+        },
+        "processed_bottom_up_feedback_ids": ["BU-DONE-001"],
+        "post_closeout_next_action": {
+            "monitor": {
+                "mechanism": "codex_thread_monitor",
+                "ref": "monitor:control-scheduler-eval",
+            }
+        },
+        "lanes": [
+            {
+                "lane_id": "IMP-P1-CONTROL-A",
+                "state": "active",
+                "stale_after": "2026-07-03T15:00:00Z",
+            },
+            {
+                "lane_id": "IMP-P1-CONTROL-B",
+                "state": "active",
+                "stale_after": "2026-07-03T15:00:00Z",
+            },
+            {
+                "lane_id": "IMP-P1-CONTROL-DONE",
+                "state": "completed",
+                "bottom_up_feedback_id": "BU-DONE-001",
+            },
+        ],
+    }
+
+    assert lint_control_scheduler_state(state, now="2026-07-03T14:00:00Z") == []
+
+
+def test_control_scheduler_linter_reports_minimal_redispatch_rules() -> None:
+    from agentflow.algorithms.control_event_register import (
+        COMPLETED_BU_NOT_PROCESSED,
+        JOIN_ALL_WITHOUT_REASON,
+        LANE_PAST_STALE_AFTER_WITHOUT_RECOVERY_OUTCOME,
+        POST_CLOSEOUT_NEXT_ACTION_WITHOUT_REAL_WAKEUP_MONITOR,
+        SINGLE_ACTIVE_LANE_WITHOUT_DEPENDENCY_REASON,
+        lint_control_scheduler_state,
+    )
+
+    state = {
+        "scheduler_policy": {"fan_in_mode": "join_all"},
+        "lanes": [
+            {
+                "lane_id": "IMP-P1-CONTROL-A",
+                "state": "active",
+                "stale_after": "2026-07-03T13:00:00Z",
+                "post_closeout_next_action": "check with evaluator later",
+            },
+            {
+                "lane_id": "IMP-P1-CONTROL-DONE",
+                "state": "completed",
+                "bottom_up_feedback_id": "BU-DONE-002",
+            },
+        ],
+    }
+
+    findings = lint_control_scheduler_state(state, now="2026-07-03T14:00:00Z")
+
+    assert {finding["code"] for finding in findings} == {
+        COMPLETED_BU_NOT_PROCESSED,
+        JOIN_ALL_WITHOUT_REASON,
+        SINGLE_ACTIVE_LANE_WITHOUT_DEPENDENCY_REASON,
+        LANE_PAST_STALE_AFTER_WITHOUT_RECOVERY_OUTCOME,
+        POST_CLOSEOUT_NEXT_ACTION_WITHOUT_REAL_WAKEUP_MONITOR,
+    }
+    assert all(finding["severity"] == "error" for finding in findings)
+
+    placeholder_only = {"post_closeout_next_action": {"monitor_ref": "monitor:placeholder"}}
+    assert [finding["code"] for finding in lint_control_scheduler_state(placeholder_only)] == [
+        POST_CLOSEOUT_NEXT_ACTION_WITHOUT_REAL_WAKEUP_MONITOR
+    ]
+
+    pseudo_delegation_response = {
+        "post_closeout_next_action": {
+            "mechanism": "current_codex_delegation_response",
+            "monitor_ref": "codex_thread:019f25c8-37c9-7e30-8c57-279e40a3a1fc",
+        }
+    }
+    assert [finding["code"] for finding in lint_control_scheduler_state(pseudo_delegation_response)] == [
+        POST_CLOSEOUT_NEXT_ACTION_WITHOUT_REAL_WAKEUP_MONITOR
+    ]
+
+
+def test_control_scheduler_linter_is_read_only() -> None:
+    from agentflow.algorithms.control_event_register import lint_control_scheduler_state
+
+    state = {
+        "scheduler_policy": {
+            "fan_in_mode": "single_lane",
+            "dependency_reason": "dependent evaluator has not accepted the implementation BU",
+        },
+        "lanes": [
+            {
+                "lane_id": "IMP-P1-CONTROL-A",
+                "state": "active",
+                "dependency_reason": "depends on evaluator lane creation",
+                "stale_after": "2026-07-03T13:00:00Z",
+                "recovery_outcome": "redispatched with explicit evaluator wakeup",
+            }
+        ],
+        "post_closeout_next_action": {
+            "mechanism": "codex_thread_wakeup",
+            "ref": "wakeup:control-scheduler-eval",
+        },
+    }
+    before = copy.deepcopy(state)
+
+    lint_control_scheduler_state(state, now="2026-07-03T14:00:00Z")
+
+    assert state == before
+
+
+def test_worker_final_ingest_fixture_materializes_recovery_sources_and_no_ack_archive_block() -> None:
+    from agentflow.algorithms.control_event_register import (
+        WORKER_FINAL_INGEST_CONTRACT,
+        WORKER_FINAL_RECOVERY_SOURCES,
+        materialize_control_register,
+    )
+
+    register = materialize_control_register(_worker_final_events())
+
+    assert register["materialized_from_event_count"] == 2
+    assert register["active_pending_lane_ids"] == ["SPEC-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH"]
+    lane = register["lanes"][0]
+    assert lane["lane_kind"] == "worker_final_ingest"
+    assert lane["route_basis"] == "readback_accepted_reaffirm_parallel_architecture_redispatch"
+    assert {source["source_class"] for source in lane["evidence_sources"]} == {
+        "dispatcher_instruction",
+        "repo_fixture",
+    }
+    ingest = lane["worker_final_ingests"][0]
+    assert ingest["ingest_contract"] == WORKER_FINAL_INGEST_CONTRACT
+    assert (
+        ingest["top_down_dispatch_id"]
+        == "TD-AFS-V02-SPEC-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH-20260703-001"
+    )
+    assert (
+        ingest["bottom_up_feedback_id"]
+        == "BU-AFS-V02-SPEC-P1-CONTROL-EVENT-BUS-WORKER-FINAL-INGEST-REDISPATCH-20260703-001"
+    )
+    assert ingest["close_state"] == "control_event_bus_worker_final_ingest_redispatch_completed"
+    assert set(lane["worker_final_recovery_sources"]) == WORKER_FINAL_RECOVERY_SOURCES
+    assert lane["ack"] == {
+        "ack_required": True,
+        "ack_state": "no_ack",
+        "ack_delivery_confirmed": False,
+        "no_ack": True,
+    }
+    assert lane["archive_policy"]["policy"] == "agent_created_archive_when_useless"
+    assert lane["archive_policy"]["archive_after_ack_delivery_confirmed"] is True
+    assert lane["archive_policy"]["archive_execution_allowed"] is False
+    assert lane["non_claims"]["full_historical_replay"] is False
+
+
+def test_worker_final_ingest_exact_duplicate_is_idempotently_deduped() -> None:
+    from agentflow.algorithms.control_event_register import materialize_control_register
+
+    events = _worker_final_events()
+    register = materialize_control_register(events + [copy.deepcopy(events[1])])
+
+    lane = register["lanes"][0]
+    assert register["materialized_from_event_count"] == 2
+    assert lane["event_ids"] == ["evt-worker-final-ingest-redispatch-lane-001", "evt-worker-final-ingest-redispatch-001"]
+    assert len(lane["worker_final_ingests"]) == 1
+
+
+def test_worker_final_ingest_rejects_duplicate_td_bu_with_different_event_id() -> None:
+    from agentflow.algorithms.control_event_register import materialize_control_register
+
+    events = _worker_final_events()
+    conflicting_event = copy.deepcopy(events[1])
+    conflicting_event["event_id"] = "evt-worker-final-ingest-conflict"
+    worker_final = conflicting_event["payload"]["worker_final_ingest"]
+    worker_final["canonical_event_id"] = "evt-worker-final-ingest-conflict"
+    worker_final["idempotency"]["dedupe_keys"]["event_id"] = "evt-worker-final-ingest-conflict"
+
+    with pytest.raises(ValueError, match="duplicate worker-final TD/BU ingest"):
+        materialize_control_register(events + [conflicting_event])
+
+
+def test_worker_final_ingest_requires_known_recovery_sources() -> None:
+    from agentflow.algorithms.control_event_register import validate_control_event
+
+    event = copy.deepcopy(_worker_final_events()[1])
+    event["payload"]["worker_final_ingest"]["recovery_sources"][0]["source_type"] = "unknown_source"
+
+    with pytest.raises(ValueError, match="unsupported worker-final recovery source"):
+        validate_control_event(event)
+
+
+def test_worker_final_ingest_materialization_fails_without_payload_contract() -> None:
+    from agentflow.algorithms.control_event_register import materialize_control_register
+
+    event = copy.deepcopy(_worker_final_events()[1])
+    event["payload"] = {}
+
+    with pytest.raises(ValueError, match="missing required object: worker_final_ingest"):
+        materialize_control_register([_worker_final_events()[0], event])
+
+
+def test_worker_final_ingest_blocks_archive_allowed_before_ack_confirmation() -> None:
+    from agentflow.algorithms.control_event_register import validate_control_event
+
+    event = copy.deepcopy(_worker_final_events()[1])
+    archive_policy = event["payload"]["worker_final_ingest"]["archive_policy"]
+    archive_policy["archive_execution_allowed"] = True
+    archive_policy["evaluation_state"] = "allowed"
+
+    with pytest.raises(ValueError, match="archive cannot be allowed before ack delivery confirmation"):
         validate_control_event(event)
