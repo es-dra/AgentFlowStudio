@@ -36,6 +36,27 @@ CompanyOS/COS mutation, durable-memory promotion, human acceptance,
 product/business/public/legal readiness, push, or merge is claimed. Handoff:
 `docs/handoff/AFS-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703.md`.
 
+Control event log register adapter addendum: Lane
+`IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER` implemented a repo-local
+active/pending control event adapter on
+`codex/control-event-log-register-adapter-20260703`. The slice adds
+`agentflow_control_event` JSONL helpers, `agentflow_control_register`
+materialization, durable implementation artifact handle validation,
+first-class claim-state events, non-claim separation, fixed role surfaces,
+evidence source classification, no-ACK preservation, and archive-policy
+evaluation before archive execution. It includes current active/pending sample
+events and a checked register fixture. Verification available in this checkout
+passed `python3 -m py_compile`, a no-pytest assertion script for
+materializer/validator/registry behavior, and contract example enumeration.
+Focused pytest is blocked because no `.venv`, `python`, or `pytest` executable
+exists and `/usr/bin/python3` has no `pytest` module. CLI help/version checks
+are blocked because `/usr/bin/python3` has no `typer` module. No thread archive
+automation, historical replay, provider gate/call, Runtime/Studio/OpenAPI
+mutation, server/deploy action, generated-media QA, human acceptance,
+business/public/legal/product readiness, CompanyOS/COS promotion,
+durable-memory promotion, push, or merge is claimed. Handoff:
+`docs/handoff/AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703.md`.
+
 P0 Runtime + Studio state recovery integration candidate addendum: Integration
 branch `codex/p0-state-recovery-integration-20260703` was created from
 baseline/reference `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in

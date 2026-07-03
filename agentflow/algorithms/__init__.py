@@ -29,6 +29,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "shared_object_evidence",
     "interactive_manga_branch_package",
     "branch_workflow_package",
+    "control_event_register",
     "revision_drift_control",
 )
 

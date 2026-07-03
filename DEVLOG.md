@@ -26,6 +26,30 @@
 - Handoff:
   `docs/handoff/AFS-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703.md`.
 
+## 2026-07-03 - Control Event Log Register Adapter
+
+- Implemented lane `IMP-P1-AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER` on
+  `codex/control-event-log-register-adapter-20260703`.
+- Added repo-local `agentflow_control_event` JSONL helpers, active/pending
+  `agentflow_control_register` materialization, validators for durable
+  implementation artifact handles, first-class claim-state events,
+  non-claim separation, archive-policy-before-archive ordering, fixed role
+  surfaces, evidence source classification, and no-ACK archive blocking.
+- Added current active/pending sample events and a checked materialized register
+  fixture; registered both artifacts in the contract registry.
+- Verification passed with `python3 -m py_compile`, no-pytest assertion script
+  coverage for materializer/validator/registry paths, and contract example
+  enumeration. Focused pytest was blocked because this checkout has no `.venv`,
+  no `python` executable, no `pytest` executable, and `/usr/bin/python3` has no
+  `pytest` module. CLI help/version checks were also blocked because
+  `/usr/bin/python3` has no `typer` module.
+- No provider gate, provider call, Runtime/Studio/OpenAPI mutation,
+  thread-archive automation, full historical replay, server/deploy action,
+  generated-media QA, human acceptance, business validation, CompanyOS/COS
+  promotion, durable-memory promotion, push, or merge occurred.
+- Handoff:
+  `docs/handoff/AFS-CONTROL-EVENT-LOG-REGISTER-ADAPTER-20260703.md`.
+
 ## 2026-07-03 - Tracker / Devlog Current State Index Pointer
 
 - Added an additive current-state maintenance index for tracker/devlog routing:
