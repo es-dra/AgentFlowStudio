@@ -58,7 +58,7 @@ export async function startRemoteKeyframeGeneration(store, runtime, node) {
     submitAttempted = true;
     submittedAtMs = Date.now();
     const response = await runtime.generateKeyframe(request);
-    applyKeyframeResponse(store, node.id, response, request, { kind: generationKind });
+    applyKeyframeResponse(store, node.id, response, request, { kind: generationKind, retrying: retryPlan.retrying });
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
     if (isKeyframeInProgress(response) && response?.job?.job_id && runtime?.pollKeyframe) {
@@ -86,7 +86,10 @@ export async function refreshPendingKeyframeGenerations(store, runtime, options 
     const jobId = node.params.lastKeyframeJobId;
     try {
       const response = await runtime.pollKeyframe(jobId);
-      applyKeyframeResponse(store, node.id, response, fallbackRequest(node), { kind: nodeGenerationKind(node) });
+      applyKeyframeResponse(store, node.id, response, fallbackRequest(node), {
+        kind: nodeGenerationKind(node),
+        retrying: Boolean(node.params?.retryFailedItemsOnly),
+      });
       await store.flushRuntimeSave?.();
       if (isKeyframeInProgress(response)) {
         void startBackgroundKeyframePolling(store, runtime, node.id, jobId, fallbackRequest(node));
@@ -111,7 +114,10 @@ async function pollKeyframeUntilTerminal(store, runtime, nodeId, jobId, request)
     const response = await runtime.pollKeyframe(jobId);
     lastResponse = response;
     const fresh = store.get().nodes[nodeId];
-    applyKeyframeResponse(store, nodeId, response, request, { kind: nodeGenerationKind(fresh) });
+    applyKeyframeResponse(store, nodeId, response, request, {
+      kind: nodeGenerationKind(fresh),
+      retrying: Boolean(fresh?.params?.retryFailedItemsOnly),
+    });
     const status = response?.job?.status || "";
     if (shouldSavePollState(attempt, status, lastSavedStatus, response)) {
       await store.flushRuntimeSave?.();

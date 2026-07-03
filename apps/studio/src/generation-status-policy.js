@@ -55,9 +55,10 @@ export function responseStatusSummary(response, options = {}) {
       || "blocked",
   );
   const hasPartialOutput = hasPartialGenerationOutput(response);
+  const retrying = Boolean(options.retrying && isActiveRuntimeStatus(runtimeStatus));
   const policyStatus = policyStatusForRuntimeStatus(runtimeStatus, {
     hasPartialOutput,
-    retrying: Boolean(options.retrying),
+    retrying,
   });
   return {
     runtimeStatus,

@@ -8,6 +8,44 @@
 
 Last updated: 2026-07-04 by Codex
 
+P0 multi-candidate job-state retry actual-path recovery addendum: Lane
+`FIX-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-ACTUAL-PATH-RECOVERY` completed a
+bounded callback fix for dispatch
+`TD-AFS-V02-FIX-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-ACTUAL-PATH-RECOVERY-20260704-001`
+on `codex/p0-multi-candidate-job-state-retry-20260704`. The recovery forwards
+`options.retrying` through `applyKeyframeResponse()` into
+`updateNodeGenerationState()`, closing the evaluator gap where helper-level
+checks passed but the actual keyframe response path dropped retry intent for
+active Runtime statuses. The recovery-owned boundary expands to
+`apps/studio/src/node-keyframe-response.js` because that was the failing actual
+path. Focused direct Node coverage now asserts active `submitted`, `pending`,
+and `running` preserve `generationPolicyStatus=retrying` and
+`retryFailedItemsOnly=true`, while terminal `complete`, `partially_complete`,
+`failed`, and `needs_attention` clear stale retrying. No provider/runtime/server
+/browser/deploy/source-sync/readiness claim is made. Handoff:
+`docs/handoff/AFS-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704.md`.
+
+P0 multi-candidate job-state retry addendum: Lane
+`IMPL-P0-MULTI-CANDIDATE-JOB-STATE-RETRY` completed bounded Studio retry-state
+implementation for dispatch
+`TD-AFS-V02-IMPL-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704-001` on
+`codex/p0-multi-candidate-job-state-retry-20260704`; expected BU
+`BU-AFS-V02-IMPL-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704-001`.
+The slice preserves failed-items-only retry job state through active keyframe
+Runtime responses after a multi-candidate retry submit, including bootstrap
+refresh and background polling, and guards terminal responses so stale retrying
+state clears on complete/partial/failed/needs-attention outcomes. Available
+validation passed `python3 -m py_compile` on the focused static test,
+`npm run check:studio-js` (`139 files`), direct no-pytest execution of the new
+static regression, direct Node retry-state assertions, and `git diff --check`;
+focused pytest is blocked because `/usr/bin/python3` has no `pytest`.
+Unrelated Owner dirty docs were preserved by using an isolated worktree. No
+fetch/pull/push/source-sync, provider call/gate, Runtime/Studio server run,
+deploy/restart, generated-media QA, OpenAPI/DOC2/COS/CompanyOS/source-KB
+mutation, readiness/human/business/public/legal claim, durable-memory
+promotion, archive execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704.md`.
+
 P0 node reference stack priority eval gaps recovery addendum: Lane
 `FIX-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS` completed bounded evaluator
 recovery for dispatch

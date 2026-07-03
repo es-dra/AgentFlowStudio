@@ -104,6 +104,114 @@ def test_runtime_recovery_envelope_feeds_studio_status_policy() -> None:
     subprocess.run(["node", "--input-type=module", "-e", script], check=True)
 
 
+def test_active_multi_candidate_retry_keeps_retrying_job_state_until_terminal_response() -> None:
+    actions = _read("src/node-keyframe-actions.js")
+    response_path = _read("src/node-keyframe-response.js")
+    policy = _read("src/generation-status-policy.js")
+
+    assert "retrying: retryPlan.retrying" in actions
+    assert "retrying: Boolean(fresh?.params?.retryFailedItemsOnly)" in actions
+    assert "retrying: Boolean(options.retrying)" in response_path
+    assert "options.retrying && isActiveRuntimeStatus(runtimeStatus)" in policy
+
+    script = textwrap.dedent(
+        """
+        import { applyKeyframeResponse } from "./apps/studio/src/node-keyframe-response.js";
+        import { responseStatusSummary } from "./apps/studio/src/generation-status-policy.js";
+        import { setSubmittingGenerationState, updateNodeGenerationState } from "./apps/studio/src/node-generation-progress.js";
+
+        function makeStore(node) {
+          const state = { nodes: { node_1: node }, assets: [] };
+          return {
+            get: () => state,
+            set: (mutator) => mutator(state),
+            nextId: (prefix) => `${prefix}_001`,
+          };
+        }
+
+        function makeNode() {
+          return { id: "node_1", type: "image", title: "Keyframe", prompt: "prompt", params: {} };
+        }
+
+        const submitted = responseStatusSummary({ job: { status: "submitted" } }, { retrying: true });
+        if (submitted.policyStatus !== "retrying") {
+          throw new Error(`expected retrying active policy, got ${submitted.policyStatus}`);
+        }
+
+        const terminal = responseStatusSummary({
+          job: { status: "succeeded" },
+          safe_manifest: { batch_status: "complete", output_count: 2 },
+        }, { retrying: true });
+        if (terminal.policyStatus !== "complete") {
+          throw new Error(`expected terminal complete policy, got ${terminal.policyStatus}`);
+        }
+
+        const node = { params: {} };
+        setSubmittingGenerationState(node, "keyframe", { retrying: true, clearPreview: false });
+        updateNodeGenerationState(node, { job: { status: "submitted" } }, { kind: "keyframe", retrying: true });
+        if (node.params.generationPolicyStatus !== "retrying" || node.params.retryFailedItemsOnly !== true) {
+          throw new Error("active retry submit lost failed-items-only job state");
+        }
+
+        updateNodeGenerationState(node, {
+          job: { status: "succeeded" },
+          safe_manifest: { batch_status: "complete", output_count: 2 },
+        }, { kind: "keyframe", retrying: true });
+        if (node.params.generationPolicyStatus !== "complete" || node.params.retryFailedItemsOnly) {
+          throw new Error("terminal retry response did not clear retrying job state");
+        }
+
+        for (const status of ["submitted", "pending", "running"]) {
+          const actualNode = makeNode();
+          const store = makeStore(actualNode);
+          applyKeyframeResponse(
+            store,
+            "node_1",
+            { job: { status, job_id: `job_${status}` } },
+            { aspect_ratio: "9:16" },
+            { kind: "keyframe", retrying: true },
+          );
+          if (actualNode.params.generationPolicyStatus !== "retrying" || actualNode.params.retryFailedItemsOnly !== true) {
+            throw new Error(`actual applyKeyframeResponse path lost retrying for ${status}`);
+          }
+        }
+
+        const terminalCases = [
+          {
+            label: "complete",
+            response: { job: { status: "succeeded" }, safe_manifest: { batch_status: "complete", output_count: 2 } },
+            expected: "complete",
+          },
+          {
+            label: "partially_complete",
+            response: { job: { status: "failed" }, safe_manifest: { batch_status: "partially_complete", output_count: 1, blocks: [{ reason: "one failed" }] } },
+            expected: "partially_complete",
+          },
+          {
+            label: "failed",
+            response: { job: { status: "failed" }, safe_manifest: { batch_status: "failed", output_count: 0, blocks: [{ reason: "provider failed" }] } },
+            expected: "failed",
+          },
+          {
+            label: "needs_attention",
+            response: { job: { status: "blocked" }, safe_manifest: { batch_status: "needs_attention", output_count: 0, blocks: [{ reason: "gate closed" }] } },
+            expected: "needs_attention",
+          },
+        ];
+        for (const item of terminalCases) {
+          const actualNode = makeNode();
+          const store = makeStore(actualNode);
+          applyKeyframeResponse(store, "node_1", item.response, { aspect_ratio: "9:16" }, { kind: "keyframe", retrying: true });
+          if (actualNode.params.generationPolicyStatus !== item.expected || actualNode.params.retryFailedItemsOnly) {
+            throw new Error(`actual terminal ${item.label} did not clear retrying; got ${actualNode.params.generationPolicyStatus}`);
+          }
+        }
+        """
+    )
+
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
 def test_partial_outputs_are_preserved_and_retry_targets_failed_items_only() -> None:
     keyframe_response = _read("src/node-keyframe-response.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")

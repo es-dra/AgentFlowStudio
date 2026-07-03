@@ -18,7 +18,7 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     const partial = !succeeded && !inProgress && Boolean(preview?.preview_url || reusableAsset?.preview_url || outputCount > 0);
     const jobId = response?.job?.job_id || null;
     const shouldRecordAsset = (succeeded || partial) && jobId && n.params.lastKeyframeCompletedJobId !== jobId;
-    updateNodeGenerationState(n, response, { kind });
+    updateNodeGenerationState(n, response, { kind, retrying: Boolean(options.retrying) });
     n.params.lastKeyframeJobId = jobId || n.params.lastKeyframeJobId || null;
     n.status = succeeded ? "complete" : inProgress ? "generating" : partial ? "partial" : "error";
     if (preview?.preview_url) {

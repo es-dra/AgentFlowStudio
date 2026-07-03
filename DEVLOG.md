@@ -1,5 +1,62 @@
 # Devlog
 
+## 2026-07-04 - P0 Multi-Candidate Job-State Retry Actual Path Recovery
+
+- Completed bounded callback lane
+  `FIX-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-ACTUAL-PATH-RECOVERY` for dispatch
+  `TD-AFS-V02-FIX-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-ACTUAL-PATH-RECOVERY-20260704-001`
+  on `codex/p0-multi-candidate-job-state-retry-20260704`.
+- Fixed evaluator gap `active Runtime retry-state preservation fails through
+  actual keyframe response application path` by forwarding `options.retrying`
+  from `applyKeyframeResponse()` into `updateNodeGenerationState()`.
+- Expanded the recovery-owned boundary to include
+  `apps/studio/src/node-keyframe-response.js` because the accepted callback
+  evidence showed the previous helper-level fix did not reach that actual
+  response path.
+- Extended focused static coverage so the direct Node assertion exercises
+  `applyKeyframeResponse()` for active `submitted`, `pending`, and `running`
+  states, preserving `generationPolicyStatus=retrying` and
+  `retryFailedItemsOnly=true`, while terminal `complete`,
+  `partially_complete`, `failed`, and `needs_attention` clear stale retrying.
+- Available validation passed `python3 -m py_compile` on the focused static
+  test, direct no-pytest actual-path static regression, direct Node actual-path
+  active and terminal assertions, `npm run check:studio-js`, project `.venv`
+  focused pytest (`8 passed`), and `git diff --check`.
+- No fetch/pull/push/source-sync, provider call/gate, Runtime/Studio
+  server/browser run, deploy/restart, generated-media QA,
+  OpenAPI/DOC2/COS/CompanyOS/source-KB mutation,
+  readiness/human/business/public/legal claim, durable-memory promotion, local
+  master integration, archive execution, or self-archive occurred.
+
+## 2026-07-04 - P0 Multi-Candidate Job-State Retry
+
+- Completed bounded lane `IMPL-P0-MULTI-CANDIDATE-JOB-STATE-RETRY` for
+  dispatch
+  `TD-AFS-V02-IMPL-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704-001`
+  on `codex/p0-multi-candidate-job-state-retry-20260704`.
+- Fixed the Studio keyframe retry-state bridge so failed-items-only retry state
+  survives active Runtime responses (`submitted`, `pending`, `running`) after
+  a multi-candidate retry submit, including bootstrap refresh and background
+  polling.
+- Guarded retry policy summarization so terminal responses clear `retrying`
+  and settle into `complete`, `partially_complete`, `failed`, or
+  `needs_attention` instead of keeping stale retry job state.
+- Added a focused static/Node regression for a two-candidate retry proving
+  active retry keeps `generationPolicyStatus=retrying` and
+  `retryFailedItemsOnly=true`, then terminal success clears retrying.
+- Validation passed `python3 -m py_compile` on the focused static test,
+  `npm run check:studio-js` (`139 files`), direct no-pytest execution of the
+  new static regression, a direct Node retry-state assertion, and
+  `git diff --check`. Focused pytest is blocked because `/usr/bin/python3` has
+  no `pytest`.
+- Preserved unrelated Owner dirty docs by working in an isolated worktree. No
+  fetch/pull/push/source-sync, provider call/gate, Runtime/Studio server run,
+  deploy/restart, generated-media QA, OpenAPI/DOC2/COS/CompanyOS/source-KB
+  mutation, readiness/human/business/public/legal claim, durable-memory
+  promotion, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-20260704.md`.
+
 ## 2026-07-04 - P0 Node Reference Stack Priority Eval Gaps Recovery
 
 - Completed bounded recovery lane
