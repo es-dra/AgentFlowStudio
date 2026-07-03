@@ -73,6 +73,7 @@ def register_runtime_storyboard_routes(app: FastAPI, store: RuntimeStore) -> Non
             "job": public_job,
             "shots": result["shots"],
             "asset_graph": result["asset_graph"],
+            "asset_auto_binding_graph": result["asset_auto_binding_graph"],
             "content_quality_report": result["content_quality_report"],
             "production_graph": result["production_graph"],
             "asset_card_candidates": result["asset_card_candidates"],
@@ -144,6 +145,7 @@ def build_storyboard_breakdown(
         content_quality_report=content_quality_report,
         fixed_visual_assets=fixed_visual_assets or [],
     )
+    asset_auto_binding_graph = production_graph.get("asset_auto_binding_graph") if isinstance(production_graph.get("asset_auto_binding_graph"), dict) else {}
     asset_card_candidates = build_asset_card_candidates(project_id=project_id, asset_graph=asset_graph)
     safe_manifest = {
         "artifact_type": "agentflow_storyboard_breakdown_safe_manifest",
@@ -160,6 +162,15 @@ def build_storyboard_breakdown(
         "asset_graph_asset_count": int(asset_graph.get("asset_count") or 0),
         "content_quality_report_status": content_quality_report["summary"]["status"],
         "production_graph_node_count": production_graph["summary"]["node_count"],
+        "asset_auto_binding_suggested_count": int(
+            (asset_auto_binding_graph.get("summary") or {}).get("suggested_binding_count") or 0
+        ),
+        "asset_auto_binding_established_count": int(
+            (asset_auto_binding_graph.get("summary") or {}).get("established_binding_count") or 0
+        ),
+        "asset_auto_binding_blocked_count": int(
+            (asset_auto_binding_graph.get("summary") or {}).get("blocked_candidate_count") or 0
+        ),
         "fixed_visual_asset_source_evidence_count": sum(
             1 for item in (fixed_visual_assets or []) if isinstance(item, dict) and item.get("source_evidence")
         ),
@@ -183,6 +194,7 @@ def build_storyboard_breakdown(
         content_quality_report=content_quality_report,
         production_graph=production_graph,
         asset_card_candidates=asset_card_candidates,
+        asset_auto_binding_graph=asset_auto_binding_graph,
     )
     safe_manifest["evidence_ledger_entry_count"] = len(evidence_ledger["evidence_items"])
     safe_manifest["evidence_ledger_stage"] = evidence_ledger["ledger_stage"]
@@ -216,6 +228,7 @@ def build_storyboard_breakdown(
         reject_unsafe_payload(payload)
     reject_unsafe_payload(content_quality_report)
     reject_unsafe_payload(production_graph)
+    reject_unsafe_payload(asset_auto_binding_graph)
     reject_unsafe_payload(asset_card_candidates)
     reject_unsafe_payload(evidence_ledger)
     return {
@@ -225,6 +238,7 @@ def build_storyboard_breakdown(
         "safe_manifest": safe_manifest,
         "safe_artifact": artifact,
         "asset_graph": asset_graph,
+        "asset_auto_binding_graph": asset_auto_binding_graph,
         "content_quality_report": content_quality_report,
         "production_graph": production_graph,
         "asset_card_candidates": asset_card_candidates,

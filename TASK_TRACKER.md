@@ -6,7 +6,36 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-03 by Codex
+Last updated: 2026-07-04 by Codex
+
+Asset auto-binding reversible graph addendum: Lane
+`IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH` completed bounded contract and
+implementation slice for dispatch
+`TD-AFS-V02-IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH-20260704-001` on
+`codex/asset-auto-binding-reversible-graph-20260704`; BU
+`BU-AFS-V02-IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH-20260704-001`, close
+state `asset_auto_binding_reversible_graph_completed`. The slice adds
+`agentflow.algorithms.asset_auto_binding` with deterministic exact
+type/normalized-label matching, confidence threshold `0.82`, required candidate
+evidence, required fixed source evidence, duplicate/unsupported/merge-candidate
+fail-closed blocking, and explicit reversible `unbind` plans. Production graph
+snapshots now include safe `asset_auto_binding_established` relationships and a
+nested `agentflow_asset_auto_binding_graph`; storyboard output also writes a
+standalone `asset_auto_binding_graph` artifact, safe manifest counts, and
+evidence ledger role. Available validation passed `python3 -m py_compile` on
+touched Python files/tests, `git diff --check`, pure no-pytest binding
+assertions, static contract assertions, and direct production-graph integration
+assertions. CLI help/version checks are blocked because `/usr/bin/python3` has
+no `typer`; focused pytest is blocked because `/usr/bin/python3` has no
+`pytest`; direct Runtime route substitute is blocked because `/usr/bin/python3`
+has no `fastapi`, and no `.venv` is present. No provider call/rerun,
+generated-media QA, human acceptance, node reference stack UI,
+multi-candidate retry engine, keyframe edit, video adherence implementation,
+source-sync/fetch/pull/push, deploy/restart/runtime server mutation,
+OpenAPI/DOC2/COS/CompanyOS mutation, fixed-asset promotion, durable-memory
+promotion, readiness, human/business/public/legal claim, archive execution, or
+self-archive is claimed. Handoff:
+`docs/handoff/AFS-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH-20260704.md`.
 
 Safe packet and Studio vocabulary contract integration addendum: Lane
 `INT-P1-P0-SAFE-PACKET-AND-STUDIO-VOCAB-CONTRACT` integrated accepted safe

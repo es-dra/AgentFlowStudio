@@ -13,6 +13,7 @@ def write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: di
     write_json(output_dir / "storyboard_breakdown_safe_artifact.json", result["safe_artifact"])
     write_json(output_dir / "storyboard_breakdown_safe_manifest.json", result["safe_manifest"])
     write_json(output_dir / "asset_graph.json", result["asset_graph"])
+    write_json(output_dir / "asset_auto_binding_graph.json", result["asset_auto_binding_graph"])
     write_json(output_dir / "content_quality_report.json", result["content_quality_report"])
     write_json(output_dir / "production_graph_snapshot.json", result["production_graph"])
     write_json(output_dir / "asset_card_candidates.json", result["asset_card_candidates"])
@@ -33,6 +34,10 @@ def write_storyboard_artifacts(store: RuntimeStore, output_dir: Path, result: di
         "asset_graph": store.register_artifact(
             output_dir / "asset_graph.json",
             role="asset_graph",
+        ),
+        "asset_auto_binding_graph": store.register_artifact(
+            output_dir / "asset_auto_binding_graph.json",
+            role="asset_auto_binding_graph",
         ),
         "content_quality_report": store.register_artifact(
             output_dir / "content_quality_report.json",

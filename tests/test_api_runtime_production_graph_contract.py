@@ -134,6 +134,72 @@ def test_storyboard_production_graph_includes_fixed_asset_source_evidence(tmp_pa
     assert "d:\\" not in serialized
 
 
+def test_storyboard_production_graph_auto_binds_reversible_fixed_asset(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_production_graph_auto_binding"
+    image_asset_id = _upload_image(client, project_id)
+    fixed_asset = _promote_fixed_asset(
+        client,
+        project_id,
+        image_asset_id,
+        asset_type="prop",
+        label="地图",
+        signature="paper map with red route markings",
+        feature_card={"appearance": "creased paper map with red route markings"},
+        negative_locks=["keep the red route markings"],
+        source_asset_card_candidate_id="asset_card_candidate:graph_prop_地图",
+    )
+
+    response = client.post(
+        f"/projects/{project_id}/storyboard-breakdowns",
+        json={
+            "node_id": "script_graph_auto_binding_001",
+            "script_text": "林晚在办公室检查地图。她把地图按在墙上，对照远处闪烁的路灯。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "generated_at": "2026-07-04T00:20:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    binding_graph = payload["asset_auto_binding_graph"]
+    production_graph = payload["production_graph"]
+    relationships = production_graph["relationships"]
+    ledger_roles = {item["artifact_role"] for item in payload["evidence_ledger"]["evidence_items"]}
+    serialized = json.dumps(binding_graph, ensure_ascii=False).lower()
+
+    assert binding_graph == production_graph["asset_auto_binding_graph"]
+    assert binding_graph["artifact_type"] == "agentflow_asset_auto_binding_graph"
+    assert binding_graph["summary"]["established_binding_count"] == 1
+    assert binding_graph["summary"]["suggested_binding_count"] == 1
+    assert payload["safe_manifest"]["asset_auto_binding_established_count"] == 1
+    assert "asset_auto_binding_graph" in payload["artifacts"]
+    assert "asset_auto_binding_graph" in ledger_roles
+
+    suggestion = binding_graph["binding_suggestions"][0]
+    assert suggestion["graph_asset_id"] == "graph:prop:地图"
+    assert suggestion["fixed_visual_asset_id"] == fixed_asset["asset_id"]
+    assert suggestion["reversal_plan"]["action"] == "unbind"
+    assert suggestion["lineage_refs"]["source_asset_card_candidate_id"] == "asset_card_candidate:graph_prop_地图"
+    assert {
+        "relationship_type": "asset_auto_binding_established",
+        "from_node_id": "asset:graph:prop:地图",
+        "to_node_id": f"fixed_asset:{fixed_asset['asset_id']}",
+        "binding_id": suggestion["binding_id"],
+        "binding_state": "bound",
+        "confidence": 0.82,
+        "explainable": True,
+        "reversible": True,
+        "undo_action": "unbind",
+        "source": "afs.asset_auto_binding.v0.1",
+    } in relationships
+    assert response_contains_unsafe_marker(binding_graph) is False
+    assert "data_base64" not in serialized
+    assert "signed_url" not in serialized
+
+
 def _upload_image(client: TestClient, project_id: str) -> str:
     response = client.post(
         f"/projects/{project_id}/image-assets",
@@ -150,19 +216,30 @@ def _upload_image(client: TestClient, project_id: str) -> str:
     return response.json()["asset"]["asset_id"]
 
 
-def _promote_fixed_asset(client: TestClient, project_id: str, image_asset_id: str) -> dict:
+def _promote_fixed_asset(
+    client: TestClient,
+    project_id: str,
+    image_asset_id: str,
+    *,
+    asset_type: str = "character",
+    label: str = "Lin Wan",
+    signature: str = "black short hair, red trench coat, scar above left brow",
+    feature_card: dict | None = None,
+    negative_locks: list[str] | None = None,
+    source_asset_card_candidate_id: str = "asset_card_candidate:main_character",
+) -> dict:
     response = client.post(
         f"/projects/{project_id}/visual-assets/promote",
         json={
             "source_image_asset_refs": [image_asset_id],
-            "asset_type": "character",
-            "label": "Lin Wan",
-            "signature": "black short hair, red trench coat, scar above left brow",
-            "feature_card": {"appearance": "young woman with black short hair"},
-            "negative_locks": ["keep black short hair"],
+            "asset_type": asset_type,
+            "label": label,
+            "signature": signature,
+            "feature_card": feature_card or {"appearance": "young woman with black short hair"},
+            "negative_locks": negative_locks or ["keep black short hair"],
             "source_node_id": "node-ref",
             "source_human_gate_id": "runtime-human-gate:demo:accepted",
-            "source_asset_card_candidate_id": "asset_card_candidate:main_character",
+            "source_asset_card_candidate_id": source_asset_card_candidate_id,
             "review_decision": "fixed",
             "reviewed_at": "2026-06-30T23:52:00+08:00",
         },

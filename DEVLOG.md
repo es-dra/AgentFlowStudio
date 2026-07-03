@@ -1,5 +1,36 @@
 # Devlog
 
+## 2026-07-04 - Asset Auto-Binding Reversible Graph
+
+- Completed bounded lane `IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH` for
+  dispatch
+  `TD-AFS-V02-IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH-20260704-001` on
+  `codex/asset-auto-binding-reversible-graph-20260704`.
+- Added `agentflow.algorithms.asset_auto_binding` with contract id
+  `afs.asset_auto_binding.v0.1`, deterministic exact type/normalized-label
+  matching, confidence threshold `0.82`, explainability requirements, explicit
+  `unbind` reversal plans, and fail-closed blocked candidate reasons.
+- Integrated the safe binding graph into production graph snapshots, storyboard
+  response/artifact output, safe manifest counts, and evidence ledger roles.
+- Added focused regression coverage for contract export, reversible established
+  relationships, low-confidence/missing-evidence blocking, ambiguous match
+  blocking, and Runtime production graph exposure.
+- Available validation passed `python3 -m py_compile` on touched Python files
+  and focused tests, `git diff --check`, pure no-pytest algorithm assertions,
+  static contract assertions, and direct production-graph integration
+  assertions. CLI help/version checks are blocked because `/usr/bin/python3`
+  has no `typer`; focused pytest is blocked because `/usr/bin/python3` has no
+  `pytest`; direct Runtime route substitute is blocked because `/usr/bin/python3`
+  has no `fastapi`, and no `.venv` is present.
+- No provider calls/reruns, generated-media QA, human acceptance, node reference
+  stack UI, multi-candidate retry engine, keyframe edit, video adherence,
+  deploy/restart/runtime server mutation, source-sync/fetch/pull/push,
+  OpenAPI/DOC2/COS/CompanyOS mutation, fixed-asset promotion,
+  durable-memory promotion, readiness, human/business/public/legal claim,
+  archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH-20260704.md`.
+
 ## 2026-07-04 - Safe Packet And Studio Vocabulary Contract Integration
 
 - Integrated accepted safe human-review packet/redaction tip

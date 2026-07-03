@@ -4,7 +4,7 @@ from typing import Any
 
 
 ALGORITHM_ID = "afs.evidence_ledger.v0.1"
-INPUT_CONTRACT = "storyboard safe manifest, candidate asset graph, quality report, production graph, asset-card candidates"
+INPUT_CONTRACT = "storyboard safe manifest, candidate asset graph, auto-binding graph, quality report, production graph, asset-card candidates"
 OUTPUT_CONTRACT = "safe evidence ledger with artifact roles, evidence states, provider boundary, and non-claims"
 FAILURE_MODES = ("missing_safe_manifest", "missing_artifact_role", "unsafe_evidence_field", "claim_state_collapse")
 EVIDENCE_BOUNDARY = "structure and runtime evidence only; no provider smoke, human acceptance, or business validation claim"
@@ -31,7 +31,9 @@ def build_storyboard_evidence_ledger(
     content_quality_report: dict[str, Any],
     production_graph: dict[str, Any],
     asset_card_candidates: dict[str, Any],
+    asset_auto_binding_graph: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    binding_graph = asset_auto_binding_graph if isinstance(asset_auto_binding_graph, dict) else {}
     evidence_items = [
         _item(
             "storyboard_breakdown_request_plan",
@@ -65,6 +67,17 @@ def build_storyboard_evidence_ledger(
             {
                 "candidate_asset_count": _int(asset_graph.get("asset_count")),
                 "unsupported_addition_count": len(_list(asset_graph.get("unsupported_additions"))),
+            },
+        ),
+        _item(
+            "asset_auto_binding_graph",
+            "agentflow_asset_auto_binding_graph",
+            "structure_verified_fail_closed",
+            "binding_review_available",
+            {
+                "established_binding_count": _int(_summary(binding_graph).get("established_binding_count")),
+                "blocked_candidate_count": _int(_summary(binding_graph).get("blocked_candidate_count")),
+                "writes_fixed_asset": False,
             },
         ),
         _item(

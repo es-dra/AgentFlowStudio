@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from agentflow.algorithms.asset_auto_binding import build_asset_auto_binding_graph
+
 
 ALGORITHM_ID = "afs.production_graph.v0.1"
-INPUT_CONTRACT = "script id, structured shots, candidate asset graph, content quality report"
-OUTPUT_CONTRACT = "safe production graph snapshot with script, shot, asset, and quality nodes"
+INPUT_CONTRACT = "script id, structured shots, candidate asset graph, content quality report, fixed visual assets"
+OUTPUT_CONTRACT = "safe production graph snapshot with script, shot, asset, quality, and reversible binding edges"
 FAILURE_MODES = ("missing_script_node", "missing_shot_nodes", "missing_asset_nodes", "missing_quality_report")
 EVIDENCE_BOUNDARY = "candidate production graph only; no fixed asset memory, provider smoke, or human acceptance"
 
@@ -35,6 +37,11 @@ def build_storyboard_production_graph(
     shot_nodes = _shot_nodes(shots)
     asset_nodes = _asset_nodes(asset_graph)
     fixed_asset_nodes = _fixed_visual_asset_nodes(fixed_visual_assets)
+    asset_auto_binding_graph = build_asset_auto_binding_graph(
+        project_id=project_id,
+        asset_graph=asset_graph,
+        fixed_visual_assets=fixed_visual_assets or [],
+    )
     quality_node = _quality_node(safe_script_id, content_quality_report)
     nodes = [
         _script_node(script_graph_node_id, script_node_id, script_text),
@@ -47,6 +54,7 @@ def build_storyboard_production_graph(
         *_script_shot_relationships(script_graph_node_id, shot_nodes),
         *_shot_asset_relationships(asset_graph),
         *_script_fixed_asset_relationships(script_graph_node_id, fixed_asset_nodes),
+        *_list(asset_auto_binding_graph.get("relationships")),
         {
             "relationship_type": "quality_report_evaluates_storyboard",
             "from_node_id": quality_node["node_id"],
@@ -67,11 +75,15 @@ def build_storyboard_production_graph(
             "shot_count": len(shot_nodes),
             "asset_count": len(asset_nodes),
             "fixed_visual_asset_count": len(fixed_asset_nodes),
+            "asset_auto_binding_suggested_count": _summary_int(asset_auto_binding_graph, "suggested_binding_count"),
+            "asset_auto_binding_established_count": _summary_int(asset_auto_binding_graph, "established_binding_count"),
+            "asset_auto_binding_blocked_count": _summary_int(asset_auto_binding_graph, "blocked_candidate_count"),
             "human_review_needed": True,
             "content_quality_status": str(content_quality_report.get("summary", {}).get("status") or ""),
         },
         "nodes": nodes,
         "relationships": relationships,
+        "asset_auto_binding_graph": asset_auto_binding_graph,
         "writes_long_term_memory": False,
         "writes_company_kb": False,
         "non_claims": NON_CLAIMS,
@@ -256,6 +268,14 @@ def _safe_id(value: str) -> str:
 
 def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _summary_int(payload: dict[str, Any], key: str) -> int:
+    summary = payload.get("summary") if isinstance(payload, dict) else {}
+    try:
+        return int((summary if isinstance(summary, dict) else {}).get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 __all__ = (
