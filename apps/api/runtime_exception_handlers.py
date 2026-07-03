@@ -68,7 +68,7 @@ def normalize_http_error_detail(request: Request, exc: HTTPException) -> dict[st
         details = {"raw_detail": str(raw or "")[:160]} if raw else {}
     context = request_context(request)
     path_project_id = project_id_from_path(request.url.path)
-    return safe_error_detail(
+    detail = safe_error_detail(
         error,
         message=message,
         user_action=user_action,
@@ -82,6 +82,9 @@ def normalize_http_error_detail(request: Request, exc: HTTPException) -> dict[st
         retryable=bool((raw if isinstance(raw, dict) else {}).get("retryable", exc.status_code in {408, 409, 429, 500, 502, 503, 504})),
         details=safe_public_details(details),
     )
+    if isinstance(raw, dict) and isinstance(raw.get("provider_calls_started"), bool):
+        detail["provider_calls_started"] = raw["provider_calls_started"]
+    return detail
 
 
 def validation_error_detail(request: Request, exc: RequestValidationError) -> dict[str, Any]:

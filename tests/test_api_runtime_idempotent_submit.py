@@ -129,7 +129,8 @@ def _assert_idempotency_conflict(response, *, existing_job_id: str) -> None:
     detail = response.json()["detail"]
     assert detail["error"] == "idempotency_conflict"
     assert detail["stage"] == "idempotency"
-    assert detail["status"] == "conflict"
+    assert detail["status"] == "failed"
+    assert detail["retryable"] is False
     assert detail["provider_calls_started"] is False
     assert detail["details"]["provider_calls_started"] is False
     assert detail["details"]["existing_job_id"] == existing_job_id
