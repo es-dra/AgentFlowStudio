@@ -1,5 +1,31 @@
 # Devlog
 
+## 2026-07-03 - Runtime Idempotent Submit Redispatch Durable Candidate
+
+- Completed bounded backend implementation on
+  `codex/runtime-idempotent-submit-redispatch-durable-20260703` for dispatch
+  `TD-AFS-V02-IMP-P1-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703-001`.
+- Added a file-backed Runtime submit idempotency ledger for keyframe, video, and
+  generation-comparison submit routes, scoped by project/action/stable request
+  id and backed by canonical request fingerprints.
+- Duplicate completed submits with the same stable request id replay the same
+  public response and `job_id`; changed payloads with the same stable id return
+  409 `idempotency_conflict` before job allocation or provider-capable dispatch,
+  with `provider_calls_started=false`.
+- Added focused tests in `tests/test_api_runtime_idempotent_submit.py` for
+  replay and changed-request conflict across the three submit surfaces.
+- Verification passed: `python3 -m py_compile` on touched Runtime/test modules
+  and `git diff --check`.
+- Pytest and adjacent Runtime suites are blocked in this checkout because there
+  is no `.venv`, no `python` command, `/usr/bin/python3` has no `pytest`, `pip`,
+  `fastapi`, or `pydantic`.
+- No provider gate was opened; no live provider call, generated media,
+  generated-media QA, server/deploy/restart, OpenAPI mutation, CompanyOS/COS
+  mutation, durable-memory promotion, human acceptance, product/business/public
+  or legal readiness, push, or merge occurred.
+- Handoff:
+  `docs/handoff/AFS-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703.md`.
+
 ## 2026-07-03 - Tracker / Devlog Current State Index Pointer
 
 - Added an additive current-state maintenance index for tracker/devlog routing:

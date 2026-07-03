@@ -23,6 +23,12 @@ from apps.api.runtime_logging import (
 )
 from apps.api.runtime_models import VideoGenerationRequest
 from apps.api.runtime_store import RuntimeStore
+from apps.api.runtime_submit_idempotency import (
+    abort_submit_idempotency,
+    begin_submit_idempotency,
+    complete_submit_idempotency,
+    submit_idempotency_error_detail,
+)
 from apps.api.runtime_video_candidates import candidate_file
 from apps.api.runtime_video_constants import SAFE_CANDIDATE_ID, VIDEO_SUFFIX_TYPES
 from apps.api.runtime_video_dispatch import poll_video_generation, submit_video_generation
@@ -159,6 +165,25 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
                 )
                 _log_video_rejected(http_request, detail)
                 raise HTTPException(status_code=409, detail=detail)
+        idempotency = begin_submit_idempotency(
+            store,
+            project_id=project_id,
+            action="video_generation",
+            request=request,
+            request_id=request_id,
+            client_request_id=client_request_id,
+        )
+        if idempotency.state == "replay":
+            return idempotency.response or {}
+        if idempotency.state in {"conflict", "pending"}:
+            detail = submit_idempotency_error_detail(
+                idempotency,
+                request_id=request_id,
+                client_request_id=client_request_id,
+                node_id=node_id,
+            )
+            _log_video_rejected(http_request, detail)
+            raise HTTPException(status_code=409, detail=detail)
         job_id = store.new_job_id("video_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -174,6 +199,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
                 client_request_id=client_request_id,
             )
         except RuntimeApiError as exc:
+            abort_submit_idempotency(idempotency)
             _raise_runtime_api_error(http_request, exc, project_id=project_id, node_id=node_id, action="video_generation", job_id=job_id)
         except ValueError as exc:
             detail = safe_error_detail(
@@ -187,6 +213,7 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
                 stage="submit",
                 details={"reason": str(exc), "job_id": job_id},
             )
+            abort_submit_idempotency(idempotency)
             _log_video_rejected(http_request, detail)
             raise HTTPException(status_code=422, detail=detail) from exc
         job = write_video_job(store, project_id, job_id, result)
@@ -211,6 +238,12 @@ def register_runtime_video_routes(app: FastAPI, store: RuntimeStore) -> None:
             reason=_first_block_reason(result),
             provider_calls_started=response.get("provider_calls_started"),
             elapsed_ms=_elapsed_ms(started),
+        )
+        complete_submit_idempotency(
+            idempotency,
+            job_id=job_id,
+            response=response,
+            provider_calls_started=bool(response.get("provider_calls_started")),
         )
         return response
 

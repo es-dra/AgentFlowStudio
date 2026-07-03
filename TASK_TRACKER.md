@@ -16,6 +16,26 @@ Owner/CTO gates, use
 an additive pointer only; no tracker content has been pruned, archived, deleted,
 or promoted to readiness/provider/human/business/legal/COS claims.
 
+Runtime idempotent submit redispatch durable addendum: Lane
+`IMP-P1-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE` implemented a bounded
+Runtime submit idempotency candidate on
+`codex/runtime-idempotent-submit-redispatch-durable-20260703` for dispatch
+`TD-AFS-V02-IMP-P1-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703-001`.
+Runtime keyframe, video, and generation-comparison submit routes now reserve a
+project/action/stable-request-id ledger before job allocation or provider-capable
+dispatch. Completed duplicate submits replay the same public response and job
+identity; changed payloads with the same stable request id return 409
+`idempotency_conflict` with `provider_calls_started=false`. Focused tests were
+added in `tests/test_api_runtime_idempotent_submit.py`; available verification
+passed `python3 -m py_compile` on touched Runtime/test modules and
+`git diff --check`. Pytest and adjacent suites are blocked in this checkout
+because there is no `.venv`, no `python` command, and `/usr/bin/python3` lacks
+`pytest`, `pip`, `fastapi`, and `pydantic`. No provider gate was opened, no live
+provider call, generated-media QA, server/deploy/restart, OpenAPI mutation,
+CompanyOS/COS mutation, durable-memory promotion, human acceptance,
+product/business/public/legal readiness, push, or merge is claimed. Handoff:
+`docs/handoff/AFS-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE-20260703.md`.
+
 P0 Runtime + Studio state recovery integration candidate addendum: Integration
 branch `codex/p0-state-recovery-integration-20260703` was created from
 baseline/reference `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` in

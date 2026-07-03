@@ -32,6 +32,12 @@ from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_recovery_contract import runtime_recovery_envelope
 from apps.api.runtime_store import safe_id
 from apps.api.runtime_store import RuntimeStore
+from apps.api.runtime_submit_idempotency import (
+    abort_submit_idempotency,
+    begin_submit_idempotency,
+    complete_submit_idempotency,
+    submit_idempotency_error_detail,
+)
 from apps.api.runtime_tracing import artifact_refs, blocked_refs_from_blocks, write_run_trace
 
 
@@ -154,6 +160,25 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
                 )
                 _log_keyframe_rejected(http_request, detail, status_code=409, elapsed_ms=_elapsed_ms(started))
                 raise HTTPException(status_code=409, detail=detail)
+        idempotency = begin_submit_idempotency(
+            store,
+            project_id=project_id,
+            action="keyframe_generation",
+            request=request,
+            request_id=request_id,
+            client_request_id=client_request_id,
+        )
+        if idempotency.state == "replay":
+            return idempotency.response or {}
+        if idempotency.state in {"conflict", "pending"}:
+            detail = submit_idempotency_error_detail(
+                idempotency,
+                request_id=request_id,
+                client_request_id=client_request_id,
+                node_id=node_id,
+            )
+            _log_keyframe_rejected(http_request, detail, status_code=409, elapsed_ms=_elapsed_ms(started))
+            raise HTTPException(status_code=409, detail=detail)
         job_id = store.new_job_id("keyframe_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         try:
@@ -201,6 +226,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
                 stage="submit",
                 details={"reason": str(exc), "job_id": job_id},
             )
+            abort_submit_idempotency(idempotency)
             _log_keyframe_rejected(http_request, detail, elapsed_ms=_elapsed_ms(started))
             raise HTTPException(status_code=422, detail=detail) from exc
         artifacts["agentflow_run_trace"] = store.register_artifact(trace_path, role="agentflow_run_trace")
@@ -257,7 +283,7 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             block_count=len(safe_manifest.get("blocks") or []),
             elapsed_ms=_elapsed_ms(started),
         )
-        return {
+        response_payload = {
             "job": public_job,
             "provider_gate": result["provider_gate"],
             "provider_calls_started": result["provider_calls_started"],
@@ -274,6 +300,13 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
             "flow": build_flow_summary(store, project_id),
             "non_claims": KEYFRAME_NON_CLAIMS,
         }
+        complete_submit_idempotency(
+            idempotency,
+            job_id=job_id,
+            response=response_payload,
+            provider_calls_started=bool(result["provider_calls_started"]),
+        )
+        return response_payload
 
     @app.post("/projects/{project_id}/keyframe-generations/{job_id}/poll")
     def poll_keyframe_generation_route(project_id: str, job_id: str, http_request: Request) -> dict[str, Any]:

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from agentflow.harness.json_io import write_json
 from apps.api.runtime_errors import safe_error_detail
@@ -17,9 +17,16 @@ from apps.api.runtime_generation_preflight import (
 )
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
+from apps.api.runtime_logging import client_request_id_from_request, request_id_from_request
 from apps.api.runtime_models import GenerationComparisonRequest, KeyframeGenerationRequest
 from apps.api.runtime_recovery_contract import public_batch_status, runtime_recovery_envelope
 from apps.api.runtime_store import RuntimeStore, read_json, reject_unsafe_payload
+from apps.api.runtime_submit_idempotency import (
+    abort_submit_idempotency,
+    begin_submit_idempotency,
+    complete_submit_idempotency,
+    submit_idempotency_error_detail,
+)
 from apps.api.runtime_tracing import artifact_refs, write_run_trace
 
 
@@ -41,8 +48,10 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_generation_comparison")) from exc
 
     @app.post("/projects/{project_id}/generation-comparisons")
-    def generation_comparison(project_id: str, request: GenerationComparisonRequest) -> dict[str, Any]:
+    def generation_comparison(project_id: str, request: GenerationComparisonRequest, http_request: Request) -> dict[str, Any]:
         store.ensure_project_manifest(project_id)
+        request_id = request_id_from_request(http_request)
+        client_request_id = client_request_id_from_request(http_request)
         preflight_requirement = generation_comparison_submit_preflight_requirement(request)
         if preflight_requirement["required"] and not request.preflight_token:
             raise HTTPException(
@@ -81,11 +90,30 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
                         details={"provider_calls_started": False},
                     ),
                 )
+        idempotency = begin_submit_idempotency(
+            store,
+            project_id=project_id,
+            action="generation_comparison",
+            request=request,
+            request_id=request_id,
+            client_request_id=client_request_id,
+        )
+        if idempotency.state == "replay":
+            return idempotency.response or {}
+        if idempotency.state in {"conflict", "pending"}:
+            detail = submit_idempotency_error_detail(
+                idempotency,
+                request_id=request_id,
+                client_request_id=client_request_id,
+                node_id=request.node_id or "",
+            )
+            raise HTTPException(status_code=409, detail=detail)
         job_id = store.new_job_id("generation_comparison", project_id)
         output_dir = store.run_dir(project_id, job_id)
         try:
             report = build_generation_comparison_report(store, project_id, request, output_dir)
         except ValueError as exc:
+            abort_submit_idempotency(idempotency)
             raise HTTPException(status_code=422, detail=safe_error_detail("invalid_generation_comparison")) from exc
         artifact = store.register_artifact(output_dir / "generation_comparison_report.json", role="generation_comparison_report")
         artifacts = {"generation_comparison_report": artifact}
@@ -123,7 +151,7 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
             stage="comparison",
             non_claims=COMPARISON_NON_CLAIMS,
         )
-        return {
+        response_payload = {
             "job": public_job,
             "report": report,
             "artifacts": artifacts,
@@ -134,6 +162,13 @@ def register_runtime_generation_comparison_routes(app: FastAPI, store: RuntimeSt
             "flow": build_flow_summary(store, project_id),
             "non_claims": COMPARISON_NON_CLAIMS,
         }
+        complete_submit_idempotency(
+            idempotency,
+            job_id=job_id,
+            response=response_payload,
+            provider_calls_started=bool(report["provider_calls_started"]),
+        )
+        return response_payload
 
 
 def build_generation_comparison_preflight(
