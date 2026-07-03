@@ -8,6 +8,59 @@
 
 Last updated: 2026-07-04 by Codex
 
+P0 node reference stack priority eval gaps recovery addendum: Lane
+`FIX-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS` completed bounded evaluator
+recovery for dispatch
+`TD-AFS-V02-FIX-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS-20260704-001` on
+`codex/p0-node-reference-stack-priority-20260704`. The recovery changes
+node-reference reversal actions to use a Studio-compatible per-entity map, so
+selected `generation_candidate` references emit `reject` rather than
+`replace`; blocks `data:*`, `data:image/...;base64`, raw base64 media
+signatures, long base64 media-byte-like refs, and bytes targets; and fails
+closed when imported `agentflow_asset_auto_binding_graph` suggestions have an
+empty fixed asset id, missing `asset_auto_binding_established` relationship, or
+missing/incomplete source relationship. Available validation passed
+`.venv/bin/python -m py_compile` on touched Python modules/tests,
+`git diff --check`, focused pytest `8 passed`, and direct no-pytest assertions
+for action applicability, unsafe target blocking, and malformed asset-binding
+graph fail-closed behavior. Unrelated dirty owner-matrix and demo/maintenance
+docs were preserved outside the staged recovery. No master integration,
+source-sync/fetch/pull/push, provider call/gate, Runtime/Studio UI/OpenAPI/DOC2
+/COS/CompanyOS mutation, deploy/restart/server action, generated-media QA,
+readiness claim, human/business/public/legal claim, durable-memory promotion,
+archive execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS-20260704.md`.
+
+P0 node reference stack priority addendum: Lane
+`IMPL-P0-NODE-REFERENCE-STACK-PRIORITY` completed a bounded contract/model
+slice for dispatch
+`TD-AFS-V02-IMPL-P0-NODE-REFERENCE-STACK-PRIORITY-20260704-001` on
+`codex/p0-node-reference-stack-priority-20260704`; BU
+`BU-AFS-V02-IMPL-P0-NODE-REFERENCE-STACK-PRIORITY-20260704-001`, close state
+`node_reference_stack_priority_completed`. The slice adds
+`agentflow.algorithms.node_reference_stack` with explicit reference
+type/scope/status/target-slot/priority fields, deterministic priority then
+scope then Studio entity type precedence, fail-closed
+`unresolved_equal_rank_conflict` handling, explainability and reversible
+`unbind`/`replace` boundaries, and no provider or memory writes. It registers
+the module in the algorithm library, depends on existing Studio vocabulary ids
+for Project Asset, Reference Input, Generation Candidate, Keyframe Version,
+Video Revision, Binding, and Lineage, and imports established
+`asset_auto_binding_established` suggestions as reversible `binding`
+references where present. Available validation passed `python3 -m py_compile`
+on touched node reference stack modules/tests, `git diff --check`, direct
+no-pytest execution of the new test functions, asset-binding stack assertions,
+equal-rank conflict assertions, and Studio vocabulary marker assertions; focused
+pytest remains blocked because `/usr/bin/python3` has no `pytest`, and CLI
+help/version checks remain blocked because `/usr/bin/python3` has no `typer`.
+No provider behavior change/call/rerun, generated-media QA, node UI redesign,
+Runtime, OpenAPI, DOC2, COS, or CompanyOS mutation, multi-candidate retry
+engine, keyframe edit, video adherence, source-sync/fetch/pull/push,
+deploy/restart/server mutation,
+durable-memory promotion, readiness, human/business/public/legal claim, archive
+execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-NODE-REFERENCE-STACK-PRIORITY-20260704.md`.
+
 Asset auto-binding reversible graph addendum: Lane
 `IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH` completed bounded contract and
 implementation slice for dispatch

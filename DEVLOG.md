@@ -1,5 +1,74 @@
 # Devlog
 
+## 2026-07-04 - P0 Node Reference Stack Priority Eval Gaps Recovery
+
+- Completed bounded recovery lane
+  `FIX-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS` for dispatch
+  `TD-AFS-V02-FIX-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS-20260704-001`
+  on `codex/p0-node-reference-stack-priority-20260704`.
+- Fixed evaluator gap `action applicability mismatch` by mapping node-reference
+  reversal actions per Studio entity; selected `generation_candidate`
+  references now emit `reject` instead of `replace`, and focused coverage
+  asserts every emitted reversal action applies to the reference entity in the
+  Studio vocabulary.
+- Fixed unsafe target handling by blocking `data:*`, `data:image/...;base64`,
+  raw base64 media signatures, long base64 media-byte-like targets, and bytes
+  input while redacting unsafe target refs from the output.
+- Hardened `agentflow_asset_auto_binding_graph` imports so bound suggestions
+  fail closed when the fixed asset id is empty, the
+  `asset_auto_binding_established` relationship is missing, or the source
+  relationship is incomplete/mismatched.
+- Validation passed `.venv/bin/python -m py_compile` on touched Python modules
+  and focused tests, `git diff --check`,
+  `.venv/bin/python -m pytest tests/test_node_reference_stack_contract.py -q`
+  (`8 passed`), and a direct no-pytest assertion script covering reversal
+  `appliesTo`, data/base64 target blocking, and malformed asset-binding graph
+  fail-closed behavior.
+- Preserved unrelated dirty owner-matrix and demo/maintenance docs outside this
+  recovery. No master integration, source-sync/fetch/pull/push, provider
+  gate/call, Runtime/Studio UI/OpenAPI/DOC2/COS/CompanyOS mutation,
+  deploy/restart/server action, generated-media QA, readiness claim,
+  human/business/public/legal claim, durable-memory promotion, archive
+  execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-NODE-REFERENCE-STACK-PRIORITY-EVAL-GAPS-20260704.md`.
+
+## 2026-07-04 - P0 Node Reference Stack Priority
+
+- Completed bounded lane `IMPL-P0-NODE-REFERENCE-STACK-PRIORITY` for dispatch
+  `TD-AFS-V02-IMPL-P0-NODE-REFERENCE-STACK-PRIORITY-20260704-001` on
+  `codex/p0-node-reference-stack-priority-20260704`.
+- Added `agentflow.algorithms.node_reference_stack` with contract id
+  `afs.node_reference_stack.v0.1`, safe `agentflow_node_reference_stack`
+  output, explicit reference type/scope/status/target-slot/priority fields,
+  deterministic priority/scope/type precedence, and fail-closed equal-rank
+  conflict handling.
+- Integrated with existing Studio entity/action vocabulary by using the
+  `project_asset`, `reference_input`, `generation_candidate`,
+  `keyframe_version`, `video_revision`, `binding`, and `lineage` entity ids,
+  plus bounded reference/bind/unbind/replace/lineage/evidence actions.
+- Added asset auto-binding compatibility so established
+  `asset_auto_binding_established` suggestions can enter the node stack as
+  reversible `binding` references without changing Runtime or provider
+  behavior.
+- Added focused coverage for contract export, priority/scope/type conflict
+  resolution, unusable state and equal-rank blocking, asset-binding import, safe
+  target redaction, and Studio vocabulary static compatibility.
+- Available validation passed `git diff --check`, `python3 -m py_compile` on
+  touched node reference stack modules and focused tests, direct no-pytest
+  execution of the new test functions, asset-binding stack assertions,
+  equal-rank conflict assertions, and Studio vocabulary marker assertions.
+  Focused pytest is blocked because `/usr/bin/python3` has no `pytest`; CLI
+  help/version checks are blocked because `/usr/bin/python3` has no `typer`.
+- No provider behavior change, provider call/rerun, generated-media QA, node UI
+  redesign, Runtime/OpenAPI/DOC2/COS/CompanyOS mutation, multi-candidate retry
+  engine, keyframe edit, video adherence, source-sync/fetch/pull/push,
+  deploy/restart/server mutation, durable-memory promotion, readiness,
+  human/business/public/legal claim, archive execution, or self-archive
+  occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-NODE-REFERENCE-STACK-PRIORITY-20260704.md`.
+
 ## 2026-07-04 - Asset Auto-Binding Reversible Graph
 
 - Completed bounded lane `IMPL-P0-ASSET-AUTO-BINDING-REVERSIBLE-GRAPH` for
