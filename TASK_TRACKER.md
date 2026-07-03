@@ -16,6 +16,23 @@ Owner/CTO gates, use
 an additive pointer only; no tracker content has been pruned, archived, deleted,
 or promoted to readiness/provider/human/business/legal/COS claims.
 
+Project Book Owner acceptance matrix redispatch addendum: Lane
+`DOC-P1-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-UPDATE-REDISPATCH` produced a
+bounded Owner-facing acceptance matrix from the existing Owner index and
+checklist for dispatch
+`TD-AFS-V02-DOC-P1-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-UPDATE-REDISPATCH-20260703-001`.
+The matrix maps landing route, package split/order, `/studio/` internal tryout,
+SPEC2/accepted-plan structure, provider/media gates, runtime freshness, human
+review, business/legal/COS gates, and archive policy as review decisions rather
+than completion claims. It supersedes waiting on old pendingWorktreeId
+`remote-ssh-discovered:afs-bwg-ops:792b0510-ea03-46c0-a0c6-8bd06486cad4`;
+that worktree was not used or repaired. No provider/REL1B/generated-media QA,
+source-sync/fetch/pull/push, deploy/restart/runtime/server mutation,
+OpenAPI/DOC2/COS/CompanyOS mutation, cleanup/delete/archive, package-complete
+claim, readiness claim, human/business/public/legal claim, or durable-memory
+promotion occurred. Handoff:
+`docs/handoff/AFS-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-REDISPATCH-20260703.md`.
+
 Runtime idempotent submit redispatch durable addendum: Lane
 `IMP-P1-RUNTIME-IDEMPOTENT-SUBMIT-REDISPATCH-DURABLE` implemented a bounded
 Runtime submit idempotency candidate on

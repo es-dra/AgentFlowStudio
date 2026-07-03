@@ -1,5 +1,26 @@
 # Devlog
 
+## 2026-07-03 - Project Book Owner Acceptance Matrix Redispatch
+
+- Completed docs-only lane
+  `DOC-P1-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-UPDATE-REDISPATCH` for dispatch
+  `TD-AFS-V02-DOC-P1-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-UPDATE-REDISPATCH-20260703-001`.
+- Added an Owner-facing acceptance matrix derived from the existing Owner index
+  and checklist. The matrix keeps review route, package split/order, `/studio/`
+  internal tryout, SPEC2/accepted-plan, provider/media, runtime freshness,
+  human review, business/legal/COS, and archive decisions separate.
+- Linked the matrix from `docs/handoff/INDEX.md` under Owner Review / Package
+  Landing and recorded the lane in `TASK_TRACKER.md`.
+- Superseded waiting on old pendingWorktreeId
+  `remote-ssh-discovered:afs-bwg-ops:792b0510-ea03-46c0-a0c6-8bd06486cad4`;
+  no old pending worktree was used or repaired.
+- No provider gate, REL1B/generated-media QA, source-sync/fetch/pull/push,
+  deploy/restart/runtime/server mutation, OpenAPI/DOC2/COS/CompanyOS mutation,
+  cleanup/delete/archive, package-complete claim, readiness claim,
+  human/business/public/legal claim, or durable-memory promotion occurred.
+- Handoff:
+  `docs/handoff/AFS-PROJECT-BOOK-OWNER-ACCEPTANCE-MATRIX-REDISPATCH-20260703.md`.
+
 ## 2026-07-03 - Runtime Idempotent Submit Redispatch Durable Candidate
 
 - Completed bounded backend implementation on
