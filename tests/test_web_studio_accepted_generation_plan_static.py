@@ -17,12 +17,15 @@ def test_studio_accepted_generation_plan_panel_defaults_to_blocked_preview() -> 
     assert "previewAcceptedGenerationPlanPacket" in panel
     assert "accepted-plan-status" in panel
     assert "Generation plan review" in panel
-    assert "Local fixture demo, not accepted" in panel
+    assert "Local fixture demo remains blocked and not accepted" in panel
     assert "not yet accepted" in panel
-    assert "Plan step-gate recorded for review" in panel
+    assert "Plan step-gate evidence recorded for review" in panel
     assert "source_mode" in panel
     assert "residual_blockers" in panel
     assert "non_claim_boundaries" in panel
+    assert "not_package_complete" in panel
+    assert "not_provider_pass" in panel
+    assert "not_human_acceptance" in panel
     assert "not_provider_smoke" in panel
     assert "not_generated_media_qa" in panel
     assert "not_product_readiness" in panel
@@ -48,4 +51,4 @@ def test_studio_accepted_generation_plan_panel_requires_explicit_confirmed_fixtu
     assert "confirmedBtn.addEventListener" in panel
     assert "load(CONFIRMED_FIXTURE_MODE)" in panel
     assert "Accepted local plan packet" not in panel
-    assert "blocked pending prerequisites" in panel
+    assert "Blocked pending prerequisites" in panel

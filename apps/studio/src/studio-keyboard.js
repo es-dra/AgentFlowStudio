@@ -40,7 +40,7 @@ export function arrangeCanvas(store) {
 function handleEscape(e, store) {
   if (e.key !== "Escape") return false;
   if (hasOpenOverlay()) {
-    closeTop();
+    closeTop("escape");
     return true;
   }
   if (store.get().selection.nodeIds.length || store.get().selection.edgeId) {

@@ -4,8 +4,11 @@ import { el, showModal } from "../overlay.js";
 const DEFAULT_FIXTURE_MODE = "default_unconfirmed";
 const CONFIRMED_FIXTURE_MODE = "confirmed_local_fixture";
 const NON_CLAIM_BOUNDARY_LABELS = [
+  "not_package_complete",
   "not_provider_smoke",
+  "not_provider_pass",
   "not_generated_media_qa",
+  "not_human_acceptance",
   "not_product_readiness",
   "not_human_creative_acceptance",
   "not_business_validation",
@@ -91,17 +94,20 @@ function renderPlan(content, response) {
 
   const status = el("section", `accepted-plan-status ${state.accepted ? "accepted" : "blocked"}`);
   const acceptedTitle = provenance.source_mode === "project_artifact"
-    ? "Plan step-gate recorded for review"
-    : "Local fixture demo, not accepted";
+    ? "Plan step-gate evidence recorded for review"
+    : "Local fixture demo remains blocked and not accepted";
+  const statusCopy = state.accepted
+    ? `${acceptedTitle}; not package complete, not human acceptance`
+    : "needs_attention · Blocked pending prerequisites";
   status.innerHTML = [
     `<span>${icon(state.accepted ? "check" : "lock", 18)}</span>`,
-    `<div><strong>${escapeHtml(state.accepted ? `complete · ${acceptedTitle} · not yet accepted` : "needs_attention · blocked pending prerequisites")}</strong>`,
+    `<div><strong>${escapeHtml(statusCopy)}</strong>`,
     `<small>${escapeHtml(packet.packet_state || state.packet_state || "unknown")}</small></div>`,
   ].join("");
   content.appendChild(status);
 
   content.appendChild(metricGrid([
-    ["Policy status", state.accepted ? "complete" : "needs_attention"],
+    ["Plan review state", state.accepted ? "step-gate evidence recorded" : "needs_attention"],
     ["State", state.packet_state || ""],
     ["Request", state.request_state || ""],
     ["Source", provenance.source_mode || provenance.evidence_origin || ""],
@@ -119,9 +125,12 @@ function renderPlan(content, response) {
   ));
   content.appendChild(metricGrid([
     ["Provider calls", nonClaims.provider_calls_started ? "started" : "not started"],
-    ["Media QA", nonClaims.generated_media_quality ? "claimed" : "not claimed"],
-    ["Readiness claim", nonClaims.product_readiness ? "claimed" : "not claimed"],
-    ["Business validation", nonClaims.business_validation ? "claimed" : "not claimed"],
+    ["Provider pass", "not claimed"],
+    ["Media QA", "not claimed"],
+    ["Human acceptance", "not claimed"],
+    ["Package complete", "not claimed"],
+    ["Product readiness", "not claimed"],
+    ["Business validation", "not claimed"],
   ]));
 }
 

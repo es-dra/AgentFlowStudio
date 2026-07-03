@@ -84,6 +84,7 @@ async function bootstrap() {
     },
   });
   projectController.setAuthUser(authState?.user);
+  if (authState?.auth_status_unknown || authState?.blocked) return;
   if (authState?.auth_required && !authState?.authenticated) return;
 
   await projectController.ensureAccessibleStartupProject();
