@@ -25,6 +25,7 @@ from apps.api.runtime_provider_dispatch import dispatch_provider_with_retry
 from apps.api.runtime_keyframe_payloads import (
     keyframe_candidate_summary,
     keyframe_request_plan,
+    keyframe_review_preview_refs,
     keyframe_safe_manifest,
 )
 from apps.api.runtime_keyframe_generation_bridge import write_keyframe_generation_bridge
@@ -440,7 +441,15 @@ def build_keyframe_generation(
         request_plan["image_input_fidelity"] = "high"
     request_plan["model_call_context_id"] = model_call_context["context_id"]
     request_plan["model_request_plan_ref"] = "model_request_plan.json"
-    candidates = keyframe_candidate_summary(request, provider_prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
+    review_preview_refs = keyframe_review_preview_refs(project_id, output_dir.name, provider_outputs)
+    candidates = keyframe_candidate_summary(
+        request,
+        provider_prompt,
+        provider_outputs,
+        KEYFRAME_NON_CLAIMS,
+        project_id=project_id,
+        job_id=output_dir.name,
+    )
     safe_manifest = keyframe_safe_manifest(
         project_id,
         request,
@@ -453,6 +462,8 @@ def build_keyframe_generation(
         retry_count=retry_count,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
+        job_id=output_dir.name,
+        review_preview_refs=review_preview_refs,
     )
     generation_bridge = write_keyframe_generation_bridge(
         output_dir,

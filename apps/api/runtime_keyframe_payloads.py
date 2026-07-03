@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agentflow.algorithms.feedback_overlay_prompt_policy import feedback_overlay_prompt_policy
 from apps.api.runtime_keyframe_plan import build_keyframe_plan
 from apps.api.runtime_models import KeyframeGenerationRequest
 from apps.api.runtime_recovery_contract import annotate_blocks, recovery_manifest_fields
+from apps.api.runtime_store import safe_id
+
+
+SAFE_REVIEW_CANDIDATE_ID = re.compile(r"^candidate_\d{3}$")
 
 
 def keyframe_request_plan(
@@ -71,6 +76,9 @@ def keyframe_candidate_summary(
     provider_prompt: str,
     outputs: list[dict[str, Any]],
     non_claims: list[str],
+    *,
+    project_id: str = "",
+    job_id: str = "",
 ) -> dict[str, Any]:
     return {
         "artifact_type": "agentflow_keyframe_candidates_summary",
@@ -82,6 +90,7 @@ def keyframe_candidate_summary(
         "seed": request.seed,
         "provider_prompt": provider_prompt,
         "outputs": outputs,
+        "review_preview_refs": keyframe_review_preview_refs(project_id, job_id, outputs),
         "media_bytes_in_payload": False,
         "provider_raw_response_stored": False,
         "non_claims": non_claims,
@@ -101,12 +110,15 @@ def keyframe_safe_manifest(
     retry_count: int,
     context_bundle: dict[str, Any] | None,
     non_claims: list[str],
+    job_id: str = "",
+    review_preview_refs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     safe_blocks = annotate_blocks(blocks)
     payload = {
         "artifact_type": "agentflow_keyframe_generation_safe_manifest",
         "schema_version": "0.1.0",
         "project_id": project_id,
+        "job_id": safe_id(job_id) if job_id else "",
         "node_id": request.node_id,
         "status": status,
         "requested_capability": "image_keyframe",
@@ -121,6 +133,8 @@ def keyframe_safe_manifest(
         "retry_count": retry_count,
         "seed": request.seed,
         "blocks": safe_blocks,
+        "review_preview_refs": list(review_preview_refs or []),
+        "review_preview_ref_policy": "safe_route_and_metadata_only",
         "safe_artifacts": [
             "keyframe_request_plan.json",
             "keyframe_candidates_summary.json",
@@ -161,4 +175,39 @@ def keyframe_safe_manifest(
     return payload
 
 
-__all__ = ("keyframe_candidate_summary", "keyframe_request_plan", "keyframe_safe_manifest")
+def keyframe_review_preview_refs(project_id: str, job_id: str, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not project_id or not job_id:
+        return []
+    refs: list[dict[str, Any]] = []
+    safe_project_id = safe_id(project_id)
+    safe_job_id = safe_id(job_id)
+    for item in outputs:
+        if not isinstance(item, dict):
+            continue
+        candidate_id = str(item.get("candidate_id") or "")
+        if not SAFE_REVIEW_CANDIDATE_ID.match(candidate_id):
+            continue
+        refs.append(
+            {
+                "job_id": safe_job_id,
+                "candidate_id": candidate_id,
+                "safe_preview_ref": (
+                    f"/projects/{safe_project_id}/keyframe-generations/"
+                    f"{safe_job_id}/candidates/{candidate_id}/preview"
+                ),
+                "byte_count": item.get("byte_count"),
+                "sha256": item.get("sha256"),
+                "width": item.get("width"),
+                "height": item.get("height"),
+                "aspect_ratio": item.get("aspect_ratio"),
+            }
+        )
+    return refs
+
+
+__all__ = (
+    "keyframe_candidate_summary",
+    "keyframe_request_plan",
+    "keyframe_review_preview_refs",
+    "keyframe_safe_manifest",
+)

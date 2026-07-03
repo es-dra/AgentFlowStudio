@@ -1,5 +1,140 @@
 # Devlog
 
+## 2026-07-04 - Safe Packet And Studio Vocabulary Contract Integration
+
+- Integrated accepted safe human-review packet/redaction tip
+  `6bf93bc63c57523a08a3226c723aee5fc14bf90d` and P0 Studio
+  entity/status/action vocabulary contract tip
+  `6adbcd018f0af08975223ef9537b0dabecbceac6` into local `master` for dispatch
+  `TD-AFS-V02-INT-P1-P0-SAFE-PACKET-AND-STUDIO-VOCAB-CONTRACT-20260704-001`.
+- Pre-integration HEAD was
+  `c40c4c40a2a77b6c915ef798b14dfef2d6e5f564`, preserving the prior
+  source-sync/runtime-freshness baseline. Both source commits were locally
+  readable and branch-contained before mutation.
+- Used non-mutating merge-tree inspection plus `git cherry-pick --no-commit`
+  over both source ranges. Resolved only expected additive conflicts in
+  `DEVLOG.md` and `docs/handoff/INDEX.md`; `TASK_TRACKER.md` auto-merged.
+- Verification passed `git diff --check`, `git diff --cached --check`,
+  `npm run check:studio-js`, py_compile on touched Python files/tests using a
+  temp pycache prefix, safe-packet redaction no-pytest assertions, Studio
+  entity/action no-pytest assertions over 39 pairs, and focused pytest
+  `9 passed`.
+- Preserved pre-existing dirty docs outside the staged integration:
+  Owner acceptance matrix handoff, `docs/demo/`, and
+  `docs/maintenance/AFS-DEMO-DOCS-CHINESE-20260629.md`.
+- No source-sync/fetch/pull/push, provider gate/call, deploy/restart/runtime
+  server mutation, generated-media QA, video/vision readiness, packet-readiness,
+  human/business/public/legal readiness, OpenAPI/DOC2/COS/CompanyOS mutation,
+  durable-memory promotion, archive execution, or self-archive is claimed.
+- Handoff:
+  `docs/handoff/AFS-SAFE-PACKET-STUDIO-VOCAB-CONTRACT-INTEGRATION-20260704.md`.
+
+## 2026-07-04 - P0 Studio Entity/Status Action Consistency Recovery
+
+- Completed bounded recovery lane
+  `FIX-P0-STUDIO-ENTITY-STATUS-ACTION-CONSISTENCY` for dispatch
+  `TD-AFS-V02-FIX-P0-STUDIO-ENTITY-STATUS-ACTION-CONSISTENCY-20260704-001`
+  on `codex/p0-studio-entity-status-vocab-contract-20260704`.
+- Fixed evaluator blocker `fail_contract_action_applicability_mismatch` by
+  keeping `lineage` as a valid `replace` next action and adding `lineage` to
+  `replace.appliesTo` in the Studio vocabulary module and handoff contract.
+- Extended focused static coverage so every entity `nextActions[]` entry must
+  reference an existing action whose `appliesTo[]` includes that entity.
+- Validation passed: `git diff --check`, `npm run check:studio-js`,
+  `python3 -m py_compile tests/test_web_studio_entity_status_vocabulary_static.py`,
+  and a standalone Node nextAction/appliesTo consistency assertion over 39
+  pairs. Focused pytest remains blocked because `/usr/bin/python3` has no
+  `pytest` and `.venv/bin/python` is absent.
+- No UI behavior, Runtime/OpenAPI/DOC2/COS/CompanyOS mutation, provider call,
+  generated-media/browser QA, source-sync/fetch/pull/push, deploy/restart,
+  readiness claim, human/business/public/legal claim, durable-memory promotion,
+  archive execution, or self-archive occurred.
+
+## 2026-07-04 - P0 Studio Entity/Status Vocabulary Contract
+
+- Completed bounded lane `IMPL-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT` for
+  dispatch
+  `TD-AFS-V02-IMPL-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704-001`
+  on `codex/p0-studio-entity-status-vocab-contract-20260704`.
+- Added
+  `docs/handoff/AFS-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704.md`
+  as the shared Studio UI and Owner acceptance vocabulary baseline for Project
+  Asset, Reference Input, Generation Candidate, Keyframe Version, Video
+  Revision, Binding, and Lineage.
+- Added `apps/studio/src/studio-entity-status-vocabulary.js`, a small
+  importable constants/helper module covering canonical statuses, Chinese UI
+  labels, existing Runtime/Studio equivalents, and bounded action vocabulary.
+- Added focused static coverage in
+  `tests/test_web_studio_entity_status_vocabulary_static.py` to keep the doc,
+  Studio constants, and project routing records aligned.
+- Validation passed: `npm run check:studio-js` (`139 files`),
+  `git diff --check`, `python3 -m py_compile` for the focused static test,
+  a no-pytest Python assertion over contract/records, a Node import assertion
+  over the Studio vocabulary module, and no-output whitespace checks for the
+  new files. Focused pytest was blocked because `/usr/bin/python3` has no
+  `pytest` module and `.venv/bin/python` is absent or not executable.
+- No Runtime, provider, OpenAPI, DOC2, CompanyOS/COS, source-sync, deploy,
+  restart, generated-media QA, browser QA, auto-binding graph behavior,
+  reference stack UI, multi-candidate retry engine, local keyframe edit, video
+  adherence panel, readiness claim, human/business/public/legal claim,
+  durable-memory promotion, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704.md`.
+
+## 2026-07-04 - Human Review Prompt Redaction Recovery
+
+- Completed bounded recovery lane
+  `FIX-P1-REL1B-HUMAN-REVIEW-PROMPT-REDACTION` for dispatch
+  `TD-AFS-V02-FIX-P1-REL1B-HUMAN-REVIEW-PROMPT-REDACTION-20260704-001` on
+  `codex/imp-p1-rel1b-human-review-safe-packet-surface-fields-20260704`.
+- Fixed evaluator blocker `fail_prompt_review_redaction_value_leak` by
+  redacting complete secret-like label/value fragments before
+  `prompt_optimization_review_summary.json` is persisted.
+- Covered password, token/access-token, auth/authorization, cookie/session,
+  bearer, api-key, secret, signed-url, and key variants across `=`, `:`,
+  whitespace, quoted, and JSON-like forms; widened safe packet forbidden-surface
+  checks for the same label family.
+- Added focused tests proving synthetic forbidden values do not persist into the
+  prompt review summary or safe packet prompt summary, and stale unsafe packet
+  prompt text fails closed.
+- Verification passed `python3 -m py_compile` on touched Runtime/test modules,
+  a no-pytest standard-library redaction assertion script, and
+  `git diff --check`. Focused pytest is blocked because `/usr/bin/python3` has
+  no `pytest`, with `fastapi` and `pydantic` also absent and no `.venv` or
+  `python` command available.
+- No provider gate/call, source sync/fetch/pull/push, deploy/restart/runtime
+  server mutation, OpenAPI/DOC2/COS/CompanyOS mutation, integration to master,
+  packet-readiness claim, human acceptance, generated-media QA, durable-memory
+  promotion, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-HUMAN-REVIEW-PROMPT-REDACTION-RECOVERY-20260704.md`.
+
+## 2026-07-04 - Human Review Safe Packet Surface Fields
+
+- Completed bounded Runtime source/contract slice for lane
+  `IMP-P1-REL1B-HUMAN-REVIEW-SAFE-PACKET-SURFACE-FIELDS` on
+  `codex/imp-p1-rel1b-human-review-safe-packet-surface-fields-20260704`.
+- Keyframe safe manifest and candidate summary now persist
+  `review_preview_refs` with safe route/ref plus dimensions/hash/byte-count
+  metadata only.
+- Prompt optimization now writes and registers
+  `prompt_optimization_review_summary.json` with
+  `optimized_prompt_char_count`, sanitized bounded `optimized_prompt_text`, and
+  creative-brief `source_artifact_id`.
+- Added a fail-closed safe packet selector/builder that reads only the safe
+  preview refs and prompt summary fields, and added focused tests for missing
+  fields, forbidden-field exclusion, and happy-path packet plan creation.
+- Verification passed `python3 -m py_compile` on touched Runtime/test modules
+  and `git diff --check`. Focused pytest is blocked in this checkout because
+  there is no `.venv`, no `python` command, and `/usr/bin/python3` lacks
+  `pytest`, `fastapi`, and `pydantic`.
+- No provider gate/call, deploy/restart/runtime server mutation, source
+  sync/fetch/pull/push, OpenAPI/DOC2/COS/CompanyOS mutation, generated-media QA,
+  human creative acceptance, product/business/public/legal readiness claim,
+  durable-memory promotion, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-HUMAN-REVIEW-SAFE-PACKET-SURFACE-FIELDS-20260704.md`.
+
 ## 2026-07-03 - Control Kernel Phase1b Scheduler/Eventbus Integration
 
 - Integrated accepted scheduler-linter source commit

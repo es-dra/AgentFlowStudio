@@ -26,6 +26,7 @@ from apps.api.runtime_prompt_memory_state import (
     write_creative_memory_state,
 )
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
+from apps.api.runtime_prompt_review_summary import prompt_optimization_review_summary
 from apps.api.runtime_script_plan import build_script_plan
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
@@ -163,6 +164,18 @@ def build_prompt_optimization(
     if script_plan:
         trace["script_plan"] = script_plan
     safe_manifest = _safe_manifest(project_id, len(background_refs), len(extracted), state, assembly, llm_enhancement, context_bundle)
+    prompt_review_summary = prompt_optimization_review_summary(
+        store,
+        output_dir,
+        project_id=project_id,
+        request=request,
+        optimized_prompt=assembled_prompt,
+    )
+    safe_manifest["prompt_review_summary_ref"] = "prompt_optimization_review_summary.json"
+    safe_manifest["safe_artifacts"] = [
+        *safe_manifest["safe_artifacts"],
+        "prompt_optimization_review_summary.json",
+    ]
     if script_plan:
         safe_manifest["script_plan_ref"] = "script_plan.json"
         safe_manifest["safe_artifacts"] = [*safe_manifest["safe_artifacts"], "script_plan.json"]
@@ -181,7 +194,7 @@ def build_prompt_optimization(
         safe_artifact_count=len(safe_manifest.get("safe_artifacts") or []),
     )
     step_started = time.perf_counter()
-    for payload in (brief, trace, safe_manifest, model_call_context):
+    for payload in (brief, trace, safe_manifest, prompt_review_summary, model_call_context):
         reject_unsafe_payload(payload)
     _log_prompt_step("payloads_validated", step_started, log_context)
     step_started = time.perf_counter()
@@ -200,12 +213,13 @@ def build_prompt_optimization(
     if script_plan:
         write_json(output_dir / "script_plan.json", script_plan)
     write_json(output_dir / "prompt_assembly_trace.json", trace)
+    write_json(output_dir / "prompt_optimization_review_summary.json", prompt_review_summary)
     write_json(output_dir / "prompt_optimization_safe_manifest.json", safe_manifest)
     _log_prompt_step(
         "artifacts_written",
         step_started,
         log_context,
-        artifact_count=4 + int(bool(script_plan)),
+        artifact_count=5 + int(bool(script_plan)),
     )
     _log_prompt_step(
         "build_complete",
@@ -221,6 +235,7 @@ def build_prompt_optimization(
         "brief": brief,
         "trace": trace,
         "safe_manifest": safe_manifest,
+        "prompt_review_summary": prompt_review_summary,
         "provider_gate": provider_gate(),
         "provider_calls_started": llm_enhancement["provider_calls_started"],
         "original_prompt": request.prompt_text,

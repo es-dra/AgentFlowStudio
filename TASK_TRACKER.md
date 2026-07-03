@@ -8,6 +8,78 @@
 
 Last updated: 2026-07-03 by Codex
 
+Safe packet and Studio vocabulary contract integration addendum: Lane
+`INT-P1-P0-SAFE-PACKET-AND-STUDIO-VOCAB-CONTRACT` integrated accepted safe
+human-review packet/redaction tip
+`6bf93bc63c57523a08a3226c723aee5fc14bf90d` and P0 Studio
+entity/status/action vocabulary contract tip
+`6adbcd018f0af08975223ef9537b0dabecbceac6` into local `master` for dispatch
+`TD-AFS-V02-INT-P1-P0-SAFE-PACKET-AND-STUDIO-VOCAB-CONTRACT-20260704-001`.
+Pre-integration HEAD was
+`c40c4c40a2a77b6c915ef798b14dfef2d6e5f564`, and both source commits were
+locally readable and branch-contained before mutation. Integration used
+non-mutating merge-tree inspection plus `git cherry-pick --no-commit` over the
+two source ranges; only expected additive conflicts in `DEVLOG.md` and
+`docs/handoff/INDEX.md` were manually resolved, while `TASK_TRACKER.md`
+auto-merged. Verification passed `git diff --check`, `git diff --cached
+--check`, `npm run check:studio-js`, py_compile on touched Python files/tests
+with temp pycache routing, safe-packet redaction no-pytest assertions, Studio
+entity/action no-pytest assertions over 39 pairs, and focused pytest
+`9 passed`. Pre-existing dirty docs were preserved outside the staged
+integration: Owner acceptance matrix handoff, `docs/demo/`, and
+`docs/maintenance/AFS-DEMO-DOCS-CHINESE-20260629.md`. No source-sync/fetch/pull
+/push, provider gate/call, deploy/restart/runtime server mutation,
+generated-media QA, video/vision readiness, packet-readiness,
+human/business/public/legal readiness, OpenAPI/DOC2/COS/CompanyOS mutation,
+durable-memory promotion, archive execution, or self-archive is claimed.
+Handoff:
+`docs/handoff/AFS-SAFE-PACKET-STUDIO-VOCAB-CONTRACT-INTEGRATION-20260704.md`.
+
+P0 Studio entity/status action consistency recovery addendum: Lane
+`FIX-P0-STUDIO-ENTITY-STATUS-ACTION-CONSISTENCY` corrected evaluator blocker
+`fail_contract_action_applicability_mismatch` for dispatch
+`TD-AFS-V02-FIX-P0-STUDIO-ENTITY-STATUS-ACTION-CONSISTENCY-20260704-001` on
+`codex/p0-studio-entity-status-vocab-contract-20260704`. The recovery keeps the
+existing `lineage` next action intent and makes `replace.appliesTo` include
+`lineage` in both `apps/studio/src/studio-entity-status-vocabulary.js` and
+`docs/handoff/AFS-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704.md`. Focused
+static coverage now asserts every entity `nextActions[]` entry resolves to an
+action whose `appliesTo[]` includes that entity, preventing this mismatch from
+recurring. Available validation passed `git diff --check`,
+`npm run check:studio-js`, `python3 -m py_compile` on the focused static test,
+and a standalone Node nextAction/appliesTo consistency assertion over 39 pairs.
+Focused pytest remains blocked because `/usr/bin/python3` has no `pytest` and
+`.venv/bin/python` is absent. No UI behavior,
+Runtime/OpenAPI/DOC2/COS/CompanyOS mutation, provider call,
+generated-media/browser QA, source-sync/fetch/pull/push, deploy/restart/server
+action, readiness claim, human/business/public/legal claim, durable-memory
+promotion, archive execution, or self-archive is claimed.
+
+P0 Studio entity/status vocabulary contract addendum: Lane
+`IMPL-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT` established the first shared
+Studio UI and Owner acceptance vocabulary baseline for dispatch
+`TD-AFS-V02-IMPL-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704-001` on
+`codex/p0-studio-entity-status-vocab-contract-20260704`. The contract covers
+`Project Asset`, `Reference Input`, `Generation Candidate`, `Keyframe Version`,
+`Video Revision`, `Binding`, and `Lineage`; maps canonical statuses
+`queued/submitted/running/succeeded/failed/retryable/cancelled/blocked/needs_attention/partial`
+to existing Runtime/Studio equivalents; defines action vocabulary
+`bind/unbind/replace/reference/retry/accept/reject/view_lineage/view_evidence/continue_to_video/edit_keyframe`;
+and adds a small Studio vocabulary constants module at
+`apps/studio/src/studio-entity-status-vocabulary.js` with focused static
+coverage. Available validation passed `npm run check:studio-js` (`139 files`),
+`git diff --check`, `python3 -m py_compile` on the focused static test,
+no-pytest contract/record assertions, Node vocabulary import assertions, and
+new-file whitespace checks; focused pytest is blocked because `/usr/bin/python3`
+has no `pytest` module and `.venv/bin/python` is absent or not executable. This
+is a contract baseline only: no auto-binding graph behavior, reference stack UI,
+multi-candidate retry engine, local keyframe edit, video adherence panel,
+provider call, generated-media QA, browser QA, deploy/restart,
+OpenAPI/DOC2/COS/CompanyOS mutation, readiness, human/business/public/legal
+claim, durable-memory promotion, archive execution, or self-archive is claimed.
+Handoff:
+`docs/handoff/AFS-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704.md`.
+
 Current-state maintenance pointer - 2026-07-03: For tracker/devlog current
 entrypoints, release/current-state summary, provider/REL1B blockers, historical
 summary routes, and the rule blocking old-stream pruning until docs refscan plus
@@ -15,6 +87,55 @@ Owner/CTO gates, use
 `docs/maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`. This is
 an additive pointer only; no tracker content has been pruned, archived, deleted,
 or promoted to readiness/provider/human/business/legal/COS claims.
+
+Human review prompt redaction recovery addendum: Lane
+`FIX-P1-REL1B-HUMAN-REVIEW-PROMPT-REDACTION` recovered evaluator blocker
+`fail_prompt_review_redaction_value_leak` for dispatch
+`TD-AFS-V02-FIX-P1-REL1B-HUMAN-REVIEW-PROMPT-REDACTION-20260704-001` on
+`codex/imp-p1-rel1b-human-review-safe-packet-surface-fields-20260704`.
+Prompt review summary redaction now removes full secret-like label/value
+fragments before `prompt_optimization_review_summary.json` is persisted,
+covering password, token/access-token, auth/authorization, cookie/session,
+bearer, api-key, secret, signed-url, and key variants across `=`, `:`,
+whitespace, quoted, and JSON-like forms. The safe human-review packet forbidden
+surface was widened for the same label family, and focused tests/static
+assertions prove synthetic forbidden values do not persist into the prompt
+review summary or packet prompt summary while unsafe stale packet prompt text
+fails closed. Available validation passed `python3 -m py_compile` on touched
+Runtime/test modules, a no-pytest standard-library redaction assertion script,
+and `git diff --check`; focused pytest remains blocked because
+`/usr/bin/python3` has no `pytest`, with `fastapi` and `pydantic` also missing
+from system Python and no `.venv` or `python` command available. Evaluator issue
+is fixed at implementation/assertion level, pending fresh evaluator. No provider
+gate/call, source sync/fetch/pull/push, deploy/restart/runtime server mutation,
+OpenAPI/DOC2/COS/CompanyOS mutation, integration to master, packet-readiness
+claim, human acceptance, generated-media QA, durable-memory promotion, archive
+execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-HUMAN-REVIEW-PROMPT-REDACTION-RECOVERY-20260704.md`.
+
+Human review safe packet surface fields addendum: Lane
+`IMP-P1-REL1B-HUMAN-REVIEW-SAFE-PACKET-SURFACE-FIELDS` implemented a bounded
+Runtime source/contract slice on
+`codex/imp-p1-rel1b-human-review-safe-packet-surface-fields-20260704` for
+dispatch
+`TD-AFS-V02-IMP-P1-REL1B-HUMAN-REVIEW-SAFE-PACKET-SURFACE-FIELDS-20260704-001`.
+Keyframe safe manifest and candidate summary now persist safe
+`review_preview_refs` with only route/ref and dimensions/hash/byte-count
+metadata; prompt optimization now writes
+`prompt_optimization_review_summary.json` with prompt character count,
+sanitized bounded prompt text, and creative-brief source artifact id. A
+fail-closed packet selector/builder reads only these safe fields and focused
+tests cover missing safe fields, forbidden-field exclusion, and happy-path safe
+packet plan creation. Available verification passed `python3 -m py_compile` on
+touched Runtime/test modules and `git diff --check`; focused pytest is blocked
+because this checkout has no `.venv`, no `python` command, and
+`/usr/bin/python3` lacks `pytest`, `fastapi`, and `pydantic`. No provider
+gate/call, deploy/restart/runtime server mutation, source sync/fetch/pull/push,
+OpenAPI/DOC2/COS/CompanyOS mutation, generated-media QA, human creative
+acceptance, product/business/public/legal readiness claim, durable-memory
+promotion, self-archive, or merge is claimed.
+Handoff:
+`docs/handoff/AFS-HUMAN-REVIEW-SAFE-PACKET-SURFACE-FIELDS-20260704.md`.
 
 Control kernel Phase1b scheduler/eventbus integration addendum: Lane
 `INT-P1-CONTROL-KERNEL-PHASE1B-SCHEDULER-EVENTBUS-INTEGRATION` integrated

@@ -1,0 +1,150 @@
+from __future__ import annotations
+
+import subprocess
+import textwrap
+from pathlib import Path
+
+
+CONTRACT = Path("docs/handoff/AFS-P0-STUDIO-ENTITY-STATUS-VOCAB-CONTRACT-20260704.md")
+VOCABULARY = Path("apps/studio/src/studio-entity-status-vocabulary.js")
+
+REQUIRED_ENTITIES = {
+    "Project Asset": "项目素材",
+    "Reference Input": "参考输入",
+    "Generation Candidate": "生成候选",
+    "Keyframe Version": "关键帧版本",
+    "Video Revision": "视频修订",
+    "Binding": "绑定",
+    "Lineage": "来源链路",
+}
+
+REQUIRED_STATUSES = {
+    "queued": "排队中",
+    "submitted": "已提交",
+    "running": "生成中",
+    "succeeded": "已完成",
+    "failed": "失败",
+    "retryable": "可重试",
+    "cancelled": "已停止刷新",
+    "blocked": "已阻断",
+    "needs_attention": "需要检查",
+    "partial": "部分完成",
+}
+
+REQUIRED_ACTIONS = {
+    "bind": "绑定",
+    "unbind": "取消绑定",
+    "replace": "替换",
+    "reference": "用作参考",
+    "retry": "重试",
+    "accept": "采纳",
+    "reject": "拒绝",
+    "view_lineage": "查看来源链路",
+    "view_evidence": "查看证据",
+    "continue_to_video": "继续生成视频",
+    "edit_keyframe": "编辑关键帧",
+}
+
+
+def test_contract_doc_covers_required_entities_statuses_actions_and_non_claims() -> None:
+    text = CONTRACT.read_text(encoding="utf-8")
+
+    for canonical, zh_label in REQUIRED_ENTITIES.items():
+        assert canonical in text
+        assert zh_label in text
+
+    for status, zh_label in REQUIRED_STATUSES.items():
+        assert f"`{status}`" in text
+        assert zh_label in text
+
+    for action, zh_label in REQUIRED_ACTIONS.items():
+        assert f"`{action}`" in text
+        assert zh_label in text
+
+    assert (
+        "| `replace` | `替换` | Project Asset, Reference Input, Keyframe Version, "
+        "Video Revision, Binding, Lineage |"
+    ) in text
+
+    for marker in (
+        "provider raw response",
+        "signed URLs",
+        "human acceptance",
+        "generated-media QA",
+        "business validation",
+        "CompanyOS/COS promotion",
+        "does not prove provider-side cancellation",
+        "retry failed items only",
+    ):
+        assert marker in text
+
+
+def test_studio_vocabulary_module_is_importable_and_matches_required_contract_ids() -> None:
+    script = textwrap.dedent(
+        """
+        import {
+          STUDIO_ACTION_VOCABULARY,
+          STUDIO_ENTITY_VOCABULARY,
+          STUDIO_ENTITY_STATUS_VOCABULARY_VERSION,
+          STUDIO_STATUS_VOCABULARY,
+          studioActionVocabularyEntry,
+          studioEntityVocabularyEntry,
+          studioStatusVocabularyEntry,
+        } from "./apps/studio/src/studio-entity-status-vocabulary.js";
+
+        const requiredEntities = ["project_asset", "reference_input", "generation_candidate", "keyframe_version", "video_revision", "binding", "lineage"];
+        const requiredStatuses = ["queued", "submitted", "running", "succeeded", "failed", "retryable", "cancelled", "blocked", "needs_attention", "partial"];
+        const requiredActions = ["bind", "unbind", "replace", "reference", "retry", "accept", "reject", "view_lineage", "view_evidence", "continue_to_video", "edit_keyframe"];
+
+        function assertUnique(items, label) {
+          const ids = items.map((item) => item.id);
+          if (new Set(ids).size !== ids.length) throw new Error(`duplicate ${label} ids`);
+        }
+
+        assertUnique(STUDIO_ENTITY_VOCABULARY, "entity");
+        assertUnique(STUDIO_STATUS_VOCABULARY, "status");
+        assertUnique(STUDIO_ACTION_VOCABULARY, "action");
+
+        if (STUDIO_ENTITY_STATUS_VOCABULARY_VERSION !== "p0-20260704") {
+          throw new Error("unexpected vocabulary version");
+        }
+        for (const id of requiredEntities) {
+          const entry = studioEntityVocabularyEntry(id);
+          if (!entry?.canonicalLabel || !entry?.zhLabel || !entry?.allowedStates?.length || !entry?.nextActions?.length) {
+            throw new Error(`missing entity ${id}`);
+          }
+        }
+        for (const id of requiredStatuses) {
+          const entry = studioStatusVocabularyEntry(id);
+          if (!entry?.zhLabel || !entry?.existingEquivalents?.length) throw new Error(`missing status ${id}`);
+        }
+        for (const id of requiredActions) {
+          const entry = studioActionVocabularyEntry(id);
+          if (!entry?.zhLabel || !entry?.appliesTo?.length) throw new Error(`missing action ${id}`);
+        }
+
+        const actionsById = new Map(STUDIO_ACTION_VOCABULARY.map((entry) => [entry.id, entry]));
+        for (const entity of STUDIO_ENTITY_VOCABULARY) {
+          for (const actionId of entity.nextActions) {
+            const action = actionsById.get(actionId);
+            if (!action) throw new Error(`entity ${entity.id} references unknown action ${actionId}`);
+            if (!action.appliesTo.includes(entity.id)) {
+              throw new Error(`entity ${entity.id} nextAction ${actionId} is not allowed by action.appliesTo`);
+            }
+          }
+        }
+        """
+    )
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
+def test_contract_is_linked_from_project_records() -> None:
+    handoff_index = Path("docs/handoff/INDEX.md").read_text(encoding="utf-8")
+    tracker = Path("TASK_TRACKER.md").read_text(encoding="utf-8")
+    devlog = Path("DEVLOG.md").read_text(encoding="utf-8")
+    file_name = CONTRACT.name
+
+    assert file_name in handoff_index
+    assert file_name in tracker
+    assert file_name in devlog
+    assert str(VOCABULARY) in tracker + devlog

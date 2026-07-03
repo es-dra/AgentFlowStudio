@@ -11,7 +11,11 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.image_utils import image_dimensions
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_file_logging import runtime_file_event
-from apps.api.runtime_keyframe_payloads import keyframe_candidate_summary, keyframe_safe_manifest
+from apps.api.runtime_keyframe_payloads import (
+    keyframe_candidate_summary,
+    keyframe_review_preview_refs,
+    keyframe_safe_manifest,
+)
 from apps.api.runtime_keyframes import (
     KEYFRAME_NON_CLAIMS,
     REMOTE_IMAGE_ENV,
@@ -296,6 +300,7 @@ def _keyframe_active_result(
         retry_count=0,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
+        job_id=output_dir.name,
     )
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
     return _result(
@@ -329,7 +334,15 @@ def _keyframe_succeeded_result(
     state["status"] = status
     _write_task_state(output_dir, state)
     prompt = str(state.get("provider_prompt") or request.optimized_prompt or request.prompt_text)
-    candidates = keyframe_candidate_summary(request, prompt, provider_outputs, KEYFRAME_NON_CLAIMS)
+    review_preview_refs = keyframe_review_preview_refs(project_id, output_dir.name, provider_outputs)
+    candidates = keyframe_candidate_summary(
+        request,
+        prompt,
+        provider_outputs,
+        KEYFRAME_NON_CLAIMS,
+        project_id=project_id,
+        job_id=output_dir.name,
+    )
     manifest = keyframe_safe_manifest(
         project_id,
         request,
@@ -342,6 +355,8 @@ def _keyframe_succeeded_result(
         retry_count=0,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
+        job_id=output_dir.name,
+        review_preview_refs=review_preview_refs,
     )
     _write_json_checked(output_dir / "keyframe_candidates_summary.json", candidates)
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
@@ -386,6 +401,7 @@ def _keyframe_poll_failed_result(
         retry_count=0,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
+        job_id=output_dir.name,
     )
     _write_json_checked(output_dir / "keyframe_generation_safe_manifest.json", manifest)
     return _result(

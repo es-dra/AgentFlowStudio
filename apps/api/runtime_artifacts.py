@@ -42,6 +42,10 @@ def prompt_memory_artifacts(
             output_dir / "prompt_assembly_trace.json",
             role="prompt_assembly_trace",
         ),
+        "prompt_optimization_review_summary": store.register_artifact(
+            output_dir / "prompt_optimization_review_summary.json",
+            role="prompt_optimization_review_summary",
+        ),
         "prompt_optimization_safe_manifest": store.register_artifact(
             output_dir / "prompt_optimization_safe_manifest.json",
             role="prompt_optimization_safe_manifest",
