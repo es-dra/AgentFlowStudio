@@ -63,6 +63,41 @@
 - Handoff:
   `docs/handoff/AFS-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705.md`.
 
+## 2026-07-05 - P0 Fixed Asset Reuse Link Integration
+
+- Completed bounded implementation lane
+  `IMPL-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION` for dispatch
+  `TD-AFS-V02-IMPL-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705-001`
+  on `codex/p0-fixed-asset-reuse-link-integration-20260705`.
+- Persisted Runtime `asset_auto_binding_graph` into Studio
+  `storyboardBreakdown`, created storyboard shot params, and sanitized Runtime
+  Studio state persistence for `assetAutoBindingGraph` / `nodeReferenceStack`.
+- Added Studio graph-bound asset helpers so bound fixed assets flow into
+  storyboard shot and asset-card node reference stacks, then into keyframe
+  `visualAssets` and `keyframeLayer.fixed_visual_asset_ids`.
+- Extended the Studio asset reuse local contract actual path so storyboard
+  nested binding graphs report `graph_bound_count` without relying on optimizer
+  metadata.
+- Added explicit fixed-asset promotion choices for `link_existing`, `replace`,
+  and `create_new` when graph-bound or same type+label fixed assets exist.
+- Added Runtime promote request fields and guards for duplicate/reuse intent,
+  including `link_existing` return of the existing fixed asset, `replace`
+  validation through `supersedes_asset_id`, `create_new`, and structured
+  duplicate warnings.
+- Regenerated `docs/openapi/afs-runtime-service.openapi.json` for the new
+  promote request fields.
+- Available validation passed `npm run check:studio-js` (`143 files`),
+  `python3 -m py_compile` on touched Python/tests, focused pytest (`54
+  passed`), OpenAPI/promotion gate pytest (`3 passed`), a direct Node
+  graph-bound intent assertion, and `git diff --check`.
+- No provider behavior change/call/gate mutation, Runtime/Studio server run,
+  browser/live `/studio/` QA, deploy/restart, source-sync/fetch/pull/push,
+  generated-media QA, duplicate-prevention live claim, human/business/public/
+  legal readiness claim, durable-memory promotion, COS/CompanyOS/source-KB
+  mutation, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705.md`.
+
 ## 2026-07-05 - P0 Structured QA Checklist Active Runtime Noncompletion Recovery
 
 - Completed bounded recovery lane

@@ -1,4 +1,5 @@
 import { createNode, connect } from "./nodes.js";
+import { graphBoundVisualAssetsForShot } from "./asset-auto-binding-refs.js";
 import { sourceEvidenceRefs } from "./generation-preflight-source-evidence.js";
 import { structuredShotFromSegment } from "./structured-shot.js";
 
@@ -70,14 +71,20 @@ function downstreamAssetCardNodes(state, scriptNodeId) {
 function fixedVisualAssetsFromAssetNodes(assetNodes) {
   const seen = new Set();
   const result = [];
+  const add = (visual) => {
+    if (!isFixedVisualAsset(visual)) return;
+    const assetId = String(visual.asset_id || visual.visual_asset_id || "").trim();
+    if (!assetId || seen.has(assetId)) return;
+    seen.add(assetId);
+    result.push(visual);
+  };
   for (const asset of assetNodes) {
     for (const visual of asset.params?.visualAssets || []) {
-      if (!isFixedVisualAsset(visual)) continue;
-      const assetId = String(visual.asset_id || visual.visual_asset_id || "").trim();
-      if (!assetId || seen.has(assetId)) continue;
-      seen.add(assetId);
-      result.push(visual);
+      add(visual);
     }
+    const graph = asset.params?.assetAutoBindingGraph || asset.params?.asset_auto_binding_graph || null;
+    const assetRef = asset.params?.asset_prep?.asset_ref || asset.params?.assetCardDraft?.source_asset_ref || {};
+    for (const visual of graphBoundVisualAssetsForShot(graph, { asset_refs: [assetRef] })) add(visual);
   }
   return result;
 }

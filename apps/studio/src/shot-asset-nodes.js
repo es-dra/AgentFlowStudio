@@ -3,19 +3,21 @@ import {
   assetCardText,
   assetCardTypeLabel,
 } from "./asset-card-drafts.js";
+import { assetAutoBindingGraph, nodeReferenceStackForGraphBoundAssets } from "./asset-auto-binding-refs.js";
 import { assetImageRatio } from "./asset-card-image-prompts.js";
 import { createNode, connect } from "./nodes.js";
 import { refineStructuredShotAssets, structuredShotFromSegment } from "./structured-shot.js";
 
 const MAX_ASSET_PREP_NODES_PER_SHOT = 4;
 
-export function createShotAssetPrepNodes(store, scriptNodeId, structuredShot, x, y) {
+export function createShotAssetPrepNodes(store, scriptNodeId, structuredShot, x, y, options = {}) {
   const refs = Array.isArray(structuredShot?.asset_refs) ? structuredShot.asset_refs : [];
   const created = [];
+  const bindingGraph = assetAutoBindingGraph(options.assetAutoBindingGraph);
   refs.slice(0, MAX_ASSET_PREP_NODES_PER_SHOT).forEach((asset, index) => {
     const draft = assetCardDraftFromRef(asset, structuredShot, { sourceScriptNodeId: scriptNodeId });
     const assetNode = createNode(store, "image", x, y + index * 150);
-    applyAssetDraftToNode(store, assetNode.id, draft, structuredShot, scriptNodeId, asset);
+    applyAssetDraftToNode(store, assetNode.id, draft, structuredShot, scriptNodeId, asset, bindingGraph);
     connect(store, scriptNodeId, assetNode.id);
     created.push(assetNode.id);
   });
@@ -36,12 +38,20 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode, options
     : fresh.params?.structuredShot
     ? refineStructuredShotAssets(fresh.params.structuredShot, context)
     : structuredShotFromSegment(context, Number(fresh.params?.scriptSegmentIndex || 1));
-  const created = createShotAssetPrepNodes(store, fresh.id, structuredShot, fresh.x + fresh.w + 160, fresh.y);
+  const bindingGraph = assetAutoBindingGraph(
+    options.assetAutoBindingGraph
+    || fresh.params?.assetAutoBindingGraph
+    || fresh.params?.storyboardBreakdown?.assetAutoBindingGraph,
+  );
+  const created = createShotAssetPrepNodes(store, fresh.id, structuredShot, fresh.x + fresh.w + 160, fresh.y, {
+    assetAutoBindingGraph: bindingGraph,
+  });
   store.set((s) => {
     const node = s.nodes[fresh.id];
     if (!node) return;
     node.params.structuredShot = structuredShot;
     node.params.shotAssetRefs = structuredShot.asset_refs;
+    if (bindingGraph) node.params.assetAutoBindingGraph = bindingGraph;
     node.params.assetPrepState = {
       status: created.length ? "card_ready" : "no_assets_detected",
       downstream_node_ids: created,
@@ -109,10 +119,11 @@ function removeShotAssetCardNodes(store, nodeIds) {
   });
 }
 
-function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeId, asset) {
+function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeId, asset, bindingGraph = null) {
   store.set((s) => {
     const node = s.nodes[nodeId];
     if (!node) return;
+    const referenceStack = nodeReferenceStackForGraphBoundAssets(bindingGraph, { asset_refs: [asset] }, nodeId);
     node.title = `${assetCardTypeLabel(draft.asset_type)} · @${draft.label}`;
     node.prompt = "";
     node.content = assetCardText(draft);
@@ -137,5 +148,7 @@ function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeI
       source_script_node_id: scriptNodeId,
       source_shot_id: structuredShot.shot_id,
     };
+    if (bindingGraph) node.params.assetAutoBindingGraph = bindingGraph;
+    if (referenceStack) node.params.nodeReferenceStack = referenceStack;
   });
 }

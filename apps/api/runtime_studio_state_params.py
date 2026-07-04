@@ -24,6 +24,7 @@ SAFE_NODE_PARAM_KEYS = (
     "quotaOverrideConfirmed", "lastContextBundle", "nodeRole", "sourceTextNodeId", "scriptSegmentIndex",
     "structuredShot", "shotAssetRefs", "assetPrepState", "asset_prep", "assetCardDraft",
     "assetCardRevision",
+    "assetAutoBindingGraph", "asset_auto_binding_graph", "nodeReferenceStack", "node_reference_stack",
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
@@ -88,6 +89,10 @@ def _sanitize_param(
         return param_values.safe_object(value, text=text, number=number, max_items=32)
     if key == "storyboardBreakdown":
         return param_values.storyboard_breakdown(value, text=text, number=number)
+    if key in {"assetAutoBindingGraph", "asset_auto_binding_graph"}:
+        return param_values.asset_auto_binding_graph(value, text=text, number=number)
+    if key in {"nodeReferenceStack", "node_reference_stack"}:
+        return param_values.node_reference_stack(value, text=text, number=number)
     if key == "keyframeLayer":
         return param_values.keyframe_layer(value, text=text)
     if key == "lastVisualAssetWarnings":

@@ -98,16 +98,23 @@ def test_visual_asset_rejected_default_list_retire_and_duplicate_warning(tmp_pat
         f"/projects/{project_id}/visual-assets/promote",
         json=_promote_payload(first_image, label="Lin Wan"),
     )
-    duplicate = client.post(
+    duplicate_without_intent = client.post(
         f"/projects/{project_id}/visual-assets/promote",
         json=_promote_payload(second_image, label="Lin Wan"),
+    )
+    duplicate = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(second_image, label="Lin Wan", reuse_intent="create_new"),
     )
 
     assert rejected.status_code == 200
     assert rejected.json()["asset"]["status"] == "rejected"
     assert fixed.status_code == 200
+    assert duplicate_without_intent.status_code == 422
     assert duplicate.status_code == 200
     assert duplicate.json()["warnings"][0]["warning_id"] == "duplicate_visual_asset_label"
+    assert duplicate.json()["warnings"][0]["warning_code"] == "fixed_asset_reuse_intent_recorded"
+    assert duplicate.json()["warnings"][0]["required_intents"] == ["link_existing", "replace", "create_new"]
 
     default_list = client.get(f"/projects/{project_id}/visual-assets")
     rejected_list = client.get(f"/projects/{project_id}/visual-assets?status=rejected")
@@ -182,3 +189,54 @@ def test_visual_asset_promote_accepts_prop_assets(tmp_path) -> None:
     assert payload["asset_type"] == "prop"
     assert payload["label"] == "Brass Compass"
     assert payload["image_asset_refs"] == [image_id]
+
+
+def test_visual_asset_duplicate_intent_link_and_replace_are_explicit(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_visual_asset_duplicate_intent"
+    first_image = _upload_image(client, project_id, "node-a")
+    second_image = _upload_image(client, project_id, "node-b")
+    third_image = _upload_image(client, project_id, "node-c")
+
+    fixed = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(first_image, label="Lin Wan"),
+    )
+    assert fixed.status_code == 200
+    fixed_id = fixed.json()["asset"]["asset_id"]
+
+    link_existing = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(
+            second_image,
+            label="Lin Wan",
+            reuse_intent="link_existing",
+            link_existing_asset_id=fixed_id,
+        ),
+    )
+    replace = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(
+            third_image,
+            label="Lin Wan",
+            reuse_intent="replace",
+            supersedes_asset_id=fixed_id,
+        ),
+    )
+    bad_link = client.post(
+        f"/projects/{project_id}/visual-assets/promote",
+        json=_promote_payload(
+            third_image,
+            label="Lin Wan",
+            reuse_intent="link_existing",
+            link_existing_asset_id="vas_missing",
+        ),
+    )
+
+    assert link_existing.status_code == 200
+    assert link_existing.json()["asset"]["asset_id"] == fixed_id
+    assert link_existing.json()["warnings"][0]["reuse_intent"] == "link_existing"
+    assert replace.status_code == 200
+    assert replace.json()["asset"]["supersedes_asset_id"] == fixed_id
+    assert replace.json()["asset"]["reuse_intent"] == "replace"
+    assert bad_link.status_code == 422

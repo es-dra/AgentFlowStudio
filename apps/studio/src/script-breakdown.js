@@ -1,4 +1,5 @@
 import { createNode, connect } from "./nodes.js";
+import { assetAutoBindingGraph, nodeReferenceStackForGraphBoundAssets } from "./asset-auto-binding-refs.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
 import { SCRIPT_UPLOAD_ACCEPT, readScriptFileText, safeFileName, scriptFileExtension } from "./script-file-import.js";
 import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
@@ -83,10 +84,12 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
   if (!shots.length) return [];
   const createdIds = [];
   const x = fresh.x + fresh.w + 180;
+  const bindingGraph = assetAutoBindingGraph(breakdown.asset_auto_binding_graph);
   for (const [index, shot] of shots.entries()) {
     const structuredShot = refineStructuredShotAssets(normalizeStoryboardShot(shot, index + 1), source);
     const shotText = structuredShotText(structuredShot);
     const shotNode = createNode(store, "script", x, fresh.y + index * 230);
+    const referenceStack = nodeReferenceStackForGraphBoundAssets(bindingGraph, structuredShot, shotNode.id);
     store.set((s) => {
       const target = s.nodes[shotNode.id];
       if (!target) return;
@@ -99,6 +102,8 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
       target.params.scriptSegmentIndex = index + 1;
       target.params.structuredShot = structuredShot;
       target.params.shotAssetRefs = structuredShot.asset_refs;
+      if (bindingGraph) target.params.assetAutoBindingGraph = bindingGraph;
+      if (referenceStack) target.params.nodeReferenceStack = referenceStack;
       target.params.assetPrepState = {
         status: "pending_user_review",
         downstream_node_ids: [],
@@ -123,6 +128,8 @@ export async function splitTextNodeToStoryboardNodes(store, node, runtime = null
       assetCardCandidateArtifactId: breakdown.artifacts?.asset_card_candidates?.artifact_id || "",
       productionGraph: breakdown.production_graph || null,
       productionGraphArtifactId: breakdown.artifacts?.production_graph_snapshot?.artifact_id || "",
+      assetAutoBindingGraph: bindingGraph,
+      assetAutoBindingGraphArtifactId: breakdown.artifacts?.asset_auto_binding_graph?.artifact_id || "",
       updated_at: new Date().toISOString(),
     };
     sourceNode.params.storyboardBreakdownState = { status: "complete", percent: 100, completed_at: new Date().toISOString() };
@@ -242,6 +249,7 @@ async function loadStoryboardBreakdown(store, runtime, node, source) {
           provider_calls_started: Boolean(payload?.provider_calls_started),
           asset_card_candidates: payload?.asset_card_candidates || null,
           production_graph: payload?.production_graph || null,
+          asset_auto_binding_graph: payload?.asset_auto_binding_graph || null,
           artifacts: payload?.artifacts || {},
         };
       }
@@ -292,6 +300,7 @@ function normalizeAssetRef(asset, index) {
   return {
     label,
     asset_id: String(asset.asset_id || `candidate:${type}:${index + 1}`),
+    graph_asset_id: String(asset.graph_asset_id || asset.graphAssetId || ""),
     asset_type: type,
     status: String(asset.status || "candidate"),
     source: String(asset.source || "llm"),

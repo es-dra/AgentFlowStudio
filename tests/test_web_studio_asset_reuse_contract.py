@@ -207,3 +207,147 @@ def test_asset_reuse_local_contract_models_states_explanations_and_reversal() ->
     asset_reuse = payload["optimization"]["node_parameters"]["asset_reuse"]
     assert asset_reuse["summary"]["graph_bound_count"] == 1
     assert "not human acceptance" in asset_reuse["non_claims"]
+
+
+def test_storyboard_graph_bound_asset_flows_to_asset_cards_keyframes_and_contract() -> None:
+    payload = _run_node(
+        textwrap.dedent(
+            r'''
+            import { splitTextNodeToStoryboardNodes } from "./apps/studio/src/script-breakdown.js";
+            import { ensureShotAssetPrepNodesForScriptNode } from "./apps/studio/src/shot-asset-nodes.js";
+            import { createKeyframeNodesForStoryboard } from "./apps/studio/src/storyboard-keyframes.js";
+            import { assetReuseLocalContract } from "./apps/studio/src/asset-reuse-contract.js";
+
+            const graph = {
+              artifact_type: "agentflow_asset_auto_binding_graph",
+              schema_version: "0.1.0",
+              algorithm_id: "afs.asset_auto_binding.v0.1",
+              summary: { suggested_binding_count: 1, established_binding_count: 1, blocked_candidate_count: 0 },
+              binding_suggestions: [{
+                binding_id: "binding:graph_prop_map:fixed_map_1",
+                binding_state: "bound",
+                graph_asset_id: "graph:prop:地图",
+                fixed_visual_asset_id: "fixed_map_1",
+                asset_type: "prop",
+                label: "地图",
+                confidence: 0.92,
+                lineage_refs: {
+                  candidate_graph_asset_id: "graph:prop:地图",
+                  fixed_visual_asset_id: "fixed_map_1",
+                  fixed_source_node_id: "asset_card_map",
+                  source_human_gate_id: "gate_map",
+                  source_asset_card_candidate_id: "asset_card_candidate_map",
+                },
+                reversal_plan: { reversible: true, action: "unbind", preserve_lineage: true, destructive_asset_write: false },
+              }],
+              relationships: [{
+                relationship_type: "asset_auto_binding_established",
+                from_node_id: "asset:graph:prop:地图",
+                to_node_id: "fixed_asset:fixed_map_1",
+                binding_id: "binding:graph_prop_map:fixed_map_1",
+                binding_state: "bound",
+                confidence: 0.92,
+                source: "afs.asset_auto_binding.v0.1",
+              }],
+              blocked_candidates: [],
+              writes_long_term_memory: false,
+              writes_company_kb: false,
+            };
+
+            const state = {
+              nodes: {
+                text_1: {
+                  id: "text_1",
+                  type: "text",
+                  title: "Script",
+                  x: 0,
+                  y: 0,
+                  w: 280,
+                  h: 280,
+                  prompt: "林晚检查地图。",
+                  content: "林晚检查地图。",
+                  params: {},
+                  status: "complete",
+                },
+              },
+              edges: {},
+              order: ["text_1"],
+              selection: { nodeIds: [], edgeId: null },
+              ui: {},
+              assets: [],
+            };
+            let seq = 0;
+            const store = {
+              get: () => state,
+              nextId: () => `node_${++seq}`,
+              set: (mutator) => mutator(state),
+            };
+            const runtime = {
+              breakdownStoryboard: async () => ({
+                safe_manifest: { status: "runtime_storyboard_breakdown" },
+                provider_calls_started: false,
+                shots: [{
+                  shot_id: "shot_01",
+                  index: 1,
+                  duration: "5s",
+                  description: "林晚检查地图。",
+                  shot_size: "近景",
+                  light_atmosphere: "冷色室内光",
+                  camera_motion: "固定机位",
+                  asset_refs: [{
+                    label: "地图",
+                    asset_type: "prop",
+                    asset_id: "candidate:prop:map",
+                    graph_asset_id: "graph:prop:地图",
+                    status: "candidate",
+                    source: "runtime",
+                  }],
+                }],
+                asset_auto_binding_graph: graph,
+                production_graph: {
+                  artifact_type: "agentflow_production_graph_snapshot",
+                  summary: { fixed_visual_asset_count: 1 },
+                  nodes: [{ node_type: "fixed_visual_asset", asset_id: "fixed_map_1" }],
+                },
+                artifacts: {
+                  asset_auto_binding_graph: { artifact_id: "artifact_binding_graph" },
+                  production_graph_snapshot: { artifact_id: "artifact_production_graph" },
+                },
+              }),
+            };
+
+            const [shotId] = await splitTextNodeToStoryboardNodes(store, state.nodes.text_1, runtime);
+            const shot = state.nodes[shotId];
+            const [assetNodeId] = ensureShotAssetPrepNodesForScriptNode(store, shot, { replaceExisting: true });
+            const assetNode = state.nodes[assetNodeId];
+            const [keyframeId] = createKeyframeNodesForStoryboard(store, shot);
+            const keyframe = state.nodes[keyframeId];
+            const shotReuse = assetReuseLocalContract(state, shot);
+            const assetReuse = assetReuseLocalContract(state, assetNode);
+
+            process.stdout.write(JSON.stringify({
+              sourceBreakdown: state.nodes.text_1.params.storyboardBreakdown,
+              shot,
+              assetNode,
+              keyframe,
+              shotReuse,
+              assetReuse,
+            }));
+            '''
+        )
+    )
+
+    source_breakdown = payload["sourceBreakdown"]
+    shot_params = payload["shot"]["params"]
+    asset_params = payload["assetNode"]["params"]
+    keyframe_params = payload["keyframe"]["params"]
+
+    assert source_breakdown["assetAutoBindingGraphArtifactId"] == "artifact_binding_graph"
+    assert source_breakdown["assetAutoBindingGraph"]["summary"]["established_binding_count"] == 1
+    assert shot_params["structuredShot"]["asset_refs"][0]["graph_asset_id"] == "graph:prop:地图"
+    assert shot_params["nodeReferenceStack"]["summary"]["asset_auto_binding_reference_count"] == 1
+    assert asset_params["nodeReferenceStack"]["references"][0]["target_ref"] == "fixed_map_1"
+    assert keyframe_params["visualAssets"][0]["asset_id"] == "fixed_map_1"
+    assert keyframe_params["keyframeLayer"]["fixed_visual_asset_ids"] == ["fixed_map_1"]
+    assert payload["shotReuse"]["summary"]["graph_bound_count"] == 1
+    assert payload["assetReuse"]["summary"]["graph_bound_count"] == 1

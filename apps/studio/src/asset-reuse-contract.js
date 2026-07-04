@@ -332,6 +332,8 @@ function assetBindingGraphs(state, node) {
     params.assetAutoBindingGraph,
     params.asset_auto_binding_graph,
     params.agentflow_asset_auto_binding_graph,
+    params.storyboardBreakdown?.assetAutoBindingGraph,
+    params.storyboardBreakdown?.asset_auto_binding_graph,
     state?.assetAutoBindingGraph,
     state?.asset_auto_binding_graph,
   ].filter((graph) => graph?.artifact_type === "agentflow_asset_auto_binding_graph");

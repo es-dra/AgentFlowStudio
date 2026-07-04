@@ -59,6 +59,32 @@ COS/CompanyOS/source-KB mutation, archive execution, or self-archive is
 claimed. Handoff:
 `docs/handoff/AFS-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705.md`.
 
+P0 fixed asset reuse link integration addendum: Lane
+`IMPL-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION` completed a bounded
+Runtime/Studio local contract implementation for dispatch
+`TD-AFS-V02-IMPL-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705-001`
+on `codex/p0-fixed-asset-reuse-link-integration-20260705`; expected BU
+`BU-AFS-V02-IMPL-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705-001`.
+The slice persists Runtime `asset_auto_binding_graph` through Studio
+script-breakdown/storyboard surfaces, maps graph-bound fixed assets into
+storyboard shot and asset-card `nodeReferenceStack` plus keyframe
+`visualAssets`, preserves actual Studio `assetReuseLocalContract()`
+`graph_bound_count`, and requires explicit `link_existing` / `replace` /
+`create_new` intent for fixed visual asset submit when a graph-bound or same
+type+label fixed asset exists. Runtime visual asset promotion now validates
+explicit duplicate/reuse intent, supports `link_existing`, validates
+`replace`, emits structured duplicate warnings, and the OpenAPI snapshot was
+regenerated for the new request fields. Available validation passed
+`npm run check:studio-js` (`143 files`), `python3 -m py_compile` on touched
+Python/tests, focused pytest (`54 passed` plus OpenAPI/promotion gate
+`3 passed`), direct Node graph-bound intent assertion, and `git diff --check`.
+No provider behavior change/call/gate, Runtime/Studio server run, browser/live
+`/studio/` QA, deploy/restart, source-sync/fetch/pull/push, generated-media
+QA, duplicate-prevention live claim, human/business/public/legal readiness
+claim, durable-memory promotion, COS/CompanyOS/source-KB mutation, archive
+execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705.md`.
+
 P0 structured QA checklist active Runtime noncompletion recovery addendum: Lane
 `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` completed a
 bounded recovery callback for dispatch

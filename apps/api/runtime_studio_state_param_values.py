@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from apps.api.runtime_studio_state_safe_text import has_media_filename_fragment
+from apps.api.runtime_studio_state_asset_binding import asset_auto_binding_graph, node_reference_stack
 from apps.api.runtime_store import safe_id
 from apps.api.runtime_studio_state_storyboard import production_graph_review, production_graph_snapshot, source_evidence_refs, visual_assets
 
@@ -37,15 +38,15 @@ def asset_refs(value: Any, *, text: TextSanitizer) -> list[dict[str, Any]]:
         label = text(item.get("label"), "", 80)
         if not label:
             continue
-        refs.append(
-            {
-                "label": label,
-                "asset_id": safe_id(text(item.get("asset_id"), "", 160)),
-                "asset_type": asset_type(item.get("asset_type")),
-                "status": text(item.get("status"), "candidate", 40),
-                "source": text(item.get("source"), "unknown", 40),
-            }
-        )
+        ref = {
+            "label": label,
+            "asset_id": safe_id(text(item.get("asset_id"), "", 160)),
+            "graph_asset_id": safe_id(text(item.get("graph_asset_id"), "", 160)),
+            "asset_type": asset_type(item.get("asset_type")),
+            "status": text(item.get("status"), "candidate", 40),
+            "source": text(item.get("source"), "unknown", 40),
+        }
+        refs.append({key: value for key, value in ref.items() if value})
         if len(refs) >= 24:
             break
     return refs
@@ -142,6 +143,20 @@ def storyboard_breakdown(value: Any, *, text: TextSanitizer, number: NumberSanit
         result["productionGraph"] = graph
     if graph_artifact_id:
         result["productionGraphArtifactId"] = graph_artifact_id
+    binding_graph = asset_auto_binding_graph(
+        value.get("assetAutoBindingGraph") or value.get("asset_auto_binding_graph"),
+        text=text,
+        number=number,
+    )
+    binding_graph_artifact_id = text(
+        value.get("assetAutoBindingGraphArtifactId") or value.get("asset_auto_binding_graph_artifact_id"),
+        "",
+        180,
+    )
+    if binding_graph:
+        result["assetAutoBindingGraph"] = binding_graph
+    if binding_graph_artifact_id:
+        result["assetAutoBindingGraphArtifactId"] = binding_graph_artifact_id
     return result
 
 
@@ -275,16 +290,7 @@ def asset_type(value: Any) -> str:
 
 
 __all__ = (
-    "asset_card_revision",
-    "asset_card_draft",
-    "asset_exclusions",
-    "asset_refs",
-    "keyframe_layer",
-    "safe_object",
-    "storyboard_breakdown",
-    "structured_shot",
-    "text_list",
-    "uploads",
-    "visual_assets",
-    "warnings",
+    "asset_card_revision", "asset_card_draft", "asset_exclusions", "asset_refs", "keyframe_layer",
+    "node_reference_stack", "safe_object", "storyboard_breakdown", "structured_shot", "text_list",
+    "uploads", "visual_assets", "warnings",
 )

@@ -85,6 +85,7 @@ export function normalizeShotAssetRefs(assetRefs, context = "") {
     const assetType = ["character", "scene", "prop"].includes(asset?.asset_type) ? asset.asset_type : "character";
     pushAssetRef(refs, asset.label || asset.name, assetType, asset.source || "candidate", context, {
       asset_id: asset.asset_id,
+      graph_asset_id: asset.graph_asset_id || asset.graphAssetId,
       status: asset.status,
     });
   }
@@ -144,13 +145,16 @@ function addImplicitRefs(refs, text) {
 function pushAssetRef(refs, label, assetType, source, context = "", options = {}) {
   const clean = cleanAssetLabel(semanticAssetLabel(label, assetType, context));
   if (!clean || refs.some((asset) => asset.label === clean)) return;
-  refs.push({
+  const ref = {
     label: clean,
     asset_id: options.asset_id || `candidate:${assetType}:${slug(clean)}`,
+    graph_asset_id: options.graph_asset_id || "",
     asset_type: assetType,
     status: options.status || (source === "explicit" ? "mentioned" : "candidate"),
     source,
-  });
+  };
+  if (!ref.graph_asset_id) delete ref.graph_asset_id;
+  refs.push(ref);
 }
 
 function descriptionWithAssets(source, assetRefs) {

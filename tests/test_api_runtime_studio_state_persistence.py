@@ -90,6 +90,64 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
         },
         "updated_by_user": True,
     }
+    asset_auto_binding_graph = {
+        "artifact_type": "agentflow_asset_auto_binding_graph",
+        "schema_version": "0.1.0",
+        "algorithm_id": "afs.asset_auto_binding.v0.1",
+        "summary": {"suggested_binding_count": 1, "established_binding_count": 1, "blocked_candidate_count": 0},
+        "binding_suggestions": [
+            {
+                "binding_id": "binding:graph_character_hero:vas_fixed_001",
+                "binding_state": "bound",
+                "graph_asset_id": "graph:character:主角",
+                "fixed_visual_asset_id": "vas_fixed_001",
+                "asset_type": "character",
+                "label": "主角",
+                "confidence": 0.91,
+                "lineage_refs": {
+                    "candidate_graph_asset_id": "graph:character:主角",
+                    "fixed_visual_asset_id": "vas_fixed_001",
+                    "fixed_source_node_id": "asset_1",
+                    "source_human_gate_id": "gate_hero",
+                    "source_asset_card_candidate_id": "asset_card_candidate_hero",
+                },
+                "reversal_plan": {"reversible": True, "action": "unbind", "preserve_lineage": True},
+            }
+        ],
+        "relationships": [
+            {
+                "relationship_type": "asset_auto_binding_established",
+                "from_node_id": "asset:graph:character:主角",
+                "to_node_id": "fixed_asset:vas_fixed_001",
+                "binding_id": "binding:graph_character_hero:vas_fixed_001",
+                "binding_state": "bound",
+                "confidence": 0.91,
+                "source": "afs.asset_auto_binding.v0.1",
+            }
+        ],
+    }
+    node_reference_stack = {
+        "artifact_type": "studio_node_reference_stack",
+        "node_id": "script_1",
+        "summary": {"asset_auto_binding_reference_count": 1, "selected_reference_count": 1},
+        "references": [
+            {
+                "reference_id": "binding:graph_character_hero:vas_fixed_001",
+                "reference_type": "binding",
+                "studio_entity_id": "binding",
+                "scope": "node",
+                "target_slot": "asset_binding:graph:character:主角",
+                "target_ref": "vas_fixed_001",
+                "status": "bound",
+                "priority": 91,
+                "source": "asset_auto_binding_graph",
+                "source_algorithm_id": "afs.asset_auto_binding.v0.1",
+                "source_relationship_type": "asset_auto_binding_established",
+                "selected": True,
+                "conflict_state": "selected",
+            }
+        ],
+    }
     state = {
         "nodes": {
             "script_1": {
@@ -102,7 +160,13 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
                     "scriptSegmentIndex": 1,
                     "structuredShot": structured_shot,
                     "shotAssetRefs": structured_shot["asset_refs"],
+                    "assetAutoBindingGraph": asset_auto_binding_graph,
+                    "nodeReferenceStack": node_reference_stack,
                     "assetPrepState": {"status": "pending_user_review", "downstream_node_ids": ["asset_1"]},
+                    "storyboardBreakdown": {
+                        "assetAutoBindingGraph": asset_auto_binding_graph,
+                        "assetAutoBindingGraphArtifactId": "artifact_binding_graph",
+                    },
                 },
             },
             "asset_1": {
@@ -173,6 +237,9 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
     asset_params = saved["asset_1"]["params"]
     keyframe_params = saved["keyframe_1"]["params"]
     assert script_params["structuredShot"]["asset_refs"][1]["asset_type"] == "scene"
+    assert script_params["assetAutoBindingGraph"]["summary"]["established_binding_count"] == 1
+    assert script_params["nodeReferenceStack"]["references"][0]["target_ref"] == "vas_fixed_001"
+    assert script_params["storyboardBreakdown"]["assetAutoBindingGraphArtifactId"] == "artifact_binding_graph"
     assert script_params["assetPrepState"]["status"] == "pending_user_review"
     assert asset_params["assetCardDraft"]["feature_card"]["appearance"] == "金属机身和青蓝发光纹路"
     assert asset_params["assetCardRevision"]["reference_assets"][0]["asset_id"] == "img_ref_001"

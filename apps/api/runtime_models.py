@@ -265,6 +265,8 @@ class VisualAssetPromoteRequest(BaseModel):
     negative_locks: list[str] = Field(default_factory=list)
     source_node_id: str | None = None
     supersedes_asset_id: str | None = None
+    reuse_intent: Literal["link_existing", "replace", "create_new"] | None = None
+    link_existing_asset_id: str | None = None
     source_human_gate_id: str | None = None
     source_asset_card_candidate_id: str | None = None
     review_decision: Literal["fixed", "rejected"]
