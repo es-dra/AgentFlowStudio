@@ -6,7 +6,28 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-04 by Codex
+Last updated: 2026-07-05 by Codex
+
+P0 reference upload Runtime error UX local contract addendum: Lane
+`FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT` completed a bounded
+Studio/Runtime client error-normalization fix for dispatch
+`TD-AFS-V02-FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705-001`
+on `codex/p0-reference-upload-runtime-error-ux-20260705`; expected BU
+`BU-AFS-V02-FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705-001`.
+The slice prevents reference upload/replace failures from rendering
+`[object Object]`, normalizes structured Runtime 422 bodies and validation
+arrays into safe Chinese messages with reason, field label, code, request id,
+and stage when present, and reuses Studio safe redaction for string errors.
+Reference upload now fails locally with clear Chinese messages for unsupported
+node targets and unsupported image file types before reading bytes or calling
+Runtime. Existing successful upload binding for image, video first frame,
+keyframe generation, and asset-card draft references remains covered. Available
+validation passed focused pytest (`3 passed`), `python -m py_compile` on the
+touched Python test, `npm run check:studio-js`, and direct Node assertions for
+object/array error bodies. No browser/server/provider/source-sync/deploy/
+restart/COS/CompanyOS/source-KB mutation or generated-media QA is claimed.
+Handoff:
+`docs/handoff/AFS-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705.md`.
 
 P0 structured QA checklist active Runtime noncompletion recovery addendum: Lane
 `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` completed a

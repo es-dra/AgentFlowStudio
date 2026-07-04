@@ -1,11 +1,10 @@
-import { formatStructuredRuntimeError } from "./runtime-error-utils.js";
+import { formatRuntimeError, formatStructuredRuntimeError } from "./runtime-error-utils.js";
 import { safePublicText } from "./generation-status-policy.js";
 
 export function safeError(error) {
   const structured = formatStructuredRuntimeError(error);
   if (structured) return structured;
-  const message = error instanceof Error ? error.message : String(error || "unknown error");
-  const clean = message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>");
+  const clean = formatRuntimeError(error, "unknown error");
   if (/Gateway timeout|504|network connection interrupted|Failed to fetch/i.test(clean)) {
     return "生成请求连接中断，正在尝试从已落盘素材找回结果。";
   }

@@ -1,31 +1,48 @@
+import { redactUnsafeText } from "./safe-text-redaction.js";
+
 export function formatRuntimeError(error, fallback = "请求失败") {
   const payload = structuredRuntimeErrorPayload(error);
   if (payload) {
-    const code = String(payload.error || error?.errorCode || "").trim();
+    const code = safeErrorCode(payload.error || payload.detail_code || error?.errorCode);
+    const details = payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
+      ? payload.details
+      : {};
     const detailText = [
-      payload.message,
-      payload.detail,
-      payload.raw_detail,
-      payload.details,
-      error?.message,
-    ].map((item) => String(item || "")).join("\n");
+      safeErrorText(payload.message, 240),
+      safeErrorText(payload.detail, 240),
+      safeErrorText(payload.raw_detail, 240),
+      safeObjectSummary(details, 320),
+      safeErrorText(error?.message, 240),
+    ].filter(Boolean).join("\n");
     const message = promptOptimizerProviderMessage(detailText)
       || messageForCode(code)
-      || String(payload.message || "").trim();
-    const userAction = String(payload.user_action || "").trim();
-    const requestId = String(payload.request_id || error?.requestId || "").trim();
-    const stage = String(payload.stage || "").trim();
-    return [
+      || safeErrorText(payload.message, 220)
+      || safeErrorText(payload.detail, 220);
+    const reason = firstSafeText(
+      payload.reason,
+      payload.raw_detail,
+      details.reason,
+      details.raw_detail,
+      details.message,
+    );
+    const field = validationFieldMessage(details.fields || payload.fields || payload.detail);
+    const userAction = safeErrorText(payload.user_action, 220);
+    const requestId = safeErrorText(payload.request_id || error?.requestId, 120);
+    const stage = safeErrorCode(payload.stage);
+    return uniqueLines([
       message || code || fallback,
+      reason && reason !== message ? `原因：${reason}` : "",
+      field ? `字段：${field}` : "",
+      code ? `代码：${code}` : "",
       userAction ? `建议：${userAction}` : "",
       requestId ? `请求编号：${requestId}` : "",
       stage ? `阶段：${stage}` : "",
-    ].filter(Boolean).join("\n").slice(0, 600);
+    ]).join("\n").slice(0, 600);
   }
-  const message = error instanceof Error ? error.message : String(error || fallback);
+  const message = safeErrorText(error instanceof Error ? error.message : error, 240) || fallback;
   const promptOptimizerMessage = promptOptimizerProviderMessage(message);
   if (promptOptimizerMessage) return promptOptimizerMessage;
-  return message.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
+  return message.slice(0, 220);
 }
 
 export function formatStructuredRuntimeError(error) {
@@ -84,9 +101,143 @@ export function messageForCode(code) {
 }
 
 function structuredRuntimeErrorPayload(error) {
-  if (error?.payload?.detail && typeof error.payload.detail === "object") return error.payload.detail;
-  if (error?.payload && typeof error.payload === "object") return error.payload;
+  if (error?.payload && typeof error.payload === "object") {
+    const payload = error.payload;
+    if (Object.prototype.hasOwnProperty.call(payload, "detail")) {
+      const detail = payload.detail;
+      if (Array.isArray(detail)) {
+        return {
+          ...payload,
+          error: payload.error || "request_validation_failed",
+          message: validationErrorMessage(detail),
+          details: {
+            ...(payload.details && typeof payload.details === "object" ? payload.details : {}),
+            fields: validationFields(detail),
+            error_count: detail.length,
+          },
+        };
+      }
+      if (detail && typeof detail === "object") {
+        return {
+          ...payload,
+          ...detail,
+          details: detail.details && typeof detail.details === "object"
+            ? detail.details
+            : (payload.details && typeof payload.details === "object" ? payload.details : {}),
+        };
+      }
+      return { ...payload, detail };
+    }
+    return payload;
+  }
   return null;
+}
+
+function validationFields(items) {
+  if (!Array.isArray(items)) return [];
+  return items.slice(0, 8).map((item) => {
+    const loc = Array.isArray(item?.loc) ? item.loc.join(".") : item?.field;
+    return {
+      field: String(loc || ""),
+      message: safeErrorText(item?.msg || item?.message, 180),
+      type: safeErrorText(item?.type, 120),
+    };
+  });
+}
+
+function validationErrorMessage(items) {
+  const field = validationFieldMessage(items);
+  return field ? "请求参数校验失败。" : "";
+}
+
+function validationFieldMessage(value) {
+  const fields = Array.isArray(value) ? value : [];
+  if (!fields.length) return "";
+  const first = fields[0] || {};
+  const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : (first.field || first.loc));
+  const message = safeErrorText(first.message || first.msg, 160);
+  const type = safeErrorText(first.type, 120);
+  const suffix = fields.length > 1 ? `；共 ${fields.length} 项` : "";
+  if (field && message) return `${field}（${message}${type ? ` / ${type}` : ""}${suffix}）`;
+  return [field, message || type].filter(Boolean).join("：") + suffix;
+}
+
+function firstSafeText(...items) {
+  for (const item of items) {
+    const text = safeErrorText(item, 220);
+    if (text) return text;
+  }
+  return "";
+}
+
+function safeErrorText(value, limit = 220) {
+  if (value == null) return "";
+  if (Array.isArray(value)) return validationFieldMessage(value) || value.map((item) => safeErrorText(item, 80)).filter(Boolean).join(" ");
+  if (typeof value === "object") return safeObjectSummary(value, limit);
+  return redactUnsafeText(String(value).replace(/\[object Object\]/g, " "), limit);
+}
+
+function safeObjectSummary(value, limit = 220) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const preferred = firstSafeText(
+    value.reason,
+    value.raw_detail,
+    value.message,
+    value.detail,
+    value.error_description,
+  );
+  if (preferred) return preferred.slice(0, limit);
+  const field = validationFieldMessage(value.fields);
+  if (field) return field.slice(0, limit);
+  const pairs = [];
+  for (const [key, item] of Object.entries(value)) {
+    if (pairs.length >= 3) break;
+    if (/token|secret|authorization|cookie|base64|bytes|raw|provider/i.test(key)) continue;
+    if (item && typeof item === "object") continue;
+    const text = safeErrorText(item, 80);
+    if (text) pairs.push(`${safeErrorCode(key)}=${text}`);
+  }
+  return pairs.join(" ").slice(0, limit);
+}
+
+function safeErrorCode(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+}
+
+function safeFieldName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const parts = raw.split(".").filter((part) => part && part !== "body");
+  const labels = parts.map((part) => {
+    const normalized = part.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
+    const known = {
+      data_base64: "上传图片内容",
+      mime_type: "图片类型",
+      filename: "文件名",
+      reference_target: "参考目标",
+      role: "绑定角色",
+      node_id: "节点",
+    };
+    return known[normalized] || safeErrorCode(normalized);
+  }).filter(Boolean);
+  return labels.join(".").slice(0, 120);
+}
+
+function uniqueLines(lines) {
+  const seen = new Set();
+  const result = [];
+  for (const line of lines) {
+    const text = safeErrorText(line, 600);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    result.push(text);
+  }
+  return result;
 }
 
 function promptOptimizerProviderMessage(value) {

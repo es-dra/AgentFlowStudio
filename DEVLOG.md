@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-07-05 - P0 Reference Upload Runtime Error UX Local Contract
+
+- Completed bounded fix lane
+  `FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT` for dispatch
+  `TD-AFS-V02-FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705-001`
+  on `codex/p0-reference-upload-runtime-error-ux-20260705`.
+- Hardened Studio Runtime error parsing and formatting so object-valued
+  Runtime 422 payloads, validation arrays, nested details, and fallback string
+  errors cannot render `[object Object]`.
+- Structured upload errors now render safe Chinese lines with the available
+  message, reason, field label, error code, request id, and stage. Internal
+  upload field names such as `data_base64` are mapped to user-facing labels
+  rather than exposed as raw payload vocabulary.
+- Reference upload now blocks unsupported node targets and unsupported PNG/JPEG
+  file selections locally before `FileReader` or Runtime upload calls.
+- Focused contract tests still cover successful image, video first-frame,
+  keyframe-generation, and asset-card-draft reference binding.
+- Available validation passed focused pytest (`3 passed`),
+  `python -m py_compile` on the touched Python test, `npm run check:studio-js`
+  (`141 files`), and direct Node assertions for structured object/array error
+  bodies.
+- No fetch/pull/push/source-sync, Runtime/Studio server/browser run, provider
+  call/gate mutation, deploy/restart, generated-media QA, OpenAPI/DOC2/COS/
+  CompanyOS/source-KB mutation, readiness/human/business/public/legal claim,
+  durable-memory promotion, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705.md`.
+
 ## 2026-07-05 - P0 Structured QA Checklist Active Runtime Noncompletion Recovery
 
 - Completed bounded recovery lane

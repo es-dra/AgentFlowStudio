@@ -2,6 +2,7 @@ import { mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets
 import { safeError, setNodeError } from "./node-action-utils.js";
 
 const IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg";
+const ACCEPTED_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg"]);
 
 export function uploadNodeImage(store, runtime, node) {
   if (!runtime?.uploadImageAsset) {
@@ -24,6 +25,16 @@ export function uploadNodeImage(store, runtime, node) {
 
 export async function uploadSelectedImage(store, runtime, nodeId, file) {
   const initialNode = store.get().nodes?.[nodeId];
+  const targetError = unsupportedUploadTargetMessage(initialNode);
+  if (targetError) {
+    setNodeError(store, nodeId, targetError);
+    return;
+  }
+  const fileError = unsupportedImageFileMessage(file);
+  if (fileError) {
+    setNodeError(store, nodeId, `图片上传失败: ${fileError}`);
+    return;
+  }
   const policy = referenceUploadPolicyForNode(initialNode);
   store.set((s) => {
     const n = s.nodes[nodeId];
@@ -89,6 +100,24 @@ export async function uploadSelectedImage(store, runtime, nodeId, file) {
   } catch (error) {
     setNodeError(store, nodeId, `图片上传失败: ${safeError(error)}`);
   }
+}
+
+function unsupportedUploadTargetMessage(node) {
+  if (!node) return "没有找到要绑定参考图的节点，请重新选择图片或视频节点。";
+  if (!["image", "video"].includes(node.type)) return "当前节点不支持参考图上传，请选择图片或视频节点。";
+  return "";
+}
+
+function unsupportedImageFileMessage(file) {
+  const mimeType = String(file?.type || "").trim().toLowerCase();
+  const filename = String(file?.name || "").trim().toLowerCase();
+  if (mimeType && !ACCEPTED_IMAGE_MIME_TYPES.has(mimeType)) {
+    return "仅支持 PNG 或 JPEG 图片，请重新选择参考图。";
+  }
+  if (!mimeType && /\.[a-z0-9]+$/i.test(filename) && !/\.(png|jpe?g)$/i.test(filename)) {
+    return "仅支持 PNG 或 JPEG 图片，请重新选择参考图。";
+  }
+  return "";
 }
 
 function readFileAsBase64(file) {

@@ -148,13 +148,19 @@ function staleRuntimeRouteMessage(response, route, body, parsed = null) {
 function runtimeErrorMessage(response, body, parsed = null) {
   let detail = "";
   if (parsed?.message || parsed?.error) {
-    detail = [parsed.message, parsed.user_action ? `建议：${parsed.user_action}` : "", parsed.request_id ? `请求编号：${parsed.request_id}` : ""]
+    detail = [
+      parsed.message,
+      parsed.field ? `字段：${parsed.field}` : "",
+      parsed.error ? `代码：${parsed.error}` : "",
+      parsed.user_action ? `建议：${parsed.user_action}` : "",
+      parsed.request_id ? `请求编号：${parsed.request_id}` : "",
+    ]
       .filter(Boolean)
       .join(" ");
   } else {
     detail = cleanTextResponseError(body, response);
   }
-  const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
+  const safeDetail = cleanRuntimeErrorText(detail, 220);
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
 }
 
@@ -169,18 +175,23 @@ function parseRuntimeErrorPayload(response, body) {
         error: "",
       };
     }
+    const details = detail.details && typeof detail.details === "object" ? detail.details : {};
     return {
       payload,
       error: String(detail.error || detail.detail_code || payload.error || "").trim(),
-      message: String(detail.message || payload.message || "").trim(),
-      user_action: String(detail.user_action || "").trim(),
-      request_id: String(detail.request_id || payload.request_id || "").trim(),
-      client_request_id: String(detail.client_request_id || payload.client_request_id || "").trim(),
-      project_id: String(detail.project_id || payload.project_id || "").trim(),
-      node_id: String(detail.node_id || payload.node_id || "").trim(),
-      action: String(detail.action || "").trim(),
-      stage: String(detail.stage || "").trim(),
-      details: detail.details && typeof detail.details === "object" ? detail.details : {},
+      message: cleanRuntimeErrorText(
+        detail.message || payload.message || (typeof payload.detail === "string" ? payload.detail : ""),
+        220,
+      ),
+      field: validationFieldMessage(details.fields || detail.fields),
+      user_action: cleanRuntimeErrorText(detail.user_action, 220),
+      request_id: cleanRuntimeErrorText(detail.request_id || payload.request_id, 120),
+      client_request_id: cleanRuntimeErrorText(detail.client_request_id || payload.client_request_id, 120),
+      project_id: cleanRuntimeErrorText(detail.project_id || payload.project_id, 120),
+      node_id: cleanRuntimeErrorText(detail.node_id || payload.node_id, 120),
+      action: cleanRuntimeErrorText(detail.action, 80),
+      stage: cleanRuntimeErrorText(detail.stage, 80),
+      details,
     };
   } catch {
     return { payload: null, message: cleanTextResponseError(body, response), error: "" };
@@ -190,8 +201,74 @@ function parseRuntimeErrorPayload(response, body) {
 function validationErrorMessage(items) {
   if (!Array.isArray(items) || !items.length) return "";
   const first = items[0] || {};
-  const field = Array.isArray(first.loc) ? first.loc.join(".") : "";
+  const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : first.field);
   return [first.msg || "请求参数校验失败", field ? `字段：${field}` : ""].filter(Boolean).join(" ");
+}
+
+function validationFieldMessage(value) {
+  const fields = Array.isArray(value) ? value : [];
+  if (!fields.length) return "";
+  const first = fields[0] || {};
+  const field = safeFieldName(Array.isArray(first.loc) ? first.loc.join(".") : (first.field || first.loc));
+  const message = cleanRuntimeErrorText(first.message || first.msg, 160);
+  const type = cleanRuntimeErrorText(first.type, 120);
+  const suffix = fields.length > 1 ? `；共 ${fields.length} 项` : "";
+  if (field && message) return `${field}（${message}${type ? ` / ${type}` : ""}${suffix}）`;
+  return [field, message || type].filter(Boolean).join("：") + suffix;
+}
+
+function cleanRuntimeErrorText(value, limit = 220) {
+  if (value == null) return "";
+  if (Array.isArray(value)) return validationFieldMessage(value) || value.map((item) => cleanRuntimeErrorText(item, 80)).filter(Boolean).join(" ");
+  if (typeof value === "object") {
+    const field = validationFieldMessage(value.fields);
+    if (field) return field.slice(0, limit);
+    for (const key of ["reason", "raw_detail", "message", "detail", "error_description"]) {
+      const text = cleanRuntimeErrorText(value[key], limit);
+      if (text) return text;
+    }
+    const pairs = [];
+    for (const [key, item] of Object.entries(value)) {
+      if (pairs.length >= 3) break;
+      if (/token|secret|authorization|cookie|base64|bytes|raw|provider/i.test(key)) continue;
+      if (item && typeof item === "object") continue;
+      const text = cleanRuntimeErrorText(item, 80);
+      if (text) pairs.push(`${key}=${text}`);
+    }
+    return pairs.join(" ").slice(0, limit);
+  }
+  return String(value || "")
+    .replace(/\[object Object\]/g, " ")
+    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
+    .replace(/Authorization\s*[:=]\s*\S+/gi, "Authorization=<redacted>")
+    .replace(/\b(?:token|secret|credential)\s*[:=]\s*\S+/gi, "<redacted>")
+    .replace(/\bdata:[^\s"'<>]+/gi, "<media-bytes-redacted>")
+    .replace(/\bdata[_ -]?base64\b/gi, "<redacted>")
+    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
+    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
+    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
+}
+
+function safeFieldName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const parts = raw.split(".").filter((part) => part && part !== "body");
+  const labels = parts.map((part) => {
+    const normalized = part.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
+    const known = {
+      data_base64: "上传图片内容",
+      mime_type: "图片类型",
+      filename: "文件名",
+      reference_target: "参考目标",
+      role: "绑定角色",
+      node_id: "节点",
+    };
+    return known[normalized] || normalized.slice(0, 80);
+  }).filter(Boolean);
+  return labels.join(".").slice(0, 120);
 }
 
 function cleanTextResponseError(body, response) {
