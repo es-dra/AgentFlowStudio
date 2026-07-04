@@ -1,5 +1,70 @@
 # Devlog
 
+## 2026-07-05 - P0 Structured QA Checklist Active Runtime Noncompletion Recovery
+
+- Completed bounded recovery lane
+  `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` for dispatch
+  `TD-AFS-V02-FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION-20260705-001`
+  on `codex/p0-structured-source-output-qa-checklist-packet-20260704`.
+- Recovered evaluator residual risk where active Runtime states could return
+  `checklist_completed` when every checklist item was followed.
+- Added `retrying` to the active Runtime state set and made active or unstable
+  states `submitted`, `pending`, `running`, and `retrying` force
+  `blocked_missing_evidence` with safe reason code
+  `runtime_state_not_stable_reviewable`.
+- Added `runtime_state_review` safe metadata to emitted packets so reviewers can
+  see that noncompletion was required without exposing provider/raw/media data.
+- Waivers now record `runtime_state_not_stable_reviewable` and remain invalid
+  while the Runtime target is active, so a non-critical waiver cannot close an
+  active target into completion.
+- Focused tests now assert active states never complete, active states cannot be
+  waived into completion, stable completed targets still complete, stable
+  partial outputs are preserved, and existing unsafe/mismatch/conflict/critical
+  and forbidden-field assertions continue to pass.
+- Available validation passed `python3 -m py_compile`, focused pytest through
+  `/home/afs-ops/AgentFlowStudio/.venv/bin/python` (`7 passed`), direct
+  no-pytest assertions, `git diff --check`, and alternate-venv CLI
+  help/version. System `python3` still lacks `pytest`.
+- No Runtime route, OpenAPI, Studio UI, browser/server run, provider call/gate
+  mutation, generated-media QA, final media decision, human/business/public/
+  legal readiness claim, durable-memory promotion, COS/CompanyOS/source-KB
+  mutation, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION-20260705.md`.
+
+## 2026-07-04 - P0 Structured Source vs Output QA Checklist Packet
+
+- Completed bounded Lane A implementation
+  `IMPL-P0-STRUCTURED-SOURCE-VS-OUTPUT-QA-CHECKLIST-PACKET` for dispatch
+  `TD-AFS-V02-IMPL-P0-STRUCTURED-SOURCE-VS-OUTPUT-QA-CHECKLIST-PACKET-20260704-001`
+  on `codex/p0-structured-source-output-qa-checklist-packet-20260704`.
+- Added pure algorithm contract
+  `agentflow.algorithms.structured_source_output_qa_checklist` with artifact
+  type `agentflow_structured_source_output_qa_checklist`, schema `0.1.0`,
+  packet states for ready/completed/missing-evidence/unsafe/scope/conflict/
+  unverifiable outcomes, and item outcomes for followed, partially followed,
+  ignored, blocked, not applicable, and unverifiable requirements.
+- The packet owns only source-vs-output checklist evidence: safe source refs,
+  safe output refs, category/severity/blocker state, expected and observed refs,
+  summary counts, waiver validation, bounded reviewer notes, and suggested local
+  actions.
+- Waivers are valid only for non-critical evidence exceptions and fail closed
+  for critical, safety, scope, project/target mismatch, unsafe payload, missing
+  target output, missing safe preview, and active Runtime state conditions.
+- Unsafe input markers and fields fail closed without echoing private values,
+  including raw provider fields, signed/private URLs, local paths, data URI or
+  base64 media markers, bearer/token/cookie/auth fragments, provider keys, and
+  media-byte markers.
+- Available validation passed `python3 -m py_compile` on touched Python modules
+  and focused tests plus direct no-pytest execution of all new test functions.
+  Focused pytest is blocked because `/usr/bin/python3` has no `pytest`.
+- No Runtime route, OpenAPI, Studio UI, browser/server run, provider call/gate
+  mutation, generated-media QA, final media decision, human/business/public/
+  legal readiness claim, durable-memory promotion, COS/CompanyOS/source-KB
+  mutation, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-STRUCTURED-SOURCE-OUTPUT-QA-CHECKLIST-PACKET-20260704.md`.
+
 ## 2026-07-04 - P0 Asset Reuse UX Safe Text Redaction Recovery
 
 - Completed bounded recovery lane

@@ -21,6 +21,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "content_quality_evaluation",
     "asset_auto_binding",
     "node_reference_stack",
+    "structured_source_output_qa_checklist",
     "asset_card_candidates",
     "production_graph",
     "evidence_ledger",
