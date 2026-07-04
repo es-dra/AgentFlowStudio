@@ -8,6 +8,56 @@
 
 Last updated: 2026-07-04 by Codex
 
+P0 asset reuse UX safe text redaction recovery addendum: Lane
+`FIX-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION` recovered evaluator blocker
+`fail_closed_redaction_gap` for dispatch
+`TD-AFS-V02-FIX-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION-20260704-001` on
+`codex/p0-asset-reuse-ux-explanation-reversal-20260704`; expected BU
+`BU-AFS-V02-FIX-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION-20260704-001`.
+The recovery adds a shared Studio-local redaction helper used by both
+`assetReuseLocalContract()` and `buildOptimizationRequest()` upload summaries,
+so unsafe fragments embedded inside otherwise valid `user_intent` text are
+redacted consistently. Covered fragments include raw provider markers,
+`raw_provider_response`, `data_base64`, `data:*` URIs, base64/media-byte
+signatures, long base64-like payloads, signed/private URLs,
+bearer/token-like strings, local paths, and raw media markers. Legitimate short
+human intent text is preserved. Direct assertions continue to cover asset reuse
+states, reversal action applicability, non-destructive preservation,
+asset-card draft separation, optimizer `asset_reuse` gating, and
+reference-upload actual-path behavior. No fetch/pull/push/source-sync,
+Runtime/Studio server/browser run, provider call/gate mutation, deploy/restart,
+generated-media QA, OpenAPI/DOC2/COS/CompanyOS/source-KB mutation,
+readiness/human/business/public/legal claim, durable-memory promotion, archive
+execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION-RECOVERY-20260704.md`.
+
+P0 asset reuse UX/explanation/reversal local contract addendum: Lane
+`IMPL-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT` completed a
+bounded Studio local contract slice for dispatch
+`TD-AFS-V02-IMPL-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT-20260704-001`
+on `codex/p0-asset-reuse-ux-explanation-reversal-20260704`; expected BU
+`BU-AFS-V02-IMPL-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT-20260704-001`.
+The slice adds a safe `asset_reuse` node-parameter summary for local Studio
+state/explanation/reversal modeling. It recognizes uploads, fixed visual asset
+reuse, optional asset auto-binding graph suggestions, node-reference stack
+conflict states, blocked candidates, local reversal records, and generation
+candidate rejection semantics where locally available. Reversal is
+non-destructive: `binding` maps to `unbind`, `generation_candidate` maps to
+`reject`, replace-capable entities map to `replace`, and assets/media/provider
+artifacts/source evidence/upload records/candidate records are preserved.
+Asset-card drafts remain draft/candidate inputs through
+`role=asset_reference` and `reference_target=asset_card_draft`; they are not
+confirmed fixed assets or ordinary keyframe generations. Available validation
+passed `python3 -m py_compile`, direct Node/static assertions for the actual
+local paths, `npm run check:studio-js`, and reference-upload regression
+assertions; focused pytest is blocked because `.venv/bin/python` is unavailable
+and `/usr/bin/python3` has no `pytest`. No fetch/pull/push/source-sync,
+provider call/gate mutation, Runtime/Studio server/browser run,
+deploy/restart, generated-media QA, OpenAPI/DOC2/COS/CompanyOS/source-KB
+mutation, readiness/human/business/public/legal claim, durable-memory
+promotion, archive execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT-20260704.md`.
+
 P0 reference upload flexibility local contract addendum: Lane
 `IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT` completed a bounded
 Studio local contract slice for dispatch

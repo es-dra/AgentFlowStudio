@@ -1,5 +1,70 @@
 # Devlog
 
+## 2026-07-04 - P0 Asset Reuse UX Safe Text Redaction Recovery
+
+- Completed bounded recovery lane
+  `FIX-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION` for dispatch
+  `TD-AFS-V02-FIX-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION-20260704-001`
+  on `codex/p0-asset-reuse-ux-explanation-reversal-20260704`.
+- Recovered evaluator blocker `fail_closed_redaction_gap` by adding a shared
+  Studio-local redaction helper and routing both `assetReuseLocalContract()`
+  and `buildOptimizationRequest()` upload summaries through the same sanitizer.
+- Redaction now removes unsafe fragments embedded inside otherwise valid
+  `user_intent` text, including raw provider markers, `raw_provider_response`,
+  `data_base64`, `data:*` URIs, short media signatures such as PNG base64
+  prefixes, long base64-like payloads, signed/private URLs, bearer/token-like
+  strings, local paths, and raw media markers.
+- Legitimate short human intent text is preserved while unsafe fragments are
+  replaced by bounded redaction tokens.
+- Direct assertions still cover asset reuse states, reversal applicability,
+  non-destructive reversal preservation, asset-card draft separation,
+  optimizer `asset_reuse` gating, and the reference-upload actual path.
+- No fetch/pull/push/source-sync, Runtime/Studio server/browser run, provider
+  call/gate mutation, deploy/restart, generated-media QA,
+  OpenAPI/DOC2/COS/CompanyOS/source-KB mutation, readiness/human/business/
+  public/legal claim, durable-memory promotion, archive execution, or
+  self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-ASSET-REUSE-UX-SAFE-TEXT-REDACTION-RECOVERY-20260704.md`.
+
+## 2026-07-04 - P0 Asset Reuse UX Explanation Reversal Local Contract
+
+- Completed bounded lane
+  `IMPL-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT` for dispatch
+  `TD-AFS-V02-IMPL-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT-20260704-001`
+  on `codex/p0-asset-reuse-ux-explanation-reversal-20260704`.
+- Added a Studio-only local contract snapshot for asset reuse states,
+  explanations, safe-field boundaries, and reversal plans. The modeled states
+  are `recognized`, `reused`, `graph-bound`, `blocked`, `conflicted`, and
+  `reversed/unbound`.
+- The contract consumes existing safe upload metadata plus local fixed visual
+  assets, optional `agentflow_asset_auto_binding_graph` data, node reference
+  stack conflict state, and local generation candidate records when present.
+- Reversal semantics follow Studio vocabulary and node-reference rules:
+  `binding` uses `unbind`, `generation_candidate` uses `reject`, and
+  replace-capable entities use `replace`; reversal records do not delete
+  assets, media, provider artifacts, source evidence, uploads, or candidate
+  records.
+- Asset-card drafts remain candidate semantics: `role=asset_reference` and
+  `reference_target=asset_card_draft` are surfaced as draft reference inputs,
+  not confirmed fixed assets or ordinary keyframe generations.
+- Optimization node parameters now include `asset_reuse` only when local safe
+  reuse items exist, and the existing `uploaded_images` summary redacts local
+  paths, signed/private URL fragments, media bytes, bearer/token-like text, and
+  raw-provider-response markers.
+- Available validation passed `python3 -m py_compile` on focused Studio
+  Python tests, direct Node/static assertions for asset reuse behavior and the
+  existing reference-upload actual path, and `npm run check:studio-js`
+  (`140 files`). Focused pytest is blocked because `.venv/bin/python` is
+  unavailable and `/usr/bin/python3` has no `pytest`.
+- No fetch/pull/push/source-sync, provider call/gate mutation, Runtime/Studio
+  server/browser run, deploy/restart, generated-media QA,
+  OpenAPI/DOC2/COS/CompanyOS/source-KB mutation, readiness/human/business/
+  public/legal claim, durable-memory promotion, archive execution, or
+  self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-ASSET-REUSE-UX-EXPLANATION-REVERSAL-LOCAL-CONTRACT-20260704.md`.
+
 ## 2026-07-04 - P0 Reference Upload Flexibility Local Contract
 
 - Completed bounded lane

@@ -3,6 +3,8 @@ import { cameraSummary } from "./presets/cameras.js";
 import { directorPromptSummary, normalizeDirectorSetup, safeDirectorSetup } from "./director-data.js";
 import { providerServiceForImageModel } from "./presets/models.js";
 import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generation-prompt.js";
+import { assetReuseLocalContract } from "./asset-reuse-contract.js";
+import { containsUnsafeText, redactUnsafeText } from "./safe-text-redaction.js";
 import {
   assetCardNodeUploadImageRefs,
   assetCardReferenceImageRefs,
@@ -23,7 +25,7 @@ const GENERATION_TARGET = {
 
 export function buildOptimizationRequest(state, node) {
   const directorSetup = linkedDirectorSetup(state, node);
-  const nodeParameters = nodeParameterSnapshot(node);
+  const nodeParameters = nodeParameterSnapshot(node, state);
   const assetRefs = safeAssetRefs(state, node);
   const contextSubgraph = buildContextSubgraph(state, node, "prompt_optimize");
   const referenceCount = assetRefs.length;
@@ -52,7 +54,7 @@ function normalizeNodeType(type) {
 }
 
 // 节点结构化参数快照：作为优化的硬约束上下文（后端按需消费，未知字段被忽略）。
-function nodeParameterSnapshot(node) {
+function nodeParameterSnapshot(node, state = null) {
   const p = node.params || {};
   const snapshot = {
     model: p.model || null,
@@ -86,6 +88,8 @@ function nodeParameterSnapshot(node) {
   if (overlayDecisions.length) snapshot.feedback_context_overlay_decisions = overlayDecisions;
   const uploadedImages = uploadReferenceSummaries(node);
   if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
+  const assetReuse = assetReuseLocalContract(state || { nodes: { [node.id]: node }, edges: {}, assets: [] }, node);
+  if (assetReuse.items.length) snapshot.asset_reuse = assetReuse;
   return snapshot;
 }
 
@@ -297,14 +301,29 @@ function isAssetCardNode(node) {
 function uploadReferenceSummaries(node) {
   const uploads = Array.isArray(node?.params?.uploads) ? node.params.uploads : [];
   return uploads.map((item) => ({
-    asset_id: String(item?.asset_id || item?.assetId || "").trim().slice(0, 80),
-    filename: String(item?.filename || item?.label || "").replace(/[\\/]/g, "").slice(0, 120),
-    role: String(item?.role || "").slice(0, 60),
-    reference_target: String(item?.reference_target || "").slice(0, 80),
-    user_intent: String(item?.user_intent || "").replace(/[\\/]/g, "").replace(/\s+/g, " ").trim().slice(0, 240),
-    media_kind: String(item?.media_kind || "").slice(0, 40),
-    mime_type: String(item?.mime_type || "").slice(0, 80),
+    asset_id: safeUploadToken(item?.asset_id || item?.assetId, 80),
+    filename: safeUploadText(item?.filename || item?.label, 120).replace(/[\\/]/g, ""),
+    role: safeUploadToken(item?.role, 60),
+    reference_target: safeUploadToken(item?.reference_target, 80),
+    user_intent: safeUploadText(item?.user_intent, 240),
+    media_kind: safeUploadToken(item?.media_kind, 40),
+    mime_type: safeUploadMime(item?.mime_type),
   })).filter((item) => item.asset_id || item.filename).slice(-4);
+}
+
+function safeUploadToken(value, limit) {
+  const text = String(value || "").trim();
+  if (containsUnsafeText(text)) return "";
+  return text.replace(/[^0-9A-Za-z_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, limit);
+}
+
+function safeUploadText(value, limit) {
+  return redactUnsafeText(value, limit);
+}
+
+function safeUploadMime(value) {
+  const text = String(value || "").toLowerCase();
+  return /^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(text) ? text.slice(0, 80) : "";
 }
 
 function nodeVisualAssetIds(node) {
