@@ -813,7 +813,8 @@ def test_asset_card_node_generation_prompt_is_not_written_into_prompt_box() -> N
 
     assert "assetCardUserAdjustmentText" in prompt_bar
     assert "assetCardPromptPlaceholder" in prompt_bar
-    assert "textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node)" in prompt_bar
+    assert "textarea.value = promptTextValue(node)" in prompt_bar
+    assert "if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node)" in prompt_bar
     assert "n.params.assetCardDraft.user_edited_text = textarea.value" in prompt_bar
     assert "node.prompt = assetImagePrompt(draft)" not in asset_nodes + asset_panel
     assert "assetCardNodeUploadImageRefs(node)" in optimizer_contract

@@ -61,7 +61,7 @@ function isPromptTextEditing(bar) {
 function buildBar(store, runtime, node) {
   const bar = el("div", "prompt-bar");
   bar.dataset.nodeId = node.id;
-  const p = node.params;
+  const p = node.params || {};
 
   if ((p.attachments || []).length) {
     const chips = el("div", "attach-chips");
@@ -76,10 +76,8 @@ function buildBar(store, runtime, node) {
   }
 
   const textarea = document.createElement("textarea");
-  textarea.placeholder = p.assetCardDraft
-    ? assetCardPromptPlaceholder(p.assetCardDraft.asset_type)
-    : promptPlaceholder(node.type, p.spec?.mode);
-  textarea.value = p.assetCardDraft ? assetCardUserAdjustmentText(node) : node.prompt || node.content || "";
+  textarea.placeholder = promptTextPlaceholder(node);
+  textarea.value = promptTextValue(node);
   textarea.addEventListener("input", () => {
     store.set((s) => {
       s.ui.promptBarNodeId = node.id;
@@ -209,12 +207,22 @@ function textAction(iconName, label, onClick) {
   return button;
 }
 
-function syncPromptBarState(bar, node) {
+export function syncPromptBarState(bar, node) {
   const task = activePromptTaskProgress(node);
   const running = Boolean(task);
   bar.classList.toggle("optimizing", running);
   const textarea = bar.querySelector("textarea");
-  textarea?.classList.toggle("prompt-shimmer", running);
+  if (textarea) {
+    textarea.classList.toggle("prompt-shimmer", running);
+    const expectedPrompt = promptTextValue(node);
+    if (!isPromptTextEditing(bar) && textarea.value !== expectedPrompt) {
+      textarea.value = expectedPrompt;
+    }
+    const expectedPlaceholder = promptTextPlaceholder(node);
+    if (textarea.placeholder !== expectedPlaceholder) {
+      textarea.placeholder = expectedPlaceholder;
+    }
+  }
   const optimizeBtn = bar.querySelector('[data-action="optimize-prompt"]');
   if (optimizeBtn) {
     optimizeBtn.classList.toggle("busy", running);
@@ -237,6 +245,17 @@ function promptTaskLabel(task) {
   const percent = Number(task?.state?.percent);
   if (Number.isFinite(percent)) return `${task.label} ${Math.max(0, Math.min(100, Math.round(percent)))}%`;
   return `${task?.label || "处理"}中`;
+}
+
+function promptTextValue(node) {
+  if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node);
+  return node?.prompt || node?.content || "";
+}
+
+function promptTextPlaceholder(node) {
+  const p = node?.params || {};
+  if (p.assetCardDraft) return assetCardPromptPlaceholder(p.assetCardDraft.asset_type);
+  return promptPlaceholder(node?.type, p.spec?.mode);
 }
 
 function usesPromptBarAssetCardRevision(revision) {
