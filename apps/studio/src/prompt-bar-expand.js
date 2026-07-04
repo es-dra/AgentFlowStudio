@@ -3,13 +3,18 @@ import { showModal, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { icon } from "./icons.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
+import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
+import { buildUserAssetCardRevisionState } from "./asset-revision-references.js";
 
 export function openExpandEditor(store, runtime, node) {
   const wrap = el("div", "prompt-expand");
   const textarea = document.createElement("textarea");
-  textarea.value = store.get().nodes[node.id]?.prompt || "";
-  textarea.placeholder = promptPlaceholder(node.type, node.params.spec?.mode);
-  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => { n.prompt = textarea.value; }, { history: false }));
+  const fresh = store.get().nodes[node.id] || node;
+  textarea.value = expandedPromptValue(fresh);
+  textarea.placeholder = expandedPromptPlaceholder(fresh);
+  textarea.addEventListener("input", () => updateNode(store, node.id, (n) => {
+    applyExpandedPromptValue(n, textarea.value);
+  }, { history: false }));
 
   const row = el("div", "bar-row");
   const optimizeBtn = el("button", "bar-tool optimize-btn");
@@ -30,4 +35,37 @@ export function openExpandEditor(store, runtime, node) {
   const close = showModal(wrap);
   closeBtn.addEventListener("click", close);
   textarea.focus();
+}
+
+function expandedPromptValue(node) {
+  if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node);
+  return node?.prompt || node?.content || "";
+}
+
+function expandedPromptPlaceholder(node) {
+  if (node?.params?.assetCardDraft) {
+    return assetCardPromptPlaceholder(node.params.assetCardDraft.asset_type);
+  }
+  return promptPlaceholder(node?.type, node?.params?.spec?.mode);
+}
+
+function applyExpandedPromptValue(node, value) {
+  node.prompt = value;
+  if (node.params?.assetCardDraft) {
+    node.params.assetCardDraft.user_edited_text = value;
+    node.params.assetCardDraft.updated_by_user = Boolean(value.trim());
+    if (value.trim()) {
+      node.params.assetCardRevision = buildUserAssetCardRevisionState(node, node.params.assetCardDraft, value);
+    } else if (usesPromptBarAssetCardRevision(node.params.assetCardRevision)) {
+      delete node.params.assetCardRevision;
+    }
+  } else if (node.type === "text" || node.type === "script") {
+    node.content = value;
+  }
+  if (node.params) delete node.params.lastOptimizedPromptPlain;
+}
+
+function usesPromptBarAssetCardRevision(revision) {
+  return Array.isArray(revision?.changed_fields)
+    && revision.changed_fields.some((item) => item?.field === "user_instruction");
 }

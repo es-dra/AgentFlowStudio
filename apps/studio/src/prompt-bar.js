@@ -9,7 +9,7 @@ import { openOptimizer } from "./optimizer.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
 import { canRunNodeGeneration, pollNodeVideoGeneration, startNodeGeneration } from "./node-actions.js";
 import { icon } from "./icons.js";
-import { barSignature, positionBar, structureSignature } from "./prompt-bar-position.js";
+import { barSignature, bindBarResizePositioning, positionBar, structureSignature } from "./prompt-bar-position.js";
 import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
@@ -113,15 +113,14 @@ function buildBar(store, runtime, node) {
   bindAssetMentionSuggestions(textarea, store, node.id);
   bar.appendChild(textarea);
 
-  if (node.type === "video" || node.type === "script") {
-    const expand = el("button", "expand-btn");
-    expand.innerHTML = icon("expand", 14);
-    expand.title = "放大编辑";
-    expand.addEventListener("click", () => openExpandEditor(store, runtime, node));
-    bar.appendChild(expand);
-  }
+  const expand = el("button", "expand-btn");
+  expand.innerHTML = icon("expand", 14);
+  expand.title = "放大编辑";
+  expand.addEventListener("click", () => openExpandEditor(store, runtime, node));
+  bar.appendChild(expand);
 
   bar.appendChild(buildBottomRow(store, runtime, node, textarea));
+  bindBarResizePositioning(bar, store, node.id);
   syncPromptBarState(bar, node);
   return bar;
 }

@@ -85,6 +85,27 @@ claim, durable-memory promotion, COS/CompanyOS/source-KB mutation, archive
 execution, or self-archive is claimed. Handoff:
 `docs/handoff/AFS-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705.md`.
 
+P2 prompt textarea resize/expand addendum: Lane
+`FIX-P2-PROMPT-TEXTAREA-RESIZE-EXPAND` completed a bounded Studio prompt
+ergonomics slice for dispatch
+`TD-AFS-V02-FIX-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705-001` on
+`codex/fix-p2-prompt-textarea-resize-expand-20260705`; expected BU
+`BU-AFS-V02-FIX-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705-001`.
+The slice makes the inline prompt bar textarea vertically resizable with
+responsive height limits, repositions the bar through a resize observer after
+manual expansion, exposes the large prompt editor from all prompt-capable Studio
+nodes, preserves text/script body content and asset-card user adjustment state
+through expanded edits, and makes the generation settings prompt textarea
+vertically resizable without changing Runtime/OpenAPI/provider behavior.
+Available validation passed `npm run check:studio-js`, focused static pytest
+through `/home/afs-ops/AgentFlowStudio/.venv/bin/python` (`15 passed`), direct
+Node marker assertions, and required git whitespace checks recorded in BU.
+System `python3` still lacks `pytest`. No browser/runtime/server/provider/
+generated-media QA, human/business/public/legal readiness claim, source sync,
+push, deploy, restart, Runtime/OpenAPI/COS/CompanyOS/source-KB mutation, archive
+execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705.md`.
+
 P0 structured QA checklist active Runtime noncompletion recovery addendum: Lane
 `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` completed a
 bounded recovery callback for dispatch

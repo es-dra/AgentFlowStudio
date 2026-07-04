@@ -98,6 +98,33 @@
 - Handoff:
   `docs/handoff/AFS-P0-FIXED-ASSET-REUSE-LINK-INTEGRATION-20260705.md`.
 
+## 2026-07-05 - P2 Prompt Textarea Resize Expand
+
+- Completed bounded Studio prompt ergonomics lane
+  `FIX-P2-PROMPT-TEXTAREA-RESIZE-EXPAND` for dispatch
+  `TD-AFS-V02-FIX-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705-001`
+  on `codex/fix-p2-prompt-textarea-resize-expand-20260705`.
+- Inline Studio prompt bar textareas are now vertically resizable with
+  responsive max-height constraints and extra right padding so the expand
+  affordance does not cover long Chinese prompt text.
+- Added resize-observer repositioning for the prompt bar so manual textarea
+  growth is re-clamped against the viewport and selected node placement.
+- The large prompt editor is now available for every prompt-capable Studio node,
+  not only video/script nodes.
+- Expanded edits now preserve the same value paths as the inline bar for
+  text/script content and asset-card user adjustment state.
+- The generation settings prompt textarea is vertically resizable with bounded
+  height so the action buttons remain reachable inside the existing modal.
+- Available validation passed `npm run check:studio-js`, focused static pytest
+  through `/home/afs-ops/AgentFlowStudio/.venv/bin/python` (`15 passed`), and
+  direct Node marker assertions. System `python3` still lacks `pytest`.
+- No browser/runtime/server/provider/generated-media QA, provider gate mutation,
+  Runtime/OpenAPI/COS/CompanyOS/source-KB mutation, source sync, push, deploy,
+  restart, human/business/public/legal readiness claim, durable-memory
+  promotion, archive execution, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705.md`.
+
 ## 2026-07-05 - P0 Structured QA Checklist Active Runtime Noncompletion Recovery
 
 - Completed bounded recovery lane

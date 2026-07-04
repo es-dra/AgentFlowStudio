@@ -8,7 +8,8 @@
 
 .prompt-bar {
   position: absolute;
-  width: 540px;
+  width: min(540px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
   background: rgba(32, 35, 39, 0.96);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-bar);
@@ -66,8 +67,11 @@
 
 .prompt-bar textarea {
   width: 100%;
-  min-height: 54px;
-  max-height: 140px;
+  min-height: 68px;
+  max-height: min(280px, calc(100vh - 210px));
+  resize: vertical;
+  overflow: auto;
+  padding-right: 28px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -140,8 +144,8 @@
   position: absolute;
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
-  width: min(740px, 84vw);
-  height: min(500px, 72vh);
+  width: min(860px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 96px));
   background: rgba(32, 35, 39, 0.98);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-bar);
@@ -152,4 +156,10 @@
   gap: 8px;
   z-index: var(--z-modal);
 }
-.prompt-expand textarea { flex: 1; max-height: none; }
+.prompt-expand textarea {
+  flex: 1 1 auto;
+  min-height: 260px;
+  max-height: calc(100vh - 190px);
+  resize: vertical;
+  overflow: auto;
+}

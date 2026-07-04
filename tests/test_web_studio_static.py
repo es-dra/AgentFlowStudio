@@ -82,7 +82,8 @@ def test_studio_disallows_native_blocking_dialogs_and_global_canvas_fallback() -
     canvas_body_source = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     assert '!["image", "video"].includes(node.type)' in canvas_body_source
     prompt_bar_source = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
-    assert 'node.type === "video" || node.type === "script"' in prompt_bar_source
+    assert "openExpandEditor(store, runtime, node)" in prompt_bar_source
+    assert 'node.type === "video" || node.type === "script") {' not in prompt_bar_source
     assert "AFS_ALLOW_REMOTE_IMAGE" in env_example
 
 

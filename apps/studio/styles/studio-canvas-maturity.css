@@ -264,6 +264,13 @@
   font: inherit;
 }
 
+.generation-field textarea {
+  min-height: 132px;
+  max-height: min(360px, 46vh);
+  resize: vertical;
+  overflow: auto;
+}
+
 .generation-setting-grid {
   display: grid;
   grid-template-columns: 0.8fr 0.7fr minmax(0, 1.4fr);

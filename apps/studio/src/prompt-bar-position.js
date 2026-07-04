@@ -47,6 +47,20 @@ export function positionBar(bar, state, node) {
   bar.style.top = `${Math.round(y)}px`;
 }
 
+export function bindBarResizePositioning(bar, store, nodeId) {
+  if (!window.ResizeObserver) return;
+  const observer = new ResizeObserver(() => {
+    if (!bar.isConnected) {
+      observer.disconnect();
+      return;
+    }
+    const state = store.get();
+    const fresh = state.nodes[nodeId];
+    if (fresh) positionBar(bar, state, fresh);
+  });
+  observer.observe(bar);
+}
+
 export function chooseNonOverlappingY({ belowY, aboveY, height, topY, bottomY, dockSafe }) {
   const minY = 8;
   const maxY = Math.max(minY, window.innerHeight - height - minY);
