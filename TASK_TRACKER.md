@@ -29,6 +29,36 @@ restart/COS/CompanyOS/source-KB mutation or generated-media QA is claimed.
 Handoff:
 `docs/handoff/AFS-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705.md`.
 
+P0 final media acceptance linked QA decision packet addendum: Lane
+`IMPL-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET` completed a bounded
+schema/algorithm/static-action contract slice for dispatch
+`TD-AFS-V02-IMPL-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705-001`
+on `codex/final-media-acceptance-decision-packet-20260705`; expected BU
+`BU-AFS-V02-IMPL-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705-001`.
+The slice adds `agentflow.algorithms.final_media_acceptance_decision` with
+artifact type `agentflow_final_media_acceptance_decision`, schema `0.1.0`, and
+algorithm id `afs.final_media_acceptance_decision.v0.1`. It consumes only
+structured QA checklist packet refs, safe summary counts, safe output
+summaries, blocker ids, packet timestamp, and explicit reviewer action; it does
+not recalculate checklist truth or copy checklist item arrays into the final
+decision artifact. `qa_passed` can enable local reviewer action but cannot set
+`accepted_for_local_final_media` without explicit supported-role reviewer
+`accept`. Fail-closed coverage includes stale/malformed/unsafe checklist packet
+refs, project/target/checklist-ref mismatch, active Runtime states, missing
+output, missing safe preview, critical fail count, safety/scope/conflict
+blockers, invalid waiver states, missing blocker ids where blocked counts
+exist, and unsupported reviewer roles. Static Studio action wiring reuses
+existing action ids `accept`, `reject`, and `view_evidence` without changing
+Studio JS. Available validation passed `python3 -m py_compile`, focused pytest
+through `/home/afs-ops/AgentFlowStudio/.venv/bin/python` (`6 passed`), direct
+no-pytest assertions, and `git diff --check`; system `python3` still lacks
+`pytest`. No
+Runtime/OpenAPI/Studio UI/browser/server/provider/generated-media QA,
+human/business/public/legal readiness, durable-memory promotion,
+COS/CompanyOS/source-KB mutation, archive execution, or self-archive is
+claimed. Handoff:
+`docs/handoff/AFS-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705.md`.
+
 P0 structured QA checklist active Runtime noncompletion recovery addendum: Lane
 `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` completed a
 bounded recovery callback for dispatch
