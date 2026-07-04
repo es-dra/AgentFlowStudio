@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-07-04 - P0 Reference Upload Flexibility Local Contract
+
+- Completed bounded lane
+  `IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT` for dispatch
+  `TD-AFS-V02-IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT-20260704-001`
+  on `codex/p0-reference-upload-flexibility-20260704`.
+- Made direct Studio reference uploads node-aware in the existing
+  `params.uploads` path, preserving safe `role`, `reference_target`,
+  `user_intent`, `media_kind`, `mime_type`, and `source_mode` metadata.
+- Video-node uploads now bind immediately as first-frame references and persist
+  `firstFrameImageAssetId` plus `videoInputSource`; keyframe-generation image
+  nodes record `reference_target=keyframe_generation`; asset-card drafts record
+  `role=asset_reference` and `reference_target=asset_card_draft`.
+- Optimization request node parameters now expose the same safe upload
+  summaries through `uploaded_images`.
+- Available validation passed `python3 -m py_compile` on the focused static
+  test, direct no-pytest actual-path execution, `npm run check:studio-js`
+  (`139 files`), and `git diff --check`. Focused pytest is blocked because
+  `.venv/bin/python` is absent and `/usr/bin/python3` has no `pytest`.
+- No source-sync/fetch/pull/push, provider call/gate, Runtime/Studio server
+  run, deploy/restart, browser QA, generated-media QA,
+  OpenAPI/DOC2/COS/CompanyOS/source-KB mutation, readiness/human/business/
+  public/legal claim, durable-memory promotion, archive execution, or
+  self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT-20260704.md`.
+
 ## 2026-07-04 - P0 Multi-Candidate Job-State Retry Actual Path Recovery
 
 - Completed bounded callback lane

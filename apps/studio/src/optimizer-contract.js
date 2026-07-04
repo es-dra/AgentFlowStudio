@@ -300,6 +300,10 @@ function uploadReferenceSummaries(node) {
     asset_id: String(item?.asset_id || item?.assetId || "").trim().slice(0, 80),
     filename: String(item?.filename || item?.label || "").replace(/[\\/]/g, "").slice(0, 120),
     role: String(item?.role || "").slice(0, 60),
+    reference_target: String(item?.reference_target || "").slice(0, 80),
+    user_intent: String(item?.user_intent || "").replace(/[\\/]/g, "").replace(/\s+/g, " ").trim().slice(0, 240),
+    media_kind: String(item?.media_kind || "").slice(0, 40),
+    mime_type: String(item?.mime_type || "").slice(0, 80),
   })).filter((item) => item.asset_id || item.filename).slice(-4);
 }
 

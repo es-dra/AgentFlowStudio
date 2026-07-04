@@ -8,6 +8,30 @@
 
 Last updated: 2026-07-04 by Codex
 
+P0 reference upload flexibility local contract addendum: Lane
+`IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT` completed a bounded
+Studio local contract slice for dispatch
+`TD-AFS-V02-IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT-20260704-001`
+on `codex/p0-reference-upload-flexibility-20260704`; expected BU
+`BU-AFS-V02-IMPL-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT-20260704-001`.
+The slice makes direct reference uploads node-aware in the existing
+`params.uploads` path, preserving safe upload metadata and bounded
+`user_intent`; video nodes bind uploaded images immediately as first-frame
+references, keyframe-generation image nodes carry
+`reference_target=keyframe_generation`, and asset-card drafts carry
+`role=asset_reference` plus `reference_target=asset_card_draft` so they are not
+treated as ordinary keyframe generations. Optimization node parameters now
+surface the same safe upload summaries through `uploaded_images`. Available
+validation passed `python3 -m py_compile`, direct no-pytest actual-path
+execution, `npm run check:studio-js`, and `git diff --check`; focused pytest is
+blocked because `.venv/bin/python` is absent and `/usr/bin/python3` has no
+`pytest`. No source-sync/fetch/pull/push, provider call/gate, Runtime/Studio
+server run, deploy/restart, browser QA, generated-media QA, OpenAPI/DOC2/COS/
+CompanyOS/source-KB mutation, readiness/human/business/public/legal claim,
+durable-memory promotion, archive execution, or self-archive is claimed.
+Handoff:
+`docs/handoff/AFS-P0-REFERENCE-UPLOAD-FLEXIBILITY-LOCAL-CONTRACT-20260704.md`.
+
 P0 multi-candidate job-state retry actual-path recovery addendum: Lane
 `FIX-P0-MULTI-CANDIDATE-JOB-STATE-RETRY-ACTUAL-PATH-RECOVERY` completed a
 bounded callback fix for dispatch
