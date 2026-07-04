@@ -4,7 +4,7 @@ const KIND_LABELS = {
   asset: "资产图生成",
   keyframe: "图片生成",
   video: "视频生成",
-  video_revision: "视频修订",
+  video_revision: "视频重生成尝试",
 };
 
 const STATUS_PROGRESS = {

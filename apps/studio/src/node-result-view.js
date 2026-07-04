@@ -64,9 +64,10 @@ function resultActions(node, result) {
   continueButton.className = "mini-btn";
   continueButton.type = "button";
   continueButton.dataset.action = "continue-generate";
+  continueButton.title = regenerateActionTitle(node);
   continueButton.innerHTML = node.status === "partial"
     ? `${icon("retry", 12)}<span>Retry failed items</span>`
-    : `${icon("play", 12)}<span>继续生成</span>`;
+    : `${icon("play", 12)}<span>${regenerateActionLabel(node)}</span>`;
   actions.appendChild(continueButton);
 
   const assetButton = document.createElement("button");
@@ -97,6 +98,21 @@ function resultActions(node, result) {
     actions.appendChild(draftButton);
   }
   return actions;
+}
+
+function regenerateActionLabel(node) {
+  if (node.type === "video" && node.params?.videoRevision?.enabled) return "重生成尝试";
+  if (node.type === "video") return "重新生成整段";
+  return "重新生成整张";
+}
+
+function regenerateActionTitle(node) {
+  if (node.status === "partial") return "只重试失败项，保留已完成输出。";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) {
+    return "提交视频重生成尝试；这不是局部编辑，未点名内容也可能变化。";
+  }
+  if (node.type === "video") return "按当前提示词重新生成整段视频；这不是局部编辑。";
+  return "按当前提示词重新生成整张图片；这不是局部编辑。";
 }
 
 function candidateGrid(candidates) {

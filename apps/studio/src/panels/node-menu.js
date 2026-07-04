@@ -27,6 +27,8 @@ import { openAssetCardPanel } from "./asset-card-panel.js";
 import { openRetireAssetModal } from "./drawer-asset-actions.js";
 
 const VIDEO_REVISION_DRAFT_MARKER = "video-revision-draft";
+const KEYFRAME_LOCAL_EDIT_GATE = "局部编辑不可用：当前只支持按提示词重新生成整张关键帧；真正局部编辑需要 image-edit/mask 能力。";
+const VIDEO_LOCAL_EDIT_GATE = "局部视频编辑不可用：当前草稿只是整段重生成尝试；真正局部/逐帧编辑需要 video-edit/mask/temporal 能力。";
 
 export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   const node = store.get().nodes[nodeId];
@@ -40,7 +42,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
   addItem(node.collapsed ? "chevronDown" : "chevronUp", node.collapsed ? "展开" : "折叠", () =>
     store.set((s) => { const n = s.nodes[nodeId]; if (n) n.collapsed = !n.collapsed; }));
   if (canRetryGeneration(node)) {
-    addItem("retry", ["error", "partial"].includes(node.status) ? "Retry failed items" : "重试生成", () => {
+    addItem("retry", retryMenuLabel(node), () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) startNodeGeneration(store, runtime, fresh);
     });
@@ -91,6 +93,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       addItem("x", "取消固定资产", () => openRetireAssetModal(store, runtime, fixedAsset));
     }
     if (canContinueKeyframeToVideo(node)) {
+      addDisabledItem("lock", "关键帧局部编辑不可用", KEYFRAME_LOCAL_EDIT_GATE);
       addItem("video", "接续视频节点", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) createVideoNodeFromKeyframe(store, fresh);
@@ -118,11 +121,12 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     });
     addItem("frames", "识别视频资产卡", () => requestVideoAssetCardDraft(store, nodeId));
     if (node.params?.lastVideoJobId) {
-      addItem("pencil", "创建视频修改草稿", () => {
+      addItem("pencil", "创建视频重生成草稿", () => {
         void VIDEO_REVISION_DRAFT_MARKER;
         const fresh = store.get().nodes[nodeId];
         if (fresh) enableVideoRevisionDraft(store, fresh);
       });
+      addDisabledItem("lock", "局部视频编辑不可用", VIDEO_LOCAL_EDIT_GATE);
       addItem("retry", "继续轮询视频任务", () => {
         const fresh = store.get().nodes[nodeId];
         if (fresh) pollNodeVideoGeneration(store, runtime, fresh);
@@ -179,6 +183,17 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     item.addEventListener("click", () => { close(); onClick(); });
     pop.appendChild(item);
   }
+
+  function addDisabledItem(iconName, label, detail) {
+    const item = el("button", "menu-item");
+    item.disabled = true;
+    item.title = detail;
+    item.innerHTML = [
+      `<span class="mi-icon">${icon(iconName, 13)}</span>`,
+      `<span><span>${label}</span><span class="mi-sub">${detail}</span></span>`,
+    ].join("");
+    pop.appendChild(item);
+  }
 }
 
 function activeFixedVisualAsset(node) {
@@ -191,6 +206,14 @@ function activeFixedVisualAsset(node) {
 
 function canRetryGeneration(node) {
   return canRunNodeGeneration(node);
+}
+
+function retryMenuLabel(node) {
+  if (["error", "partial"].includes(node.status)) return "Retry failed items";
+  if (node.type === "image") return "重新生成整张图";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) return "提交视频重生成尝试";
+  if (node.type === "video") return "重新生成整段视频";
+  return "重试生成";
 }
 
 function requestVideoAssetCardDraft(store, nodeId) {

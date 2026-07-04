@@ -37,8 +37,9 @@ export function createVideoNodeFromKeyframe(store, keyframeNode) {
     node.result = [
       "已从上游关键帧创建图生视频节点。",
       "关键帧图片已设为首帧；视频提示词和视频资产计划已自动生成。",
-      "可以直接生成，也可以先微调提示词/视频资产计划后再生成。",
-    ].join("");
+      "可以直接生成，也可以先微调提示词/视频资产计划后重新生成整段视频。",
+      "提示词微调不是局部视频编辑；未点名内容仍可能变化。",
+    ].join("\n");
     node.params = {
       ...node.params,
       nodeRole: "video_generation",

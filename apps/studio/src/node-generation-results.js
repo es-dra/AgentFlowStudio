@@ -4,21 +4,21 @@ export function videoRevisionResultText(response) {
   const status = response?.job?.status || "blocked";
   const manifest = response?.safe_manifest || {};
   const block = manifest.blocks?.[0] || {};
-  if (status === "succeeded") return "complete\nReady for review. Not yet accepted.";
+  if (status === "succeeded") return "complete\nVideo regeneration attempt is ready for review. Not yet accepted; not a local edit.";
   const partial = Number(manifest.output_count || 0) > 0
     || (Array.isArray(response?.candidate_previews) && response.candidate_previews.length > 0);
   if (partial) {
     return [
       "partially_complete",
       "Partial result is preserved.",
-      `Blocked reason: ${safePublicText(block.reason || "video revision did not fully complete")}`,
-      "Next action: retry failed items only.",
+      `Blocked reason: ${safePublicText(block.reason || "video regeneration attempt did not fully complete")}`,
+      "Next action: retry failed items only. Local/video edit capability remains unavailable.",
     ].join("\n");
   }
   return [
     status === "blocked" ? "needs_attention" : "failed",
-    `Blocked reason: ${safePublicText(block.reason || "video revision provider path is not enabled")}`,
-    "Next action: resolve the blocked reason, then retry failed items only.",
+    `Blocked reason: ${safePublicText(block.reason || "video regeneration attempt provider path is not enabled")}`,
+    "Next action: resolve the blocked reason, then retry failed items only. Local/video edit capability remains unavailable.",
   ].join("\n");
 }
 

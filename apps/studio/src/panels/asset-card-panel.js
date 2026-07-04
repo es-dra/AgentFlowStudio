@@ -58,10 +58,11 @@ function render(modal, draft) {
     <textarea data-field="negative_locks" rows="4">${escapeHtml((draft.negative_locks || []).join("\n"))}</textarea>
     <div class="va-section-label">来源</div>
     <div class="draft-status">${escapeHtml(draft.source_shot_id || "未标记")} · ${escapeHtml(draft.source || "local")}</div>
+    <div class="draft-status">保存后生成会重新绘制整张资产图；局部图像编辑未开放，需要 image-edit/mask 能力。</div>
     <div class="modal-actions">
       <button class="ghost-btn" data-action="close">取消</button>
       <button class="primary-btn" data-action="save">保存资产卡</button>
-      <button class="primary-btn" data-action="save-regenerate">保存并局部修订生成</button>
+      <button class="primary-btn" data-action="save-regenerate">保存并重新生成资产图</button>
     </div>
   `;
 }

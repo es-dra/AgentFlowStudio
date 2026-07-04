@@ -166,7 +166,8 @@ def test_storyboard_asset_cards_are_editable_candidates_before_fixed_context() -
     assert 'node.params.nodeRole = "asset_card_draft"' in asset_nodes
     assert "node.params.visualAssets" not in asset_nodes
     assert "openAssetCardPanel" in asset_panel
-    assert "保存并局部修订生成" in asset_panel
+    assert "保存并重新生成资产图" in asset_panel
+    assert "局部图像编辑未开放" in asset_panel
     assert "startNodeGeneration" in asset_panel
     assert "await store.flushRuntimeSave?.();" in asset_panel
     assert "编辑资产卡" in node_menu

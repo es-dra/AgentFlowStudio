@@ -125,6 +125,37 @@
 - Handoff:
   `docs/handoff/AFS-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705.md`.
 
+## 2026-07-05 - P1 Keyframe Local Edit UX Honesty
+
+- Completed bounded lane
+  `FIX-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY` for dispatch
+  `TD-AFS-V02-FIX-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY-20260705-001`
+  on `codex/fix-p1-keyframe-local-edit-ux-honesty-20260705`.
+- Renamed active Studio keyframe/video regenerate surfaces so users see whole
+  image or whole video regeneration instead of implied local modification.
+- Added disabled/gated keyframe and video local-edit affordances explaining
+  that true local edit is unavailable and requires image-edit/mask or
+  video-edit/mask/temporal capability.
+- Updated video revision draft/progress/result/algorithm-panel copy to call the
+  current path a video regeneration attempt, not local edit, while preserving
+  existing Runtime/provider call markers.
+- Changed asset-card panel current UI copy from local revision wording to
+  whole asset-image regeneration wording with an explicit image-edit/mask gate.
+- Added `tests/test_web_studio_local_edit_honesty_static.py` with static and
+  direct Node assertions for label/action-state honesty; updated adjacent
+  static assertions for the new labels.
+- Available validation passed `python3 -m py_compile` on focused tests, direct
+  local-edit honesty assertions, `npm run check:studio-js` (`141 files`), and
+  `git diff --check`. Focused pytest is blocked because `/usr/bin/python3`
+  has no `pytest`.
+- No true local edit, Runtime route/OpenAPI/provider descriptor/request
+  contract change, provider call/gate mutation, browser/server QA,
+  generated-media QA, source-sync/push/deploy/restart, readiness claim,
+  durable-memory promotion, COS/CompanyOS/source-KB mutation, archive execution,
+  or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY-20260705.md`.
+
 ## 2026-07-05 - P0 Structured QA Checklist Active Runtime Noncompletion Recovery
 
 - Completed bounded recovery lane

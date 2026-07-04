@@ -11,6 +11,12 @@ import { appendPreservedOutput, isPartialTerminalResponse, nodeStatusFromTermina
 import { generationRestoreSnapshot, restoreCancelledGeneration } from "./node-generation-restore.js";
 
 const VIDEO_CANCELLED_LOCAL_ONLY_STATUS = "cancelled_local_only";
+const VIDEO_LOCAL_EDIT_UNAVAILABLE = {
+  status: "unavailable",
+  required_capability: "video_edit_or_masked_temporal_edit",
+  reason: "current_video_revision_is_global_regeneration_attempt",
+  user_message: "局部视频编辑未开放；当前草稿只会按提示词和首帧提交整段重生成尝试。",
+};
 
 export function setNodeVideoFrame(store, node, slot = "first") {
   const imageAsset = lastImageAsset(node);
@@ -49,12 +55,14 @@ export function enableVideoRevisionDraft(store, node) {
       locked_aspects: previous.locked_aspects || ["character_identity", "scene_layout", "camera_path", "duration"],
       temporal_scope: previous.temporal_scope || { kind: "whole_clip" },
       feature_flag_env: "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION",
+      local_edit_availability: { ...VIDEO_LOCAL_EDIT_UNAVAILABLE },
     };
     n.result = [
-      "Experimental video revision draft is enabled.",
-      "Edit this node prompt to describe only the intended change.",
-      "Preservation is best-effort, not pixel-identical.",
-      "Requires AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION for submit.",
+      "视频重生成草稿已启用。",
+      "这不是局部编辑：当前只会基于提示词、首帧和基础视频信息提交整段重生成尝试。",
+      "局部/蒙版/逐帧编辑未开放；需要 video-edit/mask/temporal 能力。",
+      "可以描述目标变化，但未点名的画面、运动或身份仍可能漂移。",
+      "提交仍需要 AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION。",
     ].join("\n");
   });
 }
@@ -180,11 +188,11 @@ export async function startRemoteVideoRevision(store, runtime, node) {
     n.status = "generating";
     if (retryPlan.retrying) appendPreservedOutput(n, retryPlan.preserved);
     setSubmittingGenerationState(n, "video_revision", retryPlan.retrying
-      ? retrySubmittingOptions("正在提交视频修订")
-      : { label: "正在提交视频修订", percent: 8 });
+      ? retrySubmittingOptions("正在提交视频重生成尝试")
+      : { label: "正在提交视频重生成尝试", percent: 8 });
     n.result = retryPlan.retrying
       ? retryResultText()
-      : "Preparing experimental video revision...";
+      : "正在准备视频重生成尝试；这不是局部编辑，未点名内容也可能变化。";
   });
   let submitAttempted = false;
   try {
@@ -201,7 +209,7 @@ export async function startRemoteVideoRevision(store, runtime, node) {
     clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   } catch (error) {
-    setNodeError(store, node.id, `Experimental video revision request failed: ${safeError(error)}`);
+    setNodeError(store, node.id, `视频重生成尝试请求失败：${safeError(error)}`);
     if (submitAttempted) clearOneRunOverrides(store, node.id);
     await store.flushRuntimeSave?.();
   }

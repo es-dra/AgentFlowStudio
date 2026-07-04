@@ -106,6 +106,29 @@ push, deploy, restart, Runtime/OpenAPI/COS/CompanyOS/source-KB mutation, archive
 execution, or self-archive is claimed. Handoff:
 `docs/handoff/AFS-P2-PROMPT-TEXTAREA-RESIZE-EXPAND-20260705.md`.
 
+P1 keyframe local edit UX honesty addendum: Lane
+`FIX-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY` completed a bounded Studio UI honesty
+slice for dispatch
+`TD-AFS-V02-FIX-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY-20260705-001` on
+`codex/fix-p1-keyframe-local-edit-ux-honesty-20260705`; expected BU
+`BU-AFS-V02-FIX-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY-20260705-001`. Active
+keyframe/video Studio surfaces now distinguish whole-image/whole-video
+regeneration from unsupported local edit, and show disabled/gated local-edit
+states requiring image-edit/mask or video-edit/mask/temporal capability. Video
+revision draft/progress/result/algorithm-panel copy now calls the current path
+a video regeneration attempt, not local edit, and `enableVideoRevisionDraft()`
+records Studio-local `local_edit_availability.status=unavailable`. The existing
+Runtime/provider call markers are preserved; no Runtime route, OpenAPI,
+provider descriptor, or request contract changed. Available validation passed
+focused py-compile, direct local-edit honesty assertions,
+`npm run check:studio-js`, and `git diff --check`; focused pytest remains
+blocked because `/usr/bin/python3` has no `pytest`. No true local edit,
+provider/mask capability claim, browser/server QA, provider call/gate mutation,
+generated-media QA, source-sync/push/deploy/restart, human/business/public/
+legal readiness, durable-memory promotion, COS/CompanyOS/source-KB mutation,
+archive execution, or self-archive is claimed. Handoff:
+`docs/handoff/AFS-P1-KEYFRAME-LOCAL-EDIT-UX-HONESTY-20260705.md`.
+
 P0 structured QA checklist active Runtime noncompletion recovery addendum: Lane
 `FIX-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION` completed a
 bounded recovery callback for dispatch

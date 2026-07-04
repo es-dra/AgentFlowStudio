@@ -189,7 +189,8 @@ function buildBottomRow(store, runtime, node, textarea) {
   const shouldPollVideo = canVideo && node.status === "generating" && Boolean(node.params?.lastVideoJobId);
   send.innerHTML = shouldPollVideo ? icon("retry", 15) : icon("arrowUp", 15);
   const canSend = node.type === "image" || canVideo;
-  if (canSend) send.title = "生成";
+  if (node.type === "video" && node.params?.videoRevision?.enabled) send.title = "提交视频重生成尝试；不是局部编辑";
+  else if (canSend) send.title = "生成";
   else if (node.type === "video") send.title = "当前视频模型不支持直接生成";
   else send.title = "当前节点不支持直接生成，请使用该节点的专用操作";
   if (shouldPollVideo) send.title = "继续轮询";

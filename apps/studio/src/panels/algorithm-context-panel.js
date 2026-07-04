@@ -185,7 +185,7 @@ function projectFeedbackLabel(state) {
 }
 
 function operationLabel(node) {
-  if (node.params?.videoRevision || node.params?.lastRevisionJobId) return "视频修订";
+  if (node.params?.videoRevision || node.params?.lastRevisionJobId) return "视频重生成尝试";
   if (node.type === "video") return "视频生成";
   if (node.type === "image") return "图片生成";
   if (node.type === "director") return "导演上下文";
@@ -194,7 +194,7 @@ function operationLabel(node) {
 }
 
 function generationTargetLabel(node) {
-  if (node.params?.videoRevision) return "修订片段";
+  if (node.params?.videoRevision) return "重生成片段";
   if (node.type === "video") return "视频片段";
   if (node.type === "image") return "关键帧";
   if (node.type === "director") return "导演参数";

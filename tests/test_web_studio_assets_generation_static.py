@@ -1200,8 +1200,8 @@ process.stdout.write(JSON.stringify({
     assert "4.0-5.0s" in payload["prompt"]
     assert "单张关键帧" not in payload["prompt"]
     assert "候选资产卡（资产）" not in payload["prompt"]
-    assert "可以直接生成" in payload["result"]
-    assert "先微调提示词" in payload["result"]
+    assert "重新生成整段视频" in payload["result"]
+    assert "不是局部视频编辑" in payload["result"]
 
 
 def test_keyframe_to_video_and_video_asset_card_menu_markers() -> None:
