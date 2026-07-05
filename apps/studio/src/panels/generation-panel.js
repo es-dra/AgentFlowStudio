@@ -2,18 +2,22 @@ import { icon } from "../icons.js";
 import { generationReadinessSummary, safePublicText } from "../generation-status-policy.js";
 import { el, showModal } from "../overlay.js";
 import { shouldRetryFailedItemsOnly } from "../node-generation-retry.js";
+import { isKeyframeConstraintNode } from "../keyframe-constraints.js";
 import {
   applyGenerationProfileSettings,
   generationProfile,
   valueForGenerationField,
 } from "./generation-panel-profile.js";
+import { createKeyframeConstraintsEditor } from "./keyframe-constraints-editor.js";
 
 export function openGenerationPanel({ store, node, onRun }) {
   const current = store.get().nodes[node?.id] || node;
   if (!current) return null;
   const profile = generationProfile(current);
+  const isKeyframeTarget = isKeyframeConstraintNode(current);
 
   const modal = el("div", "modal compact generation-panel");
+  if (isKeyframeTarget) modal.classList.add("keyframe-generation-panel");
   const head = el("div", "modal-head generation-panel-head");
   head.appendChild(el("strong", "", "生成设置"));
   head.appendChild(el("small", "", profile.label));
@@ -29,13 +33,16 @@ export function openGenerationPanel({ store, node, onRun }) {
   const promptField = field("提示词", "textarea");
   promptField.input.value = current.prompt || current.content || "";
   promptField.input.rows = 5;
+  const keyframeConstraints = isKeyframeTarget ? createKeyframeConstraintsEditor(current) : null;
 
   const settings = el("div", "generation-setting-grid");
   settings.classList.add(`generation-setting-${profile.kind}`);
   settings.classList.add(`generation-setting-count-${profile.fields.length}`);
   const controls = renderProfileSettings(settings, current, profile);
 
-  body.append(promptField.wrap, settings, safeNote(profile));
+  body.append(promptField.wrap);
+  if (keyframeConstraints) body.appendChild(keyframeConstraints.wrap);
+  body.append(settings, safeNote(profile));
 
   const actions = el("div", "modal-actions generation-panel-actions");
   const cancel = el("button", "ghost-btn", "取消");
@@ -69,6 +76,7 @@ export function openGenerationPanel({ store, node, onRun }) {
       if (!target) return;
       target.params = target.params || {};
       target.prompt = promptField.input.value.trim();
+      keyframeConstraints?.applyToNode(target);
       applyGenerationProfileSettings(target, profile, controls);
       target.params.generationPanelTouchedAt = new Date().toISOString();
       s.selection = { nodeIds: [target.id], edgeId: null };
@@ -146,7 +154,8 @@ function positionGenerationPanel(modal, nodeId) {
   const drawerRect = document.getElementById("drawer")?.getBoundingClientRect();
   const inspectorRect = document.getElementById("inspector")?.getBoundingClientRect();
   const margin = 14;
-  const width = Math.min(340, Math.max(300, window.innerWidth - 80));
+  const wide = modal.classList.contains("keyframe-generation-panel");
+  const width = Math.min(wide ? 620 : 340, Math.max(wide ? 420 : 300, window.innerWidth - 80));
   modal.style.width = `${width}px`;
   modal.style.position = "fixed";
   const leftLimit = drawerRect && drawerRect.width > 80 ? drawerRect.right + margin : margin;

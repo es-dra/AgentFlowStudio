@@ -84,3 +84,101 @@ button.creation-action:hover {
 .generation-panel .generation-setting-video .generation-field:first-child {
   grid-column: 1 / -1;
 }
+
+.generation-panel.keyframe-generation-panel .generation-panel-body {
+  gap: 10px;
+}
+
+.keyframe-constraints-editor {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.keyframe-constraints-head,
+.keyframe-constraints-toolbar,
+.keyframe-constraint-row-top,
+.keyframe-constraint-meta,
+.keyframe-fixed-asset-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keyframe-constraints-head {
+  justify-content: space-between;
+}
+
+.keyframe-constraints-head small,
+.keyframe-fixed-asset-row small,
+.keyframe-constraints-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.keyframe-constraints-toolbar {
+  flex-wrap: wrap;
+}
+
+.keyframe-fixed-assets,
+.keyframe-constraints-list {
+  display: grid;
+  gap: 6px;
+}
+
+.keyframe-fixed-asset-row {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+.keyframe-fixed-asset-row span,
+.keyframe-fixed-asset-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyframe-constraint-row {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.keyframe-constraint-row.disabled {
+  opacity: 0.68;
+}
+
+.keyframe-constraint-row select,
+.keyframe-constraint-row input,
+.keyframe-constraint-row textarea {
+  min-width: 0;
+}
+
+.keyframe-constraint-row textarea {
+  resize: vertical;
+  min-height: 48px;
+}
+
+.keyframe-constraint-row button {
+  flex: 0 0 28px;
+}
+
+.keyframe-constraint-row-top select:first-of-type {
+  flex: 1 1 130px;
+}
+
+.keyframe-constraint-row-top select:last-of-type {
+  flex: 0 0 92px;
+}
+
+.keyframe-constraint-meta input {
+  flex: 1 1 0;
+}

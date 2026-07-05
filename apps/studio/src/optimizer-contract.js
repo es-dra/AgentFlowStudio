@@ -6,6 +6,12 @@ import { assetCardPromptText, safeAssetCardSnapshot } from "./asset-card-generat
 import { assetReuseLocalContract } from "./asset-reuse-contract.js";
 import { containsUnsafeText, redactUnsafeText } from "./safe-text-redaction.js";
 import {
+  appendKeyframeConstraintPrompt,
+  isKeyframeConstraintNode,
+  keyframeConstraintsProviderSnapshot,
+  temporaryAssetExclusionsForKeyframeConstraints,
+} from "./keyframe-constraints.js";
+import {
   assetCardNodeUploadImageRefs,
   assetCardReferenceImageRefs,
   assetCardRevisionImageRefs,
@@ -86,6 +92,10 @@ function nodeParameterSnapshot(node, state = null) {
   if (p.directorRef) snapshot.director_ref = String(p.directorRef);
   const overlayDecisions = feedbackOverlayDecisionsForRequest(p.feedbackOverlayDecisions);
   if (overlayDecisions.length) snapshot.feedback_context_overlay_decisions = overlayDecisions;
+  if (p.nodeRole === "keyframe_generation") {
+    const keyframeConstraints = keyframeConstraintsProviderSnapshot(p.keyframeConstraints);
+    if (keyframeConstraints) snapshot.keyframe_constraints = keyframeConstraints;
+  }
   const uploadedImages = uploadReferenceSummaries(node);
   if (uploadedImages.length) snapshot.uploaded_images = uploadedImages;
   const assetReuse = assetReuseLocalContract(state || { nodes: { [node.id]: node }, edges: {}, assets: [] }, node);
@@ -97,9 +107,10 @@ function primaryPromptText(node) {
   const assetPrompt = assetCardPromptText(node);
   if (assetPrompt) return assetPrompt;
   const explicit = String(node.prompt || "").trim();
-  if (explicit) return explicit;
+  if (explicit) return keyframeProviderPromptText(explicit, node);
   const content = String(node.content || "").trim();
-  if (content) return content;
+  if (content) return keyframeProviderPromptText(content, node);
+  if (isKeyframeConstraintNode(node)) return keyframeProviderPromptText("", node);
   return "请根据当前节点生成专业创作提示词。";
 }
 
@@ -107,10 +118,13 @@ export function buildKeyframeGenerationRequest(state, node) {
   const optimizationRequest = buildOptimizationRequest(state, node);
   const spec = node.params?.spec || {};
   const plainOptimizedPrompt = String(node.params?.lastOptimizedPromptPlain || "").trim();
+  const optimizedPrompt = plainOptimizedPrompt
+    ? keyframeProviderPromptText(plainOptimizedPrompt, node)
+    : optimizationRequest.prompt_text;
   return {
     node_id: node.id,
     prompt_text: optimizationRequest.prompt_text,
-    optimized_prompt: plainOptimizedPrompt || optimizationRequest.prompt_text,
+    optimized_prompt: optimizedPrompt,
     target_platform: optimizationRequest.target_platform,
     style: optimizationRequest.style,
     aspect_ratio: safeImageAspectRatio(spec.ratio),
@@ -118,13 +132,27 @@ export function buildKeyframeGenerationRequest(state, node) {
     provider_service_id: providerServiceForImageModel(node.params?.model),
     asset_refs: optimizationRequest.asset_refs,
     director_setup: optimizationRequest.director_setup,
-    node_parameters: optimizationRequest.node_parameters,
+    node_parameters: generationNodeParameters(optimizationRequest.node_parameters),
     context_subgraph: buildContextSubgraph(state, node, "context_generate"),
     temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
-    temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],
+    temporary_asset_exclusions: temporaryAssetExclusionsForKeyframeConstraints(
+      node.params?.keyframeConstraints,
+      node.params?.temporaryAssetExclusions || [],
+    ),
     seed: node.params?.seed ?? null,
     generated_at: new Date().toISOString(),
   };
+}
+
+function keyframeProviderPromptText(baseText, node) {
+  if (!isKeyframeConstraintNode(node)) return String(baseText || "").trim();
+  return appendKeyframeConstraintPrompt(baseText, node.params?.keyframeConstraints);
+}
+
+function generationNodeParameters(params) {
+  const safe = { ...(params || {}) };
+  delete safe.asset_reuse;
+  return safe;
 }
 
 export function buildContextSubgraph(state, node, runtimeWorkMode = "context_generate") {
@@ -188,7 +216,9 @@ function safeContextNode(node) {
 
 function safeContextParameters(node) {
   const params = nodeParameterSnapshot(node);
-  return Object.fromEntries(Object.entries(params).filter(([key]) => !/signature|feature|lock|secret|token/i.test(key)));
+  return Object.fromEntries(Object.entries(params).filter(([key]) => (
+    key !== "asset_reuse" && !/signature|feature|lock|secret|token/i.test(key)
+  )));
 }
 
 function safeRelation(value) {
