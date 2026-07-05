@@ -3,6 +3,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from apps.api.runtime_asset_extraction import (
+    normalize_asset_ref_for_contract,
+    normalize_asset_refs_with_diagnostics,
+)
 from apps.api.runtime_storyboard_grounding import (
     grounding_status_for_unsupported,
     storyboard_source_span,
@@ -48,7 +52,8 @@ def structured_shot(
     shot_count_hint: int | None = None,
 ) -> dict[str, Any]:
     source = _clean(text)
-    refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
+    raw_refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
+    refs, dropped_refs = normalize_asset_refs_with_diagnostics(raw_refs, context=source, include_inferred=True)
     plan_fields = storyboard_plan_fields(source, index)
     description = _description_with_assets(source, refs)
     source_span = storyboard_source_span(source, full_source or source, index)
@@ -64,6 +69,7 @@ def structured_shot(
         "dialogue": _dialogue(source),
         "sound": _sound(source),
         "asset_refs": refs,
+        "dropped_asset_ref_diagnostics": dropped_refs,
         "source_text": source,
         "source_span": source_span,
         "grounding_status": grounding_status_for_unsupported(unsupported),
@@ -100,23 +106,8 @@ def _resolve_shot_refs(source: str, refs: list[dict[str, Any]], global_refs: lis
 def normalize_asset_ref(asset: Any, index: int, context: str = "") -> dict[str, Any]:
     if not isinstance(asset, dict):
         return {}
-    label = str(asset.get("label") or asset.get("name") or "").strip()[:24]
-    asset_type = str(asset.get("asset_type") or "character")
-    if asset_type not in {"character", "scene", "prop"}:
-        asset_type = "character"
-    if not label:
-        return {}
-    label = _semantic_asset_label(label, asset_type, context)
-    return {
-        "label": label,
-        "asset_id": str(asset.get("asset_id") or f"candidate:{asset_type}:{index + 1}"),
-        "asset_type": asset_type,
-        "status": str(asset.get("status") or "candidate"),
-        "source": str(asset.get("source") or "llm"),
-        "scope": str(asset.get("scope") or "shot_tree"),
-        "confidence": float(asset.get("confidence")) if isinstance(asset.get("confidence"), (int, float)) else _asset_confidence(asset_type, label, context),
-        "evidence_text": str(asset.get("evidence_text") or _asset_evidence_for_label(context, label))[:240],
-    }
+    normalized, _diagnostic = normalize_asset_ref_for_contract(asset, index, context=context)
+    return normalized or {}
 
 
 def _script_chunks(text: str, shot_count_hint: int | None = None) -> list[str]:

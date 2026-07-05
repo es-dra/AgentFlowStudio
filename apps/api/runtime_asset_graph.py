@@ -17,9 +17,19 @@ def build_asset_graph(
     builders: dict[tuple[str, str], dict[str, Any]] = {}
     relationships: list[dict[str, Any]] = []
     unsupported: list[dict[str, str]] = []
+    held_asset_refs: list[dict[str, Any]] = []
     for index, shot in enumerate(shots if isinstance(shots, list) else [], start=1):
         shot_id = str(shot.get("shot_id") or f"shot_{index:02d}")
         source_span = _source_span(shot, source_text, index)
+        for diagnostic in _list(shot.get("dropped_asset_ref_diagnostics")):
+            if isinstance(diagnostic, dict):
+                held_asset_refs.append(
+                    {
+                        **diagnostic,
+                        "shot_id": shot_id,
+                        "source_span_id": source_span.get("span_id", ""),
+                    }
+                )
         for addition in _list(shot.get("unsupported_additions")):
             unsupported.append(
                 {
@@ -58,6 +68,8 @@ def build_asset_graph(
         "assets": assets,
         "relationships": relationships,
         "unsupported_additions": unsupported,
+        "held_asset_refs": held_asset_refs,
+        "held_asset_ref_count": len(held_asset_refs),
         "merge_candidates": _merge_candidates(assets),
         "review_state": "needs_review_unsupported_addition" if unsupported else "candidate_review_required",
         "writes_long_term_memory": False,
@@ -99,6 +111,12 @@ def _new_asset_builder(ref: dict[str, Any]) -> dict[str, Any]:
         "asset_id": str(ref.get("asset_id") or ""),
         "asset_type": asset_type,
         "label": label,
+        "display_name": str(ref.get("display_name") or label),
+        "descriptive_signatures": [],
+        "evidence_modalities": [],
+        "visual_evidence_spans": [],
+        "name_sources": [],
+        "provisional_name": False,
         "aliases": {label},
         "statuses": [str(ref.get("status") or "candidate")],
         "sources": [str(ref.get("source") or "candidate")],
@@ -115,6 +133,19 @@ def _merge_ref(builder: dict[str, Any], ref: dict[str, Any], shot_id: str, sourc
     builder["statuses"].append(str(ref.get("status") or "candidate"))
     builder["sources"].append(str(ref.get("source") or "candidate"))
     builder["confidences"].append(_confidence(ref.get("confidence")))
+    signature = str(ref.get("descriptive_signature") or "").strip()
+    if signature and signature not in builder["descriptive_signatures"]:
+        builder["descriptive_signatures"].append(signature[:240])
+    modality = str(ref.get("evidence_modality") or "").strip()
+    if modality and modality not in builder["evidence_modalities"]:
+        builder["evidence_modalities"].append(modality)
+    visual_span = str(ref.get("visual_evidence_span") or "").strip()
+    if visual_span and visual_span not in builder["visual_evidence_spans"]:
+        builder["visual_evidence_spans"].append(visual_span[:240])
+    name_source = str(ref.get("name_source") or "").strip()
+    if name_source and name_source not in builder["name_sources"]:
+        builder["name_sources"].append(name_source)
+    builder["provisional_name"] = bool(builder["provisional_name"] or ref.get("provisional_name"))
     if shot_id not in builder["shot_refs"]:
         builder["shot_refs"].append(shot_id)
     evidence = str(ref.get("evidence_text") or source_span.get("text") or "").strip()
@@ -137,6 +168,7 @@ def _final_asset(builder: dict[str, Any]) -> dict[str, Any]:
         "asset_id": builder.get("asset_id") or builder["graph_asset_id"],
         "asset_type": asset_type,
         "label": builder["label"],
+        "display_name": builder.get("display_name") or builder["label"],
         "role": _role(asset_type),
         "status": _merged_status(builder["statuses"]),
         "review_state": "candidate_review_required",
@@ -145,6 +177,12 @@ def _final_asset(builder: dict[str, Any]) -> dict[str, Any]:
         "confidence": round(max(builder["confidences"] or [0.6]), 3),
         "shot_refs": builder["shot_refs"][:24],
         "evidence_spans": builder["evidence_spans"][:12],
+        "descriptive_signature": (builder["descriptive_signatures"] or [evidence_text])[0][:240],
+        "evidence_modality": (builder["evidence_modalities"] or ["visual"])[0],
+        "visual_evidence_span": (builder["visual_evidence_spans"] or [""])[0],
+        "modality_gate_status": "accepted",
+        "name_source": (builder["name_sources"] or ["candidate"])[0],
+        "provisional_name": bool(builder.get("provisional_name")),
         "continuity_locks": _continuity_locks(asset_type, builder["label"], evidence_text),
         "negative_locks": _negative_locks(asset_type, builder["label"], evidence_text),
         "writes_long_term_memory": False,
@@ -154,13 +192,16 @@ def _final_asset(builder: dict[str, Any]) -> dict[str, Any]:
 
 def _normalize_ref(ref: dict[str, Any]) -> dict[str, Any]:
     asset_type = str(ref.get("asset_type") or "").strip()
-    label = str(ref.get("label") or "").strip()
+    label = str(ref.get("display_name") or ref.get("label") or "").strip()
     if asset_type not in ASSET_TYPES or not label:
+        return {}
+    if str(ref.get("modality_gate_status") or "accepted") != "accepted":
         return {}
     return {
         **ref,
         "asset_type": asset_type,
         "label": label[:40],
+        "display_name": str(ref.get("display_name") or label)[:80],
         "confidence": _confidence(ref.get("confidence")),
     }
 

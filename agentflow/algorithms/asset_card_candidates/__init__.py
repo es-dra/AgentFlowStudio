@@ -28,6 +28,8 @@ def build_asset_card_candidates(*, project_id: str, asset_graph: dict[str, Any])
         asset
         for asset in _list(asset_graph.get("assets"))
         if isinstance(asset, dict) and str(asset.get("asset_type") or "") in SUPPORTED_ASSET_TYPES
+        and str(asset.get("modality_gate_status") or "accepted") == "accepted"
+        and str(asset.get("evidence_modality") or "visual") == "visual"
     ]
     candidates = [_candidate(project_id, asset) for asset in assets]
     relationships = [
@@ -63,7 +65,7 @@ def build_asset_card_candidates(*, project_id: str, asset_graph: dict[str, Any])
 def _candidate(project_id: str, asset: dict[str, Any]) -> dict[str, Any]:
     graph_asset_id = str(asset.get("graph_asset_id") or asset.get("asset_id") or "asset")
     asset_type = str(asset.get("asset_type") or "")
-    label = str(asset.get("label") or asset.get("asset_id") or "asset")[:80]
+    label = str(asset.get("display_name") or asset.get("label") or asset.get("asset_id") or "asset")[:80]
     evidence_spans = _evidence_spans(asset)
     return {
         "candidate_id": f"asset_card_candidate:{_safe_id(graph_asset_id)}",
@@ -75,6 +77,11 @@ def _candidate(project_id: str, asset: dict[str, Any]) -> dict[str, Any]:
         "confirmation_state": "needs_human_confirmation",
         "draft_fields": {
             "display_name": label,
+            "descriptive_signature": str(asset.get("descriptive_signature") or "")[:240],
+            "evidence_modality": str(asset.get("evidence_modality") or "visual"),
+            "visual_evidence_span": str(asset.get("visual_evidence_span") or "")[:240],
+            "name_source": str(asset.get("name_source") or "candidate"),
+            "provisional_name": bool(asset.get("provisional_name")),
             "narrative_role": str(asset.get("role") or _role(asset_type)),
             "visual_description_seed": _visual_description_seed(asset_type, label, evidence_spans),
             "constraints": [str(item)[:120] for item in _list(asset.get("continuity_locks"))[:8]],
@@ -86,6 +93,8 @@ def _candidate(project_id: str, asset: dict[str, Any]) -> dict[str, Any]:
             "evidence_span_count": len(evidence_spans),
             "evidence_spans": evidence_spans,
             "confidence": _confidence(asset.get("confidence")),
+            "evidence_modality": str(asset.get("evidence_modality") or "visual"),
+            "visual_evidence_span": str(asset.get("visual_evidence_span") or "")[:240],
         },
         "reuse_policy": _reuse_policy(asset),
         "asset_memory_policy": {

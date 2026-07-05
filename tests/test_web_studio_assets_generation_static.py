@@ -895,6 +895,7 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     feedback = STUDIO_ROOT / "src" / "quality-feedback.js"
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
     video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
+    video_response = (STUDIO_ROOT / "src" / "node-video-response.js").read_text(encoding="utf-8")
     video_node_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
@@ -961,7 +962,9 @@ def test_mvp_experience_hardening_video_status_and_feedback_markers() -> None:
     assert "耗时：" in generation_results
     assert "cancelNodeVideoGeneration" in node_actions
     assert "cancelVideo(jobId)" in video_actions
-    assert "cancelled_local_only" in video_actions
+    assert "applyVideoResponse(store, node.id, response)" in video_actions
+    assert 'VIDEO_CANCELLED_LOCAL_ONLY_STATUS = "cancelled_local_only"' in video_response
+    assert "status === VIDEO_CANCELLED_LOCAL_ONLY_STATUS" in video_response
     assert "厂商侧任务" in video_actions
     assert "停止计费" in video_actions
     assert "ensureVideoFirstFrameAsset" in video_actions

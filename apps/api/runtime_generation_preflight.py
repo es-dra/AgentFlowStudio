@@ -126,6 +126,7 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
         "subject_reference_asset_id": (bundle or {}).get("subject_reference_asset_id"),
         "feedback_context_overlays": list((bundle or {}).get("feedback_context_overlays") or []),
         **_video_contract_fields(kind, request),
+        **_provider_capability_fields(kind, request),
         "preflight_token": _preflight_token(kind, request, bundle),
         "non_claims": [
             "preflight_only",
@@ -148,6 +149,84 @@ def _video_contract_fields(kind: str, request: KeyframeGenerationRequest | Video
     }
 
 
+def _provider_capability_fields(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> dict[str, Any]:
+    if kind != "video" or not isinstance(request, VideoGenerationRequest):
+        return {}
+    limits = _video_provider_capability_limits(request)
+    blocks = _video_unsupported_combination_blocks(limits)
+    return {
+        "provider_capability_limits": limits,
+        "preflight_blocked": bool(blocks),
+        "blocked_unsupported_combinations": blocks,
+    }
+
+
+def _video_provider_capability_limits(request: VideoGenerationRequest) -> dict[str, Any]:
+    descriptor = _descriptor_or_none(request.provider_service_id)
+    source = "provider_descriptor" if descriptor is not None else "provider_descriptor_unavailable"
+    durations = _int_list(getattr(descriptor, "supported_durations_sec", []) if descriptor is not None else [])
+    input_modes = _str_list(getattr(descriptor, "frame_modes", []) if descriptor is not None else [])
+    resolutions = _str_list(getattr(descriptor, "supported_resolutions", []) if descriptor is not None else [])
+    aspect_ratios = _str_list(getattr(descriptor, "supported_aspect_ratios", []) if descriptor is not None else [])
+    input_mode = video_input_mode(request)
+    return {
+        "provider_service_id": request.provider_service_id,
+        "source": source,
+        "provider_calls_started": False,
+        "required_gate": _provider_required_gate("video", request),
+        "duration_seconds": {
+            "requested": request.duration_sec,
+            "allowed": durations,
+            "supported": not durations or request.duration_sec in durations,
+            "request_contract": video_duration_contract(request.duration_sec),
+        },
+        "input_modes": {
+            "requested": input_mode,
+            "allowed": input_modes,
+            "supported": not input_modes or input_mode in input_modes,
+        },
+        "resolutions": {
+            "requested": request.resolution,
+            "allowed": resolutions,
+            "supported": not resolutions or request.resolution.lower() in {item.lower() for item in resolutions},
+        },
+        "aspect_ratios": {
+            "requested": request.aspect_ratio,
+            "allowed": aspect_ratios,
+            "supported": not aspect_ratios or request.aspect_ratio in aspect_ratios,
+        },
+    }
+
+
+def _video_unsupported_combination_blocks(limits: dict[str, Any]) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    checks = [
+        ("unsupported_duration", "duration_sec", "duration_seconds"),
+        ("unsupported_input_mode", "input_mode", "input_modes"),
+        ("unsupported_resolution", "resolution", "resolutions"),
+        ("unsupported_aspect_ratio", "aspect_ratio", "aspect_ratios"),
+    ]
+    for error, field, key in checks:
+        section = limits.get(key) if isinstance(limits.get(key), dict) else {}
+        if section.get("supported") is not False:
+            continue
+        blocks.append(
+            {
+                "error": error,
+                "field": field,
+                "stage": "provider_capability_check",
+                "provider_calls_started": False,
+                "details": {
+                    "requested": section.get("requested"),
+                    "allowed": list(section.get("allowed") or []),
+                    "provider_service_id": limits.get("provider_service_id"),
+                    "provider_calls_started": False,
+                },
+            }
+        )
+    return blocks
+
+
 def _preflight_token(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest, bundle: dict[str, Any] | None) -> str:
     request_payload = request.model_dump(mode="json", by_alias=True)
     request_payload.pop("generated_at", None)
@@ -156,6 +235,7 @@ def _preflight_token(kind: str, request: KeyframeGenerationRequest | VideoGenera
         "kind": kind,
         "request": request_payload,
         "provider_submit_preflight": provider_submit_preflight_requirement(kind, request),
+        "provider_capability_limits": _provider_capability_fields(kind, request).get("provider_capability_limits"),
         "bundle": _bundle_digest(bundle),
     }
     data = json.dumps(digest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -203,10 +283,8 @@ def _bundle_digest(bundle: dict[str, Any] | None) -> dict[str, Any] | None:
 
 
 def _descriptor_limits(service_id: str, *, prompt_default: int, reference_default: int) -> tuple[int, int]:
-    try:
-        registry = load_provider_registry()
-        descriptor = registry.descriptor(service_id)
-    except (ModelGatewayError, ValueError, OSError):
+    descriptor = _descriptor_or_none(service_id)
+    if descriptor is None:
         return prompt_default, reference_default
     return (
         int(getattr(descriptor, "prompt_char_limit", prompt_default) or prompt_default),
@@ -216,11 +294,44 @@ def _descriptor_limits(service_id: str, *, prompt_default: int, reference_defaul
 
 def _provider_required_gate(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> str:
     default_gate = REMOTE_VIDEO_ENV if kind == "video" else REMOTE_IMAGE_ENV
-    try:
-        descriptor = load_provider_registry().descriptor(request.provider_service_id)
-    except (ModelGatewayError, ValueError, OSError):
+    descriptor = _descriptor_or_none(request.provider_service_id)
+    if descriptor is None:
         return default_gate
     return str(getattr(descriptor, "required_gate", default_gate) or default_gate)
+
+
+def _descriptor_or_none(service_id: str) -> Any | None:
+    try:
+        return load_provider_registry().descriptor(service_id)
+    except (ModelGatewayError, ValueError, OSError):
+        return None
+
+
+def _int_list(values: Any) -> list[int]:
+    result: list[int] = []
+    seen: set[int] = set()
+    for item in values if isinstance(values, (list, tuple, set)) else []:
+        try:
+            value = int(item)
+        except (TypeError, ValueError):
+            continue
+        if value <= 0 or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return sorted(result)
+
+
+def _str_list(values: Any) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in values if isinstance(values, (list, tuple, set)) else []:
+        value = str(item or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
 
 
 def _env_gate_open(required_gate: str) -> bool:

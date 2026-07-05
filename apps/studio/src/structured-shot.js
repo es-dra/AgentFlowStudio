@@ -1,3 +1,5 @@
+import { normalizeAssetExtractionRefs } from "./asset-extraction-contract.js";
+
 const ASSET_RE = /@([A-Za-z0-9_\-\u4e00-\u9fff·]+)/g;
 const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
 const KNOWN_CHARACTER_NAMES = ["孙悟空", "金刚狼"];
@@ -10,7 +12,8 @@ export function structuredShotFromSegment(segment, index) {
   const parsed = structuredShotFromFormattedText(segment, index);
   if (parsed) return parsed;
   const source = cleanText(segment);
-  const assetRefs = extractShotAssetRefs(source);
+  const extraction = extractShotAssetExtraction(source);
+  const assetRefs = extraction.asset_refs;
   return {
     shot_id: `shot_${String(index).padStart(2, "0")}`,
     index,
@@ -22,6 +25,7 @@ export function structuredShotFromSegment(segment, index) {
     dialogue: inferDialogue(source),
     sound: inferSound(source),
     asset_refs: assetRefs,
+    dropped_asset_ref_diagnostics: extraction.dropped_asset_ref_diagnostics,
     source_text: source,
   };
 }
@@ -37,7 +41,8 @@ export function structuredShotFromFormattedText(text, index) {
   if (!fields["画面描述"] && !fields["景别"] && !fields["运镜"]) return null;
   const description = fields["画面描述"] || cleanText(text);
   const assetText = fields["资产"] || description;
-  const assetRefs = extractShotAssetRefs(`${assetText}\n${description}`);
+  const extraction = extractShotAssetExtraction(`${assetText}\n${description}`);
+  const assetRefs = extraction.asset_refs;
   return {
     shot_id: `shot_${String(index).padStart(2, "0")}`,
     index,
@@ -49,6 +54,7 @@ export function structuredShotFromFormattedText(text, index) {
     dialogue: fields["对白/旁白"] || fields["对白"] || fields["旁白"] || inferDialogue(description),
     sound: fields["音效"] || inferSound(description),
     asset_refs: assetRefs,
+    dropped_asset_ref_diagnostics: extraction.dropped_asset_ref_diagnostics,
     source_text: cleanText(text),
   };
 }
@@ -71,36 +77,41 @@ export function structuredShotText(shot) {
 }
 
 export function extractShotAssetRefs(text) {
+  return extractShotAssetExtraction(text).asset_refs;
+}
+
+function extractShotAssetExtraction(text) {
   const refs = [];
   for (const match of String(text || "").matchAll(ASSET_RE)) {
     pushAssetRef(refs, match[1], classifyAsset(match[1], text), "explicit", text);
   }
   addImplicitRefs(refs, text);
-  return refs;
+  return normalizeAssetExtractionRefs(refs, { context: text, includeInferred: true });
 }
 
 export function normalizeShotAssetRefs(assetRefs, context = "") {
-  const refs = [];
-  for (const asset of Array.isArray(assetRefs) ? assetRefs : []) {
-    const assetType = ["character", "scene", "prop"].includes(asset?.asset_type) ? asset.asset_type : "character";
-    pushAssetRef(refs, asset.label || asset.name, assetType, asset.source || "candidate", context, {
-      asset_id: asset.asset_id,
-      graph_asset_id: asset.graph_asset_id || asset.graphAssetId,
-      status: asset.status,
-    });
-  }
-  return refs;
+  return normalizeShotAssetRefsWithDiagnostics(assetRefs, context).asset_refs;
+}
+
+export function normalizeShotAssetRefsWithDiagnostics(assetRefs, context = "") {
+  return normalizeAssetExtractionRefs(Array.isArray(assetRefs) ? assetRefs : [], { context });
 }
 
 export function refineStructuredShotAssets(shot, context = "") {
   if (!shot || typeof shot !== "object") return shot;
   const source = [shot.description, shot.source_text, context].filter(Boolean).join("\n");
-  const assetRefs = normalizeShotAssetRefs(shot.asset_refs, source);
-  const refs = assetRefs.length ? assetRefs : extractShotAssetRefs(source);
+  const extraction = Array.isArray(shot.asset_refs) && shot.asset_refs.length
+    ? normalizeAssetExtractionRefs(shot.asset_refs, { context: source, includeInferred: true })
+    : extractShotAssetExtraction(source);
+  const refs = extraction.asset_refs;
   return {
     ...shot,
     description: descriptionWithAssets(String(shot.description || source || ""), refs),
     asset_refs: refs,
+    dropped_asset_ref_diagnostics: [
+      ...(Array.isArray(shot.dropped_asset_ref_diagnostics) ? shot.dropped_asset_ref_diagnostics : []),
+      ...(extraction.dropped_asset_ref_diagnostics || []),
+    ],
   };
 }
 

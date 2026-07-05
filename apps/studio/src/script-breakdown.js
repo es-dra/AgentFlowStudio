@@ -2,10 +2,13 @@ import { createNode, connect } from "./nodes.js";
 import { assetAutoBindingGraph, nodeReferenceStackForGraphBoundAssets } from "./asset-auto-binding-refs.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
 import { SCRIPT_UPLOAD_ACCEPT, readScriptFileText, safeFileName, scriptFileExtension } from "./script-file-import.js";
-import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
+import { normalizeShotAssetRefsWithDiagnostics, refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
 const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保留下一步生成关键帧所需的信息)/;
+const SCRIPT_OPTIMIZER_LABEL_RE = /^\s*(意图|角色\/主体|人物\/主体|主体|场景\/美术|动作\/情节|镜头\/构图|灯光|运动\/时间推进|连续性|负面约束|Intent|Subject\/Character|Scene\/Production Design|Action\/Beat|Camera\/Framing|Lighting|Motion\/Temporal Progression|Continuity|Negative Constraints)\s*[：:]/i;
+const SCRIPT_WRAPPER_RE = /(请把下面的一句话扩写成正式短视频剧本正文|输出要求|原始想法|script_expansion_contract|formal_script_before_storyboard_breakdown|storyboard_placeholder_outline|source_idea)/i;
+const SCRIPT_TEMPLATE_FILLER_RE = /(推进主体|展示变化|收束结果|主角或核心物体|核心物体|保留下一步拆分分镜|Primary character|Primary scene)/;
 
 export function importScriptFileIntoTextNode(store, node, textarea = null) {
   const input = document.createElement("input");
@@ -51,8 +54,12 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
     request.node_parameters = {
       ...(request.node_parameters || {}),
       script_expansion_contract: "formal_script_before_storyboard_breakdown",
+      script_generation_mode: "idea_to_script",
       source_idea: idea.slice(0, 600),
       forbidden_output: "storyboard_placeholder_outline",
+      llm_provider: "local_script_generation",
+      llm_model: "local-script-body",
+      remote_optimizer_required: false,
     };
     const response = runtime?.optimizePrompt ? await runtime.optimizePrompt(request) : null;
     const outcome = response ? normalizeOptimization(response, request) : null;
@@ -186,8 +193,15 @@ function balancedSentenceChunks(sentences, targetCount) {
 
 function normalizeExpandedScript(value, idea) {
   const text = String(value || "").trim();
-  if (!text || looksLikeStoryboardPlaceholder(text)) return draftScriptFromIdea(idea);
+  if (!text || looksLikeInvalidScriptBody(text)) return draftScriptFromIdea(idea);
   return text;
+}
+
+function looksLikeInvalidScriptBody(text) {
+  return looksLikeStoryboardPlaceholder(text)
+    || looksLikePromptWrapperEcho(text)
+    || looksLikeOptimizerSectionOutput(text)
+    || SCRIPT_TEMPLATE_FILLER_RE.test(text);
 }
 
 function looksLikeStoryboardPlaceholder(text) {
@@ -196,23 +210,77 @@ function looksLikeStoryboardPlaceholder(text) {
   return markerCount >= 3 && STORYBOARD_PLACEHOLDER_RE.test(text);
 }
 
+function looksLikePromptWrapperEcho(text) {
+  return SCRIPT_WRAPPER_RE.test(String(text || ""));
+}
+
+function looksLikeOptimizerSectionOutput(text) {
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return lines.filter((line) => SCRIPT_OPTIMIZER_LABEL_RE.test(line)).length >= 2;
+}
+
 function draftScriptFromIdea(idea) {
   const clean = cleanSegment(idea);
-  const title = fallbackScriptTitle(clean);
+  const profile = fallbackStoryProfile(clean);
   return [
-    `片名：《${title}》`,
+    `片名：《${profile.title}》`,
     "",
-    `故事从一个清晰的核心画面展开：${clean}。开场先交代主要人物或核心物体所处的环境，让观众立刻理解它为什么出现在这里，以及这个瞬间带来的情绪基调。`,
+    `${profile.protagonist}出现在${profile.scene}。这一刻看似只是${clean}，但${profile.mood}的气氛已经压在画面里：${profile.atmosphere}。`,
     "",
-    "随着时间推进，主角或核心物体开始产生细微动作和情绪变化。周围的光线、声音、空间细节共同推动气氛，让画面从静态设定进入一个可被感知的故事时刻，而不是只停留在概念展示。",
+    `时间缓慢推进，${profile.name}先是保持原来的状态，随后被一个细小异常打断。${profile.actionProgression}，让观众意识到这不是静止的概念展示，而是一段正在发生的故事。`,
     "",
-    "结尾给出一个明确但不过度解释的动作或结果：主角完成一次选择、凝视、触碰、离开或停留。这个收束要保留下一步拆分分镜所需的人物、场景、动作、情绪和视觉重点。",
+    `转折来自${profile.turnTrigger}。${profile.discovery}，${profile.name}必须在继续停留和立刻行动之间做出反应。`,
+    "",
+    `结尾停在${profile.endingImage}。${profile.endingHook}，为下一步分镜拆分留下清楚的人物、场景、动作和悬念。`,
   ].join("\n");
 }
 
-function fallbackScriptTitle(clean) {
+function fallbackStoryProfile(clean) {
+  const lower = clean.toLowerCase();
+  if (clean.includes("睡") || lower.includes("sleep")) {
+    return {
+      title: "沉睡的门铃",
+      name: "沈眠",
+      protagonist: "主角沈眠独自躺在清晨还没亮透的出租屋里",
+      scene: "一间窗帘半掩、只剩空调低声的房间",
+      mood: "安静、压抑又带一点悬疑",
+      atmosphere: "灰蓝色天光爬上床沿，床头旧闹钟停在六点十七分",
+      actionProgression: "她在梦中翻身，手指碰到枕边一张被折起的车票，呼吸忽然变得急促",
+      turnTrigger: "门外三下很轻的敲门声",
+      discovery: "门缝下没有人影，只有一枚还带着雨水的钥匙被慢慢推了进来",
+      endingImage: "沈眠坐起身握住钥匙、望向门口的背影",
+      endingHook: "门外传来一个熟悉却不该出现的声音，低声叫出她的名字",
+    };
+  }
+  if (clean.includes("机器人") || lower.includes("robot")) {
+    return {
+      title: "屋顶星光协议",
+      name: "遥星R-17",
+      protagonist: "未来机器人遥星R-17站在风声很低的屋顶边缘",
+      scene: "远离城市中心的乡村屋顶平台",
+      mood: "孤独、沉静又带着诗意",
+      atmosphere: "屋檐下的旧灯泡微微摇晃，星光落在金属外壳上",
+      actionProgression: "它抬起头校准星图，却发现胸口的旧信号灯第一次亮起",
+      turnTrigger: "天空中一颗本不该移动的星点",
+      discovery: "星点传回的不是坐标，而是一段来自多年以前的人类童声",
+      endingImage: "遥星R-17把手伸向夜空、信号灯持续闪烁的剪影",
+      endingHook: "那段童声问它是否还记得回家的路",
+    };
+  }
   const compact = clean.replace(/[，。！？；、,.!?;:：\s]+/g, "");
-  return (compact || "短片").slice(0, 12);
+  return {
+    title: (compact || "未完成的信号").slice(0, 12),
+    name: "林澈",
+    protagonist: "主角林澈站在一处被晨光切开的安静空间里",
+    scene: "兼具现实细节和故事压力的室内场景",
+    mood: "克制、微妙又暗含转折",
+    atmosphere: "桌面上的小物件、窗外的声音和人物的停顿共同压低节奏",
+    actionProgression: "他先试图维持平静，随后被一个与原本状态不相符的细节吸引",
+    turnTrigger: "一件原本不该移动的物品突然改变位置",
+    discovery: "那个细节把普通瞬间变成需要选择的故事节点",
+    endingImage: "林澈停在光影交界处、回望身后的动作",
+    endingHook: "他发现自己并不是这个场景里唯一清醒的人",
+  };
 }
 
 function formalScriptExpansionPrompt(idea) {
@@ -273,9 +341,17 @@ function normalizeStoryboardShot(shot, fallbackIndex) {
   if (typeof shot === "string") return structuredShotFromSegment(shot, fallbackIndex);
   const source = String(shot?.source_text || shot?.description || "").trim();
   const fallback = structuredShotFromSegment(source, fallbackIndex);
-  const assetRefs = Array.isArray(shot?.asset_refs) && shot.asset_refs.length
-    ? shot.asset_refs.map((asset, index) => normalizeAssetRef(asset, index)).filter(Boolean)
-    : fallback.asset_refs;
+  const normalizedAssets = Array.isArray(shot?.asset_refs) && shot.asset_refs.length
+    ? normalizeShotAssetRefsWithDiagnostics(
+        shot.asset_refs.map((asset, index) => normalizeAssetRef(asset, index)).filter(Boolean),
+        source || String(shot?.description || ""),
+      )
+    : { asset_refs: fallback.asset_refs, dropped_asset_ref_diagnostics: fallback.dropped_asset_ref_diagnostics || [] };
+  const assetRefs = normalizedAssets.asset_refs || [];
+  const droppedAssetRefDiagnostics = [
+    ...(Array.isArray(shot?.dropped_asset_ref_diagnostics) ? shot.dropped_asset_ref_diagnostics : []),
+    ...((normalizedAssets && normalizedAssets.dropped_asset_ref_diagnostics) || []),
+  ];
   return {
     ...fallback,
     shot_id: String(shot?.shot_id || fallback.shot_id),
@@ -288,22 +364,30 @@ function normalizeStoryboardShot(shot, fallbackIndex) {
     dialogue: String(shot?.dialogue || fallback.dialogue),
     sound: String(shot?.sound || fallback.sound),
     asset_refs: assetRefs,
+    dropped_asset_ref_diagnostics: droppedAssetRefDiagnostics,
     source_text: source || fallback.source_text,
   };
 }
 
 function normalizeAssetRef(asset, index) {
   if (!asset || typeof asset !== "object") return null;
-  const label = String(asset.label || asset.name || "").trim().slice(0, 24);
+  const label = String(asset.display_name || asset.label || asset.name || "").trim().slice(0, 40);
   if (!label) return null;
   const type = ["character", "scene", "prop"].includes(asset.asset_type) ? asset.asset_type : "character";
   return {
     label,
+    display_name: String(asset.display_name || label),
     asset_id: String(asset.asset_id || `candidate:${type}:${index + 1}`),
     graph_asset_id: String(asset.graph_asset_id || asset.graphAssetId || ""),
     asset_type: type,
     status: String(asset.status || "candidate"),
     source: String(asset.source || "llm"),
+    descriptive_signature: String(asset.descriptive_signature || ""),
+    evidence_modality: String(asset.evidence_modality || ""),
+    visual_evidence_span: String(asset.visual_evidence_span || ""),
+    modality_gate_status: String(asset.modality_gate_status || ""),
+    name_source: String(asset.name_source || ""),
+    provisional_name: Boolean(asset.provisional_name),
   };
 }
 

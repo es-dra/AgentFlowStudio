@@ -1,16 +1,15 @@
 import { buildContextSubgraph } from "./optimizer-contract.js";
 import { providerServiceForVideoModel } from "./presets/models.js";
-import { lastImageAsset, resizeNodeForImagePreview } from "./node-image-assets.js";
+import { lastImageAsset } from "./node-image-assets.js";
 import { clearVideoAutoPoll, ensureVideoFirstFrameAsset, scheduleVideoAutoPoll, videoInputSourceForRequest } from "./video-node-flow.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
-import { firstCandidatePreview, setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
-import { parseDuration, videoResultText, videoRevisionResultText } from "./node-generation-results.js";
+import { setSubmittingGenerationState, updateNodeGenerationState } from "./node-generation-progress.js";
+import { parseDuration } from "./node-generation-results.js";
 import { clearOneRunOverrides, normalizeStringList, prepareGenerationRequest } from "./node-generation-guards.js";
-import { reconcileVisualAssetBadges } from "./node-generation-context.js";
-import { appendPreservedOutput, isPartialTerminalResponse, nodeStatusFromTerminalResponse, retryFailedItemsPlan, retryResultText, retrySubmittingOptions } from "./node-generation-retry.js";
+import { appendPreservedOutput, retryFailedItemsPlan, retryResultText, retrySubmittingOptions } from "./node-generation-retry.js";
 import { generationRestoreSnapshot, restoreCancelledGeneration } from "./node-generation-restore.js";
+import { applyVideoResponse, applyVideoRevisionResponse } from "./node-video-response.js";
 
-const VIDEO_CANCELLED_LOCAL_ONLY_STATUS = "cancelled_local_only";
 const VIDEO_LOCAL_EDIT_UNAVAILABLE = {
   status: "unavailable",
   required_capability: "video_edit_or_masked_temporal_edit",
@@ -251,52 +250,4 @@ function buildVideoRevisionRequest(store, node, revision, baseVideoJobId, firstF
     preserve_policy: "best_effort",
     provider_capability_mode: "i2v_revision_attempt",
   };
-}
-
-function applyVideoRevisionResponse(store, nodeId, response) {
-  const status = response?.job?.status || "blocked";
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    const preview = firstCandidatePreview(response);
-    const partial = isPartialTerminalResponse(response, preview);
-    updateNodeGenerationState(n, response, { kind: "video_revision" });
-    if (preview?.url) {
-      n.previewUrl = preview.url;
-      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
-    }
-    n.params.videoRevision = {
-      ...(n.params.videoRevision || {}),
-      enabled: true,
-      experimental: true,
-      lastRevisionJobId: response?.job?.job_id || null,
-      lastSafeManifest: response?.safe_manifest || null,
-    };
-    n.status = nodeStatusFromTerminalResponse(status, partial);
-    n.result = videoRevisionResultText(response);
-  });
-}
-
-function applyVideoResponse(store, nodeId, response) {
-  const status = response?.job?.status || "blocked";
-  if (!["submitted", "pending", "running"].includes(status)) clearVideoAutoPoll(nodeId);
-  if (status === VIDEO_CANCELLED_LOCAL_ONLY_STATUS) clearVideoAutoPoll(nodeId);
-  store.set((s) => {
-    const n = s.nodes[nodeId];
-    if (!n) return;
-    const preview = firstCandidatePreview(response);
-    const previewUrl = preview?.url || null;
-    const partial = isPartialTerminalResponse(response, preview);
-    updateNodeGenerationState(n, response, { kind: "video" });
-    n.params.lastVideoJobId = response?.job?.job_id || null;
-    n.params.lastVideoPreviewUrl = previewUrl;
-    n.params.lastContextBundle = response?.context_bundle || n.params.lastContextBundle || null;
-    reconcileVisualAssetBadges(n, response?.context_bundle || null);
-    if (previewUrl) {
-      n.previewUrl = previewUrl;
-      resizeNodeForImagePreview(n, preview, n.params?.spec?.ratio || "9:16");
-    }
-    n.status = nodeStatusFromTerminalResponse(status, partial);
-    n.result = videoResultText(response);
-  });
 }

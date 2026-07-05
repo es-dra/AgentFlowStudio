@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 from apps.api.runtime_studio_state_safe_text import has_media_filename_fragment
 from apps.api.runtime_studio_state_asset_binding import asset_auto_binding_graph, node_reference_stack
+from apps.api.runtime_studio_state_keyframe_constraints import keyframe_constraints
 from apps.api.runtime_store import safe_id
 from apps.api.runtime_studio_state_storyboard import production_graph_review, production_graph_snapshot, source_evidence_refs, visual_assets
 
@@ -10,7 +11,6 @@ from apps.api.runtime_studio_state_storyboard import production_graph_review, pr
 TextSanitizer = Callable[[Any, str, int], str]
 NumberSanitizer = Callable[[Any, float], float]
 PreviewUrlSanitizer = Callable[..., str]
-
 
 def structured_shot(value: Any, *, text: TextSanitizer, number: NumberSanitizer) -> dict[str, Any]:
     if not isinstance(value, dict):
@@ -291,6 +291,6 @@ def asset_type(value: Any) -> str:
 
 __all__ = (
     "asset_card_revision", "asset_card_draft", "asset_exclusions", "asset_refs", "keyframe_layer",
-    "node_reference_stack", "safe_object", "storyboard_breakdown", "structured_shot", "text_list",
+    "keyframe_constraints", "node_reference_stack", "safe_object", "storyboard_breakdown", "structured_shot", "text_list",
     "uploads", "visual_assets", "warnings",
 )

@@ -90,12 +90,83 @@ process.stdout.write(JSON.stringify(state.nodes.text_1));
 
     assert node["params"]["scriptInputMode"] == "idea_expanded_script"
     assert "片名：《" in node["prompt"]
-    assert "故事从一个清晰的核心画面展开" in node["prompt"]
+    assert "遥星R-17" in node["prompt"]
+    assert "屋顶" in node["prompt"]
+    assert "童声" in node["prompt"]
     assert "正式短视频剧本" not in node["prompt"]
     assert "分镜 01" not in node["prompt"]
     assert "推进主体" not in node["prompt"]
     assert "展示变化" not in node["prompt"]
     assert "收束结果" not in node["prompt"]
+
+
+def test_idea_expansion_request_preserves_source_idea_and_rejects_optimizer_output() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "一个人在睡觉",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+let captured = null;
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const runtime = {
+  optimizePrompt: async (request) => {
+    captured = request;
+    const text = [
+      "意图：围绕一个人在睡觉形成清晰创作方向。",
+      "角色/主体：Primary character。",
+      "场景/美术：Primary scene。",
+      "负面约束：不要水印。"
+    ].join("\n");
+    return {
+      user_prompt: text,
+      user_prompt_plain: text
+    };
+  }
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify({ node: state.nodes.text_1, captured }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    node = payload["node"]
+    captured = payload["captured"]
+
+    assert captured["prompt_text"] != "一个人在睡觉"
+    assert "原始想法：一个人在睡觉" in captured["prompt_text"]
+    assert captured["node_parameters"]["source_idea"] == "一个人在睡觉"
+    assert captured["node_parameters"]["script_generation_mode"] == "idea_to_script"
+    assert captured["node_parameters"]["remote_optimizer_required"] is False
+    assert captured["node_parameters"]["llm_provider"] == "local_script_generation"
+    assert node["params"]["scriptInputMode"] == "idea_expanded_script"
+    assert "片名：《" in node["prompt"]
+    assert "意图：" not in node["prompt"]
+    assert "角色/主体：" not in node["prompt"]
+    assert "Primary character" not in node["prompt"]
 
 
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:

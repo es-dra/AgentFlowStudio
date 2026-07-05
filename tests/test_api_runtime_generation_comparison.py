@@ -100,6 +100,8 @@ def test_generation_comparison_report_defines_a_b_c_arms_without_gate_network(tm
 
 
 def test_generation_comparison_uses_partial_state_for_mixed_image_arms(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+
     def fake_build_keyframe_generation(store, project_id, request, output_dir, *, include_fixed_assets=True):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         write_json(
@@ -134,15 +136,25 @@ def test_generation_comparison_uses_partial_state_for_mixed_image_arms(tmp_path,
 
     monkeypatch.setattr(runtime_generation_comparisons, "build_keyframe_generation", fake_build_keyframe_generation)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_generation_compare_partial"
+    request_payload = {
+        "node_id": "target-node",
+        "prompt_text": "Lin Wan on rooftop.",
+        "optimized_prompt": "A controlled rooftop keyframe.",
+        "generated_at": "2026-06-24T12:30:00+08:00",
+    }
+    preflight = client.post(
+        f"/projects/{project_id}/generation-comparisons/preflight",
+        json=request_payload,
+    )
+    assert preflight.status_code == 200
+    preflight_payload = preflight.json()
+    assert preflight_payload["provider_calls_started"] is False
+    assert preflight_payload["provider_submit_preflight"]["required"] is True
 
     response = client.post(
-        "/projects/proj_generation_compare_partial/generation-comparisons",
-        json={
-            "node_id": "target-node",
-            "prompt_text": "Lin Wan on rooftop.",
-            "optimized_prompt": "A controlled rooftop keyframe.",
-            "generated_at": "2026-06-24T12:30:00+08:00",
-        },
+        f"/projects/{project_id}/generation-comparisons",
+        json={**request_payload, "preflight_token": preflight_payload["preflight_token"]},
     )
 
     assert response.status_code == 200

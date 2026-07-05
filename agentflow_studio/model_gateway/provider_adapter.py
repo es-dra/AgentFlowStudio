@@ -21,6 +21,81 @@ ProviderCapability = Literal["image", "video", "llm", "asr", "vision"]
 ProviderModality = ProviderCapability
 ProviderExecutionMode = Literal["sync", "async"]
 FrameSlotRequirement = Literal["required", "optional", "unsupported"]
+ImageEditScopeKind = Literal["mask_asset", "bbox", "polygon", "semantic_region"]
+ImageEditFallbackMode = Literal[
+    "provider_full_frame_edit",
+    "full_regeneration_fallback",
+    "reference_image_to_image_fallback",
+]
+ImageEditLockSupport = Literal["unsupported", "prompt_only", "structured"]
+ImageEditTruthLabel = Literal[
+    "blocked_no_supported_local_edit",
+    "provider_masked_edit",
+    "provider_region_edit",
+    "provider_full_frame_edit",
+    "true_local_edit",
+]
+ImageInputFidelityMode = Literal["low", "high"]
+
+
+class ImageEditCapabilities(BaseModel):
+    supports_image_edit: bool = False
+    supports_true_local_edit: bool = False
+    supports_mask_asset: bool = False
+    supports_bbox_region: bool = False
+    supports_polygon_region: bool = False
+    supports_semantic_region: bool = False
+    supports_preserve_locks: ImageEditLockSupport = "unsupported"
+    supports_negative_locks: ImageEditLockSupport = "unsupported"
+    fallback_modes: list[ImageEditFallbackMode] = Field(default_factory=list)
+    max_mask_count: int = Field(default=0, ge=0, le=16)
+    max_reference_images: int = Field(default=0, ge=0, le=16)
+    input_fidelity_modes: list[ImageInputFidelityMode] = Field(default_factory=list)
+    local_edit_truth_label: ImageEditTruthLabel = "blocked_no_supported_local_edit"
+
+    def local_edit_scope_kinds(self) -> list[ImageEditScopeKind]:
+        scopes: list[ImageEditScopeKind] = []
+        if self.supports_mask_asset:
+            scopes.append("mask_asset")
+        if self.supports_bbox_region:
+            scopes.append("bbox")
+        if self.supports_polygon_region:
+            scopes.append("polygon")
+        if self.supports_semantic_region:
+            scopes.append("semantic_region")
+        return scopes
+
+    def has_image_edit_claims(self) -> bool:
+        return (
+            self.supports_image_edit
+            or self.supports_true_local_edit
+            or bool(self.local_edit_scope_kinds())
+            or bool(self.fallback_modes)
+            or self.supports_preserve_locks != "unsupported"
+            or self.supports_negative_locks != "unsupported"
+            or self.max_mask_count > 0
+            or self.max_reference_images > 0
+            or bool(self.input_fidelity_modes)
+            or self.local_edit_truth_label != "blocked_no_supported_local_edit"
+        )
+
+    @model_validator(mode="after")
+    def _validate_image_edit_claims(self) -> "ImageEditCapabilities":
+        if self.supports_true_local_edit and not self.supports_image_edit:
+            raise ValueError("supports_true_local_edit requires supports_image_edit")
+        if self.supports_true_local_edit and not self.local_edit_scope_kinds():
+            raise ValueError("supports_true_local_edit requires at least one local-edit scope")
+        if self.fallback_modes and not self.supports_image_edit:
+            raise ValueError("fallback_modes require supports_image_edit")
+        if self.max_mask_count and not self.supports_mask_asset:
+            raise ValueError("max_mask_count requires supports_mask_asset")
+        if self.input_fidelity_modes and not self.supports_image_edit:
+            raise ValueError("input_fidelity_modes require supports_image_edit")
+        if self.local_edit_truth_label == "true_local_edit" and not self.supports_true_local_edit:
+            raise ValueError("true_local_edit truth label requires supports_true_local_edit")
+        if self.local_edit_truth_label != "blocked_no_supported_local_edit" and not self.supports_image_edit:
+            raise ValueError("non-blocked local_edit_truth_label requires supports_image_edit")
+        return self
 
 
 class ProviderDescriptor(BaseModel):
@@ -46,6 +121,11 @@ class ProviderDescriptor(BaseModel):
     prompt_profile: str | None = None
     cost_estimate: dict[str, Any] = Field(default_factory=dict)
     min_reference_image_edge_px: int = Field(default=0, ge=0, le=8192)
+    image_edit_capabilities: ImageEditCapabilities = Field(default_factory=ImageEditCapabilities)
+
+    @property
+    def image_edit_capabilities_present(self) -> bool:
+        return "image_edit_capabilities" in self.model_fields_set
 
     @field_validator("required_gate")
     @classmethod
@@ -103,6 +183,16 @@ class ProviderDescriptor(BaseModel):
                 raise ValueError("video provider_descriptor.v0.2 requires supported_resolutions")
             if not self.prompt_profile:
                 raise ValueError("video provider_descriptor.v0.2 requires prompt_profile")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_image_edit_v03(self) -> "ProviderDescriptor":
+        if not self.image_edit_capabilities.has_image_edit_claims():
+            return self
+        if self.modality != "image":
+            raise ValueError("image_edit_capabilities are only valid for image providers")
+        if self.schema_version in {"provider_descriptor.v0.1", "provider_descriptor.v0.2"}:
+            raise ValueError("image_edit_capabilities require provider_descriptor.v0.3 or later")
         return self
 
 
@@ -362,5 +452,6 @@ __all__ = (
     "ProviderDescriptor",
     "ProviderDispatchRequest",
     "ProviderRegistry",
+    "ImageEditCapabilities",
     "load_provider_registry",
 )

@@ -1324,6 +1324,227 @@ def test_script_prompt_optimization_returns_structured_script_plan(tmp_path) -> 
     assert artifact["narrative_sections"][0]["section_id"] == "premise"
 
 
+def test_script_generation_predicate_requires_explicit_script_contract_and_script_surface() -> None:
+    from apps.api.runtime_script_generation_body import is_script_generation_request
+
+    def request(
+        *,
+        node_type: str,
+        generation_target: str,
+        params: dict[str, object],
+    ) -> PromptOptimizationRequest:
+        return PromptOptimizationRequest(
+            node_id="predicate-node",
+            node_type=node_type,
+            prompt_text="一个人在睡觉",
+            generation_target=generation_target,
+            target_platform="short_video",
+            style="cinematic",
+            node_parameters=params,
+            generated_at="2026-07-06T10:05:00+08:00",
+        )
+
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="image",
+                generation_target="keyframe",
+                params={"source_idea": "一个人在睡觉"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="image",
+                generation_target="keyframe",
+                params={"source_idea": "一个人在睡觉", "script_generation_mode": "idea_to_script"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"script_generation_mode": "idea_to_script"},
+            )
+        )
+        is True
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"script_expansion_contract": "formal_script_before_storyboard_breakdown"},
+            )
+        )
+        is True
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="text",
+                generation_target="script",
+                params={"script_generation_mode": "idea_to_script"},
+            )
+        )
+        is False
+    )
+    assert (
+        is_script_generation_request(
+            request(
+                node_type="script",
+                generation_target="script",
+                params={"source_idea": "一个人在睡觉"},
+            )
+        )
+        is False
+    )
+
+
+def test_script_prompt_optimization_returns_script_body_with_source_idea_separated(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_body", "goal": "Script body contract"})
+    wrapper = "\n".join(
+        [
+            "请把下面的一句话扩写成正式短视频剧本正文，而不是分镜列表。",
+            "输出要求：先给片名，再给连续叙事正文。",
+            "原始想法：一个人在睡觉",
+        ]
+    )
+
+    response = client.post(
+        "/projects/proj_script_body/prompt-optimizations",
+        json={
+            "node_id": "script-node-body",
+            "node_type": "script",
+            "prompt_text": wrapper,
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "script_generation_mode": "idea_to_script",
+                "source_idea": "一个人在睡觉",
+                "forbidden_output": "storyboard_placeholder_outline",
+                "llm_provider": "prompt_optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-06T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    script = payload["optimized_prompt"]
+    assert payload["provider_calls_started"] is False
+    assert payload["original_prompt"] == wrapper
+    assert payload["script_plan"]["source_idea"] == "一个人在睡觉"
+    assert payload["script_generation_body"]["source_idea"] == "一个人在睡觉"
+    assert payload["script_generation_body"]["fallback_used"] is True
+    assert "片名：《" in script
+    assert "沈眠" in script
+    assert "房间" in script or "出租屋" in script
+    assert "敲门" in script or "钥匙" in script
+    assert "结尾" in script or "门外" in script
+    assert "请把下面的一句话" not in script
+    assert "输出要求" not in script
+    assert "原始想法" not in script
+    assert "Intent:" not in script
+    assert "角色/主体：" not in script
+    assert "推进主体" not in script
+
+    brief = client.get(f"/artifacts/{payload['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
+    manifest = client.get(f"/artifacts/{payload['artifacts']['prompt_optimization_safe_manifest']['artifact_id']}").json()["payload"]
+    assert brief["original_prompt"] == wrapper
+    assert brief["source_idea"] == "一个人在睡觉"
+    assert manifest["script_generation_body"]["fallback_used"] is True
+
+
+def test_script_body_validator_fallbacks_from_wrapper_echo_optimizer_labels_and_template_fillers() -> None:
+    from apps.api.runtime_script_generation_body import script_body_from_candidate
+
+    request = PromptOptimizationRequest(
+        node_id="script-node-validator",
+        node_type="script",
+        prompt_text="请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个人在睡觉",
+        generation_target="script",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "script_generation_mode": "idea_to_script",
+            "source_idea": "一个人在睡觉",
+        },
+        generated_at="2026-07-06T10:10:00+08:00",
+    )
+
+    wrapper = script_body_from_candidate("请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个人在睡觉", request)
+    optimizer = script_body_from_candidate(
+        "\n".join(
+            [
+                "意图：围绕一个人在睡觉形成清晰创作方向。",
+                "角色/主体：Primary character。",
+                "场景/美术：Primary scene。",
+                "负面约束：不要水印。",
+            ]
+        ),
+        request,
+    )
+    template = script_body_from_candidate(
+        "片名：《占位》\n\n推进主体出现。\n展示变化。\n收束结果。",
+        request,
+    )
+
+    assert wrapper["fallback_used"] is True
+    assert wrapper["discard_reason"] == "prompt_wrapper_echo"
+    assert optimizer["fallback_used"] is True
+    assert optimizer["discard_reason"] == "optimizer_label_output"
+    assert template["fallback_used"] is True
+    assert template["discard_reason"] == "template_filler"
+    assert "片名：《" in wrapper["script_body"]
+    assert "沈眠" in wrapper["script_body"]
+    assert "意图：" not in optimizer["script_body"]
+    assert "角色/主体：" not in optimizer["script_body"]
+
+
+def test_non_script_source_idea_only_request_keeps_remote_optimizer_required(tmp_path, monkeypatch) -> None:
+    from apps.api.runtime_script_generation_body import is_script_generation_request
+
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
+    request_payload = {
+        "node_id": "image-node-source-idea-only",
+        "node_type": "image",
+        "prompt_text": "Generate a cinematic keyframe of a person sleeping in a quiet room.",
+        "generation_target": "keyframe",
+        "target_platform": "short_video",
+        "style": "cinematic",
+        "node_parameters": {
+            "llm_provider": "prompt_optimizer",
+            "remote_optimizer_required": True,
+            "source_idea": "一个人在睡觉",
+        },
+        "generated_at": "2026-07-06T10:25:00+08:00",
+    }
+    predicate_request = PromptOptimizationRequest(**request_payload)
+
+    assert is_script_generation_request(predicate_request) is False
+
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_image_source_idea_only", "goal": "Image optimizer contract"})
+    response = client.post(
+        "/projects/proj_image_source_idea_only/prompt-optimizations",
+        json=request_payload,
+    )
+
+    assert response.status_code == 422
+    assert "remote_llm_gate_closed" in _runtime_error_raw_detail(response)
+
+
 def test_prompt_optimizer_trace_includes_professional_reference_for_rooftop_video(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post("/projects", json={"project_id": "proj_prof_ref_prompt", "goal": "Professional reference trace"})

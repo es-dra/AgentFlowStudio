@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 
 from fastapi.testclient import TestClient
 
@@ -223,6 +224,40 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
                     "lastKeyframeCompletedJobId": "keyframe_generation-abc123",
                     "lastOptimizedPromptPlain": "根据固定机器人资产生成屋顶关键帧。",
                     "temporaryAssetExclusions": [{"asset_id": "vas_old", "reason": "one_run_asset_exclusion"}],
+                    "keyframeConstraints": {
+                        "schema_version": "afs_keyframe_constraints.v0.1",
+                        "updated_at": "2026-07-06T10:00:00+08:00",
+                        "rows": [
+                            {
+                                "id": "row_character",
+                                "section": "character",
+                                "text": "keep the hero red scarf",
+                                "enabled": True,
+                                "order": 1,
+                                "projection": "provider",
+                                "unknown_key": "drop me",
+                            },
+                            {
+                                "id": "row_local",
+                                "section": "local_reference",
+                                "text": "operator-only local reference label",
+                                "enabled": True,
+                                "order": 2,
+                                "projection": "provider",
+                                "asset_id": "local_ref_1",
+                                "label": "Private Concept Board",
+                                "note": "audit only",
+                            },
+                            {
+                                "id": "row_unknown",
+                                "section": "unrecognized",
+                                "text": "unknown section stays audit only",
+                                "enabled": False,
+                                "order": 3,
+                                "projection": "provider",
+                            },
+                        ],
+                    },
                 },
             },
         },
@@ -250,6 +285,91 @@ def test_studio_state_preserves_storyboard_asset_and_keyframe_contract_params(tm
     assert keyframe_params["lastKeyframeJobId"] == "keyframe_generation-abc123"
     assert keyframe_params["lastOptimizedPromptPlain"] == "根据固定机器人资产生成屋顶关键帧。"
     assert keyframe_params["temporaryAssetExclusions"][0]["asset_id"] == "vas_old"
+    assert keyframe_params["keyframeConstraints"]["rows"][0]["text"] == "keep the hero red scarf"
+    assert "unknown_key" not in keyframe_params["keyframeConstraints"]["rows"][0]
+    assert keyframe_params["keyframeConstraints"]["rows"][1]["projection"] == "audit_only"
+    assert keyframe_params["keyframeConstraints"]["rows"][1]["label"] == "Private Concept Board"
+    assert keyframe_params["keyframeConstraints"]["rows"][2]["section"] == "local_reference"
+    assert keyframe_params["keyframeConstraints"]["rows"][2]["enabled"] is False
+
+
+def test_studio_state_sanitizes_keyframe_constraints_editor_state(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-state-keyframe-constraints"
+    client.post("/projects", json={"project_id": project_id, "goal": "Keyframe constraints persistence"})
+
+    state = {
+        "nodes": {
+            "keyframe_1": {
+                "type": "image",
+                "title": "Keyframe 1",
+                "prompt": "Base prompt",
+                "params": {
+                    "nodeRole": "keyframe_generation",
+                    "keyframeConstraints": {
+                        "schema_version": "afs_keyframe_constraints.v0.1",
+                        "updated_at": "2026-07-06T00:00:00Z",
+                        "rows": [
+                            {
+                                "id": "provider_1",
+                                "section": "lighting",
+                                "text": "cool moonlight from camera left",
+                                "enabled": True,
+                                "order": 1,
+                                "projection": "provider",
+                                "signed_url": "https://signed.example/private.png?token=secret",
+                            },
+                            {
+                                "id": "disabled_1",
+                                "section": "camera",
+                                "text": "disabled row persists locally",
+                                "enabled": False,
+                                "order": 2,
+                                "projection": "provider",
+                            },
+                            {
+                                "id": "local_1",
+                                "section": "local_reference",
+                                "text": "operator-only board label",
+                                "enabled": True,
+                                "order": 3,
+                                "projection": "provider",
+                                "asset_id": "local_board_1",
+                                "label": "Local board",
+                            },
+                            {
+                                "id": "unsafe_path",
+                                "section": "scene",
+                                "text": "use D:\\private\\scene.png",
+                                "enabled": True,
+                                "order": 4,
+                                "projection": "provider",
+                            },
+                        ],
+                    },
+                },
+            }
+        },
+        "order": ["keyframe_1"],
+    }
+
+    response = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+
+    assert response.status_code == 200
+    params = response.json()["state"]["nodes"]["keyframe_1"]["params"]
+    constraints = params["keyframeConstraints"]
+    rows = constraints["rows"]
+    serialized = json.dumps(constraints, ensure_ascii=False)
+    assert constraints["schema_version"] == "afs_keyframe_constraints.v0.1"
+    assert [row["id"] for row in rows] == ["provider_1", "disabled_1", "local_1"]
+    assert rows[0]["projection"] == "provider"
+    assert rows[1]["enabled"] is False
+    assert rows[2]["projection"] == "audit_only"
+    assert rows[2]["asset_id"] == "local_board_1"
+    assert "signed_url" not in serialized
+    assert "signed.example" not in serialized
+    assert "D:\\private" not in serialized
+    assert "unsafe_path" not in serialized
 
 
 def test_projects_list_includes_studio_state_meta_and_preview_url_persists(tmp_path) -> None:

@@ -1,9 +1,14 @@
 import { promptPlaceholder } from "./nodes.js";
-import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel } from "./presets/models.js";
+import { MODELS_BY_NODE_TYPE, findModel, isRemoteVideoModel, videoCapabilitiesForVideoModel } from "./presets/models.js";
 import {
-  VIDEO_RATIOS, VIDEO_RESOLUTIONS, VIDEO_DURATIONS,
+  VIDEO_RATIOS, VIDEO_RESOLUTIONS,
   videoSpecLabel,
 } from "./presets/specs.js";
+import {
+  clampVideoDurationLabel,
+  videoCapabilitiesFromNode,
+  videoDurationOptions,
+} from "./presets/video-capabilities.js";
 import { showPopover, el } from "./overlay.js";
 import { openOptimizer } from "./optimizer.js";
 import { openGalleryModal } from "./panels/gallery-modal.js";
@@ -281,7 +286,16 @@ function openModelPopover(store, node, anchor) {
     const item = el("button", `menu-item${node.params.model === m.id ? " selected" : ""}`);
     item.innerHTML = `<span class="mi-icon">${icon("sparkle1", 13)}</span><span>${m.name}${m.desc ? `<span class="mi-sub">${m.desc}</span>` : ""}</span><span class="mi-meta">${m.eta}</span>`;
     item.addEventListener("click", () => {
-      updateNode(store, node.id, (n) => { n.params.model = m.id; });
+      updateNode(store, node.id, (n) => {
+        n.params.model = m.id;
+        if (n.type === "video") {
+          const capabilities = videoCapabilitiesForVideoModel(m.id);
+          n.params.spec = {
+            ...(n.params.spec || {}),
+            duration: clampVideoDurationLabel(n.params.spec?.duration || "5s", capabilities),
+          };
+        }
+      });
       close();
     });
     pop.appendChild(item);
@@ -291,11 +305,12 @@ function openModelPopover(store, node, anchor) {
 
 function openVideoSpecPopover(store, node, anchor) {
   const pop = el("div", "spec-pop");
+  const videoCapabilities = videoCapabilitiesFromNode(node, videoCapabilitiesForVideoModel(node.params?.model));
   pop.appendChild(specSection("比例", VIDEO_RATIOS, node.params.spec.ratio, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.ratio = v; })));
   pop.appendChild(specSection("分辨率", VIDEO_RESOLUTIONS, node.params.spec.resolution, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.resolution = v; })));
-  pop.appendChild(specSection("时长", VIDEO_DURATIONS, node.params.spec.duration, (v) =>
+  pop.appendChild(specSection("时长", videoDurationOptions(videoCapabilities), node.params.spec.duration, (v) =>
     updateNode(store, node.id, (n) => { n.params.spec.duration = v; })));
   showPopover(anchor, pop, { place: "top" });
 }
@@ -305,9 +320,15 @@ function specSection(label, options, current, onPick, ratio = false) {
   section.appendChild(el("div", "spec-label", label));
   const wrap = el("div", "spec-options");
   for (const opt of options) {
-    const btn = el("button", `spec-opt${ratio ? " ratio" : ""}${current === opt ? " active" : ""}`, opt);
+    const value = typeof opt === "object" ? opt.value : opt;
+    const text = typeof opt === "object" ? opt.label : opt;
+    const disabled = Boolean(typeof opt === "object" && opt.disabled);
+    const btn = el("button", `spec-opt${ratio ? " ratio" : ""}${current === value ? " active" : ""}`, text);
+    btn.disabled = disabled;
+    if (disabled) btn.title = opt.reason || "unsupported";
     btn.addEventListener("click", () => {
-      onPick(opt);
+      if (disabled) return;
+      onPick(value);
       for (const sib of wrap.children) sib.classList.toggle("active", sib === btn);
     });
     wrap.appendChild(btn);

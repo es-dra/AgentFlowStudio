@@ -1,0 +1,119 @@
+{
+  "project_id": "proj_identity",
+  "same_asset_across_shots": [
+    {
+      "observation_id": "obs_shot_001_mira",
+      "shot_id": "shot_001",
+      "asset_type": "character",
+      "display_name": "Mira",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs_shot_002_mira",
+      "shot_id": "shot_002",
+      "asset_type": "character",
+      "display_name": "Mira",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    }
+  ],
+  "display_name_only": [
+    {
+      "observation_id": "obs_name_only_001",
+      "shot_id": "shot_001",
+      "asset_type": "character",
+      "display_name": "Mira"
+    },
+    {
+      "observation_id": "obs_name_only_002",
+      "shot_id": "shot_002",
+      "asset_type": "character",
+      "display_name": "Mira"
+    }
+  ],
+  "alias_candidate": [
+    {
+      "observation_id": "obs_alias_001",
+      "shot_id": "shot_001",
+      "asset_type": "character",
+      "display_name": "Mira",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs_alias_002",
+      "shot_id": "shot_003",
+      "asset_type": "character",
+      "display_name": "Mirror Girl",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    }
+  ],
+  "proper_name_signature_backed": [
+    {
+      "observation_id": "obs_proper_001",
+      "shot_id": "shot_001",
+      "asset_type": "character",
+      "display_name": "Mira Vale",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "proper_name_evidence": [
+        {
+          "name": "Mira Vale",
+          "source_ref_id": "script_span:mira_name"
+        }
+      ],
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    },
+    {
+      "observation_id": "obs_proper_002",
+      "shot_id": "shot_004",
+      "asset_type": "character",
+      "display_name": "Mira Vale",
+      "descriptive_signature": "silver braid, teal jacket, crescent hair clip",
+      "proper_name_evidence": [
+        {
+          "name": "Mira Vale",
+          "source_ref_id": "script_span:mira_name"
+        }
+      ],
+      "asset_id_evidence": [
+        {
+          "asset_id": "asset:character:mira_fixed_01",
+          "evidence_type": "fixed_asset_ref",
+          "source_ref_id": "fixed_asset:mira"
+        }
+      ]
+    }
+  ]
+}

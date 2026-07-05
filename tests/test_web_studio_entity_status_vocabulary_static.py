@@ -143,8 +143,9 @@ def test_contract_is_linked_from_project_records() -> None:
     tracker = Path("TASK_TRACKER.md").read_text(encoding="utf-8")
     devlog = Path("DEVLOG.md").read_text(encoding="utf-8")
     file_name = CONTRACT.name
+    vocabulary_record_path = VOCABULARY.as_posix()
 
     assert file_name in handoff_index
     assert file_name in tracker
     assert file_name in devlog
-    assert str(VOCABULARY) in tracker + devlog
+    assert vocabulary_record_path in tracker + devlog

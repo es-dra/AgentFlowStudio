@@ -26,6 +26,7 @@ SAFE_NODE_PARAM_KEYS = (
     "assetCardRevision",
     "assetAutoBindingGraph", "asset_auto_binding_graph", "nodeReferenceStack", "node_reference_stack",
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
+    "keyframeConstraints",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
     "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
@@ -95,6 +96,8 @@ def _sanitize_param(
         return param_values.node_reference_stack(value, text=text, number=number)
     if key == "keyframeLayer":
         return param_values.keyframe_layer(value, text=text)
+    if key == "keyframeConstraints":
+        return param_values.keyframe_constraints(value, text=text, number=number)
     if key == "lastVisualAssetWarnings":
         return param_values.warnings(value, text=text)
     if key == "temporaryAssetExclusions":
