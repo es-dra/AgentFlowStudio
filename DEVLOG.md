@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-07-05 - Studio Reference Image Upload Diagnostics
+
+- Fixed the Studio Runtime client error projection that converted object-shaped
+  FastAPI/Runtime error details into `[object Object]` in node upload failures.
+  Runtime errors now project safe `reason`, `error`, `detail_code`, and `field`
+  values, and FastAPI validation arrays are rendered as readable field messages.
+- Split Runtime image-asset upload validation into actionable safe 422 codes for
+  invalid base64, empty upload, upload too large, MIME/content mismatch,
+  unsupported file type, and unreadable image dimensions.
+- Added API and Studio static/Node regression coverage so upload failures stay
+  diagnosable without leaking uploaded bytes, local paths, provider data, or
+  secrets.
+
+Verification:
+
+```text
+python -m pytest tests\test_api_runtime_studio_state_persistence.py tests\test_web_studio_static.py -q -> 20 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 122 files
+```
+
+Boundary:
+
+- No provider gate was opened and no remote image/video/LLM/ASR call was made.
+- No uploaded media bytes, local media paths, signed URLs, provider raw
+  responses, or secrets are written to repo records.
+- This improves `/studio/` reference image upload/replace diagnostics and
+  Runtime `/projects/{project_id}/image-assets` 422 responses only.
+
 ## 2026-07-05 - Studio Resizable Canvas Nodes
 
 - Added a dedicated bottom-right resize handle to Studio canvas nodes so text,

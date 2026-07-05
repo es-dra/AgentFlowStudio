@@ -120,12 +120,49 @@ function runtimeErrorMessage(response, body) {
   let detail = "";
   try {
     const payload = body ? JSON.parse(body) : {};
-    detail = String(payload?.detail || payload?.message || "").trim();
+    detail = runtimeErrorDetail(payload);
   } catch {
     detail = cleanTextResponseError(body, response);
   }
   const safeDetail = detail.replace(/Bearer\s+\S+/gi, "Bearer <redacted>").slice(0, 220);
   return safeDetail ? `Runtime request failed (${response.status}): ${safeDetail}` : `Runtime request failed (${response.status})`;
+}
+
+function runtimeErrorDetail(payload) {
+  const detail = payload?.detail ?? payload?.message ?? "";
+  if (Array.isArray(detail)) {
+    const text = detail.map(runtimeValidationIssueText).filter(Boolean).join(" / ");
+    if (text) return text;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return "Runtime returned validation error details";
+    }
+  }
+  if (detail && typeof detail === "object") {
+    const parts = [
+      detail.message,
+      detail.reason,
+      detail.error,
+      detail.detail_code,
+      detail.field ? `field=${detail.field}` : "",
+    ];
+    const text = parts.map((part) => String(part || "").trim()).filter(Boolean).join(" / ");
+    if (text) return text;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return "Runtime returned an object error detail";
+    }
+  }
+  return String(detail || "").trim();
+}
+
+function runtimeValidationIssueText(issue) {
+  if (!issue || typeof issue !== "object") return String(issue || "").trim();
+  const loc = Array.isArray(issue.loc) ? issue.loc.filter((item) => item !== "body").join(".") : "";
+  const msg = String(issue.msg || issue.message || issue.type || "").trim();
+  return [loc ? `field=${loc}` : "", msg].filter(Boolean).join(": ");
 }
 
 function cleanTextResponseError(body, response) {

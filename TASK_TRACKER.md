@@ -8,6 +8,19 @@
 
 Last updated: 2026-07-05 by Codex
 
+Studio reference image upload diagnostics follow-up: 2026-07-05 pass addresses
+the P1 Web test report where "upload/replace reference image" reached Runtime
+but failed with HTTP 422 and the frontend displayed `[object Object]`. Root
+cause: the Studio Runtime client stringified object-shaped FastAPI/Runtime
+`detail` payloads directly, and Runtime image upload collapsed distinct
+validation failures into a generic `invalid_image_asset`. The fix renders safe
+`reason` / `error` / `detail_code` / `field` details, handles FastAPI
+validation arrays, and returns actionable safe 422 codes for invalid base64,
+empty upload, upload too large, MIME/content mismatch, unsupported file type,
+and unreadable image dimensions. Boundary: no provider gate, provider call,
+secret, signed URL, local media path, uploaded media bytes, provider raw
+response, or private Company OS source content is involved.
+
 Studio resizable canvas nodes follow-up: 2026-07-05 pass addresses the server
 retest feedback that node cards themselves still could not be resized after the
 textarea-only prompt-input fix. Root cause: nodes already persisted `w`/`h` and

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from studio_static_helpers import STUDIO_ROOT, _source, _styles
@@ -188,6 +189,84 @@ def test_studio_prompt_textareas_are_resizable_for_long_prompts() -> None:
     assert "max-height: min(420px, 60vh);" in maturity
     assert ".visual-asset-panel textarea" in modals
     assert "max-height: min(360px, 52vh);" in modals
+
+
+def test_runtime_error_detail_objects_are_rendered_without_object_object() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    upload_actions = (STUDIO_ROOT / "src" / "node-upload-actions.js").read_text(encoding="utf-8")
+
+    assert "runtimeErrorDetail(payload)" in runtime_client
+    assert "Array.isArray(detail)" in runtime_client
+    assert "runtimeValidationIssueText" in runtime_client
+    assert 'typeof detail === "object"' in runtime_client
+    assert "detail.reason" in runtime_client
+    assert "detail.error" in runtime_client
+    assert "detail.detail_code" in runtime_client
+    assert 'field=${detail.field}' in runtime_client
+    assert 'item !== "body"' in runtime_client
+    assert "String(payload?.detail" not in runtime_client
+    assert "[object Object]" not in runtime_client
+    assert "图片上传失败" in upload_actions
+
+
+def test_runtime_error_detail_object_and_validation_array_are_readable() -> None:
+    code = r"""
+import { createRuntimeClient } from './apps/studio/src/runtime-client.js';
+
+const responses = [
+  {
+    ok: false,
+    status: 422,
+    text: async () => JSON.stringify({
+      detail: {
+        error: 'reference_image_upload_invalid_base64',
+        detail_code: 'reference_image_upload_invalid_base64',
+        field: 'data_base64',
+        reason: '上传图片数据不是有效的 base64，请重新选择图片后再试。',
+      },
+    }),
+  },
+  {
+    ok: false,
+    status: 422,
+    text: async () => JSON.stringify({
+      detail: [{ loc: ['body', 'data_base64'], msg: 'Field required', type: 'missing' }],
+    }),
+  },
+];
+globalThis.window = {
+  location: { protocol: 'http:', href: 'http://127.0.0.1:8796/studio/', hostname: '127.0.0.1', port: '8796' },
+  localStorage: { getItem() { return ''; } },
+};
+globalThis.fetch = async () => responses.shift();
+const runtime = createRuntimeClient('proj_error_detail');
+
+for (const expected of ['reference_image_upload_invalid_base64', 'field=data_base64: Field required']) {
+  try {
+    await runtime.uploadImageAsset({
+      node_id: 'image_1',
+      filename: 'reference.png',
+      mime_type: 'image/png',
+      data_base64: '',
+      role: 'reference_image',
+      generated_at: '2026-07-05T10:00:00+08:00',
+    });
+  } catch (error) {
+    if (String(error.message).includes('[object Object]')) throw new Error(error.message);
+    if (!String(error.message).includes(expected)) throw new Error(`missing ${expected}: ${error.message}`);
+    continue;
+  }
+  throw new Error('expected Runtime request to fail');
+}
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", code],
+        cwd=Path.cwd(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_studio_asset_context_workflow_is_single_canvas() -> None:

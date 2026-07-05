@@ -277,3 +277,54 @@ def test_image_asset_list_returns_public_metadata_only(tmp_path) -> None:
     assert "data/processed/runs" not in serialized
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
+
+
+def test_image_asset_upload_returns_actionable_safe_422_detail(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-image-upload-error"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio image upload error"})
+
+    response = client.post(
+        f"/projects/{project_id}/image-assets",
+        json={
+            "node_id": "image_1",
+            "filename": "reference.png",
+            "mime_type": "image/png",
+            "data_base64": "not-valid-base64",
+            "role": "reference_image",
+            "generated_at": "2026-07-05T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "error": "reference_image_upload_invalid_base64",
+        "detail_code": "reference_image_upload_invalid_base64",
+        "field": "data_base64",
+        "reason": "上传图片数据不是有效的 base64，请重新选择图片后再试。",
+    }
+    assert "data_base64" in response.text
+    assert "not-valid-base64" not in response.text
+
+
+def test_image_asset_upload_rejects_mime_mismatch_with_safe_reason(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-image-upload-mismatch"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio image upload mismatch"})
+
+    response = client.post(
+        f"/projects/{project_id}/image-assets",
+        json={
+            "node_id": "image_1",
+            "filename": "reference.png",
+            "mime_type": "image/png",
+            "data_base64": base64.b64encode(b"plain text").decode("ascii"),
+            "role": "reference_image",
+            "generated_at": "2026-07-05T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["detail_code"] == "reference_image_file_type_mismatch"
+    assert response.json()["detail"]["field"] == "mime_type"
+    assert "上传图片内容与声明格式不一致" in response.json()["detail"]["reason"]
