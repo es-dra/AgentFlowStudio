@@ -188,6 +188,122 @@
 - Handoff:
   `docs/handoff/AFS-P0-STRUCTURED-QA-CHECKLIST-ACTIVE-RUNTIME-NONCOMPLETION-20260705.md`.
 
+## 2026-07-05 - P1 Three Record Index Merge on Live Master Base
+
+- Lane:
+  `TD-AFS-V02-SYNC-P1-THREE-RECORD-INDEX-MERGE-LIVE-MASTER-BASE-READWRITE-20260705-001`
+  with expected BU
+  `BU-AFS-V02-SYNC-P1-THREE-RECORD-INDEX-MERGE-LIVE-MASTER-BASE-READWRITE-20260705-001`.
+- Merge basis: live master base
+  `e30510abb026092384544d90ae2479e2be04a457`; preserved dirty checkout ref
+  `dd027f72173a5a14ebd2f52a7ab587e1cecb6d4f` from preservation snapshot
+  `C:\Users\chenzy\.codex\afs-preservation\TD-AFS-V02-SYNC-P1-PRESERVE-DIRTY-CHECKOUT-BRANCH-OR-WORKTREE-NONDESTRUCTIVE-20260705-001`.
+- Merge method: rebuilt `DEVLOG.md`, `TASK_TRACKER.md`, and
+  `docs/handoff/INDEX.md` from verified live-master versions, then reinserted
+  current dirty docs-stabilization, Neon Rain registration/correction,
+  held-evidence, and sync/control boundary records where current.
+- Touched only `DEVLOG.md`, `TASK_TRACKER.md`, and `docs/handoff/INDEX.md`.
+- Non-claims: no full sync, provider descriptor port, Runtime/server/provider
+  action, provider/generated-media QA, docs compaction/archive/delete, cleanup
+  completion, product/package readiness or finality, Owner/human acceptance,
+  public/business/legal acceptance, CompanyOS/COS/source-KB mutation,
+  staging/commit/push, deploy, restart, or self-archive occurred.
+
+## 2026-07-05 - P1 Docs Dirty Record Index Stabilization Precursor
+
+- Lane:
+  `TD-AFS-V02-STABILIZE-P1-DOCS-DIRTY-RECORD-INDEX-BUNDLE-READWRITE-20260705-001`
+  with expected BU
+  `BU-AFS-V02-STABILIZE-P1-DOCS-DIRTY-RECORD-INDEX-BUNDLE-READWRITE-20260705-001`.
+- This is a bounded dirty-record/index stabilization precursor only. It is not
+  docs compaction, archive, cleanup, product readiness, package finality,
+  Owner acceptance, provider readiness, generated-media QA, public readiness,
+  business/legal approval, or CompanyOS/COS/source-KB promotion.
+- Dirty evidence disposition: active/held/needs-disposition.
+  - `docs/handoff/AFS-P1-OWNER-PROJECT-BOOK-REVIEW-PACKET-SYNTHESIS-NONFINAL-20260705.md`
+    is active non-final Owner-review input and needs decision-owner
+    disposition before any Owner/package/finality use.
+  - `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-SCHEMA-OPENAPI-CONTRACT-NO-PROVIDER-20260705.md`
+    is active spec evidence only and needs CTO/evaluator/implementation-lane
+    disposition before code/OpenAPI/provider/runtime claims.
+  - `docs/provider_adapter_contract.md`,
+    `docs/provider_adapter_v03_image_edit_addendum.md`,
+    `agentflow_studio/model_gateway/provider_adapter.py`, and
+    `tests/test_provider_adapter_registry.py` are a paired provider-adapter
+    v0.3 image-edit descriptor bundle. They must stay together for review and
+    must not be compacted, archived, or accepted separately.
+  - `docs/demo-docs-20260629/` remains pre-existing untracked do-not-touch
+    local state for this lane.
+- The Neon Rain registration/correction wording remains preserved:
+  `current_checkout_verifiability: suspended` and the prior BU trail is
+  historical evidence only, not current-checkout-verifiable active evidence.
+- docs_compaction_hold: active. Future docs compaction remains held pending
+  this stabilization record, paired-bundle disposition, and decision-owner
+  acceptance in a separate authorized lane.
+
+## 2026-07-05 - P1 Demo Neon Rain Static Skeleton Evidence Record Correction
+
+- `current_checkout_verifiability: suspended` for
+  `internal_static_fixture_skeleton_created_and_static_checks_passed`.
+- Prior claim status: historical worker-reported BU evidence only, not
+  current-checkout-verifiable.
+- Consistency evaluator BU
+  `BU-AFS-V02-REVIEW-P1-DEMO-NEON-RAIN-STATIC-SKELETON-CONSISTENCY-READONLY-20260705-001`
+  returned needs-fix because registered evidence paths were absent.
+- Locate-first reconciliation BU
+  `BU-AFS-V02-RECONCILE-P1-DEMO-NEON-RAIN-STATIC-SKELETON-EVIDENCE-PATHS-READONLY-20260705-001`
+  result: no registered `docs/demo/`, `examples/demo_neon_rain/`, or focused
+  pytest artifact/test set was found in the current checkout, local
+  refs/worktrees/stashes, or permitted local Codex/project roots.
+- Missing registered paths include
+  `docs/demo/DEMO-NEON-RAIN-FIXTURE-PACK-CONTRACT-20260705.md`,
+  `docs/demo/RUNBOOK-DEMO-NEON-RAIN-LOCAL-DRY-RUN.md`,
+  `examples/demo_neon_rain/`, and
+  `tests/test_demo_neon_rain_fixture_pack.py`.
+- This correction supersedes only active/current evidence status and preserves
+  the prior implementation, evaluator, and reconciliation BU trail as
+  historical evidence. Future readers must not treat absent artifact paths as
+  active/current evidence.
+- Further demo maturity work is held until the artifacts are later restored
+  with source provenance and verification, or the records remain intentionally
+  superseded as not-current-checkout-verifiable.
+- Next valid action: restore/land artifacts only if source provenance is later
+  found and verified, or keep records superseded as
+  not-current-checkout-verifiable.
+- Non-claims: no fixture completeness; no internal dry-run readiness; no
+  Runtime/Studio/browser acceptance; no provider/generated-media QA; no
+  public/customer/investor/legal/business readiness; no deploy/readiness/package
+  finality; no human/Owner acceptance.
+
+## 2026-07-05 - P1 Demo Neon Rain Static Skeleton Evidence Registration
+
+- Registered prior implementation BU
+  `BU-AFS-V02-IMPL-P1-DEMO-NEON-RAIN-INTERNAL-FIXTURE-SKELETON-NO-PROVIDER-20260705-001`
+  under revised record lane
+  `TD-AFS-V02-RECORD-P1-DEMO-NEON-RAIN-STATIC-SKELETON-EVIDENCE-REGISTRATION-REVISED-ANCHOR-20260705-001`
+  with expected BU
+  `BU-AFS-V02-RECORD-P1-DEMO-NEON-RAIN-STATIC-SKELETON-EVIDENCE-REGISTRATION-REVISED-ANCHOR-20260705-001`.
+- The prior blocked record BU was accepted as correct stop-condition behavior
+  and superseded only for anchor recovery.
+- Allowed positive claim:
+  `internal_static_fixture_skeleton_created_and_static_checks_passed`.
+- Evidence paths:
+  `docs/demo/DEMO-NEON-RAIN-FIXTURE-PACK-CONTRACT-20260705.md`,
+  `docs/demo/RUNBOOK-DEMO-NEON-RAIN-LOCAL-DRY-RUN.md`,
+  `examples/demo_neon_rain/`, and
+  `tests/test_demo_neon_rain_fixture_pack.py`.
+- Accepted static checks from the prior implementation BU, without expanded
+  claims: target readback OK, 10 JSON parses OK, focused pytest 7/7, scoped
+  diff/no-index whitespace OK, forbidden-marker scan zero matches, boundary
+  markers present, and static JSON schema/content OK.
+- Non-claims: no fixture completeness; no internal dry-run readiness; no
+  Runtime/Studio/browser/server QA or acceptance; no provider calls/spend/
+  provider QA; no generated-media QA; no media provenance certification; no
+  screenshots/media binaries; no generator/builder; no Office DOCX/PPTX
+  fixtures; no external sharing; no public/customer/investor/legal/business
+  readiness; no human/operator/Owner acceptance; no deploy/readiness/package
+  finality; no durable-memory/source-KB/private-KB/COS/CompanyOS promotion.
+
 ## 2026-07-04 - P0 Structured Source vs Output QA Checklist Packet
 
 - Completed bounded Lane A implementation
