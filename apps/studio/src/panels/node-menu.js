@@ -8,6 +8,7 @@ import {
   cancelNodeVideoGeneration,
   enableVideoRevisionDraft,
   fixNodeVisualAsset,
+  createKeyframeLocalEditDraft,
   createStoryboardKeyframeLayer,
   pollNodeVideoGeneration,
   identifyScriptAssets,
@@ -93,6 +94,10 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       addItem("x", "取消固定资产", () => openRetireAssetModal(store, runtime, fixedAsset));
     }
     if (canContinueKeyframeToVideo(node)) {
+      addItem("pencil", "创建局部编辑需求草稿", () => {
+        const fresh = store.get().nodes[nodeId];
+        if (fresh) createKeyframeLocalEditDraft(store, fresh);
+      });
       addDisabledItem("lock", "关键帧局部编辑不可用", KEYFRAME_LOCAL_EDIT_GATE);
       addItem("video", "接续视频节点", () => {
         const fresh = store.get().nodes[nodeId];

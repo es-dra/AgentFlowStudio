@@ -12,6 +12,7 @@ import { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboar
 export { uploadNodeImage } from "./node-upload-actions.js";
 export { visibleAssetForNode } from "./node-visible-assets.js";
 export { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
+export { createKeyframeLocalEditDraft } from "./keyframe-local-edit-contract.js";
 export { pollNodeKeyframeGeneration } from "./node-keyframe-actions.js";
 export { cancelNodeVideoGeneration, enableVideoRevisionDraft, pollNodeVideoGeneration, setNodeVideoFrame } from "./node-video-actions.js";
 
