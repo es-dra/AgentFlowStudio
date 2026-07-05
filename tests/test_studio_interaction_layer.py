@@ -97,6 +97,9 @@ def test_canvas_nodes_have_persistent_resize_affordance() -> None:
     assert 'className = "node-resize-handle"' in canvas_view
     assert 'dataset.resizeHandle = "node"' in canvas_view
     assert "boundedNodeFrame(node)" in canvas_view
+    assert 'classList.toggle("empty-tool-node", isEmptyToolNode(node, def))' in canvas_view
+    assert 'classList.toggle("compact-node", !node.collapsed && frame.h < 330)' in canvas_view
+    assert 'classList.toggle("roomy-node", !node.collapsed && frame.w >= 420)' in canvas_view
     assert "node.collapsed ? effectiveHeight(node) : frame.h" in canvas_view
     assert "startNodeResizeSession(store, nodeEl.dataset.nodeId, e)" in canvas_input
     assert 'session.kind === "resize-node"' in canvas_input
@@ -107,7 +110,10 @@ def test_canvas_nodes_have_persistent_resize_affordance() -> None:
     assert "node.h = frame.h" in resize_module
     for marker in (
         ".node-resize-handle",
-        "width: min(100%, 360px)",
+        ".node.empty-tool-node.compact-node .node-intent",
+        "min-height: 24px",
+        ".node.empty-tool-node.roomy-node .node-intents",
+        "grid-template-columns: repeat(2, minmax(0, 1fr))",
         "max-height: none",
         "cursor: nwse-resize",
         "touch-action: none",
@@ -174,10 +180,16 @@ def test_text_node_resize_ui_keeps_all_intent_options_visible() -> None:
     styles = (STUDIO_ROOT / "styles" / "node-resize.css").read_text(encoding="utf-8")
 
     assert "文字生音乐" in nodes or "鏂囧瓧鐢熼煶涔" in nodes
-    assert "overflow: visible" in styles
-    assert ".node .node-intents" in styles
+    assert "overflow: visible" not in styles
+    assert ".node.empty-tool-node .node-intents" in styles
+    assert ".node.empty-tool-node.compact-node .node-intent" in styles
+    assert "min-height: 24px" in styles
+    assert ".node.empty-tool-node.roomy-node .node-intents" in styles
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in styles
     assert "max-height: none" in styles
     assert "white-space: nowrap" in styles
+    assert "--node-content-scale" not in styles
+    assert "calc(13px *" not in styles
 
 
 def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> None:

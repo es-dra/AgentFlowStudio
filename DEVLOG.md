@@ -11,6 +11,11 @@
 - Added a small `interaction/node-resize.js` session module with world-space
   pointer math, grid snapping, min/max bounds, collapsed-node guard, and Shift
   aspect-ratio preservation.
+- UI layout follow-up from the latest screenshots: empty tool nodes now receive
+  compact/roomy/tall layout classes from their rendered frame. Default text
+  nodes use a dense option list so all seven intent rows stay inside the card,
+  while wider nodes switch to a balanced two-column action grid instead of a
+  tiny centered island or scaled-up typography.
 - Follow-up from screenshot retest: tightened the minimum node resize to each
   node type's default frame and restored a restrained canvas-card layout:
   empty-state content now keeps normal tool-sized typography, centers within

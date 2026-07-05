@@ -132,6 +132,7 @@ function syncNodeElement(elNode, node, state, relations, store) {
 
 function syncNodeFrame(elNode, node, state) {
   const frame = boundedNodeFrame(node);
+  const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   elNode.style.transform = `translate(${node.x}px, ${node.y}px)`;
   elNode.style.width = `${frame.w}px`;
   elNode.style.minHeight = `${node.collapsed ? effectiveHeight(node) : frame.h}px`;
@@ -146,6 +147,23 @@ function syncNodeFrame(elNode, node, state) {
   elNode.classList.toggle("is-generating", node.status === "generating");
   elNode.classList.toggle("script-expanding", node.params?.scriptExpansionState?.status === "running");
   elNode.classList.toggle("has-candidates", candidatePreviews(node).length > 1);
+  elNode.classList.toggle("empty-tool-node", isEmptyToolNode(node, def));
+  elNode.classList.toggle("compact-node", !node.collapsed && frame.h < 330);
+  elNode.classList.toggle("roomy-node", !node.collapsed && frame.w >= 420);
+  elNode.classList.toggle("tall-node", !node.collapsed && frame.h >= 380);
+}
+
+function isEmptyToolNode(node, def) {
+  const status = node.status || "empty";
+  return Boolean(
+    !node.collapsed
+      && !node.content
+      && !node.result
+      && !node.previewUrl
+      && (status === "empty" || status === "idle")
+      && def.intents?.length
+      && !["image", "video"].includes(node.type),
+  );
 }
 
 function syncNodeRelations(elNode, node, relations) {

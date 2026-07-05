@@ -27,6 +27,12 @@ or private Company OS source content is involved. This does not claim fixes for
 reference image upload 422, automatic fixed-asset reuse, or keyframe local
 editing.
 
+Latest UI-design follow-up replaces the centered-island empty-node layout with
+frame-aware compact/roomy/tall classes. Default text nodes keep all seven
+intent rows inside the card, and wide empty nodes use a balanced two-column
+action grid without scaling fonts. Verification remains the same focused
+Studio regression set plus JS syntax and whitespace checks.
+
 Studio resizable prompt input follow-up: 2026-07-05 pass addresses the Web test
 feedback that node/prompt text boxes could not be resized for long prompts.
 The root cause was the global Studio textarea baseline disabling native resize.
