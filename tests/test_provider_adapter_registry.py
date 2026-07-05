@@ -111,6 +111,93 @@ def test_provider_registry_exposes_codex_image_descriptor(tmp_path) -> None:
     assert descriptor.prompt_char_limit == 4000
     assert descriptor.rate_limit_hint == "test-only"
     assert descriptor.required_gate == "AFS_ALLOW_REMOTE_IMAGE"
+    assert descriptor.image_edit_capabilities_present is False
+    assert descriptor.image_edit_capabilities.supports_image_edit is False
+    assert descriptor.image_edit_capabilities.supports_true_local_edit is False
+    assert descriptor.image_edit_capabilities.local_edit_scope_kinds() == []
+    assert descriptor.image_edit_capabilities.fallback_modes == []
+
+
+def test_provider_registry_defaults_absent_image_edit_capabilities_to_blocked(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].pop("image_edit_capabilities", None)
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    descriptor = registry.descriptor("codex_image")
+    capabilities = descriptor.image_edit_capabilities
+
+    assert descriptor.schema_version == "provider_descriptor.v0.1"
+    assert descriptor.image_edit_capabilities_present is False
+    assert capabilities.has_image_edit_claims() is False
+    assert capabilities.supports_image_edit is False
+    assert capabilities.supports_true_local_edit is False
+    assert capabilities.local_edit_scope_kinds() == []
+    assert capabilities.fallback_modes == []
+    assert capabilities.local_edit_truth_label == "blocked_no_supported_local_edit"
+
+
+def test_provider_registry_builds_future_image_edit_descriptor_v03(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "supports_true_local_edit": False,
+                "supports_mask_asset": True,
+                "supports_semantic_region": True,
+                "supports_preserve_locks": "prompt_only",
+                "supports_negative_locks": "prompt_only",
+                "fallback_modes": ["provider_full_frame_edit", "reference_image_to_image_fallback"],
+                "max_mask_count": 1,
+                "max_reference_images": 1,
+                "input_fidelity_modes": ["low", "high"],
+                "local_edit_truth_label": "provider_masked_edit",
+            },
+        }
+    )
+    store = _store(tmp_path, payload)
+    registry = ProviderRegistry.from_store(store)
+
+    descriptor = registry.descriptor("codex_image")
+    capabilities = descriptor.image_edit_capabilities
+
+    assert descriptor.image_edit_capabilities_present is True
+    assert capabilities.supports_image_edit is True
+    assert capabilities.supports_true_local_edit is False
+    assert capabilities.local_edit_scope_kinds() == ["mask_asset", "semantic_region"]
+    assert capabilities.fallback_modes == ["provider_full_frame_edit", "reference_image_to_image_fallback"]
+    assert capabilities.local_edit_truth_label == "provider_masked_edit"
+
+
+def test_provider_registry_rejects_image_edit_capabilities_on_v01_descriptor(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"]["image_edit_capabilities"] = {
+        "supports_image_edit": True,
+        "fallback_modes": ["provider_full_frame_edit"],
+    }
+    store = _store(tmp_path, payload)
+
+    with pytest.raises(ModelConfigError, match="provider_descriptor.v0.3"):
+        ProviderRegistry.from_store(store)
+
+
+def test_provider_registry_rejects_true_local_edit_as_fallback_mode(tmp_path) -> None:
+    payload = _codex_image_provider_config()
+    payload["services"]["codex_image"]["descriptor"].update(
+        {
+            "schema_version": "provider_descriptor.v0.3",
+            "image_edit_capabilities": {
+                "supports_image_edit": True,
+                "fallback_modes": ["true_local_edit"],
+            },
+        }
+    )
+    store = _store(tmp_path, payload)
+
+    with pytest.raises(ModelConfigError, match="fallback_modes"):
+        ProviderRegistry.from_store(store)
 
 
 def test_provider_registry_normalizes_legacy_narratocut_gate_prefix(tmp_path) -> None:
