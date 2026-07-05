@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 from apps.api.runtime_service import create_runtime_app
@@ -202,6 +203,40 @@ def test_keyframe_local_edit_preflight_rejects_forbidden_fallback_and_unsafe_tex
         assert "signed_url" not in serialized
         assert "bearer" not in serialized
         assert "d:\\" not in serialized
+
+
+@pytest.mark.parametrize(
+    "unsafe_marker",
+    [
+        "data:image/png;base64",
+        "base64",
+        "data_base64",
+        "raw_provider_response",
+        "provider_response",
+        "provider_raw",
+    ],
+)
+def test_keyframe_local_edit_preflight_rejects_unsafe_media_and_provider_markers(
+    tmp_path,
+    monkeypatch,
+    unsafe_marker: str,
+) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+
+    response = client.post(
+        "/projects/local-edit-unsafe-markers/keyframe-local-edits/preflight",
+        json=_request(edit_intent=f"Apply local edit using {unsafe_marker} evidence."),
+    )
+
+    assert response.status_code == 422
+    serialized = json.dumps(response.json(), ensure_ascii=False).lower()
+    assert "invalid_keyframe_local_edit" in serialized
+    assert "unsafe_local_edit_request" in serialized
+    assert unsafe_marker not in serialized
+    assert "provider_calls_started" in serialized
+    assert "local_transformation_started" in serialized
+    assert "generated_media_created" in serialized
 
 
 def test_keyframe_local_edit_preflight_openapi_contract_is_public(tmp_path) -> None:

@@ -28,6 +28,14 @@ KEYFRAME_LOCAL_EDIT_NON_CLAIMS = [
     "not_provider_or_human_acceptance",
     "not_full_frame_fallback",
 ]
+KEYFRAME_LOCAL_EDIT_UNSAFE_REQUEST_MARKERS = (
+    "data:",
+    "base64",
+    "data_base64",
+    "raw_provider_response",
+    "provider_response",
+    "provider_raw",
+)
 
 
 class KeyframeLocalEditParentLineage(BaseModel):
@@ -162,7 +170,7 @@ def keyframe_local_edit_preflight(project_id: str, request: KeyframeLocalEditReq
 
 def _reject_unsafe_request(request: KeyframeLocalEditRequest) -> None:
     payload = request.model_dump(mode="json")
-    if response_contains_unsafe_marker(payload):
+    if response_contains_unsafe_marker(payload) or _contains_local_edit_unsafe_marker(payload):
         raise ValueError("unsafe_local_edit_request")
     reject_unsafe_payload(payload)
     policy = request.fallback_policy
@@ -179,6 +187,11 @@ def _reject_unsafe_request(request: KeyframeLocalEditRequest) -> None:
         raise ValueError("bbox_scope_requires_bbox")
     if scope.kind == "polygon" and not scope.polygon:
         raise ValueError("polygon_scope_requires_points")
+
+
+def _contains_local_edit_unsafe_marker(payload: dict[str, Any]) -> bool:
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True).lower()
+    return any(marker in serialized for marker in KEYFRAME_LOCAL_EDIT_UNSAFE_REQUEST_MARKERS)
 
 
 def _required_input_blockers(request: KeyframeLocalEditRequest) -> list[dict[str, Any]]:
