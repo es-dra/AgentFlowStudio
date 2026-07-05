@@ -1,5 +1,37 @@
 # Devlog
 
+## 2026-07-05 - Studio Resizable Canvas Nodes
+
+- Added a dedicated bottom-right resize handle to Studio canvas nodes so text,
+  image, video, script, director, audio, merge, and library node cards can be
+  resized directly on the canvas.
+- Wired the handle into the pointer interaction layer before node drag/connect
+  handling, so resizing updates the persistent node `w` and `h` fields instead
+  of being interpreted as moving the node or starting an edge connection.
+- Added a small `interaction/node-resize.js` session module with world-space
+  pointer math, grid snapping, min/max bounds, collapsed-node guard, and Shift
+  aspect-ratio preservation.
+- Split resize-handle styles into `styles/node-resize.css` to keep the mature
+  canvas styling files within the project maintenance boundary.
+
+Verification:
+
+```text
+python -m pytest tests\test_studio_interaction_layer.py -q -> 14 passed
+python -m pytest tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 45 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 122 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No Runtime/API contract changed.
+- No provider gate was opened and no LLM/image/video/ASR provider call was
+  made.
+- This fixes canvas node card resizing. The earlier textarea resizing fix
+  remains separate, and upload 422, fixed-asset reuse, and keyframe local-edit
+  behavior remain separate issues.
+
 ## 2026-07-05 - Studio Resizable Prompt Inputs
 
 - Restored native vertical resizing for Studio textarea inputs after the Web

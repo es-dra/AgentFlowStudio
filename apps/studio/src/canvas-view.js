@@ -54,6 +54,7 @@ function buildNodeElement(node) {
   elNode.appendChild(nodeBody());
   elNode.appendChild(portButton("in"));
   elNode.appendChild(portButton("out"));
+  elNode.appendChild(nodeResizeHandle());
   return elNode;
 }
 
@@ -108,6 +109,16 @@ function portButton(port) {
   return button;
 }
 
+function nodeResizeHandle() {
+  const handle = document.createElement("button");
+  handle.className = "node-resize-handle";
+  handle.dataset.resizeHandle = "node";
+  handle.type = "button";
+  handle.title = "调整节点大小";
+  handle.setAttribute("aria-label", "调整节点大小");
+  return handle;
+}
+
 function syncNodeElement(elNode, node, state, relations, store) {
   const def = NODE_TYPES[node.type] || NODE_TYPES.text;
   syncNodeFrame(elNode, node, state);
@@ -122,7 +133,7 @@ function syncNodeFrame(elNode, node, state) {
   elNode.style.transform = `translate(${node.x}px, ${node.y}px)`;
   elNode.style.width = `${node.w}px`;
   elNode.style.minHeight = `${effectiveHeight(node)}px`;
-  elNode.style.height = node.collapsed ? `${effectiveHeight(node)}px` : "";
+  elNode.style.height = `${effectiveHeight(node)}px`;
   elNode.classList.toggle("selected", state.selection.nodeIds.includes(node.id));
   elNode.classList.toggle("collapsed", Boolean(node.collapsed));
   elNode.classList.toggle("director", node.type === "director");

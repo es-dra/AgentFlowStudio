@@ -4,6 +4,7 @@ import { dragSession, isEditable, selectInRect, updatePortHover } from "./canvas
 import { screenToWorld, zoomAt } from "./geometry.js";
 import { applyEdgeAutoPan } from "./interaction/auto-pan.js";
 import { beginDragFeedback, finishDragFeedback, updateDragFeedback } from "./interaction/feedback-layer.js";
+import { finishNodeResizeSession, moveNodeResizeSession, startNodeResizeSession } from "./interaction/node-resize.js";
 import { clearPortMagnet, outputPortFromMagnet, updatePortMagnet } from "./interaction/port-magnet.js";
 import { animateInertiaPan, createPointerKinematics } from "./interaction/pointer-kinematics.js";
 import { resolveDragSnap } from "./interaction/snap-engine.js";
@@ -157,6 +158,14 @@ function handlePointerDown(e, env) {
   const stackedOutputPort = findPortAtPoint(e) || outputPortFromMagnet(e);
   const portBtn = stackedOutputPort || e.target.closest(".node-port");
   const nodeEl = stackedOutputPort ? stackedOutputPort.closest(".node") : e.target.closest(".node");
+  const resizeHandle = e.target.closest(".node-resize-handle");
+  if (resizeHandle && nodeEl) {
+    const session = startNodeResizeSession(store, nodeEl.dataset.nodeId, e);
+    if (!session) return null;
+    rootEl.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    return session;
+  }
   if (portBtn && nodeEl) {
     const session = startConnectSession(store, nodeEl.dataset.nodeId, portBtn.dataset.port, e);
     rootEl.setPointerCapture(e.pointerId);
@@ -210,6 +219,7 @@ function handlePointerMove(e, { store, session, rootEl }) {
     return;
   }
   if (session.kind === "connect") return moveConnectSession(store, session, e);
+  if (session.kind === "resize-node") return moveNodeResizeSession(store, session, e);
   if (session.kind === "drag-node") return moveNodeSession(store, session, e, rootEl);
   if (session.kind === "marquee") return moveMarquee(session, e);
 }
@@ -261,6 +271,7 @@ function handlePointerUp(e, { store, runtime, session, viewportEl, rootEl }) {
     return animateInertiaPan(store, session.kinematics?.velocity?.() || { x: 0, y: 0 });
   }
   if (session.kind === "connect") finishConnectSession(store, runtime, session, e);
+  if (session.kind === "resize-node") finishNodeResizeSession(session);
   if (session.kind === "drag-node") finishDragFeedback(rootEl, session, { land: session.moved });
   if (session.kind === "drag-node" && !session.moved && session.primaryId && !session.additive) {
     store.set((s) => { s.selection = { nodeIds: [session.primaryId], edgeId: null }; }, { history: false, persist: false });

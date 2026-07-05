@@ -8,6 +8,21 @@
 
 Last updated: 2026-07-05 by Codex
 
+Studio resizable canvas nodes follow-up: 2026-07-05 pass addresses the server
+retest feedback that node cards themselves still could not be resized after the
+textarea-only prompt-input fix. Root cause: nodes already persisted `w`/`h` and
+rendered those fields, but the canvas input layer had no resize handle/session
+and expanded nodes did not receive an explicit height. The fix adds a
+bottom-right node resize handle, a small world-space resize interaction module,
+grid-snapped min/max size bounds, collapsed-node guard, and persistent updates
+to node `w` and `h`. Verification: Studio interaction tests passed 14,
+Studio static/frontend/prompt regressions passed 45, Studio JS syntax check
+passed 122 files, and `git diff --check` passed. Boundary: no Runtime/API
+contract, provider gate, provider call, local media byte, signed URL, secret,
+or private Company OS source content is involved. This does not claim fixes for
+reference image upload 422, automatic fixed-asset reuse, or keyframe local
+editing.
+
 Studio resizable prompt input follow-up: 2026-07-05 pass addresses the Web test
 feedback that node/prompt text boxes could not be resized for long prompts.
 The root cause was the global Studio textarea baseline disabling native resize.
