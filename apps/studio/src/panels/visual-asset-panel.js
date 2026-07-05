@@ -4,6 +4,7 @@ import { lockChipsForAssetType, renderVisualAssetPanel } from "./visual-asset-pa
 import { formatRuntimeError } from "../runtime-error-utils.js";
 import { buildVisualAssetPromotionPayload } from "./visual-asset-promotion-request.js";
 import { assetIdFromRef, primaryReuseCandidate, visualAssetPromotionReuseChoices } from "./visual-asset-reuse-intent.js";
+import { collectFieldValues, compactCard, mergeVisualAssets } from "./visual-asset-panel-submit-state.js";
 
 export function openVisualAssetPanel({ store, runtime, node, imageAsset, initialAssetType = "character", existingAsset = null }) {
   if (!runtime?.promoteVisualAsset) {
@@ -170,30 +171,6 @@ export function openVisualAssetPanel({ store, runtime, node, imageAsset, initial
   }
 }
 
-function collectFieldValues(root) {
-  const card = {};
-  for (const input of root.querySelectorAll("[data-card]")) {
-    const value = String(input.value || "").trim();
-    if (value) card[input.dataset.card] = value;
-  }
-  return {
-    label: field(root, "label"),
-    signature: field(root, "signature"),
-    locks: String(root.querySelector('[data-field="negative_locks"]')?.value || ""),
-    card,
-    reuseIntent: String(root.querySelector('input[name="visual-asset-reuse-intent"]:checked')?.value || ""),
-    existingAssetId: String(root.querySelector('input[name="visual-asset-reuse-intent"]:checked')?.dataset?.existingAssetId || ""),
-  };
-}
-
-function compactCard(card) {
-  const result = {};
-  for (const [key, value] of Object.entries(card || {})) {
-    if (String(value || "").trim()) result[key] = String(value).trim();
-  }
-  return result;
-}
-
 async function submitVisualAssetReview({
   store,
   runtime,
@@ -275,18 +252,6 @@ function field(root, name, attr = "data-field") {
 function setInputValue(root, name, value, attr = "data-field") {
   const input = root.querySelector(`[${attr}="${name}"]`);
   if (input) input.value = String(value || "");
-}
-
-function mergeVisualAssets(existing, asset, supersedesAssetId = "") {
-  const assetId = String(asset?.asset_id || "").trim();
-  if (!assetId) return existing;
-  return [
-    ...existing.filter((item) => {
-      const current = String(item?.asset_id || "").trim();
-      return current !== assetId && current !== supersedesAssetId;
-    }),
-    asset,
-  ].slice(-8);
 }
 
 function seedFromExistingAsset(asset) {
