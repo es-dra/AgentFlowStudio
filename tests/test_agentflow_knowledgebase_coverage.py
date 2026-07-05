@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from agentflow.knowledge.creative_prompt_rules import (
+    EXTERNAL_KNOWLEDGE_ROOT,
     assert_knowledgebase_in_sync,
     load_creative_prompt_rules,
     select_creative_prompt_rules,
@@ -75,4 +78,6 @@ def test_audio_rules_are_explainable_professional_rules() -> None:
 
 
 def test_knowledgebase_external_copy_stays_in_sync_after_audio_coverage() -> None:
+    if not EXTERNAL_KNOWLEDGE_ROOT.exists():
+        pytest.skip(f"External knowledgebase copy is not available: {EXTERNAL_KNOWLEDGE_ROOT}")
     assert_knowledgebase_in_sync()

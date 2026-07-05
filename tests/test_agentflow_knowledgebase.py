@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 from agentflow.knowledge.creative_prompt_rules import (
     EXTERNAL_KNOWLEDGE_ROOT,
     REPO_KNOWLEDGE_ROOT,
@@ -15,12 +17,16 @@ from agentflow.knowledge.creative_prompt_rules import (
 )
 
 
+def require_external_knowledgebase() -> Path:
+    if not EXTERNAL_KNOWLEDGE_ROOT.exists():
+        pytest.skip(f"External knowledgebase copy is not available: {EXTERNAL_KNOWLEDGE_ROOT}")
+    return EXTERNAL_KNOWLEDGE_ROOT
+
+
 def test_creative_prompt_knowledgebase_schema_registry_and_sync() -> None:
     assert REPO_KNOWLEDGE_ROOT.exists()
-    assert EXTERNAL_KNOWLEDGE_ROOT.exists()
 
     repo_rules = load_creative_prompt_rules(REPO_KNOWLEDGE_ROOT)
-    external_rules = load_creative_prompt_rules(EXTERNAL_KNOWLEDGE_ROOT)
     rule_ids = [rule["rule_id"] for rule in repo_rules]
 
     assert len(repo_rules) >= 40
@@ -38,8 +44,11 @@ def test_creative_prompt_knowledgebase_schema_registry_and_sync() -> None:
         "director_setup_2d",
         "negative_constraints",
     }
+
+    external_root = require_external_knowledgebase()
+    external_rules = load_creative_prompt_rules(external_root)
     assert [rule["rule_id"] for rule in external_rules] == rule_ids
-    assert normalized_knowledgebase_hash(REPO_KNOWLEDGE_ROOT) == normalized_knowledgebase_hash(EXTERNAL_KNOWLEDGE_ROOT)
+    assert normalized_knowledgebase_hash(REPO_KNOWLEDGE_ROOT) == normalized_knowledgebase_hash(external_root)
     assert_knowledgebase_in_sync()
 
 

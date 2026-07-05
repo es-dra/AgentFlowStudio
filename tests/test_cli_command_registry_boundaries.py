@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tarfile
 from pathlib import Path
 
@@ -31,6 +32,7 @@ VISIBLE_PRODUCT_COMMANDS = (
     "runtime-backup",
     "auth-invites",
 )
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def test_product_command_registry_has_no_direct_provider_or_demo_registrations() -> None:
@@ -222,7 +224,7 @@ def test_hidden_production_memory_support_commands_remain_callable() -> None:
     result = CliRunner().invoke(app, ["production-memory-loop-record-next-operator-action-result", "--help"])
 
     assert result.exit_code == 0
-    assert "recorded-at" in result.output
+    assert "recorded-at" in ANSI_ESCAPE_RE.sub("", result.output)
 
 
 def test_support_command_registry_noop_wrapper_is_removed() -> None:
