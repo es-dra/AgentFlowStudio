@@ -8,9 +8,12 @@ from apps.api.runtime_llm_enhancement_constants import SECTION_ORDER
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import visual_reference_hint
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_script_generation_body import is_script_generation_request, source_idea_from_request
 
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
+    if is_script_generation_request(request):
+        return script_generation_enhancement_instruction(request)
     if request.node_type in {"text", "script"}:
         return text_enhancement_instruction(request)
     mode = prompt_optimization_mode(request)
@@ -19,6 +22,20 @@ def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[s
     if mode == "t2i":
         return t2i_visual_enhancement_instruction(request)
     return visual_enhancement_instruction(request)
+
+
+def script_generation_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+    source_idea = source_idea_from_request(request)
+    return "\n".join(
+        [
+            "你正在为 AFS Studio 把一句创作想法扩写成正式短视频剧本正文。",
+            f"原始想法：{source_idea}",
+            "只输出剧本正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
+            "必须先给片名，然后写连续叙事正文。",
+            "正文必须包含：有名字或称呼的主角、明确场景、情绪基调、动作推进、转折或发现、结尾钩子。",
+            "不要输出分镜列表、镜头编号、提示词包装、输出要求、原始想法回显、推进主体、展示变化、收束结果或模板占位句。",
+        ]
+    )
 
 
 def video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:

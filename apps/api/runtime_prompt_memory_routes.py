@@ -292,6 +292,7 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "context_bundle": result.get("context_bundle"),
             "model_call_context_id": result["model_call_context"]["context_id"],
             "script_plan": result.get("script_plan"),
+            "script_generation_body": result.get("script_generation_body"),
             "writes_long_term_memory": False,
             "writes_company_kb": False,
             "safe_manifest": result["safe_manifest"],
