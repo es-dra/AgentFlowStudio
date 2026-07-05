@@ -8,7 +8,6 @@ export const NODE_RESIZE_LIMITS = {
 
 export const NODE_RESIZE_SCALE_LIMITS = {
   min: 1,
-  max: 2.6,
 };
 
 export function startNodeResizeSession(store, nodeId, event) {
@@ -93,13 +92,6 @@ export function boundedNodeFrame(node) {
     w: clamp(width, limits.minW, limits.maxW),
     h: clamp(height, limits.minH, limits.maxH),
   };
-}
-
-export function nodeContentScale(node) {
-  const base = nodeResizeBaseSize(node?.type);
-  const frame = boundedNodeFrame(node);
-  const scale = Math.min(frame.w / base.w, frame.h / base.h);
-  return clamp(scale, 1, NODE_RESIZE_SCALE_LIMITS.max);
 }
 
 function clamp(value, min, max) {

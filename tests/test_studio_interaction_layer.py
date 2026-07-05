@@ -98,24 +98,24 @@ def test_canvas_nodes_have_persistent_resize_affordance() -> None:
     assert 'dataset.resizeHandle = "node"' in canvas_view
     assert "boundedNodeFrame(node)" in canvas_view
     assert "node.collapsed ? effectiveHeight(node) : frame.h" in canvas_view
-    assert "--node-content-scale" in canvas_view
-    assert "nodeContentScale(node).toFixed(3)" in canvas_view
     assert "startNodeResizeSession(store, nodeEl.dataset.nodeId, e)" in canvas_input
     assert 'session.kind === "resize-node"' in canvas_input
     assert "NODE_RESIZE_SCALE_LIMITS" in resize_module
     assert "boundedNodeFrame(node)" in resize_module
-    assert "nodeContentScale(node)" in resize_module
+    assert "nodeContentScale" not in resize_module
     assert "node.w = frame.w" in resize_module
     assert "node.h = frame.h" in resize_module
     for marker in (
         ".node-resize-handle",
-        "--node-content-scale",
-        "calc(13px * var(--node-content-scale))",
+        "width: min(100%, 360px)",
+        "max-height: none",
         "cursor: nwse-resize",
         "touch-action: none",
         ".node.collapsed .node-resize-handle",
     ):
         assert marker in styles
+    assert "--node-content-scale" not in styles
+    assert "calc(13px *" not in styles
 
 
 def test_node_resize_session_updates_node_dimensions_in_world_space() -> None:
@@ -167,6 +167,17 @@ if (clamped.w !== 280 || clamped.h !== 280) throw new Error(`unexpected clamp ${
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
+
+
+def test_text_node_resize_ui_keeps_all_intent_options_visible() -> None:
+    nodes = (STUDIO_ROOT / "src" / "nodes.js").read_text(encoding="utf-8")
+    styles = (STUDIO_ROOT / "styles" / "node-resize.css").read_text(encoding="utf-8")
+
+    assert "文字生音乐" in nodes or "鏂囧瓧鐢熼煶涔" in nodes
+    assert "overflow: visible" in styles
+    assert ".node .node-intents" in styles
+    assert "max-height: none" in styles
+    assert "white-space: nowrap" in styles
 
 
 def test_interaction_motion_styles_have_reduced_motion_and_tactile_states() -> None:

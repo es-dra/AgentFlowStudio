@@ -16,15 +16,16 @@ and expanded nodes did not receive an explicit height. The fix adds a
 bottom-right node resize handle, a small world-space resize interaction module,
 grid-snapped min/max size bounds, collapsed-node guard, and persistent updates
 to node `w` and `h`. Screenshot retest follow-up then tightened the minimum
-resize to each node type's default frame and added content-scale styling so
-state strips, glyphs, intent rows, padding, and text scale with larger nodes
-instead of overflowing when shrunk or staying fixed when enlarged. Verification:
-Studio interaction/static/frontend/prompt regressions passed 59, Studio JS
-syntax check passed 122 files, and `git diff --check` passed. Boundary: no
-Runtime/API contract, provider gate, provider call, local media byte, signed
-URL, secret, or private Company OS source content is involved. This does not
-claim fixes for reference image upload 422, automatic fixed-asset reuse, or
-keyframe local editing.
+resize to each node type's default frame and replaced the overly large
+content-scaling UI with a restrained canvas-card layout: normal tool-sized
+typography, centered empty-state content in wider nodes, no body clipping, and
+all intent rows visible including `文字生音乐`. Verification: Studio
+interaction/static/frontend/prompt regressions passed 60, Studio JS syntax
+check passed 122 files, and `git diff --check` passed. Boundary: no Runtime/API
+contract, provider gate, provider call, local media byte, signed URL, secret,
+or private Company OS source content is involved. This does not claim fixes for
+reference image upload 422, automatic fixed-asset reuse, or keyframe local
+editing.
 
 Studio resizable prompt input follow-up: 2026-07-05 pass addresses the Web test
 feedback that node/prompt text boxes could not be resized for long prompts.

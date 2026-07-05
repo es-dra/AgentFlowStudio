@@ -1,63 +1,60 @@
-.node {
-  --node-content-scale: 1;
+.node .node-body {
+  overflow: visible;
 }
 
-.node .node-body {
-  padding: calc(18px * var(--node-content-scale));
-  gap: calc(4px * var(--node-content-scale));
-  font-size: calc(13px * var(--node-content-scale));
+.node .node-glyph,
+.node .node-empty-label,
+.node .node-intents {
+  width: min(100%, 360px);
+  margin-inline: auto;
+}
+
+.node .node-glyph {
+  flex: 0 0 auto;
+}
+
+.node .node-empty-label {
+  align-self: center;
+  width: min(100%, 360px);
+}
+
+.node .node-intents {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.node .node-intent {
+  min-height: 32px;
+  width: 100%;
+  min-width: 0;
+}
+
+.node .node-intent span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node .text-content-view {
+  max-height: none;
+}
+
+.node:not(.has-media-result) .node-result {
+  max-height: none;
+}
+
+.node.has-media-result .node-body {
   overflow: hidden;
 }
 
-.node.has-image-preview .node-body {
-  padding:
-    calc(34px * var(--node-content-scale))
-    calc(18px * var(--node-content-scale))
-    calc(18px * var(--node-content-scale));
+.node.has-media-result .node-result {
+  min-height: 0;
 }
 
-.node.text-content .node-body {
-  padding: calc(14px * var(--node-content-scale));
-}
-
-.node-state-strip {
-  gap: calc(6px * var(--node-content-scale));
-  padding:
-    calc(7px * var(--node-content-scale))
-    calc(12px * var(--node-content-scale))
-    calc(8px * var(--node-content-scale));
-  font-size: calc(10px * var(--node-content-scale));
-}
-
-.node-state-strip .dot {
-  width: calc(6px * var(--node-content-scale));
-  height: calc(6px * var(--node-content-scale));
-}
-
-.node-glyph {
-  font-size: calc(38px * var(--node-content-scale));
-  margin-bottom: calc(10px * var(--node-content-scale));
-}
-
-.node-empty-label {
-  margin-bottom: calc(4px * var(--node-content-scale));
-}
-
-.node-intents {
-  gap: calc(2px * var(--node-content-scale));
-}
-
-.node-intent {
-  gap: calc(8px * var(--node-content-scale));
-  padding:
-    calc(7px * var(--node-content-scale))
-    calc(8px * var(--node-content-scale));
-  font-size: calc(13px * var(--node-content-scale));
-}
-
-.node-intent .intent-icon {
-  width: calc(16px * var(--node-content-scale));
-  font-size: calc(12px * var(--node-content-scale));
+.node.has-media-result .node-preview-frame {
+  max-height: none;
 }
 
 .node-resize-handle {

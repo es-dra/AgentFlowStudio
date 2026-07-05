@@ -52,23 +52,24 @@ git diff --check -> passed
 - 刷新页面或重新进入同一项目后，节点尺寸仍保留。
 - 折叠节点不显示 resize handle。
 - 节点不能缩小到默认安全尺寸以下，避免文字和按钮溢出边框。
-- 放大节点时，状态条、图标、意图按钮、文字和内边距会按节点尺寸同步放大，而不是停留在原始位置。
+- 放大节点时，节点内部仍保持工具型 UI 的正常字号；空状态内容在更宽节点中居中，不会被拉成过大的文字面板。
+- text 节点的全部意图选项都可见，包括 `文字生音乐`。
 
 ## 2026-07-05 截图复测补充
 
-服务端复测发现：节点缩小时内容会溢出到边框外，节点放大时字体和内容位置没有随节点比例调整。
+服务端复测发现：节点缩小时内容会溢出到边框外；随后按比例放大内部文字的方案又导致 UI 过重，并且 `文字生音乐` 选项会被挤掉。
 
 补充修复：
 
 - resize 最小尺寸改为按各节点类型默认尺寸计算，不再允许 text/image/video/script 等节点小于默认安全框。
 - 渲染层使用 `boundedNodeFrame(node)`，兼容旧项目里已经保存过的过小节点尺寸。
-- 节点新增 `--node-content-scale`，按当前节点尺寸与默认尺寸的比例驱动内部布局。
-- `node-resize.css` 覆盖状态条、图标、意图按钮、文字、间距和内边距，使放大后的内容跟随节点尺寸变化。
+- 移除粗暴的内部字体放大方案，保持节点卡片为工具型 UI。
+- `node-resize.css` 让空状态内容在大节点中保持正常字号并居中，移除 body 裁剪，保证全部意图行可见。
 
 补充验证：
 
 ```text
-python -m pytest tests\test_studio_interaction_layer.py tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 59 passed
+python -m pytest tests\test_studio_interaction_layer.py tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 60 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 122 files
 git diff --check -> passed
 ```
