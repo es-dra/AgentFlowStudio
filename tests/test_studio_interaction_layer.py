@@ -92,17 +92,25 @@ def test_canvas_nodes_have_persistent_resize_affordance() -> None:
     resize_module = (STUDIO_ROOT / "src" / "interaction" / "node-resize.js").read_text(encoding="utf-8")
     styles = (STUDIO_ROOT / "styles" / "node-resize.css").read_text(encoding="utf-8")
 
-    assert './styles/node-resize.css' in index
+    assert index.index('./styles/node-resize.css') > index.index('./styles/studio-media-experience.css')
     assert "nodeResizeHandle()" in canvas_view
     assert 'className = "node-resize-handle"' in canvas_view
     assert 'dataset.resizeHandle = "node"' in canvas_view
-    assert 'elNode.style.height = `${effectiveHeight(node)}px`;' in canvas_view
+    assert "boundedNodeFrame(node)" in canvas_view
+    assert "node.collapsed ? effectiveHeight(node) : frame.h" in canvas_view
+    assert "--node-content-scale" in canvas_view
+    assert "nodeContentScale(node).toFixed(3)" in canvas_view
     assert "startNodeResizeSession(store, nodeEl.dataset.nodeId, e)" in canvas_input
     assert 'session.kind === "resize-node"' in canvas_input
+    assert "NODE_RESIZE_SCALE_LIMITS" in resize_module
+    assert "boundedNodeFrame(node)" in resize_module
+    assert "nodeContentScale(node)" in resize_module
     assert "node.w = frame.w" in resize_module
     assert "node.h = frame.h" in resize_module
     for marker in (
         ".node-resize-handle",
+        "--node-content-scale",
+        "calc(13px * var(--node-content-scale))",
         "cursor: nwse-resize",
         "touch-action: none",
         ".node.collapsed .node-resize-handle",
@@ -139,17 +147,17 @@ if (!session || session.kind !== 'resize-node') throw new Error('expected resize
 if (!classSet.has('resizing')) throw new Error('expected resizing class');
 if (state.selection.nodeIds[0] !== 'node_1' || state.selection.edgeId !== null) throw new Error('expected node selection');
 moveNodeResizeSession(store, session, { clientX: 690, clientY: 620, shiftKey: false });
-if (state.nodes.node_1.w !== 336 || state.nodes.node_1.h !== 300) {
+if (state.nodes.node_1.w !== 336 || state.nodes.node_1.h !== 336) {
   throw new Error(`unexpected resized node ${JSON.stringify(state.nodes.node_1)}`);
 }
 if (!calls.some((item) => item?.history === false && item?.persist === false)) throw new Error('expected selection to avoid persistence');
 if (!calls.some((item) => item?.history === false && item?.persist !== false)) throw new Error('expected resize to persist without history spam');
 
 const clamped = resizedNodeFrame(
-  { startWorld: { x: 0, y: 0 }, origin: { w: 280, h: 240 } },
+  { type: 'text', startWorld: { x: 0, y: 0 }, origin: { w: 280, h: 280 }, base: { w: 280, h: 280 } },
   { x: -500, y: -500 },
 );
-if (clamped.w !== 220 || clamped.h !== 180) throw new Error(`unexpected clamp ${JSON.stringify(clamped)}`);
+if (clamped.w !== 280 || clamped.h !== 280) throw new Error(`unexpected clamp ${JSON.stringify(clamped)}`);
 """
     completed = subprocess.run(
         ["node", "--input-type=module", "-e", code],

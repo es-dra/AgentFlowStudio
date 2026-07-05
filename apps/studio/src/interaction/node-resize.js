@@ -1,23 +1,31 @@
 import { screenToWorld, snap } from "../geometry.js";
+import { NODE_TYPES } from "../nodes.js";
 
 export const NODE_RESIZE_LIMITS = {
-  minW: 220,
-  minH: 180,
   maxW: 900,
   maxH: 900,
+};
+
+export const NODE_RESIZE_SCALE_LIMITS = {
+  min: 1,
+  max: 2.6,
 };
 
 export function startNodeResizeSession(store, nodeId, event) {
   const node = store.get().nodes[nodeId];
   if (!node || node.collapsed) return null;
   const state = store.get();
+  const base = nodeResizeBaseSize(node.type);
+  const frame = boundedNodeFrame(node);
   const session = {
     kind: "resize-node",
     nodeId,
+    type: node.type,
+    base,
     startWorld: screenToWorld(state.viewport, event.clientX, event.clientY),
     origin: {
-      w: Number(node.w || 280),
-      h: Number(node.h || 250),
+      w: frame.w,
+      h: frame.h,
     },
     moved: false,
   };
@@ -48,6 +56,7 @@ export function finishNodeResizeSession(session) {
 export function resizedNodeFrame(session, currentWorld, options = {}) {
   const dx = currentWorld.x - session.startWorld.x;
   const dy = currentWorld.y - session.startWorld.y;
+  const limits = nodeResizeLimits(session.type, session.base || session.origin);
   let width = session.origin.w + dx;
   let height = session.origin.h + dy;
   if (options.preserveAspect && session.origin.h > 0) {
@@ -56,9 +65,41 @@ export function resizedNodeFrame(session, currentWorld, options = {}) {
     else width = height * ratio;
   }
   return {
-    w: clamp(snap(width), NODE_RESIZE_LIMITS.minW, NODE_RESIZE_LIMITS.maxW),
-    h: clamp(snap(height), NODE_RESIZE_LIMITS.minH, NODE_RESIZE_LIMITS.maxH),
+    w: clamp(snap(width), limits.minW, limits.maxW),
+    h: clamp(snap(height), limits.minH, limits.maxH),
   };
+}
+
+export function nodeResizeBaseSize(type) {
+  const size = (NODE_TYPES[type] || NODE_TYPES.text).size || NODE_TYPES.text.size;
+  return { w: Number(size.w || 280), h: Number(size.h || 280) };
+}
+
+export function nodeResizeLimits(type, baseOverride = null) {
+  const base = baseOverride || nodeResizeBaseSize(type);
+  return {
+    minW: Math.ceil(Number(base.w || 280) * NODE_RESIZE_SCALE_LIMITS.min),
+    minH: Math.ceil(Number(base.h || 280) * NODE_RESIZE_SCALE_LIMITS.min),
+    maxW: NODE_RESIZE_LIMITS.maxW,
+    maxH: NODE_RESIZE_LIMITS.maxH,
+  };
+}
+
+export function boundedNodeFrame(node) {
+  const limits = nodeResizeLimits(node?.type);
+  const width = Number(node?.w || limits.minW);
+  const height = Number(node?.h || limits.minH);
+  return {
+    w: clamp(width, limits.minW, limits.maxW),
+    h: clamp(height, limits.minH, limits.maxH),
+  };
+}
+
+export function nodeContentScale(node) {
+  const base = nodeResizeBaseSize(node?.type);
+  const frame = boundedNodeFrame(node);
+  const scale = Math.min(frame.w / base.w, frame.h / base.h);
+  return clamp(scale, 1, NODE_RESIZE_SCALE_LIMITS.max);
 }
 
 function clamp(value, min, max) {

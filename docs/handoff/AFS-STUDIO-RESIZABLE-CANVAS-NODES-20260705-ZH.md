@@ -51,6 +51,27 @@ git diff --check -> passed
 - 松开鼠标后尺寸保留。
 - 刷新页面或重新进入同一项目后，节点尺寸仍保留。
 - 折叠节点不显示 resize handle。
+- 节点不能缩小到默认安全尺寸以下，避免文字和按钮溢出边框。
+- 放大节点时，状态条、图标、意图按钮、文字和内边距会按节点尺寸同步放大，而不是停留在原始位置。
+
+## 2026-07-05 截图复测补充
+
+服务端复测发现：节点缩小时内容会溢出到边框外，节点放大时字体和内容位置没有随节点比例调整。
+
+补充修复：
+
+- resize 最小尺寸改为按各节点类型默认尺寸计算，不再允许 text/image/video/script 等节点小于默认安全框。
+- 渲染层使用 `boundedNodeFrame(node)`，兼容旧项目里已经保存过的过小节点尺寸。
+- 节点新增 `--node-content-scale`，按当前节点尺寸与默认尺寸的比例驱动内部布局。
+- `node-resize.css` 覆盖状态条、图标、意图按钮、文字、间距和内边距，使放大后的内容跟随节点尺寸变化。
+
+补充验证：
+
+```text
+python -m pytest tests\test_studio_interaction_layer.py tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 59 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 122 files
+git diff --check -> passed
+```
 
 ## 边界
 

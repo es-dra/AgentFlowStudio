@@ -3,6 +3,7 @@ import { starterRailState } from "./canvas-starter-rail.js";
 import { buildNodeBody, candidatePreviews, escapeHtml, generationProgress, nodeBodySignature, statusLabel } from "./canvas-node-body.js";
 import { renderEdges } from "./canvas-edges.js";
 import { icon } from "./icons.js";
+import { boundedNodeFrame, nodeContentScale } from "./interaction/node-resize.js";
 import { NODE_TYPES, effectiveHeight, relationSets } from "./nodes.js";
 
 export function renderCanvas(state, store) {
@@ -130,10 +131,12 @@ function syncNodeElement(elNode, node, state, relations, store) {
 }
 
 function syncNodeFrame(elNode, node, state) {
+  const frame = boundedNodeFrame(node);
   elNode.style.transform = `translate(${node.x}px, ${node.y}px)`;
-  elNode.style.width = `${node.w}px`;
-  elNode.style.minHeight = `${effectiveHeight(node)}px`;
-  elNode.style.height = `${effectiveHeight(node)}px`;
+  elNode.style.width = `${frame.w}px`;
+  elNode.style.minHeight = `${node.collapsed ? effectiveHeight(node) : frame.h}px`;
+  elNode.style.height = `${node.collapsed ? effectiveHeight(node) : frame.h}px`;
+  elNode.style.setProperty("--node-content-scale", node.collapsed ? "1" : nodeContentScale(node).toFixed(3));
   elNode.classList.toggle("selected", state.selection.nodeIds.includes(node.id));
   elNode.classList.toggle("collapsed", Boolean(node.collapsed));
   elNode.classList.toggle("director", node.type === "director");

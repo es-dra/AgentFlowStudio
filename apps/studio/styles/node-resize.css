@@ -1,3 +1,65 @@
+.node {
+  --node-content-scale: 1;
+}
+
+.node .node-body {
+  padding: calc(18px * var(--node-content-scale));
+  gap: calc(4px * var(--node-content-scale));
+  font-size: calc(13px * var(--node-content-scale));
+  overflow: hidden;
+}
+
+.node.has-image-preview .node-body {
+  padding:
+    calc(34px * var(--node-content-scale))
+    calc(18px * var(--node-content-scale))
+    calc(18px * var(--node-content-scale));
+}
+
+.node.text-content .node-body {
+  padding: calc(14px * var(--node-content-scale));
+}
+
+.node-state-strip {
+  gap: calc(6px * var(--node-content-scale));
+  padding:
+    calc(7px * var(--node-content-scale))
+    calc(12px * var(--node-content-scale))
+    calc(8px * var(--node-content-scale));
+  font-size: calc(10px * var(--node-content-scale));
+}
+
+.node-state-strip .dot {
+  width: calc(6px * var(--node-content-scale));
+  height: calc(6px * var(--node-content-scale));
+}
+
+.node-glyph {
+  font-size: calc(38px * var(--node-content-scale));
+  margin-bottom: calc(10px * var(--node-content-scale));
+}
+
+.node-empty-label {
+  margin-bottom: calc(4px * var(--node-content-scale));
+}
+
+.node-intents {
+  gap: calc(2px * var(--node-content-scale));
+}
+
+.node-intent {
+  gap: calc(8px * var(--node-content-scale));
+  padding:
+    calc(7px * var(--node-content-scale))
+    calc(8px * var(--node-content-scale));
+  font-size: calc(13px * var(--node-content-scale));
+}
+
+.node-intent .intent-icon {
+  width: calc(16px * var(--node-content-scale));
+  font-size: calc(12px * var(--node-content-scale));
+}
+
 .node-resize-handle {
   position: absolute;
   right: 6px;

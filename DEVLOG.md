@@ -11,14 +11,18 @@
 - Added a small `interaction/node-resize.js` session module with world-space
   pointer math, grid snapping, min/max bounds, collapsed-node guard, and Shift
   aspect-ratio preservation.
+- Follow-up from screenshot retest: tightened the minimum node resize to each
+  node type's default frame and added a content-scale CSS variable so state
+  strips, icon glyphs, intent rows, padding, and text scale with larger nodes
+  instead of overflowing when the node is shrunk or staying visually fixed when
+  the node is enlarged.
 - Split resize-handle styles into `styles/node-resize.css` to keep the mature
   canvas styling files within the project maintenance boundary.
 
 Verification:
 
 ```text
-python -m pytest tests\test_studio_interaction_layer.py -q -> 14 passed
-python -m pytest tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 45 passed
+python -m pytest tests\test_studio_interaction_layer.py tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 59 passed
 npm.cmd run check:studio-js -> JS syntax check passed: 122 files
 git diff --check -> passed
 ```
