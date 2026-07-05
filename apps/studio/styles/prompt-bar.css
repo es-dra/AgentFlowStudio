@@ -67,7 +67,9 @@
 .prompt-bar textarea {
   width: 100%;
   min-height: 54px;
-  max-height: 140px;
+  max-height: min(320px, calc(100vh - 220px));
+  resize: vertical;
+  overflow-y: auto;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -142,6 +144,10 @@
   transform: translate(-50%, -50%);
   width: min(740px, 84vw);
   height: min(500px, 72vh);
+  min-width: min(520px, calc(100vw - 32px));
+  min-height: min(320px, calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
   background: rgba(32, 35, 39, 0.98);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-bar);
@@ -151,5 +157,13 @@
   padding: 14px 16px 10px;
   gap: 8px;
   z-index: var(--z-modal);
+  resize: both;
+  overflow: hidden;
 }
-.prompt-expand textarea { flex: 1; max-height: none; }
+.prompt-expand textarea {
+  flex: 1;
+  min-height: 180px;
+  max-height: none;
+  resize: vertical;
+  overflow-y: auto;
+}

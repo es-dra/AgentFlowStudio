@@ -6,7 +6,17 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-06-29 by Codex
+Last updated: 2026-07-05 by Codex
+
+Studio resizable prompt input follow-up: 2026-07-05 pass addresses the Web test
+feedback that node/prompt text boxes could not be resized for long prompts.
+The root cause was the global Studio textarea baseline disabling native resize.
+The fix restores vertical resizing with viewport-bounded heights for the main
+prompt bar, expanded prompt editor, editable node content, generation panel,
+and visual/asset-card long-text fields. Boundary: no Runtime/API contract,
+provider gate, provider call, local media byte, signed URL, secret, or private
+Company OS source content is involved. This does not claim fixes for reference
+image upload 422, automatic fixed-asset reuse, or keyframe local editing.
 
 This file keeps only current work, blockers, and evidence entrypoints. Retired
 Workbench, static memory-workbench, old Web RC, and old browser-QA threads are

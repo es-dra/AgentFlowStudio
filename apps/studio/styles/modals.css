@@ -202,6 +202,12 @@
   padding: 7px 8px;
   color: var(--text-primary);
 }
+.visual-asset-panel textarea {
+  min-height: 88px;
+  max-height: min(360px, 52vh);
+  resize: vertical;
+  overflow-y: auto;
+}
 .visual-asset-panel.is-drafting input,
 .visual-asset-panel.is-drafting textarea {
   background-image:

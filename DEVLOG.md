@@ -1,5 +1,32 @@
 # Devlog
 
+## 2026-07-05 - Studio Resizable Prompt Inputs
+
+- Restored native vertical resizing for Studio textarea inputs after the Web
+  test report found that long prompt fields could not be adjusted.
+- Constrained the main prompt bar, expanded prompt editor, node content editor,
+  generation panel, and visual/asset-card long-text fields with viewport-aware
+  max heights so larger prompt editing stays usable without uncontrolled
+  layout overflow.
+- Added static regression coverage to prevent the Studio textarea baseline from
+  being locked back to `resize: none`.
+
+Verification:
+
+```text
+python -m pytest tests\test_web_studio_static.py tests\test_web_studio_frontend_wave.py tests\test_web_studio_prompt_script_static.py -> 45 passed
+npm.cmd run check:studio-js -> JS syntax check passed: 121 files
+git diff --check -> passed
+```
+
+Boundary:
+
+- No Runtime/API contract changed.
+- No provider gate was opened and no LLM/image/video/ASR provider call was
+  made.
+- This fixes prompt/input editing ergonomics only; reference-image upload,
+  fixed-asset reuse, and keyframe local-edit behavior remain separate issues.
+
 ## 2026-06-29 - Image Relay CDN Artifact Compatibility
 
 - Fixed the next live asset-card image failure class after restoring

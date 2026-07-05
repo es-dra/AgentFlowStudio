@@ -168,6 +168,28 @@ def test_studio_keeps_flow_native_canvas_controls() -> None:
         assert marker in source
 
 
+def test_studio_prompt_textareas_are_resizable_for_long_prompts() -> None:
+    base = (STUDIO_ROOT / "styles" / "base.css").read_text(encoding="utf-8")
+    prompt_bar = (STUDIO_ROOT / "styles" / "prompt-bar.css").read_text(encoding="utf-8")
+    maturity = (STUDIO_ROOT / "styles" / "studio-canvas-maturity.css").read_text(encoding="utf-8")
+    modals = (STUDIO_ROOT / "styles" / "modals.css").read_text(encoding="utf-8")
+
+    assert "textarea { resize: none; }" not in base
+    assert "textarea {\n  resize: vertical;\n  overflow: auto;\n}" in base
+    assert ".prompt-bar textarea" in prompt_bar
+    assert "max-height: min(320px, calc(100vh - 220px));" in prompt_bar
+    assert "resize: vertical;" in prompt_bar
+    assert ".prompt-expand {" in prompt_bar
+    assert "resize: both;" in prompt_bar
+    assert ".prompt-expand textarea" in prompt_bar
+    assert ".node .node-content-editor" in maturity
+    assert "max-height: min(460px, calc(100vh - 220px));" in maturity
+    assert ".generation-field textarea" in maturity
+    assert "max-height: min(420px, 60vh);" in maturity
+    assert ".visual-asset-panel textarea" in modals
+    assert "max-height: min(360px, 52vh);" in modals
+
+
 def test_studio_asset_context_workflow_is_single_canvas() -> None:
     source = _source()
     styles = _styles()
