@@ -1,6 +1,8 @@
 // Studio model presets describe the current MVP execution surface.
 // User-facing prompt optimization is always remote-gated; local assembly remains backend-internal.
 
+import { DEFAULT_STUDIO_VIDEO_CAPABILITIES, normalizeVideoCapabilities } from "./video-capabilities.js";
+
 export const IMAGE_RELAY_SERVICE_ID = "image_relay";
 export const VIDEO_RELAY_SERVICE_ID = "seedance_i2v";
 
@@ -40,6 +42,7 @@ export const VIDEO_MODELS = [
     provider: "relay",
     capability: "video_i2v",
     providerServiceId: VIDEO_RELAY_SERVICE_ID,
+    videoCapabilities: DEFAULT_STUDIO_VIDEO_CAPABILITIES,
   },
 ];
 
@@ -85,4 +88,8 @@ export function isRemoteVideoModel(modelId) {
 
 export function providerServiceForVideoModel(modelId) {
   return findModel("video", modelId).providerServiceId || VIDEO_RELAY_SERVICE_ID;
+}
+
+export function videoCapabilitiesForVideoModel(modelId) {
+  return normalizeVideoCapabilities(findModel("video", modelId).videoCapabilities || {});
 }

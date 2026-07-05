@@ -2,6 +2,7 @@
 import { el, showModal } from "./overlay.js";
 import { assetLabel, assetTypeLabel } from "./asset-reference-summary.js";
 import { preflightSourceEvidenceSummaryText } from "./generation-preflight-source-evidence.js";
+import { normalizeVideoCapabilities, videoPreflightBlockMessage } from "./presets/video-capabilities.js";
 
 export async function prepareGenerationRequest(store, runtime, node, request, kind) {
   const preflight = kind === "video_revision"
@@ -24,6 +25,9 @@ export async function prepareGenerationRequest(store, runtime, node, request, ki
       }
       throw error;
     }
+    cacheVideoPreflightCapabilities(store, node.id, outcome, kind);
+    const blockMessage = videoPreflightBlockMessage(outcome);
+    if (blockMessage) throw new Error(blockMessage);
     const unconnectedNamed = unconnectedLabelMatchedAssets(outcome);
     if (unconnectedNamed.length) {
       const decision = await showUnconnectedNamedAssetModal(unconnectedNamed, kind);
@@ -99,6 +103,19 @@ export function clearOneRunOverrides(store, nodeId, options = {}) {
     if (!n) return;
     if (clearLocks) n.params.temporaryLockOverrides = [];
     if (clearAssets) n.params.temporaryAssetExclusions = [];
+  }, { history: false });
+}
+
+function cacheVideoPreflightCapabilities(store, nodeId, preflight, kind) {
+  if (kind !== "video" || !preflight?.provider_capability_limits) return;
+  store.set((s) => {
+    const n = s.nodes[nodeId];
+    if (!n) return;
+    if (!n.params || typeof n.params !== "object") n.params = {};
+    n.params.videoProviderCapabilities = normalizeVideoCapabilities(preflight.provider_capability_limits);
+    n.params.videoProviderCapabilityBlocks = Array.isArray(preflight.blocked_unsupported_combinations)
+      ? preflight.blocked_unsupported_combinations
+      : [];
   }, { history: false });
 }
 

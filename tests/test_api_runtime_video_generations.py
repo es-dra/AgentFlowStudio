@@ -207,6 +207,50 @@ def test_video_generation_preflight_needs_no_video_gate_and_is_stable(tmp_path, 
     assert first.json()["preflight_token"] != changed.json()["preflight_token"]
 
 
+def test_video_generation_preflight_reports_provider_duration_block_without_submit(tmp_path, monkeypatch) -> None:
+    config = _fake_video_provider_config(tmp_path)
+    monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_VIDEO", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    project_id = "video-preflight-duration-block"
+    client.post("/projects", json={"project_id": project_id, "goal": "Video preflight duration block"})
+    asset_id = _upload_image(client, project_id)
+    request = {
+        "prompt_text": "A slow camera push in.",
+        "provider_service_id": "fake_video",
+        "first_frame_image_asset_id": asset_id,
+        "duration_sec": 10,
+        "resolution": "720p",
+        "aspect_ratio": "9:16",
+        "generated_at": "2026-07-06T10:00:00+08:00",
+    }
+
+    response = client.post(f"/projects/{project_id}/video-generations/preflight", json=request)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider_calls_started"] is False
+    assert payload["duration_contract"] == {
+        "duration_seconds": 10,
+        "min_seconds": 1,
+        "max_seconds": 15,
+        "unit": "seconds",
+        "validation_scope": "afs_request_contract",
+    }
+    limits = payload["provider_capability_limits"]
+    assert limits["provider_calls_started"] is False
+    assert limits["provider_service_id"] == "fake_video"
+    assert limits["duration_seconds"]["allowed"] == [5]
+    assert limits["duration_seconds"]["requested"] == 10
+    assert limits["duration_seconds"]["supported"] is False
+    assert payload["preflight_blocked"] is True
+    block = payload["blocked_unsupported_combinations"][0]
+    assert block["error"] == "unsupported_duration"
+    assert block["stage"] == "provider_capability_check"
+    assert block["provider_calls_started"] is False
+    assert block["details"]["allowed"] == [5]
+
+
 def test_video_generation_rejects_stale_preflight_token(tmp_path, monkeypatch) -> None:
     config = _fake_video_provider_config(tmp_path)
     monkeypatch.setenv("AFS_PROVIDER_CONFIG", str(config))

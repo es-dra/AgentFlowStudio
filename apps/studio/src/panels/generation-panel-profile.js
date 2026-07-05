@@ -1,4 +1,6 @@
 import { IMAGE_COUNTS, VIDEO_DURATIONS, VIDEO_RATIOS, VIDEO_RESOLUTIONS } from "../presets/specs.js";
+import { videoCapabilitiesForVideoModel } from "../presets/models.js";
+import { clampVideoDurationLabel, supportedVideoDurationLabels, videoCapabilitiesFromNode } from "../presets/video-capabilities.js";
 
 const IMAGE_RATIOS = ["9:16", "16:9", "1:1", "4:3", "3:4"];
 const VIDEO_MOTIONS = [
@@ -23,6 +25,7 @@ export function generationProfile(node) {
     };
   }
   if (node.type === "video") {
+    const videoCapabilities = capabilitiesForVideoNode(node);
     return {
       kind: "video",
       label: "图生视频",
@@ -30,7 +33,7 @@ export function generationProfile(node) {
       note: "画幅、时长、分辨率和运镜会随视频请求提交，首帧必须有效。",
       fields: [
         { key: "firstFrame", label: "首帧来源", kind: "input", readonly: true, readonlyReason: "首帧请在节点菜单中上传或设置" },
-        { key: "duration", label: "视频时长", kind: "select", options: VIDEO_DURATIONS, defaultValue: "5s" },
+        { key: "duration", label: "视频时长", kind: "select", options: supportedVideoDurationLabels(videoCapabilities), fallbackOptions: VIDEO_DURATIONS, defaultValue: "5s" },
         { key: "resolution", label: "分辨率", kind: "select", options: VIDEO_RESOLUTIONS, defaultValue: "720P" },
         { key: "ratio", label: "比例", kind: "select", options: VIDEO_RATIOS, defaultValue: "9:16" },
         { key: "motion", label: "镜头运动 / 运镜", kind: "select", options: VIDEO_MOTIONS, defaultValue: "固定机位" },
@@ -99,15 +102,21 @@ export function applyGenerationProfileSettings(target, profile, controls) {
     return;
   }
   if (profile.kind === "video") {
+    const videoCapabilities = capabilitiesForVideoNode(target);
     target.params.spec = {
       ...(target.params.spec || {}),
       ratio: controls.ratio?.value || "9:16",
       resolution: controls.resolution?.value || "720P",
-      duration: controls.duration?.value || "5s",
+      duration: clampVideoDurationLabel(controls.duration?.value || "5s", videoCapabilities),
     };
     target.params.motion = controls.motion?.value || "固定机位";
     return;
   }
+}
+
+function capabilitiesForVideoNode(node) {
+  if (!node.params?.model && !node.params?.videoProviderCapabilities) return {};
+  return videoCapabilitiesFromNode(node, videoCapabilitiesForVideoModel(node.params?.model));
 }
 
 function clamp(value, min, max) {
