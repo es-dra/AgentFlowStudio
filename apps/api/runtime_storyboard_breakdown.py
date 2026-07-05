@@ -179,6 +179,7 @@ def build_storyboard_breakdown(
             (asset_card_candidates["summary"].get("reuse_scope_counts") or {}).get("project_reuse_candidate") or 0
         ),
         "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
+        "held_asset_ref_count": int(asset_graph.get("held_asset_ref_count") or 0),
         "discard_reason": discard_reason,
         "writes_long_term_memory": False,
         "writes_company_kb": False,

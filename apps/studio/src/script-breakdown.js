@@ -2,7 +2,7 @@ import { createNode, connect } from "./nodes.js";
 import { assetAutoBindingGraph, nodeReferenceStackForGraphBoundAssets } from "./asset-auto-binding-refs.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
 import { SCRIPT_UPLOAD_ACCEPT, readScriptFileText, safeFileName, scriptFileExtension } from "./script-file-import.js";
-import { refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
+import { normalizeShotAssetRefsWithDiagnostics, refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
 const SHOT_MARKER_RE = /^\s*(第?\s*\d+\s*[镜幕场]|镜头\s*\d+|分镜\s*\d+|场景\s*\d+|scene\s*\d+|shot\s*\d+)/i;
 const STORYBOARD_PLACEHOLDER_RE = /(推进主体|展示变化|收束结果|保留下一步生成关键帧所需的信息)/;
@@ -341,9 +341,17 @@ function normalizeStoryboardShot(shot, fallbackIndex) {
   if (typeof shot === "string") return structuredShotFromSegment(shot, fallbackIndex);
   const source = String(shot?.source_text || shot?.description || "").trim();
   const fallback = structuredShotFromSegment(source, fallbackIndex);
-  const assetRefs = Array.isArray(shot?.asset_refs) && shot.asset_refs.length
-    ? shot.asset_refs.map((asset, index) => normalizeAssetRef(asset, index)).filter(Boolean)
-    : fallback.asset_refs;
+  const normalizedAssets = Array.isArray(shot?.asset_refs) && shot.asset_refs.length
+    ? normalizeShotAssetRefsWithDiagnostics(
+        shot.asset_refs.map((asset, index) => normalizeAssetRef(asset, index)).filter(Boolean),
+        source || String(shot?.description || ""),
+      )
+    : { asset_refs: fallback.asset_refs, dropped_asset_ref_diagnostics: fallback.dropped_asset_ref_diagnostics || [] };
+  const assetRefs = normalizedAssets.asset_refs || [];
+  const droppedAssetRefDiagnostics = [
+    ...(Array.isArray(shot?.dropped_asset_ref_diagnostics) ? shot.dropped_asset_ref_diagnostics : []),
+    ...((normalizedAssets && normalizedAssets.dropped_asset_ref_diagnostics) || []),
+  ];
   return {
     ...fallback,
     shot_id: String(shot?.shot_id || fallback.shot_id),
@@ -356,22 +364,30 @@ function normalizeStoryboardShot(shot, fallbackIndex) {
     dialogue: String(shot?.dialogue || fallback.dialogue),
     sound: String(shot?.sound || fallback.sound),
     asset_refs: assetRefs,
+    dropped_asset_ref_diagnostics: droppedAssetRefDiagnostics,
     source_text: source || fallback.source_text,
   };
 }
 
 function normalizeAssetRef(asset, index) {
   if (!asset || typeof asset !== "object") return null;
-  const label = String(asset.label || asset.name || "").trim().slice(0, 24);
+  const label = String(asset.display_name || asset.label || asset.name || "").trim().slice(0, 40);
   if (!label) return null;
   const type = ["character", "scene", "prop"].includes(asset.asset_type) ? asset.asset_type : "character";
   return {
     label,
+    display_name: String(asset.display_name || label),
     asset_id: String(asset.asset_id || `candidate:${type}:${index + 1}`),
     graph_asset_id: String(asset.graph_asset_id || asset.graphAssetId || ""),
     asset_type: type,
     status: String(asset.status || "candidate"),
     source: String(asset.source || "llm"),
+    descriptive_signature: String(asset.descriptive_signature || ""),
+    evidence_modality: String(asset.evidence_modality || ""),
+    visual_evidence_span: String(asset.visual_evidence_span || ""),
+    modality_gate_status: String(asset.modality_gate_status || ""),
+    name_source: String(asset.name_source || ""),
+    provisional_name: Boolean(asset.provisional_name),
   };
 }
 

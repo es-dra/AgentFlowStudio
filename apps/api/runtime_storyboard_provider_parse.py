@@ -4,12 +4,13 @@ import json
 import re
 from typing import Any
 
+from apps.api.runtime_asset_extraction import normalize_asset_refs_with_diagnostics
 from apps.api.runtime_storyboard_grounding import (
     grounding_status_for_unsupported,
     storyboard_source_span,
     unsupported_additions_for_description,
 )
-from apps.api.runtime_storyboard_local import normalize_asset_ref, structured_shot
+from apps.api.runtime_storyboard_local import structured_shot
 
 
 def shots_from_provider_text(text: str, *, source_script_text: str = "") -> list[dict[str, Any]]:
@@ -72,11 +73,16 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
     source_span = _provider_source_span(item.get("source_span"), description, source_script_text, index)
     fallback = structured_shot(source_span["text"] or description, index, full_source=source_script_text or description)
     asset_refs = item.get("asset_refs")
+    gate_context = "\n".join(part for part in (source_span["text"], description) if part)
     if isinstance(asset_refs, list) and asset_refs:
-        refs = [normalize_asset_ref(asset, idx, source_span["text"] or description) for idx, asset in enumerate(asset_refs)]
-        refs = [ref for ref in refs if ref]
+        refs, dropped_refs = normalize_asset_refs_with_diagnostics(
+            asset_refs,
+            context=gate_context,
+            include_inferred=True,
+        )
     else:
         refs = fallback["asset_refs"]
+        dropped_refs = list(fallback.get("dropped_asset_ref_diagnostics") or [])
     unsupported = unsupported_additions_for_description(description, source_span["text"])
     return {
         **fallback,
@@ -90,6 +96,7 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
         "dialogue": str(item.get("dialogue") or fallback["dialogue"]),
         "sound": str(item.get("sound") or fallback["sound"]),
         "asset_refs": refs,
+        "dropped_asset_ref_diagnostics": dropped_refs,
         "source_text": _clean(item.get("source_text") or description),
         "source_span": source_span,
         "grounding_status": grounding_status_for_unsupported(unsupported),
