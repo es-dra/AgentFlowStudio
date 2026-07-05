@@ -20,6 +20,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "quality_feedback_scoring",
     "content_quality_evaluation",
     "asset_auto_binding",
+    "asset_identity_reuse_graph",
     "node_reference_stack",
     "structured_source_output_qa_checklist",
     "final_media_acceptance_decision",
