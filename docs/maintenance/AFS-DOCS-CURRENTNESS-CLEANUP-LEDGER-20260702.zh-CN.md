@@ -155,3 +155,77 @@ Batch 1 verification evidence:
 | `python -m pytest tests\test_repository_retention_review.py tests\test_maintenance_audit.py -q` | `15 passed`. |
 | `git diff --check` | passed. |
 | Scope | Docs-only; no code, tests, provider, Runtime, OpenAPI, server, generated media, private KB, COS, or CompanyOS mutation. |
+
+## 2026-07-07 Batch B Branch / Worktree History Compaction Gate
+
+Dispatch:
+`TD-AFS-V02-CLEAN-P1-DOCS-MAINTENANCE-BATCHB-BRANCH-WORKTREE-HISTORY-COMPACTION-20260707-001`
+
+Bottom-up feedback:
+`BU-AFS-V02-CLEAN-P1-DOCS-MAINTENANCE-BATCHB-BRANCH-WORKTREE-HISTORY-COMPACTION-20260707-001`
+
+Working branch:
+`codex/docs-batchb-history-compaction-20260707`
+
+Base:
+`origin/master=33b176139c0b7df37977a39d10112be3b8c1e66e`
+
+This lane rechecked the Batch B branch/worktree history candidates after PR
+#101 and PR #97 merged, after PR #96 refreshed onto current master, and after
+the Candidate B local docs branches were cleaned. The accepted Batch 1
+redundancy standard still applies. No Batch B candidate met all archive/delete
+conditions without touching currently active or PR-overlapped records, so this
+lane records a hold/defer decision instead of deleting files.
+
+Active PR overlap:
+
+| PR | State | Head | Changed records | Handling |
+|---|---|---|---|---|
+| #96 | open draft; current PR body/readback records `mergeable=true`, exact-head CI green, base/merge-base `33b176139c0b7df37977a39d10112be3b8c1e66e` | `codex/afs-package-project-book-draft-20260706` at `ef2e8a6dde5b9aac2c9d99a763a4c7e39a8ec3ba` | `DEVLOG.md`, `TASK_TRACKER.md`, `docs/handoff/INDEX.md`, `docs/handoff/AFS-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-20260706.md` | No edits to overlapped active PR record streams. |
+| #97 | merged into `master`; PR page shows merged state and deleted remote source branch | `codex/true-local-edit-contract-reconciliation-20260706` final head `c48349e94b99fea134221ea85f29f28377abb9e8`; merge commit/current master `33b176139c0b7df37977a39d10112be3b8c1e66e` | `DEVLOG.md`, `TASK_TRACKER.md`, `docs/handoff/INDEX.md`, `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md` | No active PR overlap remains; records are now protected current-master evidence. |
+
+Batch B candidate classification:
+
+| Classification | Path | Reference evidence | Action |
+|---|---|---|---|
+| defer_reference_hold | `docs/maintenance/AFS-BRANCH-WORKTREE-CONSOLIDATION-DECISION-PACKET-20260701.md` | Referenced by `docs/maintenance/AFS-MAINTENANCE-REDUNDANCY-STATUS-20260701.md`; deleting it would require rewriting a related historical decision packet. | Keep. |
+| defer_reference_hold | `docs/maintenance/AFS-MAINTENANCE-REDUNDANCY-STATUS-20260701.md` | Referenced outside itself by `DEVLOG.md` and `docs/handoff/AFS-T53-INTERACTIVE-MANGA-BRANCH-PACKAGE-CONTRACT-20260701.md`; `DEVLOG.md` is also PR #96/#97 overlap. | Keep. |
+| defer_current_handoff_hold | `docs/maintenance/AFS-SOURCE-COMPOSITION-REDUNDANCY-AUDIT-20260701.md` | Referenced by current handoffs `docs/handoff/AFS-FULL-PYTEST-RESIDUAL-TRIAGE-20260701.md` and `docs/handoff/AFS-STUDIO-MAIN-PATH-BROWSER-QA-20260701.md`, plus the maintenance status packet. | Keep. |
+| defer_index_overlap_hold | `docs/maintenance/AFS-BRANCH-MERGE-CLEANUP-20260622.md` | Linked from `docs/handoff/INDEX.md` Current Maintenance Evidence. Removing the link would touch an active PR #96/#97 overlap file and a Batch A-held index zone. | Keep. |
+
+Future restore source if a later authorized lane removes any Batch B file after
+clearing references:
+
+```powershell
+git restore --source=33b176139c0b7df37977a39d10112be3b8c1e66e -- docs/maintenance/AFS-BRANCH-WORKTREE-CONSOLIDATION-DECISION-PACKET-20260701.md
+git restore --source=33b176139c0b7df37977a39d10112be3b8c1e66e -- docs/maintenance/AFS-MAINTENANCE-REDUNDANCY-STATUS-20260701.md
+git restore --source=33b176139c0b7df37977a39d10112be3b8c1e66e -- docs/maintenance/AFS-SOURCE-COMPOSITION-REDUNDANCY-AUDIT-20260701.md
+git restore --source=33b176139c0b7df37977a39d10112be3b8c1e66e -- docs/maintenance/AFS-BRANCH-MERGE-CLEANUP-20260622.md
+```
+
+Verification notes:
+
+| Check | Result |
+|---|---|
+| Startup scan | `project-development-workflow` fallback skill, `AGENTS.md`, `docs/company_operating_model.md`, `TASK_TRACKER.md`, `DEVLOG.md`, `docs/handoff/INDEX.md`, current maintenance ledgers, candidate files, git status, live master, PR #96/#97 metadata/pathlists read. |
+| Current live master | `origin/master=33b176139c0b7df37977a39d10112be3b8c1e66e`; matches PR #97 merge record after PR #101. |
+| Branch base refresh | Branch rebased from previous `10b8821f7f9b5edcb53dff84253f60d0c4edbc04` base onto current `origin/master=33b176139c0b7df37977a39d10112be3b8c1e66e`; changed path set remained this ledger only. |
+| PR #96 readback | Open draft at `ef2e8a6dde5b9aac2c9d99a763a4c7e39a8ec3ba`, base/merge-base `33b176139c0b7df37977a39d10112be3b8c1e66e`, exact-head CI green per current PR body/readback. |
+| PR #97 readback | Merged; final head `c48349e94b99fea134221ea85f29f28377abb9e8`, merge commit/current master `33b176139c0b7df37977a39d10112be3b8c1e66e`, remote source branch deleted per PR page. |
+| Initial dirty state | Clean before edits on `codex/docs-batchb-history-compaction-20260707`. |
+| Reference scans before action | Ran fixed-string scans for each candidate filename and full path. Results are summarized in the classification table above. |
+| Post-action reference posture | No candidate was deleted or archived, so reference graph remains intentionally unchanged. |
+| `git diff --check` | passed. |
+| `python tools\repository_retention_review.py --summary-only` | `delete_candidate_count=0`, `manual_review_required_count=0`. |
+| `python tools\maintenance_audit.py` | `status=warning`, `failed=0`; warnings are existing legacy-frozen, Chinese coverage, secret-like fragment, and oversized-file categories. |
+| Added-lines secret scan | passed; no added secret/token/key pattern matches. |
+| Tests | Not run; no code, schema, Runtime, Studio, OpenAPI, provider, or test files changed. |
+| Changed path boundary | This ledger only. No code, tests, provider, Runtime, OpenAPI, Studio, package, server, media, private KB, source-KB, COS, or CompanyOS mutation. |
+
+Non-claims:
+
+- No broad cleanup completion, Batch A index compaction, PR #96/#97 mutation,
+  primary checkout normalization, branch/worktree deletion, archive execution,
+  provider/runtime/browser/media/server action, release, deploy, Owner/human/
+  business/legal/public acceptance, package finality, COS/CompanyOS/source-KB
+  mutation, durable-memory promotion, or self-archive is claimed.
