@@ -11,6 +11,10 @@ MVP. Retired Workbench, static memory-workbench, old LibTV canvas iterations,
 release-candidate Web docs, and old browser-QA handoffs were deleted instead of
 archived.
 
+## Held Evidence Manifests
+
+- `AFS-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-20260706.md`
+
 ## Goal / Release Gates
 
 - `AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md`

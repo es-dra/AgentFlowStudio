@@ -1,5 +1,26 @@
 # Devlog
 
+## 2026-07-06 - Dirty Primary Held Evidence Manifest
+
+- Completed bounded manifest lane
+  `TD-AFS-V02-WORK-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-CLEAN-BRANCH-READWRITE-20260706-001`
+  on `codex/dirty-primary-held-evidence-manifest-20260706`.
+- Preserved identities only for the dirty-primary held Owner-review packet,
+  true-local-edit spec packet, and `docs/demo-docs-20260629/*.md` files in
+  `docs/handoff/AFS-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-20260706.md`.
+- Base evidence: branch started from PR #95 merge
+  `26512312eb6c6f311108c97b906667dfbf21b6b9`.
+- Source verification: fixed expected hashes matched for the Owner packet and
+  true-local-edit spec; five demo-docs Markdown identities were freshly read
+  with byte sizes and sha256 values.
+- This lane did not copy held packet prose, restore/land dirty-primary files,
+  replay dirty records, modify provider/code/schema/OpenAPI/Runtime/Studio/test
+  surfaces, run provider/media/runtime/browser/server actions, push, merge, or
+  claim cleanup, finality, readiness, Owner/human/business/legal/public
+  acceptance, or COS/CompanyOS/source-KB mutation.
+- Tests were not required because the change is docs-only identity manifest and
+  record pointers.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:
