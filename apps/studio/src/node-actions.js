@@ -1,11 +1,9 @@
 import { createNode, connect } from "./nodes.js";
-import { isRemoteImageModel, isRemoteVideoModel } from "./presets/models.js";
 import { SAMPLE_SCRIPT, SAMPLE_SCRIPT_TITLE } from "./presets/starters.js";
 import { openVisualAssetPanel } from "./panels/visual-asset-panel.js";
 import { imageAssetFromVisualAsset, lastImageAsset } from "./node-image-assets.js";
 import { safeError, setNodeError } from "./node-action-utils.js";
-import { startRemoteKeyframeGeneration } from "./node-keyframe-actions.js";
-import { startRemoteVideoGeneration, startRemoteVideoRevision } from "./node-video-actions.js";
+import { canStartGenerationForNode, startNodeGeneration as runNodeGeneration } from "./node-generation-actions.js";
 import { importScriptFileIntoTextNode, splitTextNodeToStoryboardNodes } from "./script-breakdown.js";
 import { createStoryboardKeyframeLayer, identifyScriptAssets } from "./storyboard-node-actions.js";
 import {
@@ -21,7 +19,7 @@ export { pollNodeKeyframeGeneration } from "./node-keyframe-actions.js";
 export { cancelNodeVideoGeneration, enableVideoRevisionDraft, pollNodeVideoGeneration, setNodeVideoFrame } from "./node-video-actions.js";
 
 export function canRunNodeGeneration(node) {
-  return ["image", "video"].includes(node?.type);
+  return canStartGenerationForNode(node);
 }
 
 // Empty-state intent: script starter lays out a safe local upstream example flow.
@@ -120,32 +118,7 @@ export async function createKeyframeLocalEditDraft(store, runtime, node, options
   }
 }
 
-// 发送（Ctrl+Enter / 发送按钮）：当前只允许图片/视频节点触发真实生成。
+// 发送（Ctrl+Enter / 发送按钮）：图片/视频生成调度实现位于 node-generation-actions.js。
 export async function startNodeGeneration(store, runtime, node, resultText) {
-  const fresh = store.get().nodes[node.id] || node;
-  if (!canRunNodeGeneration(fresh)) {
-    setNodeError(
-      store,
-      fresh.id,
-      resultText || "当前节点不支持直接生成。请使用该节点菜单里的专用操作，或连接到图片/视频节点后生成。",
-    );
-    return;
-  }
-  if (fresh.type === "image" && isRemoteImageModel(fresh.params?.model) && runtime?.generateKeyframe) {
-    await startRemoteKeyframeGeneration(store, runtime, fresh);
-    return;
-  }
-  if (fresh.type === "video" && isRemoteVideoModel(fresh.params?.model) && runtime?.generateVideo) {
-    if (fresh.params?.videoRevision?.enabled && runtime?.generateVideoRevision) {
-      await startRemoteVideoRevision(store, runtime, fresh);
-      return;
-    }
-    await startRemoteVideoGeneration(store, runtime, fresh);
-    return;
-  }
-  setNodeError(
-    store,
-    fresh.id,
-    resultText || "当前节点不支持直接生成，请使用该节点的专用操作。",
-  );
+  return runNodeGeneration(store, runtime, node, resultText);
 }

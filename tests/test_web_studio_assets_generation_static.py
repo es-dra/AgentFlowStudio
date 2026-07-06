@@ -826,6 +826,7 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     source = _source()
     runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_actions = (STUDIO_ROOT / "src" / "node-generation-actions.js").read_text(encoding="utf-8")
     video_actions = (STUDIO_ROOT / "src" / "node-video-actions.js").read_text(encoding="utf-8")
     video_flow = (STUDIO_ROOT / "src" / "video-node-flow.js").read_text(encoding="utf-8")
     generation_guards = (STUDIO_ROOT / "src" / "node-generation-guards.js").read_text(encoding="utf-8")
@@ -846,7 +847,8 @@ def test_video_revision_and_named_asset_lookup_submit_markers() -> None:
     assert "user_excluded_unconnected_named_asset" in generation_guards
     assert "label_matched" in inspector
     assert "named_asset_not_connected_fail_closed" not in generation_guards
-    assert "startRemoteVideoRevision" in node_actions
+    assert "runNodeGeneration" in node_actions
+    assert "startRemoteVideoRevision" in generation_actions
     assert "videoRevision" in video_actions
     assert "AFS_ENABLE_EXPERIMENTAL_VIDEO_REVISION" in video_actions
     assert "enableVideoRevisionDraft" in source

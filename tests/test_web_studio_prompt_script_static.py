@@ -387,6 +387,7 @@ def test_script_nodes_identify_assets_and_create_keyframe_layer_without_candidat
 def test_script_node_menu_hides_generic_retry_generation() -> None:
     node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
+    generation_actions = (STUDIO_ROOT / "src" / "node-generation-actions.js").read_text(encoding="utf-8")
     canvas_view = (STUDIO_ROOT / "src" / "canvas-view.js").read_text(encoding="utf-8")
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
@@ -396,7 +397,8 @@ def test_script_node_menu_hides_generic_retry_generation() -> None:
     assert "function canRetryGeneration(node)" in node_menu
     assert "return canRunNodeGeneration(node);" in node_menu
     assert "export function canRunNodeGeneration(node)" in node_actions
-    assert "return [\"image\", \"video\"].includes(node?.type);" in node_actions
+    assert "return canStartGenerationForNode(node);" in node_actions
+    assert "return [\"image\", \"video\"].includes(node?.type);" in generation_actions
     assert "if (!canRunNodeGeneration(node))" in canvas_view
     assert 'runBtn.dataset.action = "run-disabled";' in canvas_view
     assert "if (node && canRunNodeGeneration(node)) startNodeGeneration" in keyboard
