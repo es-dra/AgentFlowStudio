@@ -91,6 +91,30 @@
   KB, COS, CompanyOS, PR body, remote metadata, merge, push, release, or deploy
   changes occurred.
 
+## 2026-07-06 - True Local Edit Contract Reconciliation Non-Final
+
+- Reconciled held July 5 true-local-edit schema/OpenAPI no-provider source
+  against the tracked PR #94 local-edit preflight package without restoring the
+  original held source.
+- Verified held source size `21216` bytes and SHA256
+  `4BC203F31D78FB7725B333AEC45F17D3B6DB2CFE06498BB6576C8DA8F86C87AF` before
+  use. The tracked packet uses only the sanitized display path and keeps the
+  original source as held evidence.
+- Classification summary: PR #94 absorbed the preflight-only request/draft
+  slice, lineage, blocked statuses, no-provider/no-media/no-transform flags,
+  safe error handling, and no-full-frame-fallback boundary; submit/poll/preview,
+  safe manifest/local-edit bridge, provider execution, masks, richer target/
+  lock semantics, and evaluator/provider-smoke gates remain future or
+  implementation-lane inputs.
+- Updated records so the missing July 5 held source is no longer active/current
+  checkout-verifiable evidence without disposition. Current tracked evidence is
+  this reconciliation packet plus the PR #94 post-merge packet.
+- No code, schema, OpenAPI snapshot, provider descriptor/adapter, Runtime route,
+  Studio JS, tests, generated media, source-KB/COS/CompanyOS, browser/server,
+  provider gate, deployment, release, archive, or acceptance state was changed.
+- Handoff:
+  `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:
@@ -370,8 +394,10 @@
     is active non-final Owner-review input and needs decision-owner
     disposition before any Owner/package/finality use.
   - `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-SCHEMA-OPENAPI-CONTRACT-NO-PROVIDER-20260705.md`
-    is active spec evidence only and needs CTO/evaluator/implementation-lane
-    disposition before code/OpenAPI/provider/runtime claims.
+    is held source evidence only after reconciliation. It is not active/current
+    checkout-verifiable evidence by itself; use
+    `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`
+    plus the PR #94 post-merge packet for current tracked disposition.
   - `docs/provider_adapter_contract.md`,
     `docs/provider_adapter_v03_image_edit_addendum.md`,
     `agentflow_studio/model_gateway/provider_adapter.py`, and

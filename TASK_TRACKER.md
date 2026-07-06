@@ -74,6 +74,29 @@ acceptance, release, package finality, durable-memory promotion, or
 self-archive is claimed. Next route: CEO/CTO registers the BU and decides keep,
 backup, archive/delete after acceptance, or defer with owner.
 
+P1 true local edit contract reconciliation addendum: Lane
+`TD-AFS-V02-RECORD-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-NO-PROVIDER-20260706-001`
+completed a bounded docs/records reconciliation for held source evidence
+`docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-SCHEMA-OPENAPI-CONTRACT-NO-PROVIDER-20260705.md`.
+Expected BU
+`BU-AFS-V02-RECORD-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-NO-PROVIDER-20260706-001`.
+The held source size and SHA256 were verified before use:
+`21216` bytes,
+`4BC203F31D78FB7725B333AEC45F17D3B6DB2CFE06498BB6576C8DA8F86C87AF`.
+Current tracked disposition is non-final: PR #94 absorbed only the
+preflight/draft slice (`ready_no_provider_execution` /
+`draft_needs_input`, execution blocked as `blocked_no_local_transform` /
+`blocked_missing_required_input`) with no provider/media/pixel-transform/
+full-frame fallback claim. Submit/poll/preview, safe manifests, local-edit
+bridge, masks, richer target/lock semantics, provider execution, evaluator
+gates, generated-media QA, and acceptance remain separate future or
+implementation lanes. The held July 5 source remains held evidence and is no
+longer active/current-checkout-verifiable by itself. No code, schema, OpenAPI,
+provider descriptor/adapter, Runtime route, Studio JS, tests, source-KB/COS/
+CompanyOS, generated media, browser/server/runtime, provider gate, release,
+deploy, archive, or acceptance state was changed. Handoff:
+`docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`.
+
 P1 PR #94 local edit preflight post-merge record addendum: PR
 `https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
 standard GitHub merge commit
@@ -301,8 +324,12 @@ promotion. Disposition: active/held/needs-disposition. Untracked
 is active non-final Owner-review input needing decision-owner disposition;
 untracked
 `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-SCHEMA-OPENAPI-CONTRACT-NO-PROVIDER-20260705.md`
-is active spec evidence only needing CTO/evaluator/implementation-lane
-disposition before code/OpenAPI/provider/runtime claims. Provider-adapter
+is held source evidence only after reconciliation. It is not active/current
+checkout-verifiable by itself; use
+`docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`
+plus the PR #94 post-merge packet for current tracked disposition. It remains
+held source evidence, not code, OpenAPI, runtime/provider support, generated
+media, true local-edit capability, or final schema acceptance. Provider-adapter
 surfaces `docs/provider_adapter_contract.md`,
 `docs/provider_adapter_v03_image_edit_addendum.md`,
 `agentflow_studio/model_gateway/provider_adapter.py`, and
