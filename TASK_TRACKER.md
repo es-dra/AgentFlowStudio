@@ -97,6 +97,28 @@ CompanyOS, generated media, browser/server/runtime, provider gate, release,
 deploy, archive, or acceptance state was changed. Handoff:
 `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`.
 
+P1 AFS package project-book draft non-final addendum: Lane
+`TD-AFS-V02-DOC-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-NO-RELEASE-20260706-001`
+created a bounded Owner-facing, non-final package/project-book draft on
+`codex/afs-package-project-book-draft-20260706`; expected BU
+`BU-AFS-V02-DOC-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-NO-RELEASE-20260706-001`.
+The draft maps current AFS Studio asset/video/local-edit package posture after
+PR #94 and PR #95: Runtime-hosted `/studio/` internal review surface,
+`apps/studio` source surface, Runtime Service frontend backend boundary,
+closed provider gates, capability inventory, evidence map, operational
+boundary, non-claims, residual gates, Owner decision map, and next lanes.
+Base verification confirmed HEAD contains PR #95 merge commit
+`26512312eb6c6f311108c97b906667dfbf21b6b9`. Live GitHub readback confirmed PR
+#94 merge commit `25b492f010f3a95ed3ae52ea298132052b2e67eb`, PR #95 merge
+commit `26512312eb6c6f311108c97b906667dfbf21b6b9`, PR #94 post-merge CI #205
+success, and PR #95 post-merge CI #207 success. This is docs-only and does not
+claim release, deploy, restart, runtime freshness, provider call/spend/gate
+mutation, generated media, local pixel transform, generated-media QA,
+Owner/human/business/legal/public acceptance, package finality, cleanup
+completion, archive execution, source-KB/COS/CompanyOS mutation, or
+self-archive. Handoff:
+`docs/handoff/AFS-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-20260706.md`.
+
 P1 PR #94 local edit preflight post-merge record addendum: PR
 `https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
 standard GitHub merge commit

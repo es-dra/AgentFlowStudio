@@ -115,6 +115,26 @@
 - Handoff:
   `docs/handoff/AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`.
 
+## 2026-07-06 - AFS Package Project Book Draft Non-Final
+
+- Added a non-final Owner-facing AFS Studio package/project-book draft for
+  dispatch
+  `TD-AFS-V02-DOC-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-NO-RELEASE-20260706-001`.
+- Draft summarizes current package posture after PR #94 and PR #95: `/studio/`
+  internal review surface, `apps/studio` source surface, Runtime Service
+  boundary, provider gates closed, capability inventory, evidence map,
+  operational boundary, non-claims, residual gates, Owner decisions, and next
+  lanes.
+- Verified current base includes PR #95 merge commit
+  `26512312eb6c6f311108c97b906667dfbf21b6b9`; GitHub readback confirmed PR
+  #94 and PR #95 merged, PR #94 post-merge CI #205 success, and PR #95
+  post-merge CI #207 success.
+- No code, tests, OpenAPI, Runtime, Studio JS, provider config, generated
+  media, release/deploy/restart, source-KB/COS/CompanyOS, cleanup, archive, or
+  acceptance state was changed.
+- Handoff:
+  `docs/handoff/AFS-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-20260706.md`.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:
