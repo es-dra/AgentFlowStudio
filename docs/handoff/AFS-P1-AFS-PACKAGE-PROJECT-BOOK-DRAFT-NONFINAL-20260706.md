@@ -51,6 +51,26 @@ current package surface for this draft.
 | Focused static/API tests | Current PR/package records include focused local-edit pytest, Studio JS checks, py-compile, focused reference upload, fixed asset reuse, keyframe/video honesty, QA checklist, and final-media decision packet checks. | DEVLOG and handoff records listed below |
 | Record handoff | `docs/handoff/AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md` | Local repo |
 
+## Evidence Caveats
+
+These caveats are carried forward as review boundaries, not as new current
+capability evidence:
+
+- Prior package/control evidence: T50/T51 and D2/D5/T54-T58 remain prior
+  deterministic/control evidence. They do not establish Owner/package
+  readiness, acceptance, finality, release, or current package capability by
+  themselves.
+- Generation-plan guardrail: D2/D5 and T54-T58 can inform later planning only
+  after evaluator and Owner gates. They must not be used as
+  accepted-generation-plan or project-book finality evidence without that later
+  review.
+- Current-checkout evidence: any Neon Rain or static-skeleton references are
+  historical/current-checkout-suspended context only, not current package
+  capability evidence for this PR.
+- Runtime freshness: loaded-code/runtime freshness remains a separate ops
+  lane. Prior runtime blockers or server facts are not current facts unless an
+  authorized runtime lane revalidates them.
+
 ## Operational Boundary
 
 This package draft may reference safe public GitHub URLs, commit SHAs, run
@@ -150,26 +170,33 @@ draft.
 
 ## Appendix A - Worker Record
 
+The human-facing package map is the body above. This appendix is execution
+ledger metadata only and does not create package readiness, finality,
+acceptance, release, runtime, provider, media, cleanup, or Company OS claims.
+
 | Field | Value |
 |---|---|
-| top_down_dispatch_id | `TD-AFS-V02-DOC-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-NO-RELEASE-20260706-001` |
-| bottom_up_feedback_id | `BU-AFS-V02-DOC-P1-AFS-PACKAGE-PROJECT-BOOK-DRAFT-NONFINAL-NO-RELEASE-20260706-001` |
-| Worker verdict | `PASS_DRAFT_PENDING_EVALUATOR` |
-| Task class | `Standard` docs-only package draft |
-| Write scope | This handoff, `docs/handoff/INDEX.md`, `DEVLOG.md`, `TASK_TRACKER.md` |
+| top_down_dispatch_id | `TD-AFS-V02-DOC-P1-PR-96-PACKAGE-DRAFT-OWNER-PACKET-DELTA-EXTRACTION-NO-RELEASE-20260706-001` |
+| bottom_up_feedback_id | `BU-AFS-V02-DOC-P1-PR-96-PACKAGE-DRAFT-OWNER-PACKET-DELTA-EXTRACTION-NO-RELEASE-20260706-001` |
+| Worker verdict | `PASS_DELTA_EXTRACTION_PENDING_EVALUATOR_OR_CI_MONITOR` |
+| Task class | `Standard` docs-only package delta extraction |
+| Write scope | This handoff. The wider PR already includes `docs/handoff/INDEX.md`, `DEVLOG.md`, and `TASK_TRACKER.md` from the original package publication lane. |
 | Provider gate | Closed for LLM, ASR, image, video, external download, live provider calls, provider smoke, and generated-media QA |
 | Tests | Not run; docs-only lane with no code, schema, OpenAPI, Runtime, Studio JS, provider config, or generated-media changes |
 | archive_policy | `no self-archive` |
 | upward_feedback_delivery | `sent_to_ceo` |
-| post_closeout_next_action | CEO should route package evaluator/reviewer lane before any Owner-facing acceptance, release, readiness, public, provider, media, or finality claim. |
+| post_closeout_next_action | Evaluator/reviewer or CI monitor should review the new PR #96 head before any Owner-facing acceptance, release, readiness, public, provider, media, or finality claim. |
 
 Verification route for this lane:
 
-- Confirm base contains `26512312eb6c6f311108c97b906667dfbf21b6b9`.
-- Confirm write paths are limited to `docs/handoff/`, `DEVLOG.md`, and
-  `TASK_TRACKER.md`.
+- Confirm branch/head, PR #96 draft/open/unmerged state, and base
+  `26512312eb6c6f311108c97b906667dfbf21b6b9`.
+- Confirm this delta-extraction commit writes only this handoff, with total PR
+  path set remaining within the existing allowed docs/package paths.
 - Run stale/overclaim scan for release/deploy/provider/media/acceptance/
   finality claims.
 - Run secret/path scan.
 - Run `git diff --check`.
-- Commit locally only if checks pass; do not push.
+- Commit and non-force push only if checks pass. Do not mark PR #96 ready for
+  review, merge, release, deploy, runtime, provider, media, acceptance, or
+  finality.
