@@ -8,6 +8,32 @@
 
 Last updated: 2026-07-06 by Codex
 
+P1 PR #94 local edit preflight post-merge record addendum: PR
+`https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
+standard GitHub merge commit
+`25b492f010f3a95ed3ae52ea298132052b2e67eb`; PR head before merge was
+`6cee1511d2c72c951271325aeefb80076f62cf9d`, base before merge was
+`54c45f6aec3995553b11892cadf73da9502ac828`, and post-merge readback reported
+`merged=true`, `merged_at=2026-07-06T03:39:35Z`, and
+`origin/master=25b492f010f3a95ed3ae52ea298132052b2e67eb`. The remote PR branch
+still exists at `6cee1511d2c72c951271325aeefb80076f62cf9d`. This records
+integration evidence only for the Studio-to-Runtime local-edit preflight
+package and PR-head P2 draft-scope fix; it does not claim release, deploy,
+runtime freshness, readiness, provider/media behavior, generated-media QA,
+Owner/human/business/legal/public acceptance, cleanup completion, package
+finality, COS/CompanyOS/source-KB mutation, archive execution, or self-archive.
+PR-head validation remains the recorded green evidence: focused local-edit
+pytest (`21 passed`), `npm run check:studio-js` (`151 files`), Python 3.12
+`py_compile`, `git diff --check`, and scoped boundary scans. Post-merge CI
+#205 was still in progress at merge readback, so no post-merge CI green claim is
+recorded. Residual gates: post-merge CI #205 verification, reviewer hold
+identifiers absent, P2 thread unresolved but outdated/addressed by code,
+mobile/responsive coverage, multiple node shapes, auth-on Runtime,
+provider-gate-open behavior, generated-media QA, runtime freshness/deploy/
+readiness, Owner/human/business/legal/public acceptance, and separate cleanup/
+package lanes. Handoff:
+`docs/handoff/AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md`.
+
 P1 PR #94 local edit draft scope P2 fix addendum: Lane
 `TD-AFS-V02-FIX-P1-PR-94-P2-LOCAL-EDIT-DRAFT-SCOPE-AND-BODY-READINESS-NO-RELEASE-20260706-001`
 completed a bounded Studio/Runtime regression fix on

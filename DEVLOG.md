@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
+
+- Recorded PR #94 as integration evidence only:
+  `https://github.com/es-dra/AgentFlowStudio/pull/94`.
+- Merge evidence: GitHub standard merge commit
+  `25b492f010f3a95ed3ae52ea298132052b2e67eb` from PR head
+  `6cee1511d2c72c951271325aeefb80076f62cf9d` onto base
+  `54c45f6aec3995553b11892cadf73da9502ac828`. Post-merge readback reported
+  `merged=true`, `merged_at=2026-07-06T03:39:35Z`, and
+  `origin/master=25b492f010f3a95ed3ae52ea298132052b2e67eb`.
+- Shipped package summary: Studio-to-Runtime local-edit preflight with
+  no-provider/no-media/no-local-transform boundaries, plus the PR-head P2
+  draft-scope fix that prevents placeholder local-edit scope from becoming
+  execution-ready.
+- PR-head validation evidence remains the green evidence recorded in the PR #94
+  lane: focused local-edit pytest (`21 passed`), `npm run check:studio-js`
+  (`151 files`), Python 3.12 `py_compile`, `git diff --check`, and scoped
+  boundary scans. Post-merge CI #205 was still in progress at merge readback;
+  no post-merge CI green claim is recorded here.
+- Residual gates: post-merge CI #205 verification, reviewer hold identifiers,
+  outdated/unresolved P2 thread disposition, mobile/responsive coverage,
+  multiple node shapes, auth-on Runtime behavior, provider-gate-open behavior,
+  generated-media QA, runtime freshness/deploy/readiness, and Owner/human/
+  business/legal/public acceptance.
+- Cleanup/package lanes remain separate and are not completed by this merge
+  record.
+- No release, deploy, restart, Runtime/server/browser action, provider call/
+  spend, generated media, local pixel/image transform, source-KB/COS/CompanyOS
+  mutation, cleanup execution, Owner/human/business/legal/public acceptance, or
+  product/package finality is claimed.
+- Handoff:
+  `docs/handoff/AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md`.
+
 ## 2026-07-06 - PR 94 Local Edit Draft Scope P2 Fix
 
 - Completed bounded PR #94 fix lane
