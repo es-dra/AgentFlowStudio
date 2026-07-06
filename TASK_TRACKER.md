@@ -8,6 +8,23 @@
 
 Last updated: 2026-07-06 by Codex
 
+P1 dirty-primary held evidence manifest addendum: Lane
+`TD-AFS-V02-WORK-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-CLEAN-BRANCH-READWRITE-20260706-001`
+preserved dirty-primary held evidence identities on clean branch
+`codex/dirty-primary-held-evidence-manifest-20260706` from PR #95 merge base
+`26512312eb6c6f311108c97b906667dfbf21b6b9`. Manifest:
+`docs/handoff/AFS-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-20260706.md`.
+The lane records path, byte size, sha256, source classification, hold reason,
+and current route for the held non-final Owner-review packet, held
+true-local-edit no-provider spec packet, and five `docs/demo-docs-20260629/*.md`
+files. It does not copy held packet prose, restore/land dirty-primary files,
+replay dirty record surfaces, modify provider/code/schema/OpenAPI/Runtime/
+Studio/test surfaces, run provider/media/runtime/browser/server actions, or
+claim sync, cleanup, archive, finality, readiness, Owner/human/business/legal/
+public acceptance, COS/CompanyOS/source-KB mutation, push, PR, merge, deploy,
+restart, or self-archive. Next if accepted: evaluator route before any sync,
+demo disposition, cleanup, archive, restore, or replay lane.
+
 P1 PR #94 local edit preflight post-merge record addendum: PR
 `https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
 standard GitHub merge commit
