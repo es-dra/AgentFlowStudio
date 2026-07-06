@@ -96,3 +96,62 @@ git restore --source=61b5b8b9d98577df1d2b7c0c273f32869ffb8518 -- docs/archive/ha
 quality、human creative acceptance、business validation、server/runtime health、deploy
 alignment、public/legal/patent approval、durable-memory promotion 或 CompanyOS/COS
 active-rule promotion。
+
+## 2026-07-06 Batch 1 Docs Redundancy Standard
+
+Dispatch:
+`TD-AFS-V02-CLEAN-P1-DOCS-REDUNDANCY-STANDARD-AND-BATCH1-20260706-002`
+
+Expected feedback:
+`BU-AFS-V02-CLEAN-P1-DOCS-REDUNDANCY-STANDARD-AND-BATCH1-20260706-002`
+
+Conservative redundancy deletion standard:
+
+Delete or archive a docs candidate only when all of these are true:
+
+1. It is not linked by current entrypoints such as `docs/README.md`,
+   `docs/handoff/INDEX.md`, `TASK_TRACKER.md`, `DEVLOG.md`, or current cleanup
+   ledgers.
+2. It is not referenced outside itself by filename in the repo.
+3. It is not current architecture, contract, test, provider, Runtime, Studio,
+   OpenAPI, package, Owner/CTO decision, evaluator, active PR, or safety-boundary
+   evidence.
+4. It is obsolete, duplicated, low-quality, misleading, or superseded by a
+   current summary/index.
+5. Its restoration path from git is recorded before deletion.
+
+Keep or defer any candidate that is active evidence, current task routing,
+provider/runtime safety boundary, Owner/CTO decision evidence, PR #96/#97/#100
+review or record surface, or material whose currentness cannot be proven in the
+cleanup lane.
+
+Batch 1 classification:
+
+| Classification | Path or rule | Rationale | Action |
+|---|---|---|---|
+| keep | `docs/README.md`, `docs/handoff/INDEX.md`, this cleanup ledger, active P0/P1/P2 handoffs, current maintenance evidence, PR #96/#97/#100 review/record surfaces | Current entrypoints or active evidence; not deletion candidates in this lane. | Unchanged |
+| consolidate | Historical docs already summarized by `docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`, `docs/handoff/INDEX.md`, and this ledger | Summary/index surfaces carry the recoverable context; individual stale packets require fresh proof before removal. | Defer unless no-reference rule passes |
+| delete_now | `docs/maintenance/AFS-R2-REDUNDANCY-BRANCH-WORKTREE-DISPOSITION-PACKET-20260701.md` | Not linked by current entrypoints; `rg --files-with-matches --fixed-strings` found no filename references outside itself; branch/worktree residue disposition is superseded by current maintenance summary/ledger surfaces. | Delete in Batch 1 |
+| defer | All other `docs/handoff/` and `docs/maintenance/` files not proven by the strict no-reference check | Many remain indexed, active, or referenced by current records; others need separate review. | No change |
+| do_not_touch | Code, tests, provider/OpenAPI/Runtime/server files, generated media/private KB/CompanyOS/COS, local configs/secrets, `docs/demo-docs-20260629/`, PR #96/#97/#100 surfaces | Outside dispatch scope or explicitly protected. | No change |
+
+Restoration path:
+
+```powershell
+git restore --source=a1f92690 -- docs/maintenance/AFS-R2-REDUNDANCY-BRANCH-WORKTREE-DISPOSITION-PACKET-20260701.md
+```
+
+Batch 1 verification evidence:
+
+| Check | Result |
+|---|---|
+| Base readback | `HEAD` matched fetched `origin/master` before branch creation. |
+| Working branch | `codex/docs-redundancy-standard-batch1-20260706` |
+| Initial dirty state | Clean before edits. |
+| Reference check | Candidate had zero filename references outside itself and no current entrypoint references. |
+| Post-delete reference readback | Filename references exist only in this deletion record and `DEVLOG.md` restoration notes. |
+| `python tools\repository_retention_review.py --root . --summary-only` | `delete_candidate_count=0`, `manual_review_required_count=0`, `remove_applied_pending_stage=1`. |
+| `python tools\maintenance_audit.py` | `status=warning`, `failed=0`; warnings are existing legacy/chinese-coverage/secret-like/oversized categories. |
+| `python -m pytest tests\test_repository_retention_review.py tests\test_maintenance_audit.py -q` | `15 passed`. |
+| `git diff --check` | passed. |
+| Scope | Docs-only; no code, tests, provider, Runtime, OpenAPI, server, generated media, private KB, COS, or CompanyOS mutation. |
