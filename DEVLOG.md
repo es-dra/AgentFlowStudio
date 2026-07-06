@@ -21,6 +21,33 @@
 - Tests were not required because the change is docs-only identity manifest and
   record pointers.
 
+## 2026-07-06 - C069 Residual PNG Manifest Clean-Base Integration
+
+- Completed clean-base integration lane
+  `TD-AFS-V02-INTEGRATE-P1-C069-PNG-MANIFEST-CLEAN-BASE-NO-REMOTE-20260706-002`
+  on `codex/c069-png-manifest-clean-base-20260706`.
+- Base evidence before editing: worktree HEAD was
+  `26512312eb6c6f311108c97b906667dfbf21b6b9`, the PR #95 merge commit. The
+  stale preservation source commit was
+  `b414bb147498629e5de97b15c06cb23dc4214479`.
+- Consumed source BUs: preservation BU
+  `BU-AFS-V02-PRESERVE-P1-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706-001`
+  and evaluator BU
+  `BU-AFS-V02-REVIEW-P1-C069-PNG-MANIFEST-BASE-INTEGRATION-EVALUATOR-READONLY-20260706-001`
+  with verdict `PASS_MANIFEST_SAFE_BUT_REBASE_REQUIRED`.
+- Replayed only the c069 manifest content from the preservation commit onto
+  the accepted clean base, while preserving current-base PR #94/#95 records in
+  this file, `TASK_TRACKER.md`, and `docs/handoff/INDEX.md`.
+- Added no PNG bytes and made no code, schema, OpenAPI, provider, runtime,
+  Studio, test, source-KB, COS, or CompanyOS changes.
+- Expected bottom-up feedback:
+  `BU-AFS-V02-INTEGRATE-P1-C069-PNG-MANIFEST-CLEAN-BASE-NO-REMOTE-20260706-002`.
+- Tests were not required because this is a docs-only manifest integration.
+  Verification is limited to base ancestry, changed-path boundary, whitespace
+  checks, staged diff check, credential-pattern scan, and record-presence scans.
+- Handoff:
+  `docs/handoff/AFS-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706.md`.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:

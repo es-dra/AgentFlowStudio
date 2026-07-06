@@ -25,6 +25,32 @@ public acceptance, COS/CompanyOS/source-KB mutation, push, PR, merge, deploy,
 restart, or self-archive. Next if accepted: evaluator route before any sync,
 demo disposition, cleanup, archive, restore, or replay lane.
 
+C069 residual PNG manifest clean-base integration addendum: Lane
+`TD-AFS-V02-INTEGRATE-P1-C069-PNG-MANIFEST-CLEAN-BASE-NO-REMOTE-20260706-002`
+integrated the preservation manifest from commit
+`b414bb147498629e5de97b15c06cb23dc4214479` onto accepted clean base
+`26512312eb6c6f311108c97b906667dfbf21b6b9`, the PR #95 merge commit; expected
+BU
+`BU-AFS-V02-INTEGRATE-P1-C069-PNG-MANIFEST-CLEAN-BASE-NO-REMOTE-20260706-002`.
+Source BUs consumed: preservation BU
+`BU-AFS-V02-PRESERVE-P1-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706-001`
+and evaluator BU
+`BU-AFS-V02-REVIEW-P1-C069-PNG-MANIFEST-BASE-INTEGRATION-EVALUATOR-READONLY-20260706-001`
+with verdict `PASS_MANIFEST_SAFE_BUT_REBASE_REQUIRED`. The integrated manifest
+records deterministic metadata for
+`lin-wan-reference.png` and `observatory-reference.png`: source-relative paths,
+byte sizes `8437` and `11805`, dimensions `512x768`, SHA-256 hashes
+`0cb1f8164ff4b5e3679abe6a45c34e0a0e6fb2a8696f3f50805fc5de07106bb7` and
+`04d15ac260df58a04af01d50fda4490c0f5e45cec6d3d879209b05dbe46681cc`, and
+manifest-only cleanup-preflight disposition. No PNG bytes were copied or
+tracked. Current-base PR #94/#95 records were preserved additively. No
+provider/media/runtime/browser/server action, generated-media QA, c069
+cleanup/deletion, code/schema/OpenAPI/Studio/test/source-KB/COS/CompanyOS
+mutation, durable-memory promotion, public/legal/business/human acceptance,
+push/PR/merge/release/deploy/restart, package finality, or self-archive is
+claimed. Handoff:
+`docs/handoff/AFS-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706.md`.
+
 P1 PR #94 local edit preflight post-merge record addendum: PR
 `https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
 standard GitHub merge commit
