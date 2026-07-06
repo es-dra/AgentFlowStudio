@@ -48,6 +48,27 @@
 - Handoff:
   `docs/handoff/AFS-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706.md`.
 
+## 2026-07-06 - P1 Dirty Owner Holds D1/D4/D3 Patch Manifest
+
+- Completed bounded preservation lane
+  `TD-AFS-V02-PRESERVE-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-NO-REMOTE-20260706-001`
+  on `codex/preserve-p1-dirty-owner-holds-20260706`.
+- Created compact manifest
+  `docs/handoff/AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`
+  from `origin/master=26512312eb6c6f311108c97b906667dfbf21b6b9`, preserving
+  D1/D4/D3 branch, head SHA, worktree path, dirty path lists, status summaries,
+  patch hashes, current file hashes, classification, hold reason, route, and
+  D3 non-ancestor-contained identity.
+- Source worktrees were read-only evidence sources only. D1, D4, and D3 were
+  not reset, cleaned, moved, deleted, archived, checked out, staged, committed,
+  pulled, pushed, or otherwise modified.
+- No cleanup/archive/delete/branch deletion, remote push, provider/runtime/
+  browser/media action, source-KB/COS/CompanyOS mutation, generated-media QA,
+  Owner/human/business/legal/public acceptance, release, package finality,
+  durable-memory promotion, or self-archive occurred.
+- Handoff:
+  `docs/handoff/AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:
