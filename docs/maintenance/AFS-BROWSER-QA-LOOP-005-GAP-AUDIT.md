@@ -41,7 +41,7 @@ Track A contract is present in the active line:
 | "What is seen is what is generated" | Preflight token tests exist; carry confirmation UI exists. | Needs focused test pass and browser confirmation. |
 | Zero leak: every generation manifest passes leak assertions | Existing fields are safe; Loop 005 adds dedicated keyframe/video manifest safety tests. | Partially proven; focused tests must pass. |
 | Baseline green | Previous branch was green. | Missing after Loop 005 edits. |
-| Human acceptance runbook | `docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-004.md` exists. | Present, but human acceptance not claimed. |
+| Human acceptance runbook | `docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-005.md` is the current entrypoint. | Present, but human acceptance not claimed. |
 
 ## Next Evidence To Collect
 
