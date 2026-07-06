@@ -96,6 +96,9 @@ def test_local_edit_honesty_does_not_change_runtime_or_provider_contract_markers
     assert "runtime.generateKeyframe(request)" in keyframe_actions
     assert "/video-revisions" in runtime_client
     assert "/keyframe-generations" in runtime_client
+    assert "preflightKeyframeLocalEdit" in runtime_client
+    assert "/keyframe-local-edits/preflight" in runtime_client
+    assert "preflight_keyframe_local_edit" in runtime_client
 
 
 def test_keyframe_local_edit_draft_records_lineage_without_execution() -> None:
@@ -166,9 +169,193 @@ def test_keyframe_local_edit_draft_records_lineage_without_execution() -> None:
     assert preflight["generated_media_created"] is False
     assert preflight["fallback_full_frame_edit"] is False
     assert preflight["local_edit_truth_label"] == "request_contract_only"
+    assert "preflight_token" not in preflight
+    assert preflight["preflight_receipt_status"] == "local_hash_pruned_before_persistence"
+    assert preflight["preflight_receipt_persisted"] is False
+    assert preflight["runtime_preflight_recorded"] is False
     assert "no_pixel_transformation" in preflight["non_claims"]
     assert availability["status"] == "contract_ready_execution_blocked"
+    assert "No provider call, generated media, or local pixel/image transform was performed." in node["result"]
     assert "不会生成媒体、不会调用 provider" in node["result"]
+
+
+def test_keyframe_local_edit_action_records_runtime_preflight_without_persisting_token() -> None:
+    script = textwrap.dedent(
+        """
+        import { createKeyframeLocalEditDraft } from "./apps/studio/src/node-actions.js";
+
+        const state = {
+          nodes: {
+            keyframe_1: {
+              id: "keyframe_1",
+              type: "image",
+              title: "Keyframe 001",
+              prompt: "Only cool the window light while preserving the character and composition.",
+              previewUrl: "/projects/demo/keyframe.png",
+              params: {
+                nodeRole: "keyframe_generation",
+                lastKeyframeJobId: "kg_job_001",
+                lastKeyframeCompletedJobId: "kg_job_001",
+                uploads: [{
+                  asset_id: "img_asset_001",
+                  preview_url: "/projects/demo/keyframe.png",
+                  source_candidate_id: "candidate_001",
+                }],
+              },
+              result: "ready",
+            },
+          },
+          assets: [],
+        };
+        let flushCalls = 0;
+        const store = {
+          get: () => state,
+          set: (mutator) => mutator(state),
+          flushRuntimeSave: async () => { flushCalls += 1; },
+        };
+        let runtimeCalls = 0;
+        let capturedRequest = null;
+        const runtime = {
+          preflightKeyframeLocalEdit: async (request) => {
+            runtimeCalls += 1;
+            capturedRequest = request;
+            return {
+              schema_version: "afs_keyframe_local_edit_preflight.v0.1",
+              project_id: "local-edit-runtime-preflight",
+              request_id: request.request_id,
+              contract_status: "ready_no_provider_execution",
+              execution_status: "blocked_no_local_transform",
+              provider_calls_started: false,
+              local_transformation_started: false,
+              generated_media_created: false,
+              fallback_full_frame_edit: false,
+              local_edit_truth_label: "request_contract_only",
+              blocking_capability: "image_edit_or_masked_local_transform",
+              blockers: [{
+                code: "execution_not_implemented",
+                reason: "Local pixel transformation is not implemented in this no-provider preflight slice.",
+                provider_calls_started: false,
+                local_transformation_started: false,
+                generated_media_created: false,
+              }],
+              allowed_next_actions: ["refine_edit_scope", "route_to_transform_or_provider_implementation_lane"],
+              preflight_token: "runtime-token-should-not-persist",
+              non_claims: ["no_provider_call", "no_generated_media", "no_pixel_transformation", "not_full_frame_fallback"],
+            };
+          },
+        };
+
+        await createKeyframeLocalEditDraft(store, runtime, state.nodes.keyframe_1, {
+          generatedAt: "2026-07-06T00:00:00.000Z",
+          editIntent: "Only cool the window light while preserving the character and composition.",
+          editScope: { kind: "semantic_region", target_description: "left window light area" },
+        });
+        process.stdout.write(JSON.stringify({
+          node: state.nodes.keyframe_1,
+          runtimeCalls,
+          capturedRequest,
+          flushCalls,
+        }));
+        """
+    )
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    node = payload["node"]
+    request = payload["capturedRequest"]
+    preflight = node["params"]["keyframeLocalEditDraft"]["preflight"]
+    serialized = json.dumps(node, ensure_ascii=False).lower()
+
+    assert payload["runtimeCalls"] == 1
+    assert payload["flushCalls"] == 1
+    assert request["fallback_policy"]["allow_full_frame_fallback"] is False
+    assert request["fallback_policy"]["fallback_truth_label"] == "not_allowed_in_first_slice"
+    assert request["provider_capability_mode"] == "no_provider_execution"
+    assert preflight["preflight_source"] == "runtime"
+    assert preflight["runtime_preflight_recorded"] is True
+    assert preflight["runtime_project_id"] == "local-edit-runtime-preflight"
+    assert preflight["contract_status"] == "ready_no_provider_execution"
+    assert preflight["execution_status"] == "blocked_no_local_transform"
+    assert preflight["provider_calls_started"] is False
+    assert preflight["local_transformation_started"] is False
+    assert preflight["generated_media_created"] is False
+    assert preflight["fallback_full_frame_edit"] is False
+    assert preflight["preflight_receipt_status"] == "issued_pruned_before_persistence"
+    assert preflight["preflight_receipt_persisted"] is False
+    assert "preflight_token" not in serialized
+    assert "runtime-token-should-not-persist" not in serialized
+    assert "Runtime preflight recorded" in node["result"]
+    assert "raw preflight receipt is pruned" in node["result"]
+    assert "No provider call, generated media, or local pixel/image transform was performed." in node["result"]
+
+
+def test_keyframe_local_edit_action_redacts_unsafe_runtime_preflight_error_copy() -> None:
+    script = textwrap.dedent(
+        """
+        import { createKeyframeLocalEditDraft } from "./apps/studio/src/node-actions.js";
+
+        const state = {
+          nodes: {
+            keyframe_unsafe: {
+              id: "keyframe_unsafe",
+              type: "image",
+              prompt: "Safe parent keyframe prompt",
+              params: {
+                nodeRole: "keyframe_generation",
+                lastKeyframeCompletedJobId: "kg_job_001",
+                uploads: [{ asset_id: "img_asset_001", preview_url: "/projects/demo/keyframe.png" }],
+              },
+              result: "ready",
+            },
+          },
+          assets: [],
+        };
+        const store = {
+          get: () => state,
+          set: (mutator) => mutator(state),
+          flushRuntimeSave: async () => {},
+        };
+        const runtime = {
+          preflightKeyframeLocalEdit: async () => {
+            throw new Error("Runtime request failed (422): invalid_keyframe_local_edit data_base64 raw_provider_response D:\\\\private\\\\secret.png Bearer secret-token");
+          },
+        };
+
+        await createKeyframeLocalEditDraft(store, runtime, state.nodes.keyframe_unsafe, {
+          generatedAt: "2026-07-06T00:00:00.000Z",
+          editIntent: "Use data_base64 raw_provider_response D:\\\\private\\\\secret.png Bearer secret-token",
+          editScope: { kind: "semantic_region", target_description: "left window light area" },
+        });
+        process.stdout.write(JSON.stringify(state.nodes.keyframe_unsafe));
+        """
+    )
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+    preflight = node["params"]["keyframeLocalEditDraft"]["preflight"]
+    serialized = json.dumps(node, ensure_ascii=False).lower()
+
+    assert preflight["contract_status"] == "runtime_preflight_rejected"
+    assert preflight["execution_status"] == "blocked_invalid_runtime_preflight_request"
+    assert preflight["provider_calls_started"] is False
+    assert preflight["local_transformation_started"] is False
+    assert preflight["generated_media_created"] is False
+    assert preflight["preflight_receipt_status"] == "not_issued"
+    assert "data_base64" not in serialized
+    assert "raw_provider_response" not in serialized
+    assert "secret-token" not in serialized
+    assert "d:\\\\private" not in serialized
+    assert "preflight_token" not in serialized
 
 
 def test_keyframe_local_edit_draft_blocks_missing_parent_lineage() -> None:

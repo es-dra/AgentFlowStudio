@@ -96,7 +96,7 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
     if (canContinueKeyframeToVideo(node)) {
       addItem("pencil", "创建局部编辑需求草稿", () => {
         const fresh = store.get().nodes[nodeId];
-        if (fresh) createKeyframeLocalEditDraft(store, fresh);
+        if (fresh) void createKeyframeLocalEditDraft(store, runtime, fresh);
       });
       addDisabledItem("lock", "关键帧局部编辑不可用", KEYFRAME_LOCAL_EDIT_GATE);
       addItem("video", "接续视频节点", () => {

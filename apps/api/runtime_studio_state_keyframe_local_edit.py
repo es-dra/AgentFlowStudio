@@ -74,6 +74,13 @@ def _preflight(value: Any, *, text: TextSanitizer) -> dict[str, Any]:
         "blocking_capability": text(value.get("blocking_capability"), "", 120),
         "blockers": _blockers(value.get("blockers"), text=text),
         "allowed_next_actions": _text_list(value.get("allowed_next_actions"), text=text, max_items=8, max_length=120),
+        "preflight_source": text(value.get("preflight_source"), "", 80),
+        "runtime_preflight_recorded": bool(value.get("runtime_preflight_recorded")),
+        "runtime_preflight_error": bool(value.get("runtime_preflight_error")),
+        "runtime_project_id": safe_id(text(value.get("runtime_project_id"), "", 160)),
+        "preflight_receipt_status": text(value.get("preflight_receipt_status"), "", 120),
+        "preflight_receipt_persisted": bool(value.get("preflight_receipt_persisted")),
+        "recorded_at": text(value.get("recorded_at"), "", 80),
         "non_claims": _text_list(value.get("non_claims"), text=text, max_items=12, max_length=120),
     }
     return {key: item for key, item in result.items() if item not in ({}, [], "")}

@@ -138,7 +138,7 @@ async function requestJson(route, { method = "GET", payload = null, meta = null 
 
 function staleRuntimeRouteMessage(response, route, body, parsed = null) {
   if (response.status !== 404) return "";
-  const missingPreflight = /\/(keyframe-generations|video-generations|video-revisions)\/preflight$/.test(route);
+  const missingPreflight = /\/(keyframe-generations|keyframe-local-edits|video-generations|video-revisions)\/preflight$/.test(route);
   const missingRevisionRoute = /\/video-revisions$/.test(route);
   if (!missingPreflight && !missingRevisionRoute) return "";
   const detail = runtimeErrorMessage(response, body, parsed);
@@ -320,6 +320,7 @@ function inferUserAction(route, method) {
   if (/\/video-generations\/[^/]+\/poll$/.test(route)) return "poll_video_generation";
   if (/\/video-generations$/.test(route) && method === "POST") return "click_generate_video";
   if (/^\/projects\/[^/]+$/.test(route) && method === "DELETE") return "delete_project";
+  if (/\/keyframe-local-edits\/preflight$/.test(route)) return "preflight_keyframe_local_edit";
   if (/\/keyframe-generations\/preflight$/.test(route)) return "preflight_keyframe_generation";
   if (/\/keyframe-generations$/.test(route) && method === "POST") return "click_generate_keyframe";
   if (/\/prompt-optimizations$/.test(route)) return "click_optimize_prompt";
@@ -333,6 +334,7 @@ function inferUserAction(route, method) {
 }
 
 function inferGenerationKind(route) {
+  if (route.includes("/keyframe-local-edits")) return "keyframe_local_edit";
   if (route.includes("/video-generations")) return "video";
   if (route.includes("/video-revisions")) return "video_revision";
   if (route.includes("/keyframe-generations")) return "keyframe";
@@ -475,6 +477,9 @@ export function createRuntimeClient(projectId = "studio-local-001") {
     },
     preflightKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations/preflight`, { method: "POST", payload });
+    },
+    preflightKeyframeLocalEdit(payload) {
+      return requestJson(`/projects/${encoded}/keyframe-local-edits/preflight`, { method: "POST", payload });
     },
     generateKeyframe(payload) {
       return requestJson(`/projects/${encoded}/keyframe-generations`, { method: "POST", payload });

@@ -1,4 +1,5 @@
 import { keyframeFirstFrameAsset } from "./keyframe-video-continuation.js";
+import { redactUnsafeText } from "./safe-text-redaction.js";
 
 export const KEYFRAME_LOCAL_EDIT_REQUEST_SCHEMA = "afs_keyframe_local_edit_request.v0.1";
 export const KEYFRAME_LOCAL_EDIT_PREFLIGHT_SCHEMA = "afs_keyframe_local_edit_preflight.v0.1";
@@ -40,6 +41,60 @@ export function createKeyframeLocalEditDraft(store, keyframeNode, options = {}) 
     node.result = keyframeLocalEditDraftResultText(draft);
   });
   return draft;
+}
+
+export function recordKeyframeLocalEditRuntimePreflight(store, nodeId, runtimePreflight, options = {}) {
+  let updated = null;
+  store.set((s) => {
+    const node = s.nodes?.[nodeId];
+    const draft = node?.params?.keyframeLocalEditDraft;
+    if (!node || !draft) return;
+    updated = {
+      ...draft,
+      preflight: safeRuntimePreflight(draft.preflight, runtimePreflight, options),
+    };
+    updated.availability = availabilityFromPreflight(updated.preflight);
+    node.params.keyframeLocalEditDraft = updated;
+    node.params.local_edit_availability = updated.availability;
+    node.result = keyframeLocalEditDraftResultText(updated);
+  });
+  return updated;
+}
+
+export function recordKeyframeLocalEditRuntimePreflightError(store, nodeId, message, options = {}) {
+  let updated = null;
+  store.set((s) => {
+    const node = s.nodes?.[nodeId];
+    const draft = node?.params?.keyframeLocalEditDraft;
+    if (!node || !draft) return;
+    const local = withoutRawPreflightToken(draft.preflight || {});
+    const blockerMessage = cleanPublicText(message || "Runtime local-edit preflight failed.", 320);
+    updated = {
+      ...draft,
+      preflight: {
+        ...local,
+        contract_status: "runtime_preflight_rejected",
+        execution_status: "blocked_invalid_runtime_preflight_request",
+        provider_calls_started: false,
+        local_transformation_started: false,
+        generated_media_created: false,
+        fallback_full_frame_edit: false,
+        blockers: [blocker("runtime_preflight_rejected", blockerMessage)],
+        allowed_next_actions: ["refine_edit_scope", "retry_runtime_preflight"],
+        preflight_source: "runtime",
+        runtime_preflight_recorded: false,
+        runtime_preflight_error: true,
+        preflight_receipt_status: "not_issued",
+        preflight_receipt_persisted: false,
+        recorded_at: String(options.recordedAt || new Date().toISOString()),
+      },
+    };
+    updated.availability = availabilityFromPreflight(updated.preflight);
+    node.params.keyframeLocalEditDraft = updated;
+    node.params.local_edit_availability = updated.availability;
+    node.result = keyframeLocalEditDraftResultText(updated);
+  });
+  return updated;
 }
 
 export function buildKeyframeLocalEditDraft(state, node, options = {}) {
@@ -87,16 +142,6 @@ export function keyframeLocalEditPreflight(request) {
     blockers.push(blocker("missing_edit_scope", "缺少局部编辑区域描述。"));
   }
   const contractReady = blockers.length === 0;
-  const tokenPayload = {
-    schema_version: KEYFRAME_LOCAL_EDIT_PREFLIGHT_SCHEMA,
-    target_node_id: request?.target_node_id || "",
-    parent_lineage: request?.parent_lineage || {},
-    edit_intent: request?.edit_intent || "",
-    edit_scope: request?.edit_scope || {},
-    preserve_locks: request?.preserve_locks || [],
-    negative_locks: request?.negative_locks || [],
-    fallback_policy: request?.fallback_policy || {},
-  };
   return {
     schema_version: KEYFRAME_LOCAL_EDIT_PREFLIGHT_SCHEMA,
     request_id: request?.request_id || "",
@@ -114,7 +159,10 @@ export function keyframeLocalEditPreflight(request) {
     allowed_next_actions: contractReady
       ? ["refine_edit_scope", "route_to_runtime_or_provider_implementation_lane"]
       : ["add_parent_image_asset", "add_edit_intent", "refine_edit_scope"],
-    preflight_token: stableHash(tokenPayload),
+    preflight_source: "studio_local",
+    runtime_preflight_recorded: false,
+    preflight_receipt_status: "local_hash_pruned_before_persistence",
+    preflight_receipt_persisted: false,
     non_claims: [...LOCAL_EDIT_NON_CLAIMS],
   };
 }
@@ -128,9 +176,13 @@ export function keyframeLocalEditDraftResultText(draft) {
     `父关键帧任务：${parent.parent_keyframe_job_id || "缺失"}`,
     `父图像资产：${parent.parent_image_asset_id || "缺失"}`,
     `合同状态：${preflight.contract_status || "unknown"}；执行状态：${preflight.execution_status || "unknown"}`,
+    preflight.runtime_preflight_recorded
+      ? "Runtime preflight recorded; only safe status metadata is persisted and the raw preflight receipt is pruned."
+      : "",
     firstBlocker,
+    "No provider call, generated media, or local pixel/image transform was performed.",
     "不会生成媒体、不会调用 provider、不会把整图重生成标记为局部编辑。",
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 export function keyframeLocalEditParentLineage(state, node) {
@@ -155,6 +207,49 @@ function availabilityFromPreflight(preflight) {
     reason: blocked.code || LOCAL_EDIT_EXECUTION_BLOCKED.reason,
     user_message: blocked.reason || LOCAL_EDIT_EXECUTION_BLOCKED.user_message,
   };
+}
+
+function safeRuntimePreflight(localPreflight, runtimePreflight, options = {}) {
+  const raw = runtimePreflight && typeof runtimePreflight === "object" ? runtimePreflight : {};
+  const base = withoutRawPreflightToken(localPreflight || {});
+  const hasRuntimeToken = Boolean(String(raw.preflight_token || "").trim());
+  return {
+    ...base,
+    schema_version: KEYFRAME_LOCAL_EDIT_PREFLIGHT_SCHEMA,
+    request_id: cleanId(raw.request_id || base.request_id),
+    contract_status: cleanStatus(raw.contract_status || base.contract_status),
+    execution_status: cleanStatus(raw.execution_status || base.execution_status),
+    provider_calls_started: raw.provider_calls_started === true,
+    local_transformation_started: raw.local_transformation_started === true,
+    generated_media_created: raw.generated_media_created === true,
+    fallback_full_frame_edit: raw.fallback_full_frame_edit === true,
+    local_edit_truth_label: cleanStatus(raw.local_edit_truth_label || base.local_edit_truth_label || "request_contract_only"),
+    blocking_capability: cleanStatus(raw.blocking_capability || base.blocking_capability || "image_edit_or_masked_local_transform"),
+    blockers: normalizeBlockers(raw.blockers || base.blockers),
+    allowed_next_actions: normalizeStringList(raw.allowed_next_actions || base.allowed_next_actions, []),
+    preflight_source: "runtime",
+    runtime_preflight_recorded: true,
+    runtime_project_id: cleanId(raw.project_id),
+    preflight_receipt_status: hasRuntimeToken ? "issued_pruned_before_persistence" : "not_issued",
+    preflight_receipt_persisted: false,
+    recorded_at: String(options.recordedAt || new Date().toISOString()),
+    non_claims: normalizeStringList(raw.non_claims || base.non_claims, LOCAL_EDIT_NON_CLAIMS),
+  };
+}
+
+function withoutRawPreflightToken(value) {
+  const copy = { ...(value || {}) };
+  delete copy.preflight_token;
+  return copy;
+}
+
+function normalizeBlockers(value) {
+  const items = Array.isArray(value) ? value : [];
+  const result = items.map((item) => blocker(
+    cleanStatus(item?.code || "runtime_preflight_blocked"),
+    cleanPublicText(item?.reason || item?.message || "Runtime local-edit preflight blocked execution.", 320),
+  )).filter((item) => item.code || item.reason).slice(0, 8);
+  return result.length ? result : [blocker("execution_not_implemented", "Local pixel transformation is not implemented in this no-provider preflight slice.")];
 }
 
 function normalizeEditScope(scope) {
@@ -186,7 +281,7 @@ function normalizeStringList(value, fallback = []) {
 }
 
 function blocker(code, reason) {
-  return { code, reason, provider_calls_started: false, generated_media_created: false };
+  return { code, reason, provider_calls_started: false, local_transformation_started: false, generated_media_created: false };
 }
 
 function localEditRequestId(node, parentLineage, generatedAt) {
@@ -202,17 +297,12 @@ function cleanId(value) {
   return String(value || "").replace(/[^a-zA-Z0-9_.:-]/g, "").slice(0, 120);
 }
 
+function cleanStatus(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9_.:-]/g, "_").replace(/^_+|_+$/g, "").slice(0, 120);
+}
+
 function cleanPublicText(value, limit = 500) {
-  return String(value || "")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/\b(?:token|secret|credential)\s*[:=]\s*\S+/gi, "<redacted>")
-    .replace(/\bdata:[^\s"'<>]+/gi, "<media-bytes-redacted>")
-    .replace(/[A-Za-z]:\\[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/\/(?:home|Users|mnt|var|tmp|opt)\/[^\s"'<>]+/g, "<local-path-redacted>")
-    .replace(/https?:\/\/[^\s"'<>]+/g, "<url-redacted>")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, limit);
+  return redactUnsafeText(value, limit);
 }
 
 function stableHash(value) {

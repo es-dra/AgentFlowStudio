@@ -87,6 +87,15 @@ def test_keyframe_local_edit_draft_persists_through_studio_state_without_token(t
     project_id = "local-edit-state"
     request = _request()
     preflight = client.post(f"/projects/{project_id}/keyframe-local-edits/preflight", json=request).json()
+    preflight.update(
+        {
+            "preflight_source": "runtime",
+            "runtime_preflight_recorded": True,
+            "runtime_project_id": project_id,
+            "preflight_receipt_status": "issued_pruned_before_persistence",
+            "preflight_receipt_persisted": False,
+        }
+    )
     availability = {
         "status": "contract_ready_execution_blocked",
         "required_capability": "image_edit_or_masked_local_transform",
@@ -131,6 +140,11 @@ def test_keyframe_local_edit_draft_persists_through_studio_state_without_token(t
     assert draft["preflight"]["local_transformation_started"] is False
     assert draft["preflight"]["generated_media_created"] is False
     assert draft["preflight"]["blockers"][0]["code"] == "execution_not_implemented"
+    assert draft["preflight"]["preflight_source"] == "runtime"
+    assert draft["preflight"]["runtime_preflight_recorded"] is True
+    assert draft["preflight"]["runtime_project_id"] == project_id
+    assert draft["preflight"]["preflight_receipt_status"] == "issued_pruned_before_persistence"
+    assert draft["preflight"]["preflight_receipt_persisted"] is False
     assert params["local_edit_availability"]["status"] == "contract_ready_execution_blocked"
     serialized = json.dumps(params, ensure_ascii=False).lower()
     assert "preflight_token" not in serialized
