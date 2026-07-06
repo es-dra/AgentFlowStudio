@@ -6,7 +6,27 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-05 by Codex
+Last updated: 2026-07-06 by Codex
+
+P1 PR #94 local edit draft scope P2 fix addendum: Lane
+`TD-AFS-V02-FIX-P1-PR-94-P2-LOCAL-EDIT-DRAFT-SCOPE-AND-BODY-READINESS-NO-RELEASE-20260706-001`
+completed a bounded Studio/Runtime regression fix on
+`codex/p1-studio-runtime-local-edit-preflight-integrated-20260706`; expected
+BU
+`BU-AFS-V02-FIX-P1-PR-94-P2-LOCAL-EDIT-DRAFT-SCOPE-AND-BODY-READINESS-NO-RELEASE-20260706-001`.
+Studio local-edit draft normalization no longer converts absent node-menu
+scope into placeholder target text, and Runtime preflight now treats known
+placeholder scope copy as `missing_edit_scope`. Prompt + parent image without
+user-supplied scope remains `draft_needs_input` /
+`blocked_missing_required_input`, preserving no-provider/no-generated-media/
+no-pixel-transform/no-full-frame-fallback boundaries. Available validation
+passed focused local-edit pytest (`21 passed`), `npm run check:studio-js`
+(`151 files`), Python 3.12 `py_compile` on touched Python/test files,
+`git diff --check`, and scoped boundary scans. The expected project `.venv`
+was absent in this worktree; pytest used PATH Python 3.13. No merge, release,
+deploy, restart, provider call/spend, generated-media QA, Runtime server/
+browser QA, source-KB/COS/CompanyOS mutation, human/business/public/legal
+acceptance, archive execution, or self-archive is claimed.
 
 P0 reference upload Runtime error UX local contract addendum: Lane
 `FIX-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT` completed a bounded

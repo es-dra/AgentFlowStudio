@@ -178,7 +178,7 @@ def _reject_node_params(params: Any) -> None:
         lowered = str(key).lower()
         if any(forbidden in lowered for forbidden in FORBIDDEN_STUDIO_KEYS):
             raise ValueError(f"studio state contains forbidden field: {key}")
-        if key == "keyframeConstraints":
+        if key in {"keyframeConstraints", "keyframeLocalEditDraft"}:
             continue
         if key in SAFE_NODE_PARAM_KEYS:
             _reject_forbidden(item)

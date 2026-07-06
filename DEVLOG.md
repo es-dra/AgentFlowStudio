@@ -1,5 +1,27 @@
 # Devlog
 
+## 2026-07-06 - PR 94 Local Edit Draft Scope P2 Fix
+
+- Completed bounded PR #94 fix lane
+  `TD-AFS-V02-FIX-P1-PR-94-P2-LOCAL-EDIT-DRAFT-SCOPE-AND-BODY-READINESS-NO-RELEASE-20260706-001`
+  on `codex/p1-studio-runtime-local-edit-preflight-integrated-20260706`.
+- Fixed local-edit draft scope honesty: Studio no longer seeds the local edit
+  scope target description with placeholder copy when node-menu creates a
+  draft without user-supplied `editScope`, and Runtime now treats known
+  placeholder scope copy as `missing_edit_scope`.
+- Added focused Studio and Runtime regressions proving prompt + parent image
+  without user scope stays `draft_needs_input` /
+  `blocked_missing_required_input` with `missing_edit_scope`, not
+  `ready_no_provider_execution`.
+- Available validation passed focused local-edit pytest (`21 passed`),
+  `npm run check:studio-js` (`151 files`), Python 3.12 `py_compile` on touched
+  Python/test files, `git diff --check`, and scoped diff boundary scans. The
+  project `.venv` was absent in this worktree; pytest ran on PATH Python 3.13.
+- No provider call/spend, generated media, local pixel/image transform,
+  full-frame fallback, Runtime server/browser QA, deploy/restart, merge,
+  release, source-KB/COS/CompanyOS mutation, or human/business/public/legal
+  acceptance claim occurred.
+
 ## 2026-07-05 - P0 Reference Upload Runtime Error UX Local Contract
 
 - Completed bounded fix lane

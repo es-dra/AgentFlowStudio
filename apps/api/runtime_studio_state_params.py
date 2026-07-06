@@ -7,6 +7,10 @@ from apps.api.runtime_studio_generation_state import SAFE_GENERATION_PARAM_KEYS,
 from apps.api.runtime_studio_state_context import sanitize_context_bundle
 from apps.api.runtime_studio_state_feedback_overlay import sanitize_feedback_overlay_decisions
 from apps.api.runtime_studio_state_human_gate import sanitize_human_gate_decisions
+from apps.api.runtime_studio_state_keyframe_local_edit import (
+    sanitize_keyframe_local_edit_draft,
+    sanitize_local_edit_availability,
+)
 from apps.api.runtime_studio_state_quality_feedback import sanitize_quality_feedback_candidates
 from apps.api.runtime_store import safe_id
 
@@ -26,7 +30,7 @@ SAFE_NODE_PARAM_KEYS = (
     "assetCardRevision",
     "assetAutoBindingGraph", "asset_auto_binding_graph", "nodeReferenceStack", "node_reference_stack",
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
-    "keyframeConstraints",
+    "keyframeConstraints", "keyframeLocalEditDraft", "local_edit_availability",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
     "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
@@ -98,6 +102,10 @@ def _sanitize_param(
         return param_values.keyframe_layer(value, text=text)
     if key == "keyframeConstraints":
         return param_values.keyframe_constraints(value, text=text, number=number)
+    if key == "keyframeLocalEditDraft":
+        return sanitize_keyframe_local_edit_draft(value, text=text, number=number)
+    if key == "local_edit_availability":
+        return sanitize_local_edit_availability(value, text=text)
     if key == "lastVisualAssetWarnings":
         return param_values.warnings(value, text=text)
     if key == "temporaryAssetExclusions":
