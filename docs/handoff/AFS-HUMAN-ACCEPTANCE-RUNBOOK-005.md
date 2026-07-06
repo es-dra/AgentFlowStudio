@@ -1,12 +1,24 @@
 # AFS Human Acceptance Runbook 005 人工验收手册
 
 日期：2026-06-14
+当前性整理：2026-07-07。005 是当前 human acceptance 入口；004 仅保留为历史引用，不再作为新一轮人工验收入口。
 
 目的：给人工验收一个明确入口。Loop 005 已完成的是 runtime/browser verification 和 provider smoke 证据；只有你本人按本手册走完并记录通过/失败后，才能把对应路径升级为 human acceptance。
 
+## 声明边界
+
+在你按本手册走完之前：
+
+- 测试通过只代表工程验证；
+- 浏览器 QA 只代表浏览器与 Runtime 路径验证；
+- provider smoke 只代表 provider 调用链有证据；
+- 以上都不是 human acceptance，也不是 business validation。
+
+人工验收只从你亲自执行以下路径并记录通过/失败开始。
+
 ## 证据保留规则
 
-失败时只保留：
+每个失败只保留：
 
 - project id；
 - node id 或 job id；
@@ -57,6 +69,7 @@
 - 优化结果是文生图扩写语气，不是图生图最小变更语气。
 - 没有 fixed asset 时不弹携带确认层。
 - 生成图通过 Runtime safe preview 显示。
+- 失败时给出可理解的安全失败说明。
 - 用户层错误不暴露 provider raw、secret、signed URL 或本地路径。
 
 只能由人判断：
@@ -79,11 +92,13 @@
 - 优化结果使用参考图保持 / 最小变更语气。
 - 请求使用 Runtime image asset id，不使用本地路径。
 - 生成预览来自 Runtime safe preview endpoint。
+- 失败时用户层文案清楚，技术细节不抢占主要说明。
 
 只能由人判断：
 
 - 身份是否保住；
 - 修改是否太弱、太破坏，或刚好合适。
+- 画面是否可用于后续资产固定。
 
 ## 路径 4：固定资产
 
@@ -124,6 +139,7 @@
 - 即使没有检测到明显冲突，也必须列出携带资产。
 - 主体参考图有标注。
 - 取消不会提交。
+- 取消后节点状态和 Runtime 保存状态都恢复到取消前。
 - “本次不携带”只排除本次请求，不修改资产本身。
 - 第三次生成时资产会重新进入确认层。
 
@@ -147,6 +163,7 @@
 - 不使用隐式首帧。
 - provider descriptor 没声明音频能力时，不显示声音选项。
 - candidate count 为 1。
+- 付费视频提交前确认信息清楚。
 - 视频预览使用 Runtime safe preview endpoint。
 - 刷新不丢 job 状态。
 
