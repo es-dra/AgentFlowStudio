@@ -18,6 +18,7 @@ archived.
 ## Goal / Release Gates
 
 - `AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`
+- `AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`
 - `AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md`
 - `AFS-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705.md`
 - `AFS-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705.md`
@@ -312,10 +313,14 @@ not a claim that human acceptance or business validation has happened.
   `AFS-P1-OWNER-PROJECT-BOOK-REVIEW-PACKET-SYNTHESIS-NONFINAL-20260705.md`.
   It remains non-final packet evidence and must not be used as package
   finality, readiness, or Owner acceptance.
-- Active spec evidence needing CTO/evaluator/implementation-lane disposition:
+- Held source evidence with tracked reconciliation disposition:
   `AFS-P1-TRUE-LOCAL-EDIT-SCHEMA-OPENAPI-CONTRACT-NO-PROVIDER-20260705.md`.
-  It remains a no-provider contract/spec packet, not code, OpenAPI,
-  runtime/provider support, or final schema acceptance.
+  It is not active/current-checkout-verifiable evidence by itself after
+  reconciliation. Use
+  `AFS-P1-TRUE-LOCAL-EDIT-CONTRACT-RECONCILIATION-NONFINAL-20260706.md`
+  and the PR #94 post-merge packet for current tracked disposition. It remains
+  held source evidence, not code, OpenAPI, runtime/provider support, generated
+  media, true local-edit capability, or final schema acceptance.
 - Held paired provider-adapter v0.3 image-edit descriptor bundle:
   `../provider_adapter_contract.md`,
   `../provider_adapter_v03_image_edit_addendum.md`,
