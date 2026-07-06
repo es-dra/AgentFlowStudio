@@ -315,6 +315,7 @@ not a claim that human acceptance or business validation has happened.
 
 ## Current Maintenance Evidence
 
+- `AFS-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706.md`
 - `../maintenance/AFS-TRACKER-DEVLOG-CURRENT-STATE-INDEX-20260703.md`
 - `../archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md`
 - `../maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md`
