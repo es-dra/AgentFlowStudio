@@ -36,6 +36,11 @@ KEYFRAME_LOCAL_EDIT_UNSAFE_REQUEST_MARKERS = (
     "provider_response",
     "provider_raw",
 )
+KEYFRAME_LOCAL_EDIT_SCOPE_PLACEHOLDERS = {
+    "please describe the local edit region.",
+    "describe the local edit region.",
+    "请描述要修改的局部区域。",
+}
 
 
 class KeyframeLocalEditParentLineage(BaseModel):
@@ -207,9 +212,19 @@ def _required_input_blockers(request: KeyframeLocalEditRequest) -> list[dict[str
         blockers.append(_blocker("missing_parent_image_asset", "Missing parent image asset id."))
     if not request.edit_intent.strip():
         blockers.append(_blocker("missing_edit_intent", "Missing local edit intent."))
-    if not request.edit_scope.target_description.strip():
+    if _is_missing_edit_scope_description(request.edit_scope.target_description):
         blockers.append(_blocker("missing_edit_scope", "Missing local edit target description."))
     return blockers
+
+
+def _is_missing_edit_scope_description(value: str) -> bool:
+    text = " ".join(str(value or "").split()).strip()
+    if not text:
+        return True
+    normalized = text.casefold()
+    if normalized in KEYFRAME_LOCAL_EDIT_SCOPE_PLACEHOLDERS:
+        return True
+    return normalized.startswith("璇锋弿杩")
 
 
 def _blocker(code: str, reason: str) -> dict[str, Any]:

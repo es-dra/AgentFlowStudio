@@ -186,6 +186,36 @@ def test_keyframe_local_edit_preflight_blocks_incomplete_studio_draft_without_42
     assert payload["generated_media_created"] is False
 
 
+@pytest.mark.parametrize(
+    "placeholder_scope",
+    [
+        "Please describe the local edit region.",
+        "请描述要修改的局部区域。",
+    ],
+)
+def test_keyframe_local_edit_preflight_treats_placeholder_scope_as_missing(
+    tmp_path,
+    monkeypatch,
+    placeholder_scope: str,
+) -> None:
+    monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
+    client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))
+    request = _request(edit_scope={"kind": "semantic_region", "target_description": placeholder_scope})
+
+    response = client.post("/projects/local-edit-placeholder-scope/keyframe-local-edits/preflight", json=request)
+
+    assert response.status_code == 200
+    payload = response.json()
+    blocker_codes = {blocker["code"] for blocker in payload["blockers"]}
+    assert payload["contract_status"] == "draft_needs_input"
+    assert payload["execution_status"] == "blocked_missing_required_input"
+    assert "missing_edit_scope" in blocker_codes
+    assert payload["provider_calls_started"] is False
+    assert payload["local_transformation_started"] is False
+    assert payload["generated_media_created"] is False
+    assert payload["fallback_full_frame_edit"] is False
+
+
 def test_keyframe_local_edit_preflight_rejects_forbidden_fallback_and_unsafe_text(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_IMAGE", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path / "runtime"))

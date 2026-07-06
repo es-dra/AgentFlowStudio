@@ -294,6 +294,101 @@ def test_keyframe_local_edit_action_records_runtime_preflight_without_persisting
     assert "No provider call, generated media, or local pixel/image transform was performed." in node["result"]
 
 
+def test_keyframe_local_edit_action_keeps_node_menu_draft_blocked_without_user_scope() -> None:
+    script = textwrap.dedent(
+        """
+        import { createKeyframeLocalEditDraft } from "./apps/studio/src/node-actions.js";
+
+        const state = {
+          nodes: {
+            keyframe_1: {
+              id: "keyframe_1",
+              type: "image",
+              title: "Keyframe 001",
+              prompt: "Only cool the window light while preserving the character and composition.",
+              previewUrl: "/projects/demo/keyframe.png",
+              params: {
+                nodeRole: "keyframe_generation",
+                lastKeyframeJobId: "kg_job_001",
+                lastKeyframeCompletedJobId: "kg_job_001",
+                uploads: [{
+                  asset_id: "img_asset_001",
+                  preview_url: "/projects/demo/keyframe.png",
+                  source_candidate_id: "candidate_001",
+                }],
+              },
+              result: "ready",
+            },
+          },
+          assets: [],
+        };
+        const store = {
+          get: () => state,
+          set: (mutator) => mutator(state),
+          flushRuntimeSave: async () => {},
+        };
+        let capturedRequest = null;
+        const runtime = {
+          preflightKeyframeLocalEdit: async (request) => {
+            capturedRequest = request;
+            return {
+              schema_version: "afs_keyframe_local_edit_preflight.v0.1",
+              project_id: "local-edit-runtime-preflight",
+              request_id: request.request_id,
+              contract_status: "draft_needs_input",
+              execution_status: "blocked_missing_required_input",
+              provider_calls_started: false,
+              local_transformation_started: false,
+              generated_media_created: false,
+              fallback_full_frame_edit: false,
+              local_edit_truth_label: "request_contract_only",
+              blocking_capability: "image_edit_or_masked_local_transform",
+              blockers: [{
+                code: "missing_edit_scope",
+                reason: "Missing local edit target description.",
+                provider_calls_started: false,
+                local_transformation_started: false,
+                generated_media_created: false,
+              }],
+              allowed_next_actions: ["add_parent_image_asset", "add_edit_intent", "refine_edit_scope"],
+              non_claims: ["no_provider_call", "no_generated_media", "no_pixel_transformation", "not_full_frame_fallback"],
+            };
+          },
+        };
+
+        await createKeyframeLocalEditDraft(store, runtime, state.nodes.keyframe_1, {
+          generatedAt: "2026-07-06T00:00:00.000Z",
+        });
+        process.stdout.write(JSON.stringify({
+          node: state.nodes.keyframe_1,
+          capturedRequest,
+        }));
+        """
+    )
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    request = payload["capturedRequest"]
+    node = payload["node"]
+    preflight = node["params"]["keyframeLocalEditDraft"]["preflight"]
+    blocker_codes = {blocker["code"] for blocker in preflight["blockers"]}
+
+    assert request["edit_intent"] == "Only cool the window light while preserving the character and composition."
+    assert request["edit_scope"]["target_description"] == ""
+    assert preflight["contract_status"] == "draft_needs_input"
+    assert preflight["execution_status"] == "blocked_missing_required_input"
+    assert "missing_edit_scope" in blocker_codes
+    assert node["params"]["local_edit_availability"]["status"] == "draft_needs_input"
+    assert preflight["provider_calls_started"] is False
+    assert preflight["generated_media_created"] is False
+    assert preflight["fallback_full_frame_edit"] is False
+
+
 def test_keyframe_local_edit_action_redacts_unsafe_runtime_preflight_error_copy() -> None:
     script = textwrap.dedent(
         """

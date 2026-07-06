@@ -27,6 +27,11 @@ const DEFAULT_PRESERVE_LOCKS = [
 ];
 
 const EDIT_SCOPE_KINDS = new Set(["mask_asset", "bbox", "polygon", "semantic_region"]);
+const EDIT_SCOPE_PLACEHOLDERS = new Set([
+  "please describe the local edit region.",
+  "describe the local edit region.",
+  "请描述要修改的局部区域。",
+]);
 
 export function createKeyframeLocalEditDraft(store, keyframeNode, options = {}) {
   const state = store.get();
@@ -257,11 +262,19 @@ function normalizeEditScope(scope) {
   const kind = EDIT_SCOPE_KINDS.has(String(raw.kind || "")) ? String(raw.kind) : "semantic_region";
   return {
     kind,
-    target_description: cleanPublicText(raw.target_description || raw.description || "请描述要修改的局部区域。", 240),
+    target_description: cleanEditScopeDescription(raw.target_description || raw.description || ""),
     mask_asset_id: cleanId(raw.mask_asset_id),
     bbox: normalizeBbox(raw.bbox),
     polygon: Array.isArray(raw.polygon) ? raw.polygon.slice(0, 16) : [],
   };
+}
+
+function cleanEditScopeDescription(value) {
+  const clean = cleanPublicText(value, 240);
+  const normalized = clean.trim().toLowerCase();
+  if (!normalized) return "";
+  if (EDIT_SCOPE_PLACEHOLDERS.has(normalized)) return "";
+  return normalized.startsWith("璇锋弿杩") ? "" : clean;
 }
 
 function normalizeBbox(value) {
