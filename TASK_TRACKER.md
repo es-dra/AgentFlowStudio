@@ -51,6 +51,29 @@ push/PR/merge/release/deploy/restart, package finality, or self-archive is
 claimed. Handoff:
 `docs/handoff/AFS-C069-RESIDUAL-RUNS-PNG-HASH-MANIFEST-NO-REMOTE-20260706.md`.
 
+P1 dirty-owner holds D1/D4/D3 preservation manifest addendum: Lane
+`TD-AFS-V02-PRESERVE-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-NO-REMOTE-20260706-001`
+created compact handoff manifest
+`docs/handoff/AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`
+on `codex/preserve-p1-dirty-owner-holds-20260706` from
+`origin/master=26512312eb6c6f311108c97b906667dfbf21b6b9`; expected BU
+`BU-AFS-V02-PRESERVE-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-NO-REMOTE-20260706-001`.
+The manifest records D1/D4/D3 branch, head SHA, worktree path, dirty
+tracked/untracked path lists, status summaries, patch hashes, file hashes,
+classification, hold reason, and current route. D1 and D4 heads are
+ancestor-contained in `origin/master`; D3 head
+`0be328b672b873727868a4c66539f2a30b752bc3` is not ancestor-contained and must
+be preserved carefully before any cleanup/archive/delete route. This is
+preservation evidence only: D1/D4/D3 dirty contents remain superseded for code
+integration. Source worktrees were read-only evidence sources and were not
+reset, cleaned, moved, deleted, archived, checked out, staged, committed,
+pulled, pushed, or otherwise modified. No cleanup/archive/delete/branch
+deletion, remote push, provider/runtime/browser/media action, source-KB/COS/
+CompanyOS mutation, generated-media QA, Owner/human/business/legal/public
+acceptance, release, package finality, durable-memory promotion, or
+self-archive is claimed. Next route: CEO/CTO registers the BU and decides keep,
+backup, archive/delete after acceptance, or defer with owner.
+
 P1 PR #94 local edit preflight post-merge record addendum: PR
 `https://github.com/es-dra/AgentFlowStudio/pull/94` merged successfully via
 standard GitHub merge commit

@@ -17,6 +17,7 @@ archived.
 
 ## Goal / Release Gates
 
+- `AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`
 - `AFS-P1-STUDIO-RUNTIME-LOCAL-EDIT-PREFLIGHT-PR94-POSTMERGE-20260706.md`
 - `AFS-P0-REFERENCE-UPLOAD-RUNTIME-ERROR-UX-LOCAL-CONTRACT-20260705.md`
 - `AFS-P0-FINAL-MEDIA-ACCEPTANCE-LINKED-QA-DECISION-PACKET-20260705.md`
@@ -282,6 +283,21 @@ not a claim that human acceptance or business validation has happened.
 
 ## P1 Dirty Record / Held Evidence Packets
 
+- Dirty-owner hold preservation manifest lane
+  `TD-AFS-V02-PRESERVE-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-NO-REMOTE-20260706-001`
+  with expected BU
+  `BU-AFS-V02-PRESERVE-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-NO-REMOTE-20260706-001`
+  created
+  `AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`
+  to preserve D1/D4/D3 branch, head SHA, worktree path, dirty path list,
+  status summary, patch hashes, file hashes, classification, hold reason, and
+  route. D1/D4 are ancestor-contained; D3 head
+  `0be328b672b873727868a4c66539f2a30b752bc3` is not ancestor-contained and
+  requires careful preservation before any cleanup/archive/delete route.
+  Source worktrees were readonly evidence sources only; this is not code
+  integration, cleanup, archive, branch deletion, Owner acceptance, provider or
+  runtime evidence, generated-media QA, package finality, source-KB/COS/
+  CompanyOS mutation, or self-archive.
 - Record-only stabilization lane
   `TD-AFS-V02-STABILIZE-P1-DOCS-DIRTY-RECORD-INDEX-BUNDLE-READWRITE-20260705-001`
   with expected BU
