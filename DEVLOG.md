@@ -69,6 +69,28 @@
 - Handoff:
   `docs/handoff/AFS-P1-DIRTY-OWNER-HOLDS-D1-D4-D3-PATCH-MANIFEST-20260706.md`.
 
+## 2026-07-06 - Docs Redundancy Standard Batch 1
+
+- Completed bounded docs cleanup lane
+  `TD-AFS-V02-CLEAN-P1-DOCS-REDUNDANCY-STANDARD-AND-BATCH1-20260706-002`
+  on `codex/docs-redundancy-standard-batch1-20260706`.
+- Defined the conservative docs redundancy deletion standard in
+  `docs/maintenance/AFS-DOCS-CURRENTNESS-CLEANUP-LEDGER-20260702.zh-CN.md`:
+  delete/archive only when a candidate is not linked by current entrypoints, is
+  not referenced outside itself, is not active architecture/contract/test/
+  provider/Runtime/Studio/OpenAPI/package/Owner/evaluator/safety evidence, is
+  obsolete or superseded, and has a recorded git restoration path.
+- Deleted one Batch 1 candidate:
+  `docs/maintenance/AFS-R2-REDUNDANCY-BRANCH-WORKTREE-DISPOSITION-PACKET-20260701.md`.
+  The file was not linked from current entrypoints, had zero filename
+  references outside itself, and was superseded by current maintenance summary
+  and cleanup ledger surfaces.
+- Restoration path:
+  `git restore --source=a1f92690 -- docs/maintenance/AFS-R2-REDUNDANCY-BRANCH-WORKTREE-DISPOSITION-PACKET-20260701.md`.
+- No code, tests, provider, Runtime, OpenAPI, server, generated-media, private
+  KB, COS, CompanyOS, PR body, remote metadata, merge, push, release, or deploy
+  changes occurred.
+
 ## 2026-07-06 - PR 94 Local Edit Preflight Post-Merge Record
 
 - Recorded PR #94 as integration evidence only:
