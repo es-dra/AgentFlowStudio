@@ -179,7 +179,7 @@ function buildBottomRow(store, runtime, node, textarea) {
   optimizeBtn.innerHTML = `${icon("sparkles", 14)}<span>优化</span>`;
   optimizeBtn.title = "优化提示词";
   optimizeBtn.addEventListener("click", () => {
-    if (!String(store.get().nodes[node.id]?.prompt || "").trim()) {
+    if (!optimizableNodeText(store.get().nodes[node.id]).trim()) {
       flashTooltip(optimizeBtn, "先输入提示词");
       return;
     }
@@ -210,6 +210,16 @@ function textAction(iconName, label, onClick) {
   button.title = label;
   button.addEventListener("click", onClick);
   return button;
+}
+
+function optimizableNodeText(node) {
+  if (!node) return "";
+  if (isTextContentNode(node)) return String(node.content || node.prompt || "");
+  return String(node.prompt || node.content || "");
+}
+
+function isTextContentNode(node) {
+  return node.type === "text" || node.type === "script";
 }
 
 export function syncPromptBarState(bar, node) {
@@ -254,6 +264,7 @@ function promptTaskLabel(task) {
 
 function promptTextValue(node) {
   if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node);
+  if (isTextContentNode(node)) return node?.content || node?.prompt || "";
   return node?.prompt || node?.content || "";
 }
 

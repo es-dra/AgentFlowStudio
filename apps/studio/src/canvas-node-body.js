@@ -77,7 +77,7 @@ export function nodeBodySignature(node) {
   const directorSig = node.params?.directorSetup ? directorSummary(normalizeDirectorSetup(node.params.directorSetup)) : "";
   return [
     node.status,
-    node.content ? node.content.length : 0,
+    node.content || "",
     node.result ? node.result.length : 0,
     node.previewUrl || "",
     node.params?.previewAspectRatio || "",
