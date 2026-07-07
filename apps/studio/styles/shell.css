@@ -62,6 +62,57 @@
 }
 
 .topbar-right { display: flex; align-items: center; gap: 8px; }
+.runtime-status-badge {
+  height: 26px;
+  max-width: 300px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: rgba(27, 29, 32, 0.85);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.runtime-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-faint);
+}
+.runtime-status-label,
+.runtime-status-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.runtime-status-meta {
+  color: var(--text-faint);
+}
+.runtime-status-badge.ready {
+  border-color: rgba(56, 212, 192, 0.34);
+}
+.runtime-status-badge.ready .runtime-status-dot {
+  background: var(--port-out);
+}
+.runtime-status-badge.attention,
+.runtime-status-badge.checking {
+  border-color: rgba(245, 196, 81, 0.34);
+}
+.runtime-status-badge.attention .runtime-status-dot,
+.runtime-status-badge.checking .runtime-status-dot {
+  background: var(--energy);
+}
+.runtime-status-badge.unavailable {
+  border-color: rgba(255, 97, 118, 0.42);
+}
+.runtime-status-badge.unavailable .runtime-status-dot {
+  background: var(--danger);
+}
 .save-pill {
   height: 26px;
   display: inline-flex;
@@ -92,6 +143,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .runtime-status-badge {
+    max-width: 176px;
+  }
+  .runtime-status-meta {
+    display: none;
+  }
 }
 
 /* ---------- 左抽屉 ---------- */

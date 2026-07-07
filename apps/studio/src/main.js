@@ -1,5 +1,6 @@
 import { createStore } from "./store.js";
 import { createRuntimeClient } from "./runtime-client.js";
+import { checkingRuntimeSurfaceStatus, initialRuntimeSurfaceStatus, loadRuntimeSurfaceStatus } from "./runtime-surface-status.js";
 import { renderCanvas } from "./canvas-view.js";
 import { bindCanvasInput } from "./canvas-input.js";
 import { bindCanvasContextMenu } from "./canvas-context-menu.js";
@@ -31,6 +32,8 @@ import { installClientErrorReporter, reportClientError } from "./client-error-re
 const VIDEO_ASSET_CARD_DRAFT_EVENT = "afs:video-asset-card-draft";
 
 let runtime = createRuntimeClient(initialProjectId());
+let runtimeSurfaceStatus = initialRuntimeSurfaceStatus();
+let runtimeSurfaceStatusSequence = 0;
 const runtimeRef = new Proxy({}, { get: (_, prop) => runtime[prop] });
 const store = createStore(runtime.projectId);
 store.attachRuntime(runtime);
@@ -45,6 +48,7 @@ const projectController = createProjectController({
   setRuntime: (nextRuntime) => {
     runtime = nextRuntime;
     store.attachRuntime(runtime);
+    void refreshRuntimeSurfaceStatus();
   },
   onProjectReady: (runtimeClient) => refreshPendingKeyframeGenerations(store, runtimeClient),
   render: () => renderAll(store.get()),
@@ -76,6 +80,7 @@ async function bootstrap() {
 
   store.subscribe(renderAll);
   renderAll(store.get());
+  void refreshRuntimeSurfaceStatus();
 
   const authState = await ensureAuthSession(runtime, {
     onAuthenticated: (user) => {
@@ -84,6 +89,7 @@ async function bootstrap() {
     },
   });
   projectController.setAuthUser(authState?.user);
+  await refreshRuntimeSurfaceStatus({ authState });
   if (authState?.auth_status_unknown || authState?.blocked) return;
   if (authState?.auth_required && !authState?.authenticated) return;
 
@@ -257,6 +263,7 @@ function renderAll(state) {
     onOpenHome: () => openStudioHome(state),
     onBeforeSiteHome: () => store.flushRuntimeSave(),
     authUser: projectController.authUser,
+    runtimeSurfaceStatus,
     onSignOut: async () => {
       await signOut(runtime);
       projectController.setAuthUser(null);
@@ -363,4 +370,21 @@ function promptCreateProjectBeforeStarter() {
 
 function safeError(error) {
   return formatRuntimeError(error, "unknown error");
+}
+
+async function refreshRuntimeSurfaceStatus({ authState = null } = {}) {
+  const runtimeClient = runtime;
+  const sequence = ++runtimeSurfaceStatusSequence;
+  setRuntimeSurfaceStatus(checkingRuntimeSurfaceStatus(runtimeSurfaceStatus));
+  const nextStatus = await loadRuntimeSurfaceStatus(runtimeClient, { authState, formatError: safeError });
+  if (sequence !== runtimeSurfaceStatusSequence || runtimeClient !== runtime) return;
+  setRuntimeSurfaceStatus(nextStatus);
+}
+
+function setRuntimeSurfaceStatus(nextStatus) {
+  runtimeSurfaceStatus = {
+    ...initialRuntimeSurfaceStatus(),
+    ...(nextStatus || {}),
+  };
+  renderAll(store.get());
 }
