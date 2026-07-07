@@ -5,6 +5,7 @@ import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { canRunNodeGeneration } from "./node-actions.js";
 import { generationStatusCard } from "./generation-status-view.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
+import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 
 export function buildNodeBody(node, def, store = null) {
   const out = [];
@@ -56,17 +57,7 @@ export function generationProgress(node) {
 }
 
 export function statusLabel(status) {
-  return {
-    empty: "待生成",
-    idle: "待生成",
-    running: "生成中",
-    generating: "生成中",
-    pending: "排队中",
-    complete: "complete",
-    partial: "partially_complete",
-    error: "failed",
-    cancelled: "needs_attention",
-  }[status] || "待生成";
+  return studioStatusLabel(status, "草稿");
 }
 
 export function escapeHtml(value) {

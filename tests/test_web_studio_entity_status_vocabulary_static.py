@@ -18,16 +18,26 @@ REQUIRED_ENTITIES = {
 }
 
 REQUIRED_STATUSES = {
+    "draft": "草稿",
     "queued": "排队中",
     "submitted": "已提交",
     "running": "生成中",
     "succeeded": "已完成",
+    "partial": "部分完成",
     "failed": "失败",
     "retryable": "可重试",
+    "retrying": "重试中",
     "cancelled": "已停止刷新",
     "blocked": "已阻断",
     "needs_attention": "需要检查",
-    "partial": "部分完成",
+    "accepted": "已采纳",
+    "rejected": "已拒绝",
+    "fixed": "已固定",
+    "retired": "已停用",
+    "bound": "已绑定",
+    "unbound": "未绑定",
+    "replaced": "已替换",
+    "available": "可查看",
 }
 
 REQUIRED_ACTIONS = {
@@ -85,14 +95,30 @@ def test_studio_vocabulary_module_is_importable_and_matches_required_contract_id
           STUDIO_ENTITY_VOCABULARY,
           STUDIO_ENTITY_STATUS_VOCABULARY_VERSION,
           STUDIO_STATUS_VOCABULARY,
+          canonicalStudioStatusId,
           studioActionVocabularyEntry,
           studioEntityVocabularyEntry,
+          studioStatusLabel,
           studioStatusVocabularyEntry,
         } from "./apps/studio/src/studio-entity-status-vocabulary.js";
 
         const requiredEntities = ["project_asset", "reference_input", "generation_candidate", "keyframe_version", "video_revision", "binding", "lineage"];
-        const requiredStatuses = ["queued", "submitted", "running", "succeeded", "failed", "retryable", "cancelled", "blocked", "needs_attention", "partial"];
+        const requiredStatuses = ["draft", "queued", "submitted", "running", "succeeded", "partial", "failed", "retryable", "retrying", "cancelled", "blocked", "needs_attention", "accepted", "rejected", "fixed", "retired", "bound", "unbound", "replaced", "available"];
         const requiredActions = ["bind", "unbind", "replace", "reference", "retry", "accept", "reject", "view_lineage", "view_evidence", "continue_to_video", "edit_keyframe"];
+        const aliases = {
+          empty: "draft",
+          complete: "succeeded",
+          completed: "succeeded",
+          success: "succeeded",
+          generated: "succeeded",
+          partially_complete: "partial",
+          error: "failed",
+          failure: "failed",
+          pending: "queued",
+          generating: "running",
+          cancelled_local_only: "cancelled",
+          excluded: "retired",
+        };
 
         function assertUnique(items, label) {
           const ids = items.map((item) => item.id);
@@ -116,6 +142,12 @@ def test_studio_vocabulary_module_is_importable_and_matches_required_contract_id
           const entry = studioStatusVocabularyEntry(id);
           if (!entry?.zhLabel || !entry?.existingEquivalents?.length) throw new Error(`missing status ${id}`);
         }
+        for (const [alias, expected] of Object.entries(aliases)) {
+          if (canonicalStudioStatusId(alias) !== expected) {
+            throw new Error(`alias ${alias} did not canonicalize to ${expected}`);
+          }
+          if (!studioStatusLabel(alias)) throw new Error(`alias ${alias} did not resolve a label`);
+        }
         for (const id of requiredActions) {
           const entry = studioActionVocabularyEntry(id);
           if (!entry?.zhLabel || !entry?.appliesTo?.length) throw new Error(`missing action ${id}`);
@@ -123,6 +155,11 @@ def test_studio_vocabulary_module_is_importable_and_matches_required_contract_id
 
         const actionsById = new Map(STUDIO_ACTION_VOCABULARY.map((entry) => [entry.id, entry]));
         for (const entity of STUDIO_ENTITY_VOCABULARY) {
+          for (const stateId of entity.allowedStates) {
+            if (!studioStatusVocabularyEntry(stateId)) {
+              throw new Error(`entity ${entity.id} references unknown allowedState ${stateId}`);
+            }
+          }
           for (const actionId of entity.nextActions) {
             const action = actionsById.get(actionId);
             if (!action) throw new Error(`entity ${entity.id} references unknown action ${actionId}`);

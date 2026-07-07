@@ -1,3 +1,5 @@
+import { canonicalStudioStatusId, studioStatusLabel } from "./studio-entity-status-vocabulary.js";
+
 const ACTIVE_RUNTIME_STATUSES = new Set(["submitted", "pending", "running", "generating"]);
 const COMPLETE_RUNTIME_STATUSES = new Set(["complete", "completed", "succeeded", "success", "generated"]);
 const FAILED_RUNTIME_STATUSES = new Set(["error", "failed", "failure", "timeout", "timed_out"]);
@@ -60,10 +62,13 @@ export function responseStatusSummary(response, options = {}) {
     hasPartialOutput,
     retrying,
   });
+  const canonicalStatus = canonicalStatusForPolicy(policyStatus, runtimeStatus);
   return {
     runtimeStatus,
     policyStatus,
     displayStatus: policyStatus || (isActiveRuntimeStatus(runtimeStatus) ? "waiting" : "needs_attention"),
+    canonicalStatus,
+    displayLabel: studioStatusLabel(canonicalStatus),
     tone: statusTone(policyStatus, runtimeStatus),
     title: statusTitle(policyStatus, runtimeStatus),
     detail: statusDetail(policyStatus, runtimeStatus, hasPartialOutput),
@@ -90,10 +95,13 @@ export function nodeStatusSummary(node) {
       retrying,
       uiStatus: node?.status,
     });
+  const canonicalStatus = canonicalStatusForPolicy(policyStatus, runtimeStatus);
   return {
     runtimeStatus,
     policyStatus,
     displayStatus: policyStatus || (isActiveRuntimeStatus(runtimeStatus) || node?.status === "generating" ? "waiting" : "draft"),
+    canonicalStatus,
+    displayLabel: studioStatusLabel(canonicalStatus),
     tone: statusTone(policyStatus, runtimeStatus),
     title: statusTitle(policyStatus, runtimeStatus),
     detail: node?.params?.generationStatusDetail || statusDetail(policyStatus, runtimeStatus, hasPartialOutput),
@@ -208,6 +216,11 @@ function nextActionFor(policyStatus, runtimeStatus) {
   if (policyStatus && POLICY_COPY[policyStatus]) return POLICY_COPY[policyStatus].nextAction;
   if (isActiveRuntimeStatus(runtimeStatus)) return "Wait for Runtime status; completed outputs will remain visible.";
   return "Add prompt or references, then open generation settings.";
+}
+
+function canonicalStatusForPolicy(policyStatus, runtimeStatus) {
+  const status = { complete: "succeeded", partially_complete: "partial", retrying: "retrying", failed: "failed", needs_attention: "needs_attention" }[policyStatus];
+  return status || canonicalStudioStatusId(runtimeStatus, isActiveRuntimeStatus(runtimeStatus) ? "running" : "draft");
 }
 
 function blockedReasonFromResponse(response) {

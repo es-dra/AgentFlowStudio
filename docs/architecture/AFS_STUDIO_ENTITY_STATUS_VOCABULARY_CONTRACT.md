@@ -25,16 +25,31 @@ CompanyOS/COS promotion.
 
 | ID | Chinese label |
 |---|---|
+| `draft` | 草稿 |
 | `queued` | 排队中 |
 | `submitted` | 已提交 |
 | `running` | 生成中 |
 | `succeeded` | 已完成 |
+| `partial` | 部分完成 |
 | `failed` | 失败 |
 | `retryable` | 可重试 |
+| `retrying` | 重试中 |
 | `cancelled` | 已停止刷新 |
 | `blocked` | 已阻断 |
 | `needs_attention` | 需要检查 |
-| `partial` | 部分完成 |
+| `accepted` | 已采纳 |
+| `rejected` | 已拒绝 |
+| `fixed` | 已固定 |
+| `retired` | 已停用 |
+| `bound` | 已绑定 |
+| `unbound` | 未绑定 |
+| `replaced` | 已替换 |
+| `available` | 可查看 |
+
+Every `allowedStates` value in `STUDIO_ENTITY_VOCABULARY` must have a matching
+entry in `STUDIO_STATUS_VOCABULARY`. UI aliases such as `complete`, `error`,
+`partially_complete`, `cancelled_local_only`, `generating`, and `pending` must
+resolve through `canonicalStudioStatusId()` before display.
 
 ## Actions
 
