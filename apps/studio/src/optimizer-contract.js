@@ -60,6 +60,7 @@ function nodeParameterSnapshot(node) {
     remote_optimizer_required: true,
   };
   if (p.nodeRole) snapshot.node_role = String(p.nodeRole).slice(0, 80);
+  if (p.assetReferenceMode) snapshot.reference_transform_mode = String(p.assetReferenceMode).slice(0, 80);
   if (p.assetCardDraft) snapshot.asset_card_draft = safeAssetCardSnapshot(p.assetCardDraft);
   if (p.assetCardRevision) snapshot.asset_card_revision = safeAssetCardRevisionSnapshot(p.assetCardRevision);
   if (node.type === "image" && p.spec) {

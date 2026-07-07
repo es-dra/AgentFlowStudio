@@ -8,6 +8,11 @@ from apps.api.runtime_llm_enhancement_constants import SECTION_ORDER
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import visual_reference_hint
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_reference_intent import (
+    ORIGINALIZE_REFERENCE_MODE,
+    originalize_reference_policy,
+    reference_transform_mode_for_request,
+)
 
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
@@ -80,6 +85,8 @@ def t2i_visual_enhancement_instruction(request: PromptOptimizationRequest) -> st
 
 
 def visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+    if reference_transform_mode_for_request(request) == ORIGINALIZE_REFERENCE_MODE:
+        return originalize_visual_enhancement_instruction(request)
     reference_hint = visual_reference_hint(request)
     reference_line = f"参考图线索：{reference_hint}" if reference_hint else "参考图线索：当前请求携带参考图，但没有可公开的文件名或资产签名；必须先判断它是主体参考还是风格参考。"
     reference_role_line = (
@@ -108,6 +115,33 @@ def visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
             "优先级：用户当前明确目标最高；参考图主体只提供身份和可识别特征；旧资产签名和默认锁定项不得覆盖用户当前明确要求。",
             "硬性要求：只优化提示词，不解释、不输出思考过程、不添加标题；保留用户明确要求，尤其是主体参考的图生图编辑只改变用户明确要求改变的部分。",
             "质量要求：输出不能照抄模板，必须吸收参考图线索；如果线索中有“校服周彤”这类人类角色/服装信息，角色或连续性段必须明确保留该身份和服装；如果线索是猫或动物，只保留动物主体特征，不要套用人类角色的发型、服装或身份模板。",
+            "输出必须只有以下九行，标签不可改名：意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
+            " ".join(parts),
+        ]
+    )
+
+
+def originalize_visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+    reference_hint = visual_reference_hint(request)
+    reference_line = f"参考图线索：{reference_hint}" if reference_hint else "参考图线索：当前请求携带参考图，但参考图只作为灵感来源。"
+    parts = [
+        f"意图：围绕“{request.prompt_text}”把参考图转化为新的原创资产或关键帧方向，目标是降低可识别 IP 相似度，而不是复刻参考图。",
+        "角色/主体：只抽取参考图的高层类别、功能、气质和宽泛造型语言；重新设计身份、脸部/头部细节、轮廓、服饰/材质系统和标志性辨识点。",
+        "场景/美术：可借鉴宽泛时代感、材质情绪和色彩关系，但不要复制原图独特场景构图、标志物、文字、logo、服装图案或 franchise 视觉符号。",
+        f"动作/情节：执行用户当前目标“{request.prompt_text}”，动作和情境服务新设计，不延续参考图的经典姿势、名场面或固定剧情关系。",
+        "镜头/构图：构图必须重新组织，避免贴近参考图的角度、姿势、画面布局、四视图排列或标志性剪影。",
+        "灯光：保留可用的氛围方向和可读性，但重新设计光源位置、明暗层次和材质表现，避免形成原图复刻感。",
+        "运动/时间推进：若是单帧，只表达当前新资产的可读状态；若后续用于视频，保留可动画的原创结构和动作余量。",
+        "连续性：新资产内部要稳定一致；参考图只作为灵感证据，不作为身份、服装、比例、构图或未修改细节的锁定项。",
+        "负面约束：不要复制已知角色、商标、logo、标志性服装/武器/构图/姿势，不要保留可识别 IP 组合，不要水印、文字乱码、畸形肢体或身份漂移。",
+    ]
+    return "\n".join(
+        [
+            f"原始提示词：{request.prompt_text}",
+            reference_line,
+            originalize_reference_policy(),
+            "当前场景：图生图参考用于原创重生 / 降 IP 风险。模板仍用于稳定质量，但每段必须服务“重新设计”，不能写成保守局部修图。",
+            "硬性要求：只优化提示词，不解释、不输出思考过程、不添加标题；参考图只能提供抽象灵感、材质情绪、功能方向和宽泛风格，不能作为复刻依据。",
             "输出必须只有以下九行，标签不可改名：意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束。",
             " ".join(parts),
         ]

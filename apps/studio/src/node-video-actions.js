@@ -201,6 +201,9 @@ function buildVideoGenerationRequest(store, node, firstFrame) {
     aspect_ratio: node.params?.spec?.ratio || "9:16",
     motion: node.params?.motion || "",
     candidate_count: 1,
+    node_parameters: {
+      reference_transform_mode: node.params?.assetReferenceMode || node.params?.referenceTransformMode || null,
+    },
     context_subgraph: buildContextSubgraph(store.get(), node, "context_generate"),
     temporary_lock_overrides: node.params?.temporaryLockOverrides || [],
     temporary_asset_exclusions: node.params?.temporaryAssetExclusions || [],

@@ -28,6 +28,12 @@ from apps.api.runtime_keyframe_payloads import (
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
 from apps.api.runtime_prompt_memory_state import load_creative_memory_state
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
+from apps.api.runtime_reference_intent import (
+    ORIGINALIZE_REFERENCE_MODE,
+    is_originalize_reference_request,
+    originalize_reference_policy,
+    reference_transform_mode_for_request,
+)
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -93,11 +99,13 @@ def build_keyframe_generation(
         limit=effective_reference_slots,
     )
     is_asset_card_revision = _has_asset_card_revision(request)
+    is_originalize_reference = is_originalize_reference_request(request)
     if context_bundle:
         provider_prompt = _guarded_provider_keyframe_prompt(
             provider_prompt_from_bundle(context_bundle),
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     else:
@@ -105,6 +113,7 @@ def build_keyframe_generation(
             request.optimized_prompt or assembly["creative_agent"]["provider_translation"]["prompt"],
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     image_operation = _image_operation_for_request(
@@ -123,6 +132,7 @@ def build_keyframe_generation(
             prompt_with_references,
             reference_count=len(reference_images),
             asset_card_revision=is_asset_card_revision,
+            originalize_reference=is_originalize_reference,
             limit=int(getattr(descriptor, "prompt_char_limit", DEFAULT_IMAGE_PROMPT_LIMIT)),
         )
     required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
@@ -506,10 +516,13 @@ def _write_json_checked(path: Path, payload: dict[str, Any]) -> None:
 def _reference_prompt_instruction(request: KeyframeGenerationRequest, reference_count: int) -> str:
     animal_reference = _looks_like_animal_reference_request(request)
     revision = asset_card_revision_reference_instruction(request)
+    reference_mode = reference_transform_mode_for_request(request)
     lines = []
     if revision:
         lines.append(revision)
-    if revision:
+    if reference_mode == ORIGINALIZE_REFERENCE_MODE:
+        lines.append(originalize_reference_policy(reference_count))
+    elif revision:
         lines.append(
             (
                 f"Connected reference images: {reference_count}. For this asset-card revision, reference image #1 is the primary visual source of truth; "
@@ -630,9 +643,14 @@ def _guarded_provider_keyframe_prompt(
     *,
     reference_count: int = 0,
     asset_card_revision: bool = False,
+    originalize_reference: bool = False,
     limit: int = DEFAULT_IMAGE_PROMPT_LIMIT,
 ) -> str:
-    guard = _image_generation_guard(reference_count=reference_count, asset_card_revision=asset_card_revision)
+    guard = _image_generation_guard(
+        reference_count=reference_count,
+        asset_card_revision=asset_card_revision,
+        originalize_reference=originalize_reference,
+    )
     reserve = len(guard) + 1
     base_limit = max(240, limit - reserve)
     prompt = provider_keyframe_prompt(value, limit=base_limit)
@@ -643,13 +661,24 @@ def _guarded_provider_keyframe_prompt(
     return provider_keyframe_prompt(f"{prompt} {guard}", limit=limit)
 
 
-def _image_generation_guard(*, reference_count: int = 0, asset_card_revision: bool = False) -> str:
+def _image_generation_guard(
+    *,
+    reference_count: int = 0,
+    asset_card_revision: bool = False,
+    originalize_reference: bool = False,
+) -> str:
     base = (
         "保真约束：按用户提示直接生成清晰自然的主体，主体身份、物种、材质和关键特征必须可读；"
         "不要改成图标、标志、吉祥物、矢量插画、抽象符号或无关场景，除非用户明确要求这种风格。"
     )
     if reference_count <= 0:
         return base
+    if originalize_reference:
+        return (
+            f"{base} 原创重生约束：本次携带 {reference_count} 张参考图；"
+            "参考图只作为灵感和视觉证据，不作为身份、构图、服装、标志物或精确比例锚点；"
+            "必须重设计主体身份、轮廓、服饰/材质系统和构图，降低可识别 IP 相似度。"
+        )
     if asset_card_revision:
         return (
             f"{base} 资产卡局部修订约束：本次携带 {reference_count} 张参考图；"

@@ -485,6 +485,78 @@ def test_asset_card_revision_uses_ordered_reference_images_and_partial_revision_
     assert "服装/外观: 穿着传统服装" in str(captured["prompt"])
 
 
+def test_asset_card_originalize_reference_mode_uses_inspiration_guard(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    captured: dict[str, object] = {}
+
+    def fake_dispatch(capability, service_id, request):
+        captured["reference_paths"] = list(request.reference_image_paths)
+        captured["image_operation"] = getattr(request, "image_operation", "generate")
+        captured["prompt"] = request.prompt
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                    "provider_url_persisted": False,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "apps.api.runtime_keyframes.load_provider_registry",
+        lambda: _FakeRegistry(fake_dispatch, _FakeDescriptor(reference_image_slots=1)),
+    )
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "proj_asset_card_originalize_refs"
+    ref = _upload_reference(client, project_id, "famous-warrior.png")
+
+    result = client.post(
+        f"/projects/{project_id}/keyframe-generations",
+        json={
+            "node_id": "asset-card-node",
+            "prompt_text": "根据参考图原创重生一个项目可用角色，降低 IP 风险。",
+            "optimized_prompt": "根据参考图原创重生一个项目可用角色，降低 IP 风险。",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "aspect_ratio": "16:9",
+            "candidate_count": 1,
+            "asset_refs": [ref],
+            "node_parameters": {
+                "node_role": "asset_card_draft",
+                "reference_transform_mode": "originalize_ip_safe",
+                "asset_card_revision": {
+                    "mode": "originalize_ip_safe",
+                    "reference_assets": [{"asset_id": ref, "role": "inspiration_reference", "priority": 1}],
+                    "changed_fields": [{"field": "user_instruction", "label": "用户调整要求", "to": "原创重生，降低 IP 风险"}],
+                    "preserve_locks": ["保持适合项目世界观的战斗型角色定位"],
+                },
+            },
+            "generated_at": "2026-07-07T13:20:00+08:00",
+        },
+    )
+
+    assert result.status_code == 200
+    prompt = str(captured["prompt"])
+    assert captured["image_operation"] == "edit"
+    assert Path(str(captured["reference_paths"][0])).name == "source.png"
+    assert "originalize / IP-risk reduction" in prompt
+    assert "inspiration and visual evidence only" in prompt
+    assert "primary visual source of truth" not in prompt
+    assert "changed fields are only editable delta" not in prompt
+    assert "Avoid copying recognizable IP" in prompt
+
+
 def test_image_relay_openai_route_uses_edit_for_reference_asset_even_with_legacy_zero_slots(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
     captured: dict[str, object] = {}

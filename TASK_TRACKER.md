@@ -6,7 +6,24 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-05 by Codex
+Last updated: 2026-07-07 by Codex
+
+Studio scenario-aware prompt upgrade follow-up: 2026-07-07 pass preserves the
+professional template skeleton for novice stability while making prompt
+optimization intent explicit by scenario. Studio asset-card reference workflows
+now expose `局部修订` and `原创重生` modes, pass `reference_transform_mode` into
+Runtime optimization/image/video requests, and keep the legacy localized edit
+path separate from `originalize_ip_safe`. Runtime prompt instructions,
+fallbacks, keyframe guards, context text, and video provider prompt assembly now
+treat originalize mode as inspiration/evidence-only reference use rather than
+identity/layout copying. Verification: Studio JS syntax check passed 122 files,
+changed Runtime prompt modules passed bundled Python `py_compile`,
+`git diff --check` passed, and function-level smoke confirmed Chinese
+originalize wording maps to `originalize_ip_safe` and switches instruction /
+fallback text. Boundary: no provider gate, provider call, secret, signed URL,
+local media byte, provider raw response, or private Company OS source content
+is involved. This does not claim provider policy bypass, legal clearance, or
+human creative acceptance.
 
 Studio reference image upload diagnostics follow-up: 2026-07-05 pass addresses
 the P1 Web test report where "upload/replace reference image" reached Runtime

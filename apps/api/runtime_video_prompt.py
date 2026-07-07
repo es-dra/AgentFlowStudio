@@ -17,6 +17,7 @@ def video_provider_prompt(request: VideoGenerationRequest, context_bundle: dict[
         motion=request.motion,
         last_frame_image_asset_id=request.last_frame_image_asset_id,
         context_bundle=context_bundle,
+        reference_transform_mode=str((request.node_parameters or {}).get("reference_transform_mode") or ""),
     )
 
 

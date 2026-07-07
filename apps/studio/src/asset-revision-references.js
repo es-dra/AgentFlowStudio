@@ -5,15 +5,20 @@ import {
 } from "./asset-card-drafts.js";
 
 const MAX_REVISION_REFERENCES = 4;
+export const ASSET_REFERENCE_MODES = {
+  LOCALIZED_EDIT: "localized_edit",
+  ORIGINALIZE_IP_SAFE: "originalize_ip_safe",
+};
 
 export function buildAssetCardRevisionState(node, previousDraft, nextDraft) {
   const prior = normalizeAssetCardDraft(previousDraft || {});
   const next = normalizeAssetCardDraft(nextDraft || {});
+  const mode = assetReferenceMode(node);
   const references = revisionReferenceAssets(node);
   const changed = changedAssetCardFields(prior, next);
   return {
     schema_version: "afs_asset_card_revision.v0.1",
-    mode: references.length ? "image_guided_partial_revision" : "text_only_revision",
+    mode: references.length ? mode : "text_only_revision",
     asset_type: next.asset_type,
     asset_label: next.label,
     reference_assets: references,
@@ -23,13 +28,14 @@ export function buildAssetCardRevisionState(node, previousDraft, nextDraft) {
   };
 }
 
-export function buildUserAssetCardRevisionState(node, draft, instruction) {
+export function buildUserAssetCardRevisionState(node, draft, instruction, requestedMode = "") {
   const card = normalizeAssetCardDraft(draft || {});
+  const mode = normalizeAssetReferenceMode(requestedMode || node?.params?.assetReferenceMode);
   const references = revisionReferenceAssets(node);
   const text = cleanText(instruction).slice(0, 500);
   return {
     schema_version: "afs_asset_card_revision.v0.1",
-    mode: references.length ? "image_guided_partial_revision" : "text_only_revision",
+    mode: references.length ? mode : "text_only_revision",
     asset_type: card.asset_type,
     asset_label: card.label,
     reference_assets: references,
@@ -42,6 +48,33 @@ export function buildUserAssetCardRevisionState(node, draft, instruction) {
     preserve_locks: (card.negative_locks || []).map(cleanText).filter(Boolean).slice(0, 12),
     created_at: new Date().toISOString(),
   };
+}
+
+export function normalizeAssetReferenceMode(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if ([
+    "originalize",
+    "originalize_ip_safe",
+    "reference_guided_original_rebirth",
+    "original_rebirth",
+    "ip_safe_rebirth",
+    "ip_risk_reduction",
+  ].includes(text)) return ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
+  if (["image_guided_partial_revision", "partial_revision", "localized_edit", "text_only_revision"].includes(text)) {
+    return ASSET_REFERENCE_MODES.LOCALIZED_EDIT;
+  }
+  if (/原创|降\s*ip|降低\s*ip|去\s*ip|灵感参考|重新设计|redesign|do not copy|copyright safe/i.test(String(value || ""))) {
+    return ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
+  }
+  return ASSET_REFERENCE_MODES.LOCALIZED_EDIT;
+}
+
+export function assetReferenceMode(node) {
+  return normalizeAssetReferenceMode(node?.params?.assetReferenceMode || node?.params?.assetCardRevision?.mode);
+}
+
+export function isOriginalizeAssetReferenceMode(value) {
+  return normalizeAssetReferenceMode(value) === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
 }
 
 export function assetCardRevisionImageRefs(node) {
@@ -70,7 +103,7 @@ export function safeAssetCardRevisionSnapshot(revision) {
   const changed = Array.isArray(revision.changed_fields) ? revision.changed_fields : [];
   return {
     schema_version: "afs_asset_card_revision.v0.1",
-    mode: String(revision.mode || "").slice(0, 80),
+    mode: normalizeAssetReferenceMode(revision.mode),
     asset_type: String(revision.asset_type || "").slice(0, 40),
     asset_label: cleanText(revision.asset_label).slice(0, 80),
     reference_assets: references.map((item, index) => ({
@@ -98,6 +131,9 @@ export function assetCardRevisionPromptSupplement(node) {
   const changes = revision.changed_fields
     .map((item) => `${item.label || item.field}: ${item.from || "unspecified"} -> ${item.to}`)
     .join("; ");
+  if (isOriginalizeAssetReferenceMode(revision.mode)) {
+    return originalizeRevisionPromptSupplement(revision, hasRefs, changes);
+  }
   const editPolicy = revisionEditPolicyLines(revision);
   const locks = revision.preserve_locks.length ? `Card locks to preserve: ${revision.preserve_locks.join("; ")}` : "";
   const typeLabel = assetCardTypeLabel(revision.asset_type);
@@ -118,14 +154,32 @@ export function assetCardRevisionPromptSupplement(node) {
   ].filter(Boolean).join("\n");
 }
 
+function originalizeRevisionPromptSupplement(revision, hasRefs, changes) {
+  const typeLabel = assetCardTypeLabel(revision.asset_type);
+  const locks = revision.preserve_locks.length ? `Safety constraints to respect without copying IP: ${revision.preserve_locks.join("; ")}` : "";
+  return [
+    `${typeLabel} reference transformation mode: originalize / IP-risk reduction.`,
+    hasRefs
+      ? `Use the provided reference image(s) as inspiration and visual evidence only for @${revision.asset_label || "asset"}; do not treat reference #1 as identity, costume, layout, pose, logo, or exact proportion truth.`
+      : "No prior reference image is available, so build a new original asset from the current card and user intent.",
+    "Goal: create a new reusable production asset that keeps only high-level concept, broad material mood, functional role, palette relationship, and genre direction.",
+    "Must redesign recognizable identity: change face/head details, silhouette, costume system, distinctive markings, logo-like shapes, exact weapon/object geometry, and iconic scene composition.",
+    "Do not copy or closely imitate a known character, franchise look, trademark, signature outfit, exact pose, exact layout, or uniquely recognizable IP cue.",
+    changes ? `Use these user/card directions as transformation goals, not literal copy locks: ${changes}.` : "If no explicit delta is recorded, transform the reference into a fresh original design with lower recognizability.",
+    "Output should feel like a newly art-directed asset inspired by the reference category, not the same previous reference sheet after a small edit.",
+    locks,
+  ].filter(Boolean).join("\n");
+}
+
 function revisionReferenceAssets(node) {
   const refs = [];
+  const mode = assetReferenceMode(node);
   for (const item of [...nodeImageUploads(node)].reverse()) {
     const assetId = cleanAssetId(item.asset_id || item.assetId);
     if (!assetId) continue;
     refs.push({
       asset_id: assetId,
-      role: refs.length === 0 ? "identity_layout_anchor" : referenceRole(item, refs.length),
+      role: referenceRoleForMode(item, refs.length, mode),
       source: cleanText(item.source_kind || item.sourceKind || item.role || "node_upload").slice(0, 80),
       priority: refs.length + 1,
     });
@@ -136,7 +190,7 @@ function revisionReferenceAssets(node) {
       if (!assetId) continue;
       refs.push({
         asset_id: assetId,
-        role: refs.length === 0 ? "identity_layout_anchor" : referenceRole(item, refs.length),
+        role: referenceRoleForMode(item, refs.length, mode),
         source: "fixed_visual_asset",
         priority: refs.length + 1,
       });
@@ -235,6 +289,14 @@ function referenceRole(item, index) {
   if (/prop/i.test(role)) return "prop_detail_reference";
   if (/style/i.test(role)) return "style_reference";
   return "secondary_identity_reference";
+}
+
+function referenceRoleForMode(item, index, mode) {
+  if (isOriginalizeAssetReferenceMode(mode)) {
+    if (index === 0) return "inspiration_reference";
+    return "secondary_inspiration_reference";
+  }
+  return index === 0 ? "identity_layout_anchor" : referenceRole(item, index);
 }
 
 function dedupeReferenceAssets(items) {

@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from apps.api.runtime_models import KeyframeGenerationRequest
+from apps.api.runtime_reference_intent import (
+    ORIGINALIZE_REFERENCE_MODE,
+    originalize_reference_policy,
+    reference_transform_mode_from_params,
+)
 
 
 def asset_card_revision_reference_instruction(request: KeyframeGenerationRequest) -> str:
@@ -10,6 +15,9 @@ def asset_card_revision_reference_instruction(request: KeyframeGenerationRequest
     revision = params.get("asset_card_revision") if isinstance(params.get("asset_card_revision"), dict) else {}
     if not revision:
         return ""
+    mode = reference_transform_mode_from_params(params)
+    if mode == ORIGINALIZE_REFERENCE_MODE:
+        return _asset_card_originalize_instruction(revision)
     changes = _changed_field_lines(revision)
     locks = [str(item).strip() for item in list(revision.get("preserve_locks") or [])[:8] if str(item).strip()]
     lines = [
@@ -24,6 +32,23 @@ def asset_card_revision_reference_instruction(request: KeyframeGenerationRequest
     lines.extend(_edit_policy_lines(revision))
     if locks:
         lines.append(f"Preserve locks: {'; '.join(locks)}.")
+    return " ".join(lines)
+
+
+def _asset_card_originalize_instruction(revision: dict[str, Any]) -> str:
+    changes = _changed_field_lines(revision)
+    locks = [str(item).strip() for item in list(revision.get("preserve_locks") or [])[:8] if str(item).strip()]
+    lines = [
+        "Asset-card reference transformation mode: originalize / IP-risk reduction.",
+        originalize_reference_policy(),
+        "Treat changed fields and asset-card text as art-direction goals, not copy locks from the old reference.",
+        "Create a fresh reusable asset with a new recognizable identity, new face/head details, revised silhouette, revised costume/material system, and non-iconic composition.",
+        "Keep only broad role, mood, function, material category, and palette relationship when useful; do not preserve exact identity, layout, proportions, costume, pose, logo-like marks, or signature IP cues.",
+    ]
+    if changes:
+        lines.append(f"Transformation goals: {'; '.join(changes)}.")
+    if locks:
+        lines.append(f"Safety constraints to respect without copying IP: {'; '.join(locks)}.")
     return " ".join(lines)
 
 

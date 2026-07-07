@@ -7,7 +7,8 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import ProviderDispatchRequest, load_provider_registry
 from apps.api.runtime_llm_enhancement_constants import PROMPT_OPTIMIZER_PROVIDER
 from apps.api.runtime_llm_enhancement_dispatch import dispatch_llm_with_fallback
-from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt, salvage_prompt_from_llm_article
+from apps.api.runtime_llm_enhancement_fallback import deterministic_chinese_fallback_prompt
+from apps.api.runtime_llm_enhancement_salvage import salvage_prompt_from_llm_article
 from apps.api.runtime_llm_enhancement_gate import (
     llm_provider_gate,
     prompt_optimization_mode,

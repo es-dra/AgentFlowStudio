@@ -15,6 +15,7 @@ export function structureSignature(node) {
     node.id, node.type, p.model,
     p.spec ? JSON.stringify(p.spec) : "",
     p.camera ? "cam" : "", p.motion || "", p.styleRef || "", p.effect || "",
+    p.assetReferenceMode || "",
     (p.attachments || []).length,
   ].join("~");
 }

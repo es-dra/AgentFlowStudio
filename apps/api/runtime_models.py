@@ -185,6 +185,7 @@ class VideoGenerationRequest(BaseModel):
     aspect_ratio: str = "9:16"
     motion: str = ""
     candidate_count: int = Field(default=1, ge=1, le=1)
+    node_parameters: dict[str, Any] | None = None
     context_subgraph: ContextSubgraph | None = None
     temporary_lock_overrides: list[TemporaryLockOverride] = Field(default_factory=list)
     temporary_asset_exclusions: list[AssetExclusion] = Field(default_factory=list)

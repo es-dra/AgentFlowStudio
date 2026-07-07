@@ -270,6 +270,11 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "Revision strength: conservative low-change pass" in asset_revision_refs
     assert "primary visual source of truth" in asset_revision_refs
     assert "only editable delta" in asset_revision_refs
+    assert "ORIGINALIZE_IP_SAFE" in asset_revision_refs
+    assert "originalize / IP-risk reduction" in asset_revision_refs
+    assert "reference_transform_mode" in optimizer_contract
+    assert "原创重生" in (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    assert "data-reference-mode" in asset_card_panel
     assert "Wardrobe edit scope: add the requested clothing as an outer garment layer only" in asset_revision_refs
     assert "Plush/fabric material must read as a surface covering on the same existing robot frame" in asset_revision_refs
     assert "Do not turn the subject into a toy, chibi, mascot" in asset_revision_refs
@@ -350,6 +355,8 @@ process.stdout.write(JSON.stringify({
   userAdjustment: assetCardUserAdjustmentText(node),
   promptText: assetCardPromptText(node),
   refs: request.asset_refs,
+  mode: request.node_parameters.asset_card_revision.mode,
+  transformMode: request.node_parameters.reference_transform_mode || "",
   revisionField: request.node_parameters.asset_card_revision.changed_fields[0].field,
 }));
 '''
@@ -369,6 +376,7 @@ process.stdout.write(JSON.stringify({
     assert "用户调整要求" in payload["promptText"]
     assert "只给左脸增加一道浅疤" in payload["promptText"]
     assert payload["refs"] == ["img_user_reference_001"]
+    assert payload["mode"] == "localized_edit"
     assert payload["revisionField"] == "user_instruction"
 
 

@@ -14,7 +14,11 @@ import { flashTooltip, updateNode } from "./prompt-bar-actions.js";
 import { openExpandEditor } from "./prompt-bar-expand.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset-card-image-prompts.js";
-import { buildUserAssetCardRevisionState } from "./asset-revision-references.js";
+import {
+  ASSET_REFERENCE_MODES,
+  assetReferenceMode,
+  buildUserAssetCardRevisionState,
+} from "./asset-revision-references.js";
 import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
@@ -75,6 +79,10 @@ function buildBar(store, runtime, node) {
     bar.appendChild(chips);
   }
 
+  if (p.assetCardDraft) {
+    bar.appendChild(buildAssetReferenceModeTabs(store, node));
+  }
+
   const textarea = document.createElement("textarea");
   textarea.placeholder = p.assetCardDraft
     ? assetCardPromptPlaceholder(p.assetCardDraft.asset_type)
@@ -90,7 +98,7 @@ function buildBar(store, runtime, node) {
         n.params.assetCardDraft.user_edited_text = textarea.value;
         n.params.assetCardDraft.updated_by_user = Boolean(textarea.value.trim());
         if (textarea.value.trim()) {
-          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value);
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(n, n.params.assetCardDraft, textarea.value, n.params.assetReferenceMode);
         } else if (usesPromptBarAssetCardRevision(n.params.assetCardRevision)) {
           delete n.params.assetCardRevision;
         }
@@ -131,6 +139,41 @@ function buildBar(store, runtime, node) {
   bar.appendChild(buildBottomRow(store, runtime, node, textarea));
   syncPromptBarState(bar, node);
   return bar;
+}
+
+function buildAssetReferenceModeTabs(store, node) {
+  const wrap = el("div", "mode-tabs asset-reference-mode-tabs");
+  const current = assetReferenceMode(node);
+  const modes = [
+    [ASSET_REFERENCE_MODES.LOCALIZED_EDIT, "局部修订", "按参考图稳定身份，只修改你写明的细节"],
+    [ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE, "原创重生", "只提取灵感方向，重新设计以降低 IP 风险"],
+  ];
+  for (const [mode, label, title] of modes) {
+    const tab = el("button", `mode-tab${current === mode ? " active" : ""}`, label);
+    tab.type = "button";
+    tab.title = title;
+    tab.dataset.mode = mode;
+    tab.addEventListener("click", () => {
+      store.set((s) => {
+        const n = s.nodes[node.id];
+        if (!n) return;
+        n.params.assetReferenceMode = mode;
+        if (n.params.assetCardDraft && String(n.prompt || n.params.assetCardDraft.user_edited_text || "").trim()) {
+          n.params.assetCardRevision = buildUserAssetCardRevisionState(
+            n,
+            n.params.assetCardDraft,
+            n.prompt || n.params.assetCardDraft.user_edited_text,
+            mode,
+          );
+        } else if (n.params.assetCardRevision) {
+          n.params.assetCardRevision.mode = mode;
+        }
+        delete n.params.lastOptimizedPromptPlain;
+      }, { history: false });
+    });
+    wrap.appendChild(tab);
+  }
+  return wrap;
 }
 
 function buildToolChips(store, node, defs) {

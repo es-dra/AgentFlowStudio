@@ -1,5 +1,34 @@
 # Devlog
 
+## 2026-07-07 - Studio Scenario-Aware Prompt Upgrade
+
+- Kept the professional nine-section prompt skeleton for novice stability, but
+  made optimization intent explicit across script, text/image, reference-image,
+  asset-card revision, and video paths.
+- Added an asset reference mode for `局部修订` vs `原创重生` in the Studio prompt
+  bar and asset-card panel. The frontend now passes `reference_transform_mode`
+  through Runtime optimization, image/keyframe generation, and video requests.
+- Added Runtime reference-intent handling so `originalize_ip_safe` uses
+  reference images as inspiration/evidence only, while the existing localized
+  revision path still treats reference #1 as the identity/layout anchor.
+- Split prompt salvage/originalize helpers to keep LLM enhancement modules
+  within maintenance limits.
+
+Verification:
+
+```text
+npm.cmd run check:studio-js -> JS syntax check passed: 122 files
+python bundled py_compile for changed Runtime prompt modules -> passed
+git diff --check -> passed
+function smoke: originalize mode recognized and instruction/fallback switched -> passed
+```
+
+Boundary:
+
+- No provider gate was opened and no remote image/video/LLM/ASR call was made.
+- This changes prompt assembly and optimization semantics only; it does not
+  claim provider policy bypass, legal clearance, or human creative acceptance.
+
 ## 2026-07-05 - Studio Reference Image Upload Diagnostics
 
 - Fixed the Studio Runtime client error projection that converted object-shaped
