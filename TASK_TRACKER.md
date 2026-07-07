@@ -8,6 +8,21 @@
 
 Last updated: 2026-07-07 by Codex
 
+Open Web test bug - storyboard asset recognition follow-up: 2026-07-07 user
+test found that after clicking asset recognition on a storyboard/shot node,
+asset cards can be created successfully, but the source storyboard node is then
+marked failed with `Runtime request failed: network connection interrupted` and
+the generated asset nodes appear separately on the canvas. Expected behavior:
+asset recognition should complete without turning the storyboard node into a
+failed generation state; if a follow-up Runtime generation request is optional
+or interrupted, Studio should preserve the recognized assets and show a
+retryable, scoped status instead of a node-level failure. Initial scope for the
+fix: inspect storyboard asset-recognition action handling, Runtime request
+lifecycle, node status writeback, and error projection after successful asset
+node creation. Boundary: screenshot is user evidence only and is not stored in
+repo; no provider raw response, media byte, signed URL, local file path, secret,
+or private Company OS source content should be recorded.
+
 Studio scenario-aware prompt upgrade follow-up: 2026-07-07 pass preserves the
 professional template skeleton for novice stability while making prompt
 optimization intent explicit by scenario. Studio asset-card reference workflows

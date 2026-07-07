@@ -73,6 +73,14 @@ export function assetReferenceMode(node) {
   return normalizeAssetReferenceMode(node?.params?.assetReferenceMode || node?.params?.assetCardRevision?.mode);
 }
 
+export function canUseAssetReferenceMode(node) {
+  if (node?.type !== "image" && node?.type !== "video") return false;
+  if (node?.params?.assetCardDraft) return true;
+  return nodeImageUploads(node).some((item) => cleanAssetId(item?.asset_id || item?.assetId))
+    || nodeVisualAssets(node).some((asset) => imageRefsFromVisualAsset(asset).length > 0)
+    || Boolean(node?.params?.firstFrameImageAssetId || node?.params?.lastFrameImageAssetId);
+}
+
 export function isOriginalizeAssetReferenceMode(value) {
   return normalizeAssetReferenceMode(value) === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
 }

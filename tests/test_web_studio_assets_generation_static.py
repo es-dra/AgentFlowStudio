@@ -275,6 +275,15 @@ def test_asset_card_image_generation_uses_asset_prompt_and_asset_labels() -> Non
     assert "reference_transform_mode" in optimizer_contract
     assert "原创重生" in (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     assert "data-reference-mode" in asset_card_panel
+    node_menu = (STUDIO_ROOT / "src" / "panels" / "node-menu.js").read_text(encoding="utf-8")
+    prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
+    keyframe_video = (STUDIO_ROOT / "src" / "keyframe-video-continuation.js").read_text(encoding="utf-8")
+    assert "canUseAssetReferenceMode" in asset_revision_refs
+    assert "参考图模式：局部修订" in node_menu
+    assert "参考图模式：原创重生" in node_menu
+    assert "toggleReferenceMode" in node_menu
+    assert "canUseAssetReferenceMode(node)" in prompt_bar
+    assert "assetReferenceMode: source.params?.assetReferenceMode" in keyframe_video
     assert "Wardrobe edit scope: add the requested clothing as an outer garment layer only" in asset_revision_refs
     assert "Plush/fabric material must read as a surface covering on the same existing robot frame" in asset_revision_refs
     assert "Do not turn the subject into a toy, chibi, mascot" in asset_revision_refs
@@ -830,6 +839,7 @@ const state = {
       previewUrl: "/media/keyframe_01.png",
       params: {
         nodeRole: "keyframe_generation",
+        assetReferenceMode: "originalize_ip_safe",
         lastKeyframeJobId: "kf_job_001",
         spec: { ratio: "16:9", duration: "5s", resolution: "720P" },
         uploads: [{
@@ -866,6 +876,7 @@ process.stdout.write(JSON.stringify({
   edge: edges[0],
   firstFrame: video?.params?.firstFrameImageAssetId,
   firstFramePreview: video?.params?.firstFramePreviewUrl,
+  referenceMode: video?.params?.assetReferenceMode,
   uploadRole: video?.params?.uploads?.[0]?.role,
   sourceKeyframe: video?.params?.sourceKeyframeNodeId,
   sourceAsset: video?.params?.sourceKeyframeAssetId,
@@ -885,6 +896,7 @@ process.stdout.write(JSON.stringify({
     assert payload["videoType"] == "video"
     assert payload["firstFrame"] == "img_keyframe_001"
     assert payload["firstFramePreview"] == "/media/keyframe_01.png"
+    assert payload["referenceMode"] == "originalize_ip_safe"
     assert payload["uploadRole"] == "first_frame"
     assert payload["sourceKeyframe"] == "keyframe_01"
     assert payload["sourceAsset"] == "img_keyframe_001"

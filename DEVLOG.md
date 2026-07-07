@@ -8,6 +8,12 @@
 - Added an asset reference mode for `局部修订` vs `原创重生` in the Studio prompt
   bar and asset-card panel. The frontend now passes `reference_transform_mode`
   through Runtime optimization, image/keyframe generation, and video requests.
+- Web retest follow-up exposed that ordinary uploaded image/reference nodes did
+  not show those mode controls, so use cases 4/5/6 could not be exercised from
+  the node menu. The prompt bar and image-node menu now expose the same
+  localized/originalize reference mode controls for uploaded reference images,
+  fixed visual assets, and first-frame video references; keyframe-to-video
+  continuation also carries the selected mode into the video node.
 - Added Runtime reference-intent handling so `originalize_ip_safe` uses
   reference images as inspiration/evidence only, while the existing localized
   revision path still treats reference #1 as the identity/layout anchor.
@@ -21,6 +27,8 @@ npm.cmd run check:studio-js -> JS syntax check passed: 122 files
 python bundled py_compile for changed Runtime prompt modules -> passed
 git diff --check -> passed
 function smoke: originalize mode recognized and instruction/fallback switched -> passed
+Node smoke: uploaded reference image can use reference mode controls and
+keyframe-to-video inherits originalize_ip_safe -> passed
 ```
 
 Boundary:

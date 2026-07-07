@@ -17,6 +17,7 @@ import { assetCardPromptPlaceholder, assetCardUserAdjustmentText } from "./asset
 import {
   ASSET_REFERENCE_MODES,
   assetReferenceMode,
+  canUseAssetReferenceMode,
   buildUserAssetCardRevisionState,
 } from "./asset-revision-references.js";
 import {
@@ -79,7 +80,7 @@ function buildBar(store, runtime, node) {
     bar.appendChild(chips);
   }
 
-  if (p.assetCardDraft) {
+  if (canUseAssetReferenceMode(node)) {
     bar.appendChild(buildAssetReferenceModeTabs(store, node));
   }
 

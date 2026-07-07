@@ -15,6 +15,11 @@ import {
 } from "../node-actions.js";
 import { canContinueKeyframeToVideo, createVideoNodeFromKeyframe } from "../keyframe-video-continuation.js";
 import {
+  ASSET_REFERENCE_MODES,
+  assetReferenceMode,
+  canUseAssetReferenceMode,
+} from "../asset-revision-references.js";
+import {
   expandTextIdeaToScript,
   importScriptFileIntoTextNode,
   splitTextNodeToStoryboardNodes,
@@ -77,6 +82,9 @@ export function openNodeMenu(store, runtime, nodeId, anchorOrPoint) {
       const fresh = store.get().nodes[nodeId];
       if (fresh) uploadNodeImage(store, runtime, fresh);
     });
+    if (canUseAssetReferenceMode(node)) {
+      addItem("wand", referenceModeMenuLabel(node), () => toggleReferenceMode(store, nodeId));
+    }
     addItem("bookmark", "标记为角色/场景/道具资产", () => {
       const fresh = store.get().nodes[nodeId];
       if (fresh) fixNodeVisualAsset(store, runtime, fresh);
@@ -170,6 +178,27 @@ function activeFixedVisualAsset(node) {
     const status = String(asset?.status || asset?.asset_status || "fixed");
     return status !== "retired" && status !== "excluded";
   }) || null;
+}
+
+function referenceModeMenuLabel(node) {
+  return assetReferenceMode(node) === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
+    ? "参考图模式：原创重生"
+    : "参考图模式：局部修订";
+}
+
+function toggleReferenceMode(store, nodeId) {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    const current = assetReferenceMode(node);
+    node.params.assetReferenceMode = current === ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE
+      ? ASSET_REFERENCE_MODES.LOCALIZED_EDIT
+      : ASSET_REFERENCE_MODES.ORIGINALIZE_IP_SAFE;
+    if (node.params.assetCardRevision) node.params.assetCardRevision.mode = node.params.assetReferenceMode;
+    delete node.params.lastOptimizedPromptPlain;
+    s.selection = { nodeIds: [node.id], edgeId: null };
+    s.ui.promptBarNodeId = node.id;
+  }, { history: false });
 }
 
 function requestVideoAssetCardDraft(store, nodeId) {
