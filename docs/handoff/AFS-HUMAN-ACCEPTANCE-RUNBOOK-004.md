@@ -1,3 +1,8 @@
+> HISTORICAL / HELD NOTE (2026-07-07):
+> This runbook 004 is retained for historical reference only and is not the
+> current human-acceptance entrypoint. For any new human-acceptance cycle, use
+> `docs/handoff/AFS-HUMAN-ACCEPTANCE-RUNBOOK-005.md`.
+
 # AFS Human Acceptance Runbook 004 人工验收手册
 
 日期：2026-06-14  
