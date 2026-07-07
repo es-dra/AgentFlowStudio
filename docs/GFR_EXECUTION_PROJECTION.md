@@ -1,106 +1,109 @@
-# GFR 执行投影
+# GFR / AOS Execution Projection
 
-本文是 Company OS / GFR V1 基线在 AgentFlow Studio 仓库里的执行投影。
+This document explains how Company OS / AOS v1 projects into AgentFlow Studio.
+It is not the source rule set. Source rules remain in `10-Startup`.
 
-它不是源头规则，也不替代 `10-Startup`。它的作用是让后续进入 AFS
-项目的 Agent 能够快速知道：应该读哪些源头文件、如何启动任务、写入边界
-在哪里、如何验证、什么反馈可以回流 COS。
+## Source Control Entry
 
-## 源头控制文件
-
-涉及 AFS 的 substantial 任务，先读这些文件：
+For substantial AFS work, use the smallest source entry first:
 
 ```text
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AI-Native-Company-OS-MAP.md
+D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\AGENTIC-OPERATING-SYSTEM-V1.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\GFR-Global-Rule-Compiler.md
+D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
+D:\Projects\AgentFlowStudio\docs\AOS_CURRENT_STATE.md
+```
+
+Load additional packs only when the task requires them:
+
+```text
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\default-context-packs.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-V1-BASELINE.md
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\COS-REGISTRY-V0.json
 D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\EVIDENCE-LEDGER-V0.json
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\TASKRUN-LEDGER-V0.json
-D:\Learning materials\Learning_notes\10-Startup\70-Projects\AgentFlow-Studio\PROJECT-CAPSULE.md
 ```
 
-AFS 仓库只保存执行投影。公司源头规则、私有战略、客户材料、真实成本、
-合同原文、provider 配置和密钥不写入本仓库。
+## AOS Runtime Objects
 
-`COS-REGISTRY-V0.json` 和 `EVIDENCE-LEDGER-V0.json` 是机读 v0 候选对象。
-它们让 COS/GFR 的身份、上下文包、provider gate、证据状态和反馈路由可被
-系统引用，但不代表 active 规则晋升、完整 runtime enforcement 或商业验证。
-
-## 启动行为
-
- substantial 任务必须由 GFR 编译，或者在对话内部明确应用同等结构：
+Substantial work should compile or internally apply:
 
 ```text
-identity
-task type
-work modes
-context pack
-required reads
+AOS Startup Packet
+  -> Goal Contract
+  -> Task Packet
+  -> Evidence target
+  -> Runtime Surface Vector when state can drift
+  -> Integration Queue route
+  -> Improvement Queue route
+```
+
+Minimum task fields:
+
+```text
+target outcome
+read scope
 write scope
-non-goals
-evidence standard
-tool/provider gates
+forbidden scope
+provider/tool gates
 verification route
-feedback route
-human decisions
+non-claims
+stop conditions
+closeout shape
 ```
 
-AFS 开发任务通常读取 `context-pack-index.json` 中的：
+For larger work, scale through bounded temporary lanes under one main control
+thread:
 
 ```text
-engineering_delivery
-afs_project
+main control
+  -> worker lane contract
+  -> evaluator lane contract
+  -> integration queue
+  -> closeout with separated evidence states
 ```
 
-如果任务涉及 COS 反馈、规则候选、经验晋升，再追加：
+Each lane needs a target, scope, evidence target, verification route, stop
+condition, and return route. Do not restore permanent role threads or
+status-only heartbeat loops.
 
-```text
-rule_steward
-```
+## Repository Boundary
 
-## 仓库边界
+AFS can store:
 
-本仓库可以保存：
+- code, tests, schemas, contracts, and runbooks;
+- safe manifests and safe summaries;
+- current execution state and verification commands;
+- public or semi-public engineering notes.
 
-- 代码、测试、schema、contract、runbook、handoff。
-- safe manifest、safe summary、可公开或半公开工程说明。
-- AFS 当前执行状态、验证命令、交接记录。
+AFS must not store:
 
-本仓库不能保存：
+- secrets, tokens, cookies, provider keys, or signed URLs;
+- provider raw responses, generated media bytes, or private local asset bytes;
+- private strategy, real customer data, real costs, contract originals, or
+  unpublished partner judgment;
+- Company OS candidate rules promoted to active status without human review.
 
-- secret、token、cookie、signed URL、provider key。
-- provider 原始响应、生成媒体字节、本地私有素材字节。
-- 私有战略、真实客户信息、真实成本、合同原文、未公开合作方判断。
-- 未经人工审查就晋升为 active 的 Company OS 候选规则。
+## Evidence Levels
 
-## 证据边界
+Closeouts must separate these states:
 
-AFS closeout 必须区分这些状态：
-
-| 状态 | 说明 |
+| State | Meaning |
 |---|---|
-| Structure verification | 文件、schema、静态检查、fixture 形状正确。 |
-| Runtime verification | Runtime Service 或 Studio 真正跑过目标路径。 |
-| Provider smoke | 显式 gate 下跑通过某个远程 provider 路径。 |
-| Human acceptance | 创始人或目标用户接受结果。 |
-| Business validation | 市场、客户、ROI、付费或分发证据支持判断。 |
-| Memory promotion | 候选证据经过人工审查后被晋升。 |
+| Structure verification | Files, schemas, static checks, or fixtures have the expected shape. |
+| Runtime verification | Runtime Service or Studio ran the target path. |
+| Provider smoke | An explicitly gated remote provider path ran. |
+| Human acceptance | The creator or target user accepted the result. |
+| Business validation | Market, customer, ROI, paid, or distribution evidence supports the claim. |
+| Durable memory promotion | Candidate evidence was reviewed and promoted by the human-governed process. |
 
-Provider smoke 不是 human acceptance。Runtime verification 不是 business
-validation。Candidate memory 不是 durable memory。
+Provider smoke is not human acceptance. Runtime verification is not business
+validation. Candidate memory is not durable memory.
 
-## Runtime 安全投影
+## Runtime Projection Endpoint
 
-AFS Runtime 提供一个只读安全投影：
-
-```text
-GET /company-os/gfr-projection
-```
-
-这个端点只暴露可公开给 Studio / Runtime 的字段：
+`GET /company-os/gfr-projection` may expose only a safe projection for Studio
+and Runtime use:
 
 ```text
 gfr_packet_fields
@@ -112,47 +115,31 @@ runtime_recording
 non_claim_boundary
 ```
 
-它不读取 `10-Startup` 原文，不暴露本地绝对路径、provider secret、客户材料、
-真实成本、合同原文、生成媒体字节或 provider 原始响应。它的证据等级最多是
-Runtime verification：证明 AFS 能读取一份安全的 COS/GFR 投影，不证明完整
-COS 执行器、Studio UI 展示、人类接受、商业验证或 durable memory promotion。
+It must not read raw `10-Startup` source files or expose local absolute paths,
+provider secrets, customer material, real costs, contract originals, generated
+media bytes, or provider raw responses.
 
-## 2026-06-19 LoopSpec Addendum
+## Failure Signals
 
-The source KB now has candidate LoopSpec and TaskRun Ledger objects:
+Treat these as AOS/GFR startup failures:
 
-```text
-D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\schemas\loop_spec_v0.schema.json
-D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\schemas\taskrun_ledger_v0.schema.json
-D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\TASKRUN-LEDGER-V0.json
-```
+- a new task starts from old drafts, old handoffs, or a full historical ledger;
+- the goal, read/write scope, gates, verification route, or feedback route are
+  unclear before editing;
+- provider success is described as human acceptance or business validation;
+- repo experience is written directly as an active Company OS rule;
+- private strategy, contracts, customer data, costs, or provider raw content are
+  written into the repository.
 
-AFS should treat these as execution-planning metadata: signal sources,
-evaluators, trace requirements, failure capture, repair route, update
-candidates, promotion gate, and stop conditions. They do not authorize wider
-file reads, provider gates, automatic rule promotion, or any claim beyond the
-verified evidence state.
+## Verification
 
-## 验证命令
-
-修改 COS/GFR 路由或 AFS 投影时，至少运行：
+For COS/GFR/AOS route changes or AFS projection changes:
 
 ```powershell
-python "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\tools\gfr_audit.py" --root "D:\Learning materials\Learning_notes\10-Startup" --pack-index "D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json" --packets-dir "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\task-startup-packets"
+python "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\tools\gfr_audit.py" --root "D:\Learning materials\Learning_notes\10-Startup" --pack-index "D:\Learning materials\Learning_notes\10-Startup\00-Company-OS\context-pack-index.json"
 D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe "D:\Learning materials\Learning_notes\10-Startup\80-Workflow\ai-native-company-workflow\contracts\scripts\validate_ai_native_contracts.py"
-D:\Projects\AgentFlowStudio\.venv\Scripts\python.exe -m pytest tests\test_api_runtime_company_os.py tests\test_api_runtime_service.py
 git -C "D:\Projects\AgentFlowStudio" diff --check
 ```
 
-如果改动涉及代码，还必须继续执行 `AGENTS.md` 中要求的 pytest、Studio JS、
-maintenance audit 和 Runtime 相关验证。
-
-## 失败信号
-
-出现以下情况，应视为 GFR 启动失败：
-
-- 新任务从旧 AFS draft 或旧展示材料开始，而不是从 Project Capsule 开始。
-- 编辑前说不清 identity、读写范围、provider gate、验证命令和反馈路径。
-- 把 provider 成功写成用户接受或商业验证。
-- 把项目经验直接写成 Company OS active rule。
-- 把私有战略、合同、客户、成本或 provider 原文写入 AFS 仓库。
+If code changes are included, also run the focused pytest, Studio JS, Runtime,
+or maintenance commands required by `AGENTS.md`.

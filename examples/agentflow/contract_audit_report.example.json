@@ -99,7 +99,7 @@
     {
       "artifact_type": "agentflow_intermediate_asset",
       "example_path": "examples/agentflow/intermediate_asset.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -107,7 +107,7 @@
     {
       "artifact_type": "agentflow_reusable_asset_profile",
       "example_path": "examples/agentflow/reusable_asset_profile.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -115,7 +115,7 @@
     {
       "artifact_type": "agentflow_asset_reuse_decision",
       "example_path": "examples/agentflow/asset_reuse_decision.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -123,7 +123,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -131,7 +131,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review_validation",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_validation.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -139,7 +139,7 @@
     {
       "artifact_type": "agentflow_production_asset_feedback_review_gate",
       "example_path": "examples/agentflow/agentflow_production_asset_feedback_review_gate.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -147,7 +147,7 @@
     {
       "artifact_type": "agentflow_production_asset_reuse_dry_run_plan",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_dry_run_plan.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true
@@ -155,7 +155,7 @@
     {
       "artifact_type": "agentflow_production_asset_reuse_review",
       "example_path": "examples/agentflow/agentflow_production_asset_reuse_review.example.json",
-      "doc_path": "docs/architecture/production_memory_asset_profiles.md",
+      "doc_path": "docs/architecture/production_memory_architecture.md",
       "schema_version": "0.1.0",
       "example_path_exists": true,
       "doc_path_exists": true

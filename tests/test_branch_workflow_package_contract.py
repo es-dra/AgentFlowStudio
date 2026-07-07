@@ -94,8 +94,8 @@ def test_branch_workflow_carries_pb3_stage_residual_boundaries() -> None:
     report = load_branch_workflow_package_fixture(FIXTURE_PATH)
 
     assert report["source_boundary_refs"] == [
-        "docs/handoff/AFS-T52-SHARED-OBJECT-EVIDENCE-FIXTURE-20260701.md",
-        "docs/handoff/AFS-T53-INTERACTIVE-MANGA-BRANCH-PACKAGE-CONTRACT-20260701.md",
+        "docs/AOS_CURRENT_STATE.md",
+        "docs/architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md",
         "interactive_manga_branch_package_fixture_v0",
     ]
     assert report["residual_boundaries"] == [

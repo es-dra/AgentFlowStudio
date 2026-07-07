@@ -132,7 +132,7 @@ def test_fixture_carries_t52_and_stage1_residual_boundaries() -> None:
     assert report["source_boundary_refs"] == [
         "handoff:stage1-shared-contract",
         "shared_object_evidence:fixture_v0",
-        "docs/handoff/AFS-T52-SHARED-OBJECT-EVIDENCE-FIXTURE-20260701.md",
+        "docs/AOS_CURRENT_STATE.md",
     ]
     assert report["stage1_residuals"] == ["stage1_evaluator_system_error_residual"]
     assert report["non_claims"]["final_schema_acceptance"] is False

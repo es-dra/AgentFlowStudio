@@ -8,12 +8,14 @@ try:
     from tools.maintenance_audit_policy import (
         HIGH_CONFIDENCE_SECRET_PATTERNS,
         KNOWN_SAFE_SECRET_FIXTURES,
+        SAFE_HIGH_CONFIDENCE_SECRET_FIXTURE_PATTERNS,
         SECRET_FIELD_PATTERNS,
     )
 except ModuleNotFoundError:
     from maintenance_audit_policy import (  # type: ignore[no-redef]
         HIGH_CONFIDENCE_SECRET_PATTERNS,
         KNOWN_SAFE_SECRET_FIXTURES,
+        SAFE_HIGH_CONFIDENCE_SECRET_FIXTURE_PATTERNS,
         SECRET_FIELD_PATTERNS,
     )
 
@@ -24,8 +26,9 @@ def check_secret_like_fragments(root: Path, files: list[Path], file_states: dict
     high_confidence = 0
     for path in files:
         for line_no, line in _read_lines(path):
-            if any(pattern.search(line) for pattern in HIGH_CONFIDENCE_SECRET_PATTERNS):
-                if _is_known_safe_high_confidence_fixture(line):
+            high_confidence_matches = _high_confidence_secret_matches(line)
+            if high_confidence_matches:
+                if all(_is_known_safe_high_confidence_fixture(match) for match in high_confidence_matches):
                     continue
                 high_confidence += 1
                 findings.append(_finding(root, path, "high-confidence secret-like fragment", line_no, file_states))
@@ -37,7 +40,7 @@ def check_secret_like_fragments(root: Path, files: list[Path], file_states: dict
                 findings.append(_finding(root, path, "secret-like or signed-url-like fragment", line_no, file_states))
     return {
         "check_id": "secret_like_fragments",
-        "status": "warning" if findings else "passed",
+        "status": "failed" if high_confidence else ("warning" if findings else "passed"),
         "count": len(findings),
         "findings": findings[:80],
         "high_confidence_count": high_confidence,
@@ -48,8 +51,17 @@ def _is_known_safe_secret_fixture(line: str) -> bool:
     return any(value in line for value in KNOWN_SAFE_SECRET_FIXTURES)
 
 
-def _is_known_safe_high_confidence_fixture(line: str) -> bool:
-    return "sk-test-secret-value" in line
+def _high_confidence_secret_matches(line: str) -> list[str]:
+    matches: list[str] = []
+    for pattern in HIGH_CONFIDENCE_SECRET_PATTERNS:
+        matches.extend(match.group(0) for match in pattern.finditer(line))
+    return matches
+
+
+def _is_known_safe_high_confidence_fixture(value: str) -> bool:
+    return value in KNOWN_SAFE_SECRET_FIXTURES or any(
+        pattern.fullmatch(value) for pattern in SAFE_HIGH_CONFIDENCE_SECRET_FIXTURE_PATTERNS
+    )
 
 
 def _is_safe_secret_field_reference(line: str) -> bool:
