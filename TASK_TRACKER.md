@@ -6,7 +6,26 @@
 
 当前口径：待办只保留三类，一是 Studio 和 Runtime 的联合验收，二是图片/关键帧真实模型 gate，三是创作智能体规则、评分和反馈回路的可验证改进。除此之外的旧支线、旧 UI 设想和无测试证据的概念记录都不进入任务列表。
 
-Last updated: 2026-07-06 by Codex
+Last updated: 2026-07-07 by Codex
+
+Studio text optimizer merge fix addendum: 2026-07-07 pass selectively recovered
+the visible text/script optimizer writeback fix from `origin/zhaowei`
+`8a5db1ee93b22fac0e7777895d1f944fd6d9a16f` onto current `master`
+`d0a722ac654d918d17a4685c911e06ac823bb850` on branch
+`codex/recover-visible-script-optimizer-20260707`. The fix updates
+text/script optimization to use and update the visible `node.content` surface,
+keeps `node.prompt` synchronized, and makes canvas node signatures depend on
+the full content text so equal-length replacements repaint. Handoff:
+`docs/handoff/AFS-STUDIO-TEXT-OPTIMIZER-MERGE-FIX-20260707.md`.
+Verification:
+`.venv/bin/python -m pytest tests/test_web_studio_prompt_script_static.py::test_text_prompt_optimization_uses_and_updates_visible_content -q`
+passed 1,
+`.venv/bin/python -m pytest tests/test_web_studio_prompt_script_static.py tests/test_api_runtime_prompt_memory_loop.py -q`
+passed 55, and `npm run check:studio-js` passed for 151 files. This did not
+merge the rest of `zhaowei`; image relay, reference transform modes, UI resize,
+and remote optimizer fallback policy remain separate review lanes. No provider
+call, media generation, external download, secret read, source-KB mutation,
+human acceptance, or business validation is claimed.
 
 P1 dirty-primary held evidence manifest addendum: Lane
 `TD-AFS-V02-WORK-P1-DIRTY-PRIMARY-HELD-EVIDENCE-MANIFEST-CLEAN-BRANCH-READWRITE-20260706-001`

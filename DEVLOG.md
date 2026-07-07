@@ -1,5 +1,38 @@
 # Devlog
 
+## 2026-07-07 - Studio Text Optimizer Merge Fix
+
+- Performed a selective three-way recovery from `origin/zhaowei`
+  `8a5db1ee93b22fac0e7777895d1f944fd6d9a16f` instead of merging the whole
+  branch onto current `master` `d0a722ac654d918d17a4685c911e06ac823bb850`.
+- Fixed the Studio text/script prompt optimizer path where uploaded scripts
+  could have visible body in `node.content` while optimization only updated
+  `node.prompt`.
+- Text/script optimization now writes successful optimized output back to both
+  `prompt` and `content`, uses `content || prompt` for text/script optimize
+  entrypoints, and includes the full content string in node render signatures
+  so equal-length content changes repaint.
+- Added regression coverage for a text node whose uploaded script body exists
+  only in `content`.
+- Handoff:
+  `docs/handoff/AFS-STUDIO-TEXT-OPTIMIZER-MERGE-FIX-20260707.md`.
+
+Verification:
+
+```text
+.venv/bin/python -m pytest tests/test_web_studio_prompt_script_static.py::test_text_prompt_optimization_uses_and_updates_visible_content -q -> 1 passed
+.venv/bin/python -m pytest tests/test_web_studio_prompt_script_static.py tests/test_api_runtime_prompt_memory_loop.py -q -> 55 passed
+npm run check:studio-js -> JS syntax check passed: 151 files
+```
+
+Boundary:
+
+- No provider call, ASR, image/video generation, external download, secret read,
+  signed URL, local media byte, source-KB mutation, or durable memory promotion
+  was performed.
+- This is engineering verification, not human acceptance or business
+  validation.
+
 ## 2026-07-06 - Dirty Primary Held Evidence Manifest
 
 - Completed bounded manifest lane

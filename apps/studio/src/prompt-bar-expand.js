@@ -39,6 +39,7 @@ export function openExpandEditor(store, runtime, node) {
 
 function expandedPromptValue(node) {
   if (node?.params?.assetCardDraft) return assetCardUserAdjustmentText(node);
+  if (isTextContentNode(node)) return node?.content || node?.prompt || "";
   return node?.prompt || node?.content || "";
 }
 
@@ -63,6 +64,10 @@ function applyExpandedPromptValue(node, value) {
     node.content = value;
   }
   if (node.params) delete node.params.lastOptimizedPromptPlain;
+}
+
+function isTextContentNode(node) {
+  return node.type === "text" || node.type === "script";
 }
 
 function usesPromptBarAssetCardRevision(revision) {
