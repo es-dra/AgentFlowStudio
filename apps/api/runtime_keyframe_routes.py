@@ -19,7 +19,8 @@ from apps.api.runtime_generation_preflight import (
 )
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_keyframe_async import poll_keyframe_generation
-from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation
+from apps.api.runtime_keyframe_background import submit_background_sync_keyframe_generation
+from apps.api.runtime_keyframes import KEYFRAME_NON_CLAIMS, build_keyframe_generation, keyframe_sync_background_plan
 from apps.api.runtime_logging import (
     client_request_id_from_request,
     log_business_event,
@@ -182,14 +183,28 @@ def register_runtime_keyframe_routes(app: FastAPI, store: RuntimeStore) -> None:
         job_id = store.new_job_id("keyframe_generation", project_id)
         output_dir = store.run_dir(project_id, job_id)
         try:
-            result = build_keyframe_generation(
-                store,
-                project_id,
-                request,
-                output_dir,
-                request_id=request_id,
-                client_request_id=client_request_id,
-            )
+            background_plan = keyframe_sync_background_plan(request)
+            if background_plan.get("enabled"):
+                service_id = str(background_plan.get("provider_service_id") or request.provider_service_id)
+                background_request = request.model_copy(update={"provider_service_id": service_id})
+                result = submit_background_sync_keyframe_generation(
+                    store,
+                    project_id,
+                    background_request,
+                    output_dir,
+                    provider_gate=dict(background_plan.get("provider_gate") or {}),
+                    request_id=request_id,
+                    client_request_id=client_request_id,
+                )
+            else:
+                result = build_keyframe_generation(
+                    store,
+                    project_id,
+                    request,
+                    output_dir,
+                    request_id=request_id,
+                    client_request_id=client_request_id,
+                )
             artifacts = keyframe_generation_artifacts(store, output_dir)
             safe_manifest = dict(result["safe_manifest"])
             status = str(result["status"])

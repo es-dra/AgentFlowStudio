@@ -11,6 +11,7 @@ from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.image_utils import image_dimensions
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_file_logging import runtime_file_event
+from apps.api.runtime_keyframe_background import BACKGROUND_WORKER_MODE
 from apps.api.runtime_keyframe_payloads import (
     keyframe_candidate_summary,
     keyframe_review_preview_refs,
@@ -54,7 +55,7 @@ def poll_keyframe_generation(
         provider_service_id=str(state.get("provider_service_id") or request.provider_service_id),
         status=state.get("status"),
     )
-    if state.get("status") in {"succeeded", "failed", "blocked"}:
+    if state.get("status") in {"succeeded", "partially_complete", "failed", "blocked"}:
         recovered = _recovered_terminal_provider_result(
             output_dir,
             project_id,
@@ -92,6 +93,43 @@ def poll_keyframe_generation(
             provider_outputs=outputs,
             safe_manifest=manifest,
             context_bundle=context_bundle,
+        )
+
+    if _is_background_sync_state(state):
+        completed = _background_terminal_result(
+            output_dir,
+            project_id,
+            request,
+            state,
+            provider_gate,
+            context_bundle,
+            request_id=request_id,
+            client_request_id=client_request_id,
+            started=started,
+        )
+        if completed:
+            return completed
+        runtime_file_event(
+            "keyframe",
+            "poll_background_running",
+            request_id=request_id,
+            client_request_id=client_request_id,
+            project_id=project_id,
+            node_id=request.node_id,
+            job_id=job_id,
+            provider_service_id=str(state.get("provider_service_id") or request.provider_service_id),
+            status=state.get("status"),
+            elapsed_ms=_elapsed_ms(started),
+        )
+        return _keyframe_active_result(
+            output_dir,
+            project_id,
+            request,
+            state,
+            provider_gate,
+            context_bundle,
+            status=str(state.get("status") or "running"),
+            progress=None,
         )
 
     provider_service_id = str(state.get("provider_service_id") or request.provider_service_id)
@@ -272,6 +310,57 @@ def _recovered_terminal_provider_result(
         elapsed_ms=_elapsed_ms(started) if started is not None else "",
     )
     return result
+
+
+def _is_background_sync_state(state: dict[str, Any]) -> bool:
+    background = state.get("background_execution")
+    return isinstance(background, dict) and background.get("mode") == BACKGROUND_WORKER_MODE
+
+
+def _background_terminal_result(
+    output_dir: Path,
+    project_id: str,
+    request: KeyframeGenerationRequest,
+    state: dict[str, Any],
+    provider_gate: dict[str, str],
+    context_bundle: dict[str, Any] | None,
+    *,
+    request_id: str = "",
+    client_request_id: str = "",
+    started: float | None = None,
+) -> dict[str, Any] | None:
+    try:
+        manifest = read_json(output_dir / "keyframe_generation_safe_manifest.json")
+    except (FileNotFoundError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    status = str(manifest.get("status") or "").strip().lower()
+    if status not in {"succeeded", "partially_complete", "failed", "blocked"}:
+        return None
+    outputs = _provider_outputs_from_candidate_files(output_dir)
+    state["status"] = status
+    state["last_background_poll"] = {"status": status, "provider_raw_persisted": False}
+    _write_task_state(output_dir, state)
+    runtime_file_event(
+        "keyframe",
+        "poll_background_terminal",
+        request_id=request_id,
+        client_request_id=client_request_id,
+        project_id=project_id,
+        node_id=request.node_id,
+        job_id=output_dir.name,
+        provider_service_id=str(state.get("provider_service_id") or request.provider_service_id),
+        status=status,
+        output_count=len(outputs),
+        elapsed_ms=_elapsed_ms(started) if started is not None else "",
+    )
+    return _result(
+        status=status,
+        provider_gate=provider_gate,
+        provider_calls_started=bool(manifest.get("provider_calls_started")),
+        provider_outputs=outputs,
+        safe_manifest=manifest,
+        context_bundle=context_bundle,
+    )
 
 
 def _keyframe_active_result(

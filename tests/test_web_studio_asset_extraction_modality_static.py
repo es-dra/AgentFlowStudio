@@ -84,4 +84,7 @@ process.stdout.write(JSON.stringify({ auto, explicit }));
     assert ("猪八戒", "character") in auto_refs
     assert ("云栈洞口", "scene") in auto_refs
     assert not any(asset_type == "prop" for _, asset_type in auto_refs)
-    assert ("金箍棒", "prop") in explicit_refs
+    assert ("孙悟空", "character") in explicit_refs
+    assert ("云栈洞口", "scene") in explicit_refs
+    assert not any(asset_type == "prop" for _, asset_type in explicit_refs)
+    assert any(item["reason"] == "prop_requires_manual_asset_entry" and item["label"] == "金箍棒" for item in payload["explicit"]["dropped_asset_ref_diagnostics"])

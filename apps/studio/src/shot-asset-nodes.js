@@ -92,14 +92,19 @@ export function createManualShotAssetNode(store, scriptNode, assetType, label = 
   store.set((s) => {
     const node = s.nodes[fresh.id];
     if (!node) return;
-    const refs = Array.isArray(node.params.shotAssetRefs) ? node.params.shotAssetRefs : [];
-    node.params.shotAssetRefs = [...refs, asset];
+    const structured = node.params.structuredShot || structuredShot;
+    node.params.structuredShot = {
+      ...structured,
+      asset_refs: appendAssetRef(structured.asset_refs, asset),
+    };
+    node.params.shotAssetRefs = appendAssetRef(node.params.shotAssetRefs || [], asset);
     node.params.assetPrepState = {
       status: "card_ready",
       downstream_node_ids: existingShotAssetCardNodeIds(s, fresh.id),
       updated_at: new Date().toISOString(),
     };
   });
+  linkManualAssetToMatchingStoryboardShots(store, fresh, asset, assetNode.id);
   return assetNode.id;
 }
 
@@ -161,6 +166,53 @@ function linkMatchingStoryboardShotsToAssetCards(store, sourceScriptNode, assetN
       };
     });
   }
+}
+
+function linkManualAssetToMatchingStoryboardShots(store, sourceScriptNode, asset, assetNodeId) {
+  if (!sourceScriptNode?.params?.sourceTextNodeId || !assetNodeId) return;
+  const label = String(asset?.label || "").replace(/^@+/, "").trim();
+  if (!label) return;
+  const state = store.get();
+  for (const node of Object.values(state.nodes || {})) {
+    if (!node || node.id === sourceScriptNode.id || node.type !== "script") continue;
+    if (node.params?.sourceTextNodeId !== sourceScriptNode.params.sourceTextNodeId) continue;
+    const context = node.content || node.prompt || "";
+    if (!contextMentionsAsset(context, label)) continue;
+    connect(store, node.id, assetNodeId);
+    store.set((s) => {
+      const fresh = s.nodes[node.id];
+      if (!fresh) return;
+      const siblingShot = fresh.params?.structuredShot
+        ? refineStructuredShotAssets(fresh.params.structuredShot, context)
+        : structuredShotFromSegment(context, Number(fresh.params?.scriptSegmentIndex || 1));
+      fresh.params.structuredShot = {
+        ...siblingShot,
+        asset_refs: appendAssetRef(siblingShot.asset_refs, asset),
+      };
+      fresh.params.shotAssetRefs = appendAssetRef(fresh.params.shotAssetRefs || siblingShot.asset_refs || [], asset);
+      const existing = Array.isArray(fresh.params?.assetPrepState?.downstream_node_ids)
+        ? fresh.params.assetPrepState.downstream_node_ids
+        : [];
+      fresh.params.assetPrepState = {
+        status: "linked_existing_assets",
+        downstream_node_ids: [...new Set([...existing, assetNodeId])],
+        updated_at: new Date().toISOString(),
+      };
+    });
+  }
+}
+
+function appendAssetRef(refs, asset) {
+  const next = Array.isArray(refs) ? refs.slice() : [];
+  const key = assetKey(asset);
+  if (!key || next.some((item) => assetKey(item) === key)) return next;
+  return [...next, asset];
+}
+
+function contextMentionsAsset(context, label) {
+  const source = String(context || "");
+  if (!source || !label) return false;
+  return source.includes(label) || source.includes(`@${label}`);
 }
 
 function assetKey(asset) {

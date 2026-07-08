@@ -36,6 +36,7 @@ from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
 REMOTE_IMAGE_ENV = "AFS_ALLOW_REMOTE_IMAGE"
+KEYFRAME_BACKGROUND_SYNC_ENV = "AFS_KEYFRAME_BACKGROUND_SYNC_IMAGE"
 REMOTE_TRUE_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_IMAGE_PROMPT_LIMIT = 1500
 DEFAULT_REFERENCE_IMAGE_SLOTS = 1
@@ -633,6 +634,40 @@ def image_provider_gate(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]
     return {"capability": "image", "env": required_gate, "status": status}
 
 
+def keyframe_sync_background_plan(request: KeyframeGenerationRequest) -> dict[str, Any]:
+    if os.environ.get(KEYFRAME_BACKGROUND_SYNC_ENV, "").strip().lower() not in REMOTE_TRUE_VALUES:
+        return {
+            "enabled": False,
+            "reason": "background_sync_disabled",
+            "provider_service_id": request.provider_service_id,
+            "provider_gate": image_provider_gate(),
+            "execution_mode": "",
+        }
+    try:
+        registry = load_provider_registry()
+        service_id = _resolve_image_service_id(registry, request.provider_service_id)
+        descriptor = registry.descriptor(service_id)
+    except (ModelGatewayError, OSError, ValueError):
+        return {
+            "enabled": False,
+            "reason": "provider_registry_unavailable",
+            "provider_service_id": request.provider_service_id,
+            "provider_gate": image_provider_gate(),
+            "execution_mode": "",
+        }
+    required_gate = str(getattr(descriptor, "required_gate", REMOTE_IMAGE_ENV) or REMOTE_IMAGE_ENV)
+    provider_gate = image_provider_gate(required_gate)
+    execution_mode = str(getattr(descriptor, "execution_mode", "sync") or "sync")
+    enabled = provider_gate["status"] != "blocked" and execution_mode == "sync"
+    return {
+        "enabled": enabled,
+        "reason": "" if enabled else ("provider_gate_closed" if provider_gate["status"] == "blocked" else "provider_not_sync"),
+        "provider_service_id": service_id,
+        "provider_gate": provider_gate,
+        "execution_mode": execution_mode,
+    }
+
+
 def _prompt_request(request: KeyframeGenerationRequest) -> PromptOptimizationRequest:
     params = dict(request.node_parameters or {})
     params.setdefault("aspect_ratio", request.aspect_ratio)
@@ -975,8 +1010,10 @@ def _internal_prompt_terms() -> tuple[str, ...]:
 __all__ = (
     "KEYFRAME_NON_CLAIMS",
     "DEFAULT_IMAGE_PROMPT_LIMIT",
+    "KEYFRAME_BACKGROUND_SYNC_ENV",
     "REMOTE_IMAGE_ENV",
     "build_keyframe_generation",
     "image_provider_gate",
+    "keyframe_sync_background_plan",
     "provider_keyframe_prompt",
 )

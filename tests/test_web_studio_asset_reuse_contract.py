@@ -437,3 +437,89 @@ process.stdout.write(JSON.stringify({
     assert {item["label"] for item in payload["assetCards"]} == {"孙悟空", "云栈洞口"}
     assert set(payload["secondLinks"]) == set(payload["first"])
     assert payload["shot2Prep"]["status"] == "linked_existing_assets"
+
+
+def test_manual_prop_asset_entry_reuses_across_matching_storyboard_shots() -> None:
+    payload = json.loads(
+        subprocess.check_output(
+            [
+                "node",
+                "--input-type=module",
+                "-e",
+                r'''
+import { createManualShotAssetNode } from "./apps/studio/src/shot-asset-nodes.js";
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
+
+const shotText1 = "镜号：01\n画面描述：孙悟空握住金箍棒，立在云栈洞口。";
+const shotText2 = "镜号：02\n画面描述：金箍棒横扫画面前景，孙悟空后撤半步。";
+const state = {
+  nodes: {
+    shot_1: {
+      id: "shot_1",
+      type: "script",
+      title: "分镜 01",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 240,
+      prompt: shotText1,
+      content: shotText1,
+      params: {
+        sourceTextNodeId: "text_1",
+        scriptSegmentIndex: 1,
+        structuredShot: structuredShotFromSegment(shotText1, 1),
+      },
+      status: "complete",
+    },
+    shot_2: {
+      id: "shot_2",
+      type: "script",
+      title: "分镜 02",
+      x: 0,
+      y: 260,
+      w: 280,
+      h: 240,
+      prompt: shotText2,
+      content: shotText2,
+      params: {
+        sourceTextNodeId: "text_1",
+        scriptSegmentIndex: 2,
+        structuredShot: structuredShotFromSegment(shotText2, 2),
+      },
+      status: "complete",
+    },
+  },
+  edges: {},
+  order: ["shot_1", "shot_2"],
+  selection: { nodeIds: [], edgeId: null },
+  ui: {},
+  assets: [],
+  groups: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: () => `asset_${++seq}`,
+  set: (mutator) => mutator(state),
+};
+
+const assetNodeId = createManualShotAssetNode(store, state.nodes.shot_1, "prop", "金箍棒");
+const shot2Links = Object.values(state.edges).filter((edge) => edge.from === "shot_2").map((edge) => edge.to);
+process.stdout.write(JSON.stringify({
+  assetNodeId,
+  shot1Refs: state.nodes.shot_1.params.structuredShot.asset_refs.map((ref) => [ref.label, ref.asset_type, ref.source]),
+  shot2Refs: state.nodes.shot_2.params.structuredShot.asset_refs.map((ref) => [ref.label, ref.asset_type, ref.source]),
+  shot2Links,
+  shot2Prep: state.nodes.shot_2.params.assetPrepState,
+}));
+''',
+            ],
+            text=True,
+            encoding="utf-8",
+        )
+    )
+
+    assert ["金箍棒", "prop", "manual"] in payload["shot1Refs"]
+    assert ["金箍棒", "prop", "manual"] in payload["shot2Refs"]
+    assert payload["shot2Links"] == [payload["assetNodeId"]]
+    assert payload["shot2Prep"]["status"] == "linked_existing_assets"

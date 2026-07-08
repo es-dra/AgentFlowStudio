@@ -139,7 +139,7 @@ function isPrincipalOrManualAssetRef(ref) {
   if (ref?.asset_type !== "prop") return true;
   const source = String(ref?.source || "").toLowerCase();
   const status = String(ref?.status || "").toLowerCase();
-  return source === "manual" || source === "explicit" || status === "fixed" || Boolean(ref?.graph_asset_id);
+  return source === "manual" || status === "fixed" || Boolean(ref?.graph_asset_id);
 }
 
 export function assetRefToken(asset) {
