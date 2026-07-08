@@ -413,6 +413,7 @@ export function normalizeOptimization(result, request) {
   const userSections = Array.isArray(result?.user_prompt_sections) ? result.user_prompt_sections : [];
   if (!userPrompt && !userSections.length) throw new Error("运行服务未返回用户版优化结果");
   const sections = userSections.map((s) => ({ name: s.title || s.name, text: s.text }));
+  const modelCallContextId = String(result?.model_call_context_id || result?.model_call_context_summary?.context_id || "").trim();
   return {
     source: "runtime",
     original: result?.original_prompt || request.prompt_text,
@@ -421,5 +422,88 @@ export function normalizeOptimization(result, request) {
     sections,
     optimization_mode: result?.optimization_mode || "not_applicable",
     context_bundle: result?.context_bundle || null,
+    model_call_context_id: modelCallContextId,
+    model_call_context_summary: normalizeModelCallContextSummary(result?.model_call_context_summary, modelCallContextId),
   };
+}
+
+export function normalizeModelCallContextSummary(summary, fallbackContextId = "") {
+  const source = safeSummaryObject(summary);
+  const contextId = String(source.context_id || fallbackContextId || "").trim();
+  if (!contextId) return null;
+  const contextSources = safeSummaryObject(source.context_sources);
+  const assetContext = safeSummaryObject(source.asset_context);
+  const referenceContext = safeSummaryObject(source.reference_context);
+  const providerConstraints = safeSummaryObject(source.provider_constraints);
+  const traceSummary = safeSummaryObject(source.trace_summary);
+  const safetyBoundary = safeSummaryObject(source.safety_boundary);
+  return {
+    context_id: contextId,
+    schema_version: String(source.schema_version || ""),
+    operation_intent: String(source.operation_intent || ""),
+    generation_target: String(source.generation_target || ""),
+    artifact: safeArtifactRef(source.artifact),
+    context_sources: {
+      context_bundle_present: Boolean(contextSources.context_bundle_present),
+      included_asset_count: safeSummaryCount(contextSources.included_asset_count),
+      excluded_asset_count: safeSummaryCount(contextSources.excluded_asset_count),
+      feedback_context_overlay_count: safeSummaryCount(contextSources.feedback_context_overlay_count),
+      upstream_ref_count: safeSummaryCount(contextSources.upstream_ref_count),
+    },
+    asset_context: {
+      context_eligible_asset_count: safeSummaryCount(assetContext.context_eligible_asset_count),
+      draft_assets_enter_context: Boolean(assetContext.draft_assets_enter_context),
+    },
+    reference_context: {
+      reference_image_count: safeSummaryCount(referenceContext.reference_image_count),
+    },
+    provider_constraints: {
+      capability: String(providerConstraints.capability || ""),
+      provider_gate: String(providerConstraints.provider_gate || ""),
+    },
+    trace_summary: {
+      warning_ids: safeSummaryRefs(traceSummary.warning_ids),
+      feedback_context_overlay_ids: safeSummaryRefs(traceSummary.feedback_context_overlay_ids),
+    },
+    safety_boundary: {
+      no_secrets: Boolean(safetyBoundary.no_secrets),
+      no_provider_raw: Boolean(safetyBoundary.no_provider_raw),
+      no_credentialed_url: Boolean(safetyBoundary.no_credentialed_url),
+      no_local_path: Boolean(safetyBoundary.no_local_path),
+      no_media_bytes: Boolean(safetyBoundary.no_media_bytes),
+      feedback_is_not_memory: Boolean(safetyBoundary.feedback_is_not_memory),
+      draft_assets_are_not_context_truth: Boolean(safetyBoundary.draft_assets_are_not_context_truth),
+    },
+    non_claims: safeSummaryRefs(source.non_claims),
+  };
+}
+
+function safeArtifactRef(value) {
+  const artifact = safeSummaryObject(value);
+  if (!artifact.artifact_id && !artifact.filename) return null;
+  return {
+    artifact_id: String(artifact.artifact_id || ""),
+    artifact_type: String(artifact.artifact_type || ""),
+    filename: String(artifact.filename || ""),
+    role: String(artifact.role || ""),
+    media_type: String(artifact.media_type || ""),
+  };
+}
+
+function safeSummaryObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function safeSummaryCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.round(number)) : 0;
+}
+
+function safeSummaryRefs(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item, index, arr) => arr.indexOf(item) === index)
+    .slice(0, 12);
 }

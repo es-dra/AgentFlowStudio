@@ -62,6 +62,47 @@ await openOptimizer(store, {
       user_prompt_plain: "优化后的剧本正文",
       optimization_mode: "text",
       context_bundle: { warnings: [] },
+      model_call_context_id: "mctx_prompt_text_001",
+      model_call_context_summary: {
+        context_id: "mctx_prompt_text_001",
+        schema_version: "afs_model_call_context.v0.1",
+        operation_intent: "prompt_optimize",
+        generation_target: "prompt",
+        artifact: {
+          artifact_id: "runs-proj-job-model_call_context",
+          artifact_type: "text_artifact",
+          filename: "model_call_context.json",
+          role: "model_call_context",
+          media_type: "application/json",
+        },
+        context_sources: {
+          context_bundle_present: true,
+          included_asset_count: 1,
+          excluded_asset_count: 0,
+          feedback_context_overlay_count: 0,
+          upstream_ref_count: 0,
+        },
+        asset_context: {
+          context_eligible_asset_count: 1,
+          draft_assets_enter_context: false,
+        },
+        reference_context: { reference_image_count: 0 },
+        provider_constraints: {
+          capability: "llm",
+          provider_gate: "AFS_ALLOW_REMOTE_LLM",
+        },
+        trace_summary: { warning_ids: [], feedback_context_overlay_ids: [] },
+        safety_boundary: {
+          no_secrets: true,
+          no_provider_raw: true,
+          no_credentialed_url: true,
+          no_local_path: true,
+          no_media_bytes: true,
+          feedback_is_not_memory: true,
+          draft_assets_are_not_context_truth: true,
+        },
+        non_claims: ["not_provider_execution"],
+      },
     };
   },
 }, "text_1", null, textarea);
@@ -72,6 +113,11 @@ process.stdout.write(JSON.stringify({
   content: state.nodes.text_1.content,
   textarea: textarea.value,
   status: state.nodes.text_1.params.promptOptimizationState.status,
+  modelContextId: state.nodes.text_1.params.lastModelCallContextId,
+  stateModelContextId: state.nodes.text_1.params.promptOptimizationState.model_call_context_id,
+  modelContextEligibleAssets: state.nodes.text_1.params.lastModelCallContextSummary.asset_context.context_eligible_asset_count,
+  modelContextArtifact: state.nodes.text_1.params.lastModelCallContextSummary.artifact.filename,
+  lastContextBundlePresent: Boolean(state.nodes.text_1.params.lastContextBundle),
   signatureChanged: beforeSignature !== afterSignature,
 }));
 '''
@@ -89,6 +135,11 @@ process.stdout.write(JSON.stringify({
     assert payload["content"] == "优化后的剧本正文"
     assert payload["textarea"] == "优化后的剧本正文"
     assert payload["status"] == "complete"
+    assert payload["modelContextId"] == "mctx_prompt_text_001"
+    assert payload["stateModelContextId"] == "mctx_prompt_text_001"
+    assert payload["modelContextEligibleAssets"] == 1
+    assert payload["modelContextArtifact"] == "model_call_context.json"
+    assert payload["lastContextBundlePresent"] is True
     assert payload["signatureChanged"] is True
 
 

@@ -6,6 +6,71 @@ from agentflow.algorithms.model_call_context import build_model_call_context
 from apps.api.runtime_video_contract import video_duration_contract, video_input_source_contract
 
 
+def public_model_call_context_summary(
+    context: dict[str, Any],
+    *,
+    artifact: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    sources = _safe_dict(context.get("context_sources"))
+    asset_context = _safe_dict(context.get("asset_context"))
+    reference_context = _safe_dict(context.get("reference_context"))
+    provider_constraints = _safe_dict(context.get("provider_constraints"))
+    trace_summary = _safe_dict(context.get("trace_summary"))
+    safety_boundary = _safe_dict(context.get("safety_boundary"))
+    summary = {
+        "context_id": str(context.get("context_id") or ""),
+        "schema_version": str(context.get("schema_version") or ""),
+        "operation_intent": str(context.get("operation_intent") or ""),
+        "generation_target": str(context.get("generation_target") or ""),
+        "context_sources": {
+            "context_bundle_present": bool(sources.get("context_bundle_present")),
+            "included_asset_count": _safe_int(sources.get("included_asset_count")),
+            "excluded_asset_count": _safe_int(sources.get("excluded_asset_count")),
+            "feedback_context_overlay_count": _safe_int(sources.get("feedback_context_overlay_count")),
+            "upstream_ref_count": _safe_int(sources.get("upstream_ref_count")),
+        },
+        "asset_context": {
+            "context_eligible_asset_count": len(_safe_list(asset_context.get("context_eligible_asset_ids"))),
+            "draft_assets_enter_context": bool(asset_context.get("draft_assets_enter_context")),
+        },
+        "reference_context": {
+            "reference_image_count": _safe_int(reference_context.get("reference_image_count")),
+        },
+        "provider_constraints": {
+            "capability": str(provider_constraints.get("capability") or ""),
+            "provider_gate": str(provider_constraints.get("provider_gate") or provider_constraints.get("required_gate") or ""),
+        },
+        "trace_summary": {
+            "warning_ids": _safe_ref_list(trace_summary.get("warning_ids") or []),
+            "feedback_context_overlay_ids": _safe_ref_list(trace_summary.get("feedback_context_overlay_ids") or []),
+        },
+        "safety_boundary": {
+            "no_secrets": bool(safety_boundary.get("no_secrets")),
+            "no_provider_raw": bool(safety_boundary.get("no_provider_raw")),
+            "no_credentialed_url": bool(safety_boundary.get("no_credentialed_url")),
+            "no_local_path": bool(safety_boundary.get("no_local_path")),
+            "no_media_bytes": bool(safety_boundary.get("no_media_bytes")),
+            "feedback_is_not_memory": bool(safety_boundary.get("feedback_is_not_memory")),
+            "draft_assets_are_not_context_truth": bool(safety_boundary.get("draft_assets_are_not_context_truth")),
+        },
+        "non_claims": [
+            "not_provider_execution",
+            "not_generated_media_qa",
+            "not_human_acceptance",
+            "not_public_readiness",
+        ],
+    }
+    if artifact:
+        summary["artifact"] = {
+            "artifact_id": str(artifact.get("artifact_id") or ""),
+            "artifact_type": str(artifact.get("artifact_type") or ""),
+            "filename": str(artifact.get("filename") or ""),
+            "role": str(artifact.get("role") or ""),
+            "media_type": str(artifact.get("media_type") or ""),
+        }
+    return summary
+
+
 def prompt_optimization_model_call_context(
     *,
     project_id: str,
@@ -177,9 +242,34 @@ def _director_scenario_ids(context: dict[str, Any]) -> list[str]:
     ]
 
 
+def _safe_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _safe_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _safe_ref_list(values: Any) -> list[str]:
+    refs: list[str] = []
+    for value in _safe_list(values):
+        ref = str(value or "").strip()
+        if ref and ref not in refs:
+            refs.append(ref)
+    return refs
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
 __all__ = (
     "keyframe_model_call_context",
     "prompt_optimization_model_call_context",
+    "public_model_call_context_summary",
     "revision_model_call_context",
     "video_generation_model_call_context",
     "visual_inspect_model_call_context",
