@@ -291,6 +291,65 @@ process.stdout.write(JSON.stringify({ node: state.nodes.text_1, captured }));
     assert "Primary character" not in node["prompt"]
 
 
+def test_idea_expansion_runtime_failure_is_visible_not_local_fallback() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "一个人在睡觉",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const runtime = {
+  optimizePrompt: async () => {
+    const error = new Error("Runtime request failed (422): remote_llm_gate_closed");
+    error.payload = {
+      detail: {
+        error: "invalid_prompt_optimization",
+        message: "remote LLM prompt optimization unavailable: remote_llm_gate_closed",
+        details: { raw_detail: "remote LLM prompt optimization unavailable: remote_llm_gate_closed" },
+      },
+    };
+    throw error;
+  }
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify(state.nodes.text_1));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+
+    assert node["status"] == "error"
+    assert node["params"]["scriptExpansionState"]["status"] == "failed"
+    assert node["params"]["generationPolicyStatus"] == "needs_attention"
+    assert "remote_llm_gate_closed" in node["params"]["generationBlockedReason"]
+    assert node["params"].get("scriptInputMode") != "idea_expanded_script_fallback"
+    assert "片名：《" not in node["prompt"]
+
+
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
     script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
     canvas_body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")

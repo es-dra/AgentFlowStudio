@@ -314,8 +314,6 @@ def _context_bundle(
 
 
 def _remote_optimizer_required(request: PromptOptimizationRequest) -> bool:
-    if is_script_generation_request(request):
-        return False
     params = request.node_parameters or {}
     return bool(params.get("remote_optimizer_required"))
 

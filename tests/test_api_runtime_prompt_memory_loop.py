@@ -1406,7 +1406,7 @@ def test_script_generation_predicate_requires_explicit_script_contract_and_scrip
     )
 
 
-def test_script_prompt_optimization_returns_script_body_with_source_idea_separated(tmp_path, monkeypatch) -> None:
+def test_script_prompt_generation_requires_remote_llm_when_gate_closed(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     client.post("/projects", json={"project_id": "proj_script_body", "goal": "Script body contract"})
@@ -1439,33 +1439,10 @@ def test_script_prompt_optimization_returns_script_body_with_source_idea_separat
         },
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    script = payload["optimized_prompt"]
-    assert payload["provider_calls_started"] is False
-    assert payload["original_prompt"] == wrapper
-    assert payload["script_plan"]["source_idea"] == "一个人在睡觉"
-    assert payload["script_generation_body"]["source_idea"] == "一个人在睡觉"
-    assert payload["script_generation_body"]["fallback_used"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["requested"] is True
-    assert payload["safe_manifest"]["llm_enhancement"]["status"] == "blocked"
-    assert "片名：《" in script
-    assert "沈眠" in script
-    assert "房间" in script or "出租屋" in script
-    assert "敲门" in script or "钥匙" in script
-    assert "结尾" in script or "门外" in script
-    assert "请把下面的一句话" not in script
-    assert "输出要求" not in script
-    assert "原始想法" not in script
-    assert "Intent:" not in script
-    assert "角色/主体：" not in script
-    assert "推进主体" not in script
-
-    brief = client.get(f"/artifacts/{payload['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
-    manifest = client.get(f"/artifacts/{payload['artifacts']['prompt_optimization_safe_manifest']['artifact_id']}").json()["payload"]
-    assert brief["original_prompt"] == wrapper
-    assert brief["source_idea"] == "一个人在睡觉"
-    assert manifest["script_generation_body"]["fallback_used"] is True
+    assert response.status_code == 422
+    detail = _runtime_error_raw_detail(response)
+    assert "remote_llm_gate_closed" in detail
+    assert "remote LLM prompt optimization unavailable" in detail
 
 
 def test_script_prompt_generation_applies_gated_llm_body_with_knowledge_rules(tmp_path, monkeypatch) -> None:

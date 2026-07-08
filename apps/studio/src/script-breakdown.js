@@ -1,6 +1,7 @@
 import { createNode, connect } from "./nodes.js";
 import { assetAutoBindingGraph, nodeReferenceStackForGraphBoundAssets } from "./asset-auto-binding-refs.js";
 import { buildOptimizationRequest, normalizeOptimization } from "./optimizer-contract.js";
+import { formatRuntimeError } from "./runtime-error-utils.js";
 import { SCRIPT_UPLOAD_ACCEPT, readScriptFileText, safeFileName, scriptFileExtension } from "./script-file-import.js";
 import { normalizeShotAssetRefsWithDiagnostics, refineStructuredShotAssets, structuredShotFromSegment, structuredShotText } from "./structured-shot.js";
 
@@ -69,7 +70,11 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
       scriptExpansionState: { status: "complete", percent: 100, completed_at: new Date().toISOString() },
     });
     if (textarea) textarea.value = script;
-  } catch {
+  } catch (error) {
+    if (runtime?.optimizePrompt) {
+      setScriptExpansionError(store, fresh.id, error);
+      return;
+    }
     const script = draftScriptFromIdea(idea);
     updateTextNode(store, fresh.id, script, {
       scriptInputMode: "idea_expanded_script_fallback",
@@ -419,6 +424,26 @@ function setScriptExpansionState(store, nodeId, status, visibleText = "") {
       node.status = "generating";
     }
   }, { history: false, persist: false });
+}
+
+function setScriptExpansionError(store, nodeId, error) {
+  const message = formatRuntimeError(error, "剧本扩写失败。");
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.status = "error";
+    node.params.scriptExpansionState = {
+      status: "failed",
+      percent: 100,
+      label: "剧本扩写",
+      message,
+      completed_at: new Date().toISOString(),
+    };
+    node.params.generationPolicyStatus = "needs_attention";
+    node.params.generationStatusDetail = "LLM 剧本扩写未完成。";
+    node.params.generationBlockedReason = message;
+    node.params.generationNextAction = "开启 LLM provider gate 后重试剧本扩写。";
+  });
 }
 
 function setStoryboardBreakdownState(store, nodeId, status, message = "") {
