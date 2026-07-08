@@ -13,7 +13,7 @@ from apps.api.runtime_script_generation_body import is_script_generation_request
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
     if is_script_generation_request(request):
-        return script_generation_enhancement_instruction(request)
+        return script_generation_enhancement_instruction(request, assembly)
     if request.node_type in {"text", "script"}:
         return text_enhancement_instruction(request)
     mode = prompt_optimization_mode(request)
@@ -24,18 +24,44 @@ def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[s
     return visual_enhancement_instruction(request)
 
 
-def script_generation_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+def script_generation_enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object] | None = None) -> str:
     source_idea = source_idea_from_request(request)
+    knowledge_lines = _knowledge_guidance_lines(assembly or {}, limit=8)
     return "\n".join(
         [
             "你正在为 AFS Studio 把一句创作想法扩写成正式短视频剧本正文。",
             f"原始想法：{source_idea}",
+            "专业知识库约束：",
+            *knowledge_lines,
             "只输出剧本正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
             "必须先给片名，然后写连续叙事正文。",
             "正文必须包含：有名字或称呼的主角、明确场景、情绪基调、动作推进、转折或发现、结尾钩子。",
             "不要输出分镜列表、镜头编号、提示词包装、输出要求、原始想法回显、推进主体、展示变化、收束结果或模板占位句。",
         ]
     )
+
+
+def _knowledge_guidance_lines(assembly: dict[str, object], *, limit: int) -> list[str]:
+    rules = assembly.get("knowledge_rules")
+    if not isinstance(rules, list):
+        return ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
+    lines: list[str] = []
+    preferred_domains = {"short_video_script", "storyboard", "directing", "cinematography", "negative_constraints"}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        domain = str(rule.get("domain") or "")
+        if domain not in preferred_domains:
+            continue
+        transform = rule.get("prompt_transform")
+        guidance = str(transform.get("guidance") or "").strip() if isinstance(transform, dict) else ""
+        rule_id = str(rule.get("rule_id") or "").strip()
+        if not guidance or not rule_id:
+            continue
+        lines.append(f"- {rule_id}: {guidance}")
+        if len(lines) >= limit:
+            break
+    return lines or ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
 
 
 def video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:

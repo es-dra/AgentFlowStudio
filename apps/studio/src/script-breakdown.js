@@ -57,9 +57,9 @@ export async function expandTextIdeaToScript(store, runtime, node, textarea = nu
       script_generation_mode: "idea_to_script",
       source_idea: idea.slice(0, 600),
       forbidden_output: "storyboard_placeholder_outline",
-      llm_provider: "local_script_generation",
-      llm_model: "local-script-body",
-      remote_optimizer_required: false,
+      llm_provider: "prompt_optimizer",
+      llm_model: "prompt-optimizer",
+      remote_optimizer_required: true,
     };
     const response = runtime?.optimizePrompt ? await runtime.optimizePrompt(request) : null;
     const outcome = response ? normalizeOptimization(response, request) : null;

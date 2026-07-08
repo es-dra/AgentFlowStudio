@@ -16,8 +16,14 @@ from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
 from apps.api.runtime_llm_enhancement_dispatch import dispatch_llm_with_fallback
 from apps.api.runtime_llm_enhancement_gate import llm_provider_gate
-from apps.api.runtime_models import PromptOptimizationRequest, StoryboardBreakdownRequest
+from apps.api.runtime_models import StoryboardBreakdownRequest
 from apps.api.runtime_storyboard_artifacts import write_storyboard_artifacts
+from apps.api.runtime_storyboard_knowledge import (
+    knowledge_rule_ids,
+    storyboard_instruction,
+    storyboard_knowledge_context,
+    storyboard_llm_request,
+)
 from apps.api.runtime_storyboard_local import local_storyboard_shots
 from apps.api.runtime_storyboard_provider_parse import shots_from_provider_text
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -97,6 +103,8 @@ def build_storyboard_breakdown(
     fixed_visual_assets: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     gate = llm_provider_gate()
+    llm_request = storyboard_llm_request(request)
+    storyboard_knowledge = storyboard_knowledge_context(request)
     provider_calls_started = False
     shots: list[dict[str, Any]] | None = None
     status = "local_fallback"
@@ -104,9 +112,8 @@ def build_storyboard_breakdown(
     if gate["status"] != "blocked":
         try:
             registry = load_provider_registry()
-            llm_request = _llm_request(request)
             dispatch_request = ProviderDispatchRequest(
-                prompt=_storyboard_instruction(request),
+                prompt=storyboard_instruction(request, storyboard_knowledge),
                 output_dir=output_dir,
                 task_type="storyboard_breakdown",
             )
@@ -178,6 +185,9 @@ def build_storyboard_breakdown(
         "asset_card_project_reuse_candidate_count": int(
             (asset_card_candidates["summary"].get("reuse_scope_counts") or {}).get("project_reuse_candidate") or 0
         ),
+        "knowledgebase_version": storyboard_knowledge["knowledgebase_version"],
+        "knowledgebase_registry_hash": storyboard_knowledge["knowledgebase_registry_hash"],
+        "knowledge_rule_ids": knowledge_rule_ids(storyboard_knowledge),
         "unsupported_addition_count": len(asset_graph.get("unsupported_additions") or []),
         "held_asset_ref_count": int(asset_graph.get("held_asset_ref_count") or 0),
         "discard_reason": discard_reason,
@@ -223,6 +233,9 @@ def build_storyboard_breakdown(
         "provider_gate": gate,
         "provider_calls_started": provider_calls_started,
         "raw_provider_response_stored": False,
+        "knowledgebase_version": storyboard_knowledge["knowledgebase_version"],
+        "knowledgebase_registry_hash": storyboard_knowledge["knowledgebase_registry_hash"],
+        "knowledge_rule_ids": knowledge_rule_ids(storyboard_knowledge),
         "asset_graph_contract": "candidate_asset_graph",
     }
     for payload in (safe_manifest, artifact, request_plan, asset_graph):
@@ -246,40 +259,6 @@ def build_storyboard_breakdown(
         "evidence_ledger": evidence_ledger,
         "request_plan": request_plan,
     }
-
-
-def _llm_request(request: StoryboardBreakdownRequest) -> PromptOptimizationRequest:
-    params = dict(request.node_parameters or {})
-    params.setdefault("llm_provider", "prompt_optimizer")
-    return PromptOptimizationRequest(
-        node_id=request.node_id,
-        node_type="text",
-        prompt_text=request.script_text,
-        generation_target="script",
-        target_platform=request.target_platform,
-        style=request.style,
-        node_parameters=params,
-        generated_at=request.generated_at,
-    )
-
-
-def _storyboard_instruction(request: StoryboardBreakdownRequest) -> str:
-    count_line = f"建议镜头数量：{request.shot_count_hint}" if request.shot_count_hint else "根据剧情自动决定镜头数量，避免机械三段切分。"
-    return "\n".join(
-        [
-            "你是影视分镜导演。请把输入剧本拆成专业分镜脚本，输出严格 JSON，不要 Markdown。",
-            count_line,
-            "JSON 格式：{\"shots\":[{shot_id,index,duration,description,shot_size,light_atmosphere,camera_motion,dialogue,sound,source_span,unsupported_additions,asset_refs}]}",
-            "source_span 必须包含 span_id 与 text，text 必须逐字来自剧本原文；不能为镜头效果擅自新增人物、道具、家具、屋檐或场景结构。",
-            "unsupported_additions 必须列出所有剧本未提供但你认为需要补入的内容；正常情况下应为空数组，不能静默添加。",
-            "asset_refs 每项必须包含 label, asset_type(character|scene|prop), status, source, evidence_text, confidence。描述中涉及角色、场景、道具时必须用 @名称 显式标注。",
-            "不要用泛化的“主角”“主要场景”替代剧本里的真实名称；例如孙悟空、金刚狼必须分别作为 character，金箍棒、武器、信件、地图等必须作为 prop。",
-            "每个镜头要包含时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效。",
-            f"平台：{request.target_platform}；风格：{request.style}",
-            "剧本：",
-            request.script_text,
-        ]
-    )
 
 
 def _safe_reason(value: str) -> str:

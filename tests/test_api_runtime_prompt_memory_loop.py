@@ -1447,6 +1447,8 @@ def test_script_prompt_optimization_returns_script_body_with_source_idea_separat
     assert payload["script_plan"]["source_idea"] == "一个人在睡觉"
     assert payload["script_generation_body"]["source_idea"] == "一个人在睡觉"
     assert payload["script_generation_body"]["fallback_used"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["requested"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["status"] == "blocked"
     assert "片名：《" in script
     assert "沈眠" in script
     assert "房间" in script or "出租屋" in script
@@ -1464,6 +1466,66 @@ def test_script_prompt_optimization_returns_script_body_with_source_idea_separat
     assert brief["original_prompt"] == wrapper
     assert brief["source_idea"] == "一个人在睡觉"
     assert manifest["script_generation_body"]["fallback_used"] is True
+
+
+def test_script_prompt_generation_applies_gated_llm_body_with_knowledge_rules(tmp_path, monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            calls.append(request.prompt)
+            assert request.task_type == "prompt_enhancement"
+            assert "专业知识库约束" in request.prompt
+            assert "short_video_hook_visual_promise_v1" in request.prompt
+            assert "storyboard_shot_numbering_handoff_v1" in request.prompt
+            return {
+                "text": (
+                    "片名：《星光屋顶》\n\n"
+                    "遥星R-17站在乡村屋顶的旧水塔旁，夜风吹过金属外壳，远处村庄灯火一点点熄灭。"
+                    "它原本只是校准星图，却在一颗异常移动的星点里收到旧时代的童声。"
+                    "它低头确认胸口第一次亮起的信号灯，又把手伸向夜空，像是在回答一个多年以前的问题。"
+                    "结尾停在它回望屋檐下旧灯泡的瞬间，童声轻轻问它是否还记得回家的路。"
+                )
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_llm_body", "goal": "Script body LLM contract"})
+
+    response = client.post(
+        "/projects/proj_script_llm_body/prompt-optimizations",
+        json={
+            "node_id": "script-node-llm-body",
+            "node_type": "script",
+            "prompt_text": "请把下面的一句话扩写成正式短视频剧本正文。\n原始想法：一个来自未来的机器人，在农村屋顶上看星星",
+            "generation_target": "script",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "script_expansion_contract": "formal_script_before_storyboard_breakdown",
+                "script_generation_mode": "idea_to_script",
+                "source_idea": "一个来自未来的机器人，在农村屋顶上看星星",
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-08T10:00:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert calls
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["status"] == "applied"
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is False
+    assert payload["script_generation_body"]["fallback_used"] is False
+    assert payload["optimized_prompt"].startswith("片名：《星光屋顶》")
+    assert "意图：" not in payload["optimized_prompt"]
+    assert "角色/主体：" not in payload["optimized_prompt"]
 
 
 def test_script_body_validator_fallbacks_from_wrapper_echo_optimizer_labels_and_template_fillers() -> None:

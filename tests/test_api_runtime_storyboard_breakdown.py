@@ -43,6 +43,8 @@ def test_storyboard_breakdown_gate_closed_uses_safe_local_fallback(tmp_path, mon
     assert payload["safe_manifest"]["status"] == "local_fallback"
     assert payload["safe_manifest"]["raw_provider_response_stored"] is False
     assert payload["safe_manifest"]["asset_nodes_created"] is False
+    assert payload["safe_manifest"]["knowledgebase_version"] == "creative_prompt_knowledgebase_v1"
+    assert "storyboard_shot_numbering_handoff_v1" in payload["safe_manifest"]["knowledge_rule_ids"]
     assert len(payload["shots"]) >= 1
     first = payload["shots"][0]
     for field in ("shot_id", "index", "duration", "description", "shot_size", "light_atmosphere", "camera_motion", "asset_refs"):
@@ -326,9 +328,14 @@ def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, 
     assert response.status_code == 200
     payload = response.json()
     assert len(calls) == 1
+    provider_prompt = calls[0].prompt
+    assert "专业知识库约束" in provider_prompt
+    assert "storyboard_shot_numbering_handoff_v1" in provider_prompt
     assert payload["provider_calls_started"] is True
     assert payload["safe_manifest"]["status"] == "provider_structured"
     assert payload["safe_manifest"]["raw_provider_response_stored"] is False
+    assert payload["safe_manifest"]["knowledgebase_version"] == "creative_prompt_knowledgebase_v1"
+    assert "storyboard_shot_numbering_handoff_v1" in payload["safe_manifest"]["knowledge_rule_ids"]
     assert payload["shots"][0]["description"].startswith("@主角")
     assert payload["shots"][1]["asset_refs"][1]["asset_type"] == "prop"
 

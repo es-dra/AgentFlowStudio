@@ -281,8 +281,9 @@ process.stdout.write(JSON.stringify({ node: state.nodes.text_1, captured }));
     assert "原始想法：一个人在睡觉" in captured["prompt_text"]
     assert captured["node_parameters"]["source_idea"] == "一个人在睡觉"
     assert captured["node_parameters"]["script_generation_mode"] == "idea_to_script"
-    assert captured["node_parameters"]["remote_optimizer_required"] is False
-    assert captured["node_parameters"]["llm_provider"] == "local_script_generation"
+    assert captured["node_parameters"]["remote_optimizer_required"] is True
+    assert captured["node_parameters"]["llm_provider"] == "prompt_optimizer"
+    assert captured["node_parameters"]["llm_model"] == "prompt-optimizer"
     assert node["params"]["scriptInputMode"] == "idea_expanded_script"
     assert "片名：《" in node["prompt"]
     assert "意图：" not in node["prompt"]
