@@ -15,6 +15,12 @@ export function createShotAssetPrepNodes(store, scriptNodeId, structuredShot, x,
   const created = [];
   const bindingGraph = assetAutoBindingGraph(options.assetAutoBindingGraph);
   refs.slice(0, MAX_ASSET_PREP_NODES_PER_SHOT).forEach((asset, index) => {
+    const reusableId = reusableAssetCardNodeId(store.get(), asset, scriptNodeId);
+    if (reusableId) {
+      connect(store, scriptNodeId, reusableId);
+      created.push(reusableId);
+      return;
+    }
     const draft = assetCardDraftFromRef(asset, structuredShot, { sourceScriptNodeId: scriptNodeId });
     const assetNode = createNode(store, "image", x, y + index * 150);
     applyAssetDraftToNode(store, assetNode.id, draft, structuredShot, scriptNodeId, asset, bindingGraph);
@@ -58,6 +64,7 @@ export function ensureShotAssetPrepNodesForScriptNode(store, scriptNode, options
       updated_at: new Date().toISOString(),
     };
   });
+  linkMatchingStoryboardShotsToAssetCards(store, fresh, created);
   return created;
 }
 
@@ -100,6 +107,66 @@ export function existingShotAssetCardNodeIds(state, scriptNodeId) {
   return Object.values(state.nodes || {})
     .filter((node) => node?.params?.assetCardDraft?.source_script_node_id === scriptNodeId)
     .map((node) => node.id);
+}
+
+function reusableAssetCardNodeId(state, asset, scriptNodeId = "") {
+  const key = assetKey(asset);
+  if (!key) return "";
+  for (const node of Object.values(state.nodes || {})) {
+    if (!node || node.id === scriptNodeId || node.params?.assetCardDraft?.source_script_node_id === scriptNodeId) continue;
+    const draft = node.params?.assetCardDraft;
+    const prepRef = node.params?.asset_prep?.asset_ref;
+    if (assetKey(draft) === key || assetKey(prepRef) === key) return node.id;
+  }
+  return "";
+}
+
+function linkMatchingStoryboardShotsToAssetCards(store, sourceScriptNode, assetNodeIds) {
+  if (!sourceScriptNode?.params?.sourceTextNodeId || !assetNodeIds.length) return;
+  const state = store.get();
+  const assetNodeByKey = new Map();
+  for (const assetNodeId of assetNodeIds) {
+    const assetNode = state.nodes?.[assetNodeId];
+    const key = assetKey(assetNode?.params?.assetCardDraft || assetNode?.params?.asset_prep?.asset_ref);
+    if (key) assetNodeByKey.set(key, assetNodeId);
+  }
+  if (!assetNodeByKey.size) return;
+  for (const node of Object.values(state.nodes || {})) {
+    if (!node || node.id === sourceScriptNode.id || node.type !== "script") continue;
+    if (node.params?.sourceTextNodeId !== sourceScriptNode.params.sourceTextNodeId) continue;
+    const context = node.content || node.prompt || "";
+    const siblingShot = node.params?.structuredShot
+      ? refineStructuredShotAssets(node.params.structuredShot, context)
+      : structuredShotFromSegment(context, Number(node.params?.scriptSegmentIndex || 1));
+    const matchedIds = [];
+    for (const asset of siblingShot.asset_refs || []) {
+      const assetNodeId = assetNodeByKey.get(assetKey(asset));
+      if (!assetNodeId) continue;
+      connect(store, node.id, assetNodeId);
+      matchedIds.push(assetNodeId);
+    }
+    if (!matchedIds.length) continue;
+    store.set((s) => {
+      const fresh = s.nodes[node.id];
+      if (!fresh) return;
+      const existing = Array.isArray(fresh.params?.assetPrepState?.downstream_node_ids)
+        ? fresh.params.assetPrepState.downstream_node_ids
+        : [];
+      fresh.params.structuredShot = siblingShot;
+      fresh.params.shotAssetRefs = siblingShot.asset_refs;
+      fresh.params.assetPrepState = {
+        status: "linked_existing_assets",
+        downstream_node_ids: [...new Set([...existing, ...matchedIds])],
+        updated_at: new Date().toISOString(),
+      };
+    });
+  }
+}
+
+function assetKey(asset) {
+  const label = String(asset?.label || asset?.display_name || "").replace(/^@+/, "").trim().toLowerCase();
+  const type = String(asset?.asset_type || "").trim().toLowerCase();
+  return label && type ? `${type}:${label}` : "";
 }
 
 function removeShotAssetCardNodes(store, nodeIds) {

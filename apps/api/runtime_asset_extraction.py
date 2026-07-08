@@ -194,6 +194,12 @@ def _named_characters(text: str) -> list[str]:
     names: list[str] = []
     if "林晚" in text:
         names.append("林晚")
+    if "孙悟空" in text:
+        names.append("孙悟空")
+    if "猪八戒" in text:
+        names.append("猪八戒")
+    if "金刚狼" in text:
+        names.append("金刚狼")
     if re.search(r"\bLin\s+Wan\b", text, flags=re.I):
         names.append("Lin Wan")
     if "女孩" in text:

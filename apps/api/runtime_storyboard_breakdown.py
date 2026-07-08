@@ -18,6 +18,7 @@ from apps.api.runtime_llm_enhancement_dispatch import dispatch_llm_with_fallback
 from apps.api.runtime_llm_enhancement_gate import llm_provider_gate
 from apps.api.runtime_models import StoryboardBreakdownRequest
 from apps.api.runtime_storyboard_artifacts import write_storyboard_artifacts
+from apps.api.runtime_storyboard_fixed_assets import attach_fixed_visual_asset_refs
 from apps.api.runtime_storyboard_knowledge import (
     knowledge_rule_ids,
     storyboard_instruction,
@@ -132,6 +133,7 @@ def build_storyboard_breakdown(
             status = "local_fallback"
     if not shots:
         shots = local_storyboard_shots(request.script_text, request.shot_count_hint)
+    shots = attach_fixed_visual_asset_refs(shots, fixed_visual_assets or [])
     asset_graph = build_asset_graph(shots, source_text=request.script_text, graph_source=f"storyboard_{status}")
     shots = attach_graph_asset_ids_to_shots(shots, asset_graph)
     content_quality_report = evaluate_storyboard_content_quality(

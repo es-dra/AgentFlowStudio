@@ -143,6 +143,64 @@ process.stdout.write(JSON.stringify({
     assert payload["signatureChanged"] is True
 
 
+def test_studio_state_save_strips_provider_raw_but_keeps_safe_model_summary() -> None:
+    script = r'''
+import { normalizeSnapshot } from "./apps/studio/src/store-state.js";
+
+const snapshot = normalizeSnapshot({
+  meta: { projectId: "proj_safe_summary", projectName: "Safe", canvasName: "Canvas", seq: 1 },
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      title: "文本",
+      prompt: "剧本正文",
+      content: "剧本正文",
+      status: "complete",
+      params: {
+        lastContextBundle: {
+          included_assets: [{ asset_id: "asset_1", provider_raw: { unsafe: true }, label: "孙悟空" }],
+          text_channel: { raw_provider_response: { unsafe: true }, safe_summary: "safe" },
+        },
+        lastModelCallContextSummary: {
+          artifact: { filename: "model_call_context.json" },
+          safety_boundary: { no_provider_raw: true, no_local_path: true },
+        },
+      },
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [
+    {
+      asset_id: "img_1",
+      label: "候选图",
+      preview_url: "/projects/proj_safe_summary/image-assets/img_1/preview",
+      provider_raw_response: { unsafe: true },
+    },
+  ],
+});
+
+process.stdout.write(JSON.stringify(snapshot));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    serialized = json.dumps(payload, ensure_ascii=False)
+
+    assert "provider_raw_response" not in serialized
+    assert "raw_provider_response" not in serialized
+    assert '"provider_raw"' not in serialized
+    summary = payload["nodes"]["text_1"]["params"]["lastModelCallContextSummary"]
+    assert summary["safety_boundary"]["no_provider_raw"] is True
+    assert summary["artifact"]["filename"] == "model_call_context.json"
+
+
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")

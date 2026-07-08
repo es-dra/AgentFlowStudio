@@ -9,6 +9,7 @@ from apps.api.runtime_store import reject_unsafe_text
 
 SCRIPT_GENERATION_MODE = "idea_to_script"
 SCRIPT_GENERATION_VALIDATOR_VERSION = "script_generation_body_validator.v0.1"
+SCRIPT_SURFACE_VALIDATOR_VERSION = "script_surface_body_validator.v0.1"
 
 _SCRIPT_CONTRACT = "formal_script_before_storyboard_breakdown"
 _WRAPPER_MARKERS = (
@@ -67,6 +68,22 @@ def is_script_generation_request(request: PromptOptimizationRequest) -> bool:
     return explicit_script_contract and script_surface
 
 
+def is_script_surface_request(request: PromptOptimizationRequest) -> bool:
+    if is_script_generation_request(request):
+        return False
+    params = request.node_parameters or {}
+    script_hint = any(
+        str(params.get(key) or "").strip()
+        for key in ("scriptInputMode", "sourceTextNodeId", "scriptSegmentIndex")
+    )
+    structured_hint = isinstance(params.get("structuredShot"), dict) or isinstance(params.get("storyboardBreakdown"), dict)
+    return bool(
+        structured_hint
+        or script_hint
+        or (request.node_type in {"text", "script"} and looks_like_script_text(request.prompt_text))
+    )
+
+
 def source_idea_from_request(request: PromptOptimizationRequest) -> str:
     params = request.node_parameters or {}
     explicit = _clean(str(params.get("source_idea") or ""))
@@ -96,6 +113,30 @@ def script_body_from_candidate(candidate: str, request: PromptOptimizationReques
         "script_body_mode": "formal_short_video_script_body",
         "validator_version": SCRIPT_GENERATION_VALIDATOR_VERSION,
         "source_idea": source_idea,
+        "script_body": script_body,
+        "fallback_used": fallback_used,
+        "discard_reason": discard_reason,
+    }
+
+
+def script_surface_body_from_candidate(candidate: str, request: PromptOptimizationRequest) -> dict[str, Any]:
+    source = _clean_body(request.prompt_text)
+    text = _clean_body(candidate)
+    discard_reason = _invalid_script_surface_reason(text, request)
+    if discard_reason:
+        script_body = source
+        status = "fallback_used"
+        fallback_used = True
+    else:
+        script_body = text
+        status = "accepted"
+        fallback_used = False
+    reject_unsafe_text(script_body)
+    return {
+        "status": status,
+        "script_body_mode": "script_surface_optimization_body",
+        "validator_version": SCRIPT_SURFACE_VALIDATOR_VERSION,
+        "source_idea": source[:600],
         "script_body": script_body,
         "fallback_used": fallback_used,
         "discard_reason": discard_reason,
@@ -170,6 +211,61 @@ def _invalid_script_body_reason(text: str) -> str:
     if len(_clean(text)) < 120:
         return "script_body_too_thin"
     return ""
+
+
+def _invalid_script_surface_reason(text: str, request: PromptOptimizationRequest) -> str:
+    if not text:
+        return "empty_output"
+    if len(text) > 12000:
+        return "script_body_too_long"
+    if any(marker.lower() in text.lower() for marker in _WRAPPER_MARKERS):
+        return "prompt_wrapper_echo"
+    if any(marker.lower() in text.lower() for marker in _INSTRUCTION_LEAKAGE_MARKERS):
+        return "instruction_leakage"
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    optimizer_label_count = sum(1 for line in lines if _OPTIMIZER_LABEL_RE.match(line))
+    if optimizer_label_count >= 2:
+        return "optimizer_label_output"
+    if any(marker in text for marker in _TEMPLATE_FILLER_MARKERS):
+        return "template_filler"
+    if looks_like_script_text(request.prompt_text) and not looks_like_script_text(text) and len(_clean(text)) < 120:
+        return "script_shape_lost"
+    return ""
+
+
+def looks_like_script_text(value: str) -> bool:
+    text = _clean_body(value)
+    if not text:
+        return False
+    markers = (
+        "片名",
+        "剧本",
+        "镜号",
+        "分镜",
+        "镜头",
+        "画面描述",
+        "景别",
+        "光影氛围",
+        "运镜",
+        "对白",
+        "旁白",
+        "音效",
+        "时长",
+    )
+    marker_count = sum(1 for marker in markers if marker in text)
+    if marker_count >= 2:
+        return True
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    field_count = sum(
+        1
+        for line in lines
+        if re.match(r"^(?:镜号|时长|画面描述|景别|光影氛围|运镜|对白/旁白|对白|旁白|音效|资产)\s*[：:]", line)
+    )
+    if field_count >= 2:
+        return True
+    if "《" in text and ("主角" in text or "场景" in text or "镜头" in text):
+        return True
+    return False
 
 
 def _story_profile(idea: str) -> dict[str, str]:
@@ -248,7 +344,10 @@ __all__ = (
     "SCRIPT_GENERATION_MODE",
     "deterministic_script_body",
     "is_script_generation_request",
+    "is_script_surface_request",
+    "looks_like_script_text",
     "public_script_generation_body",
     "script_body_from_candidate",
+    "script_surface_body_from_candidate",
     "source_idea_from_request",
 )

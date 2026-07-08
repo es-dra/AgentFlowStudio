@@ -47,7 +47,7 @@ def build_main_loop_e2e_state(client: TestClient, project_id: str, *, case_id: s
         storyboard_payload,
         decisions=[
             {"graph_asset_id": "graph:character:林晚", "decision": "confirm", "label": "林晚", "note": "Keep the character identity across the next keyframe pass."},
-            {"graph_asset_id": "graph:prop:地图", "decision": "revise", "label": "地图", "note": "Map markings need clearer red-line continuity."},
+            {"graph_asset_id": "graph:scene:办公室", "decision": "revise", "label": "办公室", "note": "Office staging needs clearer investigation-wall continuity."},
         ],
     )
     feedback_payload = overlay_state["feedback_payload"]

@@ -16,8 +16,8 @@ from apps.api.runtime_storyboard_planning import storyboard_plan_fields
 
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
-SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
-KNOWN_CHARACTER_NAMES = ("孙悟空", "金刚狼")
+SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "云栈洞口", "洞口", "洞内", "山洞", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
+KNOWN_CHARACTER_NAMES = ("孙悟空", "猪八戒", "金刚狼")
 CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "女生", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", "皇帝", "侦探", *KNOWN_CHARACTER_NAMES)
 PROP_HINTS = ("金箍棒", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
 GENERIC_CHARACTER_LABELS = {"主角", "角色", "人物"}
@@ -183,9 +183,6 @@ def _asset_refs(text: str) -> list[dict[str, Any]]:
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
     if not any(ref["asset_type"] == "scene" for ref in refs) and any(hint in text for hint in SCENE_HINTS):
         _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
-    if not any(ref["asset_type"] == "prop" for ref in refs):
-        for prop in _infer_prop_labels(text):
-            _push_ref(refs, prop, "prop", "candidate", text)
     if not refs:
         _push_ref(refs, _infer_character_label(text) or "主角", "character", "candidate", text)
         _push_ref(refs, _infer_scene_label(text) or "主要场景", "scene", "candidate", text)
@@ -340,6 +337,8 @@ def _infer_scene_label(text: str) -> str:
         return "屋顶平台"
     if is_city:
         return "城市场景"
+    if re.search(r"云栈洞口|洞口|洞内|山洞", source):
+        return "云栈洞口" if "云栈" in source else "山洞场景"
     if re.search(r"暗办公室|昏暗办公室", source):
         return "暗办公室"
     if "办公室" in source:

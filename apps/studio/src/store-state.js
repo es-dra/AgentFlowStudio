@@ -2,6 +2,22 @@ const HISTORY_LIMIT = 80;
 const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/([a-zA-Z0-9_.-]+)\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
 const HTML_ERROR_RE = /<\/?(html|head|body|center|title|h1|hr)\b/i;
 const MEDIA_FILENAME_FRAGMENT_RE = /\.(mp4|mov)\b/i;
+const FORBIDDEN_RAW_PROVIDER_KEYS = new Set([
+  "provider_raw",
+  "providerraw",
+  "raw_provider",
+  "rawprovider",
+  "raw_provider_response",
+  "rawproviderresponse",
+  "provider_raw_response",
+  "providerrawresponse",
+  "provider_response",
+  "providerresponse",
+  "raw_response",
+  "rawresponse",
+  "provider_output_raw",
+  "provideroutputraw",
+]);
 
 export function initialState(projectId = "studio-local-001") {
   return {
@@ -152,7 +168,7 @@ function sanitizeSnapshotForPersistence(snapshot) {
 
 function sanitizeNodeForPersistence(node, projectId) {
   const params = sanitizeParamsForPersistence(node.params || {}, projectId);
-  const next = { ...node, params };
+  const next = stripForbiddenRawProviderFields({ ...node, params });
   const previewUrl = safeRuntimePreviewUrl(next.previewUrl, projectId);
   if (previewUrl && (next.type !== "video" || previewUrl.includes("/video-generations/"))) {
     next.previewUrl = previewUrl;
@@ -166,7 +182,7 @@ function sanitizeNodeForPersistence(node, projectId) {
 }
 
 function sanitizeParamsForPersistence(params, projectId) {
-  const next = { ...params };
+  const next = stripForbiddenRawProviderFields(params);
   if ("uploads" in next) next.uploads = sanitizePreviewList(next.uploads, projectId);
   if ("visualAssets" in next) next.visualAssets = sanitizePreviewList(next.visualAssets, projectId);
   if ("candidatePreviewUrls" in next) {
@@ -187,7 +203,7 @@ function sanitizeParamsForPersistence(params, projectId) {
 
 function sanitizeAssetsForPersistence(assets, projectId) {
   if (!Array.isArray(assets)) return [];
-  return sanitizePreviewList(assets, projectId);
+  return sanitizePreviewList(stripForbiddenRawProviderFields(assets), projectId);
 }
 
 function sanitizePreviewList(value, projectId) {
@@ -215,7 +231,7 @@ function sanitizeCandidatePreviews(value, projectId) {
 
 function sanitizePreviewObject(item, projectId) {
   if (!item || typeof item !== "object") return null;
-  const next = { ...item };
+  const next = stripForbiddenRawProviderFields(item);
   sanitizeMediaRefDisplayFields(next);
   const previewUrl = safeRuntimePreviewUrl(next.preview_url || next.url, projectId);
   if (previewUrl) {
@@ -226,6 +242,30 @@ function sanitizePreviewObject(item, projectId) {
     delete next.url;
   }
   return next;
+}
+
+function stripForbiddenRawProviderFields(value, seen = new WeakSet()) {
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return null;
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      return value.map((item) => stripForbiddenRawProviderFields(item, seen));
+    }
+    const next = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (isForbiddenRawProviderKey(key)) continue;
+      next[key] = stripForbiddenRawProviderFields(item, seen);
+    }
+    return next;
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function isForbiddenRawProviderKey(key) {
+  const normalized = String(key || "").replace(/[^a-zA-Z0-9]+/g, "").toLowerCase();
+  return FORBIDDEN_RAW_PROVIDER_KEYS.has(String(key || "").toLowerCase()) || FORBIDDEN_RAW_PROVIDER_KEYS.has(normalized);
 }
 
 function sanitizeMediaRefDisplayFields(item) {

@@ -1,8 +1,8 @@
 import { normalizeAssetExtractionRefs } from "./asset-extraction-contract.js";
 
 const ASSET_RE = /@([A-Za-z0-9_\-\u4e00-\u9fff·]+)/g;
-const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
-const KNOWN_CHARACTER_NAMES = ["孙悟空", "金刚狼"];
+const SCENE_HINTS = ["主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "云栈洞口", "洞口", "洞内", "山洞", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕"];
+const KNOWN_CHARACTER_NAMES = ["孙悟空", "猪八戒", "金刚狼"];
 const CHARACTER_HINTS = ["主角", "角色", "人物", "女孩", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", ...KNOWN_CHARACTER_NAMES];
 const PROP_HINTS = ["金箍棒", "钢爪", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门"];
 const GENERIC_CHARACTER_LABELS = new Set(["主角", "角色", "人物"]);
@@ -86,7 +86,7 @@ function extractShotAssetExtraction(text) {
     pushAssetRef(refs, match[1], classifyAsset(match[1], text), "explicit", text);
   }
   addImplicitRefs(refs, text);
-  return normalizeAssetExtractionRefs(refs, { context: text, includeInferred: true });
+  return principalAssetExtraction(normalizeAssetExtractionRefs(refs, { context: text, includeInferred: true }));
 }
 
 export function normalizeShotAssetRefs(assetRefs, context = "") {
@@ -94,14 +94,14 @@ export function normalizeShotAssetRefs(assetRefs, context = "") {
 }
 
 export function normalizeShotAssetRefsWithDiagnostics(assetRefs, context = "") {
-  return normalizeAssetExtractionRefs(Array.isArray(assetRefs) ? assetRefs : [], { context });
+  return principalAssetExtraction(normalizeAssetExtractionRefs(Array.isArray(assetRefs) ? assetRefs : [], { context }));
 }
 
 export function refineStructuredShotAssets(shot, context = "") {
   if (!shot || typeof shot !== "object") return shot;
   const source = [shot.description, shot.source_text, context].filter(Boolean).join("\n");
   const extraction = Array.isArray(shot.asset_refs) && shot.asset_refs.length
-    ? normalizeAssetExtractionRefs(shot.asset_refs, { context: source, includeInferred: true })
+    ? principalAssetExtraction(normalizeAssetExtractionRefs(shot.asset_refs, { context: source, includeInferred: true }))
     : extractShotAssetExtraction(source);
   const refs = extraction.asset_refs;
   return {
@@ -113,6 +113,33 @@ export function refineStructuredShotAssets(shot, context = "") {
       ...(extraction.dropped_asset_ref_diagnostics || []),
     ],
   };
+}
+
+function principalAssetExtraction(extraction) {
+  const refs = Array.isArray(extraction?.asset_refs) ? extraction.asset_refs : [];
+  const accepted = [];
+  const dropped = [...(Array.isArray(extraction?.dropped_asset_ref_diagnostics) ? extraction.dropped_asset_ref_diagnostics : [])];
+  for (const ref of refs) {
+    if (isPrincipalOrManualAssetRef(ref)) {
+      accepted.push(ref);
+    } else {
+      dropped.push({
+        display_name: ref.display_name || ref.label || "",
+        label: ref.label || ref.display_name || "",
+        asset_type: ref.asset_type || "prop",
+        reason: "prop_requires_manual_asset_entry",
+        evidence_text: ref.evidence_text || ref.visual_evidence_span || "",
+      });
+    }
+  }
+  return { asset_refs: accepted, dropped_asset_ref_diagnostics: dropped };
+}
+
+function isPrincipalOrManualAssetRef(ref) {
+  if (ref?.asset_type !== "prop") return true;
+  const source = String(ref?.source || "").toLowerCase();
+  const status = String(ref?.status || "").toLowerCase();
+  return source === "manual" || source === "explicit" || status === "fixed" || Boolean(ref?.graph_asset_id);
 }
 
 export function assetRefToken(asset) {
@@ -134,7 +161,6 @@ export function assetTypeLabel(asset) {
 function addImplicitRefs(refs, text) {
   const hasCharacter = refs.some((asset) => asset.asset_type === "character");
   const hasScene = refs.some((asset) => asset.asset_type === "scene");
-  const hasProp = refs.some((asset) => asset.asset_type === "prop");
   for (const label of inferCharacterLabels(text)) {
     pushAssetRef(refs, label, "character", "candidate", text);
   }
@@ -143,9 +169,6 @@ function addImplicitRefs(refs, text) {
   }
   if (!hasScene && SCENE_HINTS.some((hint) => text.includes(hint))) {
     pushAssetRef(refs, inferSceneLabel(text) || "主要场景", "scene", "candidate", text);
-  }
-  if (!hasProp) {
-    for (const prop of inferPropLabels(text)) pushAssetRef(refs, prop, "prop", "candidate", text);
   }
   if (!refs.length) {
     pushAssetRef(refs, inferCharacterLabel(text) || "主角", "character", "candidate", text);
@@ -222,17 +245,6 @@ function inferCharacterLabels(text) {
   return labels.slice(0, 6);
 }
 
-function inferPropLabels(text) {
-  const source = String(text || "");
-  const labels = [];
-  for (const hint of PROP_HINTS) {
-    if (!source.includes(hint)) continue;
-    if (["棒", "棍"].includes(hint) && source.includes("金箍棒")) continue;
-    appendLabel(labels, hint);
-  }
-  return labels.slice(0, 6);
-}
-
 function inferSceneLabel(text) {
   const source = String(text || "");
   const isNight = /夜|星空|月光|霓虹|灯火/.test(source);
@@ -243,6 +255,7 @@ function inferSceneLabel(text) {
   if (isNight && isCity) return "夜晚城市";
   if (isRooftop) return "屋顶平台";
   if (isCity) return "城市场景";
+  if (/云栈洞口|洞口|洞内|山洞/.test(source)) return source.includes("云栈") ? "云栈洞口" : "山洞场景";
   if (/山巅|山脊|石台|云海|战场/.test(source)) return "山巅石台战场";
   return "";
 }

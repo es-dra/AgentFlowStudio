@@ -104,6 +104,8 @@ function normalizeCandidatePreview(item) {
 
 function progressPercent(response, status, override) {
   if (override === null) return null;
+  const mode = response?.job?.progress?.mode || response?.progress?.mode;
+  if (String(mode || "") === "indeterminate") return null;
   const explicit = override
     ?? response?.job?.progress?.percent
     ?? response?.job?.progress_percent

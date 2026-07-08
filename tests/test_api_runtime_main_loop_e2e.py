@@ -47,7 +47,8 @@ def test_real_baseline_script_runs_provider_closed_main_loop_evidence(tmp_path, 
     assert checks["script_source_grounding"]["status"] == "passed"
     assert checks["dynamic_shot_count"]["status"] == "passed"
     assert checks["asset_evidence"]["status"] == "passed"
-    assert {("林晚", "character"), ("办公室", "scene"), ("地图", "prop")} <= labels_by_type
+    assert {("林晚", "character"), ("办公室", "scene")} <= labels_by_type
+    assert ("地图", "prop") not in labels_by_type
     assert payload["production_graph"]["summary"]["fixed_visual_asset_count"] == 1
     assert payload["safe_manifest"]["fixed_visual_asset_source_evidence_count"] == 1
     assert "script_can_reuse_fixed_asset" in graph_relationships

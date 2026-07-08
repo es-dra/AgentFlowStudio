@@ -26,7 +26,12 @@ from apps.api.runtime_llm_enhancement_safety import (
 )
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_prompt_text import plain_prompt_from_sections, strip_user_prompt_section_headers
-from apps.api.runtime_script_generation_body import is_script_generation_request, script_body_from_candidate
+from apps.api.runtime_script_generation_body import (
+    is_script_generation_request,
+    is_script_surface_request,
+    script_body_from_candidate,
+    script_surface_body_from_candidate,
+)
 
 
 def maybe_enhance_prompt_with_llm(
@@ -141,6 +146,48 @@ def maybe_enhance_prompt_with_llm(
             return _with_total_elapsed({**base, "status": "discarded", "discard_reason": safe_reason(str(exc))}, started)
         _log_prompt_llm_step(
             "script_body_validate_done",
+            script_validate_started,
+            log_base,
+            provider=provider_name(request),
+            optimization_mode=optimization_mode,
+            script_body_status=script_body.get("status"),
+            discard_reason=script_body.get("discard_reason"),
+            fallback_used=script_body.get("fallback_used"),
+        )
+        payload = {
+            **base,
+            "status": "applied",
+            "provider_calls_started": True,
+            "guardrail_fallback_used": bool(script_body.get("fallback_used")),
+            "discard_reason": script_body.get("discard_reason"),
+            **_prompt_payload(str(script_body["script_body"])),
+        }
+        return _with_total_elapsed(payload, started)
+
+    if is_script_surface_request(request):
+        script_validate_started = time.perf_counter()
+        _log_prompt_llm_step(
+            "script_surface_validate_start",
+            script_validate_started,
+            log_base,
+            provider=provider_name(request),
+            optimization_mode=optimization_mode,
+        )
+        try:
+            script_body = script_surface_body_from_candidate(enhanced, request)
+        except ValueError as exc:
+            _log_prompt_llm_step(
+                "script_surface_validate_failed",
+                script_validate_started,
+                log_base,
+                level="WARNING",
+                provider=provider_name(request),
+                optimization_mode=optimization_mode,
+                reason=safe_reason(str(exc)),
+            )
+            return _with_total_elapsed({**base, "status": "discarded", "discard_reason": safe_reason(str(exc))}, started)
+        _log_prompt_llm_step(
+            "script_surface_validate_done",
             script_validate_started,
             log_base,
             provider=provider_name(request),

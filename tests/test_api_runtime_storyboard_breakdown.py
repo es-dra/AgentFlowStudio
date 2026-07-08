@@ -147,7 +147,7 @@ def test_storyboard_breakdown_returns_asset_graph_with_cross_shot_evidence(tmp_p
     assert graph["writes_company_kb"] is False
 
 
-def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_count() -> None:
+def test_storyboard_local_fallback_extracts_named_characters_scenes_and_dynamic_count() -> None:
     script = (
         "孙悟空大战金刚狼，破碎山巅石台上云雾翻卷。"
         "孙悟空手持金箍棒向前压低身形。"
@@ -172,7 +172,7 @@ def test_storyboard_local_fallback_extracts_named_characters_props_and_dynamic_c
     assert ("孙悟空", "character") in labels_by_type
     assert ("金刚狼", "character") in labels_by_type
     assert ("山巅石台战场", "scene") in labels_by_type
-    assert ("金箍棒", "prop") in labels_by_type
+    assert not any(ref["asset_type"] == "prop" for ref in refs)
     assert "@主角" not in descriptions
     assert "@主要场景" not in descriptions
 

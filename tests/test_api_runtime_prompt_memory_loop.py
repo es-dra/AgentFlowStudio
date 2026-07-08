@@ -1505,6 +1505,74 @@ def test_script_prompt_generation_applies_gated_llm_body_with_knowledge_rules(tm
     assert "角色/主体：" not in payload["optimized_prompt"]
 
 
+def test_script_surface_optimizer_preserves_script_shape_when_llm_returns_prompt_labels(tmp_path, monkeypatch) -> None:
+    original_script = "\n".join(
+        [
+            "镜号：01",
+            "时长：1.8",
+            "画面描述：@孙悟空 @云栈洞口。低角度仰拍，孙悟空后撤半步，赤色云海压在洞口。",
+            "景别：中景",
+            "光影氛围：冷灰主调，赤云边缘光。",
+            "运镜：轻微推近",
+            "对白/旁白：无明确对白",
+            "音效：铁链拖地声与洞内回响",
+        ]
+    )
+    captured: list[str] = []
+
+    class FakeRegistry:
+        def dispatch(self, capability, service_id, request):
+            assert capability == "llm"
+            assert service_id == "prompt_optimizer"
+            captured.append(request.prompt)
+            return {
+                "text": "\n".join(
+                    [
+                        "意图：聚焦孙悟空与猪八戒对峙。",
+                        "角色/主体：孙悟空、猪八戒、洞内呼哑重声。",
+                        "场景/美术：云栈洞口。",
+                        "负面约束：不要水印。",
+                    ]
+                )
+            }
+
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_LLM", "true")
+    monkeypatch.setattr("apps.api.runtime_llm_enhancement.load_provider_registry", lambda: FakeRegistry())
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    client.post("/projects", json={"project_id": "proj_script_surface", "goal": "Script surface optimization"})
+
+    response = client.post(
+        "/projects/proj_script_surface/prompt-optimizations",
+        json={
+            "node_id": "text-script-surface",
+            "node_type": "text",
+            "prompt_text": original_script,
+            "generation_target": "prompt",
+            "target_platform": "short_video",
+            "style": "cinematic",
+            "node_parameters": {
+                "llm_provider": "prompt_optimizer",
+                "llm_model": "prompt-optimizer",
+                "remote_optimizer_required": True,
+            },
+            "generated_at": "2026-07-08T13:50:00+08:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured
+    assert "优化已有短视频剧本或分镜脚本正文" in captured[0]
+    assert "这不是生图提示词优化" in captured[0]
+    assert payload["provider_calls_started"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["guardrail_fallback_used"] is True
+    assert payload["safe_manifest"]["llm_enhancement"]["discard_reason"] == "optimizer_label_output"
+    assert payload["optimized_prompt"] == original_script
+    assert payload["user_prompt_sections"][0]["title"] == "剧本/分镜正文"
+    assert "意图：" not in payload["optimized_prompt"]
+    assert "角色/主体：" not in payload["optimized_prompt"]
+
+
 def test_script_body_validator_fallbacks_from_wrapper_echo_optimizer_labels_and_template_fillers() -> None:
     from apps.api.runtime_script_generation_body import script_body_from_candidate
 

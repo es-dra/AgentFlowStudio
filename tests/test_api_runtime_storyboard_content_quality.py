@@ -54,7 +54,7 @@ def test_storyboard_breakdown_writes_content_quality_report_for_dynamic_assets(t
     assert checks["dynamic_shot_count"]["status"] == "passed"
     assert checks["dynamic_shot_count"]["details"]["fixed_template_claimed"] is False
     assert checks["asset_evidence"]["status"] == "passed"
-    assert checks["asset_evidence"]["details"]["asset_types"] == ["character", "prop", "scene"]
+    assert checks["asset_evidence"]["details"]["asset_types"] == ["character", "scene"]
     assert checks["keyframe_and_video_intent"]["status"] == "passed"
     assert checks["safe_boundary"]["status"] == "passed"
     assert "human review required before fixed assets or quality acceptance" in report["non_claims"]
@@ -64,4 +64,3 @@ def test_storyboard_breakdown_writes_content_quality_report_for_dynamic_assets(t
     assert "api_key" not in serialized
     assert "signed_url" not in serialized
     assert "d:\\" not in serialized
-

@@ -153,6 +153,9 @@ function specificAssetTypes(candidates) {
 function namedCharacters(text) {
   const names = [];
   if (text.includes("林晚")) names.push("林晚");
+  if (text.includes("孙悟空")) names.push("孙悟空");
+  if (text.includes("猪八戒")) names.push("猪八戒");
+  if (text.includes("金刚狼")) names.push("金刚狼");
   if (/\bLin\s+Wan\b/i.test(text)) names.push("Lin Wan");
   if (text.includes("女孩")) names.push("女孩");
   if (text.includes("机器人")) names.push("机器人");

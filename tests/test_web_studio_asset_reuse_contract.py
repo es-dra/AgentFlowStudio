@@ -351,3 +351,89 @@ def test_storyboard_graph_bound_asset_flows_to_asset_cards_keyframes_and_contrac
     assert keyframe_params["keyframeLayer"]["fixed_visual_asset_ids"] == ["fixed_map_1"]
     assert payload["shotReuse"]["summary"]["graph_bound_count"] == 1
     assert payload["assetReuse"]["summary"]["graph_bound_count"] == 1
+
+
+def test_storyboard_asset_recognition_reuses_same_asset_card_across_matching_shots() -> None:
+    payload = json.loads(
+        subprocess.check_output(
+            [
+                "node",
+                "--input-type=module",
+                "-e",
+                r'''
+import { ensureShotAssetPrepNodesForScriptNode } from "./apps/studio/src/shot-asset-nodes.js";
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
+
+const shotText1 = "镜号：01\n画面描述：孙悟空在云栈洞口后撤。";
+const shotText2 = "镜号：02\n画面描述：孙悟空回到云栈洞口，目光转向洞内。";
+const state = {
+  nodes: {
+    shot_1: {
+      id: "shot_1",
+      type: "script",
+      title: "分镜 01",
+      x: 0,
+      y: 0,
+      w: 280,
+      h: 240,
+      prompt: shotText1,
+      content: shotText1,
+      params: {
+        sourceTextNodeId: "text_1",
+        scriptSegmentIndex: 1,
+        structuredShot: structuredShotFromSegment(shotText1, 1),
+      },
+      status: "complete",
+    },
+    shot_2: {
+      id: "shot_2",
+      type: "script",
+      title: "分镜 02",
+      x: 0,
+      y: 260,
+      w: 280,
+      h: 240,
+      prompt: shotText2,
+      content: shotText2,
+      params: {
+        sourceTextNodeId: "text_1",
+        scriptSegmentIndex: 2,
+        structuredShot: structuredShotFromSegment(shotText2, 2),
+      },
+      status: "complete",
+    },
+  },
+  edges: {},
+  order: ["shot_1", "shot_2"],
+  selection: { nodeIds: [], edgeId: null },
+  ui: {},
+  assets: [],
+  groups: {},
+};
+let seq = 0;
+const store = {
+  get: () => state,
+  nextId: () => `asset_${++seq}`,
+  set: (mutator) => mutator(state),
+};
+
+const first = ensureShotAssetPrepNodesForScriptNode(store, state.nodes.shot_1, { replaceExisting: true });
+const secondLinks = Object.values(state.edges).filter((edge) => edge.from === "shot_2").map((edge) => edge.to);
+const assetCards = Object.values(state.nodes).filter((node) => node.params?.nodeRole === "asset_card_draft");
+process.stdout.write(JSON.stringify({
+  first,
+  secondLinks,
+  assetCards: assetCards.map((node) => ({ id: node.id, label: node.params.assetCardDraft.label, type: node.params.assetCardDraft.asset_type })),
+  shot2Prep: state.nodes.shot_2.params.assetPrepState,
+}));
+''',
+            ],
+            text=True,
+            encoding="utf-8",
+        )
+    )
+
+    assert len(payload["assetCards"]) == 2
+    assert {item["label"] for item in payload["assetCards"]} == {"孙悟空", "云栈洞口"}
+    assert set(payload["secondLinks"]) == set(payload["first"])
+    assert payload["shot2Prep"]["status"] == "linked_existing_assets"
