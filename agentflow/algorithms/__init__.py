@@ -14,6 +14,7 @@ CORE_AGENT_ALGORITHMS = (
 CORE_AGENT_ALGORITHM_MODULES = (
     "runtime_prompt_memory_engine",
     "context_resolver",
+    "creative_runtime_contract",
     "visual_understanding",
     "fixed_asset_memory",
     "request_projection",
