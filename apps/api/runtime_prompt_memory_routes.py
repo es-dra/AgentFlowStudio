@@ -10,6 +10,7 @@ from apps.api.runtime_artifacts import prompt_memory_artifacts
 from apps.api.runtime_errors import safe_exception_detail
 from apps.api.runtime_flow import build_flow_summary
 from apps.api.runtime_jobs import runtime_job
+from apps.api.runtime_creative_runtime_contract import public_prompt_creative_runtime_contract_summary
 from apps.api.runtime_logging import (
     client_request_id_from_request,
     log_business_event,
@@ -295,6 +296,11 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "model_call_context_summary": public_model_call_context_summary(
                 result["model_call_context"],
                 artifact=artifacts.get("model_call_context"),
+            ),
+            "creative_runtime_contract_id": result["creative_runtime_contract"]["contract_id"],
+            "creative_runtime_contract_summary": public_prompt_creative_runtime_contract_summary(
+                result["creative_runtime_contract"],
+                artifact=artifacts.get("creative_runtime_contract"),
             ),
             "script_plan": result.get("script_plan"),
             "script_generation_body": result.get("script_generation_body"),

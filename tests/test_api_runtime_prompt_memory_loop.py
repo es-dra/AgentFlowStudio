@@ -51,7 +51,11 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     brief = client.get(f"/artifacts/{payload['artifacts']['creative_brief']['artifact_id']}").json()["payload"]
     trace = client.get(f"/artifacts/{payload['artifacts']['prompt_assembly_trace']['artifact_id']}").json()["payload"]
     manifest = client.get(f"/artifacts/{payload['artifacts']['prompt_optimization_safe_manifest']['artifact_id']}").json()["payload"]
-    serialized = json.dumps({"payload": payload, "brief": brief, "trace": trace, "manifest": manifest}, ensure_ascii=False).lower()
+    contract = client.get(f"/artifacts/{payload['artifacts']['creative_runtime_contract']['artifact_id']}").json()["payload"]
+    serialized = json.dumps(
+        {"payload": payload, "brief": brief, "trace": trace, "manifest": manifest, "contract": contract},
+        ensure_ascii=False,
+    ).lower()
 
     assert payload["job"]["action"] == "prompt_optimization"
     assert payload["job"]["status"] == "succeeded"
@@ -74,6 +78,17 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert manifest["provider_calls_started"] is False
     assert manifest["raw_provider_response_stored"] is False
     assert manifest["generated_media_bytes_stored"] is False
+    assert manifest["creative_runtime_contract_id"] == contract["contract_id"]
+    assert manifest["creative_runtime_contract_ref"] == "creative_runtime_contract.json"
+    assert payload["creative_runtime_contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["artifact"]["filename"] == "creative_runtime_contract.json"
+    assert payload["creative_runtime_contract_summary"]["operation"] == "prompt_optimization"
+    assert payload["creative_runtime_contract_summary"]["provider_context"]["required_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert payload["creative_runtime_contract_summary"]["provider_context"]["provider_calls_started"] is False
+    assert contract["model_call_context"]["context_id"] == payload["model_call_context_id"]
+    assert contract["runtime_policy"]["writes_long_term_memory"] is False
+    assert contract["runtime_policy"]["requires_evaluator_before_quality_claim"] is True
+    assert "not_durable_memory_promotion" in contract["non_claims"]
     assert payload["provider_calls_started"] is False
     assert payload["writes_long_term_memory"] is False
     assert payload["writes_company_kb"] is False
