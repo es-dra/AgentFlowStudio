@@ -31,6 +31,8 @@ export async function openOptimizer(store, runtime, nodeId, _anchorEl = null, te
       summary: optimizationSummary(request, outcome),
       model_call_context_id: outcome.model_call_context_id || "",
       model_call_context_summary: outcome.model_call_context_summary || null,
+      creative_runtime_contract_id: outcome.creative_runtime_contract_id || "",
+      creative_runtime_contract_summary: outcome.creative_runtime_contract_summary || null,
     });
   } catch (error) {
     setPromptOptimizationState(store, nodeId, {
@@ -66,6 +68,12 @@ function recordOptimizationEvidence(store, nodeId, outcome) {
     if (outcome.context_bundle) node.params.lastContextBundle = outcome.context_bundle;
     if (outcome.model_call_context_id) node.params.lastModelCallContextId = outcome.model_call_context_id;
     if (outcome.model_call_context_summary) node.params.lastModelCallContextSummary = outcome.model_call_context_summary;
+    if (outcome.creative_runtime_contract_id) {
+      node.params.lastCreativeRuntimeContractId = outcome.creative_runtime_contract_id;
+    }
+    if (outcome.creative_runtime_contract_summary) {
+      node.params.lastCreativeRuntimeContractSummary = outcome.creative_runtime_contract_summary;
+    }
   }, { history: false, persist: true });
 }
 
