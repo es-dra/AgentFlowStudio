@@ -166,6 +166,31 @@ const snapshot = normalizeSnapshot({
           artifact: { filename: "model_call_context.json" },
           safety_boundary: { no_provider_raw: true, no_local_path: true },
         },
+        lastGenerationManifest: {
+          status: "blocked",
+          batch_status: "failed",
+          stage: "provider_request_read",
+          failure_class: "provider_timeout",
+          output_count: 0,
+          retry_count: 1,
+          raw_provider_response_stored: false,
+          provider_raw_persisted: false,
+          provider_diagnostics: {
+            provider_stage: "provider_request_read",
+            failure_class: "provider_timeout",
+            reason: "API relay request timed out while reading provider result",
+            retry_count: 1,
+            attempt_count: 2,
+          },
+          blocks: [{
+            block_id: "remote_image_provider_not_ready",
+            reason: "The read operation timed out",
+            failure_class: "provider_timeout",
+            provider_stage: "provider_request_read",
+            provider_raw_persisted: false,
+          }],
+        },
+        generationBlockedReason: "provider_raw_persisted false should not reach persistence",
       },
     },
   },
@@ -195,10 +220,18 @@ process.stdout.write(JSON.stringify(snapshot));
 
     assert "provider_raw_response" not in serialized
     assert "raw_provider_response" not in serialized
+    assert "provider_raw_persisted" not in serialized
+    assert "raw_provider_response_stored" not in serialized
     assert '"provider_raw"' not in serialized
     summary = payload["nodes"]["text_1"]["params"]["lastModelCallContextSummary"]
     assert summary["safety_boundary"]["no_provider_raw"] is True
     assert summary["artifact"]["filename"] == "model_call_context.json"
+    manifest = payload["nodes"]["text_1"]["params"]["lastGenerationManifest"]
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert "provider-response-redacted" in payload["nodes"]["text_1"]["params"]["generationBlockedReason"]
 
 
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:

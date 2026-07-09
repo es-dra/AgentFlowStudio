@@ -182,6 +182,7 @@ def build_keyframe_generation(
     provider_outputs: list[dict[str, Any]] = []
     status = "blocked"
     blocks = []
+    provider_diagnostics: dict[str, Any] = {}
     provider_calls_started = False
     retry_count = 0
     if provider_gate["status"] == "blocked":
@@ -408,8 +409,14 @@ def build_keyframe_generation(
         except (ModelGatewayError, TimeoutError) as exc:
             retry_count = max(retry_count, int(getattr(exc, "retry_count", 0) or 0))
             status = "blocked"
-            blocks.append(_provider_failure_block(str(exc), required_gate))
             provider_elapsed_ms = _elapsed_ms(provider_started) if "provider_started" in locals() else ""
+            provider_diagnostics = _provider_failure_diagnostics(
+                exc,
+                required_gate,
+                retry_count=retry_count,
+                provider_elapsed_ms=provider_elapsed_ms,
+            )
+            blocks.append(_provider_failure_block(str(exc), required_gate, diagnostics=provider_diagnostics))
             runtime_file_event(
                 "keyframe",
                 "provider_failed",
@@ -421,6 +428,9 @@ def build_keyframe_generation(
                 provider_service_id=request.provider_service_id,
                 error=type(exc).__name__,
                 reason=_safe_error(str(exc)),
+                provider_stage=provider_diagnostics.get("provider_stage"),
+                failure_class=provider_diagnostics.get("failure_class"),
+                attempt_count=provider_diagnostics.get("attempt_count"),
                 retry_count=retry_count,
                 provider_elapsed_ms=provider_elapsed_ms,
                 elapsed_ms=_elapsed_ms(started),
@@ -461,6 +471,7 @@ def build_keyframe_generation(
         output_count=len(provider_outputs),
         reference_image_count=len(reference_images),
         retry_count=retry_count,
+        provider_diagnostics=provider_diagnostics,
         context_bundle=context_bundle,
         non_claims=KEYFRAME_NON_CLAIMS,
         job_id=output_dir.name,
@@ -726,6 +737,13 @@ def _provider_manifest_blocks(
         candidate_id = str(item.get("candidate_id") or "")
         if candidate_id.startswith("candidate_"):
             block["candidate_id"] = candidate_id[:32]
+        for field in ("failure_class", "provider_stage"):
+            value = str(item.get(field) or "")
+            if value:
+                block[field] = value[:80]
+        for field in ("retry_count", "attempt_count", "provider_elapsed_ms"):
+            if item.get(field) is not None:
+                block[field] = item[field]
         blocks.append(block)
     if output_count < requested_count and _provider_status_allows_partial(str(manifest.get("status") or "")):
         blocks.append(
@@ -884,7 +902,12 @@ def _gate_closed_block(required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
     }
 
 
-def _provider_failure_block(value: str, required_gate: str = REMOTE_IMAGE_ENV) -> dict[str, str]:
+def _provider_failure_block(
+    value: str,
+    required_gate: str = REMOTE_IMAGE_ENV,
+    *,
+    diagnostics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     lowered = value.lower()
     if "reference_image_slots exceeded" in lowered:
         block_id = "image_reference_slots_exceeded"
@@ -898,11 +921,77 @@ def _provider_failure_block(value: str, required_gate: str = REMOTE_IMAGE_ENV) -
         block_id = "image_relay_http_error"
     else:
         block_id = "remote_image_provider_not_ready"
-    return {
+    block: dict[str, Any] = {
         "block_id": block_id,
         "reason": _safe_error(value),
         "required_gate": required_gate,
     }
+    if diagnostics:
+        for key in (
+            "failure_class",
+            "provider_stage",
+            "retry_count",
+            "attempt_count",
+            "provider_elapsed_ms",
+        ):
+            if diagnostics.get(key) not in (None, ""):
+                block[key] = diagnostics[key]
+    else:
+        block["failure_class"] = _failure_class_for_provider_error(value, block_id)
+    return block
+
+
+def _provider_failure_diagnostics(
+    error: Exception,
+    required_gate: str,
+    *,
+    retry_count: int,
+    provider_elapsed_ms: float | str,
+) -> dict[str, Any]:
+    reason = str(error)
+    block = _provider_failure_block(reason, required_gate)
+    failure_class = _failure_class_for_provider_error(reason, str(block.get("block_id") or ""))
+    return {
+        "provider_stage": _provider_stage_for_error(reason),
+        "failure_class": failure_class,
+        "error_type": type(error).__name__,
+        "reason": _safe_error(reason),
+        "required_gate": required_gate,
+        "retry_count": retry_count,
+        "attempt_count": retry_count + 1,
+        "provider_elapsed_ms": provider_elapsed_ms if isinstance(provider_elapsed_ms, (int, float)) else 0,
+    }
+
+
+def _provider_stage_for_error(value: str) -> str:
+    lowered = value.lower()
+    if "reference_image_slots exceeded" in lowered or "does not accept reference images" in lowered:
+        return "request_validation"
+    if "image url download" in lowered or "artifact download" in lowered:
+        return "provider_image_download"
+    if "timed out" in lowered or "timeout" in lowered:
+        return "provider_request_read"
+    if "http error" in lowered:
+        return "provider_http_status"
+    if "connection" in lowered or "network" in lowered:
+        return "provider_network"
+    return "provider_request"
+
+
+def _failure_class_for_provider_error(value: str, block_id: str = "") -> str:
+    lowered = value.lower()
+    normalized_block = str(block_id or "").lower()
+    if "timeout" in normalized_block or "timed out" in lowered or "timeout" in lowered:
+        return "provider_timeout"
+    if "gate_closed" in normalized_block:
+        return "provider_gate_closed"
+    if "reference_image_slots exceeded" in lowered or "does not accept reference images" in lowered:
+        return "validation_block"
+    if "invalid api key" in lowered or "http error 401" in lowered or "http error 403" in lowered:
+        return "provider_not_ready"
+    if "http error" in lowered:
+        return "provider_http_error"
+    return "provider_failed"
 
 
 def _safe_error(value: str) -> str:

@@ -277,7 +277,11 @@ def _post_json(
             body = response.read()
     except urllib.error.HTTPError as exc:
         raise ModelGatewayError(f"API relay HTTP error {exc.code}") from exc
+    except TimeoutError as exc:
+        raise ModelGatewayError("API relay request timed out while reading provider result") from exc
     except urllib.error.URLError as exc:
+        if _looks_like_timeout(str(exc.reason)):
+            raise ModelGatewayError("API relay request timed out while reading provider result") from exc
         raise ModelGatewayError(f"API relay request failed: {_safe_error(str(exc.reason))}") from exc
     try:
         decoded = json.loads(body.decode("utf-8"))
@@ -377,6 +381,11 @@ def _safe_error(value: str) -> str:
     if any(term in lowered for term in ("api", "key", "secret", "token", "authorization", "cookie")):
         return "API relay configuration is not ready."
     return " ".join(value.split())[:160] or "API relay request failed."
+
+
+def _looks_like_timeout(value: str) -> bool:
+    lowered = value.lower()
+    return "timed out" in lowered or "timeout" in lowered
 
 
 __all__ = ("ApiRelayAdapter",)

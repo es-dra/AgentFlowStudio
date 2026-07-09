@@ -12,6 +12,12 @@ from apps.api.runtime_studio_state_keyframe_local_edit import (
     sanitize_local_edit_availability,
 )
 from apps.api.runtime_studio_state_quality_feedback import sanitize_quality_feedback_candidates
+from apps.api.runtime_studio_state_runtime_summaries import (
+    generation_manifest_summary,
+    model_call_context_summary,
+    safe_public_text,
+    safe_refs,
+)
 from apps.api.runtime_store import safe_id
 
 
@@ -32,6 +38,10 @@ SAFE_NODE_PARAM_KEYS = (
     "storyboardBreakdown", "storyboardBreakdownState", "scriptExpansionState", "keyframeLayer",
     "keyframeConstraints", "keyframeLocalEditDraft", "local_edit_availability",
     "lastKeyframeJobId", "lastKeyframeCompletedJobId", "lastOptimizedPromptPlain",
+    "lastModelCallContextId", "lastModelCallContextSummary",
+    "lastGenerationManifest", "generationPolicyStatus", "generationStatusDetail",
+    "generationBlockedReason", "generationNextAction", "generationSafeRefs",
+    "lastGenerationBridgeArtifactId",
     "promptOptimizationState", "lastVisualAssetWarnings", "temporaryAssetExclusions",
     "humanGateDecisions", "feedbackOverlayDecisions", "qualityFeedbackCandidates",
 )
@@ -66,7 +76,15 @@ def _sanitize_param(
 ) -> Any:
     if key == "uploads":
         return param_values.uploads(value, project_id=project_id, preview_url=preview_url, text=text, number=number)
-    if key in {"firstFrameImageAssetId", "lastFrameImageAssetId", "lastVideoJobId", "lastKeyframeJobId", "lastKeyframeCompletedJobId"}:
+    if key in {
+        "firstFrameImageAssetId",
+        "lastFrameImageAssetId",
+        "lastVideoJobId",
+        "lastKeyframeJobId",
+        "lastKeyframeCompletedJobId",
+        "lastModelCallContextId",
+        "lastGenerationBridgeArtifactId",
+    }:
         return safe_id(text(value, "", 120))
     if key == "lastVideoPreviewUrl":
         return preview_url(value, project_id=project_id)
@@ -110,6 +128,17 @@ def _sanitize_param(
         return param_values.warnings(value, text=text)
     if key == "temporaryAssetExclusions":
         return param_values.asset_exclusions(value, text=text)
+    if key == "lastModelCallContextSummary":
+        return model_call_context_summary(value, text=text, number=number)
+    if key == "lastGenerationManifest":
+        return generation_manifest_summary(value, text=text, number=number)
+    if key == "generationSafeRefs":
+        return safe_refs(value, text=text)
+    if key in {"generationStatusDetail", "generationBlockedReason", "generationNextAction"}:
+        return safe_public_text(value, text=text, limit=360)
+    if key == "generationPolicyStatus":
+        status = text(value, "", 40)
+        return status if status in {"complete", "partially_complete", "failed", "retrying", "needs_attention"} else ""
     if key == "humanGateDecisions":
         return sanitize_human_gate_decisions(value, text=text)
     if key == "feedbackOverlayDecisions":

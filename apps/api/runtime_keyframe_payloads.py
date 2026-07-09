@@ -112,8 +112,13 @@ def keyframe_safe_manifest(
     non_claims: list[str],
     job_id: str = "",
     review_preview_refs: list[dict[str, Any]] | None = None,
+    provider_diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     safe_blocks = annotate_blocks(blocks)
+    diagnostics = provider_diagnostics if isinstance(provider_diagnostics, dict) else {}
+    recovery_stage = str(diagnostics.get("provider_stage") or "")
+    if not recovery_stage and status == "blocked" and not provider_calls_started:
+        recovery_stage = "provider_gate"
     payload = {
         "artifact_type": "agentflow_keyframe_generation_safe_manifest",
         "schema_version": "0.1.0",
@@ -131,6 +136,7 @@ def keyframe_safe_manifest(
         "output_count": output_count,
         "reference_image_count": reference_image_count,
         "retry_count": retry_count,
+        "provider_diagnostics": diagnostics,
         "seed": request.seed,
         "blocks": safe_blocks,
         "review_preview_refs": list(review_preview_refs or []),
@@ -152,7 +158,7 @@ def keyframe_safe_manifest(
             blocks=safe_blocks,
             provider_calls_started=provider_calls_started,
             retry_count=retry_count,
-            stage="provider_gate" if status == "blocked" else "",
+            stage=recovery_stage,
             capability="image_keyframe",
         )
     )

@@ -669,6 +669,15 @@ def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monke
     assert manifest["status"] == "blocked"
     assert manifest["retry_count"] == 1
     assert manifest["blocks"][0]["block_id"] == "remote_image_provider_not_ready"
+    assert manifest["blocks"][0]["failure_class"] == "provider_timeout"
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    assert manifest["blocks"][0]["retry_count"] == 1
+    assert manifest["blocks"][0]["attempt_count"] == 2
+    assert manifest["provider_diagnostics"]["failure_class"] == "provider_timeout"
+    assert manifest["provider_diagnostics"]["provider_stage"] == "provider_request_read"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
     assert "timed out" in manifest["blocks"][0]["reason"]
 
 
