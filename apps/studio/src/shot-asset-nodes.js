@@ -247,7 +247,7 @@ function applyAssetDraftToNode(store, nodeId, draft, structuredShot, scriptNodeI
     node.prompt = "";
     node.content = assetCardText(draft);
     node.status = "complete";
-    node.h = Math.max(300, Math.min(460, 210 + Object.keys(draft.feature_card || {}).length * 22));
+    node.h = Math.max(230, Math.min(340, 170 + Object.keys(draft.feature_card || {}).length * 18));
     node.params.nodeRole = "asset_card_draft";
     node.params.assetCardDraft = draft;
     node.params.spec = {

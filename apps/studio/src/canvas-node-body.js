@@ -152,7 +152,8 @@ function contentBlock(node, store) {
 
 function editableContentBlock(node, store, expanding) {
   const textarea = document.createElement("textarea");
-  textarea.className = `text-content-view node-content-editor${expanding ? " content-shimmer" : ""}`;
+  const assetCardEditor = node.params?.assetCardDraft ? " asset-card-content-editor" : "";
+  textarea.className = `text-content-view node-content-editor${assetCardEditor}${expanding ? " content-shimmer" : ""}`;
   textarea.value = node.content || "";
   textarea.spellcheck = false;
   textarea.dataset.nodeId = node.id;

@@ -29,6 +29,22 @@ const GENERATION_TARGET = {
   director: "prompt",
 };
 
+const SCRIPT_SURFACE_MARKERS = [
+  "片名",
+  "镜号",
+  "画面描述",
+  "分镜",
+  "镜头",
+  "时长",
+  "景别",
+  "光影氛围",
+  "运镜",
+  "对白",
+  "旁白",
+  "音效",
+  "资产",
+];
+
 export function buildOptimizationRequest(state, node) {
   const directorSetup = linkedDirectorSetup(state, node);
   const nodeParameters = nodeParameterSnapshot(node, state);
@@ -43,7 +59,7 @@ export function buildOptimizationRequest(state, node) {
     node_id: node.id,
     node_type: normalizeNodeType(node.type),
     prompt_text: primaryPromptText(node),
-    generation_target: GENERATION_TARGET[node.type] || "prompt",
+    generation_target: inferredGenerationTarget(node),
     target_platform: "short_video",
     style: node.params?.styleRef || "cinematic",
     asset_refs: assetRefs,
@@ -59,6 +75,11 @@ function normalizeNodeType(type) {
   return allowed.includes(type) ? type : "text";
 }
 
+function inferredGenerationTarget(node) {
+  if (looksLikeScriptSurfaceNode(node)) return "script";
+  return GENERATION_TARGET[node.type] || "prompt";
+}
+
 // 节点结构化参数快照：作为优化的硬约束上下文（后端按需消费，未知字段被忽略）。
 function nodeParameterSnapshot(node, state = null) {
   const p = node.params || {};
@@ -69,6 +90,22 @@ function nodeParameterSnapshot(node, state = null) {
     remote_optimizer_required: true,
   };
   if (p.nodeRole) snapshot.node_role = String(p.nodeRole).slice(0, 80);
+  if (p.scriptInputMode) snapshot.scriptInputMode = String(p.scriptInputMode).slice(0, 80);
+  if (p.sourceTextNodeId) snapshot.sourceTextNodeId = String(p.sourceTextNodeId).slice(0, 120);
+  if (p.scriptSegmentIndex !== undefined && p.scriptSegmentIndex !== null) {
+    const index = Number(p.scriptSegmentIndex);
+    if (Number.isFinite(index)) snapshot.scriptSegmentIndex = index;
+  }
+  if (p.structuredShot && typeof p.structuredShot === "object") {
+    snapshot.structuredShot = safeStructuredShotSnapshot(p.structuredShot);
+  }
+  if (p.storyboardBreakdown && typeof p.storyboardBreakdown === "object") {
+    snapshot.storyboardBreakdown = safeStoryboardBreakdownSnapshot(p.storyboardBreakdown);
+  }
+  if (looksLikeScriptSurfaceNode(node)) {
+    snapshot.script_surface_intent = "preserve_script_shape";
+    if (!snapshot.scriptInputMode) snapshot.scriptInputMode = "inferred_script_surface";
+  }
   if (p.assetCardDraft) snapshot.asset_card_draft = safeAssetCardSnapshot(p.assetCardDraft);
   if (p.assetCardRevision) snapshot.asset_card_revision = safeAssetCardRevisionSnapshot(p.assetCardRevision);
   if (node.type === "image" && p.spec) {
@@ -101,6 +138,46 @@ function nodeParameterSnapshot(node, state = null) {
   const assetReuse = assetReuseLocalContract(state || { nodes: { [node.id]: node }, edges: {}, assets: [] }, node);
   if (assetReuse.items.length) snapshot.asset_reuse = assetReuse;
   return snapshot;
+}
+
+function looksLikeScriptSurfaceNode(node) {
+  if (!node) return false;
+  if (node.type === "script") return true;
+  const p = node.params || {};
+  if (p.scriptInputMode || p.sourceTextNodeId || p.scriptSegmentIndex !== undefined || p.structuredShot || p.storyboardBreakdown) return true;
+  if (node.type !== "text") return false;
+  const text = `${node.content || ""}\n${node.prompt || ""}`.trim();
+  if (!text) return false;
+  const markerCount = SCRIPT_SURFACE_MARKERS.reduce((count, marker) => count + (text.includes(marker) ? 1 : 0), 0);
+  if (markerCount >= 2) return true;
+  return text.length >= 120 && /(?:角色|人物|场景|动作|转折|结尾|冲突|对白|旁白)/.test(text) && /(?:。|！|\n)/.test(text);
+}
+
+function safeStructuredShotSnapshot(shot) {
+  const refs = Array.isArray(shot.asset_refs) ? shot.asset_refs : [];
+  return {
+    shot_id: String(shot.shot_id || "").slice(0, 80),
+    index: Number.isFinite(Number(shot.index)) ? Number(shot.index) : null,
+    duration: String(shot.duration || "").slice(0, 40),
+    description: String(shot.description || "").slice(0, 900),
+    shot_size: String(shot.shot_size || "").slice(0, 80),
+    light_atmosphere: String(shot.light_atmosphere || "").slice(0, 180),
+    camera_motion: String(shot.camera_motion || "").slice(0, 180),
+    asset_refs: refs.slice(0, 8).map((asset) => ({
+      label: String(asset?.label || asset?.display_name || "").slice(0, 80),
+      asset_type: String(asset?.asset_type || "").slice(0, 40),
+      status: String(asset?.status || "").slice(0, 40),
+    })),
+  };
+}
+
+function safeStoryboardBreakdownSnapshot(value) {
+  const shots = Array.isArray(value.shots) ? value.shots : [];
+  return {
+    status: String(value.status || value.safe_manifest?.status || "").slice(0, 80),
+    mode: String(value.planning_mode || value.mode || "").slice(0, 80),
+    shot_count: shots.length || Number(value.shot_count || 0) || 0,
+  };
 }
 
 function primaryPromptText(node) {

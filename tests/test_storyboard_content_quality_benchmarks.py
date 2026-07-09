@@ -70,6 +70,15 @@ def test_content_quality_benchmark_scripts_cover_dynamic_storyboard_and_assets()
             key = (expected["label"], expected["asset_type"])
             assert key in labels_by_type, case["id"]
             assert key in candidates_by_key, case["id"]
+        held_by_type = {
+            (asset["display_name"], asset["asset_type"])
+            for asset in graph.get("held_asset_refs", [])
+        }
+        for expected in case.get("expected_held_assets", []):
+            key = (expected["label"], expected["asset_type"])
+            assert key in held_by_type, case["id"]
+            assert key not in labels_by_type, case["id"]
+            assert key not in candidates_by_key, case["id"]
 
         _assert_story_requirements(case, shots, assets_by_key, candidates_by_key)
 
@@ -110,4 +119,3 @@ def _first_asset_shot_index(asset: dict) -> int:
 
 def _relationship_types(production_graph: dict) -> set[str]:
     return {str(item.get("relationship_type") or "") for item in production_graph["relationships"]}
-

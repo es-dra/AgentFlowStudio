@@ -7,9 +7,11 @@ from fastapi.testclient import TestClient
 
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
+from apps.api.runtime_llm_enhancement_instructions import enhancement_instruction
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.openapi_export import export_openapi_schema
 from apps.api.runtime_service import create_runtime_app
+from apps.api.runtime_script_generation_body import is_script_surface_request
 
 
 def _runtime_error_raw_detail(result) -> str:
@@ -82,6 +84,29 @@ def test_node_prompt_optimization_returns_only_optimized_prompt_for_canvas_ui(tm
     assert "c:\\" not in serialized
     assert "d:\\" not in serialized
     assert "data/processed/runs" not in serialized
+
+
+def test_text_node_script_target_uses_script_surface_instruction() -> None:
+    request = PromptOptimizationRequest(
+        node_id="text-script-surface",
+        node_type="text",
+        prompt_text="片名：《白骨灯》\n\n唐僧娶了白骨精。孙悟空和猪八戒在远处旁观。结尾，红盖头下露出白骨影子。",
+        generation_target="script",
+        target_platform="short_video",
+        style="cinematic",
+        node_parameters={
+            "scriptInputMode": "idea_expanded_script",
+            "remote_optimizer_required": True,
+        },
+        generated_at="2026-07-09T10:00:00+08:00",
+    )
+
+    instruction = enhancement_instruction(request, {"knowledge_rules": []})
+
+    assert is_script_surface_request(request) is True
+    assert "这不是生图提示词优化" in instruction
+    assert "输出仍必须像剧本正文" in instruction
+    assert "意图、角色/主体" in instruction
 
 
 def test_prompt_memory_mvp_openapi_exposes_optimizer_but_not_memory_review_surfaces(tmp_path) -> None:

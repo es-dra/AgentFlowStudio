@@ -197,7 +197,9 @@
         {
           "label": "办公室",
           "asset_type": "scene"
-        },
+        }
+      ],
+      "expected_held_assets": [
         {
           "label": "地图",
           "asset_type": "prop"
@@ -231,18 +233,7 @@
         "街道",
         "办公室"
       ],
-      "expected_reused_assets": [
-        {
-          "label": "地图",
-          "asset_type": "prop",
-          "min_shot_refs": 4
-        },
-        {
-          "label": "信件",
-          "asset_type": "prop",
-          "min_shot_refs": 2
-        }
-      ],
+      "expected_reused_assets": [],
       "expected_story_terms": {
         "emotion_change": [
           "愤怒",

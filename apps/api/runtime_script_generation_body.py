@@ -72,13 +72,17 @@ def is_script_surface_request(request: PromptOptimizationRequest) -> bool:
     if is_script_generation_request(request):
         return False
     params = request.node_parameters or {}
+    explicit_script_surface = request.generation_target == "script" and (
+        request.node_type == "text" or str(params.get("script_surface_intent") or "").strip()
+    )
     script_hint = any(
         str(params.get(key) or "").strip()
         for key in ("scriptInputMode", "sourceTextNodeId", "scriptSegmentIndex")
     )
     structured_hint = isinstance(params.get("structuredShot"), dict) or isinstance(params.get("storyboardBreakdown"), dict)
     return bool(
-        structured_hint
+        explicit_script_surface
+        or structured_hint
         or script_hint
         or (request.node_type in {"text", "script"} and looks_like_script_text(request.prompt_text))
     )

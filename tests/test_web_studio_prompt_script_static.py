@@ -143,6 +143,54 @@ process.stdout.write(JSON.stringify({
     assert payload["signatureChanged"] is True
 
 
+def test_script_like_text_node_optimization_uses_script_surface_contract() -> None:
+    script = r'''
+import { buildOptimizationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "",
+      content: "片名：《白骨灯》\n\n唐僧娶了白骨精，婚礼夜里孙悟空和猪八戒在殿外旁观。唐僧发现灯影里有第二副白骨。结尾，白骨精把红盖头递到他手里。",
+      params: {
+        scriptInputMode: "idea_expanded_script",
+        sourceTextNodeId: "seed_text",
+        storyboardBreakdown: { status: "shots_ready_for_review", shots: [{ shot_id: "shot_01" }] },
+      },
+      status: "complete",
+    },
+  },
+  edges: {},
+  assets: [],
+  groups: {},
+};
+const request = buildOptimizationRequest(state, state.nodes.text_1);
+process.stdout.write(JSON.stringify({
+  generationTarget: request.generation_target,
+  scriptInputMode: request.node_parameters.scriptInputMode,
+  scriptIntent: request.node_parameters.script_surface_intent,
+  sourceTextNodeId: request.node_parameters.sourceTextNodeId,
+  shotCount: request.node_parameters.storyboardBreakdown.shot_count,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["generationTarget"] == "script"
+    assert payload["scriptInputMode"] == "idea_expanded_script"
+    assert payload["scriptIntent"] == "preserve_script_shape"
+    assert payload["sourceTextNodeId"] == "seed_text"
+    assert payload["shotCount"] == 1
+
+
 def test_studio_state_save_strips_provider_raw_but_keeps_safe_model_summary() -> None:
     script = r'''
 import { normalizeSnapshot } from "./apps/studio/src/store-state.js";
@@ -600,6 +648,47 @@ process.stdout.write(JSON.stringify({
     for polluted in ("多视图角色设定表", "多视角场景设定图", "设定板", "软件界面"):
         assert polluted not in payload["legacyCharacterPrompt"] + payload["legacyScenePrompt"]
     assert "Forbidden: software dashboard, app interface, data chart" in payload["legacyCharacterPrompt"]
+
+
+def test_storyboard_asset_recognition_prioritizes_principal_characters_and_manual_props() -> None:
+    script = r'''
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
+
+const shot = structuredShotFromSegment(
+  "唐僧娶了白骨精，孙悟空和猪八戒在远处旁观。白骨精手边放着@金箍棒，殿内红烛摇晃。",
+  1,
+);
+process.stdout.write(JSON.stringify({
+  refs: shot.asset_refs.map((item) => [item.label, item.asset_type]),
+  dropped: shot.dropped_asset_ref_diagnostics.map((item) => [item.label, item.asset_type, item.reason]),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["refs"] == [["唐僧", "character"], ["白骨精", "character"]]
+    assert ["孙悟空", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
+    assert ["猪八戒", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
+    assert ["金箍棒", "prop", "prop_requires_manual_asset_entry"] in payload["dropped"]
+
+
+def test_asset_and_storyboard_cards_use_compact_editor_layout() -> None:
+    body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    styles = _styles()
+    shot_asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
+    script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
+
+    assert "asset-card-content-editor" in body
+    assert ".node .node-content-editor.asset-card-content-editor" in styles
+    assert "min-height: 112px" in styles
+    assert "Math.max(230, Math.min(340" in shot_asset_nodes
+    assert "Math.max(220, Math.min(360" in script_breakdown
 
 
 def test_prompt_bar_canvas_double_click_and_node_motion_are_stable() -> None:

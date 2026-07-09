@@ -6,6 +6,7 @@ from typing import Any
 from apps.api.runtime_asset_extraction import (
     normalize_asset_ref_for_contract,
     normalize_asset_refs_with_diagnostics,
+    principal_asset_refs_with_diagnostics,
 )
 from apps.api.runtime_storyboard_grounding import (
     grounding_status_for_unsupported,
@@ -17,7 +18,7 @@ from apps.api.runtime_storyboard_planning import storyboard_plan_fields
 
 ASSET_RE = re.compile(r"@([A-Za-z0-9_\-\u4e00-\u9fff·]+)")
 SCENE_HINTS = ("主要场景", "场景", "办公室", "房间", "街道", "屋顶", "楼顶", "天台", "城市", "天际线", "森林", "海边", "山谷", "山巅", "山脊", "石台", "战场", "云海", "云栈洞口", "洞口", "洞内", "山洞", "餐厅", "车内", "走廊", "宫殿", "庭院", "广场", "屏幕")
-KNOWN_CHARACTER_NAMES = ("孙悟空", "猪八戒", "金刚狼")
+KNOWN_CHARACTER_NAMES = ("唐僧", "白骨精", "孙悟空", "猪八戒", "沙僧", "金刚狼", "林晚")
 CHARACTER_HINTS = ("主角", "角色", "人物", "女孩", "女生", "男孩", "女人", "男人", "老人", "孩子", "机器人", "队长", "老师", "学生", "皇帝", "侦探", *KNOWN_CHARACTER_NAMES)
 PROP_HINTS = ("金箍棒", "手机", "电脑", "键盘", "刀", "剑", "棍", "棒", "车辆", "汽车", "信件", "信封", "信纸", "照片", "路灯", "台灯", "灯具", "灯柱", "书", "门", "地图")
 GENERIC_CHARACTER_LABELS = {"主角", "角色", "人物"}
@@ -54,6 +55,7 @@ def structured_shot(
     source = _clean(text)
     raw_refs = _resolve_shot_refs(source, _asset_refs(source), global_refs or [])
     refs, dropped_refs = normalize_asset_refs_with_diagnostics(raw_refs, context=source, include_inferred=True)
+    refs, dropped_refs = principal_asset_refs_with_diagnostics(refs, dropped_refs)
     plan_fields = storyboard_plan_fields(source, index)
     description = _description_with_assets(source, refs)
     source_span = storyboard_source_span(source, full_source or source, index)
@@ -266,12 +268,17 @@ def _asset_evidence_for_label(text: str, label: str) -> str:
 def _infer_character_labels(text: str) -> list[str]:
     source = str(text or "")
     labels: list[str] = []
-    for left, right in re.findall(r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})大战([\u4e00-\u9fffA-Za-z0-9·]{2,12})", source):
+    for left, right in re.findall(
+        r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})(?:大战|对决|迎娶|娶了|娶|嫁给|爱上|遇见|面对|追击|追杀|营救|守护)([\u4e00-\u9fffA-Za-z0-9·]{2,12})",
+        source,
+    ):
         for item in (left, right):
             _append_label(labels, _trim_character_name(item))
-    for name in KNOWN_CHARACTER_NAMES:
-        if name in source:
-            _append_label(labels, name)
+    for name, _index in sorted(
+        ((name, source.find(name)) for name in KNOWN_CHARACTER_NAMES if source.find(name) >= 0),
+        key=lambda item: item[1],
+    ):
+        _append_label(labels, name)
     if re.search(r"女生|女孩|少女", source):
         _append_label(labels, "女生" if "女生" in source else "女孩")
     for name in _repeated_actor_names(source):
@@ -318,7 +325,9 @@ def _append_label(labels: list[str], value: str) -> None:
 
 def _trim_character_name(value: str) -> str:
     clean = re.sub(r"^(以|把|将|当|用|和|与|及|、)+", "", str(value or "")).strip()
+    clean = re.sub(r"^.*(?:是|讲述|关于|围绕)", "", clean).strip()
     clean = re.sub(r"(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$", "", clean).strip()
+    clean = re.sub(r"(但是|但|却|旁观|观战|从旁).*$", "", clean).strip()
     return clean
 
 

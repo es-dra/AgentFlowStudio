@@ -177,7 +177,7 @@ def test_storyboard_local_fallback_extracts_named_characters_scenes_and_dynamic_
     assert "@主要场景" not in descriptions
 
 
-def test_shot_asset_plan_endpoint_returns_character_scene_and_prop_assets(tmp_path, monkeypatch) -> None:
+def test_shot_asset_plan_endpoint_returns_principal_character_scene_assets_and_holds_props(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("AFS_ALLOW_REMOTE_LLM", raising=False)
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "proj_shot_asset_plan"
@@ -225,7 +225,11 @@ def test_shot_asset_plan_endpoint_returns_character_scene_and_prop_assets(tmp_pa
     assert ("孙悟空", "character") in labels_by_type
     assert ("金刚狼", "character") in labels_by_type
     assert ("山巅石台战场", "scene") in labels_by_type
-    assert ("金箍棒", "prop") in labels_by_type
+    assert ("金箍棒", "prop") not in labels_by_type
+    assert any(
+        item.get("display_name") == "金箍棒" and item.get("reason") == "prop_requires_manual_asset_entry"
+        for item in payload["asset_graph"]["held_asset_refs"]
+    )
     assert all(item["evidence_text"] for item in payload["asset_refs"])
     assert response_contains_unsafe_marker(payload) is False
 
@@ -337,7 +341,12 @@ def test_storyboard_breakdown_uses_llm_structured_json_when_gate_open(tmp_path, 
     assert payload["safe_manifest"]["knowledgebase_version"] == "creative_prompt_knowledgebase_v1"
     assert "storyboard_shot_numbering_handoff_v1" in payload["safe_manifest"]["knowledge_rule_ids"]
     assert payload["shots"][0]["description"].startswith("@主角")
-    assert payload["shots"][1]["asset_refs"][1]["asset_type"] == "prop"
+    assert not any(ref["asset_type"] == "prop" for ref in payload["shots"][1]["asset_refs"])
+    assert any(
+        item.get("display_name") == "发光地图" and item.get("reason") == "prop_requires_manual_asset_entry"
+        for item in payload["shots"][1]["dropped_asset_ref_diagnostics"]
+    )
+    assert payload["asset_graph"]["held_asset_ref_count"] >= 1
 
 
 def test_storyboard_breakdown_accepts_llm_json_with_markdown_and_trailing_text(tmp_path, monkeypatch) -> None:
