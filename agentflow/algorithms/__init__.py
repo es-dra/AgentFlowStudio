@@ -19,6 +19,7 @@ CORE_AGENT_ALGORITHM_MODULES = (
     "request_projection",
     "quality_feedback_scoring",
     "content_quality_evaluation",
+    "script_storyboard_critique",
     "asset_auto_binding",
     "asset_identity_reuse_graph",
     "node_reference_stack",
