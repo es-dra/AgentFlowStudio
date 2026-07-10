@@ -221,6 +221,8 @@ def test_runtime_prompt_optimization_registers_model_call_context_artifact(tmp_p
     payload = result.json()
     context_ref = payload["artifacts"]["model_call_context"]
     context = client.get(f"/artifacts/{context_ref['artifact_id']}").json()["payload"]
+    contract_ref = payload["artifacts"]["creative_runtime_contract"]
+    contract = client.get(f"/artifacts/{contract_ref['artifact_id']}").json()["payload"]
 
     assert payload["model_call_context_id"] == context["context_id"]
     assert payload["model_call_context_summary"]["context_id"] == context["context_id"]
@@ -236,6 +238,15 @@ def test_runtime_prompt_optimization_registers_model_call_context_artifact(tmp_p
     assert context["asset_context"]["context_eligible_asset_ids"] == []
     assert context["preference_context"]["expert_rule_ids"]
     assert context["safety_boundary"]["no_provider_raw"] is True
+    assert payload["creative_runtime_contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["contract_id"] == contract["contract_id"]
+    assert payload["creative_runtime_contract_summary"]["artifact"]["artifact_id"] == contract_ref["artifact_id"]
+    assert payload["creative_runtime_contract_summary"]["model_call_context"]["context_id"] == context["context_id"]
+    assert contract["operation"] == "prompt_optimization"
+    assert contract["evidence_context"]["model_call_context_id"] == context["context_id"]
+    assert contract["provider_context"]["required_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert contract["provider_context"]["provider_calls_started"] is False
+    assert "not_provider_execution" in contract["non_claims"]
 
 
 def test_runtime_keyframe_request_plan_is_projected_from_model_call_context(tmp_path, monkeypatch) -> None:

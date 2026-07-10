@@ -8,6 +8,7 @@ from agentflow.harness.json_io import write_json
 from apps.api.runtime_models import PromptOptimizationRequest
 from apps.api.runtime_context_resolver import resolve_context_bundle
 from apps.api.runtime_file_logging import runtime_file_event
+from apps.api.runtime_creative_runtime_contract import prompt_optimization_creative_runtime_contract
 from apps.api.runtime_llm_enhancement import maybe_enhance_prompt_with_llm
 from apps.api.runtime_model_call_context import prompt_optimization_model_call_context
 from apps.api.runtime_prompt_memory_engine import assemble_prompt_context
@@ -233,6 +234,23 @@ def build_prompt_optimization(
         assembly=assembly,
         context_bundle=context_bundle,
     )
+    creative_runtime_contract = prompt_optimization_creative_runtime_contract(
+        project_id=project_id,
+        request_id=request_id,
+        request=request,
+        state=state,
+        assembly=assembly,
+        context_bundle=context_bundle,
+        model_call_context=model_call_context,
+        provider_gate_state=provider_gate(),
+        llm_enhancement=llm_enhancement,
+    )
+    safe_manifest["creative_runtime_contract_id"] = creative_runtime_contract["contract_id"]
+    safe_manifest["creative_runtime_contract_ref"] = "creative_runtime_contract.json"
+    safe_manifest["safe_artifacts"] = [
+        *safe_manifest["safe_artifacts"],
+        "creative_runtime_contract.json",
+    ]
     _log_prompt_step(
         "payloads_built",
         step_started,
@@ -242,7 +260,7 @@ def build_prompt_optimization(
         safe_artifact_count=len(safe_manifest.get("safe_artifacts") or []),
     )
     step_started = time.perf_counter()
-    for payload in (brief, trace, safe_manifest, prompt_review_summary, model_call_context):
+    for payload in (brief, trace, safe_manifest, prompt_review_summary, model_call_context, creative_runtime_contract):
         reject_unsafe_payload(payload)
     _log_prompt_step("payloads_validated", step_started, log_context)
     step_started = time.perf_counter()
@@ -257,6 +275,7 @@ def build_prompt_optimization(
     step_started = time.perf_counter()
     output_dir.mkdir(parents=True, exist_ok=True)
     write_json(output_dir / "model_call_context.json", model_call_context)
+    write_json(output_dir / "creative_runtime_contract.json", creative_runtime_contract)
     write_json(output_dir / "creative_brief.json", brief)
     if script_plan:
         write_json(output_dir / "script_plan.json", script_plan)
@@ -267,7 +286,7 @@ def build_prompt_optimization(
         "artifacts_written",
         step_started,
         log_context,
-        artifact_count=5 + int(bool(script_plan)),
+        artifact_count=6 + int(bool(script_plan)),
     )
     _log_prompt_step(
         "build_complete",
@@ -294,6 +313,7 @@ def build_prompt_optimization(
         "user_prompt_sections": user_prompt_sections,
         "context_bundle": context_bundle,
         "model_call_context": model_call_context,
+        "creative_runtime_contract": creative_runtime_contract,
         "script_plan": script_plan,
         "script_generation_body": public_script_generation_body(script_generation_body),
         "llm_provider": llm_enhancement.get("provider"),

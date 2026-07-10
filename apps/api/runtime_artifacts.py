@@ -34,6 +34,10 @@ def prompt_memory_artifacts(
             output_dir / "model_call_context.json",
             role="model_call_context",
         ),
+        "creative_runtime_contract": store.register_artifact(
+            output_dir / "creative_runtime_contract.json",
+            role="creative_runtime_contract",
+        ),
         "creative_brief": store.register_artifact(
             output_dir / "creative_brief.json",
             role="creative_brief",
