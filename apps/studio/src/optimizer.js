@@ -23,11 +23,14 @@ export async function openOptimizer(store, runtime, nodeId, _anchorEl = null, te
     const result = await runtime.optimizePrompt(request);
     const outcome = normalizeOptimization(result, request);
     applyPrompt(store, nodeId, outcome.optimized, outcome.plain || outcome.optimized, textarea);
+    recordOptimizationEvidence(store, nodeId, outcome);
     setPromptOptimizationState(store, nodeId, {
       status: "complete",
       percent: 100,
       completed_at: new Date().toISOString(),
       summary: optimizationSummary(request, outcome),
+      model_call_context_id: outcome.model_call_context_id || "",
+      model_call_context_summary: outcome.model_call_context_summary || null,
     });
   } catch (error) {
     setPromptOptimizationState(store, nodeId, {
@@ -53,6 +56,17 @@ function applyPrompt(store, nodeId, text, plainText, textarea) {
     node.params.lastOptimizedPromptPlain = plainText || stripSectionHeaders(text);
   });
   if (textarea && store.get().nodes[nodeId]) textarea.value = text;
+}
+
+function recordOptimizationEvidence(store, nodeId, outcome) {
+  store.set((s) => {
+    const node = s.nodes[nodeId];
+    if (!node) return;
+    node.params = node.params || {};
+    if (outcome.context_bundle) node.params.lastContextBundle = outcome.context_bundle;
+    if (outcome.model_call_context_id) node.params.lastModelCallContextId = outcome.model_call_context_id;
+    if (outcome.model_call_context_summary) node.params.lastModelCallContextSummary = outcome.model_call_context_summary;
+  }, { history: false, persist: true });
 }
 
 function isTextContentNode(node) {

@@ -19,6 +19,7 @@ from apps.api.runtime_logging import (
     user_action_from_request,
 )
 from apps.api.runtime_models import PromptOptimizationRequest
+from apps.api.runtime_model_call_context import public_model_call_context_summary
 from apps.api.runtime_prompt_memory import (
     PROMPT_MEMORY_NON_CLAIMS,
     PromptOptimizationUnavailable,
@@ -291,6 +292,10 @@ def register_runtime_prompt_memory_routes(app: FastAPI, store: RuntimeStore) -> 
             "provider_calls_started": result["provider_calls_started"],
             "context_bundle": result.get("context_bundle"),
             "model_call_context_id": result["model_call_context"]["context_id"],
+            "model_call_context_summary": public_model_call_context_summary(
+                result["model_call_context"],
+                artifact=artifacts.get("model_call_context"),
+            ),
             "script_plan": result.get("script_plan"),
             "script_generation_body": result.get("script_generation_body"),
             "writes_long_term_memory": False,

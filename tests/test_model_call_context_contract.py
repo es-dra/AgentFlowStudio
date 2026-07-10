@@ -223,6 +223,14 @@ def test_runtime_prompt_optimization_registers_model_call_context_artifact(tmp_p
     context = client.get(f"/artifacts/{context_ref['artifact_id']}").json()["payload"]
 
     assert payload["model_call_context_id"] == context["context_id"]
+    assert payload["model_call_context_summary"]["context_id"] == context["context_id"]
+    assert payload["model_call_context_summary"]["artifact"]["artifact_id"] == context_ref["artifact_id"]
+    assert payload["model_call_context_summary"]["operation_intent"] == "prompt_optimize"
+    assert payload["model_call_context_summary"]["context_sources"]["context_bundle_present"] is False
+    assert payload["model_call_context_summary"]["asset_context"]["context_eligible_asset_count"] == 0
+    assert payload["model_call_context_summary"]["provider_constraints"]["provider_gate"] == "AFS_ALLOW_REMOTE_LLM"
+    assert payload["model_call_context_summary"]["safety_boundary"]["no_provider_raw"] is True
+    assert "feedback_context" not in payload["model_call_context_summary"]
     assert context["operation_intent"] == "prompt_optimize"
     assert context["generation_target"] == "prompt"
     assert context["asset_context"]["context_eligible_asset_ids"] == []
