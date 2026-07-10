@@ -58,3 +58,33 @@ process.stdout.write(JSON.stringify({ audio, visual, generic, unresolved, provid
     assert payload["unresolved"]["asset_refs"] == []
     assert any(item["reason"] == "unresolved_generic_character" for item in payload["unresolved"]["dropped_asset_ref_diagnostics"])
     assert payload["providerRefs"] == []
+
+
+def test_studio_structured_shot_auto_assets_focus_characters_and_scenes_with_manual_props() -> None:
+    script = r'''
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
+
+const auto = structuredShotFromSegment("孙悟空握着金箍棒，猪八戒在云栈洞口后撤，铁链拖地。", 1);
+const explicit = structuredShotFromSegment("@金箍棒 横在画面前景，@孙悟空 站在@云栈洞口。", 2);
+
+process.stdout.write(JSON.stringify({ auto, explicit }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    auto_refs = {(ref["label"], ref["asset_type"]) for ref in payload["auto"]["asset_refs"]}
+    explicit_refs = {(ref["label"], ref["asset_type"]) for ref in payload["explicit"]["asset_refs"]}
+
+    assert ("孙悟空", "character") in auto_refs
+    assert ("猪八戒", "character") in auto_refs
+    assert ("云栈洞口", "scene") in auto_refs
+    assert not any(asset_type == "prop" for _, asset_type in auto_refs)
+    assert ("孙悟空", "character") in explicit_refs
+    assert ("云栈洞口", "scene") in explicit_refs
+    assert not any(asset_type == "prop" for _, asset_type in explicit_refs)
+    assert any(item["reason"] == "prop_requires_manual_asset_entry" and item["label"] == "金箍棒" for item in payload["explicit"]["dropped_asset_ref_diagnostics"])

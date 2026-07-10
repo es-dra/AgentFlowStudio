@@ -26,10 +26,6 @@
         {
           "label": "暗办公室",
           "asset_type": "scene"
-        },
-        {
-          "label": "照片",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -58,10 +54,6 @@
         {
           "label": "山巅石台战场",
           "asset_type": "scene"
-        },
-        {
-          "label": "金箍棒",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -86,10 +78,6 @@
         {
           "label": "海边",
           "asset_type": "scene"
-        },
-        {
-          "label": "信件",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -114,10 +102,6 @@
         {
           "label": "办公室",
           "asset_type": "scene"
-        },
-        {
-          "label": "地图",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -142,10 +126,6 @@
         {
           "label": "室内空间",
           "asset_type": "scene"
-        },
-        {
-          "label": "手机",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -174,10 +154,6 @@
         {
           "label": "餐厅",
           "asset_type": "scene"
-        },
-        {
-          "label": "信件",
-          "asset_type": "prop"
         }
       ],
       "quality_focus": [
@@ -221,7 +197,9 @@
         {
           "label": "办公室",
           "asset_type": "scene"
-        },
+        }
+      ],
+      "expected_held_assets": [
         {
           "label": "地图",
           "asset_type": "prop"
@@ -255,18 +233,7 @@
         "街道",
         "办公室"
       ],
-      "expected_reused_assets": [
-        {
-          "label": "地图",
-          "asset_type": "prop",
-          "min_shot_refs": 4
-        },
-        {
-          "label": "信件",
-          "asset_type": "prop",
-          "min_shot_refs": 2
-        }
-      ],
+      "expected_reused_assets": [],
       "expected_story_terms": {
         "emotion_change": [
           "愤怒",

@@ -40,7 +40,30 @@ const VISUAL_CITY_TERMS = [
   "路面",
   "灯光",
 ];
-const VISUAL_CHARACTER_TERMS = ["walks", "runs", "face", "coat", "hand", "站", "走", "奔跑", "穿", "低头", "手部", "展开", "外套", "侧脸", "女孩", "林晚", "机器人"];
+const KNOWN_CHARACTER_NAMES = ["唐僧", "白骨精", "孙悟空", "猪八戒", "沙僧", "金刚狼", "林晚"];
+const VISUAL_CHARACTER_TERMS = [
+  "walks",
+  "runs",
+  "face",
+  "coat",
+  "hand",
+  "站",
+  "走",
+  "奔跑",
+  "穿",
+  "低头",
+  "手部",
+  "展开",
+  "外套",
+  "侧脸",
+  "女孩",
+  "林晚",
+  "机器人",
+  "唐僧",
+  "白骨精",
+  "孙悟空",
+  "猪八戒",
+];
 
 export function normalizeAssetExtractionRefs(assetRefs, options = {}) {
   const context = cleanText(options.context || "");
@@ -152,12 +175,33 @@ function specificAssetTypes(candidates) {
 
 function namedCharacters(text) {
   const names = [];
-  if (text.includes("林晚")) names.push("林晚");
+  const relationRe = /([\u4e00-\u9fffA-Za-z0-9·]{2,12})(?:大战|对决|迎娶|娶了|娶|嫁给|爱上|遇见|面对|追击|追杀|营救|守护)([\u4e00-\u9fffA-Za-z0-9·]{2,12})/gu;
+  for (const match of text.matchAll(relationRe)) {
+    names.push(trimCharacterName(match[1]), trimCharacterName(match[2]));
+  }
+  for (const item of knownCharactersInSourceOrder(text)) names.push(item);
   if (/\bLin\s+Wan\b/i.test(text)) names.push("Lin Wan");
   if (text.includes("女孩")) names.push("女孩");
   if (text.includes("机器人")) names.push("机器人");
   if (/\bfuture robot\b|\brobot\b/i.test(text)) names.push("Future Robot");
   return [...new Set(names)];
+}
+
+function knownCharactersInSourceOrder(text) {
+  return KNOWN_CHARACTER_NAMES
+    .map((name) => ({ name, index: text.indexOf(name) }))
+    .filter((item) => item.index >= 0)
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.name);
+}
+
+function trimCharacterName(value) {
+  return String(value || "")
+    .replace(/^(以|把|将|当|用|和|与|及|、)+/, "")
+    .replace(/^.*(?:是|讲述|关于|围绕)/, "")
+    .replace(/(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$/, "")
+    .replace(/(但是|但|却|旁观|观战|从旁).*$/, "")
+    .trim();
 }
 
 function provisionalCharacterName(text) {

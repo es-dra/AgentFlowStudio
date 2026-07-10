@@ -143,6 +143,145 @@ process.stdout.write(JSON.stringify({
     assert payload["signatureChanged"] is True
 
 
+def test_script_like_text_node_optimization_uses_script_surface_contract() -> None:
+    script = r'''
+import { buildOptimizationRequest } from "./apps/studio/src/optimizer-contract.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "",
+      content: "片名：《白骨灯》\n\n唐僧娶了白骨精，婚礼夜里孙悟空和猪八戒在殿外旁观。唐僧发现灯影里有第二副白骨。结尾，白骨精把红盖头递到他手里。",
+      params: {
+        scriptInputMode: "idea_expanded_script",
+        sourceTextNodeId: "seed_text",
+        storyboardBreakdown: { status: "shots_ready_for_review", shots: [{ shot_id: "shot_01" }] },
+      },
+      status: "complete",
+    },
+  },
+  edges: {},
+  assets: [],
+  groups: {},
+};
+const request = buildOptimizationRequest(state, state.nodes.text_1);
+process.stdout.write(JSON.stringify({
+  generationTarget: request.generation_target,
+  scriptInputMode: request.node_parameters.scriptInputMode,
+  scriptIntent: request.node_parameters.script_surface_intent,
+  sourceTextNodeId: request.node_parameters.sourceTextNodeId,
+  shotCount: request.node_parameters.storyboardBreakdown.shot_count,
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["generationTarget"] == "script"
+    assert payload["scriptInputMode"] == "idea_expanded_script"
+    assert payload["scriptIntent"] == "preserve_script_shape"
+    assert payload["sourceTextNodeId"] == "seed_text"
+    assert payload["shotCount"] == 1
+
+
+def test_studio_state_save_strips_provider_raw_but_keeps_safe_model_summary() -> None:
+    script = r'''
+import { normalizeSnapshot } from "./apps/studio/src/store-state.js";
+
+const snapshot = normalizeSnapshot({
+  meta: { projectId: "proj_safe_summary", projectName: "Safe", canvasName: "Canvas", seq: 1 },
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      title: "文本",
+      prompt: "剧本正文",
+      content: "剧本正文",
+      status: "complete",
+      params: {
+        lastContextBundle: {
+          included_assets: [{ asset_id: "asset_1", provider_raw: { unsafe: true }, label: "孙悟空" }],
+          text_channel: { raw_provider_response: { unsafe: true }, safe_summary: "safe" },
+        },
+        lastModelCallContextSummary: {
+          artifact: { filename: "model_call_context.json" },
+          safety_boundary: { no_provider_raw: true, no_local_path: true },
+        },
+        lastGenerationManifest: {
+          status: "blocked",
+          batch_status: "failed",
+          stage: "provider_request_read",
+          failure_class: "provider_timeout",
+          output_count: 0,
+          retry_count: 1,
+          raw_provider_response_stored: false,
+          provider_raw_persisted: false,
+          provider_diagnostics: {
+            provider_stage: "provider_request_read",
+            failure_class: "provider_timeout",
+            reason: "API relay request timed out while reading provider result",
+            retry_count: 1,
+            attempt_count: 2,
+          },
+          blocks: [{
+            block_id: "remote_image_provider_not_ready",
+            reason: "The read operation timed out",
+            failure_class: "provider_timeout",
+            provider_stage: "provider_request_read",
+            provider_raw_persisted: false,
+          }],
+        },
+        generationBlockedReason: "provider_raw_persisted false should not reach persistence",
+      },
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [
+    {
+      asset_id: "img_1",
+      label: "候选图",
+      preview_url: "/projects/proj_safe_summary/image-assets/img_1/preview",
+      provider_raw_response: { unsafe: true },
+    },
+  ],
+});
+
+process.stdout.write(JSON.stringify(snapshot));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+    serialized = json.dumps(payload, ensure_ascii=False)
+
+    assert "provider_raw_response" not in serialized
+    assert "raw_provider_response" not in serialized
+    assert "provider_raw_persisted" not in serialized
+    assert "raw_provider_response_stored" not in serialized
+    assert '"provider_raw"' not in serialized
+    summary = payload["nodes"]["text_1"]["params"]["lastModelCallContextSummary"]
+    assert summary["safety_boundary"]["no_provider_raw"] is True
+    assert summary["artifact"]["filename"] == "model_call_context.json"
+    manifest = payload["nodes"]["text_1"]["params"]["lastGenerationManifest"]
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert "provider-response-redacted" in payload["nodes"]["text_1"]["params"]["generationBlockedReason"]
+
+
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
     prompt_bar = (STUDIO_ROOT / "src" / "prompt-bar.js").read_text(encoding="utf-8")
     canvas_action_handler = (STUDIO_ROOT / "src" / "canvas-node-action-handler.js").read_text(encoding="utf-8")
@@ -281,13 +420,73 @@ process.stdout.write(JSON.stringify({ node: state.nodes.text_1, captured }));
     assert "原始想法：一个人在睡觉" in captured["prompt_text"]
     assert captured["node_parameters"]["source_idea"] == "一个人在睡觉"
     assert captured["node_parameters"]["script_generation_mode"] == "idea_to_script"
-    assert captured["node_parameters"]["remote_optimizer_required"] is False
-    assert captured["node_parameters"]["llm_provider"] == "local_script_generation"
+    assert captured["node_parameters"]["remote_optimizer_required"] is True
+    assert captured["node_parameters"]["llm_provider"] == "prompt_optimizer"
+    assert captured["node_parameters"]["llm_model"] == "prompt-optimizer"
     assert node["params"]["scriptInputMode"] == "idea_expanded_script"
     assert "片名：《" in node["prompt"]
     assert "意图：" not in node["prompt"]
     assert "角色/主体：" not in node["prompt"]
     assert "Primary character" not in node["prompt"]
+
+
+def test_idea_expansion_runtime_failure_is_visible_not_local_fallback() -> None:
+    script = r'''
+import { expandTextIdeaToScript } from "./apps/studio/src/script-breakdown.js";
+
+const state = {
+  nodes: {
+    text_1: {
+      id: "text_1",
+      type: "text",
+      prompt: "一个人在睡觉",
+      content: "",
+      params: {},
+      status: "empty",
+    },
+  },
+  edges: {},
+  order: ["text_1"],
+  assets: [],
+  groups: {},
+  selection: { nodeIds: ["text_1"], edgeId: null },
+  ui: {},
+};
+const store = {
+  get: () => state,
+  set: (mutator) => mutator(state),
+};
+const runtime = {
+  optimizePrompt: async () => {
+    const error = new Error("Runtime request failed (422): remote_llm_gate_closed");
+    error.payload = {
+      detail: {
+        error: "invalid_prompt_optimization",
+        message: "remote LLM prompt optimization unavailable: remote_llm_gate_closed",
+        details: { raw_detail: "remote LLM prompt optimization unavailable: remote_llm_gate_closed" },
+      },
+    };
+    throw error;
+  }
+};
+await expandTextIdeaToScript(store, runtime, state.nodes.text_1);
+process.stdout.write(JSON.stringify(state.nodes.text_1));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    node = json.loads(completed.stdout)
+
+    assert node["status"] == "error"
+    assert node["params"]["scriptExpansionState"]["status"] == "failed"
+    assert node["params"]["generationPolicyStatus"] == "needs_attention"
+    assert "remote_llm_gate_closed" in node["params"]["generationBlockedReason"]
+    assert node["params"].get("scriptInputMode") != "idea_expanded_script_fallback"
+    assert "片名：《" not in node["prompt"]
 
 
 def test_text_script_body_receives_generated_content_and_keeps_editable_surface() -> None:
@@ -449,6 +648,47 @@ process.stdout.write(JSON.stringify({
     for polluted in ("多视图角色设定表", "多视角场景设定图", "设定板", "软件界面"):
         assert polluted not in payload["legacyCharacterPrompt"] + payload["legacyScenePrompt"]
     assert "Forbidden: software dashboard, app interface, data chart" in payload["legacyCharacterPrompt"]
+
+
+def test_storyboard_asset_recognition_prioritizes_principal_characters_and_manual_props() -> None:
+    script = r'''
+import { structuredShotFromSegment } from "./apps/studio/src/structured-shot.js";
+
+const shot = structuredShotFromSegment(
+  "唐僧娶了白骨精，孙悟空和猪八戒在远处旁观。白骨精手边放着@金箍棒，殿内红烛摇晃。",
+  1,
+);
+process.stdout.write(JSON.stringify({
+  refs: shot.asset_refs.map((item) => [item.label, item.asset_type]),
+  dropped: shot.dropped_asset_ref_diagnostics.map((item) => [item.label, item.asset_type, item.reason]),
+}));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["refs"] == [["唐僧", "character"], ["白骨精", "character"]]
+    assert ["孙悟空", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
+    assert ["猪八戒", "character", "secondary_character_requires_manual_asset_entry"] in payload["dropped"]
+    assert ["金箍棒", "prop", "prop_requires_manual_asset_entry"] in payload["dropped"]
+
+
+def test_asset_and_storyboard_cards_use_compact_editor_layout() -> None:
+    body = (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    styles = _styles()
+    shot_asset_nodes = (STUDIO_ROOT / "src" / "shot-asset-nodes.js").read_text(encoding="utf-8")
+    script_breakdown = (STUDIO_ROOT / "src" / "script-breakdown.js").read_text(encoding="utf-8")
+
+    assert "asset-card-content-editor" in body
+    assert ".node .node-content-editor.asset-card-content-editor" in styles
+    assert "min-height: 112px" in styles
+    assert "Math.max(230, Math.min(340" in shot_asset_nodes
+    assert "Math.max(220, Math.min(360" in script_breakdown
 
 
 def test_prompt_bar_canvas_double_click_and_node_motion_are_stable() -> None:

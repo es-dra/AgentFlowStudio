@@ -204,7 +204,11 @@ def _download_image_url(url: str, *, allowed_url_hosts: tuple[str, ...], timeout
     try:
         with urllib.request.urlopen(request, timeout=timeout_sec) as response:
             image_bytes = response.read(MAX_IMAGE_DOWNLOAD_BYTES + 1)
+    except TimeoutError as exc:
+        raise ModelGatewayError("API relay image URL download timed out") from exc
     except urllib.error.URLError as exc:
+        if _looks_like_timeout(str(exc.reason)):
+            raise ModelGatewayError("API relay image URL download timed out") from exc
         raise ModelGatewayError("API relay image URL download failed") from exc
     if len(image_bytes) > MAX_IMAGE_DOWNLOAD_BYTES:
         raise ModelGatewayError("API relay image URL download exceeded size limit")
@@ -229,6 +233,11 @@ def _mime_type_for_bytes(image_bytes: bytes) -> str:
     if image_bytes.startswith(b"\xff\xd8"):
         return "image/jpeg"
     return ""
+
+
+def _looks_like_timeout(value: str) -> bool:
+    lowered = value.lower()
+    return "timed out" in lowered or "timeout" in lowered
 
 
 __all__ = ("openai_images_payload", "write_image_outputs")

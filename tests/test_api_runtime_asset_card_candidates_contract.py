@@ -60,7 +60,8 @@ def test_storyboard_breakdown_writes_safe_asset_card_candidates(tmp_path, monkey
     assert candidate_set["writes_long_term_memory"] is False
     assert candidate_set["writes_company_kb"] is False
 
-    assert {"character", "scene", "prop"} <= asset_types
+    assert {"character", "scene"} <= asset_types
+    assert "prop" not in asset_types
     assert candidates
     for candidate in candidates:
         assert candidate["candidate_id"].startswith("asset_card_candidate:")

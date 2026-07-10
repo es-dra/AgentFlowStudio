@@ -152,6 +152,10 @@ def test_active_multi_candidate_retry_keeps_retrying_job_state_until_terminal_re
         if (node.params.generationPolicyStatus !== "retrying" || node.params.retryFailedItemsOnly !== true) {
           throw new Error("active retry submit lost failed-items-only job state");
         }
+        updateNodeGenerationState(node, { job: { status: "running", progress: { mode: "indeterminate" } } }, { kind: "keyframe" });
+        if (node.params.progressPercent !== null || node.params.jobProgress.mode !== "indeterminate") {
+          throw new Error(`indeterminate progress should not expose a fake percent, got ${node.params.progressPercent}`);
+        }
 
         updateNodeGenerationState(node, {
           job: { status: "succeeded" },

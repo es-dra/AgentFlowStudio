@@ -25,6 +25,7 @@ AUDIO_ONLY_TERMS = (
     "black screen",
 )
 CITY_TERMS = ("城市", "city", "街道", "street", "road")
+KNOWN_CHARACTER_NAMES = ("唐僧", "白骨精", "孙悟空", "猪八戒", "沙僧", "金刚狼", "林晚")
 VISUAL_CITY_TERMS = (
     "rain-night city street",
     "city street",
@@ -65,6 +66,10 @@ VISUAL_CHARACTER_TERMS = (
     "女孩",
     "林晚",
     "机器人",
+    "唐僧",
+    "白骨精",
+    "孙悟空",
+    "猪八戒",
 )
 
 
@@ -97,6 +102,46 @@ def normalize_asset_refs_with_diagnostics(
             diagnostic_key = (diagnostic["asset_type"], diagnostic["display_name"], diagnostic["reason"])
             if diagnostic_key not in {(item["asset_type"], item["display_name"], item["reason"]) for item in diagnostics}:
                 diagnostics.append(diagnostic)
+    return accepted, diagnostics
+
+
+def principal_asset_refs_with_diagnostics(
+    asset_refs: list[dict[str, Any]],
+    dropped_refs: list[dict[str, Any]] | None = None,
+    *,
+    max_auto_characters: int = 2,
+    max_auto_scenes: int = 1,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    accepted: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = list(dropped_refs or [])
+    auto_character_count = 0
+    auto_scene_count = 0
+    for ref in asset_refs:
+        asset_type = str(ref.get("asset_type") or "")
+        if _is_manual_or_fixed_asset_ref(ref):
+            accepted.append(ref)
+            continue
+        explicit_named = _is_explicit_named_asset_ref(ref)
+        if asset_type == "prop":
+            diagnostics.append(_principal_diagnostic(ref, "prop_requires_manual_asset_entry"))
+            continue
+        if asset_type == "character":
+            if explicit_named or auto_character_count < max_auto_characters:
+                accepted.append(ref)
+                if not explicit_named:
+                    auto_character_count += 1
+            else:
+                diagnostics.append(_principal_diagnostic(ref, "secondary_character_requires_manual_asset_entry"))
+            continue
+        if asset_type == "scene":
+            if explicit_named or auto_scene_count < max_auto_scenes:
+                accepted.append(ref)
+                if not explicit_named:
+                    auto_scene_count += 1
+            else:
+                diagnostics.append(_principal_diagnostic(ref, "secondary_scene_requires_manual_asset_entry"))
+            continue
+        diagnostics.append(_principal_diagnostic(ref, "unsupported_asset_type_requires_manual_entry"))
     return accepted, diagnostics
 
 
@@ -192,8 +237,12 @@ def _specific_asset_types(candidates: list[dict[str, Any]]) -> set[str]:
 
 def _named_characters(text: str) -> list[str]:
     names: list[str] = []
-    if "林晚" in text:
-        names.append("林晚")
+    for left, right in re.findall(
+        r"([\u4e00-\u9fffA-Za-z0-9·]{2,12})(?:大战|对决|迎娶|娶了|娶|嫁给|爱上|遇见|面对|追击|追杀|营救|守护)([\u4e00-\u9fffA-Za-z0-9·]{2,12})",
+        text,
+    ):
+        names.extend([_trim_character_name(left), _trim_character_name(right)])
+    names.extend(_known_characters_in_source_order(text))
     if re.search(r"\bLin\s+Wan\b", text, flags=re.I):
         names.append("Lin Wan")
     if "女孩" in text:
@@ -202,7 +251,25 @@ def _named_characters(text: str) -> list[str]:
         names.append("机器人")
     if re.search(r"\bfuture robot\b|\brobot\b", text, flags=re.I):
         names.append("Future Robot")
-    return _dedupe(names)
+    return _dedupe([name for name in names if name])
+
+
+def _known_characters_in_source_order(text: str) -> list[str]:
+    return [
+        name
+        for name, _index in sorted(
+            ((name, text.find(name)) for name in KNOWN_CHARACTER_NAMES if text.find(name) >= 0),
+            key=lambda item: item[1],
+        )
+    ]
+
+
+def _trim_character_name(value: str) -> str:
+    clean = re.sub(r"^(以|把|将|当|用|和|与|及|、)+", "", str(value or "")).strip()
+    clean = re.sub(r"^.*(?:是|讲述|关于|围绕)", "", clean).strip()
+    clean = re.sub(r"(为核心|为主题|为主|展开|对决|战斗|格斗|碰撞).*$", "", clean).strip()
+    clean = re.sub(r"(但是|但|却|旁观|观战|从旁).*$", "", clean).strip()
+    return clean[:24]
 
 
 def _provisional_character_name(text: str) -> str:
@@ -319,6 +386,33 @@ def _diagnostic(label: str, asset_type: str, reason: str, evidence: str) -> dict
     }
 
 
+def _principal_diagnostic(ref: dict[str, Any], reason: str) -> dict[str, Any]:
+    label = str(ref.get("display_name") or ref.get("label") or "").strip()
+    asset_type = str(ref.get("asset_type") or "prop").strip() or "prop"
+    evidence = str(ref.get("evidence_text") or ref.get("visual_evidence_span") or "")
+    return _diagnostic(label, asset_type, reason, evidence)
+
+
+def _is_manual_or_fixed_asset_ref(ref: dict[str, Any]) -> bool:
+    return (
+        str(ref.get("source") or "").lower() == "manual"
+        or str(ref.get("status") or "").lower() == "fixed"
+        or bool(ref.get("graph_asset_id") or ref.get("graphAssetId"))
+    )
+
+
+def _is_explicit_named_asset_ref(ref: dict[str, Any]) -> bool:
+    asset_type = str(ref.get("asset_type") or "")
+    if asset_type == "prop":
+        return False
+    source = str(ref.get("source") or "").lower()
+    status = str(ref.get("status") or "").lower()
+    if "explicit" not in source and status != "mentioned":
+        return False
+    label = str(ref.get("display_name") or ref.get("label") or "").strip()
+    return label not in GENERIC_CHARACTER_LABELS and label not in GENERIC_SCENE_LABELS
+
+
 def _descriptive_signature(asset: dict[str, Any], fallback: str) -> str:
     return _clean_text(
         asset.get("descriptive_signature")
@@ -364,4 +458,5 @@ __all__ = (
     "GENERIC_SCENE_LABELS",
     "normalize_asset_ref_for_contract",
     "normalize_asset_refs_with_diagnostics",
+    "principal_asset_refs_with_diagnostics",
 )

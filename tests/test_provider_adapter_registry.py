@@ -772,6 +772,37 @@ def test_provider_registry_dispatches_api_relay_openai_images_url_response(tmp_p
     assert "secret-relay-key" not in json.dumps(result, ensure_ascii=False)
 
 
+def test_provider_registry_reports_openai_images_download_timeout_stage(tmp_path, monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        if request.full_url == "https://api.crazyrouter.com/v1/images/generations":
+            return _JsonResponse({"data": [{"url": "http://251000800.vod2.myqcloud.com/task-artifacts/result.png"}]})
+        if request.full_url == "http://251000800.vod2.myqcloud.com/task-artifacts/result.png":
+            raise TimeoutError("The read operation timed out")
+        raise AssertionError(f"unexpected URL: {request.full_url}")
+
+    config = _api_relay_provider_config(include_image=True)
+    account = config["accounts"]["model_relay"]
+    account["base_url"] = "https://api.crazyrouter.com/v1"
+    account["default_models"]["image"] = "gpt-image-2"
+    service = config["services"]["relay_image"]
+    service["endpoint"] = "/images/generations"
+    service["model"] = "gpt-image-2"
+    service["request_format"] = "openai_images"
+    service["account_ref"] = "crazyrouter"
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agentflow_studio.model_gateway.provider_api_relay_images.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_MODEL_RELAY_API_KEY", "secret-relay-key")
+    registry = ProviderRegistry.from_store(_store(tmp_path, config))
+
+    with pytest.raises(ModelGatewayError, match="image URL download timed out"):
+        registry.dispatch(
+            "image",
+            "relay_image",
+            ProviderDispatchRequest(prompt="Generate a clean asset sheet", output_dir=tmp_path / "run", aspect_ratio="9:16"),
+        )
+
+
 def test_provider_registry_dispatches_api_relay_openai_images_edit_with_source_image_field(
     tmp_path,
     monkeypatch,

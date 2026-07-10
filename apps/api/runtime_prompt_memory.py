@@ -29,8 +29,10 @@ from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
 from apps.api.runtime_prompt_review_summary import prompt_optimization_review_summary
 from apps.api.runtime_script_generation_body import (
     is_script_generation_request,
+    is_script_surface_request,
     public_script_generation_body,
     script_body_from_candidate,
+    script_surface_body_from_candidate,
 )
 from apps.api.runtime_script_plan import build_script_plan
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -153,6 +155,7 @@ def build_prompt_optimization(
         script_plan_present=bool(script_plan),
     )
     script_generation_body = None
+    script_surface_body = None
     if is_script_generation_request(request):
         script_generation_body = script_body_from_candidate(user_prompt_plain or user_prompt or assembled_prompt, request)
         script_body = str(script_generation_body["script_body"])
@@ -168,7 +171,22 @@ def build_prompt_optimization(
             script_body_discard_reason=script_generation_body.get("discard_reason"),
             script_body_fallback_used=script_generation_body.get("fallback_used"),
         )
-    if context_bundle and not script_generation_body:
+    elif is_script_surface_request(request):
+        script_surface_body = script_surface_body_from_candidate(user_prompt_plain or user_prompt or assembled_prompt, request)
+        script_body = str(script_surface_body["script_body"])
+        assembled_prompt = script_body
+        user_prompt = script_body
+        user_prompt_plain = script_body
+        user_prompt_sections = [{"title": "剧本/分镜正文", "text": script_body}]
+        _log_prompt_step(
+            "script_surface_body_validated",
+            started,
+            log_context,
+            script_body_status=script_surface_body.get("status"),
+            script_body_discard_reason=script_surface_body.get("discard_reason"),
+            script_body_fallback_used=script_surface_body.get("fallback_used"),
+        )
+    if context_bundle and not script_generation_body and not script_surface_body:
         signature_segment = str(context_bundle.get("text_channel", {}).get("asset_signature_segment") or "")
         if signature_segment:
             assembled_prompt = f"{assembled_prompt}\nAsset Signatures:\n{signature_segment}"
@@ -314,8 +332,6 @@ def _context_bundle(
 
 
 def _remote_optimizer_required(request: PromptOptimizationRequest) -> bool:
-    if is_script_generation_request(request):
-        return False
     params = request.node_parameters or {}
     return bool(params.get("remote_optimizer_required"))
 

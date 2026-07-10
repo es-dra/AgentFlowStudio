@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 
 from apps.api.runtime_asset_profile_plan import attach_asset_profiles, build_asset_profile_plan
 from apps.api.runtime_asset_graph import attach_graph_asset_ids_to_refs, build_asset_graph
+from apps.api.runtime_asset_extraction import principal_asset_refs_with_diagnostics
 from apps.api.runtime_errors import safe_error_detail
 from apps.api.runtime_models import ShotAssetPlanRequest
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
@@ -49,7 +50,8 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
     refs = _remove_generic_when_specific(refs)
     refs = _dedupe_refs(refs)
     refs = [_with_evidence(ref, text) for ref in refs]
-    graph_shot = _graph_shot(shot, inferred_shot, refs, text)
+    refs, dropped_refs = principal_asset_refs_with_diagnostics(refs)
+    graph_shot = _graph_shot(shot, inferred_shot, refs, text, dropped_refs)
     asset_graph = build_asset_graph([graph_shot], source_text=request.script_text or text, graph_source="shot_asset_plan")
     refs = attach_graph_asset_ids_to_refs(refs, asset_graph)
     asset_profile_plan = build_asset_profile_plan(refs, text)
@@ -90,11 +92,18 @@ def build_shot_asset_plan(project_id: str, request: ShotAssetPlanRequest) -> dic
     return payload
 
 
-def _graph_shot(shot: dict[str, Any], inferred_shot: dict[str, Any], refs: list[dict[str, Any]], text: str) -> dict[str, Any]:
+def _graph_shot(
+    shot: dict[str, Any],
+    inferred_shot: dict[str, Any],
+    refs: list[dict[str, Any]],
+    text: str,
+    dropped_refs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     return {
         **inferred_shot,
         **{key: value for key, value in shot.items() if key in {"shot_id", "index", "description", "source_text", "source_span", "unsupported_additions"}},
         "asset_refs": refs,
+        "dropped_asset_ref_diagnostics": list(dropped_refs or []),
         "source_text": str(shot.get("source_text") or inferred_shot.get("source_text") or text),
     }
 

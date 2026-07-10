@@ -113,6 +113,11 @@
   user-select: text;
 }
 
+.node .node-content-editor.asset-card-content-editor {
+  min-height: 112px;
+  max-height: 220px;
+}
+
 .node .node-content-editor:focus {
   color: var(--text-primary);
   border-color: rgba(90, 200, 250, 0.38);

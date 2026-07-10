@@ -8,12 +8,18 @@ from apps.api.runtime_llm_enhancement_constants import SECTION_ORDER
 from apps.api.runtime_llm_enhancement_gate import prompt_optimization_mode
 from apps.api.runtime_llm_enhancement_safety import visual_reference_hint
 from apps.api.runtime_models import PromptOptimizationRequest
-from apps.api.runtime_script_generation_body import is_script_generation_request, source_idea_from_request
+from apps.api.runtime_script_generation_body import (
+    is_script_generation_request,
+    is_script_surface_request,
+    source_idea_from_request,
+)
 
 
 def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object]) -> str:
     if is_script_generation_request(request):
-        return script_generation_enhancement_instruction(request)
+        return script_generation_enhancement_instruction(request, assembly)
+    if is_script_surface_request(request):
+        return script_surface_enhancement_instruction(request, assembly)
     if request.node_type in {"text", "script"}:
         return text_enhancement_instruction(request)
     mode = prompt_optimization_mode(request)
@@ -24,18 +30,64 @@ def enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[s
     return visual_enhancement_instruction(request)
 
 
-def script_generation_enhancement_instruction(request: PromptOptimizationRequest) -> str:
+def script_generation_enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object] | None = None) -> str:
     source_idea = source_idea_from_request(request)
+    knowledge_lines = _knowledge_guidance_lines(assembly or {}, limit=8)
     return "\n".join(
         [
             "你正在为 AFS Studio 把一句创作想法扩写成正式短视频剧本正文。",
             f"原始想法：{source_idea}",
+            "专业知识库约束：",
+            *knowledge_lines,
             "只输出剧本正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
             "必须先给片名，然后写连续叙事正文。",
-            "正文必须包含：有名字或称呼的主角、明确场景、情绪基调、动作推进、转折或发现、结尾钩子。",
+            "正文必须包含：有名字或称呼的主角、明确场景、情绪基调、动作推进、冲突升级、转折或发现、结尾钩子。",
+            "按专业短视频剧本标准补强节奏：开场钩子、关系或目标、阻碍、选择、反应、余味；不要只写一句画面提示。",
             "不要输出分镜列表、镜头编号、提示词包装、输出要求、原始想法回显、推进主体、展示变化、收束结果或模板占位句。",
         ]
     )
+
+
+def script_surface_enhancement_instruction(request: PromptOptimizationRequest, assembly: dict[str, object] | None = None) -> str:
+    knowledge_lines = _knowledge_guidance_lines(assembly or {}, limit=8)
+    return "\n".join(
+        [
+            "你正在为 AFS Studio 优化已有短视频剧本或分镜脚本正文。",
+            "这不是生图提示词优化，也不是把剧本改写成意图/主体/镜头标签。",
+            "专业知识库约束：",
+            *knowledge_lines,
+            f"原始剧本/分镜：\n{request.prompt_text}",
+            "硬性要求：只输出优化后的剧本/分镜正文，不要解释、不要 Markdown 标题、不要输出提示词优化标签。",
+            "如果输入是连续剧本：保持片名和叙事段落，补强戏剧目标、人物动机、空间调度、情绪转折、动作因果和结尾钩子；输出仍必须像剧本正文。",
+            "如果输入是分镜脚本：保留镜号、时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效、资产等字段；补强每个镜头的主次关系、节奏、视线方向、动作连续性和可拍性。",
+            "不得输出“意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束”等提示词标签。",
+            "不得把连续剧本压缩成单段提示词；不得把分镜字段合并成生图提示词。",
+            "不要新增与原剧本无关的人物、场景、道具或设定；不确定时保持原文。",
+        ]
+    )
+
+
+def _knowledge_guidance_lines(assembly: dict[str, object], *, limit: int) -> list[str]:
+    rules = assembly.get("knowledge_rules")
+    if not isinstance(rules, list):
+        return ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
+    lines: list[str] = []
+    preferred_domains = {"short_video_script", "storyboard", "directing", "cinematography", "negative_constraints"}
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        domain = str(rule.get("domain") or "")
+        if domain not in preferred_domains:
+            continue
+        transform = rule.get("prompt_transform")
+        guidance = str(transform.get("guidance") or "").strip() if isinstance(transform, dict) else ""
+        rule_id = str(rule.get("rule_id") or "").strip()
+        if not guidance or not rule_id:
+            continue
+        lines.append(f"- {rule_id}: {guidance}")
+        if len(lines) >= limit:
+            break
+    return lines or ["- 使用短视频剧本、导演意图、分镜连续性和负面约束规则，但不要回显规则文本。"]
 
 
 def video_enhancement_instruction(request: PromptOptimizationRequest, *, mode: str) -> str:
@@ -106,6 +158,16 @@ def visual_enhancement_instruction(request: PromptOptimizationRequest) -> str:
 
 def strict_format_retry_instruction(request: PromptOptimizationRequest) -> str:
     mode = prompt_optimization_mode(request)
+    if is_script_surface_request(request):
+        return "\n".join(
+            [
+                "你正在重新整理已有短视频剧本或分镜优化结果。",
+                f"原始剧本/分镜：\n{request.prompt_text}",
+                "上一次输出破坏了剧本格式。只输出优化后的剧本/分镜正文。",
+                "保留原有片名/段落，或保留镜号、时长、画面描述、景别、光影氛围、运镜、对白/旁白、音效、资产等字段。",
+                "禁止输出意图、角色/主体、场景/美术、动作/情节、镜头/构图、灯光、运动/时间推进、连续性、负面约束等提示词标签。",
+            ]
+        )
     if mode in {"i2v", "t2v"}:
         return algorithm_video_strict_format_retry_instruction(
             prompt_text=request.prompt_text,

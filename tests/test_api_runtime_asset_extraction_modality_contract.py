@@ -96,6 +96,23 @@ def test_ambiguous_aliases_are_not_auto_merged_into_named_character() -> None:
     assert not any("她" in str(asset.get("aliases") or []) and asset.get("display_name") == "林晚" for asset in graph["assets"])
 
 
+def test_principal_character_extraction_prioritizes_relationship_subjects_and_holds_props() -> None:
+    script = "唐僧娶了白骨精，孙悟空和猪八戒在远处旁观。@金箍棒 靠在殿门边。"
+    shots = local_storyboard_shots(script, shot_count_hint=1)
+    refs = _all_refs(shots)
+    diagnostics = _all_diagnostics(shots)
+    graph = build_asset_graph(shots, source_text=script)
+    character_names = [ref["display_name"] for ref in refs if ref["asset_type"] == "character"]
+
+    assert character_names == ["唐僧", "白骨精"]
+    assert not any(ref.get("display_name") == "孙悟空" for ref in refs)
+    assert not any(ref.get("display_name") == "猪八戒" for ref in refs)
+    assert not any(ref.get("asset_type") == "prop" for ref in refs)
+    assert any(item["display_name"] == "孙悟空" and item["reason"] == "secondary_character_requires_manual_asset_entry" for item in diagnostics)
+    assert any(item["display_name"] == "金箍棒" and item["reason"] == "prop_requires_manual_asset_entry" for item in diagnostics)
+    assert graph["held_asset_ref_count"] >= 2
+
+
 def test_provider_asset_refs_pass_through_same_modality_gate() -> None:
     audio_payload = {
         "shots": [

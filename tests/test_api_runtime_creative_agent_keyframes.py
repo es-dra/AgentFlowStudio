@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -422,6 +424,75 @@ def test_async_keyframe_poll_safe_manifest_does_not_echo_provider_paths(tmp_path
     assert "codex_image_job" not in serialized
 
 
+def test_sync_keyframe_provider_can_continue_in_runtime_background(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setenv("AFS_KEYFRAME_BACKGROUND_SYNC_IMAGE", "true")
+
+    provider_started = threading.Event()
+    release_provider = threading.Event()
+
+    def fake_dispatch(capability, service_id, request):
+        provider_started.set()
+        if not release_provider.wait(5):
+            raise TimeoutError("background provider was not released")
+        output_dir = Path(request.output_dir)
+        image_dir = output_dir / "image_candidates"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        image_path = image_dir / "candidate_001.png"
+        image_path.write_bytes(PNG_BYTES)
+        return {
+            "outputs": [
+                {
+                    "candidate_id": "candidate_001",
+                    "image_path": "image_candidates/candidate_001.png",
+                    "byte_count": image_path.stat().st_size,
+                    "sha256": "fake-sha256",
+                    "width": 1,
+                    "height": 1,
+                    "aspect_ratio": "1:1",
+                }
+            ]
+        }
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+
+    request = {
+        "node_id": "image-node-background-sync-001",
+        "prompt_text": "A controlled background keyframe.",
+        "optimized_prompt": "A controlled background keyframe.",
+        "aspect_ratio": "9:16",
+        "candidate_count": 1,
+        "generated_at": "2026-07-08T18:20:00+00:00",
+    }
+    submitted = _submit_keyframe_with_preflight(client, "proj_keyframe_background_sync", request)
+    payload = submitted.json()
+    assert submitted.status_code == 200
+    assert payload["job"]["status"] == "running"
+    assert payload["candidate_previews"] == []
+    assert payload["provider_calls_started"] is True
+    assert provider_started.wait(2)
+
+    release_provider.set()
+    terminal = payload
+    for _ in range(40):
+        polled = client.post(
+            f"/projects/proj_keyframe_background_sync/keyframe-generations/{payload['job']['job_id']}/poll"
+        )
+        assert polled.status_code == 200
+        terminal = polled.json()
+        if terminal["job"]["status"] == "succeeded":
+            break
+        time.sleep(0.05)
+
+    assert terminal["job"]["status"] == "succeeded"
+    assert terminal["candidate_previews"][0]["candidate_id"] == "candidate_001"
+    assert terminal["reusable_image_assets"][0]["source_node_id"] == "image-node-background-sync-001"
+    serialized = json.dumps(terminal, ensure_ascii=False).lower()
+    assert "image_candidates/" not in serialized
+    assert "output_dir" not in serialized
+
+
 def test_uploaded_image_asset_can_be_deleted_from_project_runtime(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     upload = client.post(
@@ -598,6 +669,15 @@ def test_keyframe_generation_provider_timeout_returns_safe_block(tmp_path, monke
     assert manifest["status"] == "blocked"
     assert manifest["retry_count"] == 1
     assert manifest["blocks"][0]["block_id"] == "remote_image_provider_not_ready"
+    assert manifest["blocks"][0]["failure_class"] == "provider_timeout"
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    assert manifest["blocks"][0]["retry_count"] == 1
+    assert manifest["blocks"][0]["attempt_count"] == 2
+    assert manifest["provider_diagnostics"]["failure_class"] == "provider_timeout"
+    assert manifest["provider_diagnostics"]["provider_stage"] == "provider_request_read"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
     assert "timed out" in manifest["blocks"][0]["reason"]
 
 

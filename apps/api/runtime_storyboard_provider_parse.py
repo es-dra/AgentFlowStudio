@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from apps.api.runtime_asset_extraction import normalize_asset_refs_with_diagnostics
+from apps.api.runtime_asset_extraction import normalize_asset_refs_with_diagnostics, principal_asset_refs_with_diagnostics
 from apps.api.runtime_storyboard_grounding import (
     grounding_status_for_unsupported,
     storyboard_source_span,
@@ -80,6 +80,7 @@ def _normalize_provider_shot(item: Any, index: int, *, source_script_text: str =
             context=gate_context,
             include_inferred=True,
         )
+        refs, dropped_refs = principal_asset_refs_with_diagnostics(refs, dropped_refs)
     else:
         refs = fallback["asset_refs"]
         dropped_refs = list(fallback.get("dropped_asset_ref_diagnostics") or [])

@@ -173,6 +173,91 @@ def test_studio_state_preserves_generation_progress_and_safe_candidates(tmp_path
     assert params["candidatePreviewUrls"][0]["artifact_id"] == "artifact_safe_001"
 
 
+def test_studio_state_preserves_public_generation_and_model_context_summaries(tmp_path) -> None:
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    project_id = "studio-public-generation-summary"
+    client.post("/projects", json={"project_id": project_id, "goal": "Studio public summary state test"})
+    state = {
+        "nodes": {
+            "image_1": {
+                "id": "image_1",
+                "type": "image",
+                "title": "关键帧",
+                "status": "error",
+                "params": {
+                    "lastModelCallContextId": "mctx_public_001",
+                    "lastModelCallContextSummary": {
+                        "context_id": "mctx_public_001",
+                        "schema_version": "afs_model_call_context.v0.1",
+                        "operation_intent": "prompt_optimize",
+                        "generation_target": "prompt",
+                        "artifact": {"artifact_id": "artifact_mctx_001", "filename": "model_call_context.json"},
+                        "context_sources": {"context_bundle_present": True, "included_asset_count": 1},
+                        "asset_context": {"context_eligible_asset_count": 1, "draft_assets_enter_context": False},
+                        "reference_context": {"reference_image_count": 0},
+                        "provider_constraints": {"capability": "llm", "provider_gate": "AFS_ALLOW_REMOTE_LLM"},
+                        "trace_summary": {"warning_ids": ["w1"], "feedback_context_overlay_ids": ["ov1"]},
+                        "safety_boundary": {"no_provider_raw": True, "no_local_path": True, "no_media_bytes": True},
+                    },
+                    "lastGenerationManifest": {
+                        "status": "blocked",
+                        "batch_status": "failed",
+                        "stage": "provider_request_read",
+                        "failure_class": "provider_timeout",
+                        "output_count": 0,
+                        "reference_image_count": 0,
+                        "retry_count": 1,
+                        "provider_calls_started": True,
+                        "provider_diagnostics": {
+                            "provider_stage": "provider_request_read",
+                            "failure_class": "provider_timeout",
+                            "error_type": "ModelGatewayError",
+                            "reason": "API relay request timed out while reading provider result",
+                            "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                            "retry_count": 1,
+                            "attempt_count": 2,
+                            "provider_elapsed_ms": 244000.1,
+                        },
+                        "blocks": [
+                            {
+                                "block_id": "remote_image_provider_not_ready",
+                                "reason": "API relay request timed out while reading provider result",
+                                "required_gate": "AFS_ALLOW_REMOTE_IMAGE",
+                                "failure_class": "provider_timeout",
+                                "provider_stage": "provider_request_read",
+                                "retry_count": 1,
+                                "attempt_count": 2,
+                            }
+                        ],
+                    },
+                    "generationStatusDetail": "No complete output is available.",
+                    "generationBlockedReason": "API relay request timed out while reading provider result",
+                    "generationNextAction": "Retry failed items only.",
+                    "generationPolicyStatus": "failed",
+                    "generationSafeRefs": [{"label": "job", "value": "job_001"}],
+                },
+            }
+        },
+        "order": ["image_1"],
+    }
+
+    saved = client.put(f"/projects/{project_id}/studio-state", json={"state": state})
+
+    assert saved.status_code == 200
+    params = saved.json()["state"]["nodes"]["image_1"]["params"]
+    assert params["lastModelCallContextId"] == "mctx_public_001"
+    assert params["lastModelCallContextSummary"]["safety_boundary"]["no_provider_raw"] is True
+    assert params["lastModelCallContextSummary"]["trace_summary"]["warning_ids"] == ["w1"]
+    manifest = params["lastGenerationManifest"]
+    assert manifest["stage"] == "provider_request_read"
+    assert manifest["failure_class"] == "provider_timeout"
+    assert manifest["provider_diagnostics"]["attempt_count"] == 2
+    assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
+    serialized = str(params).lower()
+    assert "raw_provider_response_stored" not in serialized
+    assert "provider_raw_persisted" not in serialized
+
+
 def test_studio_state_rejects_secrets_local_paths_and_provider_raw(tmp_path) -> None:
     client = TestClient(create_runtime_app(runtime_root=tmp_path))
     project_id = "studio-state-unsafe"
