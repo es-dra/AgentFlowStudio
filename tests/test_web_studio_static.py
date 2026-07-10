@@ -113,6 +113,32 @@ def test_studio_has_homepage_navigation_and_account_session_surface() -> None:
     assert "首页" in topbar
 
 
+def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> None:
+    runtime_client = (STUDIO_ROOT / "src" / "runtime-client.js").read_text(encoding="utf-8")
+    runtime_status = (STUDIO_ROOT / "src" / "runtime-surface-status.js").read_text(encoding="utf-8")
+    main = (STUDIO_ROOT / "src" / "main.js").read_text(encoding="utf-8")
+    topbar = (STUDIO_ROOT / "src" / "studio-topbar.js").read_text(encoding="utf-8")
+    styles = _styles()
+
+    assert 'health()' in runtime_client
+    assert 'requestJson("/health")' in runtime_client
+    assert 'authStatus()' in runtime_client
+    assert "runtimeSurfaceStatus" in main
+    assert "refreshRuntimeSurfaceStatus" in main
+    assert "loadRuntimeSurfaceStatus(runtimeClient" in main
+    assert "runtime.health()" in runtime_status
+    assert "runtime.authStatus()" in runtime_status
+    assert "providerGateSummary" in runtime_status
+    assert "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed." in runtime_status
+    assert "runtimeSurfaceStatus" in topbar
+    assert "runtimeStatusBadge" in topbar
+    assert "safeRuntimeStatusState" in topbar
+    assert "runtime-status-badge" in topbar
+    assert "data-state" in topbar or "dataset.state" in topbar
+    assert ".runtime-status-badge.ready" in styles
+    assert ".runtime-status-badge.unavailable" in styles
+
+
 def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
     store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
 
