@@ -12,18 +12,20 @@ export function buildNodeBody(node, def, store = null) {
   if (node.collapsed) return out;
   const carry = carryChainView(node);
   if (carry) out.push(carry);
-  if (node.type === "director") return directorBody(node, def);
-  if (node.status === "generating") return generationBody(node);
-  if (node.status === "cancelled") return cancelledBody(node);
-  if (node.status === "partial") return partialBody(node);
-  if (node.type === "image" && node.status === "complete" && node.previewUrl) return completeBody(node);
-  if (node.status === "complete" && node.result) return completeBody(node);
-  if (node.status === "error") return errorBody(node);
+  if (node.type === "director") return withCreativeRuntimeContract(node, directorBody(node, def));
+  if (node.status === "generating") return withCreativeRuntimeContract(node, generationBody(node));
+  if (node.status === "cancelled") return withCreativeRuntimeContract(node, cancelledBody(node));
+  if (node.status === "partial") return withCreativeRuntimeContract(node, partialBody(node));
+  if (node.type === "image" && node.status === "complete" && node.previewUrl) {
+    return withCreativeRuntimeContract(node, completeBody(node));
+  }
+  if (node.status === "complete" && node.result) return withCreativeRuntimeContract(node, completeBody(node));
+  if (node.status === "error") return withCreativeRuntimeContract(node, errorBody(node));
   if (node.content) {
     out.push(contentBlock(node, store));
-    return out;
+    return withCreativeRuntimeContract(node, out);
   }
-  return emptyBody(node, def);
+  return withCreativeRuntimeContract(node, emptyBody(node, def));
 }
 
 export function candidatePreviews(node) {
@@ -76,6 +78,7 @@ export function nodeBodySignature(node) {
     generationProgress(node)?.percent ?? "",
     node.params?.visualAssets?.length || 0,
     node.params?.lastContextBundle?.included_assets?.length || 0,
+    node.params?.lastCreativeRuntimeContractSummary?.contract_id || "",
     carryChainItems(node).map((asset) => `${asset.asset_id || asset.assetId || ""}:${assetCarryState(asset)}`).join(","),
     node.type,
     node.collapsed ? 1 : 0,
@@ -148,6 +151,77 @@ function contentBlock(node, store) {
   view.className = `text-content-view${expanding ? " content-shimmer" : ""}`;
   view.textContent = node.content;
   return view;
+}
+
+function withCreativeRuntimeContract(node, items) {
+  const contract = creativeRuntimeContractSummary(node);
+  return contract ? [...items, contract] : items;
+}
+
+function creativeRuntimeContractSummary(node) {
+  const summary = node.params?.lastCreativeRuntimeContractSummary
+    || node.params?.promptOptimizationState?.creative_runtime_contract_summary;
+  if (!summary?.contract_id) return null;
+  const provider = safeSummaryObject(summary.provider_context);
+  const knowledge = safeSummaryObject(summary.knowledge_context);
+  const assets = safeSummaryObject(summary.asset_context);
+  const modelContext = safeSummaryObject(summary.model_call_context);
+  const artifact = safeSummaryObject(summary.artifact);
+  const box = document.createElement("details");
+  box.className = "creative-runtime-contract-summary";
+
+  const header = document.createElement("summary");
+  header.innerHTML = [
+    `<span>${icon("sparkles", 12)}</span>`,
+    `<strong>Creative contract</strong>`,
+    `<small>${escapeHtml(summary.operation || "runtime")} / ${escapeHtml(provider.required_gate || "gate pending")}</small>`,
+  ].join("");
+  box.appendChild(header);
+
+  const detail = document.createElement("div");
+  detail.className = "creative-runtime-contract-detail";
+  appendContractChip(detail, "contract", shortRef(summary.contract_id));
+  appendContractChip(detail, "model", shortRef(modelContext.context_id || summary.evidence_context?.model_call_context_id));
+  appendContractChip(detail, "provider", provider.provider_calls_started ? "started" : "not started");
+  appendContractChip(detail, "gate", [provider.required_gate, provider.gate_status].filter(Boolean).join(" / "));
+  appendContractChip(detail, "rules", safeCount(knowledge.rule_count));
+  appendContractChip(detail, "assets", [
+    `fixed ${safeCount(assets.fixed_asset_count)}`,
+    `draft ${safeCount(assets.draft_asset_count)}`,
+    `unresolved ${safeCount(assets.unresolved_asset_count)}`,
+  ].join(" / "));
+  appendContractChip(detail, "artifact", artifact.filename || "summary only");
+  appendContractChip(detail, "non-claims", safeArray(summary.non_claims).length);
+  box.appendChild(detail);
+
+  return box;
+}
+
+function appendContractChip(parent, label, value) {
+  const chip = document.createElement("span");
+  chip.className = "creative-runtime-contract-chip";
+  chip.textContent = `${label}: ${value === 0 ? "0" : String(value || "none")}`;
+  parent.appendChild(chip);
+}
+
+function safeSummaryObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function safeCount(value) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+}
+
+function shortRef(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= 18) return text;
+  return `${text.slice(0, 10)}...${text.slice(-6)}`;
 }
 
 function editableContentBlock(node, store, expanding) {

@@ -491,6 +491,9 @@ export function normalizeOptimization(result, request) {
   if (!userPrompt && !userSections.length) throw new Error("运行服务未返回用户版优化结果");
   const sections = userSections.map((s) => ({ name: s.title || s.name, text: s.text }));
   const modelCallContextId = String(result?.model_call_context_id || result?.model_call_context_summary?.context_id || "").trim();
+  const creativeRuntimeContractId = String(
+    result?.creative_runtime_contract_id || result?.creative_runtime_contract_summary?.contract_id || "",
+  ).trim();
   return {
     source: "runtime",
     original: result?.original_prompt || request.prompt_text,
@@ -501,6 +504,11 @@ export function normalizeOptimization(result, request) {
     context_bundle: result?.context_bundle || null,
     model_call_context_id: modelCallContextId,
     model_call_context_summary: normalizeModelCallContextSummary(result?.model_call_context_summary, modelCallContextId),
+    creative_runtime_contract_id: creativeRuntimeContractId,
+    creative_runtime_contract_summary: normalizeCreativeRuntimeContractSummary(
+      result?.creative_runtime_contract_summary,
+      creativeRuntimeContractId,
+    ),
   };
 }
 
@@ -550,6 +558,55 @@ export function normalizeModelCallContextSummary(summary, fallbackContextId = ""
       no_media_bytes: Boolean(safetyBoundary.no_media_bytes),
       feedback_is_not_memory: Boolean(safetyBoundary.feedback_is_not_memory),
       draft_assets_are_not_context_truth: Boolean(safetyBoundary.draft_assets_are_not_context_truth),
+    },
+    non_claims: safeSummaryRefs(source.non_claims),
+  };
+}
+
+export function normalizeCreativeRuntimeContractSummary(summary, fallbackContractId = "") {
+  const source = safeSummaryObject(summary);
+  const contractId = String(source.contract_id || fallbackContractId || "").trim();
+  if (!contractId) return null;
+  const memoryContext = safeSummaryObject(source.memory_context);
+  const knowledgeContext = safeSummaryObject(source.knowledge_context);
+  const assetContext = safeSummaryObject(source.asset_context);
+  const modelCallContext = safeSummaryObject(source.model_call_context);
+  const providerContext = safeSummaryObject(source.provider_context);
+  const evidenceContext = safeSummaryObject(source.evidence_context);
+  return {
+    contract_id: contractId,
+    schema_version: String(source.schema_version || ""),
+    operation: String(source.operation || ""),
+    generation_target: String(source.generation_target || ""),
+    artifact: safeArtifactRef(source.artifact),
+    memory_context: {
+      project_memory_count: safeSummaryCount(memoryContext.project_memory_count),
+      user_preference_count: safeSummaryCount(memoryContext.user_preference_count),
+      promotion_candidates_only: Boolean(memoryContext.promotion_candidates_only),
+    },
+    knowledge_context: {
+      rule_count: safeSummaryCount(knowledgeContext.rule_count),
+      director_scenario_count: safeSummaryCount(knowledgeContext.director_scenario_count),
+      registry_hash: String(knowledgeContext.registry_hash || ""),
+    },
+    asset_context: {
+      fixed_asset_count: safeSummaryCount(assetContext.fixed_asset_count),
+      draft_asset_count: safeSummaryCount(assetContext.draft_asset_count),
+      unresolved_asset_count: safeSummaryCount(assetContext.unresolved_asset_count),
+    },
+    model_call_context: {
+      context_id: String(modelCallContext.context_id || ""),
+      schema_version: String(modelCallContext.schema_version || ""),
+    },
+    provider_context: {
+      capability: String(providerContext.capability || ""),
+      required_gate: String(providerContext.required_gate || ""),
+      gate_status: String(providerContext.gate_status || ""),
+      provider_calls_started: Boolean(providerContext.provider_calls_started),
+    },
+    evidence_context: {
+      model_call_context_id: String(evidenceContext.model_call_context_id || ""),
+      safe_manifest_ref: String(evidenceContext.safe_manifest_ref || ""),
     },
     non_claims: safeSummaryRefs(source.non_claims),
   };

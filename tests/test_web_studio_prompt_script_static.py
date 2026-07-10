@@ -17,6 +17,11 @@ def test_prompt_optimization_is_inline_and_selection_safe() -> None:
     assert 'store.get().nodes[nodeId]' in optimizer
     assert "connectNamedAssetToTarget" in optimizer
     assert "buildAssetReferenceActions" in optimizer
+    assert "lastCreativeRuntimeContractSummary" in optimizer
+    assert "creative_runtime_contract_summary" in optimizer
+    assert "normalizeCreativeRuntimeContractSummary" in (STUDIO_ROOT / "src" / "optimizer-contract.js").read_text(encoding="utf-8")
+    assert "creativeRuntimeContractSummary" in (STUDIO_ROOT / "src" / "canvas-node-body.js").read_text(encoding="utf-8")
+    assert "creative-runtime-contract-summary" in styles
     assert "prompt-shimmer" in prompt_bar
     assert "syncPromptBarState" in prompt_bar
     assert "promptTextShimmer" in styles
@@ -103,6 +108,50 @@ await openOptimizer(store, {
         },
         non_claims: ["not_provider_execution"],
       },
+      creative_runtime_contract_id: "crtc_prompt_text_001",
+      creative_runtime_contract_summary: {
+        contract_id: "crtc_prompt_text_001",
+        schema_version: "afs_creative_runtime_contract.v0.1",
+        operation: "prompt_optimization",
+        generation_target: "prompt",
+        artifact: {
+          artifact_id: "runs-proj-job-creative_runtime_contract",
+          artifact_type: "text_artifact",
+          filename: "creative_runtime_contract.json",
+          role: "creative_runtime_contract",
+          media_type: "application/json",
+        },
+        memory_context: {
+          project_memory_count: 0,
+          user_preference_count: 0,
+          promotion_candidates_only: true,
+        },
+        knowledge_context: {
+          rule_count: 3,
+          director_scenario_count: 0,
+          registry_hash: "kb_hash_001",
+        },
+        asset_context: {
+          fixed_asset_count: 1,
+          draft_asset_count: 0,
+          unresolved_asset_count: 0,
+        },
+        model_call_context: {
+          context_id: "mctx_prompt_text_001",
+          schema_version: "afs_model_call_context.v0.1",
+        },
+        provider_context: {
+          capability: "llm",
+          required_gate: "AFS_ALLOW_REMOTE_LLM",
+          gate_status: "blocked",
+          provider_calls_started: false,
+        },
+        evidence_context: {
+          model_call_context_id: "mctx_prompt_text_001",
+          safe_manifest_ref: "prompt_optimization_safe_manifest.json",
+        },
+        non_claims: ["not_provider_execution", "not_generated_media_qa", "not_human_acceptance"],
+      },
     };
   },
 }, "text_1", null, textarea);
@@ -117,6 +166,11 @@ process.stdout.write(JSON.stringify({
   stateModelContextId: state.nodes.text_1.params.promptOptimizationState.model_call_context_id,
   modelContextEligibleAssets: state.nodes.text_1.params.lastModelCallContextSummary.asset_context.context_eligible_asset_count,
   modelContextArtifact: state.nodes.text_1.params.lastModelCallContextSummary.artifact.filename,
+  contractId: state.nodes.text_1.params.lastCreativeRuntimeContractId,
+  stateContractId: state.nodes.text_1.params.promptOptimizationState.creative_runtime_contract_id,
+  contractArtifact: state.nodes.text_1.params.lastCreativeRuntimeContractSummary.artifact.filename,
+  contractProviderCallsStarted: state.nodes.text_1.params.lastCreativeRuntimeContractSummary.provider_context.provider_calls_started,
+  contractNonClaims: state.nodes.text_1.params.lastCreativeRuntimeContractSummary.non_claims,
   lastContextBundlePresent: Boolean(state.nodes.text_1.params.lastContextBundle),
   signatureChanged: beforeSignature !== afterSignature,
 }));
@@ -139,6 +193,11 @@ process.stdout.write(JSON.stringify({
     assert payload["stateModelContextId"] == "mctx_prompt_text_001"
     assert payload["modelContextEligibleAssets"] == 1
     assert payload["modelContextArtifact"] == "model_call_context.json"
+    assert payload["contractId"] == "crtc_prompt_text_001"
+    assert payload["stateContractId"] == "crtc_prompt_text_001"
+    assert payload["contractArtifact"] == "creative_runtime_contract.json"
+    assert payload["contractProviderCallsStarted"] is False
+    assert "not_human_acceptance" in payload["contractNonClaims"]
     assert payload["lastContextBundlePresent"] is True
     assert payload["signatureChanged"] is True
 
@@ -239,6 +298,16 @@ const snapshot = normalizeSnapshot({
           }],
         },
         generationBlockedReason: "provider_raw_persisted false should not reach persistence",
+        lastCreativeRuntimeContractSummary: {
+          contract_id: "crtc_safe_summary",
+          artifact: { filename: "creative_runtime_contract.json" },
+          provider_context: {
+            required_gate: "AFS_ALLOW_REMOTE_LLM",
+            provider_calls_started: false,
+            provider_raw_response: { unsafe: true },
+          },
+          non_claims: ["not_provider_execution", "not_human_acceptance"],
+        },
       },
     },
   },
@@ -280,6 +349,116 @@ process.stdout.write(JSON.stringify(snapshot));
     assert manifest["blocks"][0]["provider_stage"] == "provider_request_read"
     assert manifest["provider_diagnostics"]["attempt_count"] == 2
     assert "provider-response-redacted" in payload["nodes"]["text_1"]["params"]["generationBlockedReason"]
+    contract = payload["nodes"]["text_1"]["params"]["lastCreativeRuntimeContractSummary"]
+    assert contract["contract_id"] == "crtc_safe_summary"
+    assert contract["artifact"]["filename"] == "creative_runtime_contract.json"
+    assert contract["provider_context"]["provider_calls_started"] is False
+    assert "provider_raw_response" not in json.dumps(contract, ensure_ascii=False)
+
+
+def test_creative_runtime_contract_summary_renders_for_content_and_prompt_nodes() -> None:
+    script = r'''
+import { buildNodeBody } from "./apps/studio/src/canvas-node-body.js";
+
+function makeElement(tagName) {
+  const element = {
+    tagName: String(tagName || "").toUpperCase(),
+    children: [],
+    dataset: {},
+    style: {},
+    className: "",
+    title: "",
+    value: "",
+    placeholder: "",
+    disabled: false,
+    textContent: "",
+    innerHTML: "",
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    addEventListener() {},
+  };
+  Object.defineProperty(element, "innerText", {
+    get() {
+      const own = [this.textContent, String(this.innerHTML || "").replace(/<[^>]+>/g, " ")]
+        .filter(Boolean)
+        .join(" ");
+      return [own, ...this.children.map((child) => child.innerText || child.textContent || "")]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    },
+  });
+  return element;
+}
+
+globalThis.document = { createElement: makeElement };
+
+const summary = {
+  contract_id: "crtc_prompt_text_001",
+  schema_version: "afs_creative_runtime_contract.v0.1",
+  operation: "prompt_optimization",
+  generation_target: "prompt",
+  artifact: { filename: "creative_runtime_contract.json" },
+  memory_context: { project_memory_count: 0, user_preference_count: 0, promotion_candidates_only: true },
+  knowledge_context: { rule_count: 3, director_scenario_count: 0, registry_hash: "kb_hash_001" },
+  asset_context: { fixed_asset_count: 1, draft_asset_count: 0, unresolved_asset_count: 0 },
+  model_call_context: { context_id: "mctx_prompt_text_001", schema_version: "afs_model_call_context.v0.1" },
+  provider_context: {
+    capability: "llm",
+    required_gate: "AFS_ALLOW_REMOTE_LLM",
+    gate_status: "blocked",
+    provider_calls_started: false,
+    provider_raw_response: { unsafe: true },
+  },
+  evidence_context: {
+    model_call_context_id: "mctx_prompt_text_001",
+    safe_manifest_ref: "prompt_optimization_safe_manifest.json",
+  },
+  non_claims: ["not_provider_execution", "not_generated_media_qa", "not_human_acceptance"],
+};
+
+const textNode = {
+  id: "text_1",
+  type: "text",
+  content: "Optimized text",
+  prompt: "Optimized text",
+  status: "complete",
+  params: { lastCreativeRuntimeContractSummary: summary },
+};
+const imageNode = {
+  id: "image_1",
+  type: "image",
+  prompt: "Optimized image prompt",
+  status: "empty",
+  params: { lastCreativeRuntimeContractSummary: summary },
+};
+
+const textRendered = buildNodeBody(textNode, { icon: "text", intents: [] }, null).map((part) => part.innerText).join(" ");
+const imageRendered = buildNodeBody(imageNode, { icon: "image", intents: [] }, null).map((part) => part.innerText).join(" ");
+process.stdout.write(JSON.stringify({ textRendered, imageRendered }));
+'''
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-e", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    payload = json.loads(completed.stdout)
+
+    for rendered in (payload["textRendered"], payload["imageRendered"]):
+        assert "Creative contract" in rendered
+        assert "prompt_optimization / AFS_ALLOW_REMOTE_LLM" in rendered
+        assert "provider: not started" in rendered
+        assert "gate: AFS_ALLOW_REMOTE_LLM / blocked" in rendered
+        assert "rules: 3" in rendered
+        assert "assets: fixed 1 / draft 0 / unresolved 0" in rendered
+        assert "artifact: creative_runtime_contract.json" in rendered
+        assert "non-claims: 3" in rendered
+        assert "provider_raw_response" not in rendered
 
 
 def test_text_node_has_script_import_expand_and_breakdown_controls() -> None:
