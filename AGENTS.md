@@ -94,6 +94,10 @@ Scale-up rules:
   deletion risk, or quality-claim work, add an evaluator gate before closeout.
 - For multi-surface work, maintain a compact integration queue instead of
   creating new long-running ledgers.
+- For release or runtime work, use a separate Release Lane. Updating `/opt` or
+  another deploy checkout is not enough: the managed process must be restarted
+  or reloaded through its service manager, and a fresh runtime health/process
+  check must prove that the target commit is loaded.
 
 If the working tree already contains a broad uncommitted cleanup, either finish
 and integrate that cleanup first or isolate the new task in a fresh worktree.
@@ -166,6 +170,11 @@ Long historical ledgers and handoff archives are not active state. Delete them
 from the working tree when replacement contracts or Git history are sufficient.
 Do not keep noisy documents merely because they once supported a loop.
 
+Do not resurrect `DEVLOG.md`, `TASK_TRACKER.md`, `docs/handoff/INDEX.md`, or a
+retired handoff archive to satisfy a worker habit or resolve a rebase conflict.
+Use the PR body, thread closeout, and focused current state/program documents
+unless a task-specific audit reason proves a durable repo record is required.
+
 ## Verification
 
 Choose verification by blast radius. Common commands:
@@ -177,6 +186,20 @@ Choose verification by blast radius. Common commands:
 .\.venv\Scripts\python.exe tools\maintenance_audit.py
 git diff --check
 ```
+
+For release/runtime freshness claims, also verify:
+
+```powershell
+git -C <deploy-checkout> rev-parse HEAD
+systemctl status <service> --no-pager
+ss -ltnp | Select-String "8790|8791|8792"
+curl -fsS http://127.0.0.1:8790/health
+```
+
+If service restart requires an unavailable sudo or service-manager capability,
+record `deploy_dir_updated` plus `runtime_stale`; do not claim delivery and do
+not bypass systemd by killing the process unless the task explicitly authorizes
+that emergency route.
 
 For COS/GFR projection work, also use the current `10-Startup` audit:
 

@@ -114,6 +114,35 @@ runtime health and auth boundary
 This document does not contain a fresh server, GitHub, provider, or runtime
 health check.
 
+## Release Lane
+
+Runtime release is a separate lane from implementation. Use this state chain
+for AFS server work:
+
+```text
+intent_authorized
+-> capability_checked
+-> branch_integrated
+-> local_verified
+-> pushed_pr
+-> ci_pending
+-> ci_green
+-> deploy_dir_updated
+-> service_restart_required
+-> runtime_freshness_verified
+-> delivered
+```
+
+If `/opt/afs/AgentFlowStudio` is updated to a target commit but
+`afs-runtime.service` is not restarted, the state is `deploy_dir_updated` plus
+`runtime_stale`. Do not claim the user is running the new code until a fresh
+process/health check proves the service loaded the target commit.
+
+Server write authorization is not the same as available capability. If
+`systemctl restart afs-runtime.service` requires an unavailable sudo password,
+stop in `service_restart_required` and route the exact restart command plus
+post-restart evidence to the human operator.
+
 ## Current Drift Risks
 
 Treat these as known drift classes until a fresh Runtime Surface Vector proves
@@ -124,7 +153,11 @@ otherwise:
 - server `/opt` main runtime and `/home` working surfaces can diverge;
 - `/test` worktrees or processes can remain active;
 - provider gates can be closed while docs imply provider readiness;
-- governance docs can update while runtime state remains stale.
+- governance docs can update while runtime state remains stale;
+- deploy checkout can be fresh while the managed runtime process still runs old
+  code;
+- a user can authorize restart while the active agent lacks non-interactive
+  sudo or service-manager capability.
 
 ## Default Verification
 

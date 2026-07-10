@@ -16,7 +16,7 @@ Studio 只消费 `context_id`、safe summary 和 artifact ref。
 | write scope | `agentflow/algorithms/`, `apps/api/`, `tests/`, `docs/architecture/`, current project records |
 | non-goals | SaaS 化、live provider smoke、human acceptance、business validation、durable memory promotion |
 | provider gates | 全部默认关闭；本契约不授权任何 provider call |
-| evidence | deterministic tests, safe artifacts, handoff, DEVLOG/TASK_TRACKER |
+| evidence | deterministic tests, safe artifacts, PR body or focused current program state |
 | feedback route | repo 记录执行投影；COS 只走 candidate/limited，不自动 active |
 
 ## 契约定位
