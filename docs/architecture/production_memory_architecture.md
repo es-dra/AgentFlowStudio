@@ -1,56 +1,34 @@
-# Production Memory 架构
+# Production Memory 遗留契约索引
 
-本文是 Production Memory 遗产层的短索引。它不再是当前 Studio MVP 主线，也不再提供默认可见 CLI 产品入口；详细事实以代码、contract example、测试和本地内测 runbook 为准。
+Production Memory 是已退役的 legacy contract island。它不是当前 Studio MVP
+路径，不暴露为可见或隐藏 CLI 产品面，也不是新任务启动上下文。
 
-## 目标
+本文件只保留一个狭窄职责：给仍在 static contract registry 中登记的
+Production Memory 示例提供 `doc_path` 锚点。剩余库代码、示例和 legacy 测试
+需要在后续独立瘦身 lane 中整体退休。
 
-把一次内容生产 run 中的证据、反馈、候选、晋升决策和上下文投影组织成可审计闭环：
-
-```text
-Round 1 package
-  -> tester feedback
-  -> update candidate
-  -> promotion decision / profile version
-  -> context projection
-  -> Round 2 package
-  -> consistency review
-  -> before/after report
-```
-
-## 遗产实现入口
+## 遗留代码面
 
 ```text
 agentflow/memory/
-apps/cli/production_memory_command_registry.py  # hidden compatibility only
 examples/agentflow/production_memory_loop.example.json
-docs/local_internal_test_runbook.md
+examples/agentflow/*asset*.example.json
 ```
 
-## 关键对象
+旧 `apps/cli/production_memory_*` 命令面已经退休。历史 local runbook 和
+per-asset-profile 文档已从当前树删除。
 
-- `agentflow_production_memory_loop`
-- `agentflow_production_memory_asset_profile`
-- `agentflow_production_memory_asset_feedback_event`
-- `agentflow_production_memory_asset_profile_update_candidate`
-- `agentflow_production_memory_asset_profile_promotion_decision`
-- `agentflow_production_memory_asset_profile_version`
-- `agentflow_production_memory_asset_profile_context_projection`
-- `agentflow_production_memory_asset_consistency_review`
-- `agentflow_project_manifest`
+## 边界
 
-## 强边界
+- candidate memory 不是 durable memory。
+- feedback 是 evidence，不是 memory。
+- asset reuse 必须有显式 promotion decision。
+- context reuse 不得写入 long-term memory。
+- 这些 contract 不授权 provider call。
+- runtime verification、provider smoke、human acceptance、business validation
+  和 CompanyOS/COS active-rule promotion 都是独立证据层。
 
-- feedback 是 raw evidence，不是 memory。
-- candidate 不是 durable memory。
-- blocked refs 必须保留原因，并且不能进入下一轮 context。
-- provider 默认关闭，必须显式 gate。
-- 运行验证不是 human acceptance。
-- provider smoke 不是 business validation。
-- AFS 不写 `10-Startup` / Company KB active rule。
+## 后续退休 lane
 
-## 相关文档
-
-- `docs/architecture/production_memory_asset_profiles.md`
-- `docs/local_internal_test_runbook.md`
-- `docs/project_manifest_contract.md`
-- `docs/architecture/AFS_STUDIO_FRONTEND_ARCHITECTURE_V1.zh-CN.md`
+后续可以在替换或删除 static contract audit 中仍指向本文件的 registry 条目后，
+删除 `agentflow/memory`、相关 legacy tests 和 Production Memory examples。

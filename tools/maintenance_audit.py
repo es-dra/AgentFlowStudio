@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import re
 from dataclasses import dataclass
@@ -13,9 +12,6 @@ try:
     from tools.maintenance_audit_policy import (
         ARTIFACT_TYPE,
         DEFAULT_EXCLUDE_DIRS,
-        HISTORICAL_DOC_GLOBS,
-        HISTORICAL_DOC_PREFIXES,
-        HISTORICAL_SUMMARY_PATH,
         LEGACY_FROZEN_PREFIXES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
@@ -27,9 +23,6 @@ except ModuleNotFoundError:
     from maintenance_audit_policy import (  # type: ignore[no-redef]
         ARTIFACT_TYPE,
         DEFAULT_EXCLUDE_DIRS,
-        HISTORICAL_DOC_GLOBS,
-        HISTORICAL_DOC_PREFIXES,
-        HISTORICAL_SUMMARY_PATH,
         LEGACY_FROZEN_PREFIXES,
         LEGACY_COMPANY_PATTERNS,
         SCHEMA_VERSION,
@@ -159,14 +152,10 @@ def _is_legacy_frozen_path(root: Path, path: Path) -> bool:
 
 def _check_chinese_doc_coverage(root: Path, files: list[Path], file_states: dict[str, str]) -> dict[str, Any]:
     findings: list[Finding] = []
-    exempted_historical = 0
     doc_files = [path for path in files if path.suffix.lower() == ".md"]
     for path in doc_files:
         text = _read_text(path)
         if _is_machine_or_archive_doc(path):
-            continue
-        if _is_historical_doc_with_summary(root, path):
-            exempted_historical += 1
             continue
         if _chinese_ratio(text) < 0.08:
             findings.append(_finding(root, path, "human-facing Markdown is not substantially Chinese", file_states))
@@ -174,8 +163,6 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path], file_states: dict
     return {
         **_check("human_doc_chinese_coverage", status, findings[:80]),
         "total_markdown_files": len(doc_files),
-        "historical_summary_path": HISTORICAL_SUMMARY_PATH,
-        "historical_docs_exempted_count": exempted_historical,
         "warning_limit_applied": len(findings) > 80,
     }
 
@@ -183,7 +170,7 @@ def _check_chinese_doc_coverage(root: Path, files: list[Path], file_states: dict
 def _check_oversized_files(root: Path, files: list[Path], file_states: dict[str, str]) -> dict[str, Any]:
     findings = []
     for path in files:
-        if _is_machine_or_archive_doc(path) or _is_historical_doc_with_summary(root, path):
+        if _is_machine_or_archive_doc(path):
             continue
         line_count = sum(1 for _ in _read_lines(path))
         if line_count > 300:
@@ -269,18 +256,6 @@ def _strip_machine_contract_text(text: str) -> str:
 def _is_machine_or_archive_doc(path: Path) -> bool:
     normalized = path.as_posix().lower()
     return "/archive/" in normalized or "/tests/fixtures/" in normalized or normalized.endswith(".example.md")
-
-
-def _is_historical_doc_with_summary(root: Path, path: Path) -> bool:
-    summary_path = root / HISTORICAL_SUMMARY_PATH
-    if not summary_path.exists():
-        return False
-    relative = _rel(root, path)
-    if relative == HISTORICAL_SUMMARY_PATH:
-        return False
-    if any(relative.startswith(prefix) for prefix in HISTORICAL_DOC_PREFIXES):
-        return True
-    return any(fnmatch.fnmatch(relative, pattern) for pattern in HISTORICAL_DOC_GLOBS)
 
 
 def _git_state(root: Path, path: Path, file_states: dict[str, str]) -> str:

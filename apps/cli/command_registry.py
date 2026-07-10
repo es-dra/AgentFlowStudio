@@ -7,7 +7,6 @@ import typer
 from apps.cli.auth_invite_commands import auth_invites_app
 from apps.cli.media_commands import ffmpeg_check_command
 from apps.cli.memory_review_command import memory_evidence_reuse_review_command
-from apps.cli.production_memory_command_registry import register_production_memory_commands
 from apps.cli.real_slicing_commands import slice_real_command
 from apps.cli.runtime_backup_commands import runtime_backup_app
 from apps.cli.runtime_service_command import runtime_service_command, runtime_service_openapi_export_command
@@ -24,7 +23,6 @@ def register_product_commands(app: typer.Typer) -> None:
     app.command(name="inspect-run")(inspect_run_command)
     app.command(name="review-run")(review_run_command)
     app.command(name="memory-evidence-reuse-review")(memory_evidence_reuse_review_command)
-    register_production_memory_commands(app)
     app.command(name="runtime-service")(runtime_service_command)
     app.command(name="runtime-service-openapi-export")(runtime_service_openapi_export_command)
     app.add_typer(runtime_backup_app, name="runtime-backup")

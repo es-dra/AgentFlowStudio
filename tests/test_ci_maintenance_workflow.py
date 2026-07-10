@@ -13,7 +13,7 @@ def test_github_maintenance_workflow_exists_with_required_gates() -> None:
     assert 'python -m pip install -e ".[dev]"' in source
     assert "python -m apps.cli.main --help" in source
     assert "python -m apps.cli.main version" in source
-    assert "python tools/maintenance_audit.py" in source
+    assert "python tools/maintenance_audit.py --fail-on failed" in source
     assert "python -m pytest" in source
     assert "git diff --check" in source
 

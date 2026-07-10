@@ -44,7 +44,8 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "memory-advantage-demo-012" not in source
     assert "memory-advantage-demo-015" not in source
     assert "memory_video_pipeline_command" not in source
-    assert "register_production_memory_commands" in source
+    assert "register_production_memory_commands" not in source
+    assert "production_memory_command_registry" not in source
     assert "runtime-service" in source
     assert "runtime-service-openapi-export" in source
     assert "runtime_backup_app" in source
@@ -55,22 +56,8 @@ def test_product_command_registry_has_no_direct_provider_or_demo_registrations()
     assert "production-memory-loop-record-action-result-acceptance-feedback" not in source
 
 
-def test_production_memory_registry_is_hidden_compatibility_only() -> None:
-    source = PRODUCTION_MEMORY_REGISTRY.read_text(encoding="utf-8")
-
-    assert "hidden compatibility only" in source
-    assert "production-memory-loop-asset-profile-readiness" in source
-    assert "production-memory-loop-run-asset-test-package" in source
-    assert "production-memory-loop-record-asset-feedback" in source
-    assert "production-memory-loop-run-real-asset-test-harness" in source
-    assert "production-memory-loop-two-round-context-runtime-validation" in source
-    assert "production-memory-loop-provider-validation-gate" in source
-    assert "production-memory-loop-next-operator-start-packet" in source
-    assert "production-memory-loop-record-next-operator-action-result" in source
-    assert "production-memory-loop-record-action-result-acceptance-feedback" in source
-    assert "_hidden(app" in source
-    assert "hidden=True" in source
-    assert "_visible(app" not in source
+def test_production_memory_registry_is_retired_not_hidden() -> None:
+    assert not PRODUCTION_MEMORY_REGISTRY.exists()
 
 
 def test_default_help_excludes_production_memory_legacy_surface() -> None:
@@ -220,11 +207,11 @@ def test_runtime_backup_cli_excludes_codex_home_by_default(tmp_path) -> None:
     assert "runtime_root/codex-home/auth.json" not in names
 
 
-def test_hidden_production_memory_support_commands_remain_callable() -> None:
+def test_hidden_production_memory_support_commands_are_retired() -> None:
     result = CliRunner().invoke(app, ["production-memory-loop-record-next-operator-action-result", "--help"])
 
-    assert result.exit_code == 0
-    assert "recorded-at" in ANSI_ESCAPE_RE.sub("", result.output)
+    assert result.exit_code != 0
+    assert "No such command" in ANSI_ESCAPE_RE.sub("", result.output)
 
 
 def test_support_command_registry_noop_wrapper_is_removed() -> None:

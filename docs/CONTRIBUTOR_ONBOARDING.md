@@ -41,10 +41,13 @@ Start from:
 AGENTS.md
 docs/company_operating_model.md
 docs/GFR_EXECUTION_PROJECTION.md
+docs/AOS_CURRENT_STATE.md
 docs/README.md
-TASK_TRACKER.md
-docs/handoff/INDEX.md
 ```
+
+Historical trackers, devlogs, and handoff archives are not startup context. Use
+Git history or a targeted restored reference only when a task needs specific
+historical evidence. Do not make old loop records the default read scope.
 
 For software engineering standards, also read the installed CompanyOS docs:
 
@@ -111,6 +114,5 @@ If a command cannot run, record why and state the residual risk.
 ## Feedback To CompanyOS
 
 Reusable process lessons should become feedback candidates, not automatic
-Company OS rules. Put project-local evidence in AFS docs or handoffs first;
+Company OS rules. Put project-local evidence in focused current AFS docs first;
 maintainers decide what moves back to private COS or public CompanyOS.
-

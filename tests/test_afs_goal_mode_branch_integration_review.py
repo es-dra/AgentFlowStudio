@@ -16,18 +16,18 @@ def test_branch_integration_review_allows_known_demo_docs_untracked() -> None:
         base_is_ancestor=True,
         status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n?? docs/demo-docs-20260629/\n",
         changed_files=[
-            "docs/handoff/AFS-PROVIDER-SMOKE-READINESS-GATE-20260630.md",
-            "docs/handoff/INDEX.md",
+            "docs/AOS_CURRENT_STATE.md",
+            "docs/architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md",
             "tools/afs_provider_connected_validation_readiness.py",
         ],
-        handoff_index_text="- `AFS-PROVIDER-SMOKE-READINESS-GATE-20260630.md`\n",
+        handoff_index_text="",
         allowed_untracked=("docs/demo-docs-20260629/",),
     )
 
     assert blockers == []
 
 
-def test_branch_integration_review_blocks_missing_handoff_index_entry() -> None:
+def test_branch_integration_review_blocks_legacy_handoff_path_changes() -> None:
     blockers = build_branch_integration_blockers(
         branch="codex/afs-project-book-full-goal-20260630",
         expected_branch_prefix="codex/",
@@ -45,8 +45,9 @@ def test_branch_integration_review_blocks_missing_handoff_index_entry() -> None:
 
     assert blockers == [
         {
-            "block_id": "handoff_index_missing_entries",
+            "block_id": "legacy_handoff_paths_changed",
             "paths": ["docs/handoff/AFS-NEW-TASKRUN.md"],
+            "replacement": "Use docs/AOS_CURRENT_STATE.md or a focused docs/architecture contract.",
         }
     ]
 
@@ -62,8 +63,8 @@ def test_branch_integration_review_blocks_forbidden_artifact_paths() -> None:
         local_base_head="base123",
         base_is_ancestor=True,
         status_text="## codex/afs-project-book-full-goal-20260630...origin/codex/afs-project-book-full-goal-20260630\n",
-        changed_files=["runs/live-smoke.json", "docs/handoff/AFS-OK.md", "apps/studio/assets/generated.png"],
-        handoff_index_text="- `AFS-OK.md`\n",
+        changed_files=["runs/live-smoke.json", "docs/AOS_CURRENT_STATE.md", "apps/studio/assets/generated.png"],
+        handoff_index_text="",
         allowed_untracked=("docs/demo-docs-20260629/",),
     )
 
@@ -85,7 +86,7 @@ def test_branch_integration_review_blocks_unpushed_or_wrong_branch_state() -> No
         base_head="base123",
         local_base_head="base999",
         base_is_ancestor=True,
-        status_text="## master...origin/master\n M DEVLOG.md\n?? scratch.txt\n",
+        status_text="## master...origin/master\n M docs/AOS_CURRENT_STATE.md\n?? scratch.txt\n",
         changed_files=[],
         handoff_index_text="",
         allowed_untracked=("docs/demo-docs-20260629/",),

@@ -29,7 +29,7 @@ def test_studio_client_event_logging_sanitizes_nested_sensitive_fragments(tmp_pa
             "details": {
                 "safe_count": 3,
                 "nested": {
-                    "api_key": "sk-client-event",
+                    "api_key": "sk-fixture-client-event",
                     "authorization": "Bearer nested-client-token",
                     "prompt": r"use C:\Users\chenzy\private\prompt.png",
                     "source_path": r"D:\private\clips\sample.mov",
@@ -49,7 +49,7 @@ def test_studio_client_event_logging_sanitizes_nested_sensitive_fragments(tmp_pa
     assert response.status_code == 200
     combined = _combined_logs(caplog, tmp_path / "logs")
     assert "safe_count" in combined
-    assert "sk-client-event" not in combined
+    assert "sk-fixture-client-event" not in combined
     assert "nested-client-token" not in combined
     assert "raw-access-token" not in combined
     assert "leaked-token" not in combined
@@ -82,7 +82,7 @@ def test_process_file_logging_sanitizes_prompt_path_and_raw_payload_fields(tmp_p
         "video_generation_probe",
         request_id="req_harden",
         project_id="log-hardening",
-        provider_prompt=r"draw from D:\private\asset.png with api_key=sk-process",
+        provider_prompt=r"draw from D:\private\asset.png with api_key=sk-fixture-process",
         details={
             "raw_payload": {"client_secret": "client-secret-value"},
             "nested": {"refresh_token": "refresh-token-value", "safe_label": "kept"},
@@ -96,7 +96,7 @@ def test_process_file_logging_sanitizes_prompt_path_and_raw_payload_fields(tmp_p
     assert "safe_label" in combined
     assert "client-secret-value" not in combined
     assert "refresh-token-value" not in combined
-    assert "sk-process" not in combined
+    assert "sk-fixture-process" not in combined
     assert "api_key" not in combined.lower()
     assert "refresh_token" not in combined.lower()
     assert "client_secret" not in combined.lower()

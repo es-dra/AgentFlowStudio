@@ -3,7 +3,7 @@
   "fixture_claim_level": "deterministic_branch_workflow_package_contract_only",
   "schema_version": "0.1.0",
   "source_branch_package_fixture_path": "tests/fixtures/interactive_manga_branch_package/branch_package_fixture.json",
-  "source_boundary_refs": ["docs/handoff/AFS-T52-SHARED-OBJECT-EVIDENCE-FIXTURE-20260701.md", "docs/handoff/AFS-T53-INTERACTIVE-MANGA-BRANCH-PACKAGE-CONTRACT-20260701.md", "interactive_manga_branch_package_fixture_v0"],
+  "source_boundary_refs": ["docs/AOS_CURRENT_STATE.md", "docs/architecture/AFS_STUDIO_ENTITY_STATUS_VOCABULARY_CONTRACT.md", "interactive_manga_branch_package_fixture_v0"],
   "residual_boundaries": ["pb3_local_package_commit_8296afa31b639224bcb3e7c1f8dea70000ea00b4_review_pending_local_package", "pb3_spec_evaluator_pass_with_residual_risk_implementation_dispatch_candidate", "pb3_stage0_stage1_evaluator_pass_with_residual_risk_stage_review_ready", "stage1_evaluator_system_error_residual"],
   "non_claims": {
     "reader_playback": false,

@@ -43,7 +43,7 @@ jobs:
 
       - name: Maintenance audit
         shell: pwsh
-        run: python tools/maintenance_audit.py
+        run: python tools/maintenance_audit.py --fail-on failed
 
       - name: Tests
         shell: pwsh

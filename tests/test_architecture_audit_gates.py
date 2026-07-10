@@ -8,48 +8,6 @@ SOURCE_ROOTS = ("agentflow", "agentflow_studio", "apps")
 
 KNOWN_AGENTFLOW_STUDIO_IMPORT_DEBT: set[tuple[str, str]] = set()
 
-KNOWN_HIDDEN_COMMAND_DEBT = {
-    "production-memory-loop-asset-profile-context-projection",
-    "production-memory-loop-asset-profile-readiness",
-    "production-memory-loop-capture-operator-feedback",
-    "production-memory-loop-check-operator-manifest",
-    "production-memory-loop-check-operator-run-package",
-    "production-memory-loop-company-kb-candidates",
-    "production-memory-loop-draft-acceptance-feedback-candidate",
-    "production-memory-loop-draft-asset-profile-update-candidate",
-    "production-memory-loop-draft-feedback",
-    "production-memory-loop-draft-next-pass-result-no-provider",
-    "production-memory-loop-draft-operator-feedback-candidate",
-    "production-memory-loop-next-context-handoff",
-    "production-memory-loop-next-operator-start-packet",
-    "production-memory-loop-next-task-packet",
-    "production-memory-loop-operator-handoff-packet",
-    "production-memory-loop-provider-validation-gate",
-    "production-memory-loop-record-acceptance-feedback",
-    "production-memory-loop-record-action-result-acceptance-feedback",
-    "production-memory-loop-record-asset-feedback",
-    "production-memory-loop-record-next-operator-action-result",
-    "production-memory-loop-record-next-operator-start",
-    "production-memory-loop-review-acceptance-feedback-candidate",
-    "production-memory-loop-review-asset-consistency",
-    "production-memory-loop-review-asset-profile-update-candidate",
-    "production-memory-loop-review-next-pass",
-    "production-memory-loop-review-next-pass-promotion",
-    "production-memory-loop-review-operator-feedback-candidate",
-    "production-memory-loop-review-promotion",
-    "production-memory-loop-run-acceptance-feedback-candidate-reviewed-no-provider",
-    "production-memory-loop-run-asset-test-package",
-    "production-memory-loop-run-next-pass-reviewed-feedback-no-provider",
-    "production-memory-loop-run-no-provider",
-    "production-memory-loop-run-operator-feedback-candidate-reviewed-no-provider",
-    "production-memory-loop-run-operator-no-provider",
-    "production-memory-loop-run-real-asset-test-harness",
-    "production-memory-loop-run-reviewed-feedback-no-provider",
-    "production-memory-loop-session-report",
-    "production-memory-loop-two-round-context-runtime-validation",
-    "production-memory-loop-validate",
-}
-
 def test_runtime_service_does_not_depend_on_cli_or_legacy_web_bridge() -> None:
     forbidden = _import_pairs(Path("apps/api"), ("apps.cli", "apps.web_bridge"))
 
@@ -78,10 +36,10 @@ def test_package_level_cycles_are_not_allowed() -> None:
     assert cycles == set()
 
 
-def test_hidden_cli_surface_debt_is_frozen() -> None:
+def test_hidden_cli_surface_debt_is_removed() -> None:
     actual = _hidden_cli_commands()
 
-    assert actual <= KNOWN_HIDDEN_COMMAND_DEBT
+    assert actual == set()
 
 
 def test_no_new_numbered_memory_advantage_demo_modules() -> None:
@@ -180,7 +138,7 @@ def _package_cycles(edges: dict[str, set[str]]) -> list[set[str]]:
 
 def _hidden_cli_commands() -> set[str]:
     names: set[str] = set()
-    for path in (Path("apps/cli/production_memory_command_registry.py"),):
+    for path in Path("apps/cli").glob("*command_registry.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):

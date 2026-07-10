@@ -4,6 +4,7 @@ import { el } from "../overlay.js";
 import { assetsFromNode } from "../asset-reference-summary.js";
 import { blockedReasonForNode, nextActionForNode, statusLineForNode } from "../generation-status-view.js";
 import { keyframeSourceEvidenceTraceSummaryText } from "../keyframe-source-evidence-trace.js";
+import { studioStatusLabel } from "../studio-entity-status-vocabulary.js";
 import { algorithmConsoleSection, projectPipelineSection } from "./algorithm-context-panel.js";
 import {
   nodeAssetDecisionText,
@@ -230,22 +231,7 @@ function assetSummary(node) {
 }
 
 function statusText(status) {
-  return {
-    complete: "已完成",
-    generated: "已完成",
-    succeeded: "已完成",
-    success: "已完成",
-    ready: "待生成",
-    generating: "生成中",
-    partial: "partially_complete",
-    running: "生成中",
-    pending: "排队中",
-    blocked: "已阻塞",
-    error: "失败",
-    failed: "失败",
-    cancelled: "已取消",
-    empty: "草稿",
-  }[status] || "草稿";
+  return studioStatusLabel(status, "草稿");
 }
 
 function providerLabel(value) {

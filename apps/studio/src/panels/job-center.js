@@ -59,7 +59,7 @@ function jobCard(state, store, node, compact = false) {
     `<small>${escapeHtml(jobSummary(node, compact))}</small>`,
   ].join("");
   card.appendChild(main);
-  card.appendChild(el("span", "job-state", summary.displayStatus));
+  card.appendChild(el("span", "job-state", summary.displayLabel || summary.displayStatus));
   card.addEventListener("click", () => {
     store.set((s) => { s.selection = { nodeIds: [node.id], edgeId: null }; }, { history: false, persist: false });
     if (compact) openCreationProcessPanel(state, node);
@@ -150,7 +150,7 @@ function jobSummary(node, compact) {
   if (node.params?.lastVideoJobId) return `视频任务 ${node.params.lastVideoJobId}${suffix}`;
   if (node.params?.lastKeyframeJobId) return `关键帧任务 ${node.params.lastKeyframeJobId}${suffix}`;
   if (node.params?.lastVideoArtifactId) return `输出 ${node.params.lastVideoArtifactId}${suffix}`;
-  if (node.status === "partial") return `partial result preserved${suffix}`;
+  if (node.status === "partial") return `partially_complete · partial result preserved${suffix}`;
   if (compact && node.previewUrl) return "已有预览";
   return node.result ? String(node.result).slice(0, 80) : "本地草稿";
 }

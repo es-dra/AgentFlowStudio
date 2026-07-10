@@ -57,6 +57,10 @@ HIGH_CONFIDENCE_SECRET_PATTERNS = (
     re.compile(r"BEGIN [A-Z ]*PRIVATE KEY"),
 )
 
+SAFE_HIGH_CONFIDENCE_SECRET_FIXTURE_PATTERNS = (
+    re.compile(r"sk-(?:test|fixture)-[A-Za-z0-9_\-]{4,}"),
+)
+
 SECRET_FIELD_PATTERNS = (
     re.compile(r"api[_-]?key\s*(?::|=(?!=))", re.IGNORECASE),
     re.compile(r"token\s*(?::|=(?!=))", re.IGNORECASE),
@@ -80,40 +84,3 @@ KNOWN_SAFE_SECRET_FIXTURES = {
     "sk-test-secret-value",
     "token=abc",
 }
-
-HISTORICAL_SUMMARY_PATH = "docs/archive/HISTORICAL_DOCS_SUMMARY.zh-CN.md"
-
-HISTORICAL_DOC_PREFIXES = (
-    "docs/company-kb-feedback-candidates/",
-    "docs/handoff/",
-    "docs/maintenance/",
-    "docs/retrospectives/",
-    "docs/strategy/",
-    "docs/task_briefs/",
-    "docs/testing/",
-    "docs/workbench/",
-)
-
-HISTORICAL_DOC_GLOBS = (
-    "docs/afs_delivery_checklist.md",
-    "docs/agent_*.md",
-    "docs/agentflow_*.md",
-    "docs/asset_lifecycle.md",
-    "docs/current_architecture.md",
-    "docs/feedback_contract.md",
-    "docs/golden_*.md",
-    "docs/highlight_detection_design.md",
-    "docs/local_alpha_*.md",
-    "docs/module_boundary.md",
-    "docs/platform_profile_contract.md",
-    "docs/post_v0_1_0_plan.md",
-    "docs/product_*.md",
-    "docs/real_*.md",
-    "docs/run_contract.md",
-    "docs/tool_contracts.md",
-    "docs/video_assembly_design.md",
-    "docs/viral_clip_quality_plan.md",
-    "docs/workflow_plan_contract.md",
-    "docs/workspace_contract.md",
-    "docs/architecture/production_memory_*.md",
-)

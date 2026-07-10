@@ -86,7 +86,6 @@ def collect_branch_integration_review(
     commits = _commit_summaries(repo_root, base_ref)
     diff_stat = diff_numstat_summary(repo_root, base_ref)
     thresholds = build_branch_size_thresholds(commit_count=len(commits), changed_file_count=len(changed_files), insertion_count=diff_stat["insertions"])
-    index_text = _read_text(repo_root / "docs" / "handoff" / "INDEX.md")
     blockers = build_branch_integration_blockers(
         branch=branch,
         expected_branch_prefix=expected_branch_prefix,
@@ -98,7 +97,7 @@ def collect_branch_integration_review(
         base_is_ancestor=base_is_ancestor,
         status_text=status_text,
         changed_files=changed_files,
-        handoff_index_text=index_text,
+        handoff_index_text="",
         allowed_untracked=allowed_untracked,
     )
     return {
@@ -173,9 +172,15 @@ def build_branch_integration_blockers(
     forbidden = [path for path in changed_files if _is_forbidden_changed_path(path)]
     if forbidden:
         blockers.append({"block_id": "forbidden_changed_paths", "paths": forbidden})
-    missing = _handoff_index_missing(_handoff_files(changed_files), handoff_index_text)
-    if missing:
-        blockers.append({"block_id": "handoff_index_missing_entries", "paths": missing})
+    legacy_handoffs = _handoff_files(changed_files)
+    if legacy_handoffs:
+        blockers.append(
+            {
+                "block_id": "legacy_handoff_paths_changed",
+                "paths": legacy_handoffs,
+                "replacement": "Use docs/AOS_CURRENT_STATE.md or a focused docs/architecture contract.",
+            }
+        )
     return blockers
 
 
@@ -201,10 +206,6 @@ def _handoff_files(changed_files: list[str]) -> list[str]:
         for path in changed_files
         if path.startswith("docs/handoff/") and path.endswith(".md") and path != "docs/handoff/INDEX.md"
     ]
-
-
-def _handoff_index_missing(handoff_files: list[str], handoff_index_text: str) -> list[str]:
-    return [path for path in handoff_files if Path(path).name not in handoff_index_text]
 
 
 def _disallowed_status_lines(status_text: str, allowed_untracked: tuple[str, ...]) -> list[str]:

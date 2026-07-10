@@ -2,12 +2,13 @@ import { icon } from "./icons.js";
 import { nodeStatusSummary, safePublicText } from "./generation-status-policy.js";
 
 export function statusTokenForNode(node) {
-  return nodeStatusSummary(node).displayStatus;
+  const summary = nodeStatusSummary(node);
+  return summary.canonicalStatus || summary.displayStatus;
 }
 
 export function statusLineForNode(node) {
   const summary = nodeStatusSummary(node);
-  return `${summary.displayStatus} · ${summary.detail}`;
+  return `${summary.displayLabel || summary.displayStatus} · ${summary.detail}`;
 }
 
 export function nextActionForNode(node) {
@@ -26,7 +27,7 @@ export function generationStatusCard(node, options = {}) {
   head.className = "generation-status-card-head";
   head.innerHTML = [
     `<span>${icon(iconForTone(summary.tone), 12)}</span>`,
-    `<strong>${escapeHtml(summary.displayStatus)}</strong>`,
+    `<strong>${escapeHtml(summary.displayLabel || summary.displayStatus)}</strong>`,
   ].join("");
   card.appendChild(head);
   card.appendChild(row("State", summary.detail));

@@ -2,6 +2,7 @@ import { NODE_TYPES, deleteNodes } from "../nodes.js";
 import { visibleCanvasCenter } from "../canvas-safe-area.js";
 import { icon } from "../icons.js";
 import { el } from "../overlay.js";
+import { canonicalStudioStatusId, studioStatusLabel } from "../studio-entity-status-vocabulary.js";
 
 export function renderProjectNavigator(state, store, body) {
   body.appendChild(summaryRow(state));
@@ -91,16 +92,16 @@ function panViewportToNode(viewport, node) {
 }
 
 function statusText(status) {
-  return {
-    complete: "已完成",
-    generating: "生成中",
-    error: "失败",
-    cancelled: "已取消",
-  }[status] || "草稿";
+  return studioStatusLabel(status, "草稿");
 }
 
 function statusClass(status) {
-  return status === "generating" ? "running" : status === "complete" ? "done" : status === "error" ? "failed" : "";
+  const canonical = canonicalStudioStatusId(status, "draft");
+  if (canonical === "running" || canonical === "queued" || canonical === "submitted" || canonical === "retrying") return "running";
+  if (canonical === "succeeded" || canonical === "accepted" || canonical === "fixed") return "done";
+  if (canonical === "failed") return "failed";
+  if (canonical === "partial" || canonical === "cancelled" || canonical === "blocked" || canonical === "needs_attention") return "attention";
+  return "";
 }
 
 function escapeHtml(value) {
