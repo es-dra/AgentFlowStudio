@@ -144,3 +144,44 @@ process.stdout.write(JSON.stringify({ generateCalls, node: state.nodes.video_1 }
     assert "Video preflight blocked" in payload["node"]["result"]
     assert payload["node"]["params"]["videoProviderCapabilities"]["durationSeconds"]["allowed"] == [5, 10]
     assert payload["node"]["params"]["videoProviderCapabilityBlocks"][0]["error"] == "unsupported_duration"
+
+
+def test_studio_video_capabilities_project_generation_path_contracts() -> None:
+    payload = _run_node(
+        r'''
+import {
+  DEFAULT_STUDIO_VIDEO_CAPABILITIES,
+  VIDEO_GENERATION_PATH_CONTRACTS,
+  generationPathContract,
+  normalizeVideoCapabilities,
+} from "./apps/studio/src/presets/video-capabilities.js";
+
+const capabilities = normalizeVideoCapabilities({});
+const t2v = generationPathContract("t2v");
+const i2v = generationPathContract("i2v_first_frame");
+
+process.stdout.write(JSON.stringify({
+  pathIds: Object.keys(VIDEO_GENERATION_PATH_CONTRACTS).sort(),
+  defaultSupportedPaths: DEFAULT_STUDIO_VIDEO_CAPABILITIES.supportedGenerationPaths,
+  normalizedSupportedPaths: capabilities.supportedGenerationPaths,
+  t2v,
+  i2v,
+}));
+'''
+    )
+
+    assert payload["pathIds"] == [
+        "director_to_keyframe",
+        "director_to_video",
+        "i2v_first_frame",
+        "i2v_first_last",
+        "reference_video",
+        "t2v",
+    ]
+    assert payload["defaultSupportedPaths"] == ["i2v_first_frame", "i2v_first_last"]
+    assert payload["normalizedSupportedPaths"] == ["i2v_first_frame", "i2v_first_last"]
+    assert payload["t2v"]["adoptionState"] == "planned"
+    assert payload["t2v"]["safePreflight"]["providerCallsStarted"] is False
+    assert "first_frame_image_asset_id" not in payload["t2v"]["requiredInputs"]
+    assert payload["i2v"]["adoptionState"] == "supported"
+    assert "first_frame_image_asset_id" in payload["i2v"]["requiredInputs"]

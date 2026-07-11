@@ -1,4 +1,75 @@
 export const AFS_VIDEO_DURATION_SECONDS = Array.from({ length: 15 }, (_, index) => index + 1);
+export const GENERATION_PATH_CONTRACT_SCHEMA_VERSION = "afs_generation_path_contract.v1";
+export const DEFAULT_VIDEO_GENERATION_PATH = "i2v_first_frame";
+
+export const VIDEO_GENERATION_PATH_CONTRACTS = Object.freeze({
+  t2v: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "t2v",
+    label: "Text to video",
+    required_inputs: ["prompt_text"],
+    optional_inputs: ["optimized_prompt", "duration_sec", "resolution", "aspect_ratio", "motion", "context_subgraph"],
+    allowed_media_families: { inputs: ["text"], output: "video" },
+    provider_capability: "video.t2v",
+    adoption_state: "planned",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+  i2v_first_frame: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "i2v_first_frame",
+    label: "Image to video from first frame",
+    required_inputs: ["prompt_text", "first_frame_image_asset_id"],
+    optional_inputs: ["optimized_prompt", "input_source", "duration_sec", "resolution", "aspect_ratio", "motion", "context_subgraph"],
+    allowed_media_families: { inputs: ["text", "image"], output: "video" },
+    provider_capability: "video.i2v.first_frame",
+    adoption_state: "supported",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+  i2v_first_last: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "i2v_first_last",
+    label: "Image to video from first and last frames",
+    required_inputs: ["prompt_text", "first_frame_image_asset_id", "last_frame_image_asset_id"],
+    optional_inputs: ["optimized_prompt", "input_source", "duration_sec", "resolution", "aspect_ratio", "motion", "context_subgraph"],
+    allowed_media_families: { inputs: ["text", "image"], output: "video" },
+    provider_capability: "video.i2v.first_last_frame",
+    adoption_state: "supported",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+  reference_video: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "reference_video",
+    label: "Reference video to video",
+    required_inputs: ["prompt_text", "reference_video_artifact_id"],
+    optional_inputs: ["optimized_prompt", "duration_sec", "resolution", "aspect_ratio", "motion", "context_subgraph"],
+    allowed_media_families: { inputs: ["text", "video"], output: "video" },
+    provider_capability: "video.reference_video",
+    adoption_state: "blocked",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+  director_to_keyframe: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "director_to_keyframe",
+    label: "Director setup to keyframe",
+    required_inputs: ["prompt_text", "director_setup"],
+    optional_inputs: ["optimized_prompt", "context_subgraph", "aspect_ratio"],
+    allowed_media_families: { inputs: ["text", "director"], output: "image" },
+    provider_capability: "image.keyframe.director",
+    adoption_state: "supported",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+  director_to_video: {
+    schema_version: GENERATION_PATH_CONTRACT_SCHEMA_VERSION,
+    path_id: "director_to_video",
+    label: "Director setup to video",
+    required_inputs: ["prompt_text", "director_setup"],
+    optional_inputs: ["optimized_prompt", "duration_sec", "resolution", "aspect_ratio", "motion", "context_subgraph"],
+    allowed_media_families: { inputs: ["text", "director"], output: "video" },
+    provider_capability: "video.director",
+    adoption_state: "planned",
+    safety_preflight: { provider_calls_started: false, media_bytes_required_by_preflight: false },
+  },
+});
 
 export const DEFAULT_STUDIO_VIDEO_CAPABILITIES = normalizeVideoCapabilities({
   source: "studio_cached_model_projection",
@@ -6,6 +77,8 @@ export const DEFAULT_STUDIO_VIDEO_CAPABILITIES = normalizeVideoCapabilities({
   supportedInputModes: ["first_frame"],
   supportedResolutions: ["720p"],
   supportedAspectRatios: ["16:9", "9:16"],
+  supportedGenerationPaths: ["i2v_first_frame", "i2v_first_last"],
+  generationPathContracts: VIDEO_GENERATION_PATH_CONTRACTS,
 });
 
 export function videoDurationLabel(seconds) {
@@ -23,6 +96,7 @@ export function normalizeVideoCapabilities(value = {}) {
   const input = objectValue(raw.inputModes || raw.input_modes);
   const resolution = objectValue(raw.resolutions);
   const ratio = objectValue(raw.aspectRatios || raw.aspect_ratios);
+  const generationPathContracts = normalizeGenerationPathContracts(raw.generationPathContracts || raw.generation_path_contracts);
   return {
     source: stringValue(raw.source || raw.capability_source || ""),
     providerServiceId: stringValue(raw.providerServiceId || raw.provider_service_id || ""),
@@ -48,6 +122,13 @@ export function normalizeVideoCapabilities(value = {}) {
       allowed: normalizeStringList(raw.supportedAspectRatios || raw.supported_aspect_ratios || ratio.allowed),
       supported: ratio.supported !== false,
     },
+    supportedGenerationPaths: normalizeStringList(
+      raw.supportedGenerationPaths || raw.supported_generation_paths || supportedGenerationPathIds(generationPathContracts),
+    ),
+    generationPathContract: normalizeGenerationPathContract(
+      raw.generationPathContract || raw.generation_path_contract || raw.generation_path,
+    ),
+    generationPathContracts,
   };
 }
 
@@ -105,6 +186,54 @@ export function videoPreflightBlockMessage(preflight) {
     ? ` Supported values: ${allowed.map((item) => String(item).endsWith("s") ? item : `${item}s`).join(", ")}.`
     : "";
   return `Video preflight blocked before provider submit: ${first.error || first.reason || "unsupported_combination"}.${allowedText} Provider calls not started.`;
+}
+
+export function generationPathContract(pathId = DEFAULT_VIDEO_GENERATION_PATH) {
+  return normalizeGenerationPathContract(
+    VIDEO_GENERATION_PATH_CONTRACTS[stringValue(pathId)] || VIDEO_GENERATION_PATH_CONTRACTS[DEFAULT_VIDEO_GENERATION_PATH],
+  );
+}
+
+export function normalizeGenerationPathContract(value = {}) {
+  const raw = typeof value === "string" ? { path_id: value } : objectValue(value);
+  const fallback = VIDEO_GENERATION_PATH_CONTRACTS[stringValue(raw.pathId || raw.path_id)]
+    || VIDEO_GENERATION_PATH_CONTRACTS[DEFAULT_VIDEO_GENERATION_PATH];
+  const source = { ...fallback, ...raw };
+  const media = objectValue(source.allowedMediaFamilies || source.allowed_media_families);
+  const preflight = objectValue(source.safePreflight || source.safe_preflight);
+  return {
+    schemaVersion: stringValue(source.schemaVersion || source.schema_version || GENERATION_PATH_CONTRACT_SCHEMA_VERSION),
+    pathId: stringValue(source.pathId || source.path_id || fallback.path_id),
+    label: stringValue(source.label || fallback.label),
+    requiredInputs: normalizeStringList(source.requiredInputs || source.required_inputs || fallback.required_inputs),
+    optionalInputs: normalizeStringList(source.optionalInputs || source.optional_inputs || fallback.optional_inputs),
+    allowedMediaFamilies: {
+      inputs: normalizeStringList(media.inputs || fallback.allowed_media_families.inputs),
+      output: stringValue(media.output || fallback.allowed_media_families.output),
+    },
+    providerCapability: stringValue(source.providerCapability || source.provider_capability || fallback.provider_capability),
+    adoptionState: stringValue(source.adoptionState || source.adoption_state || fallback.adoption_state),
+    safePreflight: {
+      providerCallsStarted: Boolean(preflight.providerCallsStarted || preflight.provider_calls_started),
+      mediaBytesRequiredByPreflight: Boolean(preflight.mediaBytesRequiredByPreflight || preflight.media_bytes_required_by_preflight),
+      providerSubmitAllowed: preflight.providerSubmitAllowed ?? preflight.provider_submit_allowed ?? null,
+      preflightBlocked: Boolean(preflight.preflightBlocked || preflight.preflight_blocked),
+    },
+  };
+}
+
+function normalizeGenerationPathContracts(value = {}) {
+  const provided = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const raw = Object.keys(provided).length ? provided : VIDEO_GENERATION_PATH_CONTRACTS;
+  return Object.fromEntries(
+    Object.entries(raw).map(([pathId, contract]) => [pathId, normalizeGenerationPathContract({ path_id: pathId, ...objectValue(contract) })]),
+  );
+}
+
+function supportedGenerationPathIds(contracts) {
+  return Object.values(contracts || {})
+    .filter((contract) => contract?.adoptionState === "supported" && contract?.allowedMediaFamilies?.output === "video")
+    .map((contract) => contract.pathId);
 }
 
 function capabilityPayload(value) {

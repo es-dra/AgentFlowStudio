@@ -156,6 +156,7 @@ def safe_manifest(
     model_call_context_id: str | None = None,
     input_source: dict[str, Any] | None = None,
     input_mode: str | None = None,
+    generation_path_contract: dict[str, Any] | None = None,
     duration_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     safe_blocks = annotate_blocks(blocks)
@@ -195,6 +196,9 @@ def safe_manifest(
         manifest["input_source"] = input_source
     if input_mode:
         manifest["input_mode"] = input_mode
+    if generation_path_contract:
+        manifest["generation_path"] = str(generation_path_contract.get("path_id") or "")
+        manifest["generation_path_contract"] = generation_path_contract
     if duration_contract:
         manifest["duration_contract"] = duration_contract
     if context_bundle:

@@ -8,9 +8,15 @@ from typing import Any
 from agentflow_studio.model_gateway.errors import ModelGatewayError
 from agentflow_studio.model_gateway.provider_adapter import load_provider_registry
 from apps.api.runtime_context_resolver import resolve_context_bundle
+from apps.api.generation_path_contract import generation_path_preflight
 from apps.api.runtime_models import KeyframeGenerationRequest, VideoGenerationRequest
 from apps.api.runtime_prompt_text import strip_user_prompt_section_headers
-from apps.api.runtime_video_contract import video_duration_contract, video_input_mode, video_input_source_contract
+from apps.api.runtime_video_contract import (
+    video_duration_contract,
+    video_generation_path_contract,
+    video_input_mode,
+    video_input_source_contract,
+)
 from apps.api.runtime_store import RuntimeStore, reject_unsafe_payload
 
 
@@ -142,7 +148,10 @@ def _preflight_response(kind: str, request: KeyframeGenerationRequest | VideoGen
 def _video_contract_fields(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> dict[str, Any]:
     if kind != "video" or not isinstance(request, VideoGenerationRequest):
         return {}
+    path_contract = video_generation_path_contract(request)
     return {
+        "generation_path": path_contract["path_id"],
+        "generation_path_contract": path_contract,
         "input_source": video_input_source_contract(request),
         "input_mode": video_input_mode(request),
         "duration_contract": video_duration_contract(request.duration_sec),
@@ -152,10 +161,12 @@ def _video_contract_fields(kind: str, request: KeyframeGenerationRequest | Video
 def _provider_capability_fields(kind: str, request: KeyframeGenerationRequest | VideoGenerationRequest) -> dict[str, Any]:
     if kind != "video" or not isinstance(request, VideoGenerationRequest):
         return {}
+    path_preflight = generation_path_preflight(request)
     limits = _video_provider_capability_limits(request)
-    blocks = _video_unsupported_combination_blocks(limits)
+    blocks = [*path_preflight["blocks"], *_video_unsupported_combination_blocks(limits)]
     return {
         "provider_capability_limits": limits,
+        "generation_path_preflight": path_preflight,
         "preflight_blocked": bool(blocks),
         "blocked_unsupported_combinations": blocks,
     }
@@ -174,6 +185,7 @@ def _video_provider_capability_limits(request: VideoGenerationRequest) -> dict[s
         "source": source,
         "provider_calls_started": False,
         "required_gate": _provider_required_gate("video", request),
+        "generation_path_contract": video_generation_path_contract(request),
         "duration_seconds": {
             "requested": request.duration_sec,
             "allowed": durations,
@@ -235,6 +247,7 @@ def _preflight_token(kind: str, request: KeyframeGenerationRequest | VideoGenera
         "kind": kind,
         "request": request_payload,
         "provider_submit_preflight": provider_submit_preflight_requirement(kind, request),
+        "generation_path_contract": video_generation_path_contract(request) if isinstance(request, VideoGenerationRequest) else None,
         "provider_capability_limits": _provider_capability_fields(kind, request).get("provider_capability_limits"),
         "bundle": _bundle_digest(bundle),
     }
