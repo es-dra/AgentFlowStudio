@@ -216,6 +216,133 @@ def test_active_multi_candidate_retry_keeps_retrying_job_state_until_terminal_re
     subprocess.run(["node", "--input-type=module", "-e", script], check=True)
 
 
+def test_studio_preserves_multi_image_candidate_lists_across_result_and_restore() -> None:
+    script = textwrap.dedent(
+        """
+        import { applyKeyframeResponse } from "./apps/studio/src/node-keyframe-response.js";
+        import { candidatePreviews as canvasCandidatePreviews } from "./apps/studio/src/canvas-node-body.js";
+        import { candidatePreviewItems } from "./apps/studio/src/node-generation-progress.js";
+        import { normalizeSnapshot } from "./apps/studio/src/store-state.js";
+
+        function makeStore(node) {
+          const state = { nodes: { node_1: node }, assets: [] };
+          return {
+            get: () => state,
+            set: (mutator) => mutator(state),
+            nextId: (prefix) => `${prefix}_001`,
+          };
+        }
+
+        function makeNode() {
+          return { id: "node_1", type: "image", title: "Keyframe", prompt: "prompt", params: {} };
+        }
+
+        const projectId = "studio-multi-candidates";
+        const firstUrl = `/projects/${projectId}/keyframe-generations/job_multi_001/candidates/candidate_001/preview`;
+        const secondUrl = `/projects/${projectId}/keyframe-generations/job_multi_001/candidates/candidate_002/preview`;
+
+        const twoSuccess = {
+          job: { status: "succeeded", job_id: "job_multi_001" },
+          safe_manifest: { batch_status: "complete", output_count: 2 },
+          candidate_previews: [
+            { candidate_id: "candidate_001", preview_url: firstUrl, width: 1024, height: 576, aspect_ratio: "16:9" },
+            { candidate_id: "candidate_002", preview_url: secondUrl, width: 1024, height: 576, aspect_ratio: "16:9" },
+          ],
+        };
+
+        const successItems = candidatePreviewItems(twoSuccess);
+        if (successItems.length !== 2 || successItems[1].candidate_id !== "candidate_002") {
+          throw new Error(`expected both successful candidates, got ${JSON.stringify(successItems)}`);
+        }
+
+        const successNode = makeNode();
+        applyKeyframeResponse(makeStore(successNode), "node_1", twoSuccess, { aspect_ratio: "16:9" });
+        if (successNode.status !== "complete" || successNode.previewUrl !== firstUrl) {
+          throw new Error(`two-success response did not keep primary preview/status: ${JSON.stringify(successNode)}`);
+        }
+        if (successNode.params.candidatePreviewUrls?.length !== 2) {
+          throw new Error(`two-success node degraded candidate list: ${JSON.stringify(successNode.params.candidatePreviewUrls)}`);
+        }
+
+        const partialResponse = {
+          job: { status: "failed", job_id: "job_multi_001" },
+          safe_manifest: {
+            batch_status: "partially_complete",
+            output_count: 1,
+            blocks: [{ candidate_id: "candidate_002", reason: "provider temporarily unavailable", failure_class: "provider_timeout" }],
+          },
+          candidate_previews: [
+            { candidate_id: "candidate_001", preview_url: firstUrl, width: 1024, height: 576, aspect_ratio: "16:9" },
+          ],
+          runtime_recovery: {
+            status: "partially_complete",
+            outputs: [
+              { item_id: "candidate_001", state: "complete", preserved: true, preview_url: firstUrl },
+              { item_id: "candidate_002", state: "failed", preserved: false, failure_class: "provider_timeout" },
+            ],
+          },
+        };
+
+        const partialNode = makeNode();
+        applyKeyframeResponse(makeStore(partialNode), "node_1", partialResponse, { aspect_ratio: "16:9" });
+        const partialItems = partialNode.params.candidatePreviewUrls || [];
+        if (partialNode.status !== "partial" || partialNode.params.generationPolicyStatus !== "partially_complete") {
+          throw new Error(`partial response did not expose partial state: ${JSON.stringify(partialNode)}`);
+        }
+        if (partialItems.length !== 2) {
+          throw new Error(`partial response lost failed candidate evidence: ${JSON.stringify(partialItems)}`);
+        }
+        if (partialItems[0].candidate_id !== "candidate_001" || partialItems[0].status !== "succeeded") {
+          throw new Error(`partial response lost successful candidate identity: ${JSON.stringify(partialItems)}`);
+        }
+        if (partialItems[1].candidate_id !== "candidate_002" || partialItems[1].status !== "failed") {
+          throw new Error(`partial response lost failed candidate slot: ${JSON.stringify(partialItems)}`);
+        }
+
+        const restored = normalizeSnapshot({
+          meta: { projectId },
+          nodes: {
+            node_1: {
+              id: "node_1",
+              type: "image",
+              previewUrl: firstUrl,
+              status: "partial",
+              params: { candidatePreviewUrls: partialItems },
+            },
+          },
+          order: ["node_1"],
+        });
+        const restoredItems = restored.nodes.node_1.params.candidatePreviewUrls || [];
+        if (restoredItems.length !== 2 || restoredItems[1].status !== "failed") {
+          throw new Error(`persistence restore degraded candidate list: ${JSON.stringify(restoredItems)}`);
+        }
+
+        const runtimeSanitizedRestore = normalizeSnapshot({
+          meta: { projectId },
+          nodes: {
+            node_1: {
+              id: "node_1",
+              type: "image",
+              previewUrl: firstUrl,
+              status: "partial",
+              params: {
+                candidatePreviewUrls: [{ url: firstUrl, preview_url: firstUrl }],
+                lastGenerationManifest: partialNode.params.lastGenerationManifest,
+              },
+            },
+          },
+          order: ["node_1"],
+        });
+        const rebuiltItems = canvasCandidatePreviews(runtimeSanitizedRestore.nodes.node_1);
+        if (rebuiltItems.length !== 2 || rebuiltItems[0].candidate_id !== "candidate_001" || rebuiltItems[1].status !== "failed") {
+          throw new Error(`runtime-style restore did not rebuild candidate evidence: ${JSON.stringify(rebuiltItems)}`);
+        }
+        """
+    )
+
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
 def test_partial_outputs_are_preserved_and_retry_targets_failed_items_only() -> None:
     keyframe_response = _read("src/node-keyframe-response.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")

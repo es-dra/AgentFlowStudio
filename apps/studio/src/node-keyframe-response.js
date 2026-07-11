@@ -1,6 +1,6 @@
 import { mergeImageAssets, resizeNodeForImagePreview } from "./node-image-assets.js";
 import { visibleAssetForNode } from "./node-visible-assets.js";
-import { updateNodeGenerationState } from "./node-generation-progress.js";
+import { firstCandidatePreview, updateNodeGenerationState } from "./node-generation-progress.js";
 import { isKeyframeInProgress, keyframeResultText } from "./node-generation-results.js";
 import { reconcileVisualAssetBadges } from "./node-generation-context.js";
 import { keyframeSourceEvidenceTrace } from "./keyframe-source-evidence-trace.js";
@@ -12,7 +12,7 @@ export function applyKeyframeResponse(store, nodeId, response, request, options 
     const n = s.nodes[nodeId];
     if (!n) return;
     const reusableAsset = response?.reusable_image_assets?.[0] || null;
-    const preview = response?.candidate_previews?.[0] || previewFromReusableAsset(reusableAsset);
+    const preview = firstCandidatePreview(response) || previewFromReusableAsset(reusableAsset);
     const outputCount = Number(response?.safe_manifest?.output_count || 0);
     const succeeded = status === "succeeded";
     const partial = !succeeded && !inProgress && Boolean(preview?.preview_url || reusableAsset?.preview_url || outputCount > 0);

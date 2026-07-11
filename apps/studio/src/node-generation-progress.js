@@ -1,4 +1,4 @@
-import { responseStatusSummary } from "./generation-status-policy.js";
+import { responseStatusSummary, safePublicText } from "./generation-status-policy.js";
 
 const KIND_LABELS = {
   asset: "资产图生成",
@@ -79,27 +79,125 @@ export function updateNodeGenerationState(node, response, options = {}) {
 }
 
 export function candidatePreviewItems(response) {
+  const candidates = [];
+  const byKey = new Map();
+  const blocks = candidateFailureBlocks(response);
+  const recoveryOutputs = Array.isArray(response?.runtime_recovery?.outputs) ? response.runtime_recovery.outputs : [];
+  for (const output of recoveryOutputs) {
+    addCandidatePreview(candidates, byKey, normalizeRecoveryCandidate(output, blocks));
+  }
   const raw = Array.isArray(response?.candidate_previews) ? response.candidate_previews : [];
-  return raw
-    .map((item) => normalizeCandidatePreview(item))
-    .filter((item) => item.url);
+  for (const item of raw) {
+    addCandidatePreview(candidates, byKey, normalizeCandidatePreview(item));
+  }
+  if (!recoveryOutputs.length) {
+    for (const block of blocks) addCandidatePreview(candidates, byKey, normalizeFailedCandidate(block));
+  }
+  return candidates.filter(hasCandidateEvidence);
 }
 
 export function firstCandidatePreview(response) {
-  return candidatePreviewItems(response)[0] || null;
+  return candidatePreviewItems(response).find((item) => item.url || item.preview_url) || null;
 }
 
 function normalizeCandidatePreview(item) {
-  if (typeof item === "string") return { url: item };
+  if (typeof item === "string") return { url: item, preview_url: item, status: "succeeded" };
   const url = item?.preview_url || item?.url || "";
   return {
+    candidate_id: safeCandidateId(item?.candidate_id || item?.item_id || item?.id),
     url,
     preview_url: item?.preview_url || url,
     width: item?.width || null,
     height: item?.height || null,
     aspect_ratio: item?.aspect_ratio || null,
     artifact_id: item?.artifact_id || null,
+    byte_count: item?.byte_count || null,
+    status: "succeeded",
+    state: "complete",
+    preserved: true,
   };
+}
+
+function normalizeRecoveryCandidate(item, blocks) {
+  if (!item || typeof item !== "object") return null;
+  const candidateId = safeCandidateId(item.item_id || item.candidate_id || item.id);
+  const block = blocks.find((candidateBlock) => safeCandidateId(candidateBlock.candidate_id) === candidateId) || {};
+  const url = item.preview_url || item.image_asset_preview_url || item.url || "";
+  const status = candidateStatus(item.state || item.status);
+  return {
+    candidate_id: candidateId,
+    url,
+    preview_url: url,
+    width: item.width || null,
+    height: item.height || null,
+    aspect_ratio: item.aspect_ratio || null,
+    artifact_id: item.artifact_id || null,
+    image_asset_id: item.image_asset_id || null,
+    byte_count: item.byte_count || null,
+    status,
+    state: item.state || status,
+    preserved: Boolean(item.preserved || status === "succeeded"),
+    failure_class: item.failure_class || block.failure_class || "",
+    reason: safePublicText(item.reason || block.reason || "", 180),
+  };
+}
+
+function normalizeFailedCandidate(block) {
+  if (!block || typeof block !== "object") return null;
+  return {
+    candidate_id: safeCandidateId(block.candidate_id || block.item_id || block.id),
+    status: "failed",
+    state: "failed",
+    preserved: false,
+    failure_class: block.failure_class || block.block_id || "",
+    reason: safePublicText(block.reason || block.message || block.error || "", 180),
+  };
+}
+
+function candidateFailureBlocks(response) {
+  const blocks = Array.isArray(response?.safe_manifest?.blocks) ? response.safe_manifest.blocks : [];
+  return blocks.filter((block) => block && typeof block === "object");
+}
+
+function addCandidatePreview(candidates, byKey, candidate) {
+  if (!hasCandidateEvidence(candidate)) return;
+  const key = candidateKey(candidate, candidates.length);
+  if (byKey.has(key)) {
+    Object.assign(byKey.get(key), mergeCandidatePreview(byKey.get(key), candidate));
+    return;
+  }
+  byKey.set(key, candidate);
+  candidates.push(candidate);
+}
+
+function mergeCandidatePreview(current, next) {
+  const merged = { ...current, ...next };
+  if (!next.url && current.url) merged.url = current.url;
+  if (!next.preview_url && current.preview_url) merged.preview_url = current.preview_url;
+  if (current.status === "succeeded" || next.status === "succeeded") merged.status = "succeeded";
+  if (current.state === "complete" || next.state === "complete") merged.state = "complete";
+  merged.preserved = Boolean(current.preserved || next.preserved || merged.status === "succeeded");
+  return merged;
+}
+
+function candidateKey(candidate, fallbackIndex) {
+  return candidate.candidate_id || candidate.url || candidate.preview_url || `candidate_${fallbackIndex + 1}`;
+}
+
+function hasCandidateEvidence(candidate) {
+  return Boolean(candidate && (candidate.url || candidate.preview_url || candidate.candidate_id || candidate.status));
+}
+
+function candidateStatus(value) {
+  const status = String(value || "").trim().toLowerCase();
+  if (["complete", "completed", "success", "succeeded", "preserved"].includes(status)) return "succeeded";
+  if (["failed", "failure", "error", "timeout", "timed_out"].includes(status)) return "failed";
+  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(status)) return status;
+  return "";
+}
+
+function safeCandidateId(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
 }
 
 function progressPercent(response, status, override) {

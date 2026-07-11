@@ -247,17 +247,42 @@ function sanitizePreviewList(value, projectId) {
 function sanitizeCandidatePreviews(value, projectId) {
   if (!Array.isArray(value)) return [];
   return value
-    .map((item) => {
-      if (typeof item === "string") {
-        const url = safeRuntimePreviewUrl(item, projectId);
-        return url ? { url, preview_url: url } : null;
-      }
-      const next = sanitizePreviewObject(item, projectId);
-      if (!next?.preview_url) return null;
-      next.url = next.preview_url;
-      return next;
-    })
-    .filter(Boolean);
+    .map((item) => sanitizeCandidatePreview(item, projectId))
+    .filter(Boolean)
+    .slice(0, 9);
+}
+
+function sanitizeCandidatePreview(item, projectId) {
+  if (typeof item === "string") {
+    const url = safeRuntimePreviewUrl(item, projectId);
+    return url ? { url, preview_url: url, status: "succeeded" } : null;
+  }
+  if (!item || typeof item !== "object") return null;
+  const source = stripForbiddenRawProviderFields(item);
+  const previewUrl = safeRuntimePreviewUrl(source.preview_url || source.url, projectId);
+  const candidate = stripEmpty({
+    candidate_id: safeToken(source.candidate_id || source.item_id || source.id, 40),
+    status: safeCandidateStatus(source.status || source.state),
+    state: safeCandidateState(source.state),
+    artifact_id: safeToken(source.artifact_id, 160),
+    image_asset_id: safeToken(source.image_asset_id || source.asset_id, 160),
+    failure_class: safeToken(source.failure_class || source.block_id, 80),
+    reason: safePublicStatusText(source.reason || source.message || source.error, 180),
+    width: safeOptionalCount(source.width),
+    height: safeOptionalCount(source.height),
+    byte_count: safeOptionalCount(source.byte_count),
+    aspect_ratio: safeShortText(source.aspect_ratio, 20),
+    preserved: Boolean(source.preserved),
+  });
+  if (previewUrl) {
+    candidate.preview_url = previewUrl;
+    candidate.url = previewUrl;
+    if (!candidate.status) candidate.status = "succeeded";
+    if (!candidate.state) candidate.state = "complete";
+    candidate.preserved = true;
+  }
+  if (!candidate.preview_url && !candidate.candidate_id && !candidate.status) return null;
+  return candidate;
 }
 
 function sanitizePreviewObject(item, projectId) {
@@ -511,6 +536,11 @@ function safeCount(value) {
   return Math.max(0, Math.min(999999, Math.round(number)));
 }
 
+function safeOptionalCount(value) {
+  if (value == null || value === "") return null;
+  return safeCount(value);
+}
+
 function safeNumber(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
@@ -526,6 +556,20 @@ function stripEmpty(value) {
     result[key] = item;
   }
   return result;
+}
+
+function safeCandidateStatus(value) {
+  const normalized = safeToken(value, 40).toLowerCase();
+  if (["complete", "completed", "success", "succeeded", "preserved"].includes(normalized)) return "succeeded";
+  if (["failed", "failure", "error", "timeout", "timed_out"].includes(normalized)) return "failed";
+  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(normalized)) return normalized;
+  return "";
+}
+
+function safeCandidateState(value) {
+  const normalized = safeToken(value, 40).toLowerCase();
+  if (["complete", "completed", "failed", "blocked", "retryable", "cancelled", "partial"].includes(normalized)) return normalized;
+  return "";
 }
 
 function sanitizeMediaRefDisplayFields(item) {

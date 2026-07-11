@@ -4,6 +4,7 @@ import { icon } from "./icons.js";
 import { bindAssetMentionSuggestions } from "./mention-suggestions.js";
 import { canRunNodeGeneration } from "./node-actions.js";
 import { generationStatusCard } from "./generation-status-view.js";
+import { candidatePreviewsFromNode } from "./node-candidate-previews.js";
 import { bundleSummary, resultView } from "./node-result-view.js";
 import { studioStatusLabel } from "./studio-entity-status-vocabulary.js";
 
@@ -29,11 +30,7 @@ export function buildNodeBody(node, def, store = null) {
 }
 
 export function candidatePreviews(node) {
-  const raw = node.params?.candidatePreviewUrls || node.params?.candidate_previews || node.params?.candidates || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => (typeof item === "string" ? { url: item } : item))
-    .filter((item) => item?.url || item?.preview_url);
+  return candidatePreviewsFromNode(node);
 }
 
 export function generationProgress(node) {
@@ -74,7 +71,11 @@ export function nodeBodySignature(node) {
     node.result ? node.result.length : 0,
     node.previewUrl || "",
     node.params?.previewAspectRatio || "",
-    candidatePreviews(node).map((item) => item.url || item.preview_url || "").join(","),
+    candidatePreviews(node).map((item) => [
+      item.candidate_id || "",
+      item.status || item.state || "",
+      item.url || item.preview_url || "",
+    ].join(":")).join(","),
     generationProgress(node)?.percent ?? "",
     node.params?.visualAssets?.length || 0,
     node.params?.lastContextBundle?.included_assets?.length || 0,
