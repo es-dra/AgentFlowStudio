@@ -12,6 +12,8 @@
   min-width: 0;
   overflow: hidden;
   background: #0b0d10;
+  border: 0;
+  color: var(--text-secondary);
 }
 
 .candidate-card img {
@@ -23,6 +25,35 @@
 
 .candidate-card:hover img {
   transform: scale(1.03);
+}
+
+.candidate-card.failed,
+.candidate-card.blocked,
+.candidate-card.needs_attention,
+.candidate-card.retryable,
+.candidate-card.partial,
+.candidate-card.cancelled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 170, 90, 0.42);
+  background: rgba(255, 170, 90, 0.08);
+}
+
+.candidate-card:disabled {
+  cursor: default;
+}
+
+.candidate-empty {
+  display: block;
+  max-width: calc(100% - 14px);
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #ffc285;
 }
 
 .candidate-badge {

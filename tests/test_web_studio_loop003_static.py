@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import subprocess
+import textwrap
+
 from studio_static_helpers import STUDIO_ROOT
 
 def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_markers() -> None:
@@ -13,16 +16,37 @@ def test_loop003_qal003_002_generated_image_promotion_entries_have_regression_ma
         )
     )
     node_actions = (STUDIO_ROOT / "src" / "node-actions.js").read_text(encoding="utf-8")
-    keyframe_actions = (STUDIO_ROOT / "src" / "node-keyframe-actions.js").read_text(encoding="utf-8")
+    candidate_previews = (STUDIO_ROOT / "src" / "node-candidate-previews.js").read_text(encoding="utf-8")
     keyframe_response = (STUDIO_ROOT / "src" / "node-keyframe-response.js").read_text(encoding="utf-8")
-    keyframe_generation = keyframe_actions + keyframe_response
     visual_asset_panel = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel.js").read_text(encoding="utf-8")
     visual_asset_render = (STUDIO_ROOT / "src" / "panels" / "visual-asset-panel-render.js").read_text(encoding="utf-8")
 
     assert 'data-action="fix-visual-asset"' in canvas_view
     assert "fixNodeVisualAsset" in node_actions
-    assert "candidate_previews" in keyframe_generation
-    assert "reusable_image_assets" in keyframe_generation
+    assert "candidatePreviewsFromNode" in candidate_previews
+    assert "candidate_id" in candidate_previews
+    assert "lastGenerationManifest" in candidate_previews
+    assert "reusable_image_assets" in keyframe_response
+    script = textwrap.dedent(
+        """
+        import { candidatePreviewsFromNode } from "./apps/studio/src/node-candidate-previews.js";
+
+        const previews = candidatePreviewsFromNode({
+          params: {
+            candidatePreviewUrls: [
+              { url: "/projects/p/keyframe-generations/j/candidates/candidate_001/preview" },
+            ],
+            lastGenerationManifest: {
+              blocks: [{ candidate_id: "candidate_002", reason: "provider temporarily unavailable" }],
+            },
+          },
+        });
+        if (previews.length !== 2 || previews[0].candidate_id !== "candidate_001" || previews[1].status !== "failed") {
+          throw new Error(`candidate preview reconstruction failed: ${JSON.stringify(previews)}`);
+        }
+        """
+    )
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
     assert 'initialAssetType: assetType' in drawer
     assert 'initialAssetType = "character"' in visual_asset_panel
     assert 'data-action="draft-card"' in visual_asset_render
