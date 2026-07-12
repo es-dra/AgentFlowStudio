@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from hashlib import sha256
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -63,7 +64,9 @@ def _to_jsonable(data: Any) -> Any:
 
 
 def _lock_path(path: Path) -> Path:
-    return path.with_name(f"{path.name}.lock")
+    lock_identity = os.path.normcase(path.name) if os.name == "nt" else path.name
+    digest = sha256(lock_identity.encode("utf-8")).hexdigest()
+    return path.with_name(f".json-lock-{digest}.lock")
 
 
 def _lock_handle(handle: Any) -> None:

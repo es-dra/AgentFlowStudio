@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agentflow.harness.json_io import exclusive_file_lock, write_json
+from agentflow.harness.json_io import _lock_path, exclusive_file_lock, write_json
 
 
 def _system_path(path: Path) -> str:
@@ -32,7 +32,12 @@ def _long_directory(tmp_path: Path) -> Path:
 def _long_json_filename() -> str:
     filename = ("state-" + ("y" * 232)) + ".json"
     assert len(filename) == 243
-    assert len(filename + ".lock") <= 255
+    return filename
+
+
+def _maximum_length_json_filename() -> str:
+    filename = ("state-" + ("z" * 244)) + ".json"
+    assert len(filename) == 255
     return filename
 
 
@@ -48,7 +53,7 @@ def test_write_json_atomic_concurrent_writes_keep_valid_json(tmp_path) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(payload["index"], int)
     assert payload["values"] == list(range(25))
-    assert (tmp_path / "state.json.lock").exists()
+    assert _lock_path(tmp_path / "state.json").exists()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows long-path semantics")
@@ -61,7 +66,7 @@ def test_write_json_supports_windows_long_paths_without_temp_residue(tmp_path) -
     with open(_system_path(path), encoding="utf-8") as handle:
         assert json.load(handle) == {"status": "ready", "value": 7}
     assert returned == path
-    assert os.path.exists(_system_path(directory / f"{path.name}.lock"))
+    assert os.path.exists(_system_path(_lock_path(path)))
     with os.scandir(_system_path(directory)) as entries:
         assert not [entry.name for entry in entries if entry.name.endswith(".tmp")]
 
@@ -83,6 +88,18 @@ def test_write_json_concurrent_writes_support_windows_long_paths(tmp_path) -> No
     assert payload["values"] == list(range(25))
     with os.scandir(_system_path(directory)) as entries:
         assert not [entry.name for entry in entries if entry.name.endswith(".tmp")]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows filename boundary semantics")
+def test_write_json_supports_maximum_length_windows_filename(tmp_path) -> None:
+    path = tmp_path / _maximum_length_json_filename()
+
+    write_json(path, {"status": "ready"})
+
+    with open(_system_path(path), encoding="utf-8") as handle:
+        assert json.load(handle) == {"status": "ready"}
+    assert len(_lock_path(path).name) <= 255
+    assert os.path.exists(_system_path(_lock_path(path)))
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows long-path semantics")
