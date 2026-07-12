@@ -130,10 +130,14 @@ def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> 
     assert "runtime.authStatus()" in runtime_status
     assert "providerGateSummary" in runtime_status
     assert "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed." in runtime_status
+    assert "Runtime service ready" in runtime_status
+    assert "boundaryLabel" in runtime_status
     assert "runtimeSurfaceStatus" in topbar
     assert "runtimeStatusBadge" in topbar
     assert "safeRuntimeStatusState" in topbar
     assert "runtime-status-badge" in topbar
+    assert "runtime-status-gates" in topbar
+    assert "runtime-status-boundary" in topbar
     assert "data-state" in topbar or "dataset.state" in topbar
     assert ".runtime-status-badge.ready" in styles
     assert ".runtime-status-badge.unavailable" in styles

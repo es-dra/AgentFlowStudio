@@ -114,14 +114,18 @@ function runtimeStatusBadge(status) {
   const state = safeRuntimeStatusState(status?.state);
   const label = String(status?.label || "Runtime unknown");
   const authLabel = String(status?.authLabel || "Auth unknown");
+  const providerGateLabel = String(status?.providerGateLabel || "Provider gates unknown");
+  const boundaryLabel = String(status?.boundaryLabel || "Health only");
   const badge = el("span", `runtime-status-badge ${state}`);
   badge.dataset.state = state;
   badge.appendChild(el("span", "runtime-status-dot"));
   badge.appendChild(el("span", "runtime-status-label", label));
   badge.appendChild(el("span", "runtime-status-meta", authLabel));
+  badge.appendChild(el("span", "runtime-status-meta runtime-status-gates", providerGateLabel));
+  badge.appendChild(el("span", "runtime-status-boundary", boundaryLabel));
   badge.title = status?.detail || [
     authLabel,
-    status?.providerGateLabel,
+    providerGateLabel,
     "Service health only; provider smoke, generated-media QA, human acceptance, and public readiness are not claimed.",
   ].filter(Boolean).join(" | ");
   return badge;

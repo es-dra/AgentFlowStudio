@@ -64,7 +64,7 @@
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .runtime-status-badge {
   height: 26px;
-  max-width: 300px;
+  max-width: min(520px, 48vw);
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -85,13 +85,17 @@
   background: var(--text-faint);
 }
 .runtime-status-label,
-.runtime-status-meta {
+.runtime-status-meta,
+.runtime-status-boundary {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .runtime-status-meta {
   color: var(--text-faint);
+}
+.runtime-status-boundary {
+  color: var(--energy);
 }
 .runtime-status-badge.ready {
   border-color: rgba(56, 212, 192, 0.34);
@@ -149,7 +153,8 @@
   .runtime-status-badge {
     max-width: 176px;
   }
-  .runtime-status-meta {
+  .runtime-status-meta,
+  .runtime-status-boundary {
     display: none;
   }
 }

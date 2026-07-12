@@ -53,14 +53,14 @@ def test_accepted_plan_copy_keeps_non_claim_boundaries_explicit() -> None:
         "not_package_complete",
         "not_provider_pass",
         "not_human_acceptance",
-        "Plan step-gate evidence recorded for review",
-        "not package complete, not human acceptance",
-        '["Provider pass", "not claimed"]',
-        '["Media QA", "not claimed"]',
-        '["Human acceptance", "not claimed"]',
-        '["Package complete", "not claimed"]',
-        '["Product readiness", "not claimed"]',
-        '["Business validation", "not claimed"]',
+        "计划步骤门证据已记录，等待复核",
+        "未声明包完成或人工接受",
+        '["Provider 通过", "未声明"]',
+        '["媒体 QA", "未声明"]',
+        '["人工接受", "未声明"]',
+        '["包完成", "未声明"]',
+        '["产品就绪", "未声明"]',
+        '["业务验证", "未声明"]',
     ):
         assert marker in panel
 
