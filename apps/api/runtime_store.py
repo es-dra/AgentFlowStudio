@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,7 +10,7 @@ from uuid import uuid4
 
 from agentflow.contracts.project_manifest import validate_project_manifest
 from agentflow.harness.constants import AGENTFLOW_FORBIDDEN_PRIVATE_FRAGMENTS
-from agentflow.harness.json_io import write_json
+from agentflow.harness.json_io import system_path, write_json
 
 
 SAFE_ID_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
@@ -193,7 +194,7 @@ class RuntimeStore:
 
     def register_artifact(self, path: Path, *, role: str) -> dict[str, Any]:
         resolved = Path(path).resolve()
-        if not resolved.exists():
+        if not _path_exists(resolved):
             raise FileNotFoundError(str(path))
         relative_path = resolved.relative_to(self.root.resolve()).as_posix()
         artifact_id = safe_id(str(resolved.relative_to(self.root.resolve()).with_suffix("")))
@@ -235,7 +236,7 @@ class RuntimeStore:
             payload = read_json(path)
             reject_unsafe_payload(payload)
             return {**ref, "payload": payload}
-        text = path.read_text(encoding="utf-8")
+        text = _read_text(path, encoding="utf-8")
         reject_unsafe_text(text)
         return {**ref, "text": text}
 
@@ -251,9 +252,10 @@ class RuntimeStore:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    json_path = Path(path)
+    payload = json.loads(_read_text(json_path, encoding="utf-8-sig"))
     if not isinstance(payload, dict):
-        raise ValueError(f"{Path(path).name} must be a JSON object")
+        raise ValueError(f"{json_path.name} must be a JSON object")
     return payload
 
 
@@ -308,6 +310,15 @@ def _is_within(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _path_exists(path: Path) -> bool:
+    return os.path.exists(system_path(path))
+
+
+def _read_text(path: Path, *, encoding: str) -> str:
+    with open(system_path(path), encoding=encoding) as handle:
+        return handle.read()
 
 
 def _project_id_from_artifact_relative_path(relative_path: str) -> str:
