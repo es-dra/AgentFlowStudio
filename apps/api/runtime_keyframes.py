@@ -1008,7 +1008,23 @@ def _safe_error(value: str) -> str:
         return "Image relay credential is not ready."
     if "api relay http error" in lowered:
         return "Image relay request failed at the provider HTTP boundary."
-    if any(term in lowered for term in ("api key", "secret", "token", "authorization", "cookie", "bearer ")):
+    if any(
+        term in lowered
+        for term in (
+            "api key",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "secret_key",
+            "client_secret",
+            "signed_url",
+            "secret",
+            "token",
+            "authorization",
+            "cookie",
+            "bearer ",
+        )
+    ):
         return "Image relay configuration is not ready."
     return " ".join(value.split())[:160]
 

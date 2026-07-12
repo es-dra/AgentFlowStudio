@@ -715,6 +715,37 @@ def test_keyframe_generation_redacts_provider_http_error_fragments(tmp_path, mon
     assert "signed_url" not in serialized
 
 
+def test_keyframe_generation_redacts_secret_markers_without_http_prefix(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AFS_ALLOW_REMOTE_IMAGE", "true")
+    monkeypatch.setattr("apps.api.runtime_provider_dispatch.time.sleep", lambda _seconds: None)
+
+    def fake_dispatch(capability, service_id, request):
+        raise ModelGatewayError("provider rejected api_key=private before dispatch")
+
+    monkeypatch.setattr("apps.api.runtime_keyframes.load_provider_registry", lambda: _FakeRegistry(fake_dispatch))
+    client = TestClient(create_runtime_app(runtime_root=tmp_path))
+    request = {
+        "node_id": "image-node-marker-redaction-001",
+        "prompt_text": "A controlled character reference sheet.",
+        "optimized_prompt": "A controlled character reference sheet.",
+        "aspect_ratio": "16:9",
+        "candidate_count": 1,
+        "generated_at": "2026-06-24T15:42:00+08:00",
+    }
+
+    result = _submit_keyframe_with_preflight(client, "proj_keyframe_marker_redaction", request)
+
+    assert result.status_code == 200
+    payload = result.json()
+    manifest = client.get(
+        f"/artifacts/{payload['artifacts']['keyframe_generation_safe_manifest']['artifact_id']}"
+    ).json()["payload"]
+    serialized = json.dumps(manifest, ensure_ascii=False).lower()
+    assert payload["job"]["status"] == "blocked"
+    assert manifest["provider_diagnostics"]["reason"] == "Image relay configuration is not ready."
+    assert "api_key" not in serialized
+
+
 def test_keyframe_prompt_for_image_provider_removes_internal_runtime_terms() -> None:
     prompt = provider_keyframe_prompt(
         "\n".join(
