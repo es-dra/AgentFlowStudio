@@ -22,6 +22,23 @@ const ACTIVE_STATUS_PROGRESS = {
   running: 58,
 };
 const ACTIVE_STATUSES = new Set(["submitted", "pending", "running"]);
+const SAFE_PREVIEW_ROUTE_RE = /^\/projects\/[a-zA-Z0-9_.-]+\/(?:image-assets\/[a-zA-Z0-9_.-]+\/preview|keyframe-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview|video-generations\/[a-zA-Z0-9_.-]+\/candidates\/[a-zA-Z0-9_.-]+\/preview)$/;
+const SAFE_IDENTIFIER_RE = /^[a-zA-Z0-9_.:-]+$/;
+const UNSAFE_IDENTIFIER_FRAGMENT_RE = /(?:authorization|auth|token|secret|credential|api[_-]?key|cookie|session)/i;
+const ALLOWED_FAILURE_CLASSES = new Set([
+  "provider_timeout",
+  "provider_gate_closed",
+  "provider_policy_block",
+  "provider_http_error",
+  "provider_not_ready",
+  "provider_output_missing",
+  "provider_failed",
+  "provider_error",
+  "validation_block",
+  "skipped",
+  "remote_vision_gate_closed",
+  "remote_vision_provider_not_ready",
+]);
 
 export function setSubmittingGenerationState(node, kind, options = {}) {
   const params = ensureParams(node);
@@ -102,57 +119,80 @@ export function firstCandidatePreview(response) {
 }
 
 function normalizeCandidatePreview(item) {
-  if (typeof item === "string") return { url: item, preview_url: item, status: "succeeded" };
-  const url = item?.preview_url || item?.url || "";
-  return {
-    candidate_id: safeCandidateId(item?.candidate_id || item?.item_id || item?.id),
+  if (typeof item === "string") {
+    const url = safePreviewUrl(item);
+    if (!url) return null;
+    return {
+      candidate_id: candidateIdFromUrl(url),
+      url,
+      preview_url: url,
+      status: "succeeded",
+      state: "complete",
+      preserved: true,
+    };
+  }
+  if (!item || typeof item !== "object") return null;
+  const url = firstSafePreviewUrl(item.preview_url, item.url, item.image_asset_preview_url);
+  return compactCandidate({
+    candidate_id: safeCandidateId(item.candidate_id || item.item_id || item.id) || candidateIdFromUrl(url),
     url,
-    preview_url: item?.preview_url || url,
-    width: item?.width || null,
-    height: item?.height || null,
-    aspect_ratio: item?.aspect_ratio || null,
-    artifact_id: item?.artifact_id || null,
-    byte_count: item?.byte_count || null,
+    preview_url: url,
+    width: safeOptionalCount(item.width, 20000),
+    height: safeOptionalCount(item.height, 20000),
+    aspect_ratio: safeAspectRatio(item.aspect_ratio),
+    artifact_id: safeIdentifier(item.artifact_id, 160),
+    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
+    byte_count: safeOptionalCount(item.byte_count, 100000000),
+    attempt_index: safeOptionalCount(item.attempt_index, 9999),
+    requested_count: safeOptionalCount(item.requested_count, 9999),
+    returned_count: safeOptionalCount(item.returned_count, 9999),
     status: "succeeded",
     state: "complete",
     preserved: true,
-  };
+  });
 }
 
 function normalizeRecoveryCandidate(item, blocks) {
   if (!item || typeof item !== "object") return null;
   const candidateId = safeCandidateId(item.item_id || item.candidate_id || item.id);
   const block = blocks.find((candidateBlock) => safeCandidateId(candidateBlock.candidate_id) === candidateId) || {};
-  const url = item.preview_url || item.image_asset_preview_url || item.url || "";
-  const status = candidateStatus(item.state || item.status);
-  return {
+  const url = firstSafePreviewUrl(item.preview_url, item.image_asset_preview_url, item.url);
+  const status = candidateStatus(item.status || item.state || (url ? "succeeded" : ""));
+  const state = candidateState(item.state || item.status || status);
+  return compactCandidate({
     candidate_id: candidateId,
     url,
     preview_url: url,
-    width: item.width || null,
-    height: item.height || null,
-    aspect_ratio: item.aspect_ratio || null,
-    artifact_id: item.artifact_id || null,
-    image_asset_id: item.image_asset_id || null,
-    byte_count: item.byte_count || null,
+    width: safeOptionalCount(item.width, 20000),
+    height: safeOptionalCount(item.height, 20000),
+    aspect_ratio: safeAspectRatio(item.aspect_ratio),
+    artifact_id: safeIdentifier(item.artifact_id, 160),
+    image_asset_id: safeIdentifier(item.image_asset_id || item.asset_id, 160),
+    byte_count: safeOptionalCount(item.byte_count, 100000000),
+    attempt_index: safeOptionalCount(item.attempt_index, 9999),
+    requested_count: safeOptionalCount(item.requested_count, 9999),
+    returned_count: safeOptionalCount(item.returned_count, 9999),
     status,
-    state: item.state || status,
-    preserved: Boolean(item.preserved || status === "succeeded"),
-    failure_class: item.failure_class || block.failure_class || "",
+    state: state || (status === "succeeded" ? "complete" : status),
+    preserved: Boolean(item.preserved || status === "succeeded" || state === "complete"),
+    failure_class: safeFailureClass(item.failure_class || block.failure_class || block.block_id),
     reason: safeReason(item.reason || block.reason || ""),
-  };
+  });
 }
 
 function normalizeFailedCandidate(block) {
   if (!block || typeof block !== "object") return null;
-  return {
+  return compactCandidate({
     candidate_id: safeCandidateId(block.candidate_id || block.item_id || block.id),
     status: "failed",
     state: "failed",
     preserved: false,
-    failure_class: block.failure_class || block.block_id || "",
+    failure_class: safeFailureClass(block.failure_class || block.block_id || block.reason),
     reason: safeReason(block.reason || block.message || block.error || ""),
-  };
+    attempt_index: safeOptionalCount(block.attempt_index, 9999),
+    requested_count: safeOptionalCount(block.requested_count, 9999),
+    returned_count: safeOptionalCount(block.returned_count, 9999),
+  });
 }
 
 function candidateFailureBlocks(response) {
@@ -172,7 +212,11 @@ function addCandidatePreview(candidates, byKey, candidate) {
 }
 
 function mergeCandidatePreview(current, next) {
-  const merged = { ...current, ...next };
+  const merged = { ...current };
+  for (const [key, value] of Object.entries(next)) {
+    if (value === "" || value == null) continue;
+    merged[key] = value;
+  }
   if (!next.url && current.url) merged.url = current.url;
   if (!next.preview_url && current.preview_url) merged.preview_url = current.preview_url;
   if (current.status === "succeeded" || next.status === "succeeded") merged.status = "succeeded";
@@ -190,19 +234,110 @@ function hasCandidateEvidence(candidate) {
 }
 
 function candidateStatus(value) {
-  const status = String(value || "").trim().toLowerCase();
-  if (["complete", "completed", "success", "succeeded", "preserved"].includes(status)) return "succeeded";
-  if (["failed", "failure", "error", "timeout", "timed_out"].includes(status)) return "failed";
-  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(status)) return status;
+  const status = redactedLowerText(value, 80);
+  const normalized = status.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["complete", "completed", "success", "succeeded", "preserved"].includes(normalized)) return "succeeded";
+  if (["failed", "failure", "error", "timeout", "timed_out", "poll_failed"].includes(normalized)) return "failed";
+  if (["blocked", "needs_attention", "cancelled", "retryable", "partial"].includes(normalized)) return normalized;
+  if (/\b(?:complete|completed|success|succeeded|preserved)\b/.test(status)) return "succeeded";
+  if (/\b(?:failed|failure|error|timeout|timed out|timed_out|poll_failed)\b/.test(status)) return "failed";
+  if (/\b(?:blocked|gate)\b/.test(status)) return "blocked";
+  if (/\bneeds[_\s-]?attention\b/.test(status)) return "needs_attention";
+  if (/\bcancel/.test(status)) return "cancelled";
+  if (/\bretry/.test(status)) return "retryable";
+  if (/\bpartial\b/.test(status)) return "partial";
   return "";
 }
 
 function safeCandidateId(value) {
-  return String(value || "").replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+  return safeIdentifier(value, 40);
 }
 
 function safeReason(value) {
   return redactUnsafeText(value, 180);
+}
+
+function candidateState(value) {
+  const state = redactedLowerText(value, 80);
+  const normalized = state.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (["complete", "completed"].includes(normalized)) return "complete";
+  if (/\bcomplete(?:d)?\b/.test(state)) return "complete";
+  return candidateStatus(value);
+}
+
+function safeFailureClass(value) {
+  const text = redactedLowerText(value, 140);
+  if (!text) return "";
+  const normalized = text.replace(/<redacted>/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (ALLOWED_FAILURE_CLASSES.has(normalized)) return normalized;
+  if (text.includes("timeout") || text.includes("timed out")) return "provider_timeout";
+  if (text.includes("gate_closed") || text.includes("gate closed")) return "provider_gate_closed";
+  if (text.includes("policy") || text.includes("copyright")) return "provider_policy_block";
+  if (text.includes("validation") || text.includes("invalid") || text.includes("unsupported")) return "validation_block";
+  if (text.includes("not_ready") || text.includes("not ready") || text.includes("service_not_found")) return "provider_not_ready";
+  if (text.includes("missing")) return "provider_output_missing";
+  if (text.includes("http")) return "provider_http_error";
+  if (text.includes("skipped")) return "skipped";
+  return "provider_failed";
+}
+
+function safeIdentifier(value, limit) {
+  const original = String(value || "").trim();
+  if (!original || original.length > limit) return "";
+  const redacted = redactUnsafeText(original, 512);
+  if (redacted !== original) return "";
+  if (UNSAFE_IDENTIFIER_FRAGMENT_RE.test(original)) return "";
+  return SAFE_IDENTIFIER_RE.test(original) ? original : "";
+}
+
+function firstSafePreviewUrl(...values) {
+  for (const value of values) {
+    const url = safePreviewUrl(value);
+    if (url) return url;
+  }
+  return "";
+}
+
+function safePreviewUrl(value) {
+  const original = String(value || "").trim();
+  if (!original) return "";
+  const redacted = redactUnsafeText(original, 512);
+  if (redacted !== original) return "";
+  return SAFE_PREVIEW_ROUTE_RE.test(original) ? original : "";
+}
+
+function candidateIdFromUrl(url) {
+  const match = String(url || "").match(/\/candidates\/([^/]+)\/preview$/);
+  return safeCandidateId(match?.[1]);
+}
+
+function safeAspectRatio(value) {
+  const original = String(value || "").trim();
+  if (!original || original.length > 20) return null;
+  const redacted = redactUnsafeText(original, 80);
+  if (redacted !== original) return null;
+  const match = original.match(/^([1-9]\d?):([1-9]\d?)$/);
+  return match ? `${Number(match[1])}:${Number(match[2])}` : null;
+}
+
+function safeOptionalCount(value, max) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.min(max, Math.round(number)));
+}
+
+function compactCandidate(candidate) {
+  const result = {};
+  for (const [key, value] of Object.entries(candidate)) {
+    if (value === "" || value == null) continue;
+    result[key] = value;
+  }
+  return result;
+}
+
+function redactedLowerText(value, limit) {
+  return redactUnsafeText(value, limit).toLowerCase();
 }
 
 function progressPercent(response, status, override) {

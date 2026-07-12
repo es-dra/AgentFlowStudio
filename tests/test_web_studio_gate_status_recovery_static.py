@@ -518,6 +518,179 @@ def test_candidate_failure_reasons_are_redacted_before_state_restore_and_dom() -
     subprocess.run(["node", "--input-type=module", "-e", script], check=True)
 
 
+def test_candidate_preview_items_sanitize_adversarial_immediate_state() -> None:
+    script = textwrap.dedent(
+        """
+        import { applyKeyframeResponse } from "./apps/studio/src/node-keyframe-response.js";
+
+        function makeStore(node) {
+          const state = { nodes: { node_1: node }, assets: [] };
+          return {
+            get: () => state,
+            set: (mutator) => mutator(state),
+            nextId: (prefix) => `${prefix}_001`,
+          };
+        }
+
+        function assertNoUnsafe(label, value) {
+          const text = JSON.stringify(value);
+          const forbidden = [
+            "Authorization=TOPSECRET",
+            "TOPSECRET",
+            "token=MYTOKEN",
+            "MYTOKEN",
+            "secret=MYSECRET",
+            "MYSECRET",
+            "api_key=APIKEY",
+            "APIKEY",
+          ];
+          for (const item of forbidden) {
+            if (text.includes(item)) {
+              throw new Error(`${label} leaked ${item}: ${text}`);
+            }
+          }
+          if (text.toLowerCase().includes("api_key")) {
+            throw new Error(`${label} leaked api_key marker: ${text}`);
+          }
+        }
+
+        const allowedStatus = new Set(["succeeded", "failed", "blocked", "needs_attention", "cancelled", "retryable", "partial"]);
+        const allowedState = new Set(["complete", ...allowedStatus]);
+        const safePreviewRoute = /^\\/projects\\/[a-zA-Z0-9_.-]+\\/(?:image-assets\\/[a-zA-Z0-9_.-]+\\/preview|keyframe-generations\\/[a-zA-Z0-9_.-]+\\/candidates\\/[a-zA-Z0-9_.-]+\\/preview|video-generations\\/[a-zA-Z0-9_.-]+\\/candidates\\/[a-zA-Z0-9_.-]+\\/preview)$/;
+        const safeIdentifier = /^[a-zA-Z0-9_.:-]{1,160}$/;
+
+        function assertCandidateAllowlist(candidate, index) {
+          if (candidate.status && !allowedStatus.has(candidate.status)) {
+            throw new Error(`candidate ${index} kept unsafe status: ${JSON.stringify(candidate)}`);
+          }
+          if (candidate.state && !allowedState.has(candidate.state)) {
+            throw new Error(`candidate ${index} kept unsafe state: ${JSON.stringify(candidate)}`);
+          }
+          for (const field of ["candidate_id", "artifact_id", "image_asset_id"]) {
+            if (candidate[field] && !safeIdentifier.test(candidate[field])) {
+              throw new Error(`candidate ${index} kept unsafe ${field}: ${JSON.stringify(candidate)}`);
+            }
+          }
+          for (const field of ["url", "preview_url"]) {
+            if (candidate[field] && !safePreviewRoute.test(candidate[field])) {
+              throw new Error(`candidate ${index} kept unsafe ${field}: ${JSON.stringify(candidate)}`);
+            }
+          }
+          if (candidate.aspect_ratio && !/^\\d{1,2}:\\d{1,2}$/.test(candidate.aspect_ratio)) {
+            throw new Error(`candidate ${index} kept unsafe aspect ratio: ${JSON.stringify(candidate)}`);
+          }
+          for (const field of ["attempt_index", "requested_count", "returned_count"]) {
+            if (field in candidate && (!Number.isInteger(candidate[field]) || candidate[field] < 0 || candidate[field] > 9999)) {
+              throw new Error(`candidate ${index} kept unsafe ${field}: ${JSON.stringify(candidate)}`);
+            }
+          }
+        }
+
+        const unsafe = "Authorization=TOPSECRET token=MYTOKEN secret=MYSECRET api_key=APIKEY";
+        const projectId = "studio-candidate-allowlist";
+        const safeUrl = `/projects/${projectId}/keyframe-generations/job_matrix_001/candidates/candidate_001/preview`;
+        const unsafeUrl = `https://signed.example/private.png?api_key=APIKEY&token=MYTOKEN`;
+        const response = {
+          job: { status: "failed", job_id: "job_matrix_001" },
+          safe_manifest: {
+            batch_status: "partially_complete",
+            output_count: 1,
+            blocks: [
+              {
+                candidate_id: `candidate_002 ${unsafe}`,
+                item_id: `item_${unsafe}`,
+                id: `id_${unsafe}`,
+                block_id: `block_${unsafe}`,
+                reason: unsafe,
+                message: unsafe,
+                error: unsafe,
+                failure_class: `provider_timeout ${unsafe}`,
+                provider_stage: `provider_request ${unsafe}`,
+                required_gate: `gate_${unsafe}`,
+                attempt_index: `2 ${unsafe}`,
+                requested_count: `2 ${unsafe}`,
+                returned_count: `1 ${unsafe}`,
+              },
+            ],
+            provider_diagnostics: {
+              reason: unsafe,
+              failure_class: `provider_timeout ${unsafe}`,
+              provider_stage: `provider_request ${unsafe}`,
+            },
+          },
+          candidate_previews: [
+            {
+              candidate_id: `candidate_001 ${unsafe}`,
+              item_id: `item_${unsafe}`,
+              id: `id_${unsafe}`,
+              preview_url: unsafeUrl,
+              url: unsafeUrl,
+              artifact_id: `artifact_${unsafe}`,
+              image_asset_id: `image_${unsafe}`,
+              width: "1024",
+              height: "576",
+              aspect_ratio: `16:9 ${unsafe}`,
+              attempt_index: `1 ${unsafe}`,
+              requested_count: `2 ${unsafe}`,
+              returned_count: `1 ${unsafe}`,
+            },
+          ],
+          runtime_recovery: {
+            status: "partially_complete",
+            outputs: [
+              {
+                item_id: `candidate_001 ${unsafe}`,
+                state: `complete ${unsafe}`,
+                status: `succeeded ${unsafe}`,
+                preserved: true,
+                preview_url: safeUrl,
+                image_asset_preview_url: unsafeUrl,
+                url: `javascript:alert("${unsafe}")`,
+                artifact_id: `artifact_${unsafe}`,
+                image_asset_id: `image_${unsafe}`,
+                width: "1024",
+                height: "576",
+                aspect_ratio: `16:9 ${unsafe}`,
+                attempt_index: `1 ${unsafe}`,
+                requested_count: `2 ${unsafe}`,
+                returned_count: `1 ${unsafe}`,
+              },
+              {
+                item_id: "candidate_002",
+                state: `failed ${unsafe}`,
+                status: `failed ${unsafe}`,
+                preserved: false,
+                preview_url: unsafeUrl,
+                image_asset_preview_url: unsafeUrl,
+                url: unsafeUrl,
+                artifact_id: `artifact_${unsafe}`,
+                image_asset_id: `image_${unsafe}`,
+                failure_class: `provider_timeout ${unsafe}`,
+                reason: unsafe,
+                aspect_ratio: `1:1 ${unsafe}`,
+                attempt_index: `2 ${unsafe}`,
+                requested_count: `2 ${unsafe}`,
+                returned_count: `1 ${unsafe}`,
+              },
+            ],
+          },
+        };
+
+        const node = { id: "node_1", type: "image", title: "Keyframe", prompt: "prompt", params: {} };
+        applyKeyframeResponse(makeStore(node), "node_1", response, { aspect_ratio: "16:9" });
+        assertNoUnsafe("immediate params", node.params);
+        assertNoUnsafe("immediate result", node.result);
+        assertNoUnsafe("immediate manifest", node.params.lastGenerationManifest);
+        assertNoUnsafe("immediate candidates", node.params.candidatePreviewUrls);
+        for (const [index, candidate] of (node.params.candidatePreviewUrls || []).entries()) {
+          assertCandidateAllowlist(candidate, index);
+        }
+        """
+    )
+
+    subprocess.run(["node", "--input-type=module", "-e", script], check=True)
+
+
 def test_partial_outputs_are_preserved_and_retry_targets_failed_items_only() -> None:
     keyframe_response = _read("src/node-keyframe-response.js")
     keyframe_actions = _read("src/node-keyframe-actions.js")
