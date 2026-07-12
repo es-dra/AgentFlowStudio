@@ -131,7 +131,16 @@
 }
 .save-pill.saved { color: var(--port-out); border-color: rgba(56, 212, 192, 0.34); }
 .save-pill.saving { color: var(--energy); border-color: rgba(245, 196, 81, 0.34); }
+.save-pill.failed { color: var(--danger); border-color: rgba(255, 97, 118, 0.42); }
+.save-pill.failed.conflict { color: var(--energy); border-color: rgba(245, 196, 81, 0.42); }
 .save-pill.local { color: var(--text-faint); }
+.save-pill-button {
+  cursor: pointer;
+  font: inherit;
+}
+.save-pill-button:hover {
+  background: rgba(255, 97, 118, 0.12);
+}
 .topbar-right .icon-btn {
   background: rgba(27, 29, 32, 0.85);
   border: 1px solid var(--border-soft);

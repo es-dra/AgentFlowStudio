@@ -48,6 +48,7 @@ def test_internal_beta_acceptance_contract_keeps_report_safe(tmp_path: Path, mon
     assert steps["feedback_raw_evidence"]["status"] == "passed"
     assert steps["artifact_scope"]["status"] == "passed"
     assert steps["video_gate_closed"]["status"] == "passed"
+    assert steps["auth_logout_rejects_protected_studio_state"]["status"] == "passed"
 
     serialized = json.dumps(report, ensure_ascii=False)
     assert str(tmp_path) not in serialized

@@ -145,12 +145,14 @@ def test_studio_topbar_surfaces_runtime_health_auth_and_non_claim_boundary() -> 
 
 def test_studio_state_save_tracks_runtime_version_conflicts() -> None:
     store_source = (STUDIO_ROOT / "src" / "store.js").read_text(encoding="utf-8")
+    runtime_save_source = (STUDIO_ROOT / "src" / "store-runtime-save.js").read_text(encoding="utf-8")
 
     assert "runtimeStateVersion" in store_source
     assert "payload?.state_version" in store_source
-    assert "saveStudioState(snapshotStudioState(state), runtimeStateVersion)" in store_source
-    assert "error?.status === 409" in store_source
-    assert "项目已在其他窗口更新" in store_source
+    assert "const snapshot = snapshotStudioState(state)" in store_source
+    assert "saveStudioState(snapshot, runtimeStateVersion)" in store_source
+    assert "error?.status === 409" in runtime_save_source
+    assert "项目已在其他窗口更新" in runtime_save_source
     state_source = (STUDIO_ROOT / "src" / "store-state.js").read_text(encoding="utf-8")
     assert "sanitizeSnapshotForPersistence" in state_source
     assert "SAFE_PREVIEW_ROUTE_RE" in state_source
