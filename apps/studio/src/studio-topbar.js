@@ -39,6 +39,7 @@ export function renderTopbar(options) {
   if (topbar.dataset.signature === signature) return;
   topbar.dataset.signature = signature;
   topbar.classList.toggle("drawer-open", state.ui.drawerOpen);
+  topbar.classList.toggle("save-attention", isSaveAttentionState(state.ui.saveState));
   topbar.replaceChildren();
 
   if (!state.ui.drawerOpen) {
@@ -190,6 +191,10 @@ function savePill(state, onRetrySave) {
 
 function isRetryableSaveState(state) {
   return state === "保存失败" || state === "需要登录";
+}
+
+function isSaveAttentionState(state) {
+  return isRetryableSaveState(state) || state === "保存冲突";
 }
 
 function saveClass(state) {
